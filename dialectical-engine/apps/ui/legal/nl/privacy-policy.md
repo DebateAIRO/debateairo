@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: PRIVACYBELEID · v3.3 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: PRIVACYBELEID · v3.4 · VAN KRACHT OP 12 OKTOBER 2026
 title: Wat wij opslaan en waarom
 lede: Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.
-endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.3
+endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Tekst van het privacybeleid
 annexTitle: Bijlage B — Regionale privacybepalingen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.3 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Onze hostingprovider bewaart uw account en uw debatten in Londen, in het Verenigd Koninkrijk; hoofdstuk 5 zegt waar uw gegevens verder naartoe gaan. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw uitgefaseerde pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken.
 
@@ -183,7 +183,7 @@ Dialectical Engine gebruikt 20 items, die alle strikt noodzakelijk zijn voor de 
 | `__Host-debateai-session` | Cookiebestand (HttpOnly) | Houdt u aangemeld. Het cookie wordt verlengd zolang u de dienst gebruikt. | 14 dagen |
 | `__Host-debateai-csrf` | Cookiebestand | Voorkomt dat andere websites namens u formulieren verzenden. | 14 dagen |
 | `__Host-debateai-age-refusal` | Cookiebestand (HttpOnly) | Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. | 30 dagen |
-| `debateai.locale` | Cookiebestand | Onthoudt de interfacetaal die u hebt gekozen. | 1 jaar |
+| `debateai.locale` | Cookiebestand | Onthoudt de interfacetaal die u hebt gekozen, en bepaalt de taal van de e-mails die wij u sturen. | 1 jaar |
 | `__Host-debateai-staff` | Cookiebestand (HttpOnly) | Afzonderlijke medewerkerstoegang | Tot 8 uur; 15 minuten inactiviteit |
 | `__Host-debateai-staff-csrf` | Cookiebestand | Voorkomt dat andere websites namens u formulieren verzenden. | Tot 8 uur; 15 minuten inactiviteit |
 | `__Host-debateai-password-reset` | Cookiebestand (HttpOnly) | Alleen wachtwoordreset | Tot 30 minuten |
@@ -201,6 +201,8 @@ Dialectical Engine gebruikt 20 items, die alle strikt noodzakelijk zijn voor de 
 | `debateai.exportPending` | Sessieopslag | Bewaart de per e-mail ontvangen exportlink in dit tabblad om in te loggen en opnieuw te proberen. | Tot het tabblad sluit, u zich afmeldt, een nieuwe link opent, de eerste download slaagt of een ongeldige link of verkeerd account wordt vastgesteld |
 | `debateai.exportLinkOutcome` | Sessieopslag | Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond. | Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent |
 
+Elke e-mail die wij voor u in de wachtrij zetten, behoudt de taal die u had gekozen totdat wij hem verzenden.
+
 Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen.
 
 Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. Dialectical Engine volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal.
@@ -211,7 +213,7 @@ Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voo
 
 Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie.
 
-Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.3 verving versie 3.2: het beleid behandelt alleen de regio's die wij bedienen, noemt onze vennootschap en, in hoofdstuk 5, onze hosting-, contentleverings- en e-mailaanbieders, en beschrijft de Cloudflare-botcontrole.
+Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.4 verving versie 3.3: hoofdstuk 13 zegt nu dat het cookie debateai.locale ook de taal bepaalt waarin wij de e-mails schrijven die wij u sturen, en voegt een alinea toe die zegt dat elke e-mail die wij voor u in de wachtrij zetten de taal behoudt die u had gekozen totdat wij hem verzenden.
 
 ## Annex B — Regionale privacybepalingen
 

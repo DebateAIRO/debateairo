@@ -211,8 +211,8 @@ describe("0114: a forward step, applied once", () => {
   it("is recorded after 0113 and a second migrate() changes nothing", async () => {
     const steps = (await db().query("SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name")).rows
       .map((row) => row.source_name);
-    // data-export S01 (V-41): the export's 0115 is recorded after 0114.
-    expect(steps.slice(-3)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql"]);
+    // data-export S01 (V-41): the export's 0115 is recorded after 0114; the mail-locale step's 0116 is the tail (S01-C05).
+    expect(steps.slice(-4)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

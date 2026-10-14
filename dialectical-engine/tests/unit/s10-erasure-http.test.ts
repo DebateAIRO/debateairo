@@ -157,7 +157,8 @@ describe("S10 erasure HTTP boundary",()=>{
       status:"SCHEDULED",execute_at:"2026-08-31T00:00:00.000Z",
       cancellation_ref:CANCELLATION_REF,delete_public_debates:false
     });
-    expect(schedule).toHaveBeenCalledWith({ authenticated,grantToken:GRANT_TOKEN });
+    expect(schedule).toHaveBeenCalledWith({ authenticated,grantToken:GRANT_TOKEN,
+      source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-4",userAgent:"s10-test-browser" } });
     await api.close();
   });
   it("rejects every crossed account/run step-up target shape at HTTP parsing",async ()=>{
@@ -224,7 +225,8 @@ describe("S10 erasure HTTP boundary",()=>{
     expect(cancelled.json()).toEqual({ status:"CANCELLED" });
     expect(current).toHaveBeenCalledWith(authenticated);
     expect(cancel).toHaveBeenCalledWith({
-      authenticated,cancellationRef:CANCELLATION_REF
+      authenticated,cancellationRef:CANCELLATION_REF,
+      source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-2",userAgent:"s10-test-browser" }
     });
     await api.close();
   });

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.2 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.3 · VAN KRACHT OP 12 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.2
+endMarker: EINDE VAN DE VOORWAARDEN · v2.3
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.2 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.3 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -114,7 +114,7 @@ Als u twijfelt of iets is toegestaan, vraag het ons voordat u het plaatst.
 
 **Uw inhoud blijft van u.** U behoudt alle rechten die u hebt op de vragen, stellingen, annotaties en betwistingen die u indient. U verleent ons een niet-exclusieve, wereldwijde en royaltyvrije licentie om die inhoud te hosten, op te slaan, te reproduceren, aan te passen en te verwerken ten behoeve van de exploitatie van de dienst: het uitvoeren van het debat, het opslaan ervan zodat u het opnieuw kunt openen en afspelen, het bieden van ondersteuning, het nakomen van onze wettelijke verplichtingen en — uitsluitend als u voor publicatie kiest — de doeleinden van hoofdstuk 9. Deze licentie eindigt wanneer de inhoud wordt verwijderd, behoudens voor zover hoofdstuk 9 of de wet anders vereist.
 
-**Wij trainen niet op uw inhoud.** Wij trainen geen modellen op uw inhoud. Wij gebruiken AI-aanbieders alleen onder voorwaarden die hen niet toestaan uw inhoud te gebruiken om hun modellen te trainen of te verbeteren; het Register van aanbieders toont per aanbieder of wij dit hebben bevestigd, en wanneer.
+**Wij trainen niet op uw inhoud.** Wij gebruiken AI-aanbieders alleen onder voorwaarden die hen niet toestaan uw inhoud te gebruiken om hun modellen te trainen of te verbeteren; het Register van aanbieders toont per aanbieder of wij dit hebben bevestigd, en wanneer.
 
 **Hoe uw inhoud AI-aanbieders bereikt.** Om een debat uit te voeren, sturen wij tekst naar een of meer externe modelaanbieders. Een aanbieder ontvangt uw vraag, de sturende annotaties die u instelt en verklaringen die de engine tijdens het debat opstelt — een aanbieder ziet dus tekst die is afgeleid van en opgebouwd rond wat u hebt ingevoerd, niet alleen uw oorspronkelijke woorden. De aanbieder ontvangt nooit uw e-mailadres, accountidentificatoren, sessiegegevens of betalingsgegevens.
 
@@ -239,7 +239,7 @@ Hoofdstuk 8 behandelt uw inhoud en de status van gegenereerde uitvoer. Als u mee
 
 ## 17. Persoonsgegevens
 
-Hoe wij persoonsgegevens verwerken, staat in het **Privacybeleid** op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op Dialectical Engine gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd.
+Hoe wij persoonsgegevens verwerken, staat in het **Privacybeleid** op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op Dialectical Engine gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd. E-mails die wij u sturen, worden geschreven in de taal die u op onze site hebt gekozen; hoofdstuk 13 van het Privacybeleid legt uit hoe wij die keuze bewaren.
 
 ## 18. Toepasselijk recht en bevoegde rechter
 

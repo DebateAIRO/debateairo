@@ -58,7 +58,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
       "0114_role_rotation.sql",
-      "0115_data_export.sql"
+      "0115_data_export.sql",
+      "0116_mail_locale.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -104,7 +105,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
       "0114_role_rotation.sql",
-      "0115_data_export.sql"
+      "0115_data_export.sql",
+      "0116_mail_locale.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -144,7 +146,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0112_auth_db_batch.sql",
       "0113_billing_price_currencies.sql",
       "0114_role_rotation.sql",
-      "0115_data_export.sql"
+      "0115_data_export.sql",
+      "0116_mail_locale.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));

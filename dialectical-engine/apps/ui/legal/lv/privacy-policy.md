@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PRIVĀTUMA POLITIKA · v3.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PRIVĀTUMA POLITIKA · v3.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Ko mēs glabājam un kāpēc
 lede: Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.
-endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.3
+endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Privātuma politikas teksts
 annexTitle: B pielikums — Reģionālie privātuma noteikumi
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SĪKDATNES
 -->
 
-**Version 3.3 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Mūsu mitināšanas pakalpojumu sniedzējs glabā jūsu kontu un debates Londonā, Apvienotajā Karalistē; 5. sadaļā norādīts, uz kurieni jūsu dati tiek nosūtīti vēl. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta.
 
@@ -183,7 +183,7 @@ Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jū
 | `__Host-debateai-session` | Sīkdatne (HttpOnly) | Saglabā jūsu pierakstīšanās sesiju. Tā tiek atjaunota, kamēr lietojat pakalpojumu. | 14 dienas |
 | `__Host-debateai-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | 14 dienas |
 | `__Host-debateai-age-refusal` | Sīkdatne (HttpOnly) | Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu. | 30 dienas |
-| `debateai.locale` | Sīkdatne | Atceras jūsu izvēlēto saskarnes valodu. | 1 gads |
+| `debateai.locale` | Sīkdatne | Atceras jūsu izvēlēto saskarnes valodu un nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus. | 1 gads |
 | `__Host-debateai-staff` | Sīkdatne (HttpOnly) | Atsevišķa personāla piekļuve | Līdz 8 stundām; 15 minūtes neaktivitātes |
 | `__Host-debateai-staff-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | Līdz 8 stundām; 15 minūtes neaktivitātes |
 | `__Host-debateai-password-reset` | Sīkdatne (HttpOnly) | Tikai paroles atiestatīšana | Līdz 30 minūtēm |
@@ -201,6 +201,8 @@ Dialectical Engine izmanto 20 elementus, kas visi ir absolūti nepieciešami jū
 | `debateai.exportPending` | Sesijas krātuve | Saglabā e-pastā saņemto eksporta saiti šajā cilnē, lai varētu pierakstīties un mēģināt vēlreiz. | Līdz cilnes aizvēršanai, izrakstīšanai, jaunai saitei, pirmajai veiksmīgajai lejupielādei vai nederīgas saites vai nepareiza konta rezultātam |
 | `debateai.exportLinkOutcome` | Sesijas krātuve | Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. | Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei |
 
+Katrs e-pasta ziņojums, ko mēs jums sagatavojam, saglabā valodu, kuru izvēlējāties, līdz mēs to nosūtām.
+
 Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs.
 
 Pārlūkprogrammas var sūtīt signālu “Do Not Track” vai līdzīgu signālu. Dialectical Engine jūs neizseko, tāpēc šādam signālam nav ko izslēgt: pakalpojums darbojas vienādi gan ar to, gan bez tā.
@@ -211,7 +213,7 @@ Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet 
 
 Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju.
 
-Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.3 aizstāja versiju 3.2: tā aptver tikai tos reģionus, kuros sniedzam pakalpojumu, nosauc mūsu uzņēmumu, 5. sadaļā — mūsu mitināšanas, satura piegādes un e-pasta pakalpojumu sniedzējus, kā arī apraksta Cloudflare robotu pārbaudi.
+Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.4 aizstāja versiju 3.3: 13. sadaļā tagad norādīts, ka sīkdatne debateai.locale nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus, un pievienota rindkopa, ka katrs jums sagatavotais e-pasta ziņojums saglabā valodu, kuru izvēlējāties, līdz to nosūtām.
 
 ## Annex B — Reģionālie privātuma noteikumi
 

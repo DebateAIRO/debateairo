@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: DATENSCHUTZERKLÄRUNG · v3.3 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: DATENSCHUTZERKLÄRUNG · v3.4 · GÜLTIG AB 12. OKTOBER 2026
 title: Was wir speichern und warum
 lede: DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.
-endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.3
+endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.4
 bodyLabel: Text der Datenschutzerklärung
 annexTitle: Anhang B – Regionale Datenschutzbestimmungen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.3 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Unser Hostinganbieter speichert Ihr Konto und Ihre Debatten in London im Vereinigten Königreich; Abschnitt 5 nennt, wohin Ihre Daten sonst noch gelangen. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; bei der Planung entscheiden Sie, ob auch Ihre veröffentlichten Debatten entfernt werden oder unter Ihrem stillgelegten Pseudonym öffentlich bleiben. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen.
 
@@ -183,7 +183,7 @@ Dialectical Engine verwendet 20 Elemente, die alle für den von Ihnen angeforder
 | `__Host-debateai-session` | Cookie-Datei (HttpOnly) | Hält Sie angemeldet. Das Cookie wird verlängert, solange Sie den Dienst nutzen. | 14 Tage |
 | `__Host-debateai-csrf` | Cookie-Datei | Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. | 14 Tage |
 | `__Host-debateai-age-refusal` | Cookie-Datei (HttpOnly) | Nach einer abgelehnten Altersprüfung hindert er diesen Browser 30 Tage lang an einem neuen Versuch. Er enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten. | 30 Tage |
-| `debateai.locale` | Cookie-Datei | Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche. | 1 Jahr |
+| `debateai.locale` | Cookie-Datei | Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche und legt die Sprache der E-Mails fest, die wir Ihnen senden. | 1 Jahr |
 | `__Host-debateai-staff` | Cookie-Datei (HttpOnly) | Getrennter Mitarbeiterzugang | Bis zu 8 Stunden; 15 Minuten Inaktivität |
 | `__Host-debateai-staff-csrf` | Cookie-Datei | Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. | Bis zu 8 Stunden; 15 Minuten Inaktivität |
 | `__Host-debateai-password-reset` | Cookie-Datei (HttpOnly) | Nur Passwortzurücksetzung | Bis zu 30 Minuten |
@@ -201,6 +201,8 @@ Dialectical Engine verwendet 20 Elemente, die alle für den von Ihnen angeforder
 | `debateai.exportPending` | Sitzungsspeicher | Bewahrt den per E-Mail gesendeten Exportlink in diesem Tab für Anmeldung und erneute Versuche auf. | Bis zum Schließen des Tabs, zur Abmeldung, zu einem neuen Link, zum ersten erfolgreichen Download oder zu einem Ergebnis für einen ungültigen Link oder ein falsches Konto |
 | `debateai.exportLinkOutcome` | Sitzungsspeicher | Merkt sich, welche Meldung zum Downloadlink in diesem Tab angezeigt werden soll. | Bis zum Schließen des Tabs, zur Abmeldung oder zu einem neuen Link |
 
+Jede E-Mail, die wir für Sie in die Warteschlange stellen, behält die Sprache, die Sie ausgewählt hatten, bis wir sie senden.
+
 Keine andere Partei erhebt über Dialectical Engine Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg.
 
 Browser können ein „Do Not Track“-Signal oder ein ähnliches Signal senden. Dialectical Engine verfolgt Sie nicht, daher gibt es nichts, was ein solches Signal abschalten könnte: Der Dienst funktioniert mit und ohne dieses Signal gleich.
@@ -211,7 +213,7 @@ Um diese Elemente abzulehnen, blockieren oder löschen Sie Cookies und Websiteda
 
 Wenn wir diese Datenschutzerklärung ändern, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und einem neuen Gültigkeitsdatum und bewahren die früheren Fassungen unter dezbatere.ro/privacy/versions auf. Bei einer Änderung, durch die ein neuer Zweck oder ein neuer Empfänger hinzukommt, informieren wir Sie vor Beginn der neuen Verarbeitung per E-Mail und im Produkt und geben Ihnen Zeit zum Widerspruch. Hängt ein neuer Zweck von Ihrer Einwilligung ab – etwa wenn wir Inhalte jemals zur Verbesserung von Modellen nutzen wollten –, holen wir diese Einwilligung gesondert und ausdrücklich ein; die Annahme aktualisierter Nutzungsbedingungen behandeln wir niemals als Einwilligung in eine neue Verarbeitung. Bei Klarstellungen, die nichts an unserem Vorgehen ändern, veröffentlichen wir lediglich die neue Fassung.
 
-Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.3 ersetzte Version 3.2: Sie betrifft nur die Regionen, die wir bedienen, nennt unser Unternehmen sowie in Abschnitt 5 unsere Hosting-, Auslieferungs- und E-Mail-Anbieter und beschreibt die Bot-Prüfung von Cloudflare.
+Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.4 ersetzte Version 3.3: Abschnitt 13 nennt nun, dass das Cookie debateai.locale auch die Sprache festlegt, in der wir die E-Mails schreiben, die wir Ihnen senden, und ein Absatz ergänzt, dass jede E-Mail, die wir für Sie in die Warteschlange stellen, die Sprache behält, die Sie ausgewählt hatten, bis wir sie senden.
 
 ## Annex B — Regionale Datenschutzbestimmungen
 

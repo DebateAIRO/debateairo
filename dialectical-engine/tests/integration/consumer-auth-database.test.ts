@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, PostgresConsumerAuthRepository, PostgresSessionRepository, type Pool } from '@debateai/db';
@@ -83,7 +84,7 @@ async function addGrant(a: Awaited<ReturnType<typeof enrolled>>, action = 'ADD_P
     if (!authenticated)
         throw new Error('SESSION_MISSING');
     const factorId = randomUUID();
-    await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [factorId, a.userId]);
+    await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [factorId, a.userId]));
     const grant = token(), replacement = token(), csrf = token(), sessionRepo = new PostgresSessionRepository(runtime, audit);
     const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId, secretCiphertext: env, lastAcceptedStep: 1 };
     expect(await sessionRepo.rotateAfterStepUp({ identity, currentSessionId: authenticated.session.session_id, currentTokenHash: authenticated.tokenHash, acceptedStep: 2, replacementTokenHash: hashToken('session', replacement), replacementCsrfHash: hashToken('csrf', csrf), bindingContext: { user_agent_hash: sessions.consumerProducer().bindingHash(source) }, occurredAt: new Date(), idleExpiresAt: new Date(Date.now() + 1209600000), source,
@@ -165,7 +166,7 @@ describe('restricted consumer passkey authority', () => {
         for (const mutation of ['revoked', 'hold', 'epoch', 'erasure']) {
             const a = await enrolled(), l = await login(a);
             if (mutation === 'revoked')
-                await database.pool.query('UPDATE identity.consumer_passkey_credential SET revoked_at=clock_timestamp() WHERE user_id=$1', [a.userId]);
+                await withMailLocale(database.pool, 'en', (c) => c.query('UPDATE identity.consumer_passkey_credential SET revoked_at=clock_timestamp() WHERE user_id=$1', [a.userId]));
             if (mutation === 'hold' || mutation === 'epoch')
                 await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,$2,1)', [a.userId, mutation === 'hold']);
             if (mutation === 'erasure')
@@ -199,7 +200,7 @@ describe('restricted consumer passkey authority', () => {
                 if (mutation === 'hold')
                     await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,true,1)', [a.userId]);
                 if (mutation === 'revoked')
-                    await database.pool.query('UPDATE identity.consumer_passkey_credential SET revoked_at=clock_timestamp() WHERE user_id=$1', [a.userId]);
+                    await withMailLocale(database.pool, 'en', (c) => c.query('UPDATE identity.consumer_passkey_credential SET revoked_at=clock_timestamp() WHERE user_id=$1', [a.userId]));
                 if (mutation === 'erased')
                     await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [a.userId]);
                 if (mutation === 'password')
@@ -260,7 +261,7 @@ describe('restricted consumer passkey authority', () => {
             const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), password = 'Consumer passkey fixture password!';
             const passwordHash = await hashPassword(argon2, password, authPolicy.password.argon2id);
             await database.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1', [a.userId, passwordHash]);
-            await database.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())", [factorId, a.userId, encrypt(dek, secret, ['identity', 'mfa_factor.secret_ciphertext', factorId, 'run:none', a.userId, `user-dek:${a.userId}`, '1'])]);
+            await withMailLocale(database.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())", [factorId, a.userId, encrypt(dek, secret, ['identity', 'mfa_factor.secret_ciphertext', factorId, 'run:none', a.userId, `user-dek:${a.userId}`, '1'])]));
             const realSessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => undefined,
                 dekStore: { load: async () => Buffer.from(dek) } as never, argon2, authPolicy, mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: passwordHash });
             const authenticated = (await realSessions.authenticate(a.result.sessionToken, source))!;
@@ -307,7 +308,7 @@ describe('restricted consumer passkey authority', () => {
             if (mutation === 'password')
                 await database.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1', [a.userId, 'different-password']);
             if (mutation === 'method')
-                await database.pool.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1", [g.factorId]);
+                await withMailLocale(database.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1", [g.factorId]));
             if (mutation === 'expiry')
                 await database.pool.query("UPDATE identity.login_challenge SET expires_at=created_at+interval '1 microsecond' WHERE token_hash=$1", [hashToken('login-challenge', continuation)]);
             if (mutation === 'used')
@@ -449,8 +450,8 @@ describe('restricted consumer passkey authority', () => {
 async function seedInventory(userId: string, count: number, idBytes: number) {
     await database.pool.query('DELETE FROM identity.consumer_passkey_credential WHERE user_id=$1', [userId]);
     const ids = Array.from({ length: count }, () => b64(randomBytes(idBytes)));
-    await database.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
-      SELECT $1,id,$3,0,'multiDevice',true,$4,$5 FROM unnest($2::text[]) AS id`, [userId, ids, b64(consumerFixture().k.wire), rpId, origin]);
+    await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
+      SELECT $1,id,$3,0,'multiDevice',true,$4,$5 FROM unnest($2::text[]) AS id`, [userId, ids, b64(consumerFixture().k.wire), rpId, origin]));
 }
 async function beginMutationState(a: {
     userId: string;

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate, RunRepository } from "@debateai/db";
@@ -123,7 +124,7 @@ describe("data export database authority", () => {
     const a = await account();
     const factor = randomUUID(), token = `sha256:${createHash("sha256").update(randomUUID()).digest("hex")}`;
     const identity = (await db.pool.query('SELECT owner_ref,password_hash,audit_token FROM identity."user" WHERE user_id=$1', [a.user])).rows[0];
-    await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())", [factor, a.user]);
+    await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())", [factor, a.user]));
     const currentHash = `sha256:${createHash("sha256").update(a.session).digest("hex")}`;
     const rotated = await asRuntime(client => client.query(`SELECT identity.rotate_session_after_step_up_with_audit(
       $1,$2,$3,$4,2,$5,$6,$7,$8,'{}'::jsonb,clock_timestamp()+interval '1 hour',
@@ -145,8 +146,8 @@ describe("data export database authority", () => {
 
     const credentialId = randomBytes(32).toString("base64url"), handle = randomBytes(32).toString("base64url");
     await db.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)", [a.user, handle]);
-    await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
-      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test','only-key')`, [a.user, credentialId, randomBytes(65).toString("base64url")]);
+    await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
+      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test','only-key')`, [a.user, credentialId, randomBytes(65).toString("base64url")]));
     const challenge = { userId: a.user, sessionId: a.session, tokenHash: hash("b"),
       challengesPerScope: 5, challengeCapacity: 100, handleHash: hash("1"), challengeHash: hash("2"),
       bindingHash: hash("3"), retentionKey: hash("4"), rpId: "example.test", origin: "https://example.test",

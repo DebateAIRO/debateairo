@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Fanann d'ábhar i do sheilbh. Coinníonn tú aon cheart atá agat sna ceisteanna, sna maímh, sna nótaí agus sna dúshláin a chuireann tú isteach. Deonaíonn tú ceadúnas neamheisiach, domhanda agus saor ó ríchíos dúinn chun an t-ábhar sin a óstáil, a stóráil, a atáirgeadh, a oiriúnú agus a phróiseáil chun an tseirbhís a oibriú: an díospóireacht a reáchtáil, í a stóráil ionas gur féidir leat í a athoscailt agus a athsheinm, tacaíocht a sholáthar, ár n-oibleagáidí dlíthiúla a chomhlíonadh, agus — ach amháin má roghnaíonn tú foilsiú — na críocha i rannán 9. Tagann deireadh leis an gceadúnas seo nuair a scriostar an t-ábhar, ach amháin de réir mar a éilíonn rannán 9 nó an dlí." },
-      { kind: "p", text: "Ní dhéanaimid oiliúint ar d'ábhar. Ní dhéanaimid samhlacha a oiliúint ar d'ábhar. Ní úsáidimid soláthraithe IS ach amháin faoi théarmaí nach gceadaíonn dóibh d'ábhar a úsáid chun a samhlacha a oiliúint nó a fheabhsú; léiríonn an Clár Soláthraithe, i gcás gach soláthraí, an ndearna muid é seo a dheimhniú, agus cathain." },
+      { kind: "p", text: "Ní dhéanaimid oiliúint ar d'ábhar. Ní úsáidimid soláthraithe IS ach amháin faoi théarmaí nach gceadaíonn dóibh d'ábhar a úsáid chun a samhlacha a oiliúint nó a fheabhsú; léiríonn an Clár Soláthraithe, i gcás gach soláthraí, an ndearna muid é seo a dheimhniú, agus cathain." },
       { kind: "p", text: "An chaoi a sroicheann d'ábhar soláthraithe IS. Chun díospóireacht a reáchtáil, seolaimid téacs chuig soláthraí seachtrach samhlacha amháin nó níos mó. Is iad do cheist, na nótaí stiúrtha a shocraíonn tú, agus ráitis a chumann an t-inneall le linn na díospóireachta a fhaigheann soláthraí — mar sin feiceann soláthraí téacs a dhíorthaítear ón méid a chlóscríobh tú agus a tógadh timpeall air, ní hamháin do bhunfhocail. Ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais, do thaifid sheisiúin ná do shonraí íocaíochta riamh." },
       { kind: "p", text: "An méid a sheolann an comhrá tacaíochta. Is samhail IS é an cúntóir tacaíochta freisin. Nuair a scríobhann tú chuige, seolaimid do theachtaireacht chuig soláthraí seachtrach samhlacha ionas gur féidir leis an tsamhail freagra a thabhairt, mar aon leis na hailt chabhrach ar a mbunaíonn sí a freagra. Sula seolaimid í, ceilimid aon rud a bhfuil cuma pasfhocail, cóid aonuaire nó eochrach air. Má iarrann tú labhairt le duine, seolaimid an comhrá chuig an tsamhail freisin, ceilte ar an mbealach céanna, ionas go scríobhfaidh sí achoimre ghearr don bhall dár bhfoireann a ghlacfaidh do chás. Ní chuirimid do sheoladh ríomhphoist, d'aitheantóirí cuntais ná do shonraí íocaíochta leis, ach faigheann an tsamhail gach rud eile a chlóscríobhann tú sa chomhrá, mar sin ná scríobh aon rud ansin nach mbeadh uait go léifeadh sí." },
       { kind: "p", text: "Cé hiad na soláthraithe, agus cá bhfuil siad. Is cuid de na Téarmaí seo ár gClár Soláthraithe IS ag dezbatere.ro/providers. Liostaítear ann gach soláthraí a fhéadfaimid a úsáid: a eintiteas dlíthiúil agus a thír; an méid a fhaigheann sé agus an fáth; an áit a bpróiseálann sé; a théarmaí coinneála; an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. D'fhéadfadh soláthraithe a bheith lonnaithe lasmuigh de do thír agus lasmuigh den Limistéar Eorpach Eacnamaíoch. Mínítear na coimircí inár mBeartas Príobháideachais." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sonraí pearsanta",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Leagtar amach sa Bheartas Príobháideachais ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar Dialectical Engine, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais." }
+      { kind: "p", text: "Leagtar amach sa Bheartas Príobháideachais ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar Dialectical Engine, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais. Scríobhtar na ríomhphoist a sheolaimid chugat sa teanga a roghnaigh tú ar ár suíomh; mínítear i rannán 13 den Bheartas Príobháideachais conas a choinnímid an rogha sin." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "25d05c302c1d79987f5c9d7f3e752c4bd03b525b9c0a0110f1b739f33219c076",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.2 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "2.3",
+  sha256: "167f817c2e3d9180bc708a82546bb2dadd7b297bbefa9c54894c26b36868e59a",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.2",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

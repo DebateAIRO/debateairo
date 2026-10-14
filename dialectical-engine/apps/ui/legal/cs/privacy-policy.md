@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.3 · ÚČINNÉ OD 12. ŘÍJNA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.4 · ÚČINNÉ OD 12. ŘÍJNA 2026
 title: Co uchováváme a proč
 lede: Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.
-endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.3
+endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Text zásad ochrany osobních údajů
 annexTitle: Příloha B — Regionální podmínky ochrany osobních údajů
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SOUBORY COOKIE
 -->
 
-**Version 3.3 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Náš poskytovatel hostingu uchovává váš účet a vaše debaty v Londýně ve Spojeném království; oddíl 5 uvádí, kam dále vaše údaje putují. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu.
 
@@ -183,7 +183,7 @@ Dialectical Engine používá 20 položek, všechny nezbytně nutné pro službu
 | `__Host-debateai-session` | Soubor cookie (HttpOnly) | Udržuje vás přihlášené. Během používání služby se průběžně obnovuje. | 14 dní |
 | `__Host-debateai-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | 14 dní |
 | `__Host-debateai-age-refusal` | Soubor cookie (HttpOnly) | Po zamítnuté kontrole věku zabrání tomuto prohlížeči pokusit se znovu po dobu 30 dní. Obsahuje jen slovo „zamítnuto“, žádné osobní údaje. | 30 dní |
-| `debateai.locale` | Soubor cookie | Pamatuje si, jaký jazyk rozhraní jste zvolili. | 1 rok |
+| `debateai.locale` | Soubor cookie | Pamatuje si, jaký jazyk rozhraní jste zvolili, a nastavuje jazyk e-mailů, které vám zasíláme. | 1 rok |
 | `__Host-debateai-staff` | Soubor cookie (HttpOnly) | Oddělený přístup pracovníků | Až 8 hodin; 15 minut nečinnosti |
 | `__Host-debateai-staff-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | Až 8 hodin; 15 minut nečinnosti |
 | `__Host-debateai-password-reset` | Soubor cookie (HttpOnly) | Pouze obnovení hesla | Až 30 minut |
@@ -201,6 +201,8 @@ Dialectical Engine používá 20 položek, všechny nezbytně nutné pro službu
 | `debateai.exportPending` | Úložiště relace | Uchovává odkaz pro export zaslaný e-mailem na této kartě pro přihlášení a opakovaný pokus. | Do zavření karty, odhlášení, otevření nového odkazu, prvního úspěšného stažení nebo výsledku neplatného odkazu či jiného účtu |
 | `debateai.exportLinkOutcome` | Úložiště relace | Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit. | Do zavření karty, odhlášení nebo otevření nového odkazu |
 
+Každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme.
+
 Žádná jiná strana prostřednictvím Dialectical Engine neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami.
 
 Prohlížeče mohou odesílat signál „Do Not Track“ (nesledovat) nebo podobný signál. Dialectical Engine vás nesleduje, takže takový signál nemá co vypnout: služba funguje stejně s ním i bez něj.
@@ -211,7 +213,7 @@ Chcete-li tyto položky odmítnout, zablokujte nebo smažte soubory cookie a dat
 
 Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na dezbatere.ro/privacy/versions. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi.
 
-Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.3 nahradila verzi 3.2: týká se pouze regionů, v nichž službu poskytujeme, uvádí naši společnost a v oddíle 5 naše poskytovatele hostingu, doručování obsahu a e-mailu a popisuje kontrolu proti robotům prostřednictvím Cloudflare.
+Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.4 nahradila verzi 3.3: oddíl 13 nyní uvádí, že soubor cookie debateai.locale nastavuje také jazyk, ve kterém vám píšeme e-maily, a přidává odstavec, podle něhož každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme.
 
 ## Annex B — Regionální podmínky ochrany osobních údajů
 

@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "연령 확인이 거부된 후 이 브라우저가 30일 동안 다시 시도하지 못하게 합니다. ‘거부됨’이라는 단어만 담고 있으며 개인정보는 없습니다.",
   "legal.cookies.ageRefusal.life": "30일",
   "legal.cookies.locale.kind": "쿠키",
-  "legal.cookies.locale.purpose": "귀하가 선택한 인터페이스 언어를 기억합니다.",
+  "legal.cookies.locale.purpose": "귀하가 선택한 인터페이스 언어를 기억하며, 당사가 보내는 이메일의 언어도 설정합니다.",
   "legal.cookies.locale.life": "1년",
   "legal.cookies.storageTitle": "쿠키가 아닌 브라우저에 저장되는 정보",
   "legal.cookies.storageIntro": "브라우저 저장소에는 네 가지 항목이 보관됩니다. 두 가지는 로컬 스토리지에 직접 삭제할 때까지, 두 가지는 세션 스토리지에 탭을 닫을 때까지 보관됩니다. 쿠키와 달리 이 항목들은 요청에 첨부되지 않습니다. 도움말 채팅 항목은 Dialectical Engine 도움말과 나눈 대화의 사본을 보관하며, 그 메시지는 보낼 때 이미 Dialectical Engine에 전달되었습니다.",

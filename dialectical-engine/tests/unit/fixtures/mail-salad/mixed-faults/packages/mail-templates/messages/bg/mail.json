@@ -1,0 +1,6 @@
+{
+  "auth.common.greeting": "Здравейте,",
+  "auth.common.signoff": "",
+  "auth.extra.note": "Допълнително.",
+  "auth.pwr.proof.body": "Беше заявено нулиране на паролата за вашия акаунт в DebateAI. Използвайте този линк преди {expiry}."
+}

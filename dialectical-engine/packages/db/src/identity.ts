@@ -6,6 +6,7 @@ import {
 } from "@debateai/crypto";
 import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
 import type { DeclaredRegion } from "@debateai/kernel";
+import { MAIL_LOCALE_SETTING } from "./mail-locale.js";
 
 export interface AuthSourceContext {
   readonly ip: string;
@@ -15,6 +16,8 @@ export interface AuthSourceContext {
   readonly countryCode?: string;
   /** Server-derived HttpOnly social continuation cookie hash; never public JSON. */
   readonly socialBrowserHash?: string;
+  /** C03.3 (R-09): the mail language of this request (MLV, one of the 37), resolved once in sourceFor. */
+  readonly mailLocale?: string;
 }
 
 export interface PendingAccountInput {
@@ -576,6 +579,8 @@ export class PostgresIdentityRepository {
   }): Promise<Readonly<{ userId: string; pseudonym: string; factorId: string }> | null> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      // C07.4 (R-11, D-56): the request's mail language, first statement of this transaction.
+      await client.query("SELECT set_config($1, $2, true)", [MAIL_LOCALE_SETTING, input.source.mailLocale ?? "en"]);
       const result = await client.query<{
         user_id: string; pseudonym: string; factor_id: string;
       }>(`SELECT * FROM identity.begin_totp_enrollment_with_audit(
@@ -636,6 +641,8 @@ export class PostgresIdentityRepository {
   }): Promise<"confirmed" | "replayed" | "invalid"> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      // C07.4 (R-11, D-56): the request's mail language, first statement of this transaction.
+      await client.query("SELECT set_config($1, $2, true)", [MAIL_LOCALE_SETTING, input.source.mailLocale ?? "en"]);
       const result = await client.query<{ outcome: "CONFIRMED" | "REPLAYED" | "INVALID" }>(`
         SELECT identity.confirm_totp_enrollment_with_audit(
           $1,$2,$3,$4,$5::jsonb
@@ -678,6 +685,8 @@ export class PostgresIdentityRepository {
     }
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      // C07.4 (R-11, D-56): the request's mail language, first statement of this transaction.
+      await client.query("SELECT set_config($1, $2, true)", [MAIL_LOCALE_SETTING, input.source.mailLocale ?? "en"]);
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.store_recovery_codes_with_audit(
           $1,$2,$3::jsonb,$4,$5::jsonb
@@ -772,6 +781,8 @@ export class PostgresIdentityRepository {
   }): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      // C07.4 (R-11, D-56): the request's mail language, first statement of this transaction.
+      await client.query("SELECT set_config($1, $2, true)", [MAIL_LOCALE_SETTING, input.source.mailLocale ?? "en"]);
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(
           $1,$2,NULL,$3,$4::jsonb

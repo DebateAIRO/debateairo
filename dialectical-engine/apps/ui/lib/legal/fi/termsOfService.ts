@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Sisältösi säilyy sinun sisältönäsi. Säilytät kaikki oikeutesi lähettämiisi kysymyksiin, väitteisiin, huomautuksiin ja haastamisiin. Myönnät meille ei-yksinomaisen, maailmanlaajuisen ja maksuttoman käyttöluvan kyseisen sisällön isännöintiin, tallentamiseen, jäljentämiseen, mukauttamiseen ja käsittelyyn palvelun tarjoamista varten: väittelyn suorittamiseen, sen tallentamiseen uudelleen avaamista ja toistamista varten, tuen tarjoamiseen, lakisääteisten velvoitteidemme täyttämiseen sekä — vain jos päätät julkaista — kohdassa 9 mainittuihin tarkoituksiin. Tämä käyttölupa päättyy, kun sisältö poistetaan, paitsi siltä osin kuin kohta 9 tai laki muuta edellyttää." },
-      { kind: "p", text: "Emme kouluta malleja sisällölläsi. Emme kouluta malleja sisällölläsi. Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin." },
+      { kind: "p", text: "Emme kouluta malleja sisällölläsi. Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin." },
       { kind: "p", text: "Miten sisältösi päätyy tekoälypalveluntarjoajille. Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi." },
       { kind: "p", text: "Mitä tukipalvelun chat lähettää. Tukipalveluavustaja on myös tekoälymalli. Kun kirjoitat sille, lähetämme viestisi ulkoiselle mallipalveluntarjoajalle, jotta malli voi vastata, yhdessä niiden ohjeartikkelien kanssa, joihin se perustaa vastauksensa. Ennen lähettämistä peitämme kaiken, mikä näyttää salasanalta, kertakäyttökoodilta tai avaimelta. Jos pyydät saada keskustella henkilön kanssa, lähetämme mallille myös keskustelun samalla tavalla peitettynä, jotta se voi kirjoittaa lyhyen yhteenvedon tapauksesi vastaanottavalle tiimimme jäsenelle. Emme liitä mukaan sähköpostiosoitettasi, tilitunnisteitasi tai maksutietojasi, mutta malli saa kaiken muun, mitä kirjoitat chattiin, joten älä kirjoita sinne mitään, mitä et halua sen lukevan." },
       { kind: "p", text: "Mitkä palveluntarjoajat ja missä. Osoitteessa dezbatere.ro/providers oleva tekoälypalveluntarjoajarekisterimme on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Henkilötiedot",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa tietosuojakäytännössä. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos Dialectical Engine -palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla." }
+      { kind: "p", text: "Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa tietosuojakäytännössä. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos Dialectical Engine -palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla. Sähköpostit, jotka lähetämme sinulle, on kirjoitettu kielellä, jonka valitsit sivustollamme; tietosuojakäytännön kohta 13 kertoo, miten säilytämme tämän valinnan." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "e74b29a7869efe93b57337d8250a8691af77d947c44a5c103019ccf53939a698",
-  eyebrow: "KÄYTTÖEHDOT · v2.2 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "2.3",
+  sha256: "9e390c87bb4ef647898455a8e44826df44eadea29ec82c43aeefab5e04e6f7ed",
+  eyebrow: "KÄYTTÖEHDOT · v2.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.2",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

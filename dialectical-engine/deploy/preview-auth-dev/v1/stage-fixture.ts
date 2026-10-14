@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../../packages/db/src/mail-locale.js';
 /** Synthetic staging only. The active native operator never imports this module. */
 import { mkdir,writeFile,readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -93,6 +94,7 @@ async function prepareFullAccounts(admin:Pool,environment:Record<string,string>)
    const primary=address(email,'user.email_ciphertext'),backup=address(backupEmail,'user.recovery_email_ciphertext'),passwordHash=password===null?null:await hashPassword(argon,password,auth.password.argon2id);
    await client.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1::uuid,$2,$3,$4,$5,$1::text,$6,clock_timestamp())`,[id,createEmailBlindIndex(blind,email),primary,backup,passwordHash,kind==='pending'?'pending_verification':'active']);
    await client.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,verified_at) VALUES($1,'email',$2,'verified',clock_timestamp()),($1,'recovery_email',$3,'pending_verification',NULL)`,[id,primary,backup]);
+   await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
    if(secret){const factor=randomUUID(),cipher=encrypt(dek,secret,['identity','mfa_factor.secret_ciphertext',factor,'run:none',id,`user-dek:${id}`,'1']);await client.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp())`,[factor,id,cipher]);}
    await client.query('INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_hash,code_slot) VALUES($1,$2,$3,1)',[randomUUID(),id,await hashRecoveryCode(argon,code,mfa.recoveryCodes.argon2id)]);
    if(passkey){await client.query('INSERT INTO identity.consumer_passkey_subject VALUES($1,$2)',[id,passkey.handle]);await client.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,0,'multiDevice',true,$4,$5)`,[id,passkey.id,passkey.publicKey,previewRp,previewOrigin]);}
@@ -106,7 +108,7 @@ async function prepareFullAccounts(admin:Pool,environment:Record<string,string>)
   await migrate(admin);
   const expected=['candidate','fallback'].flatMap(artifact=>['legacy','reset'].map(kind=>accounts[artifact]![kind]!.id)).sort();
   const actual=(await admin.query('SELECT user_id::text id FROM identity.mfa_recovery_legacy_cohort ORDER BY user_id')).rows.map(row=>row.id).sort();if(JSON.stringify(actual)!==JSON.stringify(expected))throw new TypeError('PREVIEW_FULL_COHORT_REFUSED');
-  for(const artifact of ['candidate','fallback']){await admin.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`,[accounts[artifact]!.pending!.id]);for(const kind of ['totp','passkey','provider'])accounts[artifact]![kind]=await seed(kind,artifact);}
+  for(const artifact of ['candidate','fallback']){await withMailLocale(admin, 'en', (c) => c.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`,[accounts[artifact]!.pending!.id]));for(const kind of ['totp','passkey','provider'])accounts[artifact]![kind]=await seed(kind,artifact);}
   return accounts;
  }finally{await argon.close();blind.fill(0);for(const handle of handles)destroyKek(handle);}
 }

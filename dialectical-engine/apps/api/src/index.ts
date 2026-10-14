@@ -17,6 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
+import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
@@ -2149,6 +2150,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ...(countryCode === null ? {} : { countryCode }),
       ...(legal === undefined ? {} : { legal }),
       ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! }),
+      // C03.3 (R-09, D-54): the request's mail language, read once here: the register or resend body, else the cookie, else en.
+      mailLocale: resolveSourceMailLocale(request.headers.cookie as string | undefined, mailDisplays.get(request)?.locale),
       ...(region === undefined ? {} : { region })
     });
   };
@@ -2833,9 +2836,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (options.accountErasure===undefined) {
       return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
     }
+    // C11.1 (R-16): the schedule request's source carries its mail language into the SCHEDULED row.
     const scheduled=await options.accountErasure.schedule({
       authenticated,grantToken:input.step_up_grant,
-      ...(input.delete_public_debates === true ? { deletePublicDebates:true } : {})
+      ...(input.delete_public_debates === true ? { deletePublicDebates:true } : {}),
+      source:sourceFor(request)
     });
     if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
       return reply.status(409).send({ error:"ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED" });
@@ -2885,8 +2890,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
       }
       const input=parseRequest(AccountErasureCancelRequestSchema,request.body);
+      // C11.2 (R-16): the cancel request's source carries its mail language into the CANCELLED row.
       if (!await options.accountErasure.cancel({
-        authenticated,cancellationRef:input.cancellation_ref
+        authenticated,cancellationRef:input.cancellation_ref,source:sourceFor(request)
       })) {
         return reply.status(404).send({ error:"NOT_FOUND" });
       }

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -175,8 +176,8 @@ describe("data export over a real database and encrypted file store", () => {
     try {
       const passwordHash = await hashPassword(argon2, password, authPolicy.password.argon2id);
       await db.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1', [a.userId, passwordHash]);
-      await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp(),clock_timestamp())",
-        [factorId, a.userId, encrypt(dek, secret, ["identity", "mfa_factor.secret_ciphertext", factorId, "run:none", a.userId, `user-dek:${a.userId}`, "1"])]);
+      await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp(),clock_timestamp())",
+        [factorId, a.userId, encrypt(dek, secret, ["identity", "mfa_factor.secret_ciphertext", factorId, "run:none", a.userId, `user-dek:${a.userId}`, "1"])]));
       const audit = { hashSourceIp: async () => "a".repeat(64), hashUserAgent: async () => "b".repeat(64) } as never;
       const sessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit),
         riskSignals: { recordForSession: async () => "recorded" } as never, onRiskSignalFailure: () => undefined,
@@ -236,9 +237,9 @@ describe("data export over a real database and encrypted file store", () => {
         clockClient.release();
         await db.pool.query("DROP SCHEMA fixture_clock CASCADE");
       }
-      await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp(),clock_timestamp())",
+      await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp(),clock_timestamp())",
         [providerFactorId, provider.userId, encrypt(dek, providerSecret,
-          ["identity", "mfa_factor.secret_ciphertext", providerFactorId, "run:none", provider.userId, `user-dek:${provider.userId}`, "1"])]);
+          ["identity", "mfa_factor.secret_ciphertext", providerFactorId, "run:none", provider.userId, `user-dek:${provider.userId}`, "1"])]));
       await db.pool.query("UPDATE identity.session SET token_hash=$2,csrf_token_hash=$3,binding_context=$4::jsonb WHERE session_id=$1",
         [provider.sessionId, hashToken("session", providerToken), hashToken("csrf", providerCsrf),
           JSON.stringify({ user_agent_hash: sessions.consumerProducer().bindingHash(source) })]);
@@ -287,9 +288,9 @@ describe("data export over a real database and encrypted file store", () => {
         VALUES($1,'email','{}','verified',clock_timestamp(),clock_timestamp())`, [p.userId]);
       const pSessionToken = randomBytes(32).toString("base64url"), pCsrf = randomBytes(32).toString("base64url");
       await db.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)", [p.userId, passkey.handle]);
-      await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
+      await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
         VALUES($1,$2,$3,0,'multiDevice',true,'app.example.test','https://app.example.test','only-key')`,
-        [p.userId, passkey.credentialId, passkey.k.wire.toString("base64url")]);
+        [p.userId, passkey.credentialId, passkey.k.wire.toString("base64url")]));
       await db.pool.query("UPDATE identity.session SET token_hash=$2,csrf_token_hash=$3,binding_context=$4::jsonb WHERE session_id=$1",
         [p.sessionId, hashToken("session", pSessionToken), hashToken("csrf", pCsrf),
           JSON.stringify({ user_agent_hash: sessions.consumerProducer().bindingHash(source) })]);
@@ -343,10 +344,10 @@ describe("data export over a real database and encrypted file store", () => {
     const ip = sealRecord(recordsKey, { table: "billing.location_evidence", column: "ip_ciphertext", rowId: chargeId }, Buffer.from('{"ip":"192.0.2.8"}'));
     await db.pool.query("INSERT INTO identity.registration_region(user_id,country_code) VALUES($1,'RO')", [a.userId]);
     await db.pool.query("INSERT INTO identity.age_check(user_id,outcome,min_age_applied,country_code,rule_version,context,checked_at) VALUES($1,'passed',18,'RO','matrix-v1','registration',clock_timestamp())", [a.userId]);
-    await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())", [factorId, a.userId]);
+    await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())", [factorId, a.userId]));
     await db.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)", [a.userId, subjectHandle]);
-    await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
-      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test',$4)`, [a.userId, randomBytes(32).toString("base64url"), randomBytes(65).toString("base64url"), passkeyLabel]);
+    await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
+      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test',$4)`, [a.userId, randomBytes(32).toString("base64url"), randomBytes(65).toString("base64url"), passkeyLabel]));
     await db.pool.query("INSERT INTO identity.recovery_code(user_id,code_hash) VALUES($1,$2)", [a.userId, `matrix-code-${randomUUID()}`]);
     await db.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration)
       VALUES($1,'google','https://accounts.google.com','matrix','matrix-provider-subject',$2)`, [a.userId, `sha256:${"c".repeat(64)}`]);
@@ -435,8 +436,8 @@ describe("data export over a real database and encrypted file store", () => {
     await db.pool.query("INSERT INTO core.legacy_run_claim(run_id,owner_ref,claimed_at,audit_id) VALUES($1,$2,clock_timestamp(),$3)", [runId, a.ownerRef, legacyAuditId]);
     await db.pool.query("INSERT INTO legal.account_closure(owner_ref,closed_at) VALUES($1,'2030-06-07T08:09:10Z')", [a.ownerRef]);
     const channelId = (await db.pool.query("SELECT channel_binding_id FROM identity.channel_binding WHERE user_id=$1 AND channel_type='email'", [a.userId])).rows[0].channel_binding_id;
-    await db.pool.query(`INSERT INTO identity.consumer_security_notice(notice_id,user_id,channel_binding_id,channel_ciphertext,event_kind)
-      VALUES($1,$2,$3,'{}','METHOD_CHANGED') ON CONFLICT(user_id,channel_binding_id,event_kind) DO NOTHING`, [noticeId, a.userId, channelId]);
+    await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_security_notice(notice_id,user_id,channel_binding_id,channel_ciphertext,event_kind)
+      VALUES($1,$2,$3,'{}','METHOD_CHANGED') ON CONFLICT(user_id,channel_binding_id,event_kind) DO NOTHING`, [noticeId, a.userId, channelId]));
     noticeId = (await db.pool.query("SELECT notice_id FROM identity.consumer_security_notice WHERE user_id=$1 AND channel_binding_id=$2 AND event_kind='METHOD_CHANGED'", [a.userId, channelId])).rows[0].notice_id;
     const riskEnvelope = encrypt(Buffer.alloc(32, 11), Buffer.from("matrix-risk-signal"),
       ["identity", "authentication_risk_signal.context_ciphertext", riskId, "run:none", a.userId, `auth-risk:${a.userId}:v1`, "1"]);
@@ -661,11 +662,11 @@ describe("data export over a real database and encrypted file store", () => {
     const credentialId = `credential${randomUUID().replaceAll("-", "")}`;
     const publicKey = `publickey${randomUUID().replaceAll("-", "")}`;
     const a = await account();
-    await db.pool.query("INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,'totp',$2::jsonb,'active',clock_timestamp(),clock_timestamp())", [a.userId, JSON.stringify({ marker: totpSecret })]);
+    await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,'totp',$2::jsonb,'active',clock_timestamp(),clock_timestamp())", [a.userId, JSON.stringify({ marker: totpSecret })]));
     await db.pool.query("INSERT INTO identity.recovery_code(user_id,code_hash) VALUES($1,$2)", [a.userId, codeHash]);
     await db.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)", [a.userId, randomBytes(32).toString("base64url")]);
-    await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
-      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test','personal')`, [a.userId, credentialId, publicKey]);
+    await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
+      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test','personal')`, [a.userId, credentialId, publicKey]));
     const secrets = (await db.pool.query(`SELECT u.password_hash,encode(u.email_blind_index,'hex') email_blind_index,
       s.token_hash FROM identity."user" u JOIN identity.session s ON s.user_id=u.user_id WHERE u.user_id=$1`, [a.userId])).rows[0];
     const { store, row } = await completed(a);

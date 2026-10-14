@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Soubor cookie (HttpOnly) — Udržuje vás přihlášené. Během používání služby se průběžně obnovuje. — 14 dní",
         "__Host-debateai-csrf — Soubor cookie — Brání jiným webům v odesílání formulářů vaším jménem. — 14 dní",
         "__Host-debateai-age-refusal — Soubor cookie (HttpOnly) — Po zamítnuté kontrole věku zabrání tomuto prohlížeči pokusit se znovu po dobu 30 dní. Obsahuje jen slovo „zamítnuto“, žádné osobní údaje. — 30 dní",
-        "debateai.locale — Soubor cookie — Pamatuje si, jaký jazyk rozhraní jste zvolili. — 1 rok",
+        "debateai.locale — Soubor cookie — Pamatuje si, jaký jazyk rozhraní jste zvolili, a nastavuje jazyk e-mailů, které vám zasíláme. — 1 rok",
         "__Host-debateai-staff — Soubor cookie (HttpOnly) — Oddělený přístup pracovníků — Až 8 hodin; 15 minut nečinnosti",
         "__Host-debateai-staff-csrf — Soubor cookie — Brání jiným webům v odesílání formulářů vaším jménem. — Až 8 hodin; 15 minut nečinnosti",
         "__Host-debateai-password-reset — Soubor cookie (HttpOnly) — Pouze obnovení hesla — Až 30 minut",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Úložiště relace — Pamatuje si, která zpráva o odkazu ke stažení se má na této kartě zobrazit. — Do zavření karty, odhlášení nebo otevření nového odkazu"
         ]
       },
+      { kind: "p", text: "Každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme." },
       { kind: "p", text: "Žádná jiná strana prostřednictvím Dialectical Engine neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami." },
       { kind: "p", text: "Prohlížeče mohou odesílat signál „Do Not Track“ (nesledovat) nebo podobný signál. Dialectical Engine vás nesleduje, takže takový signál nemá co vypnout: služba funguje stejně s ním i bez něj." },
       { kind: "p", text: "Chcete-li tyto položky odmítnout, zablokujte nebo smažte soubory cookie a data webu pro tento web v nastavení prohlížeče. Co pak přestane fungovat: přihlášení a zapamatování vaší volby jazyka a režimu zobrazení; oznámení o souborech cookie se také zobrazí znovu." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na dezbatere.ro/privacy/versions. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi." },
-      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.3 nahradila verzi 3.2: týká se pouze regionů, v nichž službu poskytujeme, uvádí naši společnost a v oddíle 5 naše poskytovatele hostingu, doručování obsahu a e-mailu a popisuje kontrolu proti robotům prostřednictvím Cloudflare." }
+      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.4 nahradila verzi 3.3: oddíl 13 nyní uvádí, že soubor cookie debateai.locale nastavuje také jazyk, ve kterém vám píšeme e-maily, a přidává odstavec, podle něhož každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "c9c9b2e75fa01ba31f4659cd73876a128eca2fa672ff8d2c6f6f5130bc01b7fb",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.3 · ÚČINNÉ OD 12. ŘÍJNA 2026",
+  version: "3.4",
+  sha256: "09e6ecc70fb94b868c6c28394e93c49ef50a659caa9c63c3987e5395c1ff52d6",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.4 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",
-  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobních údajů",
   sectionIdPrefix: "policy-section-",

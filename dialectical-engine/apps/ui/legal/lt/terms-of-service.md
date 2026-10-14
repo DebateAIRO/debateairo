@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.2 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.2
+endMarker: SĄLYGŲ PABAIGA · v2.3
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.2 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.3 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -114,7 +114,7 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 
 **Jūsų turinys lieka jūsų.** Išsaugote visas turimas teises į jūsų pateikiamus klausimus, teiginius, pastabas ir prieštaravimus. Suteikiate mums neišimtinę, visame pasaulyje galiojančią, neatlygintiną licenciją teikti šio turinio prieglobą, jį saugoti, atgaminti, pritaikyti ir tvarkyti paslaugos teikimo tikslais: debatams vykdyti ir saugoti, kad galėtumėte juos vėl atverti ir pakartoti, pagalbai teikti, mūsų teisinėms prievolėms vykdyti ir — tik jei nuspręsite paskelbti — 9 skyriuje nurodytais tikslais. Ši licencija baigiasi ištrynus turinį, išskyrus atvejus, kai pagal 9 skyrių ar teisės aktus reikalaujama kitaip.
 
-**Jūsų turinio nenaudojame mokymui.** Nemokome modelių naudodami jūsų turinį. DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada.
+**Jūsų turinio nenaudojame mokymui.** DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada.
 
 **Kaip jūsų turinys pasiekia DI paslaugų teikėjus.** Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų.
 
@@ -239,7 +239,7 @@ Jūsų turinys ir sugeneruotų rezultatų statusas aptarti 8 skyriuje. Jei manot
 
 ## 17. Asmens duomenys
 
-Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei Dialectical Engine paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje.
+Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei Dialectical Engine paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje. El. laiškai, kuriuos siunčiame jums, rašomi kalba, kurią pasirinkote mūsų svetainėje; Privatumo politikos 13 skyriuje paaiškinta, kaip išsaugome šį pasirinkimą.
 
 ## 18. Taikytina teisė ir ginčų nagrinėjimo vieta
 

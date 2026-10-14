@@ -4,6 +4,14 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, isSingleDeliverableRecipient } from "../../apps/api/src/mail-channel.js";
 import { mailAlternatives } from "../support/accountMail.js";
+
+// C16 (V-24): a non-ASCII Subject is RFC 2047 B-encoded and a non-ASCII body is base64. The helpers assert the encoded
+// form is on the wire, then return the text the pins compare against.
+const encodedSubject = (message: string): string => {
+  expect(message).toMatch(/\r\nSubject: =\?UTF-8\?B\?/);
+  const header = /\r\nSubject: ([^\r]*)\r\n/.exec(message)?.[1] ?? "";
+  return Buffer.concat([...header.matchAll(/=\?UTF-8\?B\?([A-Za-z0-9+/=]+)\?=/g)].map(word => Buffer.from(word[1]!, "base64"))).toString("utf8");
+};
 it("produces exactly two base64 alternatives without bearer headers or tracking", async () => {
   const dir = await mkdtemp(join(tmpdir(), "task6-mime-")), capture = join(dir, "mail"), executable = join(dir, "sink");
   await writeFile(executable, `#!${process.execPath}\nimport fs from 'node:fs'; let chunks=[]; for await(const c of process.stdin)chunks.push(c); fs.writeFileSync(${JSON.stringify(capture)}, Buffer.concat(chunks),{mode:0o600});`, { mode: 0o700 });
@@ -13,7 +21,7 @@ it("produces exactly two base64 alternatives without bearer headers or tracking"
     await sender.sendVerification({ attemptId: "opaque", recipient: "person@example.test", token, expiresAt: new Date("2026-10-05T07:41:00Z"), display: { locale: "ro", timeZone: "Europe/Bucharest" } });
     const message = await readFile(capture, "utf8"), parts = mailAlternatives(message);
     expect(message).toContain("From: dezbatere.ro <noreply@dezbatere.ro>\r\n");
-    expect(message).toContain("Subject: Verify your email for Dialectical Engine\r\n");
+    expect(encodedSubject(message)).toBe("Verificați adresa de e-mail pentru Dialectical Engine");
     expect(message).toContain('Content-Type: multipart/alternative; boundary="dialectical-account-v1"');
     expect(message.match(/Content-Transfer-Encoding: base64/g)).toHaveLength(2);
     expect(message.split("\r\n\r\n")[0]).not.toContain(token);

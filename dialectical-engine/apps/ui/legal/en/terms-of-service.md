@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.3 · EFFECTIVE 12 OCTOBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.2
+endMarker: END OF TERMS · v2.3
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.2 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.3 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -114,7 +114,7 @@ If you are unsure whether something is allowed, ask us before you post it.
 
 **Your content stays yours.** You keep any rights you have in the questions, claims, annotations and challenges you submit. You grant us a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, adapt and process that content for the purposes of operating the service: running the debate, storing it so you can reopen and replay it, providing support, meeting our legal obligations, and — only if you choose to publish — the purposes in section 9. This licence ends when the content is deleted, except as section 9 or the law requires.
 
-**We do not train on your content.** We do not train models on your content. We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Provider Register shows, for each provider, whether we have confirmed this, and when.
+**We do not train on your content.** We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Provider Register shows, for each provider, whether we have confirmed this, and when.
 
 **How your content reaches AI providers.** To run a debate we send text to one or more external model providers. What a provider receives is your question, the steering annotations you set, and statements the engine composes during the debate — so a provider sees text derived from and built around what you typed, not only your original words. It never receives your email address, your account identifiers, your session records or your payment details.
 
@@ -239,7 +239,7 @@ Section 8 covers your content and the status of generated outputs. If you believ
 
 ## 17. Personal data
 
-How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on Dialectical Engine contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains.
+How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on Dialectical Engine contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains. Emails we send you are written in the language you chose on our site; section 13 of the Privacy Policy explains how we keep that choice.
 
 ## 18. Governing law and where disputes are heard
 

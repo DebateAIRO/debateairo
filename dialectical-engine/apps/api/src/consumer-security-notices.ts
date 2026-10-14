@@ -14,7 +14,8 @@ export class ConsumerSecurityNoticeReconciler {
                         const recipient = plain.toString('utf8');
                         if (!isSingleDeliverableRecipient(recipient))
                             throw new Error('MAIL_INPUT_INVALID');
-                        await this.sender.sendConsumerSecurityNotice({ recipient, messageId: notice.messageId, eventKind: notice.eventKind, happenedAt: new Date(notice.happenedAt) });
+                        // C07.7 (R-13): the stored language of this row, never a profile or cookie.
+                        await this.sender.sendConsumerSecurityNotice({ recipient, messageId: notice.messageId, eventKind: notice.eventKind, happenedAt: new Date(notice.happenedAt), display: { locale: notice.mailLocale, timeZone: null } });
                     }
                     finally {
                         plain?.fill(0);

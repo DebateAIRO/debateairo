@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Váš obsah zůstává vaším. Ponecháváte si veškerá práva, která máte k otázkám, tvrzením, anotacím a námitkám, jež zadáte. Udělujete nám nevýhradní, celosvětovou a bezúplatnou licenci tento obsah hostovat, ukládat, rozmnožovat, upravovat a zpracovávat za účelem provozu služby: vedení debaty, jejího ukládání, abyste ji mohli znovu otevřít a přehrát, poskytování podpory, plnění našich právních povinností a — pouze pokud se rozhodnete obsah zveřejnit — pro účely uvedené v oddílu 9. Tato licence končí vymazáním obsahu, s výjimkou případů, kdy oddíl 9 nebo zákon vyžaduje něco jiného." },
-      { kind: "p", text: "Na vašem obsahu netrénujeme. Modely na vašem obsahu netrénujeme. Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr poskytovatelů u každého z nich uvádí, zda jsme to potvrdili, a kdy." },
+      { kind: "p", text: "Na vašem obsahu netrénujeme. Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr poskytovatelů u každého z nich uvádí, zda jsme to potvrdili, a kdy." },
       { kind: "p", text: "Jak se váš obsah dostává k poskytovatelům AI. Za účelem vedení debaty posíláme text jednomu či více externím poskytovatelům modelů. Poskytovatel obdrží vaši otázku, vámi nastavené řídicí anotace a výroky, které systém sestavuje v průběhu debaty — vidí tedy text odvozený z toho, co jste zadali, a vytvořený na tomto základě, nikoli pouze vaše původní slova. Nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu, záznamy relací ani platební údaje." },
       { kind: "p", text: "Co posílá chat podpory. Asistent podpory je rovněž model AI. Když mu napíšete, pošleme vaši zprávu externímu poskytovateli modelů, aby model mohl odpovědět, spolu s články nápovědy, na kterých zakládá svou odpověď. Před odesláním zamaskujeme vše, co vypadá jako heslo, jednorázový kód nebo klíč. Pokud požádáte o rozhovor s člověkem, pošleme modelu také konverzaci, zamaskovanou stejným způsobem, aby napsal krátké shrnutí pro člena našeho týmu, který váš případ převezme. Nepřikládáme vaši e-mailovou adresu, identifikátory účtu ani platební údaje, model však obdrží vše ostatní, co do chatu napíšete, proto tam nepište nic, co byste nechtěli, aby si přečetl." },
       { kind: "p", text: "Kteří poskytovatelé a kde. Náš Registr poskytovatelů AI na adrese dezbatere.ro/providers je součástí těchto Podmínek. Uvádí každého poskytovatele, kterého můžeme použít: jeho právnickou osobu a zemi; co přijímá a proč; kde údaje zpracovává; jeho podmínky uchovávání; zda je pro koncový bod, který používáme, aktivní nulové uchovávání údajů; zda smí podle naší smlouvy používat vstupy k trénování; mechanismus předávání, o který se opíráme; a datum posledního ověření každého záznamu. Poskytovatelé se mohou nacházet mimo vaši zemi a mimo Evropský hospodářský prostor. Naše Zásady ochrany osobních údajů vysvětlují příslušné záruky." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Osobní údaje",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Způsob, jakým nakládáme s osobními údaji, stanoví Zásady ochrany osobních údajů na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na Dialectical Engine vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů." }
+      { kind: "p", text: "Způsob, jakým nakládáme s osobními údaji, stanoví Zásady ochrany osobních údajů na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na Dialectical Engine vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů. E-maily, které vám zasíláme, jsou psány v jazyce, který jste zvolili na našem webu; oddíl 13 Zásad ochrany osobních údajů vysvětluje, jak tuto volbu uchováváme." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "101001fb501f1e61e336c21b3d075eee051d3cfdba875fef6924cc8a543c5069",
-  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.2 · ÚČINNÉ OD 12. ŘÍJNA 2026",
+  version: "2.3",
+  sha256: "4cec4eba3c4b0331c2bfb15b755db8e68ba65c637c0a5a45344c9e7dc89e5e9f",
+  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.3 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
-  endMarker: "KONEC PODMÍNEK · v2.2",
+  endMarker: "KONEC PODMÍNEK · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmínek poskytování služby",
   sectionIdPrefix: "terms-section-",

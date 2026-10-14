@@ -36,7 +36,8 @@ describe("S10 own-sendmail security notification adapter", () => {
           messageId,
           recipient: "person@example.test",
           eventKind,
-          executeAt
+          executeAt,
+          display: { locale: "en", timeZone: null }
         });
         const message = readFileSync(capture, "utf8");
         expect(message).toContain("From: dezbatere.ro <noreply@debateai.test>\r\n");
@@ -52,7 +53,8 @@ describe("S10 own-sendmail security notification adapter", () => {
         messageId,
         recipient: "person@example.test\r\nBcc: attacker@example.test",
         eventKind: "SCHEDULED",
-        executeAt
+        executeAt,
+        display: { locale: "en", timeZone: null }
       })).rejects.toEqual(expect.objectContaining<Partial<MailDeliveryError>>({
         operatorCode: "MAIL_INPUT_INVALID"
       }));
@@ -82,7 +84,8 @@ describe("S10 own-sendmail security notification adapter", () => {
         messageId: "11111111-1111-4111-8111-111111111111",
         recipient: "person@example.test",
         eventKind: "SCHEDULED",
-        executeAt: new Date("2026-08-31T00:00:00.000Z")
+        executeAt: new Date("2026-08-31T00:00:00.000Z"),
+        display: { locale: "en", timeZone: null }
       });
       const argv = readFileSync(argumentsFile, "utf8").trim().split("\n");
       // `-t` reads the recipient out of the header block on stdin, so it never
@@ -119,7 +122,8 @@ describe("S10 own-sendmail security notification adapter", () => {
         messageId: "11111111-1111-4111-8111-111111111111",
         recipient,
         eventKind: "SCHEDULED",
-        executeAt: new Date("2026-08-31T00:00:00.000Z")
+        executeAt: new Date("2026-08-31T00:00:00.000Z"),
+        display: { locale: "en", timeZone: null }
       })).rejects.toEqual(expect.objectContaining<Partial<MailDeliveryError>>({
         operatorCode: "MAIL_INPUT_INVALID"
       }));

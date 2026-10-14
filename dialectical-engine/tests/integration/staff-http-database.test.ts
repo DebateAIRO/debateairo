@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, vi, expect, it } from 'vitest';
 import { buildApi } from '@debateai/api';
@@ -28,10 +29,10 @@ const users: ReadableUserDekStore = {load: async userId => {
 }, store: async () => {},exists: async id => deks.has(id),destroy: async () => 'ALREADY_ABSENT'};
 async function hardware(userId: string) {
     const f = fixture(key(),1,randomBytes(32)), factorId = randomUUID();
-    await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter)
+    await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter)
         VALUES($1,$2,'passkey',$3,$4,'active',now(),now(),$5,$6,true,false,false,$7,0)`,
         [factorId,userId,f.expected.credentialId,JSON.stringify({format:'COSE_KEY_BASE64URL_V1',value:b64(f.k.wire)}),rpId,origin,
-            {v:1,keyId:`passkey-label:${factorId}:v1`,nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}]);
+            {v:1,keyId:`passkey-label:${factorId}:v1`,nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}]));
     await database.pool.query('INSERT INTO identity.staff_webauthn_metadata(mfa_factor_id,user_id,user_handle_sha256) VALUES($1,$2,$3)',[factorId,userId,digest(f.handle)]);
     return {f,factorId,counter: 0};
 }
@@ -41,7 +42,7 @@ async function account() {
     const address = encrypt(dek,Buffer.from(email),['identity','user.email_ciphertext',userId,'run:none',userId,`user-dek:${userId}`,'1']);
     await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,$3,$3,$4,$5,'active',now())`,[userId,createEmailBlindIndex(blindIndexKey,email),address,passwordHash,'private-customer-'+userId]);
     await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'email',$2,'verified',now(),now())`,[userId,address]);
-    await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())`,[factorId,userId,encrypt(dek,secret,['identity','mfa_factor.secret_ciphertext',factorId,'run:none',userId,`user-dek:${userId}`,'1'])]);
+    await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp',$3,'active',now(),now())`,[factorId,userId,encrypt(dek,secret,['identity','mfa_factor.secret_ciphertext',factorId,'run:none',userId,`user-dek:${userId}`,'1'])]));
     // The step is read AFTER the password check: read before it, a 30 s boundary crossed during the Argon2 work left
     // step-1 two steps old against a one-step drift, and the login failed AUTH_CREDENTIALS_INVALID (PR #134's CI).
     const login = await sessions.beginLogin({email,password},source), step = Math.floor(Date.now()/(mfaPolicy.totp.periodSeconds*1000));

@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Fajl cookie (HttpOnly) — Iżżommok fil-kont. Tiġġedded sakemm tibqa’ tuża s-servizz. — 14-il jum",
         "__Host-debateai-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — 14-il jum",
         "__Host-debateai-age-refusal — Fajl cookie (HttpOnly) — Wara li verifika tal-età tiġi rrifjutata, iżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. — 30 jum",
-        "debateai.locale — Fajl cookie — Tiftakar il-lingwa tal-interfaċċja li għażilt. — 1 sena",
+        "debateai.locale — Fajl cookie — Tiftakar il-lingwa tal-interfaċċja li għażilt, u tiddetermina l-lingwa tal-email li nibagħtulek. — 1 sena",
         "__Host-debateai-staff — Fajl cookie (HttpOnly) — Aċċess separat għall-persunal — Sa 8 sigħat; 15-il minuta ta’ inattività",
         "__Host-debateai-staff-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — Sa 8 sigħat; 15-il minuta ta’ inattività",
         "__Host-debateai-password-reset — Fajl cookie (HttpOnly) — Reset tal-password biss — Sa 30 minuta",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Ħażna tas-sessjoni — Jiftakar liema messaġġ dwar il-link tat-tniżżil għandu jintwera f’din it-tab. — Sakemm tingħalaq it-tab, toħroġ jew jinfetaħ link ġdid"
         ]
       },
+      { kind: "p", text: "Kull email li nqiegħdu fil-kju għalik iżżomm il-lingwa li kont għażilt sakemm nibagħtuha." },
       { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },
       { kind: "p", text: "Il-browsers jistgħu jibagħtu sinjal “Do Not Track” jew sinjal simili. Dialectical Engine ma jsegwikx, għalhekk m’hemm xejn x’jitfi sinjal bħal dan: is-servizz jaħdem bl-istess mod bih jew mingħajru." },
       { kind: "p", text: "Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-sit għal dan is-sit fis-settings tal-browser tiegħek. X’jieqaf jaħdem imbagħad: id-dħul fil-kont, u t-tfakkir tal-għażliet tiegħek tal-lingwa u tal-wiri; l-avviż dwar il-cookies jerġa’ jidher ukoll." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida." },
-      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.3 issostitwiet il-verżjoni 3.2: tkopri biss ir-reġjuni li naqdu, issemmi l-kumpanija tagħna b’isimha u, fit-taqsima 5, il-fornituri tagħna tal-ospitar, tat-twassil tal-kontenut u tal-posta elettronika, u tiddeskrivi l-verifika kontra r-robots ta’ Cloudflare." }
+      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.4 issostitwiet il-verżjoni 3.3: it-taqsima 13 issa tgħid li l-cookie debateai.locale jiddetermina wkoll il-lingwa li biha nikitbu l-emails li nibagħtulek, u żżid paragrafu li jgħid li kull email li nqiegħdu fil-kju għalik iżżomm il-lingwa li kont għażilt sakemm nibagħtuha." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "4579b48ce57a22e261b32dafacfc296284ae8fdfda1de6d613794e175bdeff35",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.3 · EFFETTIVA 12 TA’ OTTUBRU 2026",
+  version: "3.4",
+  sha256: "7c59ea7cd23e8364464f548fdda9d6c9543520160bd7cc1a913fb19b38d0ddfe",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.4 · EFFETTIVA 12 TA’ OTTUBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

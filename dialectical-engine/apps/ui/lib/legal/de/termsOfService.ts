@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ihre Inhalte bleiben Ihre Inhalte. Sie behalten alle Rechte, die Sie an den von Ihnen übermittelten Fragen, Behauptungen, Anmerkungen und Anfechtungen haben. Sie räumen uns eine nicht ausschließliche, weltweite und unentgeltliche Lizenz ein, diese Inhalte zum Betrieb des Dienstes zu hosten, zu speichern, zu vervielfältigen, anzupassen und zu verarbeiten: um die Debatte durchzuführen, sie zu speichern, damit Sie sie erneut öffnen und wiedergeben können, Support zu leisten, unsere gesetzlichen Pflichten zu erfüllen und – nur wenn Sie sich für eine Veröffentlichung entscheiden – für die in Abschnitt 9 genannten Zwecke. Diese Lizenz endet mit der Löschung der Inhalte, soweit Abschnitt 9 oder das Gesetz nichts anderes erfordert." },
-      { kind: "p", text: "Wir trainieren nicht mit Ihren Inhalten. Wir trainieren keine Modelle mit Ihren Inhalten. Wir setzen KI-Anbieter nur zu Bedingungen ein, die es ihnen nicht erlauben, Ihre Inhalte zum Trainieren oder Verbessern ihrer Modelle zu nutzen; das Verzeichnis der KI-Anbieter zeigt für jeden Anbieter, ob und wann wir dies bestätigt haben." },
+      { kind: "p", text: "Wir trainieren nicht mit Ihren Inhalten. Wir setzen KI-Anbieter nur zu Bedingungen ein, die es ihnen nicht erlauben, Ihre Inhalte zum Trainieren oder Verbessern ihrer Modelle zu nutzen; das Verzeichnis der KI-Anbieter zeigt für jeden Anbieter, ob und wann wir dies bestätigt haben." },
       { kind: "p", text: "Wie Ihre Inhalte KI-Anbieter erreichen. Zur Durchführung einer Debatte senden wir Text an einen oder mehrere externe Modellanbieter. Ein Anbieter erhält Ihre Frage, die von Ihnen festgelegten Steuerungsanmerkungen und Aussagen, die das System während der Debatte zusammensetzt – ein Anbieter sieht also Text, der aus Ihren Eingaben abgeleitet und um sie herum aufgebaut wurde, nicht nur Ihre ursprünglichen Worte. Ihre E-Mail-Adresse, Ihre Kontokennungen, Ihre Sitzungsaufzeichnungen oder Ihre Zahlungsdaten erhält er niemals." },
       { kind: "p", text: "Was der Support-Chat sendet. Der Support-Assistent ist ebenfalls ein KI-Modell. Wenn Sie ihm schreiben, senden wir Ihre Nachricht an einen externen Modellanbieter, damit das Modell antworten kann, zusammen mit den Hilfeartikeln, auf die es seine Antwort stützt. Vor dem Senden maskieren wir alles, was wie ein Passwort, ein Einmalcode oder ein Schlüssel aussieht. Wenn Sie darum bitten, mit einem Menschen zu sprechen, senden wir auch das Gespräch, auf dieselbe Weise maskiert, an das Modell, damit es eine kurze Zusammenfassung für das Mitglied unseres Teams schreibt, das Ihren Fall übernimmt. Ihre E-Mail-Adresse, Ihre Kontokennungen oder Ihre Zahlungsdaten fügen wir nicht bei, aber das Modell erhält alles andere, was Sie in den Chat schreiben – schreiben Sie dort also nichts, was es nicht lesen soll." },
       { kind: "p", text: "Welche Anbieter und wo. Unser Verzeichnis der KI-Anbieter unter dezbatere.ro/providers ist Bestandteil dieser Nutzungsbedingungen. Es führt jeden Anbieter auf, den wir verwenden können: seinen Rechtsträger und sein Land; welche Daten er zu welchem Zweck erhält; wo er sie verarbeitet; seine Aufbewahrungsbedingungen; ob für den von uns verwendeten Endpunkt eine Null-Daten-Aufbewahrung aktiv ist; ob er Eingaben nach unserem Vertrag für Trainingszwecke verwenden darf; auf welchen Übermittlungsmechanismus wir uns stützen und wann wir den jeweiligen Eintrag zuletzt überprüft haben. Anbieter können sich außerhalb Ihres Landes und außerhalb des Europäischen Wirtschaftsraums befinden. Unsere Datenschutzerklärung erläutert die Schutzmaßnahmen." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personenbezogene Daten",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Wie wir personenbezogene Daten verarbeiten, ist in der Datenschutzerklärung unter dezbatere.ro/privacy dargelegt. Sie erläutert, was wir erheben, auf welcher Rechtsgrundlage die einzelnen Zwecke beruhen, wie lange wir Daten aufbewahren, wer Daten empfängt, welche Übermittlungen stattfinden und wie Sie Ihre Rechte ausüben können. Drei Punkte gehören ebenfalls hierher. Abschnitt 7 fordert Sie auf, keine personenbezogenen Daten anderer Personen in eine Frage aufzunehmen; tun Sie es dennoch, sind Sie dafür verantwortlich, und wir können den Inhalt entfernen. Enthält eine auf Dialectical Engine veröffentlichte Debatte personenbezogene Daten über Sie, können Sie auch ohne Konto deren Entfernung verlangen (Abschnitt 9). Außerdem halten wir Ihre Zustimmung zu diesen Nutzungsbedingungen – Fassung, Zeitpunkt und technische Einzelheiten der Sitzung – als Nachweis des Vertrags fest, wie die Datenschutzerklärung erläutert." }
+      { kind: "p", text: "Wie wir personenbezogene Daten verarbeiten, ist in der Datenschutzerklärung unter dezbatere.ro/privacy dargelegt. Sie erläutert, was wir erheben, auf welcher Rechtsgrundlage die einzelnen Zwecke beruhen, wie lange wir Daten aufbewahren, wer Daten empfängt, welche Übermittlungen stattfinden und wie Sie Ihre Rechte ausüben können. Drei Punkte gehören ebenfalls hierher. Abschnitt 7 fordert Sie auf, keine personenbezogenen Daten anderer Personen in eine Frage aufzunehmen; tun Sie es dennoch, sind Sie dafür verantwortlich, und wir können den Inhalt entfernen. Enthält eine auf Dialectical Engine veröffentlichte Debatte personenbezogene Daten über Sie, können Sie auch ohne Konto deren Entfernung verlangen (Abschnitt 9). Außerdem halten wir Ihre Zustimmung zu diesen Nutzungsbedingungen – Fassung, Zeitpunkt und technische Einzelheiten der Sitzung – als Nachweis des Vertrags fest, wie die Datenschutzerklärung erläutert. E-Mails, die wir Ihnen senden, sind in der Sprache verfasst, die Sie auf unserer Website gewählt haben. Abschnitt 13 der Datenschutzerklärung erläutert, wie wir diese Wahl speichern." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "0e5629da68696c601fffa5c27b40b525cd410733f4dac758fd948279eccb1875",
-  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.2 · GÜLTIG AB 12. OKTOBER 2026",
+  version: "2.3",
+  sha256: "584257e6a7caac2810ff35c4368f778bf859a9158262efe4ad6d2449d344744f",
+  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.3 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.2",
+  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text der Nutzungsbedingungen",
   sectionIdPrefix: "terms-section-",

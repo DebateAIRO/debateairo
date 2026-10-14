@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Uw inhoud blijft van u. U behoudt alle rechten die u hebt op de vragen, stellingen, annotaties en betwistingen die u indient. U verleent ons een niet-exclusieve, wereldwijde en royaltyvrije licentie om die inhoud te hosten, op te slaan, te reproduceren, aan te passen en te verwerken ten behoeve van de exploitatie van de dienst: het uitvoeren van het debat, het opslaan ervan zodat u het opnieuw kunt openen en afspelen, het bieden van ondersteuning, het nakomen van onze wettelijke verplichtingen en — uitsluitend als u voor publicatie kiest — de doeleinden van hoofdstuk 9. Deze licentie eindigt wanneer de inhoud wordt verwijderd, behoudens voor zover hoofdstuk 9 of de wet anders vereist." },
-      { kind: "p", text: "Wij trainen niet op uw inhoud. Wij trainen geen modellen op uw inhoud. Wij gebruiken AI-aanbieders alleen onder voorwaarden die hen niet toestaan uw inhoud te gebruiken om hun modellen te trainen of te verbeteren; het Register van aanbieders toont per aanbieder of wij dit hebben bevestigd, en wanneer." },
+      { kind: "p", text: "Wij trainen niet op uw inhoud. Wij gebruiken AI-aanbieders alleen onder voorwaarden die hen niet toestaan uw inhoud te gebruiken om hun modellen te trainen of te verbeteren; het Register van aanbieders toont per aanbieder of wij dit hebben bevestigd, en wanneer." },
       { kind: "p", text: "Hoe uw inhoud AI-aanbieders bereikt. Om een debat uit te voeren, sturen wij tekst naar een of meer externe modelaanbieders. Een aanbieder ontvangt uw vraag, de sturende annotaties die u instelt en verklaringen die de engine tijdens het debat opstelt — een aanbieder ziet dus tekst die is afgeleid van en opgebouwd rond wat u hebt ingevoerd, niet alleen uw oorspronkelijke woorden. De aanbieder ontvangt nooit uw e-mailadres, accountidentificatoren, sessiegegevens of betalingsgegevens." },
       { kind: "p", text: "Wat de ondersteuningschat verstuurt. De ondersteuningsassistent is ook een AI-model. Wanneer u de assistent schrijft, sturen wij uw bericht naar een externe modelaanbieder zodat het model kan antwoorden, samen met de helpartikelen waarop het zijn antwoord baseert. Vóór het versturen maskeren wij alles wat eruitziet als een wachtwoord, een eenmalige code of een sleutel. Als u vraagt met een persoon te spreken, sturen wij ook het gesprek, op dezelfde manier gemaskeerd, naar het model zodat het een korte samenvatting schrijft voor het lid van ons team dat uw zaak overneemt. Wij voegen uw e-mailadres, accountidentificatoren of betalingsgegevens niet toe, maar het model ontvangt alles wat u verder in de chat typt, dus schrijf daar niets wat u het model niet wilt laten lezen." },
       { kind: "p", text: "Welke aanbieders en waar. Ons Register van AI-aanbieders op dezbatere.ro/providers maakt deel uit van deze Voorwaarden. Het vermeldt voor elke aanbieder die wij kunnen gebruiken: diens juridische entiteit en land; wat deze ontvangt en waarom; waar deze de gegevens verwerkt; de bewaartermijnen; of voor het door ons gebruikte eindpunt geen gegevens worden bewaard; of de aanbieder invoer krachtens onze overeenkomst voor training mag gebruiken; het doorgiftemechanisme waarop wij ons baseren; en de datum waarop wij elke vermelding voor het laatst hebben gecontroleerd. Aanbieders kunnen buiten uw land en buiten de Europese Economische Ruimte zijn gevestigd. Ons Privacybeleid legt de waarborgen uit." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Persoonsgegevens",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Hoe wij persoonsgegevens verwerken, staat in het Privacybeleid op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op Dialectical Engine gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd." }
+      { kind: "p", text: "Hoe wij persoonsgegevens verwerken, staat in het Privacybeleid op dezbatere.ro/privacy. Het legt uit wat wij verzamelen, wat de rechtsgrond voor elk doel is, hoelang wij zaken bewaren, wie gegevens ontvangt, welke doorgiften plaatsvinden en hoe u uw rechten kunt uitoefenen. Drie punten horen ook hier thuis. Hoofdstuk 7 vraagt u geen persoonsgegevens van anderen in een vraag op te nemen; als u dit toch doet, bent u daarvoor verantwoordelijk en kunnen wij de inhoud verwijderen. Als een op Dialectical Engine gepubliceerd debat persoonsgegevens over u bevat, kunt u ons zonder account vragen deze te verwijderen (hoofdstuk 9). En wij leggen uw aanvaarding van deze Voorwaarden — versie, tijdstip en technische sessiegegevens — vast als bewijs van de overeenkomst, zoals in het Privacybeleid wordt uitgelegd. E-mails die wij u sturen, worden geschreven in de taal die u op onze site hebt gekozen; hoofdstuk 13 van het Privacybeleid legt uit hoe wij die keuze bewaren." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "7c9288559efa3e905ed14de3620a4c13e7149485dde2b3267e7e31018f6485a9",
-  eyebrow: "SERVICEVOORWAARDEN · v2.2 · VAN KRACHT OP 12 OKTOBER 2026",
+  version: "2.3",
+  sha256: "3f057e9c98b1bdd8bd8b7812d58ed0c6c567af812f85738ad836e20991e07ad0",
+  eyebrow: "SERVICEVOORWAARDEN · v2.3 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.2",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

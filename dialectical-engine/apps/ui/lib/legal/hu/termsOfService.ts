@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Az Ön tartalma az Öné marad. Ön megtartja a beküldött kérdéseihez, állításaihoz, megjegyzéseihez és kifogásaihoz fűződő valamennyi jogát. Ön nem kizárólagos, az egész világra kiterjedő, jogdíjmentes engedélyt ad számunkra e tartalom tárhelyen tartására, tárolására, többszörözésére, átdolgozására és feldolgozására a szolgáltatás működtetése céljából: a vita futtatásához, annak tárolásához, hogy Ön újból megnyithassa és lejátszhassa, támogatás nyújtásához, jogi kötelezettségeink teljesítéséhez, valamint — kizárólag akkor, ha Ön a közzététel mellett dönt — a 9. szakaszban foglalt célokra. Ez az engedély a tartalom törlésekor megszűnik, kivéve, ha a 9. szakasz vagy a jog ettől eltérően rendelkezik." },
-      { kind: "p", text: "Nem tanítjuk be az Ön tartalmán a modelleket. Nem tanítunk be modelleket az Ön tartalmán. MI-szolgáltatókat kizárólag olyan feltételekkel veszünk igénybe, amelyek nem engedik meg nekik, hogy az Ön tartalmát modelljeik betanítására vagy továbbfejlesztésére használják; a Nyilvántartás szolgáltatónként feltünteti, hogy ezt megerősítettük-e, és mikor." },
+      { kind: "p", text: "Nem tanítjuk be az Ön tartalmán a modelleket. MI-szolgáltatókat kizárólag olyan feltételekkel veszünk igénybe, amelyek nem engedik meg nekik, hogy az Ön tartalmát modelljeik betanítására vagy továbbfejlesztésére használják; a Nyilvántartás szolgáltatónként feltünteti, hogy ezt megerősítettük-e, és mikor." },
       { kind: "p", text: "Hogyan jut el az Ön tartalma az MI-szolgáltatókhoz. Egy vita futtatásához szöveget küldünk egy vagy több külső modellszolgáltatónak. A szolgáltató megkapja az Ön kérdését, az Ön által beállított irányító megjegyzéseket és a motor által a vita során összeállított állításokat — így nem csupán az Ön eredeti szavait látja, hanem az Ön által beírt szövegből származó és aköré épített szöveget is. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg." },
       { kind: "p", text: "Mit küld a támogatási csevegés. A támogatási asszisztens szintén MI-modell. Amikor Ön ír neki, üzenetét elküldjük egy külső modellszolgáltatónak, hogy a modell válaszolni tudjon, azokkal a súgócikkekkel együtt, amelyekre a válaszát alapozza. Küldés előtt elfedünk mindent, ami jelszónak, egyszer használatos kódnak vagy kulcsnak tűnik. Ha Ön azt kéri, hogy személlyel beszélhessen, a beszélgetést is — ugyanígy elfedve — elküldjük a modellnek, hogy rövid összefoglalót írjon csapatunk azon tagjának, aki átveszi az Ön ügyét. Az Ön e-mail-címét, fiókazonosítóit vagy fizetési adatait nem csatoljuk, de a modell minden mást megkap, amit Ön a csevegésbe beír, ezért ne írjon oda semmit, amit nem szeretne, hogy elolvasson." },
       { kind: "p", text: "Mely szolgáltatók és hol. A dezbatere.ro/providers címen elérhető MI-szolgáltatói nyilvántartásunk e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Személyes adatok",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető Adatvédelmi szabályzat határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti." }
+      { kind: "p", text: "A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető Adatvédelmi szabályzat határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti. Az Önnek küldött e-maileket az Ön által a webhelyünkön választott nyelven írjuk; az Adatvédelmi szabályzat 13. szakasza ismerteti, hogyan őrizzük meg ezt a választást." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "b54ec4c2e659188b4f85b31b44b171d7cc37369d1b49d675df22b5c2d5105084",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.2 · HATÁLYOS 2026. OKTÓBER 12.",
+  version: "2.3",
+  sha256: "10cf75751d2bea1a28c4081ab5e95c09192d07b746b0fafc617f2eaed6ee13a5",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.3 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.2",
+  endMarker: "A FELTÉTELEK VÉGE · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",

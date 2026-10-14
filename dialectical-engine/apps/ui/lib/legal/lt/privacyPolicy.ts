@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Slapukas (HttpOnly) — Išlaiko jus prisijungusius. Atnaujinamas, kol naudojatės paslauga. — 14 dienų",
         "__Host-debateai-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — 14 dienų",
         "__Host-debateai-age-refusal — Slapukas (HttpOnly) — Atmetus amžiaus patikrą, 30 dienų neleidžia šiai naršyklei bandyti dar kartą. Jame yra tik žodis „atmesta“, jokių asmens duomenų. — 30 dienų",
-        "debateai.locale — Slapukas — Įsimena jūsų pasirinktą sąsajos kalbą. — 1 metai",
+        "debateai.locale — Slapukas — Įsimena jūsų pasirinktą sąsajos kalbą ir nustato kalbą, kuria rašome jums siunčiamus el. laiškus. — 1 metai",
         "__Host-debateai-staff — Slapukas (HttpOnly) — Atskira darbuotojų prieiga — Iki 8 valandų; 15 minučių neveiklumo",
         "__Host-debateai-staff-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — Iki 8 valandų; 15 minučių neveiklumo",
         "__Host-debateai-password-reset — Slapukas (HttpOnly) — Tik slaptažodžio atkūrimas — Iki 30 minučių",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Seanso saugykla — Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. — Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos"
         ]
       },
+      { kind: "p", text: "Kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime." },
       { kind: "p", text: "Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },
       { kind: "p", text: "Naršyklės gali siųsti signalą „Do Not Track“ arba panašų signalą. Dialectical Engine jūsų neseka, todėl tokiam signalui nėra ko išjungti: paslauga veikia vienodai su juo arba be jo." },
       { kind: "p", text: "Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arba ištrinkite šios svetainės slapukus ir svetainės duomenis. Kas tada nustoja veikti: prisijungimas ir jūsų kalbos bei rodymo pasirinkimų įsiminimas; slapukų pranešimas taip pat bus rodomas vėl." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.3 versija pakeitė 3.2 versiją: ji apima tik tuos regionus, kuriuose teikiame paslaugą, įvardija mūsų bendrovę, 5 skyriuje – mūsų prieglobos, turinio pristatymo ir el. pašto paslaugų teikėjus, ir aprašo Cloudflare robotų patikrą." }
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.4 versija pakeitė 3.3 versiją: 13 skyriuje dabar nurodyta, kad slapukas debateai.locale taip pat nustato kalbą, kuria rašome jums siunčiamus el. laiškus, ir pridėta pastraipa, kad kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "f84d5788f896bbcd3b9017a6110c36831aeb18adee695bcfc6ac53c80a113c92",
-  eyebrow: "PRIVATUMO POLITIKA · v3.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "3.4",
+  sha256: "52dcdcea88636800bfad33107969efeda6deede9f337f04861a9fb8ca65bd09e",
+  eyebrow: "PRIVATUMO POLITIKA · v3.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

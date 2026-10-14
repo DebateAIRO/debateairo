@@ -9,7 +9,8 @@ import { APPLIED, type ChargeSettlement, type SettlementPrepared, type Settlemen
 
 /** INITIAL: the checkout's first payment activates the plan; the month is anchored at the payment (spec §1.2). */
 export function createInitialSettlement(deps: Readonly<{
-  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "subscriptionsForOwner" | "enqueue" | "ownerErasurePending">;
+  repository: Pick<BillingRepository,
+    "appendSubscriptionEvent" | "subscriptionsForOwner" | "subscriptionEvents" | "enqueue" | "ownerErasurePending">;
   entitlements: Pick<EntitlementRepository, "append">;
   /**
    * L3a's widened `latest` (D7 #14, ruling Q-3): the Terms acceptance M1 attaches (spec §2.5.10: "the Terms of the
@@ -90,8 +91,15 @@ export function createInitialSettlement(deps: Readonly<{
         { kind: "ACCEPTED_TERMS", fields: terms },
         ...(withdrawal ? [{ kind: "WITHDRAWAL_FORM" as const, fields: {} }] : [])
       ];
+      // S01-C13 (D-74, B6): M1 is in the checkout's language, which the CREATED event recorded; a later checkout moves
+      // the billing profile, so the profile is not read here. A subscription created before that key existed has none
+      // and keeps the profile's language (D-06's rule for pre-deploy rows).
+      const created = (await deps.repository.subscriptionEvents(subscription.subscriptionId, client))
+        .find((event) => event.kind === "CREATED");
+      const checkoutLocale = created?.data.locale;
       await enqueueEmail(deps.repository, client, {
         template: "M1", recipient: { kind: "CUSTOMER", customerId: context.customerId }, dedupeRef: subscription.subscriptionId,
+        ...(typeof checkoutLocale === "string" ? { locale: checkoutLocale } : {}),
         params: {
           plan: quote.planId, totalAmount: microsToDecimal(context.charge.totalMicros), currency: context.charge.currency,
           renewDate: periodEnd.toISOString(),

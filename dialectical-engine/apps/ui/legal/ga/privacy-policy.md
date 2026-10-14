@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid a stórálaimid, agus an fáth
 lede: Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.3
+endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Téacs an Bheartais Príobháideachais
 annexTitle: Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 FIANÁIN
 -->
 
-**Version 3.3 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Stórálann ár soláthraí óstála do chuntas agus do dhíospóireachtaí i Londain, sa Ríocht Aontaithe; insíonn rannán 5 cá háit eile a dtéann do shonraí. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi d'ainm cleite scortha. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu.
 
@@ -183,7 +183,7 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 | `__Host-debateai-session` | Fianán (HttpOnly) | Coinníonn sé sínithe isteach thú. Athnuaitear é fad is a bhíonn tú ag úsáid na seirbhíse. | 14 lá |
 | `__Host-debateai-csrf` | Fianán | Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. | 14 lá |
 | `__Host-debateai-age-refusal` | Fianán (HttpOnly) | Tar éis seiceáil aoise a dhiúltú, cuireann sé cosc ar an mbrabhsálaí seo triail eile a bhaint as ar feadh 30 lá. Níl ann ach an focal “diúltaithe”, gan aon sonraí pearsanta. | 30 lá |
-| `debateai.locale` | Fianán | Meabhraíonn sé teanga an chomhéadain a roghnaigh tú. | 1 bhliain |
+| `debateai.locale` | Fianán | Meabhraíonn sé teanga an chomhéadain a roghnaigh tú, agus socraíonn sé teanga na ríomhphost a sheolaimid chugat. | 1 bhliain |
 | `__Host-debateai-staff` | Fianán (HttpOnly) | Rochtain ar leith don fhoireann | Suas le 8 n-uaire; 15 nóiméad díomhaointis |
 | `__Host-debateai-staff-csrf` | Fianán | Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. | Suas le 8 n-uaire; 15 nóiméad díomhaointis |
 | `__Host-debateai-password-reset` | Fianán (HttpOnly) | Athshocrú focail faire amháin | Suas le 30 nóiméad |
@@ -201,6 +201,8 @@ Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbl
 | `debateai.exportPending` | Stóras seisiúin | Coinníonn sé an nasc easpórtála a seoladh ar ríomhphost sa chluaisín seo chun síniú isteach agus triail eile a dhéanamh. | Go ndúnfar an cluaisín, go síneofar amach, go n-osclófar nasc nua, go n-éireoidh leis an gcéad íoslódáil nó go bhfaighfear toradh naisc neamhbhailí nó cuntais mhícheart |
 | `debateai.exportLinkOutcome` | Stóras seisiúin | Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo. | Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua |
 
+Coinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é.
+
 Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí Dialectical Engine.
 
 Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn Dialectical Engine thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é.
@@ -211,7 +213,7 @@ Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh
 
 Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú.
 
-Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.3 in ionad leagan 3.2: ní chlúdaíonn sé ach na réigiúin a sheirbhísímid, ainmníonn sé ár gcuideachta agus, i rannán 5, ár soláthraithe óstála, seachadta inneachair agus ríomhphoist, agus déanann sé cur síos ar an tseiceáil ar bhotaí a dhéanann Cloudflare.
+Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.4 in ionad leagan 3.3: deir rannán 13 anois go socraíonn an fianán debateai.locale freisin an teanga ina scríobhaimid na ríomhphost a sheolaimid chugat, agus cuireann sé paragraf leis a deir go gcoinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é.
 
 ## Annex B — Téarmaí príobháideachais réigiúnacha
 

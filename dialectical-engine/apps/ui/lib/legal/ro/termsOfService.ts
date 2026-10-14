@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Conținutul dumneavoastră vă aparține în continuare. Păstrați toate drepturile pe care le dețineți asupra întrebărilor, afirmațiilor, adnotărilor și contestărilor pe care le transmiteți. Ne acordați o licență neexclusivă, mondială și scutită de redevențe pentru a găzdui, stoca, reproduce, adapta și prelucra acel conținut în scopul operării serviciului: derularea dezbaterii, stocarea acesteia pentru a o putea redeschide și reda, furnizarea de asistență, îndeplinirea obligațiilor noastre legale și — numai dacă alegeți să publicați — scopurile prevăzute în secțiunea 9. Această licență încetează atunci când conținutul este șters, cu excepția situațiilor impuse de secțiunea 9 sau de lege." },
-      { kind: "p", text: "Nu ne antrenăm modelele pe conținutul dumneavoastră. Nu antrenăm modele pe conținutul dumneavoastră. Folosim furnizori de IA numai în condiții care nu le permit să utilizeze conținutul dumneavoastră pentru antrenarea sau îmbunătățirea modelelor lor; Registrul furnizorilor de IA arată, pentru fiecare furnizor, dacă am confirmat acest lucru și când." },
+      { kind: "p", text: "Nu ne antrenăm modelele pe conținutul dumneavoastră. Folosim furnizori de IA numai în condiții care nu le permit să utilizeze conținutul dumneavoastră pentru antrenarea sau îmbunătățirea modelelor lor; Registrul furnizorilor de IA arată, pentru fiecare furnizor, dacă am confirmat acest lucru și când." },
       { kind: "p", text: "Cum ajunge conținutul dumneavoastră la furnizorii de IA. Pentru a derula o dezbatere, trimitem text către unul sau mai mulți furnizori externi de modele. Un furnizor primește întrebarea dumneavoastră, adnotările de orientare pe care le stabiliți și enunțurile pe care motorul le compune pe parcursul dezbaterii — astfel, furnizorul vede text derivat din și construit în jurul a ceea ce ați introdus, nu doar cuvintele dumneavoastră originale. Acesta nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată." },
       { kind: "p", text: "Ce trimite chatul de suport. Asistentul de suport este și el un model de IA. Când îi scrieți, trimitem mesajul dumneavoastră către un furnizor extern de modele, pentru ca modelul să poată răspunde, împreună cu articolele de ajutor pe care își sprijină răspunsul. Înainte de trimitere, mascăm tot ce seamănă cu o parolă, un cod de unică folosință sau o cheie. Dacă cereți să vorbiți cu o persoană, trimitem modelului și conversația, mascată în același mod, pentru ca acesta să scrie un scurt rezumat pentru membrul echipei noastre care preia cazul dumneavoastră. Nu atașăm adresa dumneavoastră de e-mail, identificatorii contului sau datele de plată, dar modelul primește orice altceva scrieți în chat, așa că nu scrieți acolo nimic din ce nu ați vrea să citească." },
       { kind: "p", text: "Ce furnizori folosim și unde se află. Registrul furnizorilor de IA de la dezbatere.ro/providers face parte din acești Termeni. Acesta enumeră fiecare furnizor pe care îl putem utiliza: entitatea juridică și țara sa; ce primește și de ce; unde efectuează prelucrarea; condițiile sale de păstrare; dacă pentru punctul final pe care îl utilizăm este activată păstrarea zero a datelor; dacă poate utiliza datele de intrare pentru antrenare conform contractului nostru; mecanismul de transfer pe care ne bazăm; și data la care am verificat ultima dată fiecare înregistrare. Furnizorii pot fi situați în afara țării dumneavoastră și în afara Spațiului Economic European. Politica noastră de confidențialitate explică garanțiile aplicabile." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Date cu caracter personal",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Modul în care prelucrăm datele cu caracter personal este descris în Politica de confidențialitate de la dezbatere.ro/privacy. Aceasta explică datele pe care le colectăm, temeiul juridic pentru fiecare scop, durata păstrării, destinatarii datelor, transferurile implicate și modul în care vă puteți exercita drepturile. Alte trei aspecte trebuie menționate și aici. Secțiunea 7 vă solicită să nu introduceți într-o întrebare datele cu caracter personal ale altor persoane; dacă o faceți, sunteți responsabil pentru acestea, iar noi putem elimina conținutul. Dacă o dezbatere publicată pe Dialectical Engine conține date cu caracter personal despre dumneavoastră, puteți solicita eliminarea acesteia fără să dețineți un cont (secțiunea 9). De asemenea, păstrăm o evidență a acceptării acestor Termeni — versiunea, ora și detaliile tehnice ale sesiunii — ca dovadă a contractului, astfel cum explică Politica de confidențialitate." }
+      { kind: "p", text: "Modul în care prelucrăm datele cu caracter personal este descris în Politica de confidențialitate de la dezbatere.ro/privacy. Aceasta explică datele pe care le colectăm, temeiul juridic pentru fiecare scop, durata păstrării, destinatarii datelor, transferurile implicate și modul în care vă puteți exercita drepturile. Alte trei aspecte trebuie menționate și aici. Secțiunea 7 vă solicită să nu introduceți într-o întrebare datele cu caracter personal ale altor persoane; dacă o faceți, sunteți responsabil pentru acestea, iar noi putem elimina conținutul. Dacă o dezbatere publicată pe Dialectical Engine conține date cu caracter personal despre dumneavoastră, puteți solicita eliminarea acesteia fără să dețineți un cont (secțiunea 9). De asemenea, păstrăm o evidență a acceptării acestor Termeni — versiunea, ora și detaliile tehnice ale sesiunii — ca dovadă a contractului, astfel cum explică Politica de confidențialitate. E-mailurile pe care vi le trimitem sunt redactate în limba pe care ați ales-o pe site-ul nostru; secțiunea 13 din Politica de confidențialitate explică modul în care păstrăm această alegere." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "1e26fc552f1d4a06ce9e6a056361bd66a7851543e1149c0d80c56d7fc1356899",
-  eyebrow: "TERMENII SERVICIULUI · v2.2 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "2.3",
+  sha256: "6a1da3a230ffdffdbd856b89416a1212a6864a80251f8c2be4e32cd0afcd7fc3",
+  eyebrow: "TERMENII SERVICIULUI · v2.3 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.2",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

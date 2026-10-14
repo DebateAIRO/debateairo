@@ -250,7 +250,9 @@ export class CheckoutService implements CheckoutServicePort {
           // Spec §2.5.5: the payment system this subscription's charges and saved card belong to.
           payment_provider: "netopia", payment_environment: environment,
           // Spec 2026-10-05 §2.16.3: the subscription's currency, for good.
-          currency: quote.currency
+          currency: quote.currency,
+          // S01-C13 (D-74, R-17): the checkout's language, which the M1 settlement reads back for its own row.
+          locale: input.locale
         }
       });
       // Provisional: the paid period starts at activation (P9b anchors it there).

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 
@@ -60,7 +61,7 @@ export async function createBillingTestAccount(pool: Pool, label: string): Promi
 
 /** Prepare → acknowledge the completion mail → finalize as the erasure principal. Returns the outcome. */
 export async function eraseBillingTestAccount(pool: Pool, account: BillingTestAccount): Promise<string> {
-  await pool.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}','{}')", [account.erasureId]);
+  await withMailLocale(pool, 'en', (c) => c.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}','{}')", [account.erasureId]));
   await pool.query(`
     UPDATE identity.account_erasure_notification_outbox
     SET claim_token=gen_random_uuid(),claim_expires_at=NULL,acknowledged_at=clock_timestamp(),last_error_code=NULL

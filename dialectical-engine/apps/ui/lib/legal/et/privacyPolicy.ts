@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Küpsis (HttpOnly) — Hoiab teid sisselogituna. Seda pikendatakse, kuni te teenust kasutate. — 14 päeva",
         "__Host-debateai-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — 14 päeva",
         "__Host-debateai-age-refusal — Küpsis (HttpOnly) — Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid. — 30 päeva",
-        "debateai.locale — Küpsis — Jätab meelde teie valitud liidese keele. — 1 aasta",
+        "debateai.locale — Küpsis — Jätab meelde teie valitud liidese keele ja määrab keele, milles me teile e-kirju saadame. — 1 aasta",
         "__Host-debateai-staff — Küpsis (HttpOnly) — Eraldi töötajate juurdepääs — Kuni 8 tundi; 15 minutit tegevusetust",
         "__Host-debateai-staff-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — Kuni 8 tundi; 15 minutit tegevusetust",
         "__Host-debateai-password-reset — Küpsis (HttpOnly) — Ainult parooli lähtestamine — Kuni 30 minutit",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Seansi salvestusruum — Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata. — Kuni vahekaardi sulgemise, väljalogimise või uue lingini"
         ]
       },
+      { kind: "p", text: "Iga e-kiri, mille teie jaoks järjekorda paneme, säilitab keele, mille te valisite, kuni me selle saadame." },
       { kind: "p", text: "Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },
       { kind: "p", text: "Brauserid võivad saata signaali „Do Not Track“ või muu sarnase signaali. Dialectical Engine ei jälgi teid, seega pole sellisel signaalil midagi välja lülitada: teenus töötab samamoodi nii signaaliga kui ka ilma." },
       { kind: "p", text: "Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja saidiandmed oma brauseri seadetes. Mis siis enam ei tööta: sisselogimine ning teie keele- ja kuvavaliku meelespidamine; ka küpsiseteade kuvatakse uuesti." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni." },
-      { kind: "p", text: "Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.3 asendas versiooni 3.2: see hõlmab ainult piirkondi, kus teenust pakume, nimetab meie ettevõtte ning jaotises 5 meie majutus-, sisuedastus- ja meiliteenuse pakkujad ning kirjeldab Cloudflare'i robotikontrolli." }
+      { kind: "p", text: "Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.4 asendas versiooni 3.3: jaotis 13 ütleb nüüd, et küpsis debateai.locale määrab ka keele, milles kirjutame teile saadetavad e-kirjad, ning lisandub lõik, mille kohaselt iga järjekorda pandud e-kiri säilitab keele, mille olete valinud, kuni me selle saadame." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "76abe7b9d37f637d2be2a91c63d6a28f0e58cbc02b8d5b7e39f31ffbd5a61213",
-  eyebrow: "PRIVAATSUSPOLIITIKA · v3.3 · KEHTIB ALATES 12. OKTOOBRIST 2026",
+  version: "3.4",
+  sha256: "a52cff2cff7489164fd69d93daebabecf4b0800a1c9b50c93a1c5c45c513f04a",
+  eyebrow: "PRIVAATSUSPOLIITIKA · v3.4 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",
-  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privaatsuspoliitika tekst",
   sectionIdPrefix: "policy-section-",

@@ -161,9 +161,9 @@ export class EmailChangeService {
     if (outcome.status !== "PENDING") throw new EmailChangeError("STEP_UP_REQUIRED");
     const currentEmail = await this.withDek(session.userId, (dek) =>
       this.open(dek, session.userId, outcome.currentEmailCiphertext, "user.email_ciphertext"));
-    await this.sendLink(newEmail, confirmToken, outcome.expiresAt, outcome.addressAvailable);
+    await this.sendLink(newEmail, confirmToken, outcome.expiresAt, outcome.addressAvailable, source);
     await this.dependencies.mail.sendEmailChange({
-      kind: "notice", recipient: currentEmail, newEmail, cancelToken, expiresAt: outcome.expiresAt
+      kind: "notice", recipient: currentEmail, newEmail, cancelToken, expiresAt: outcome.expiresAt, display: { locale: source.mailLocale ?? "en", timeZone: null }
     });
     return Object.freeze({ newEmail, expiresAt: outcome.expiresAt });
   }
@@ -182,7 +182,7 @@ export class EmailChangeService {
     if (outcome.status !== "RESENT") throw new EmailChangeError("NO_PENDING_CHANGE");
     const newEmail = await this.withDek(session.userId, (dek) =>
       this.open(dek, session.userId, outcome.newEmailCiphertext, "user.email_ciphertext"));
-    await this.sendLink(newEmail, confirmToken, outcome.expiresAt, outcome.addressAvailable);
+    await this.sendLink(newEmail, confirmToken, outcome.expiresAt, outcome.addressAvailable, source);
     return Object.freeze({ newEmail, expiresAt: outcome.expiresAt });
   }
 
@@ -210,10 +210,12 @@ export class EmailChangeService {
     if (outcome !== "CANCELLED") throw new EmailChangeError("LINK_INVALID");
   }
 
-  private async sendLink(recipient: string, token: string, expiresAt: Date, addressAvailable: boolean): Promise<void> {
+  private async sendLink(recipient: string, token: string, expiresAt: Date, addressAvailable: boolean, source: AuthSourceContext): Promise<void> {
+    // C12.6: the request's mail language, on both the confirmation and the address-unavailable mail (R-15).
+    const display = { locale: source.mailLocale ?? "en", timeZone: null };
     await this.dependencies.mail.sendEmailChange(addressAvailable
-      ? { kind: "confirmation", recipient, token, expiresAt }
-      : { kind: "address-unavailable", recipient });
+      ? { kind: "confirmation", recipient, token, expiresAt, display }
+      : { kind: "address-unavailable", recipient, display });
   }
 
   private open(

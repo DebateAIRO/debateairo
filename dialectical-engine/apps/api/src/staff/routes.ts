@@ -237,7 +237,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     route('POST', '/v1/admin/webauthn/registration/verify', async (request) => {
         const input = parse(contract.StaffRegistrationVerifyRequestSchema, request.body);
         await requireUnlocked();
-        const result = await application!.webauthn.finishRegistration(ordinary(request.authenticatedSession!), input, application!.intents.enrollment);
+        const result = await application!.webauthn.finishRegistration(ordinary(request.authenticatedSession!), input, application!.intents.enrollment, transport.sourceFor(request));
         return project(contract.StaffRegistrationResponseSchema, { receipt: receipt(result.receipt), credentialId: result.credentialId });
     });
     route('POST', '/v1/admin/webauthn/elevation/options', async (request) => {
