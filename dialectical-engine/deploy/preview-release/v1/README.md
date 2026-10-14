@@ -210,6 +210,49 @@ Then pin and restart exactly as `deploy/preview-lifecycle/v1/README.md` "Pinning
 says (`prestart.mjs pin --from "$ART/api-launch.json"`, the same for ui, regenerate both release
 drop-ins, `daemon-reload`, restart api then ui).
 
+## Releasing the debate-shape code (a new register version, even with the shape off)
+
+**In plain words.** The debate-shape release changes two of the instructions the AIs are sent, so their
+fingerprints in the settings (the register) change too. The new runner checks those fingerprints when it starts
+and refuses a settings version that does not carry them (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`). So this
+release needs a **new register version** before it can run at all, **even with the debate shape switched off**.
+With register 12 still pinned, the API would start and accept debates, but the runner would refuse to start, and
+those debates would wait with nobody to run them.
+
+**What the new version changes** (and nothing else):
+
+- `judgeContractHash`: `e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365` becomes
+  `aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612`;
+- `composerContractHash`: `4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f` becomes
+  `9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662`;
+- `mapContractHash` is new: `25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392` (read only
+  beside a debate-shape row);
+- `nodeRuntimeVersion` keeps its value with a new source reference, as at every publication.
+
+There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
+changed row: stop and ask.
+
+**The order.**
+
+1. **Practice first, with `--register-next`** (`tools/preview-practice/README.md`). Without it the practice
+   debate stops at `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`. Its progress line must name exactly the rows above.
+2. **Apply migrations 0116 and 0117** with the release's database step (step 6 above, `apply-and-plan`, then
+   the native operator once). Without 0116 every debate page fails: the page asks for the debate's map, and
+   the table it reads does not exist yet.
+3. **Publish the new version from this code, without `--debate-shape`**: the plan, the owner's review of the
+   delta, then the publish, as "Publishing a new register version on the preview" below describes. The plan
+   keeps the checker and rotation choices of version 12.
+4. **Wait until no debate is queued or running.** A debate in flight was started under the old fingerprints;
+   the runner finds its earlier attempts by them, so a debate crossing the switch would ask the AIs again and
+   pay twice.
+5. **Restart the API and the runner together** on the new version: `REGISTER_VERSION` moves in both `api.env`
+   and `runner.env`, and the launch plans carry the new publication. Start the website with the API or after
+   it, never before. Never restart the API alone on version 12: it does not check the fingerprints, so it
+   would accept debates the runner cannot start.
+
+Rollback: the new version stays sealed and unused; the old release goes back on version 12 in both env files.
+Switching the shape on later is a separate publication (`--debate-shape`), after these steps.
+
 ## Publishing a new register version on the preview (publish kit v2)
 
 **When.** Whenever the release's code builds a register different from the version the preview runs:
