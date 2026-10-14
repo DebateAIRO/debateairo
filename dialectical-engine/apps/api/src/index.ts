@@ -4673,7 +4673,13 @@ export class PostgresAskApplication implements AskApplication {
     // of the person's choice is a 409 the page answers by checking again; an offer ends the request with a 409.
     // Ruling L-NOCONSENT (pre-flight PF-L30): the route records consent only for signed-in people, so a legacy
     // principal never reaches the fast AI (eld + site language, no offer). The step stays before billing (CR-1).
+    // An unknown tier with billing off (a direct caller; the route's schema admits only free and premium) can never
+    // start: today's typed check refuses it further on (`#submitWithRoom`'s first line, or `evaluateAskAdmission`
+    // after the daily guard), in today's order. So the decider is not asked for it (no fast call, no offer). With
+    // billing on the server decides the tier from the person's plan, so the decider is asked as for any ask.
+    const tierRefusedLater = this.settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
     const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || this.settings.questionLanguage === undefined
+      || tierRefusedLater
       ? null
       : await this.settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
         fastCheckAllowed: principal.kind === "server" })

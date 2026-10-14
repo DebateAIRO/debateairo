@@ -165,7 +165,8 @@ export function readQuestionLanguageReply(text: string, questionLine: string): F
 }
 
 export type FastCheckTransport = (input: Readonly<{ packet: PromptPacket; signal: AbortSignal }>) => Promise<string>;
-export type FastCheck = Readonly<{ contractHash: string; read(questionLine: string, site: QuestionLanguage): Promise<FastCheckReading> }>;
+/** `timeoutMs`: the row's time limit this check applies itself; the decider bounds the call again just past it. */
+export type FastCheck = Readonly<{ contractHash: string; timeoutMs: number; read(questionLine: string, site: QuestionLanguage): Promise<FastCheckReading> }>;
 
 /**
  * The time limit holds for ANY transport (pre-flight PF-L15): the call is raced against the signal's abort, so a
@@ -180,6 +181,7 @@ export function createFastCheck(deps: Readonly<{ transport: FastCheckTransport; 
   const contractHash = questionLanguageCheckContractHash(deps.instruction);
   return Object.freeze({
     contractHash,
+    timeoutMs: deps.timeoutMs,
     async read(questionLine: string, site: QuestionLanguage): Promise<FastCheckReading> {
       const controller = new AbortController();
       const { signal } = controller;

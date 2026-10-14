@@ -10,7 +10,8 @@ import { ELD_TUNING } from "../../apps/api/src/question-language/eld-tuning.js";
 import type { FastCheck, FastCheckReading } from "../../apps/api/src/question-language/fast-check.js";
 import { FAST_CHECK_ALWAYS_SITES } from "../../apps/api/src/question-language/decide.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
-import { SITE_LANGUAGE_CODES } from "@debateai/contract";
+import { QUESTION_LANGUAGE_CHOICE_NEEDED, SITE_LANGUAGE_CODES } from "@debateai/contract";
+import { inspect } from "node:util";
 
 const NOW = new Date("2026-10-13T10:00:00.000Z");
 const MIX_Q = "Ar trebui România să adopte euro, or should it wait until wages catch up?";
@@ -21,7 +22,7 @@ const askOf = (question_line: string, extra: Partial<AskRequest> = {}) => ({ que
 const eldSaying = (reading: EldReading): EldReader => ({ read: () => reading, languages: () => [] });
 const fastSaying = (reading: FastCheckReading) => {
   const read = vi.fn(async () => reading);
-  return { check: { contractHash: "c".repeat(64), read } as FastCheck, read };
+  return { check: { contractHash: "c".repeat(64), timeoutMs: 5_000, read } as FastCheck, read };
 };
 const sure = (code: string): EldReading => ({ code, reliable: true, letters: ELD_TUNING.minLetters + 40, segments: [] });
 // Pre-flight PF-L20: the "eld settles" case uses a site eld may settle (Task 3 may make ro or en always-ask).
@@ -168,7 +169,7 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
 
   it("never blocks: a fast check that throws is the fallback (DOWN), and an eld that throws is no reading", async () => {
     const read = vi.fn(async () => { throw new Error(`boom ${MIX_Q}`); });
-    const lock = await deciderWith(eldSaying(sure("en")), { contractHash: "c".repeat(64), read } as FastCheck)
+    const lock = await deciderWith(eldSaying(sure("en")), { contractHash: "c".repeat(64), timeoutMs: 5_000, read } as FastCheck)
       .decide({ ask: askOf("Should Romania adopt the euro?", { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
     expect(lock).toMatchObject({ language: { code: "en" }, source: "FALLBACK_ELD", trace: { fast: { outcome: "DOWN", reason: "TRANSPORT", main: null } } });
 
@@ -233,6 +234,87 @@ describe("the question-language decider (question-language spec 2026-10-13)", ()
   it("ownerScopeOf: owner:<ownerRef> for a signed-in person, legacy:<id> otherwise", () => {
     expect(ownerScopeOf({ kind: "server", ownerRef: "o-1" })).toBe("owner:o-1");
     expect(ownerScopeOf({ kind: "legacy", legacyAskerId: "a-1" })).toBe("legacy:a-1");
+  });
+
+  // ---- Hardening round (Tasks 10+11 review) ----
+
+  it("the offer error validates its own body: a body the contract refuses is a typed refusal, never a 500 later", () => {
+    const trace = { eld: null, fast: null, contractHash: null };
+    const bad = { check_ref: "a.b", main_language: { code: "ro", name: "R".repeat(65) },
+      languages_seen: [{ code: "ro", name: "Romanian" }, { code: "en", name: "English" }], proposed_question: REWRITE };
+    const thrown = (() => { try { return new QuestionLanguageChoiceNeeded(bad, trace); } catch (error) { return error; } })();
+    expect(thrown).toBeInstanceOf(TypedDomainError);
+    expect((thrown as TypedDomainError).code).toBe("QUESTION_LANGUAGE_OFFER_INVALID");
+    expect((thrown as Error).message).not.toContain("Ar trebui");
+    expect(QuestionLanguageChoiceNeeded.from(bad, trace)).toBeNull();
+    expect(QuestionLanguageChoiceNeeded.from({ ...bad, extra: 1 }, trace)).toBeNull();
+    expect(() => new QuestionLanguageChoiceNeeded({ ...bad, main_language: { code: "ro", name: "Romanian" }, languages_seen: [{ code: "ro", name: "Romanian" }] }, trace))
+      .toThrow("QUESTION_LANGUAGE_OFFER_INVALID");
+  });
+
+  it("the offer error carries its code, and logging or JSON of it never prints the rewrite (offer and trace are not enumerable)", () => {
+    const good = { check_ref: "a.b", main_language: { code: "ro", name: "Romanian" },
+      languages_seen: [{ code: "ro", name: "Romanian" }, { code: "en", name: "English" }], proposed_question: REWRITE };
+    const needed = QuestionLanguageChoiceNeeded.from(good, { eld: null, fast: null, contractHash: "h" })!;
+    expect(needed).toBeInstanceOf(QuestionLanguageChoiceNeeded);
+    expect(needed.code).toBe(QUESTION_LANGUAGE_CHOICE_NEEDED);
+    expect(needed.message).toBe(QUESTION_LANGUAGE_CHOICE_NEEDED);
+    expect(needed.offer).toEqual(good);
+    expect(needed.trace).toEqual({ eld: null, fast: null, contractHash: "h" });
+    expect(Object.keys(needed)).not.toContain("offer");
+    expect(Object.keys(needed)).not.toContain("trace");
+    expect(JSON.stringify(needed)).not.toContain("salariile");
+    expect(inspect(needed)).not.toContain("salariile");
+    expect(Object.isFrozen(needed.offer) && Object.isFrozen(needed.offer.languages_seen)).toBe(true);
+  });
+
+  it("never blocks: a fast check that never answers is the fallback just past the row's limit (row + 1 s)", async () => {
+    vi.useFakeTimers();
+    try {
+      const read = vi.fn(() => new Promise<FastCheckReading>(() => undefined));
+      const pending = deciderWith(eldSaying(sure("en")), { contractHash: "c".repeat(64), timeoutMs: 2_000, read })
+        .decide({ ask: askOf("Should Romania adopt the euro?", { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
+      let settled: QuestionLanguageLock | undefined;
+      void pending.then((lock) => { settled = lock; });
+      await vi.advanceTimersByTimeAsync(2_999);
+      expect(settled).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toMatchObject({ language: { code: "en" }, source: "FALLBACK_ELD", trace: { fast: { outcome: "DOWN", reason: "TIMEOUT" } } });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("an answered fast check leaves no timer behind", async () => {
+    vi.useFakeTimers();
+    try {
+      const lock = await deciderWith(eldSaying(sure("en")), fastSaying({ kind: "ONE", main: { code: "en", name: "English" } }).check)
+        .decide({ ask: askOf("Should Romania adopt the euro?", { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
+      expect(lock).toMatchObject({ source: "FAST" });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the impossible offer before the fast call is the site lock (DECISION_FALLBACK_SITE), never a throw", async () => {
+    vi.resetModules();
+    vi.doMock("../../apps/api/src/question-language/decide.js", async (original) => ({
+      ...(await original<typeof import("../../apps/api/src/question-language/decide.js")>()),
+      decideBeforeFast: () => ({ kind: "OFFER", main: { code: "en", name: "English" }, seen: [], proposed: "x" })
+    }));
+    try {
+      const { QuestionLanguageDecider: Mocked } = await import("../../apps/api/src/question-language/decider.js");
+      const fast = fastSaying({ kind: "ONE", main: { code: "en", name: "English" } });
+      const lock = await new Mocked({ eld: eldSaying(sure("en")), fastCheck: fast.check, key: newQuestionLanguageReferenceKey(), clock: () => NOW,
+        maxQuestionBytes: 8192 }).decide({ ask: askOf(MIX_Q, { site_language: "ro" }), ownerScope: "owner:a", fastCheckAllowed: true });
+      expect(lock).toMatchObject({ language: { code: "ro" }, source: "FALLBACK_SITE", recordCode: "DECISION_FALLBACK_SITE", localReason: null });
+      expect(fast.read).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock("../../apps/api/src/question-language/decide.js");
+      vi.resetModules();
+    }
   });
 
   it("runLanguageOf with a lock: the lock's code (script subtag kept) and English name", () => {

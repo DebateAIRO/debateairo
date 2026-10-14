@@ -19,6 +19,7 @@ import {
 } from "@debateai/contract";
 import { RunCostSubstitutionRepository, RunRepository } from "@debateai/db";
 import { TypedDomainError, detectArgumentLanguage } from "@debateai/kernel";
+import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues, type PlanId
@@ -97,6 +98,10 @@ function fixtureApplication(
 }
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
+const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
+  deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
+  budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
+}))!;
 const Q = "Ar trebui România să adopte euro?";
 const ask = (extra: Partial<AskRequest> = {}): AskRequest => ({ question_line: Q, risk_tier: "casual", tier_source: "ASKER",
   tier_provenance_ref: "asker:test", composition_budget_tier: "medium", depth_params: { depth: 2 }, decision_scope: "question language submit",
@@ -119,7 +124,7 @@ const startingRoom: AskRoomPort = {
 };
 
 function arrangeWith(input: Readonly<{ policy: boolean; port?: QuestionLanguagePort; billing?: AskBilling; room?: AskRoomPort;
-  openAdmissionLock?: () => unknown; resolveDiscoveredPanel?: () => Promise<typeof PANEL> }>) {
+  openAdmissionLock?: () => unknown; resolveDiscoveredPanel?: () => Promise<typeof PANEL>; extra?: Partial<RunCreationSettings> }>) {
   const started: Array<Parameters<RunRepository["startRun"]>[0]> = [];
   vi.spyOn(LivenessRepository.prototype, "recordQuery").mockResolvedValue(1);
   vi.spyOn(RunRepository.prototype, "startRun").mockImplementation(async (run) => { started.push(run); return RUN_ID; });
@@ -138,7 +143,8 @@ function arrangeWith(input: Readonly<{ policy: boolean; port?: QuestionLanguageP
       computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned, ...(shape === null ? {} : { shape }) }),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     ...(input.policy ? { debateShapePolicy: debateShapePolicyStartValues() } : {}),
-    ...(input.port === undefined ? {} : { questionLanguage: input.port })
+    ...(input.port === undefined ? {} : { questionLanguage: input.port }),
+    ...input.extra
   };
   const application = new PostgresAskApplication(stubPool(), { dispatch: vi.fn(async () => undefined) }, settings,
     { read: async () => [] }, stubPool(), { server: stubPool(), legacy: stubPool() });
@@ -241,6 +247,38 @@ describe("submit with the question-language step (question-language spec 2026-10
     const legacySession = { ...serverSession, ownership_provenance: "legacy" as never, asker_id: "asker-legacy-1" };
     await application.submit(ask({ site_language: "ro" }), legacySession, { kind: "legacy", legacyAskerId: "asker-legacy-1" });
     expect(decide).toHaveBeenCalledWith(expect.objectContaining({ ownerScope: "legacy:asker-legacy-1", fastCheckAllowed: false }));
+  });
+
+  // Hardening round (Tasks 10+11 review): the decider is asked only after the checks today's submit makes first.
+  it("the decider is never asked when the session does not match the principal", async () => {
+    const decide = vi.fn(async () => LOCK);
+    const { application, started } = arrangeWith({ policy: true, port: { decide } });
+    await expect(application.submit(ask({ site_language: "ro" }), { ...serverSession, asker_id: "owner:someone-else" }, serverPrincipal))
+      .rejects.toMatchObject({ code: "RUN_PRINCIPAL_SESSION_MISMATCH" });
+    expect(decide).not.toHaveBeenCalled();
+    expect(started).toEqual([]);
+  });
+
+  it("the decider is never asked when the preview's team check refuses the person", async () => {
+    const decide = vi.fn(async () => LOCK);
+    const { application, started } = arrangeWith({ policy: true, port: { decide },
+      extra: { previewProviderTestConfig: PREVIEW, previewTeamUserIds: ["77777777-7777-4777-8777-777777777777"] } });
+    await expect(application.submit(ask({ site_language: "ro" }), serverSession, serverPrincipal))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "PREVIEW_TEAM_ONLY" });
+    expect(decide).not.toHaveBeenCalled();
+    expect(started).toEqual([]);
+  });
+
+  it("with the row and a decider, an unknown plan tier is today's ASK_PLAN_TIER_INVALID and the decider is never asked", async () => {
+    for (const room of [undefined, startingRoom]) {
+      const decide = vi.fn(async () => LOCK);
+      const { application, started } = arrangeWith({ policy: true, port: { decide }, ...(room === undefined ? {} : { room }) });
+      await expect(application.submit(ask({ site_language: "ro", plan_tier: "gold" as never }), serverSession, serverPrincipal))
+        .rejects.toMatchObject({ name: "AskRefusal", code: "ASK_PLAN_TIER_INVALID" });
+      expect(decide, room === undefined ? "today's path" : "the room's path").not.toHaveBeenCalled();
+      expect(started).toEqual([]);
+      vi.restoreAllMocks();
+    }
   });
 
   it("the route answers the offer as a strict 409 body, and a stale or forged choice as 409 with its code", async () => {

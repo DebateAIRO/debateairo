@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { QuestionLanguageOfferSchema, type AskRequest, type QuestionLanguageOffer } from "@debateai/contract";
+import { QUESTION_LANGUAGE_CHOICE_NEEDED, QuestionLanguageOfferSchema, type AskRequest, type QuestionLanguageOffer } from "@debateai/contract";
 import { TypedDomainError, detectArgumentLanguage, questionLanguageOf, type QuestionLanguage } from "@debateai/kernel";
 import {
   REPEAT_OFFER_WINDOW, decideAfterFast, decideBeforeFast, decisionRecordCode, withoutRepeatOffer, type LanguageDecision, type LockSource
@@ -50,14 +50,32 @@ export type QuestionLanguageLock = Readonly<{ language: QuestionLanguage; source
   rewriteAccepted: boolean; originalQuestionLine: string | null; trace: QuestionLanguageTrace;
   recordCode: string; localReason: QuestionLanguageLocalReason | null }>;
 
+/**
+ * A real-mix offer, thrown to end the request with a 409. It validates its own body against the contract's 409 schema
+ * (PF-L19), so no port or double can hand the route a body whose parse would throw a 500: a body the contract refuses
+ * is the typed QUESTION_LANGUAGE_OFFER_INVALID instead (`from` answers null, for the decider's lock). `offer` and
+ * `trace` are NON-enumerable, so logging the error or JSON.stringify of it never prints the rewrite; the message and
+ * `code` are the code alone.
+ */
 export class QuestionLanguageChoiceNeeded extends Error {
-  readonly offer: QuestionLanguageOffer;
-  readonly trace: QuestionLanguageTrace;
-  constructor(offer: QuestionLanguageOffer, trace: QuestionLanguageTrace) {
-    super("QUESTION_LANGUAGE_CHOICE_NEEDED");
+  readonly code = QUESTION_LANGUAGE_CHOICE_NEEDED;
+  declare readonly offer: QuestionLanguageOffer;
+  declare readonly trace: QuestionLanguageTrace;
+  constructor(offer: unknown, trace: QuestionLanguageTrace) {
+    super(QUESTION_LANGUAGE_CHOICE_NEEDED);
+    const parsed = QuestionLanguageOfferSchema.safeParse(offer);
+    if (!parsed.success) throw new TypedDomainError("QUESTION_LANGUAGE_OFFER_INVALID", "QUESTION_LANGUAGE_OFFER_INVALID");
     this.name = "QuestionLanguageChoiceNeeded";
-    this.offer = offer;
-    this.trace = trace;
+    const body: QuestionLanguageOffer = Object.freeze({ ...parsed.data,
+      main_language: Object.freeze({ ...parsed.data.main_language }),
+      languages_seen: Object.freeze(parsed.data.languages_seen.map((language) => Object.freeze({ ...language }))) as QuestionLanguageOffer["languages_seen"] });
+    Object.defineProperty(this, "offer", { value: body, enumerable: false, writable: false, configurable: false });
+    Object.defineProperty(this, "trace", { value: Object.freeze({ ...trace }), enumerable: false, writable: false, configurable: false });
+  }
+
+  /** The offer, or null when the contract would refuse its body (the caller then locks instead: never a block). */
+  static from(offer: unknown, trace: QuestionLanguageTrace): QuestionLanguageChoiceNeeded | null {
+    return QuestionLanguageOfferSchema.safeParse(offer).success ? new QuestionLanguageChoiceNeeded(offer, trace) : null;
   }
 }
 
@@ -77,6 +95,13 @@ export function ownerScopeOf(principal: Readonly<{ kind: "server"; ownerRef: str
 
 /** CR-5: at most this many offers are remembered (oldest dropped first); each for REPEAT_OFFER_WINDOW only. */
 const OFFER_MEMORY = Object.freeze({ entries: 10_000 });
+
+/**
+ * The decider's own bound on the fast call: the row's limit (FastCheck.timeoutMs, which createFastCheck applies
+ * itself) plus a margin, so a port that ignores its own limit can never hold the request. A FastCheck naming no
+ * usable limit is bounded by the row's largest (register question-language-policy: 1,000..15,000 ms).
+ */
+const FAST_CALL_BOUND = Object.freeze({ marginMs: 1_000, rowMaxMs: 15_000 });
 
 /** A failing eld is no reading (never block): the fast AI, or the site language, decides. */
 const NO_READING: EldReading = Object.freeze({ code: null, reliable: false, letters: 0, segments: Object.freeze([]) });
@@ -127,7 +152,12 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
     const fastCheck = this.#deps.fastCheck;
     const before = decideBeforeFast(site, reading, questionLine,
       { fastCheckAvailable: fastCheck !== null, fastCheckAllowed: input.fastCheckAllowed });
-    if (before.kind === "OFFER") throw refusal("QUESTION_LANGUAGE_DECISION_INVALID");
+    if (before.kind === "OFFER") {
+      // Impossible (decideBeforeFast never offers), but never a block: the site language, by its own record code.
+      return this.#done(Object.freeze({ language: site, source: "FALLBACK_SITE", siteLanguage: site.code, rewriteAccepted: false,
+        originalQuestionLine: null, trace: Object.freeze({ eld, fast: null, contractHash: null }), recordCode: "DECISION_FALLBACK_SITE",
+        localReason: null }));
+    }
     if (before.kind === "LOCK") {
       const localReason: QuestionLanguageLocalReason | null = before.source !== "LOCAL_ELD" && before.source !== "LOCAL_SITE" ? null
         : fastCheck === null ? this.#deps.fastCheckOffReason ?? "NO_FAST_CHECK" : "SIGNED_OUT";
@@ -146,18 +176,17 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
       proposed: decision.proposed, main: decision.main.code, now: new Date(nowMs) });
     // PF-L19: the offer must be a body the 409 can carry (the route parses it; a failure there would be a 500, a
     // block). One the contract refuses is never sent and never remembered as shown: the main language is locked.
-    const offer = QuestionLanguageOfferSchema.safeParse({ check_ref: checkRef,
+    const needed = QuestionLanguageChoiceNeeded.from({ check_ref: checkRef,
       main_language: { code: decision.main.code, name: decision.main.name },
       languages_seen: decision.seen.map((language) => ({ code: language.code, name: language.name })),
-      proposed_question: decision.proposed });
-    if (!offer.success) {
+      proposed_question: decision.proposed }, trace);
+    if (needed === null) {
       // L-B64: the lock carries the language's own English name, never the refused one.
       const language = questionLanguageOf(primary(decision.main.code), questionLine) ?? site;
       return this.#done(Object.freeze({ language, source: "FAST_MIX_NO_OFFER", siteLanguage: site.code, rewriteAccepted: false,
         originalQuestionLine: null, trace, recordCode: "FAST_MIX_NO_OFFER:OFFER_BODY_REFUSED", localReason: null }));
     }
     this.#remember(offerKey, nowMs);
-    const needed = new QuestionLanguageChoiceNeeded(Object.freeze(offer.data), trace);
     this.#deps.onDecided?.(needed);
     throw needed;
   }
@@ -183,12 +212,22 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
     }
   }
 
-  /** Never blocks: createFastCheck never throws, but any FastCheck that does is a DOWN reading (the table's fallback). */
+  /**
+   * Never blocks: createFastCheck never throws and applies the row's limit, but any FastCheck that throws is DOWN
+   * (TRANSPORT), and one still pending just past the row's limit is DOWN (TIMEOUT): the table's fallback either way.
+   */
   async #fast(fastCheck: FastCheck, questionLine: string, site: QuestionLanguage): Promise<FastCheckReading> {
+    const rowMs = Number.isFinite(fastCheck.timeoutMs) && fastCheck.timeoutMs > 0 ? fastCheck.timeoutMs : FAST_CALL_BOUND.rowMaxMs;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<FastCheckReading>((resolve) => {
+      timer = setTimeout(() => resolve(Object.freeze({ kind: "DOWN", reason: "TIMEOUT" })), rowMs + FAST_CALL_BOUND.marginMs);
+    });
     try {
-      return await fastCheck.read(questionLine, site);
+      return await Promise.race([Promise.resolve().then(() => fastCheck.read(questionLine, site)), expired]);
     } catch {
       return Object.freeze({ kind: "DOWN", reason: "TRANSPORT" });
+    } finally {
+      clearTimeout(timer);
     }
   }
 
