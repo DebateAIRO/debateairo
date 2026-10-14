@@ -51,6 +51,11 @@ const SCRIPT_OF_TAG: Readonly<Record<string, ReplyScript>> = Object.freeze({
   ru: "Cyrillic", uk: "Cyrillic", bg: "Cyrillic"
 });
 
+/** The writing system a language tag's own table names (Russian → Cyrillic), or undefined for the rest. */
+export function replyScriptOfTag(tag: string): ReplyScript | undefined {
+  return Object.hasOwn(SCRIPT_OF_TAG, tag) ? SCRIPT_OF_TAG[tag] : undefined;
+}
+
 const SCRIPT_PATTERNS: readonly (readonly [ReplyScript, RegExp])[] = Object.freeze([
   ["Latin", /\p{Script=Latin}/gu],
   ["Cyrillic", /\p{Script=Cyrillic}/gu],
