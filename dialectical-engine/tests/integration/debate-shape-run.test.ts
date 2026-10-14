@@ -392,7 +392,12 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       expect(calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:"))).toEqual([]);
       expect(gates.requests.filter((request) => request.kind === "JUDGE")).toHaveLength(1);
       // Root 0's first grader was asked and answered after the stop (it fits): the stop, not the money left, held the rest.
-      expect(hosted.seamLog.filter((entry) => entry.phase === "BODY" && entry.providerRef === first.rootZeroGrader && entry.room === 0
+      // The grader is read from THIS run's requests: which maker grades root 0 depends on the run id, so the measuring
+      // run's first grader (priced cheap above) is not always on this run's panel (about one run in ten failed on that).
+      const finalGraderModel = gates.requests.slice(gates.requests.findIndex((request) => request.kind === "JUDGE"))
+        .find((request) => request.kind === "PANEL")!.model;
+      const finalGrader = TARGETS.find((target) => PANEL_REFS.includes(target.providerRef) && target.model === finalGraderModel)!.providerRef;
+      expect(hosted.seamLog.filter((entry) => entry.phase === "BODY" && entry.providerRef === finalGrader && entry.room === 0
         && entry.outcome === "ADMITTED").length).toBeGreaterThan(0);
       expect(hosted.charges.filter((entry) => entry.runId === debate.runId && entry.spendPhase === "BODY" && entry.providerRef === rootZeroRef).length)
         .toBeGreaterThan(0);
