@@ -1611,6 +1611,8 @@ export interface ReviewCatchUpReviewer {
     readonly callSiteKey: string;
     readonly questionLine: string;
     readonly argumentLanguageName?: string;
+    /** P2d Task 7c: the run's lock, exactly as the runner's own review sends it (`JudgeSubjectInput.questionLanguage`). */
+    readonly questionLanguage?: QuestionLanguage;
     readonly statement: string;
     readonly authorMaker: string;
     readonly providerRef: string;
@@ -1778,6 +1780,14 @@ export async function runReviewCatchUp(input: {
   readonly workItemId: string;
   readonly questionLine: string;
   readonly argumentLanguageName?: string;
+  /**
+   * P2d Task 7c (controller ruling D-CATCHUP; ruling L-SHAPED-ONLY): the run's stored tag and its frozen receipt
+   * (`core.run.envelope_basis`), both as `RunRepository.readFrozenHead` returns them. The receipt decides the lock
+   * exactly as the runner decides it for its own reviews (`runQuestionLanguageLock`): a receipt with a shape locks every
+   * catch-up review to the stored pair; a receipt with no shape, or none given, keeps today's review.
+   */
+  readonly argumentLanguageTag?: string;
+  readonly envelopeBasis?: unknown;
   readonly invocationId: string;
   readonly pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[];
   readonly judgeBound: CallBound;
@@ -1789,6 +1799,14 @@ export async function runReviewCatchUp(input: {
   return input.dependencies.withContentLease(input.runId,async () => {
   const beforeAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
+  // P2d Task 7c (controller ruling D-CATCHUP): THE RUN'S LOCK, read off its receipt as the runner reads it. The Postgres
+  // reader above has already parsed this same receipt, so one that does not parse is refused there, as today.
+  const catchUpLanguage: QuestionLanguage | null = input.envelopeBasis === undefined ? null
+    : runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {
+      argumentLanguageTag: input.argumentLanguageTag ?? "und",
+      argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
+    });
+  const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -1842,6 +1860,7 @@ export async function runReviewCatchUp(input: {
         callSiteKey,
         questionLine: input.questionLine,
         argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
+        ...catchUpLanguageInput,
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,

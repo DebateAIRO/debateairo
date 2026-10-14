@@ -143,6 +143,10 @@ async function main(): Promise<void> {
       workItemId: source.workItemId,
       questionLine: run.questionLine,
       argumentLanguageName: run.argumentLanguageName,
+      // P2d Task 7c (controller ruling D-CATCHUP): the stored tag and the frozen receipt, so a shaped run's catch-up
+      // reviews in its locked language as the runner's own reviews do; a run with no shape keeps today's review.
+      argumentLanguageTag: run.argumentLanguageTag,
+      envelopeBasis: run.envelopeBasis,
       invocationId: randomUUID(),
       pinnedPanel: run.discoveredPanel.map((member) => ({
         maker: member.maker, providerRef: member.provider_ref
