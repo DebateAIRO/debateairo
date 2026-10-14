@@ -114,7 +114,7 @@ export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | un
  * sentence with high confidence (a real run refused a valid Romanian merge three times over two short claims), so a
  * field's language is never judged on one member alone. The verdict itself is the kernel's reply-side check (R-5).
  */
-export function mapLanguageIssues(texts: readonly string[], expected: ReplyLanguageExpectation, path: readonly (string | number)[]): readonly MapReplyIssue[] {
+function mapLanguageIssues(texts: readonly string[], expected: ReplyLanguageExpectation, path: readonly (string | number)[]): readonly MapReplyIssue[] {
   return mapWrongLanguage(texts.join(" "), expected) ? [Object.freeze({ path, code: "MAP_WRONG_LANGUAGE" })] : [];
 }
 

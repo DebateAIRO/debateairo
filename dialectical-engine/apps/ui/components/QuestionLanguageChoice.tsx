@@ -73,7 +73,7 @@ export function useQuestionLanguageChoice({
   return { ensureChoice, dialog };
 }
 
-export function QuestionLanguageChoiceDialog({
+function QuestionLanguageChoiceDialog({
   catalog,
   locale,
   offer,

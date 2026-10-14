@@ -84,7 +84,7 @@ export function eldConfident(reading: EldReading): boolean {
 }
 
 /** Ruling L-MIX: one clause read confidently (its letters are plain words only: never names, brands or acronyms). */
-export function eldSegmentConfident(segment: EldSegmentReading): boolean {
+function eldSegmentConfident(segment: EldSegmentReading): boolean {
   return segment.code !== null && segment.reliable && segment.letters >= ELD_TUNING.segmentMinLetters;
 }
 

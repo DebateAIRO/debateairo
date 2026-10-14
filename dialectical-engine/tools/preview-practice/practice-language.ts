@@ -478,7 +478,7 @@ export type PracticeLanguageRunInput = Readonly<{
 }>;
 
 /** Every case in turn: eld, the fast check (always), the lock as the decider computes it, one planner call. */
-export async function runPracticeLanguage(input: PracticeLanguageRunInput): Promise<Readonly<{
+async function runPracticeLanguage(input: PracticeLanguageRunInput): Promise<Readonly<{
   records: readonly PracticeLanguageCaseRecord[]; notRun: readonly PracticeLanguageNotRun[];
 }>> {
   const settings = input.policy.fastCheck;

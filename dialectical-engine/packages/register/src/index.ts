@@ -1230,7 +1230,6 @@ export {
 } from "./debate-shape-policy.js";
 export {
   QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION,
-  QUESTION_LANGUAGE_FAST_CHECK_PROVIDERS,
   QUESTION_LANGUAGE_POLICY_ROW_KEY,
   parseQuestionLanguagePolicy,
   questionLanguagePolicyRow,
