@@ -501,7 +501,11 @@ export class StoryWriter {
       nodes: input.nodes,
       arrows: input.arrows,
       sensitivity: input.sensitivity,
-      setAside: input.setAside
+      setAside: input.setAside,
+      // Debate shape P2c: the snapshot's optional map fields reach the material; absent on every other run, whose
+      // material stays byte for byte. The spread form keeps exactOptionalPropertyTypes satisfied.
+      ...(input.alsoRaised === undefined ? {} : { alsoRaised: input.alsoRaised }),
+      ...(input.answersNote === undefined ? {} : { answersNote: input.answersNote })
     };
     const stepLease = input.stepLease ?? BARE_STEP;
     const readEnrichment = this.#deps.readEnrichment ?? readStoryEnrichment;

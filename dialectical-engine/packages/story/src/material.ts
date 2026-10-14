@@ -49,6 +49,36 @@ export interface StorySnapshotArrow {
   readonly polarity: "support" | "attack";
 }
 
+/**
+ * Debate shape P2c (spec 2026-10-12 §3.3 step 8): one map point that was raised but not
+ * debated. `raisedBy` is how many different makers raised it. The claim is model text:
+ * evidence, like every claim.
+ */
+export interface StorySnapshotAlsoRaised {
+  readonly claim: string;
+  readonly raisedBy: number;
+}
+
+/**
+ * Debate shape P2c, owner ruling C-STORY: why not every answer argued was picked the usual
+ * way. MAP_UNAVAILABLE: the map could not list the possible answers, so each AI argued its
+ * own (today's opening). ANSWERS_FILLED: code added an answer or a point so that enough
+ * options were tested. The runner reads it from the map's marks (story-snapshot.ts).
+ */
+export type StoryAnswersNoteKind = "MAP_UNAVAILABLE" | "ANSWERS_FILLED";
+/**
+ * The owner's option 1 of three phrasings for each kind (plan "Wording picks"), in plain
+ * English; the storyteller says its meaning once, in the question's language.
+ */
+export const STORY_ANSWERS_NOTE_MAP_UNAVAILABLE =
+  "We could not first gather every possible answer, so each AI argued the answer it found best.";
+export const STORY_ANSWERS_NOTE_ANSWERS_FILLED =
+  "Some of the answers or points argued here were added to make sure enough options were tested.";
+const STORY_ANSWERS_NOTE_TEXT: Readonly<Record<StoryAnswersNoteKind, string>> = Object.freeze({
+  MAP_UNAVAILABLE: STORY_ANSWERS_NOTE_MAP_UNAVAILABLE,
+  ANSWERS_FILLED: STORY_ANSWERS_NOTE_ANSWERS_FILLED
+});
+
 export interface StoryRunSnapshot {
   readonly runId: string;
   readonly workItemId: string;
@@ -69,6 +99,17 @@ export interface StoryRunSnapshot {
   readonly arrows: readonly StorySnapshotArrow[];
   readonly sensitivity: readonly { readonly removedNodeId: string; readonly leverage: number }[];
   readonly setAside: readonly { readonly nodeId: string; readonly reason: string }[];
+  /**
+   * Debate shape P2c: the map's points that were raised but not debated, most-raised
+   * first. Absent on every run without the new shape, whose material stays byte for byte
+   * what it was.
+   */
+  readonly alsoRaised?: readonly StorySnapshotAlsoRaised[];
+  /**
+   * Debate shape P2c, owner ruling C-STORY: present only when the answers argued came
+   * from a map fallback. Absent on every other run, whose material stays byte for byte.
+   */
+  readonly answersNote?: StoryAnswersNoteKind;
 }
 
 export interface StoryNodeEnrichment {
@@ -146,6 +187,12 @@ export interface StoryMaterialOmitted {
   readonly attacks: number;
 }
 
+/** Debate shape P2c: a raised-but-not-debated point as the models read it. It has no reference. */
+export interface StoryMaterialAlsoRaised {
+  readonly claim: string;
+  readonly raised_by: number;
+}
+
 export interface StoryMaterialVerdict {
   readonly label: StoryVerdictBasis["label"];
   readonly rule_in_words: string;
@@ -177,7 +224,15 @@ export interface StoryMaterial {
   readonly hinges: readonly string[];
   readonly setAside: readonly { readonly id: string; readonly reason: string }[];
   readonly omitted: readonly StoryMaterialOmitted[];
-  /** UTF-8 bytes of every field's content (question through omitted). */
+  /** Debate shape P2c: present only when at least one also-raised point fitted the budget. */
+  readonly alsoRaised?: readonly StoryMaterialAlsoRaised[];
+  /**
+   * Debate shape P2c, owner ruling C-STORY: the sentence of the snapshot's `answersNote`.
+   * Part of the debate's own material at every ladder step: never dropped, and counted
+   * in `bytes` like every core field.
+   */
+  readonly answersNote?: string;
+  /** UTF-8 bytes of every field's content (question through answers_note). */
   readonly bytes: number;
 }
 
@@ -208,16 +263,18 @@ const STORY_THRESHOLD_KEYS: StoryKeyList<StoryMaterialVerdict["thresholds"]> = {
 };
 const STORY_OMITTED_KEYS: StoryKeyList<StoryMaterialOmitted> = { position_ref: true, supports: true, attacks: true };
 const STORY_SET_ASIDE_KEYS: StoryKeyList<StoryMaterial["setAside"][number]> = { id: true, reason: true };
+const STORY_ALSO_RAISED_KEYS: StoryKeyList<StoryMaterialAlsoRaised> = { claim: true, raised_by: true };
 /** The fenced field names (`storyCoreFields`, plus the second draft's `prior_objection`). */
 const STORY_MATERIAL_FIELD_NAMES = Object.freeze([
-  "question", "verdict", "served_statement", "positions", "points", "hinges", "set_aside", "omitted", "prior_objection"
+  "question", "verdict", "served_statement", "positions", "points", "hinges", "set_aside", "omitted", "also_raised",
+  "answers_note", "prior_objection"
 ]);
 
 /** Every key and field name of the material, each once. */
 export const STORY_MATERIAL_KEYS: readonly string[] = Object.freeze([...new Set([
   ...Object.keys(STORY_POINT_KEYS), ...Object.keys(STORY_POSITION_KEYS), ...Object.keys(STORY_VERDICT_KEYS),
   ...Object.keys(STORY_THRESHOLD_KEYS), ...Object.keys(STORY_OMITTED_KEYS), ...Object.keys(STORY_SET_ASIDE_KEYS),
-  ...STORY_MATERIAL_FIELD_NAMES
+  ...Object.keys(STORY_ALSO_RAISED_KEYS), ...STORY_MATERIAL_FIELD_NAMES
 ])]);
 
 /**
@@ -251,6 +308,10 @@ const STORY_HINGE_COUNT = 5;
 const STORY_TOP_LEVERAGE = 10;
 /** Ladder steps 6 and 7 spare this many highest-leverage points (positions are not ranked). */
 const STORY_KEPT_LEVERAGE = 20;
+/** Debate shape P2c: at most this many also-raised points reach the material, most-raised first. */
+export const STORY_ALSO_RAISED_MAX = 12;
+/** An also-raised claim is cut to this many characters, or to the ladder step's claim cut when that is shorter. */
+const STORY_ALSO_RAISED_CLAIM_CHARS = 240;
 
 /**
  * The shrink ladder, verbatim from spec §5.2, one `compressionStep` per row.
@@ -345,7 +406,9 @@ function storyEngineTokens(material: StoryMaterial): ReadonlySet<string> {
   const own = [
     material.question,
     ...material.positions.map((position) => position.claim),
-    ...material.points.map((point) => point.claim)
+    ...material.points.map((point) => point.claim),
+    // Debate shape P2c: a raised point is the person's side of the debate, as a claim is.
+    ...(material.alsoRaised ?? []).map((item) => item.claim)
   ].join("\n");
   return new Set(STORY_ENGINE_TOKENS.filter((token) =>
     !new RegExp(`(?<![\\p{L}\\p{N}_])${token}(?![\\p{L}\\p{N}_])`, "u").test(own)));
@@ -372,7 +435,8 @@ function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
     ...material.positions.map((position) => position.claim),
     ...material.points.flatMap((point) => [
       point.claim, point.best_case ?? "", point.objection ?? "", ...(point.review_reasons ?? [])
-    ])
+    ]),
+    ...(material.alsoRaised ?? []).map((item) => item.claim)
   ]);
   const texts = new Set<string>();
   const add = (value: number | null | undefined): void => {
@@ -578,12 +642,58 @@ function storyCoreFields(core: StoryMaterialCore): FramedMaterialField[] {
     { name: "points", content: JSON.stringify(core.points) },
     { name: "hinges", content: JSON.stringify(core.hinges) },
     { name: "set_aside", content: JSON.stringify(core.setAside) },
-    { name: "omitted", content: JSON.stringify(core.omitted) }
+    { name: "omitted", content: JSON.stringify(core.omitted) },
+    // Debate shape P2c: only when there is something to send, so a run without the new
+    // shape keeps today's fields byte for byte.
+    ...(core.alsoRaised === undefined || core.alsoRaised.length === 0
+      ? []
+      : [{ name: "also_raised", content: JSON.stringify(core.alsoRaised) }]),
+    // Owner ruling C-STORY: only on a run whose answers came from a map fallback.
+    ...(core.answersNote === undefined ? [] : [{ name: "answers_note", content: JSON.stringify(core.answersNote) }])
   ];
 }
 
 function storyFieldBytes(fields: readonly FramedMaterialField[]): number {
   return fields.reduce((total, field) => total + Buffer.byteLength(field.content, "utf8"), 0);
+}
+
+/** Debate shape P2c: non-blank points, most-raised first (ties keep the map's order), at most STORY_ALSO_RAISED_MAX. */
+function storyAlsoRaisedRanked(items: readonly StorySnapshotAlsoRaised[]): readonly StorySnapshotAlsoRaised[] {
+  return items
+    .map((item, order) => ({
+      item: { claim: item.claim.trim(), raisedBy: Number.isFinite(item.raisedBy) ? Math.max(1, Math.trunc(item.raisedBy)) : 1 },
+      order
+    }))
+    .filter(({ item }) => item.claim !== "")
+    .sort((left, right) => right.item.raisedBy - left.item.raisedBy || left.order - right.order)
+    .slice(0, STORY_ALSO_RAISED_MAX)
+    .map(({ item }) => item);
+}
+
+/**
+ * Debate shape P2c: the also-raised points ride in whatever the budget leaves once the
+ * debate's own material fits. They never push the debate down the ladder. The most-raised
+ * points that still fit are kept and the rest are left out; with no room at all, the field
+ * is not sent.
+ */
+function storyWithAlsoRaised(
+  material: StoryMaterial,
+  ranked: readonly StorySnapshotAlsoRaised[],
+  claimChars: number | null,
+  budgetBytes: number
+): StoryMaterial {
+  if (ranked.length === 0) return material;
+  const limit = claimChars === null ? STORY_ALSO_RAISED_CLAIM_CHARS : Math.min(claimChars, STORY_ALSO_RAISED_CLAIM_CHARS);
+  const items = ranked.map((item): StoryMaterialAlsoRaised => Object.freeze({
+    claim: storyClip(item.claim, limit),
+    raised_by: item.raisedBy
+  }));
+  for (let count = items.length; count > 0; count -= 1) {
+    const kept = Object.freeze(items.slice(0, count));
+    const bytes = material.bytes + Buffer.byteLength(JSON.stringify(kept), "utf8");
+    if (bytes <= budgetBytes) return Object.freeze({ ...material, alsoRaised: kept, bytes });
+  }
+  return material;
 }
 
 /**
@@ -772,7 +882,10 @@ export function buildStoryMaterial(input: {
       setAside: Object.freeze(snapshot.setAside
         .filter((entry) => visible.has(entry.nodeId))
         .map((entry) => Object.freeze({ id: ref(entry.nodeId), reason: entry.reason }))),
-      omitted: Object.freeze(omitted)
+      omitted: Object.freeze(omitted),
+      // Owner ruling C-STORY: the answers note is the debate's own material at every ladder step, so it is never
+      // dropped and its bytes count like any core field's. Absent on every other run: today's bytes.
+      ...(snapshot.answersNote === undefined ? {} : { answersNote: STORY_ANSWERS_NOTE_TEXT[snapshot.answersNote] })
     };
     return { material: Object.freeze({ ...core, bytes: storyFieldBytes(storyCoreFields(core)) }), visible };
   };
@@ -780,10 +893,13 @@ export function buildStoryMaterial(input: {
   // The positions' references, strongest first: the order they were numbered and
   // listed in, and the order the checks read "the strongest `pathCap`" from.
   const positionOrder: readonly string[] = Object.freeze(positionNodes.map((node) => ref(node.nodeId)));
+  const alsoRaised = storyAlsoRaisedRanked(snapshot.alsoRaised ?? []);
   let lastBytes = 0;
   for (const [step, shrink] of STORY_SHRINK_LADDER.entries()) {
-    const { material, visible } = materialAt(shrink);
-    if (material.bytes <= budgetBytes) {
+    const fitted = materialAt(shrink);
+    if (fitted.material.bytes <= budgetBytes) {
+      const material = storyWithAlsoRaised(fitted.material, alsoRaised, shrink.claimChars, budgetBytes);
+      const visible = fitted.visible;
       return Object.freeze({
         kind: "OK",
         material,
@@ -801,7 +917,7 @@ export function buildStoryMaterial(input: {
         compressionStep: step
       });
     }
-    lastBytes = material.bytes;
+    lastBytes = fitted.material.bytes;
   }
   return Object.freeze({ kind: "TOO_LARGE", bytes: lastBytes, budgetBytes });
 }

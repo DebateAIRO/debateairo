@@ -10,6 +10,7 @@ import {
 } from "@debateai/providers";
 import type { StoryPolicy } from "@debateai/register";
 import {
+  STORY_ANSWERS_NOTE_ANSWERS_FILLED,
   STORY_CHECKER_CONTRACT_ID,
   STORYTELLER_CONTRACT_ID,
   StoryWriter,
@@ -1104,5 +1105,36 @@ describe("StoryWriter — a repaired reply is logged by its repair code", () => 
     await writer.writeAfterSettle(SNAPSHOT);
     expect(inserted[0]).toMatchObject({ outcome: "READY" });
     expect(events).not.toContain("STORY_REPLY_REPAIRED");
+  });
+});
+
+describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () => {
+  it("hands the snapshot's also-raised points and answers note to both prompts, and none without them", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({
+      ...SNAPSHOT,
+      alsoRaised: [{ claim: "Ask the school about a mid-year move.", raisedBy: 2 }],
+      answersNote: "ANSWERS_FILLED"
+    });
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      const fields = readPromptFrame(call.packet).fields;
+      expect(fields.find((field) => field.name === "also_raised")?.content)
+        .toBe(JSON.stringify([{ claim: "Ask the school about a mid-year move.", raised_by: 2 }]));
+      expect(fields.find((field) => field.name === "answers_note")?.content)
+        .toBe(JSON.stringify(STORY_ANSWERS_NOTE_ANSWERS_FILLED));
+      const names = fields.map((field) => field.name);
+      expect(names.indexOf("answers_note")).toBe(names.indexOf("also_raised") + 1);
+    }
+    const plain = scripted(byContract);
+    await harness(providing(plain.provider)).writer.writeAfterSettle(SNAPSHOT);
+    expect(plain.calls).toHaveLength(2);
+    for (const call of plain.calls) {
+      const names = readPromptFrame(call.packet).fields.map((field) => field.name);
+      expect(names).not.toContain("also_raised");
+      expect(names).not.toContain("answers_note");
+    }
   });
 });
