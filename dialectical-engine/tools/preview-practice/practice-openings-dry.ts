@@ -157,7 +157,7 @@ function openingsDryPatch(paths: readonly string[], fields: readonly FramedMater
 /** What the dry script has done so far. */
 export type OpeningsDryScript = { busyModel: string | null; slipped: boolean; requests: number };
 
-function openingsDryVendorReply(provider: "deepinfra" | "anthropic", model: string, content: string, id: number): string {
+export function openingsDryVendorReply(provider: "deepinfra" | "anthropic", model: string, content: string, id: number): string {
   return provider === "anthropic"
     ? JSON.stringify({ id: `msg_dry_${String(id)}`, type: "message", role: "assistant", model, content: [{ type: "text", text: content }],
       stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 100, output_tokens: 50 } })

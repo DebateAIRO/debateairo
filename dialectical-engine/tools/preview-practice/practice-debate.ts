@@ -10,6 +10,7 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { QuestionLanguageChoiceNeeded } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
@@ -19,6 +20,7 @@ import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, type PreviewBudgetPorts, 
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
+import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { composePracticeAsk, practiceRemainingPorts } from "./practice-ask-composition.js";
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
 import {
@@ -31,6 +33,15 @@ import {
   recheckReply,
   replyContentOf
 } from "./practice-lanes.js";
+import {
+  practiceDebateLanguageBlock,
+  practiceLanguageResubmission,
+  practiceSiteLanguageFor,
+  readPracticeMapLanguage,
+  type PracticeDebateLanguage,
+  type PracticeDebateLanguageBlock,
+  type PracticeMapLanguage
+} from "./practice-language.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
@@ -169,6 +180,8 @@ export type PracticeDebateResult = Readonly<{
   transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
   /** Debate shape: what the shape run did (practice-shape.ts); absent when the debate ran without a debate-shape row. */
   shape?: PracticeShapeBlock;
+  /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
+  language?: PracticeDebateLanguageBlock;
 }>;
 
 const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
@@ -340,6 +353,8 @@ export async function runPracticeDebate(input: Readonly<{
   transcriptDirectory?: string | null;
   /** Debate shape (`--shape-policy`, the three ask settings): absent: today's debate command. */
   shape?: PracticeShapeOverride;
+  /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
+  language?: PracticeDebateLanguage;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -413,6 +428,13 @@ export async function runPracticeDebate(input: Readonly<{
       throw new PracticeRefusal("PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW",
         "--depth-mode, --scrutiny and --answer-length need a debate-shape row (--shape-policy)");
     }
+    if (shapeRow === null && input.language !== undefined) {
+      // Without the row the ask ignores the site language and never offers a rewrite: refused before any AI is asked.
+      throw new PracticeRefusal("PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW",
+        "--site-language and --language-choice need a debate-shape row (--shape-policy)");
+    }
+    // Every lock or offer the ask's question-language decider makes (P2L Task 12's onQuestionLanguage).
+    const languageOutcomes: (QuestionLanguageLock | QuestionLanguageChoiceNeeded)[] = [];
     const shapeSource = input.shape !== undefined && input.shape.policy !== null ? "FLAG" as const
       : shapeRow !== null ? "REGISTER" as const : null;
     const shapeBlockOf = (source: PracticeShapeSource, facts: PracticeShapeFacts | null, unreadable?: string): PracticeShapeBlock =>
@@ -445,15 +467,19 @@ export async function runPracticeDebate(input: Readonly<{
     const ask = await composePracticeAsk({
       pool, provisionPool: database.extraPool(), serverAdmissionPool: database.extraPool(), legacyAdmissionPool: database.extraPool(),
       settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
-      dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress
+      dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress,
+      onQuestionLanguage: (outcome) => { languageOutcomes.push(outcome); }
     });
     const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceDebateQuestion(input.questionId);
+    // The site language goes with the question only when the ask reads it (a debate-shape row); else the ask is today's.
+    const siteLanguage = shapeRow === null ? null : input.language?.siteLanguage ?? practiceSiteLanguageFor(question.questionLine);
     const request = {
-      question_line: question.questionLine, risk_tier: "casual", tier_source: "ASKER",
+      question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
+      risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "asker-declaration:preview-practice", composition_budget_tier: "high", plan_tier: "premium",
       depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: new Date().toISOString(),
       steering_presets: [], steering_annotations: []
@@ -462,8 +488,20 @@ export async function runPracticeDebate(input: Readonly<{
       ownership_provenance: "server_session", provisional_identity_model: false } as Session;
     const admissionStarted = performance.now();
     let refusalCode: string | null = null;
+    let languageChoice: "USE_REWRITE" | "KEEP_MINE" | null = null;
     try {
-      await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+      try {
+        await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+      } catch (error) {
+        if (!(error instanceof QuestionLanguageChoiceNeeded)) throw error;
+        // The site's one-language pop-up (P2L): answered as the operator asked (--language-choice, default keep:
+        // KEEP_MINE, as the P2L final review asks; controller ruling D-CHOICE), by the same ask sent again with the
+        // choice, exactly as the page sends it. USE_REWRITE debates the rewrite; the transcript keeps the case's own line.
+        const choice = input.language?.choice ?? "keep";
+        languageChoice = choice === "use" ? "USE_REWRITE" : "KEEP_MINE";
+        progress(`the ask answered with a one-language offer; answering ${languageChoice} as the site's pop-up would`);
+        await ask.application.submit(practiceLanguageResubmission(request, error.offer, choice), session, { kind: "server", userId, ownerRef });
+      }
     } catch (error) {
       refusalCode = codeOf(error);
     }
@@ -486,7 +524,9 @@ export async function runPracticeDebate(input: Readonly<{
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
-        ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) })
+        ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
+        ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
+          planner: null, storedLanguage: null }) })
       });
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
@@ -575,6 +615,21 @@ export async function runPracticeDebate(input: Readonly<{
         progress(`debate shape: what the run did could not be read (${codeOf(error)})`);
       }
     }
+    // Question language: the lock and the offer (from the decider), the language the run was stored with, and the
+    // planner's naming as the map stored it (operator-only, CR-3). A reading that breaks costs only the planner facts,
+    // never the report.
+    let language: PracticeDebateLanguageBlock | undefined;
+    if (siteLanguage !== null) {
+      // Ruling L-SHAPED-ONLY: the run stores the lock only when admission froze a shape (apps/api/src/index.ts,
+      // `storedLanguageLock`), else today's guess; this says which reached the run (pre-flight PF-D27).
+      const storedLanguage = (await pool.query<{ argument_language_tag: string }>(
+        "SELECT argument_language_tag FROM core.run WHERE run_id=$1", [job.runId])).rows[0]?.argument_language_tag ?? null;
+      let planner: PracticeMapLanguage | null = null;
+      try { planner = await readPracticeMapLanguage(pool, job.runId); } catch (error) {
+        progress(`question language: the map's planner facts could not be read (${codeOf(error)})`);
+      }
+      language = practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice, planner, storedLanguage });
+    }
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
     remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
     return Object.freeze({
@@ -590,7 +645,8 @@ export async function runPracticeDebate(input: Readonly<{
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
       parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript }),
-      ...(shape === undefined ? {} : { shape })
+      ...(shape === undefined ? {} : { shape }),
+      ...(language === undefined ? {} : { language })
     });
   } finally {
     remaining.deepinfra.after ??= await readRemaining(remainingPorts.deepinfra);

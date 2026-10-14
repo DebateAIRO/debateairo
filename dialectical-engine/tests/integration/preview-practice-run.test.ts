@@ -25,8 +25,9 @@ import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegis
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
-import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
-import { startPreviewGateStubs, stubChatBody, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
+import { PRACTICE_LANGUAGE_DRY_REWRITES, practiceLanguageDryReading } from "../../tools/preview-practice/practice-language.js";
+import { PRACTICE_LANGUAGE_CASES, PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
+import { startPreviewGateStubs, stubChatBody, stubMapContent, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
@@ -793,6 +794,10 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     shape?: { source: string; registerVersion: string; row: string | null; storedDepthParams: unknown; sizes: Record<string, unknown> | null;
       opening: string | null; mapMarks: Record<string, number>; chosenAnswers: number | null; alsoRaised: number | null;
       panelCloseCallExtensions: number; scrutinyExtensions: number; mapCallsByStep: Record<string, number>; notExercised: string | null };
+    language?: { siteLanguage: string; offered: boolean; choice: string | null;
+      lock: { code: string; source: string; recordCode: string; localReason: string | null;
+        fast: { outcome: string; reason: string | null; main: string | null } | null } | null;
+      rewriteUsed: boolean; storedLanguage: string | null; plannerLanguage: string | null; plannerDisagrees: boolean | null };
   };
   const exportDigest = () => createHash("sha256").update(readFileSync(registerExportPath)).digest("hex");
   /** How many also-raised points the storyteller was handed (its `also_raised` field, P2c), over all its answered calls. */
@@ -830,6 +835,13 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
     expect(stubs.requests.filter((request) => request.kind === "MAP" && request.answer === "OK").length).toBeGreaterThanOrEqual(5);
     expect(storytellerAlsoRaised(stubs.requests)).toBeGreaterThan(0);
+    // The question language (Task 7b): the Romanian question on the Romanian site. Romanian is an always-ask site (ruling
+    // L-KEEP), so the fast check read it (the stub's one language: FAST, never ELD_SITE), and the run stored that lock
+    // (admission froze a shape: ruling L-SHAPED-ONLY; pre-flight PF-D27). The planner named the same language. Its
+    // naming is recorded for the operator only (CR-3): no condition mark is expected for it.
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, choice: null,
+      lock: { code: "ro", source: "FAST", recordCode: "FAST", localReason: null, fast: { outcome: "ONE", main: "ro" } },
+      rewriteUsed: false, storedLanguage: "ro", plannerLanguage: "ro", plannerDisagrees: false });
     // The transcript holds the map and ran on the practice's version.
     const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as {
       run: { registerVersion: string }; attempts: { family: string }[];
@@ -847,6 +859,7 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     const report = outcome.report as unknown as ShapeReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect("shape" in report).toBe(false);
+    expect("language" in report).toBe(false);
     expect(report.ask).toEqual({ questionId: "ro", depth: 1, planTier: "premium" });
     expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(false);
     expect(stubs.requests.some((request) => request.kind === "MAP")).toBe(false);
@@ -875,5 +888,62 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(outcome.exitCode).toBe(40);
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
     expect(stubs.requests).toEqual([]);
+  }, 300_000);
+});
+
+describe("preview practice: language mode, the question language (P2L)", () => {
+  type LanguageReport = { verdict: string; exitCode: number; reasons: string[]; mode: string;
+    cases: { id: string; lock: string; lockSource: string; offered: boolean; fastNeeded: boolean;
+      fastCheck: { outcome: string; proposedQuestion: string | null };
+      planner: { status: string; questionLanguage: string | null; disagrees: boolean | null } }[];
+    notRun: unknown[] };
+  const EN_ON_RO = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-en-on-ro")!;
+  const MIX = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-ro-en-mix")!;
+  /** The fast check answers each case as it expects (the dry script's reading); the planner of lang-en-on-ro names Romanian. */
+  const languageScript = (request: GateRequest): GateOverride | null => {
+    const chat = stubChatBody(request.provider, request.body);
+    const question = readFramedMaterial(wirePacket(chat)).fields.find((field) => field.name === "question_line")?.content ?? "";
+    if (request.kind === "QUESTION_LANGUAGE") return { content: practiceLanguageDryReading(question) };
+    if (request.kind === "MAP" && question === EN_ON_RO.questionLine) {
+      return { content: JSON.stringify({ ...(JSON.parse(stubMapContent(chat, 1)) as object), question_language: "ro" }) };
+    }
+    return null;
+  };
+
+  it("language mode: every case locked as expected, the mix offered, the fast check asked for every case, the planner recorded only: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario(languageScript);
+    const outcome = await runPractice(["language", ...common], env, quiet);
+    const report = outcome.report as unknown as LanguageReport;
+    // No case is settled by eld alone (ro, en and id are always-ask, ruling L-KEEP; lang-ku-arab is under eld's floor),
+    // so a LANGUAGE_MIX_NOT_OFFERED:lang-ro-en-mix:<record code> can only come from the fast check's side: the rewrite
+    // refused (FAST_MIX_NO_OFFER:REWRITE_UNUSABLE:â€¦, ruling L-REWRITE) or an offer body the contract refuses
+    // (FAST_MIX_NO_OFFER:OFFER_BODY_REFUSED). STOP and report it; never weaken this (pre-flight PF-D20, PF-D22).
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.mode).toBe("language");
+    expect(report.cases.map((entry) => [entry.id, entry.lock]))
+      .toEqual(PRACTICE_LANGUAGE_CASES.map((entry) => [entry.id, entry.expectedLock]));
+    // Every lock's source (controller ruling D-SETTLE): eld settles none of them (lang-ro-plain on ro is FAST, never
+    // ELD_SITE); lang-zh-short is worked out with the fast check off, so its script decides (LOCAL_ELD).
+    expect(report.cases.map((entry) => [entry.id, entry.lockSource])).toEqual([["lang-ro-plain", "FAST"], ["lang-ro-en-mix", "OFFER"],
+      ["lang-en-on-ro", "FAST"], ["lang-short-code", "FAST"], ["lang-sr-latn", "FAST"], ["lang-id", "FAST"], ["lang-ro-borrowed", "FAST"],
+      ["lang-zh-short", "LOCAL_ELD"], ["lang-ku-arab", "FAST"]]);
+    // The fast check is asked for EVERY case, whatever eld said; one planner call (with any repair) per case; nothing else.
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE" && request.answer === "OK")).toHaveLength(PRACTICE_LANGUAGE_CASES.length);
+    expect(report.cases.every((entry) => entry.fastCheck.outcome !== "DOWN")).toBe(true);
+    expect(stubs.requests.filter((request) => request.kind === "MAP").length).toBeGreaterThanOrEqual(PRACTICE_LANGUAGE_CASES.length);
+    expect(stubs.requests.every((request) => request.kind === "QUESTION_LANGUAGE" || request.kind === "MAP")).toBe(true);
+    expect(report.cases.find((entry) => entry.id === "lang-ro-en-mix")).toMatchObject({ offered: true, lockSource: "OFFER",
+      fastCheck: { outcome: "MIX", proposedQuestion: PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"] } });
+    // CR-3: the planner of lang-en-on-ro named Romanian; it is recorded, and the verdict above is still PASS.
+    expect(report.cases.find((entry) => entry.id === "lang-en-on-ro")!.planner).toMatchObject({ status: "ANSWERED", questionLanguage: "ro", disagrees: true });
+    // language.jsonl: a start line, one line per case, an end line; never a case's question text.
+    const log = readFileSync(join(out, "language.jsonl"), "utf8");
+    expect(log.trim().split("\n").map((line) => (JSON.parse(line) as { kind: string }).kind))
+      .toEqual(["start", ...PRACTICE_LANGUAGE_CASES.map(() => "case"), "end"]);
+    for (const entry of PRACTICE_LANGUAGE_CASES) expect(log).not.toContain(entry.questionLine);
+    // report.md: the mixed question beside its rewrite, for the owners' read.
+    const markdown = readFileSync(join(out, "report.md"), "utf8");
+    expect(markdown).toContain(`original Â«${MIX.questionLine}Â»; rewrite Â«${PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!}Â»`);
   }, 300_000);
 });

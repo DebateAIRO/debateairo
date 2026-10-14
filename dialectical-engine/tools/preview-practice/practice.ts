@@ -7,7 +7,7 @@
  * gates on the server (they hold the keys; this computer never sees one), reached through SSH-forwarded sockets and a
  * small relay on the server (gate-relay.py). It spends real money, a little: see the README.
  *
- * Three modes, and a fourth command:
+ * Four modes, and a fifth command:
  *  - formats: every model asked to do every job a few times; each reply checked by that job's real format check. The
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
@@ -18,10 +18,14 @@
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
  *             --shape-policy FILE runs it in the new debate shape, in the throwaway register only (practice-shape.ts).
+ *             --site-language and --language-choice set the site language and answer the one-language offer (default keep).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
  *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
  *             script (practice-openings-dry.ts): no settings, no socket, no gate port is built, nothing is spent.
+ *  - language: the question-language practice (P2L, practice-language.ts): nine fixed cases, each read by eld, the
+ *             fast check (always asked) and one angle-planner call; the lock computed as the site's decider computes it;
+ *             <out>/language.jsonl, report.json and report.md. --dry answers from a script: nothing is spent.
  *  - report:  builds report.json and report.md again from <out>/openings.jsonl when the folder holds one, else from
  *             <out>/samples.jsonl (sends nothing, needs no gate). With --side-by-side <samples.jsonl> it writes
  *             <out>/side-by-side.html instead (spec 2026-10-12 §4.8).
@@ -67,6 +71,7 @@ import {
   type OpeningsQuestion
 } from "./practice-openings-questions.js";
 import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
+import { practiceDebateLanguageFromArgs, practiceLanguageDryPorts, practiceLanguagePolicy, runPracticeLanguageMode } from "./practice-language.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { composePracticeNextRegisterVersion, parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
@@ -107,12 +112,12 @@ export function repositoryRoot(): string {
   }
 }
 
-type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
+type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "language" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
-  "--answer-length"]);
+  "--answer-length", "--site-language", "--language-choice"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
 
 /**
@@ -122,6 +127,9 @@ const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--re
 const OPENINGS_FLAGS: ReadonlySet<string> = new Set(["--out", "--questions", "--arms", "--busy-wait-minutes", "--max-in-flight", "--dry",
   "--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
 const OPENINGS_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
+/** The flags language reads (practice-language.ts); every other flag is refused there. A dry run reads no settings, gate status or export. */
+const LANGUAGE_FLAGS: ReadonlySet<string> = new Set(["--out", "--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export", "--dry"]);
+const LANGUAGE_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export"]);
 
 /** What the interrupt messages say the report is written from: openings' finished calls, the other modes' samples. */
 export function practiceFinishedUnit(mode: string | undefined): "calls" | "samples" {
@@ -130,8 +138,8 @@ export function practiceFinishedUnit(mode: string | undefined): "calls" | "sampl
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
-  if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "report") {
-    throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate, openings or report");
+  if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "language" && mode !== "report") {
+    throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate, openings, language or report");
   }
   const flags = new Map<string, string>();
   const switches = new Set<string>();
@@ -207,7 +215,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   options: PracticeRunOptions = {}): Promise<PracticeRunResult> {
   const startedAt = new Date();
   const log = options.log ?? ((line: string) => { process.stderr.write(`${line}\n`); });
-  let mode = argv[0] === "debate" ? "debate" : argv[0] === "report" ? "report" : argv[0] === "openings" ? "openings" : "formats";
+  let mode = argv[0] === "debate" ? "debate" : argv[0] === "report" ? "report" : argv[0] === "language" ? "language"
+    : argv[0] === "openings" ? "openings" : "formats";
   let directory: string | null = null;
   let observer: PracticeGateObserver | null = null;
   // Formats: the samples log, open from just before the first paid call to the end line.
@@ -350,12 +359,16 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.switches.has("--transcript") && args.mode !== "debate") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
     }
-    if (args.switches.has("--dry") && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--dry (openings mode only)");
+    if (args.switches.has("--dry") && args.mode !== "openings" && args.mode !== "language") {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--dry (openings or language mode only)");
+    }
     // Debate shape (spec 2026-10-12 §5): the four debate-only flags, read and checked here, before any socket, settings
     // file or gate is touched; a policy file that does not pass the register's own check never starts a paid run.
     const shapeOverride = practiceShapeOverrideFromArgs(args.mode, args.flags);
     // The debate's question, a fixed id only, checked here too (it used to fail only once the database had started).
     const debateQuestionId = args.mode === "debate" ? practiceDebateQuestion(args.flags.get("--question") ?? "ro").id : "ro";
+    // Question language (P2L, practice-language.ts): debate mode's two language flags, checked here too.
+    const debateLanguage = practiceDebateLanguageFromArgs(args.mode, args.flags);
     for (const flag of ["--questions", "--arms"]) {
       if (args.flags.has(flag) && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (openings mode only)`);
     }
@@ -365,6 +378,14 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       for (const flag of [...args.flags.keys(), ...args.switches]) {
         if (!OPENINGS_FLAGS.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by openings)`);
         if (dryRun && OPENINGS_REAL_RUN_ONLY.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by openings --dry)`);
+      }
+    }
+    if (args.mode === "language") {
+      // The other way round: a flag only another mode reads is refused here (its value is never repeated).
+      const dryRun = args.switches.has("--dry");
+      for (const flag of [...args.flags.keys(), ...args.switches]) {
+        if (!LANGUAGE_FLAGS.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by language)`);
+        if (dryRun && LANGUAGE_REAL_RUN_ONLY.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by language --dry)`);
       }
     }
     // Only fixed ids are accepted, each checked with its seat rotation before anything else (ruling T11-m6); the text of
@@ -431,6 +452,23 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 0, 0, 240) * 60_000,
         maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: dry.sleep });
     }
+    if (args.mode === "language" && args.switches.has("--dry")) {
+      // --dry: the two gate ports come ONLY from the script (practice-language.ts practiceLanguageDryPorts). No
+      // acknowledgement, no socket, no settings, no gate status, no export; nothing can reach a gate, nothing is spent.
+      // eld still reads each question on this computer.
+      const folder = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
+      directory = folder;
+      const watched = new PracticeGateObserver();
+      observer = watched;
+      options.onObserver?.(watched, stop);
+      const config = openingsDryConfig();
+      const dry = practiceLanguageDryPorts();
+      const chosen = practiceLanguagePolicy(null);
+      return finish(await runPracticeLanguageMode({ config, targets: openingsDryTargets(config),
+        ports: Object.freeze({ deepinfra: watched.wrap("deepinfra", dry.ports.deepinfra), anthropic: watched.wrap("anthropic", dry.ports.anthropic) }),
+        observer: watched, policy: chosen.policy, policySource: chosen.source, bound: practiceRunnerPolicy(config).bounds.JUDGE,
+        folder, dry: true, startedAt, sleep: async () => undefined, progress: log, shouldStop: () => stopRequested }));
+    }
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"));
@@ -450,7 +488,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       unsentStreakAtStart[gate] = status.unsentStreak;
       if (status.maxConcurrentCalls !== null) gateLimits[gate] = status.maxConcurrentCalls;
     }
-    const register = mode === "debate" ? (() => {
+    const register = mode === "debate" || (mode === "language" && args.flags.has("--register-export")) ? (() => {
       let text: string;
       try { text = readFileSync(required(args, "--register-export"), "utf8"); } catch (error) {
         if (error instanceof PracticeRefusal) throw error;
@@ -485,6 +523,17 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       try { answer = await remainingPorts[gate](); } catch { throw new PracticeRefusal("PRACTICE_GATE_UNREACHABLE", gate); }
       if (answer.state !== "active" || !answer.windowOpen) throw new PracticeRefusal("PRACTICE_GATE_NOT_OPEN", `${gate}: ${answer.state}`);
       before[gate] = answer;
+    }
+    if (args.mode === "language") {
+      // Question language (P2L): the fast check's model and every preview AI (the planners take turns) must be enabled.
+      const chosen = practiceLanguagePolicy(register);
+      const models = [...settings.previewConfig.premium_model_ids];
+      assertEnabledAtGates([...models, chosen.policy.fastCheck!.model], before);
+      return finish(await runPracticeLanguageMode({ config: settings.previewConfig,
+        targets: onePerModel(practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON), models),
+        ports: budgetPorts, observer, policy: chosen.policy, policySource: chosen.source,
+        bound: practiceRunnerPolicy(settings.previewConfig).bounds.JUDGE, folder: directory, dry: false, startedAt,
+        ...(options.sleep === undefined ? {} : { sleep: options.sleep }), progress: log, shouldStop: () => stopRequested }));
     }
     if (args.mode === "openings") {
       // All the preview's AIs (spec §2: "all five preview AIs"); each must be enabled at its gate.
@@ -573,6 +622,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: debateQuestionId,
       ...(shapeOverride === null ? {} : { shape: shapeOverride }),
+      ...(debateLanguage === null ? {} : { language: debateLanguage }),
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
@@ -585,7 +635,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       : error instanceof Error && error.message === "PRACTICE_REPORT_INSIDE_REPOSITORY" ? error.message
         : typeof (error as { code?: unknown })?.code === "string" ? String((error as { code: string }).code)
           : error instanceof Error ? `${error.name}:${error.message.slice(0, 120)}` : "UNKNOWN";
-    if (code === "PRACTICE_REPORT_INSIDE_REPOSITORY" || mode === "report") directory = null;
+    if (code === "PRACTICE_REPORT_INSIDE_REPOSITORY" || mode === "report" || code === "PRACTICE_OUT_ALREADY_HOLDS_LANGUAGE") directory = null;
     // Once the samples log is open the run has started: what finished is kept, and the verdict is ABORTED.
     if (samplesLog !== null || openingsLog !== null) {
       log(`practice broke midway: ${code}`);

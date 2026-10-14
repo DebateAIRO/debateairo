@@ -11,6 +11,13 @@ import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
+import {
+  practiceDebateLanguageLines,
+  practiceLanguageLines,
+  type PracticeDebateLanguageBlock,
+  type PracticeLanguageCaseRecord,
+  type PracticeLanguageNotRun
+} from "./practice-language.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
 import {
@@ -402,6 +409,8 @@ export function debateReport(input: Readonly<{
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
+    // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).
+    ...(r.language === undefined ? {} : { language: r.language }),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -455,6 +464,13 @@ export function reportMarkdown(report: PracticeReport): string {
   if (totals !== undefined) lines.push("Totals:", "", ...Object.entries(totals).map(([key, value]) => `- ${key}: ${String(value)}`), "");
   const shape = typeof report.shape === "object" && report.shape !== null ? report.shape as PracticeShapeBlock : undefined;
   if (shape !== undefined) lines.push(...practiceShapeLines(shape));
+  const language = report.mode === "debate" && typeof report.language === "object" && report.language !== null
+    ? report.language as PracticeDebateLanguageBlock : undefined;
+  if (language !== undefined) lines.push(...practiceDebateLanguageLines(language));
+  if (report.mode === "language" && Array.isArray(report.cases)) {
+    lines.push(...practiceLanguageLines(report.cases as readonly PracticeLanguageCaseRecord[],
+      Array.isArray(report.notRun) ? report.notRun as readonly PracticeLanguageNotRun[] : []));
+  }
   const gates = report.gates as Record<string, GateBlock> | undefined;
   if (gates !== undefined) {
     lines.push("Gates:", "");
@@ -558,7 +574,8 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const failures = report.failures as readonly unknown[] | undefined;
   // Openings keep reply text in "failures" only for a call whose format never passed; the formats wording is unchanged.
-  lines.push(report.mode === "openings"
+  // The language mode keeps no "failures" (a planner's failed call is its case's planner status and code).
+  if (report.mode !== "language") lines.push(report.mode === "openings"
     ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
       + "reply text only for calls whose format never passed)."
     : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");

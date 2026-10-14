@@ -17,7 +17,7 @@ server, because only they hold the keys. The Mac never sees a key:
 
 It spends real money from the same daily pots as the site, a little (see "Money and time").
 
-Three modes:
+Four modes:
 
 - **formats**: every model is asked to do every job a few times (write a position, attack one, answer a cross
   exchange, sit on a panel, review a node, write the answer, check the answer, tell the story, check the story). The
@@ -42,6 +42,9 @@ Three modes:
   picks the angles, each AI lists points from its own angle, then merge, up to two "what is missing?" rounds and
   choose). The first AI changes from question to question. It is not a pass/fail test of the release: it collects the
   data the owners compare with their own method.
+- **language**: the question-language practice (no debate, under $0.05). Nine fixed questions are each read the way the
+  site will read them before a debate, and the report says which language each would be locked to. See "The question
+  language".
 
 Run **formats** first, then **debate**. Both must PASS. **openings** is separate: run it when the owners want the
 comparison, never as a release check.
@@ -289,12 +292,105 @@ tool: publish a register version with this code's prompt fingerprints; run migra
 keep the row out of force until the /new page's language pop-up (P2L Task 18) is deployed (L-POPUP-FIRST); fix the
 re-claim bug first (task_205182c8); publish the support article (C-ARTICLE); and let running debates finish first.
 
-To run the new shape, add `--register-next` (see above) and the start values to S-6's debate command (S-3 first, as
-always):
+To run the new shape, add the start values to S-6's debate command, which already runs with `--register-next` (see
+above; S-3 first, as always):
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --shape-policy tools/preview-practice/shape-policy-start.json --out "$P/debate-shape-report"
+echo "exit: $?"
+```
+
+### The question language (language mode, and debate's `--site-language`)
+
+With the new shape on, the site fixes the language of each question before the debate starts (P2L):
+
+- First eld, a small language reader on the server, reads the question. When it is sure the question is in the
+  site's language, that is the language. On some sites eld is never trusted alone, because there it mixes up near
+  neighbours (Romanian, English and Indonesian are among them): there the fast AI below always reads the question.
+- Otherwise one short call to a fast AI (Haiku) reads it. If the question really mixes two languages, the person is
+  offered the question written in one language (the pop-up), and can keep their own wording instead.
+- With no fast AI (a signed-out person, or no paid AI), eld and the question's alphabet decide, else the site's
+  language.
+
+`language` mode checks this on nine fixed questions, with no debate and no database:
+
+- For each question: eld's reading, the fast AI's reading (always asked here, so its reading is written down even when
+  eld was sure), and one call to the AI that plans a debate's angles (the AIs take turns).
+- The language is worked out exactly as the site does it. One question, `lang-zh-short`, is worked out as if there
+  were no fast AI: its language must come from its alphabet. The fast AI is still asked, so its reading is written
+  down.
+- It writes `language.jsonl` (one line per question, never the question's text), `report.json` and `report.md`.
+- It costs under $0.05 and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
+  170 seconds to plan a question's angles.
+
+| Id | Site | Must lock | Offer the rewrite |
+|---|---|---|---|
+| `lang-ro-plain` | ro | ro | no |
+| `lang-ro-en-mix` | ro | ro | yes |
+| `lang-en-on-ro` | ro | en | no |
+| `lang-short-code` | en | en | no |
+| `lang-sr-latn` | ro | sr-Latn | no |
+| `lang-id` | id | id | no |
+| `lang-ro-borrowed` | ro | ro | no |
+| `lang-zh-short` | en | zh | no |
+| `lang-ku-arab` | ar | ku | no |
+
+`lang-zh-short` is a short Chinese question, worked out as if there were no fast AI. `lang-ku-arab` is Kurdish
+(Sorani) written in Arabic letters, asked on the Arabic site: it must lock Kurdish (`ku`).
+
+The verdict:
+
+- FAIL: a question locked to the wrong language, or the mixed question not offered a rewrite.
+- NOT_PROVEN: the fast AI did not answer, so the language came from a fallback. Run it again later.
+- PASS otherwise. Then the owners read each rewrite in `report.md`, where it stands beside the question, and decide
+  whether it keeps the meaning.
+- The planner's naming is recorded for the operator only: it never changes the verdict and never shows up as a mark
+  on an answer.
+
+The fast AI's settings come from the export's `questionLanguagePolicy` row when it has one (`--register-export`), else
+from the code's start values. A row the site itself would refuse at start-up is refused here too, before anything is
+sent: for example a reserved word in the owners' text, or a model or thinking level the Anthropic gate does not allow.
+
+If you interrupt a language run (Ctrl-C), its report is still written. But `report --out` cannot rebuild a language
+folder (it refuses with `PRACTICE_SAMPLES_LOG_MISSING`): run the mode again into a new folder instead.
+
+A dry run first (scripted answers, nothing spent, no socket):
+
+```sh
+node_modules/.bin/tsx tools/preview-practice/practice.ts language --dry --out "$P/language-dry"
+echo "exit: $?"
+```
+
+The real run (S-3 first, as always):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts language --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/language-report"
+echo "exit: $?"
+```
+
+Debate mode, with a debate-shape row, also asks with a site language:
+
+- `--site-language <code>`: one of the site's 35 languages. Left out, it is the question's own language as the old
+  guesser reads it, if the site has that language; else English.
+- `--language-choice use|keep`: how the pop-up is answered when the ask offers a rewrite. The default is `keep`: the
+  person keeps their own wording. With `use`, the debate argues the rewritten question, while `transcript.json` still
+  names the case's own question.
+- Both need a debate-shape row; without one they are refused before any AI is asked
+  (`PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW`).
+- `report.json` gains a `language` block, and `report.md` a "Question language" paragraph: the site language; the
+  language locked, how and why; the language the debate was stored with; whether a rewrite was offered and used; and
+  what the planner named (for the operator only).
+
+The full practice debate on the mixed question, before the preview upload (S-8). It answers the pop-up with `use`, so
+the rewrite is tried once. Like every practice debate of this release, it runs with `--register-next`: the release
+needs a new register version (new prompts), and until the owners publish it the practice runs on this code's next
+version (see `--register-next` under "Optional flags").
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --register-next --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question lang-ro-en-mix --site-language ro --language-choice use --shape-policy tools/preview-practice/shape-policy-start.json --transcript --out "$P/language-debate"
 echo "exit: $?"
 ```
 
@@ -384,7 +480,9 @@ echo "exit: $?"
   shape, plus one fast language check by Haiku on the Anthropic gate (about $0.00013). Its start-of-debate estimate may
   need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
   the first new-shape run's admission figures (S-8, "Room the estimate needs").
-- the whole-debate comparison (S-8): eight depth-1 debates over at least four days, about $1.9 to $4.3 in all with
+- language: under $0.05, about 5 to 20 minutes.
+- the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
+  `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
 
 ## Operator steps
@@ -493,11 +591,13 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-Only after formats passes: repeat S-3 (fresh gate status) and copy the two status files down again, then:
+Only after formats passes: repeat S-3 (fresh gate status) and copy the two status files down again, then run the
+debate. Until the owners publish a register version that carries this code's prompt fingerprints, it runs with
+`--register-next` (see "The new debate shape"): without it, the debate is refused before it starts.
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --out "$P/debate-report"
 echo "exit: $?"
 ```
 
@@ -565,6 +665,10 @@ Optional flags:
   measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`).
   With `--shape-policy`, the debate-shape row goes into that next version too (no other version is made), so
   `register.codeNext` also names `debateShapePolicy`, which the release's own publish leaves out.
+  `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with
+  a debate-shape row).
+- language: `--dry` (scripted answers, nothing spent); `--register-export` (the fast AI's settings from its
+  `questionLanguagePolicy` row, if any). Nothing else.
 
 ### S-6b, Mac: thinking levels side by side (formats, `--levels`)
 
@@ -668,7 +772,12 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 **The pass bar comes first** (the owner's rule: before any upload, a practice with all real AIs must pass):
 
 1. Day 1: run S-3, then S-6's formats. It must PASS. For exit 10 the owner decides, as in the table above.
-2. Then run the first pair on `ro-euro`, today's shape first. Both debates must PASS:
+2. Then the language mode (above): first `--dry`, then the real run. It must PASS. A FAIL stops everything: nothing is
+   uploaded. NOT_PROVEN: run it again later the same day.
+3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
+   question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
+   rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
+4. Day 2: run the first pair on `ro-euro`, today's shape first. Both debates must PASS:
    - today's shape is the release's practice debate, because the upload ships with the row absent, so the site keeps
      today's shape, and with a new register version carrying this code's three prompt fingerprints (P2b OWNER STEP
      PF-B13). That is why this debate runs with `--register-next` too: it practises that very version;
@@ -681,17 +790,17 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 | Day | Pair | Order |
 |---|---|---|
-| 2 | `ro-strainatate` | new shape first |
-| 3 | `en-nuclear` | today's shape first |
-| 4 | `en-social-media-age` | new shape first |
+| 3 | `ro-strainatate` | new shape first |
+| 4 | `en-nuclear` | today's shape first |
+| 5 | `en-social-media-age` | new shape first |
 
 Money and time, within the owner's test budget of $5 DeepInfra and $1 Haiku a day:
 
 - **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
   plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
   $0.10 to $0.30. The whole comparison is about $1.9 to $4.3 (four debates in each shape and day 1's formats),
-  spread over at least four days. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in
-  all).
+  spread over at least five days. The language mode costs under $0.05 and the `lang-ro-en-mix` debate about $0.30, on
+  day 1 after formats. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in all).
 - **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends: about $4
   DeepInfra and $0.90 Anthropic for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
   Then the report's first reason starts with `ADMISSION_REFUSED:`, and nothing but the AIs' health checks was spent.
@@ -774,7 +883,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (the three modes, the start checks, the report).
+- `practice.ts`: the command (the four modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview. `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
@@ -783,6 +892,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `--transcript` file.
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
+- `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
+  out, `language.jsonl`, the report) and debate mode's `--site-language` and `--language-choice`.
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
@@ -799,6 +910,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-levels.test.ts`,
   `tests/unit/preview-thinking-levels-check.test.ts`,
   `tests/unit/preview-practice-shape.test.ts`,
+  `tests/unit/preview-practice-language.test.ts`,
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,

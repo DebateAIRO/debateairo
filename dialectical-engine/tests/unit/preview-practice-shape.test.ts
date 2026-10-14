@@ -342,7 +342,8 @@ describe("README: the debate commands are real commands of this tool", () => {
       for (const id of asked === "$Q" ? [...PRACTICE_COMPARISON_QUESTION_IDS] : [asked]) expect(practiceDebateQuestion(id).id).toBe(id);
       expect(() => practiceShapeOverrideFromArgs(args.mode, args.flags, readFromEngine)).not.toThrow();
       // Controller ruling D-BOTHNEXT (pre-flight PF-D2): until the owners republish the register with this code's prompt
-      // fingerprints, every new-shape and comparison debate needs --register-next. S-6's own debate line keeps none.
+      // fingerprints, every new-shape and comparison debate needs --register-next (S-6's own debate line carries it too:
+      // P2d Task 7b, the progress ledger's NOTE for Task 7b).
       if (asked === "$Q" || args.flags.has("--shape-policy")) expect(args.switches.has("--register-next")).toBe(true);
       if (asked === "$Q") {
         expect(args.flags.get("--depth")).toBe("1");
