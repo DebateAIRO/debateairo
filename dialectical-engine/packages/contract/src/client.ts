@@ -53,6 +53,8 @@ import {
   AnswerDisclosureSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
+  QuestionLanguageChoiceNeededSchema,
+  type AskSubmitOutcome,
   AskRoomResponseSchema,
   BillingCancelLinkAcceptedSchema,
   BillingCardChangeResponseSchema,
@@ -445,6 +447,8 @@ export interface ContractClient {
   confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
+  /** Question language (spec 2026-10-13, D1): the same POST /v1/asks, with a valid real-mix offer (409) read as data. */
+  submitAskOrLanguageChoice(input: AskRequest): Promise<AskSubmitOutcome>;
   /**
    * Budget spec §2.7: the room this ask would find — a word, never a figure. Debate shape (M4): the three shape
    * fields go on the query only when given, so today's query is unchanged.
@@ -796,6 +800,16 @@ export function createContractClient(
     ),
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    submitAskOrLanguageChoice: (input: AskRequest) => requestJson<AskSubmitOutcome>(
+      root.href, fetchImplementation, "/v1/asks",
+      AskAcceptedSchema.transform((accepted): AskSubmitOutcome => Object.freeze({ kind: "ACCEPTED" as const, accepted })),
+      { method: "POST", body: JSON.stringify(input) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const parsed = QuestionLanguageChoiceNeededSchema.safeParse(body);
+        return parsed.success ? Object.freeze({ kind: "LANGUAGE_CHOICE_NEEDED" as const, offer: parsed.data.offer }) : null;
+      }
+    ),
     getAskRoom: (input: Readonly<{
       plan_tier: PlanTier;
       composition_budget_tier: "low" | "medium" | "high";
