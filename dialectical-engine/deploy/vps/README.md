@@ -989,8 +989,12 @@ starts) stays off until BOTH hold: 0117 is applied (the API checks at start that
 may run it), and `SUPPORT_MODEL_TARGET_JSON` is the Anthropic Messages target (base URL exactly
 `https://api.anthropic.com/v1`), whose key it borrows. Until then the language is settled without it (the site
 language and the local detector), and the person is never blocked. It is also skipped, never blocking, while the
-day's site pot is at its ceiling or after its spend record has failed (`api.question_language.spend_record_down` in
-the API log; a restart checks again).
+day's site pot is at its ceiling or after the spend-record breaker latches (a refused grant, a missing writer or a check
+violation, or three failed records in a row: `api.question_language.spend_record_down` in the API log; a restart checks
+again). In 0117, the trigger `language_check_spend_writer_only` lets a `LANGUAGE_CHECK` row in only when the inserting
+role is the writer's owner (`debateai_staff_security_owner`): the check is by role, not by function. It holds because
+that role's other definer writers record only RUN or STORY rows; a future definer writer owned by that role must keep
+it so.
 
 Do these in this order, with the new checkout in place:
 
