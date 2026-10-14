@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { readFile } from 'node:fs/promises';
 import { authBranchMigrationsBefore } from '../support/authBranchLineage.js';
 import { randomUUID } from 'node:crypto';
@@ -55,7 +56,7 @@ it('rejects malformed fixed credential arrays and unverified, synced, held or un
    for(const patch of [{verified_at:null},{user_verification_required:false},{backup_eligible:true},{backup_eligible:true,backup_state:true},{state:'revoked',revoked_at:new Date().toISOString()}]){
     const factorId=randomUUID(),credentialId='key_'+factorId.replaceAll('-',''),factor={...original,mfa_factor_id:factorId,credential_id:credentialId,...patch,device_label_ciphertext:{...original.device_label_ciphertext,keyId:`passkey-label:${factorId}:v1`}};
     // Invalid candidates are inserted with their initial immutable binding; no guard is disabled.
-    await database.pool.query('INSERT INTO identity.mfa_factor SELECT * FROM jsonb_populate_record(NULL::identity.mfa_factor,$1::jsonb)',[factor]);
+    await withMailLocale(database.pool, 'en', (c) => c.query('INSERT INTO identity.mfa_factor SELECT * FROM jsonb_populate_record(NULL::identity.mfa_factor,$1::jsonb)',[factor]));
     await expect(prepare([credentialId])).rejects.toThrow('STAFF_OWNER_CREDENTIALS_INVALID');
    }
    await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)',[target.userId]);await expect(prepare([target.credentialIds[0]])).rejects.toThrow('STAFF_OWNER_CREDENTIALS_INVALID');
@@ -80,7 +81,7 @@ it('requires both distinct matching current proofs for a fixed two-key command a
    await expect(jit.query('SELECT staff.read_owner_receipts($1,$2::uuid[])',[commandId,[receipts[0]]])).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');
    const original=(await database.pool.query('SELECT credential_id FROM staff.owner_possession_receipt WHERE receipt_id=$1',[receipts[1]])).rows[0].credential_id;
    await database.pool.query('UPDATE staff.owner_possession_receipt SET credential_id=$2 WHERE receipt_id=$1',[receipts[1],'unselected-key']);await expect(commit(receipts)).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');await database.pool.query('UPDATE staff.owner_possession_receipt SET credential_id=$2 WHERE receipt_id=$1',[receipts[1],original]);
-   await database.pool.query("UPDATE identity.mfa_factor SET state='revoked' WHERE mfa_factor_id=$1",[target.keys[1]!.id]);await expect(commit(receipts)).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');await database.pool.query("UPDATE identity.mfa_factor SET state='active' WHERE mfa_factor_id=$1",[target.keys[1]!.id]);
+   await withMailLocale(database.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='revoked' WHERE mfa_factor_id=$1",[target.keys[1]!.id]));await expect(commit(receipts)).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');await withMailLocale(database.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='active' WHERE mfa_factor_id=$1",[target.keys[1]!.id]));
    await database.pool.query("UPDATE staff.owner_possession_receipt SET expires_at=clock_timestamp()-interval '1 second' WHERE receipt_id=$1",[receipts[1]]);await expect(commit(receipts)).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');
    expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.owner_possession_receipt WHERE command_id=$1 AND consumed_at IS NOT NULL',[commandId])).rows[0].n).toBe(0);
    expect((await database.pool.query('SELECT state FROM staff.owner_command WHERE command_id=$1',[commandId])).rows[0].state).toBe('PENDING');

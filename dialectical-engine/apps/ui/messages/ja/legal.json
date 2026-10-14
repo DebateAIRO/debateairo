@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "年齢確認が拒否された後、このブラウザーが30日間再試行できないようにします。保存されるのは「拒否」という語だけで、個人データは含みません。",
   "legal.cookies.ageRefusal.life": "30日間",
   "legal.cookies.locale.kind": "クッキー",
-  "legal.cookies.locale.purpose": "お客様が選択したインターフェース言語を記憶します。",
+  "legal.cookies.locale.purpose": "お客様が選択したインターフェース言語を記憶し、当社がお送りするメールの言語も設定します。",
   "legal.cookies.locale.life": "1年間",
   "legal.cookies.storageTitle": "クッキーではなくブラウザー内に保存される情報",
   "legal.cookies.storageIntro": "ブラウザーのストレージには4つの項目が保存されます。2つはローカルストレージに、お客様が消去するまで保存され、2つはセッションストレージに、タブを閉じるまで保存されます。クッキーとは異なり、これらはリクエストに添付されません。ヘルプチャットの項目は、Dialectical Engineのヘルプとの会話のコピーを保持するもので、そのメッセージは送信した時点でDialectical Engineに届いています。",

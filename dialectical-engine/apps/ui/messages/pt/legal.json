@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Depois de uma verificação de idade recusada, impede este navegador de tentar novamente durante 30 dias. Contém apenas a palavra «recusado», nenhum dado pessoal.",
   "legal.cookies.ageRefusal.life": "30 dias",
   "legal.cookies.locale.kind": "Ficheiro cookie",
-  "legal.cookies.locale.purpose": "Memoriza o idioma da interface que escolheu.",
+  "legal.cookies.locale.purpose": "Memoriza o idioma da interface que escolheu e define o idioma dos e-mails que lhe enviamos.",
   "legal.cookies.locale.life": "1 ano",
   "legal.cookies.storageTitle": "Guardado no seu navegador, não num cookie",
   "legal.cookies.storageIntro": "São guardados quatro elementos no armazenamento do seu navegador: dois no armazenamento local, até os apagar, e dois no armazenamento de sessão, até fechar o separador. Ao contrário dos cookies, não são anexados aos seus pedidos; o elemento do chat de ajuda guarda uma cópia de uma conversa que teve com a ajuda do Dialectical Engine, cujas mensagens chegaram ao Dialectical Engine quando as enviou.",

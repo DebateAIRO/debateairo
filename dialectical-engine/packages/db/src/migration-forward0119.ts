@@ -5,18 +5,18 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
 
 /**
  * A debate taken over after a crash (spec 2026-10-14-reclaim-resume-design, "The database change") as the chain step
- * after the language check's site cost 0117 (migrations/lineage/README.md). The runtime may set a node aside
+ * after the language check's site cost 0118 (migrations/lineage/README.md). The runtime may set a node aside
  * (generation_status 'stale', one way, nothing else in the row), and an answer's map root moves from a stale root to a
- * live one in a new append-only table, core.map_position_repoint (core.map_position itself is 0116's, digested by 0116's
+ * live one in a new append-only table, core.map_position_repoint (core.map_position itself is 0117's, digested by 0117's
  * postcondition, so it is not touched). It adds no billing relation and no billing function, so the effective verifier
- * 0117 keeps in force (0111's) stays in force and is named as its own. Its checks are its postcondition (below),
+ * 0118 keeps in force (0111's) stays in force and is named as its own. Its checks are its postcondition (below),
  * compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
  */
 const NAME='0119_reclaim_resume.sql';
 const VERSION='reclaim-resume-forward0119-v1';
 const MANIFEST_PATH='lineage/reclaim-resume-forward0119.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0119 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 to 0117 keep)
-const PREVIOUS='0117_language_check_spend.sql';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0119 adds no billing relation or function, so it names the verifier in force (0111's, which 0112 to 0118 keep)
+const PREVIOUS='0118_language_check_spend.sql';
 const FUNCTIONS=['core.enforce_map_position_repoint()','core.reject_node_mutation_except_retire()'] as const;
 const NODE_TRIGGERS=['reject_mutation','reject_mutation_except_retire'] as const;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0119_${detail}`);};
@@ -29,7 +29,7 @@ const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f
  * core.node's guard triggers by name (0000's reject_mutation must stay ABSENT, reject_mutation_except_retire present:
  * name, enabled state, definition) and the runtime's column grants on core.node (UPDATE on generation_status only) and
  * its table grants there (no DELETE); and core.map_position_repoint whole (owner, ACL, columns, constraints, indexes,
- * triggers, rules), as 0116 digests its own tables.
+ * triggers, rules), as 0117 digests its own tables.
  */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const functions=(await client.query(`

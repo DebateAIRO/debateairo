@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Vaša vsebina ostane vaša. Ohranite vse pravice, ki jih imate na vprašanjih, trditvah, opombah in izpodbijanjih, ki jih pošljete. Podeljujete nam neizključno, svetovno in brezplačno licenco za gostovanje, shranjevanje, razmnoževanje, prilagajanje ter obdelavo te vsebine za namene delovanja storitve: izvajanje razprave, njeno shranjevanje, da jo lahko znova odprete in si ogledate njeno ponovitev, zagotavljanje podpore, izpolnjevanje naših pravnih obveznosti in — samo če se odločite za objavo — namene iz razdelka 9. Ta licenca preneha z izbrisom vsebine, razen če razdelek 9 ali zakon zahteva drugače." },
-      { kind: "p", text: "Na vaši vsebini ne učimo modelov. Na vaši vsebini ne učimo modelov. Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register ponudnikov umetne inteligence za vsakega ponudnika prikaže, ali smo to potrdili, in kdaj." },
+      { kind: "p", text: "Na vaši vsebini ne učimo modelov. Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register ponudnikov umetne inteligence za vsakega ponudnika prikaže, ali smo to potrdili, in kdaj." },
       { kind: "p", text: "Kako vaša vsebina doseže ponudnike umetne inteligence. Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu." },
       { kind: "p", text: "Kaj pošlje klepet s podporo. Tudi pomočnik za podporo je model umetne inteligence. Ko mu pišete, vaše sporočilo pošljemo zunanjemu ponudniku modelov, da lahko model odgovori, skupaj s članki pomoči, na katerih temelji njegov odgovor. Pred pošiljanjem zakrijemo vse, kar je videti kot geslo, enkratna koda ali ključ. Če zaprosite za pogovor z osebo, modelu pošljemo tudi pogovor, zakrit na enak način, da napiše kratek povzetek za člana naše ekipe, ki prevzame vaš primer. Ne priložimo vašega e-poštnega naslova, identifikatorjev računa ali podatkov o plačilu, vendar model prejme vse drugo, kar vpišete v klepet, zato tja ne pišite ničesar, česar ne bi želeli, da prebere." },
       { kind: "p", text: "Kateri ponudniki in kje. Naš Register ponudnikov umetne inteligence na dezbatere.ro/providers je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Osebni podatki",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Način ravnanja z osebnimi podatki je opisan v Pravilniku o zasebnosti na dezbatere.ro/privacy. V njem je pojasnjeno, kaj zbiramo, pravna podlaga za vsak namen, kako dolgo podatke hranimo, kdo jih prejema, kateri prenosi se izvajajo in kako lahko uveljavljate svoje pravice. Sem spadajo tudi tri točke. Razdelek 7 vas poziva, da v vprašanja ne vključujete osebnih podatkov drugih ljudi; če to storite, ste zanje odgovorni in vsebino lahko odstranimo. Če razprava, objavljena na Dialectical Engine, vsebuje vaše osebne podatke, lahko od nas zahtevate, da jo odstranimo, ne da bi imeli račun (razdelek 9). Hranimo tudi zapis o vašem sprejetju teh Pogojev — različico, čas in tehnične podatke seje — kot dokaz pogodbe, kot je pojasnjeno v Pravilniku o zasebnosti." }
+      { kind: "p", text: "Način ravnanja z osebnimi podatki je opisan v Pravilniku o zasebnosti na dezbatere.ro/privacy. V njem je pojasnjeno, kaj zbiramo, pravna podlaga za vsak namen, kako dolgo podatke hranimo, kdo jih prejema, kateri prenosi se izvajajo in kako lahko uveljavljate svoje pravice. Sem spadajo tudi tri točke. Razdelek 7 vas poziva, da v vprašanja ne vključujete osebnih podatkov drugih ljudi; če to storite, ste zanje odgovorni in vsebino lahko odstranimo. Če razprava, objavljena na Dialectical Engine, vsebuje vaše osebne podatke, lahko od nas zahtevate, da jo odstranimo, ne da bi imeli račun (razdelek 9). Hranimo tudi zapis o vašem sprejetju teh Pogojev — različico, čas in tehnične podatke seje — kot dokaz pogodbe, kot je pojasnjeno v Pravilniku o zasebnosti. E-poštna sporočila, ki vam jih pošiljamo, so napisana v jeziku, ki ste ga izbrali na našem spletnem mestu; razdelek 13 Pravilnika o zasebnosti pojasnjuje, kako ohranjamo to izbiro." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "9e5c61dc3983d7d718f1213ea221414a9bf9f7b35017dc6c8b6b614bfef388b3",
-  eyebrow: "POGOJI UPORABE · v2.2 · VELJAVNI OD 12. OKTOBRA 2026",
+  version: "2.3",
+  sha256: "953383155770dc8526f96f455be9d946e29987b57b8d9763018d4fe0890392f6",
+  eyebrow: "POGOJI UPORABE · v2.3 · VELJAVNI OD 12. OKTOBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.2",
+  endMarker: "KONEC POGOJEV · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Twoje treści pozostają Twoją własnością. Zachowujesz wszelkie prawa przysługujące Ci do przesyłanych pytań, twierdzeń, adnotacji i zastrzeżeń. Udzielasz nam niewyłącznej, ogólnoświatowej i nieodpłatnej licencji na hosting, przechowywanie, powielanie, adaptowanie i przetwarzanie tych treści w celu obsługi usługi: prowadzenia debaty, przechowywania jej w sposób umożliwiający ponowne otwarcie i odtworzenie, zapewniania wsparcia, wykonywania naszych obowiązków prawnych oraz — wyłącznie jeżeli zdecydujesz się na publikację — w celach określonych w sekcji 9. Licencja ta wygasa z chwilą usunięcia treści, z wyjątkiem przypadków wymaganych przez sekcję 9 lub prawo." },
-      { kind: "p", text: "Nie trenujemy modeli na Twoich treściach. Nie trenujemy modeli na Twoich treściach. Korzystamy z dostawców AI wyłącznie na warunkach, które nie pozwalają im wykorzystywać Twoich treści do trenowania lub ulepszania ich modeli; Rejestr Dostawców AI pokazuje dla każdego dostawcy, czy to potwierdziliśmy, i kiedy." },
+      { kind: "p", text: "Nie trenujemy modeli na Twoich treściach. Korzystamy z dostawców AI wyłącznie na warunkach, które nie pozwalają im wykorzystywać Twoich treści do trenowania lub ulepszania ich modeli; Rejestr Dostawców AI pokazuje dla każdego dostawcy, czy to potwierdziliśmy, i kiedy." },
       { kind: "p", text: "W jaki sposób Twoje treści trafiają do dostawców AI. W celu przeprowadzenia debaty przesyłamy tekst jednemu lub większej liczbie zewnętrznych dostawców modeli. Dostawca otrzymuje Twoje pytanie, ustawione przez Ciebie adnotacje sterujące oraz wypowiedzi tworzone przez silnik w toku debaty — widzi zatem tekst wyprowadzony z tego, co wpisujesz, i utworzony wokół tej treści, a nie wyłącznie Twoje pierwotne słowa. Dostawca nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta, zapisów sesji ani danych płatniczych." },
       { kind: "p", text: "Co wysyła czat wsparcia. Asystent wsparcia również jest modelem AI. Gdy do niego piszesz, przesyłamy Twoją wiadomość zewnętrznemu dostawcy modeli, aby model mógł odpowiedzieć, wraz z artykułami pomocy, na których opiera odpowiedź. Przed wysłaniem maskujemy wszystko, co wygląda na hasło, kod jednorazowy lub klucz. Jeśli poprosisz o rozmowę z człowiekiem, przesyłamy modelowi także rozmowę, zamaskowaną w ten sam sposób, aby napisał krótkie podsumowanie dla członka naszego zespołu, który przejmie Twoją sprawę. Nie dołączamy Twojego adresu e-mail, identyfikatorów konta ani danych płatniczych, ale model otrzymuje wszystko inne, co wpiszesz na czacie, dlatego nie pisz tam niczego, czego nie chcesz, aby przeczytał." },
       { kind: "p", text: "Którzy dostawcy i gdzie. Nasz Rejestr Dostawców AI, dostępny pod adresem dezbatere.ro/providers, stanowi część niniejszych Warunków. Wymieniono w nim każdego dostawcę, z którego możemy korzystać: jego podmiot prawny i państwo; otrzymywane dane i cel ich otrzymywania; miejsce przetwarzania; warunki przechowywania; informację, czy dla używanego przez nas punktu końcowego aktywna jest opcja zerowej retencji danych; informację, czy na mocy zawartej z nami umowy dostawca może wykorzystywać dane wejściowe do trenowania; mechanizm przekazywania danych, na którym się opieramy; oraz datę ostatniej weryfikacji każdego wpisu. Dostawcy mogą mieć siedzibę poza Twoim państwem oraz poza Europejskim Obszarem Gospodarczym. Stosowane zabezpieczenia wyjaśnia nasza Polityka prywatności." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dane osobowe",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Sposób przetwarzania przez nas danych osobowych określa Polityka prywatności, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w Dialectical Engine zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności." }
+      { kind: "p", text: "Sposób przetwarzania przez nas danych osobowych określa Polityka prywatności, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w Dialectical Engine zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności. Wiadomości e-mail, które do Ciebie wysyłamy, są napisane w języku wybranym przez Ciebie w naszym serwisie; sekcja 13 Polityki prywatności wyjaśnia, jak przechowujemy ten wybór." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "4865f01add35d1e9a62bd3d975d67cd6841539a750061ce58e4a611fa6e1d3a0",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.2 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
+  version: "2.3",
+  sha256: "15044191029ca5601691b0022d8efc13c736bb61625ec4ed171faa970762d604",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.3 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.2",
+  endMarker: "KONIEC WARUNKÓW · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

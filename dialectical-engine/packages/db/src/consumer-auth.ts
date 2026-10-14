@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
+import { MAIL_LOCALE_SETTING } from './mail-locale.js';
 export type ConsumerLegalPair = Readonly<{
     kind: 'TERMS' | 'PRIVACY';
     locale: string;
@@ -117,6 +118,8 @@ export class PostgresConsumerAuthRepository {
         try {
             await client.query('BEGIN');
             await client.query('SELECT identity.begin_runtime_audit_attempt()');
+            // C07.3 (R-11, R-14, D-56): the request's mail language, set for this transaction only. A request with no language is en (R-08).
+            await client.query('SELECT set_config($1, $2, true)', [MAIL_LOCALE_SETTING, source.mailLocale ?? 'en']);
             const result = await operation(client, prepared);
             await client.query('COMMIT');
             return result;

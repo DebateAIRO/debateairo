@@ -53,11 +53,16 @@ function templatedRecipient(recipientPolicy,recipient){
  */
 function selectTemplatedMail(message,text,end,lines,options){
  const boundary=/^Content-Type: multipart\/mixed; boundary="mixed-([A-Za-z0-9]{16,64})"$/.exec(lines.at(-1)??'')?.[1];
- const withId=lines.length===6;
- if(!boundary||![5,6].includes(lines.length)||lines[0]!==`From: ${FROM}`||!lines[1].startsWith('To: ')||lines.at(-2)!=='MIME-Version: 1.0')refuse();
- const messageId=withId?/^Message-ID: <([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})@debateai\.local>$/i.exec(lines[2])?.[1]:null;
- if(messageId===undefined||!lines[withId?3:2].startsWith('Subject: '))refuse();
- const to=lines[1].slice(4),subject=subjectText(lines[withId?3:2].slice(9));
+ // C12 (R-31): buildTemplatedMessage writes `Content-Language: <cc>` after Subject for a catalogue mail; the selector admits that one line and rebuilds it.
+ const languageAt=lines.findIndex(line=>line.startsWith('Content-Language: '));
+ const contentLanguage=languageAt<0?undefined:/^Content-Language: ([a-z]{2})$/.exec(lines[languageAt])?.[1];
+ if(languageAt>=0&&(contentLanguage===undefined||languageAt!==lines.length-3))refuse();
+ const core=languageAt<0?lines:lines.filter((_,index)=>index!==languageAt);
+ const withId=core.length===6;
+ if(!boundary||![5,6].includes(core.length)||core[0]!==`From: ${FROM}`||!core[1].startsWith('To: ')||core.at(-2)!=='MIME-Version: 1.0')refuse();
+ const messageId=withId?/^Message-ID: <([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})@debateai\.local>$/i.exec(core[2])?.[1]:null;
+ if(messageId===undefined||!core[withId?3:2].startsWith('Subject: '))refuse();
+ const to=core[1].slice(4),subject=subjectText(core[withId?3:2].slice(9));
  const body=text.slice(end+4).split('\r\n');let at=0;
  const take=expected=>{if(body[at++]!==expected)refuse();};
  const until=stops=>{const start=at;while(at<body.length&&!stops.includes(body[at]))at++;if(at>=body.length)refuse();return body.slice(start,at);};
@@ -78,7 +83,7 @@ function selectTemplatedMail(message,text,end,lines,options){
  }
  take(`${mixed}--`);take('');
  if(at!==body.length||attachments.reduce((sum,file)=>sum+file.content.length,0)>TEMPLATED_ATTACHMENT_BYTES_MAX)refuse();
- const rebuilt=Buffer.from(options.buildTemplatedMessage({from:FROM,to,messageId,subject,text:plain,html,attachments,boundary}),'utf8');
+ const rebuilt=Buffer.from(options.buildTemplatedMessage({from:FROM,to,messageId,subject,text:plain,html,attachments,boundary,...(contentLanguage===undefined?{}:{contentLanguage})}),'utf8');
  if(!rebuilt.equals(message))refuse();
  const recipient=templatedRecipient(options.recipientPolicy,to);
  // Only To changes, as the account transport does (the forward aliases go to the installed forward target).
@@ -100,24 +105,30 @@ export function selectCanonicalMail(message,options) {
    const forwarded=ownedForwardingMessage(message,options.recipientPolicy);forwarded.fill(0);
    return {family:'account',message};
   }
-  if(lines.length!==6||headers.size!==6||lines[0]!==`From: ${options.from}`||!lines[1].startsWith('To: ')||!lines[2].startsWith('Subject: ')
-   ||!lines[3].startsWith('Message-ID: ')||lines[4]!=='MIME-Version: 1.0'||lines[5]!=='Content-Type: text/plain; charset=UTF-8')refuse();
+  // C22.1 (D-118): the producer's names only. The seven every family writes are required; Content-Transfer-Encoding is admitted only as base64.
+  // Order is not pinned (the families order their headers differently); the byte-equality re-render below is the authority.
+  const producerNames=['from','to','subject','content-language','message-id','mime-version','content-type','content-transfer-encoding'];
+  const requiredNames=['from','to','subject','content-language','message-id','mime-version','content-type'];
+  if([...headers.keys()].some(name=>!producerNames.includes(name))||!requiredNames.every(name=>headers.has(name))||lines[0]!==`From: ${options.from}`
+   ||headers.get('content-type')!=='text/plain; charset=UTF-8'||(headers.has('content-transfer-encoding')&&headers.get('content-transfer-encoding')!=='base64'))refuse();
   const id=/^<(password-reset|backup-email|mfa-recovery)-([0-9a-f-]{36})@v3-preview\.dezbatere\.ro>$/i.exec(headers.get('message-id')??'');if(!id)refuse();
-  const expiry=/expires at ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)\./.exec(text);
-  const expiresAt=expiry?new Date(expiry[1]):new Date(0);
-  // WAITING (24-hour authenticator replacement wait) states its notBefore in the body; an unparsable time cannot re-render.
-  const wait=/nothing is replaced before ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)\./.exec(text);
+  // C22.1 (D-118): a base64 body is decoded before anything is read from it. The wording is localized, so no sentence is matched:
+  // the body's single ISO-8601 instant is the PROOF expiry, or the WAITING notBefore (measured: each carries exactly one). Zero or two instants leave it unset.
+  const bodyText=headers.get('content-transfer-encoding')==='base64'?Buffer.from(text.slice(end+4).replace(/\r\n/g,''),'base64').toString('utf8'):text.slice(end+4);
+  const instants=[...bodyText.matchAll(/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z/g)].map(m=>m[0]);
+  const instant=instants.length===1?new Date(instants[0]):null;
+  const expiresAt=instant??new Date(0);
   const path=id[1]==='password-reset'?'/reset-password':id[1]==='backup-email'?'/verify-backup-email':'/recover-authenticator';
-  const links=text.split('\r\n').filter(line=>line.startsWith(`${PREVIEW_ORIGIN}${path}#`));const proofs={};
+  const links=bodyText.split('\r\n').filter(line=>line.startsWith(`${PREVIEW_ORIGIN}${path}#`));const proofs={};
   // Only the authenticator recovery family ever carries a finish link.
   const kinds=id[1]==='mfa-recovery'?/^#(token|cancel|finish)=([A-Za-z0-9_-]{43})$/:/^#(token|cancel)=([A-Za-z0-9_-]{43})$/;
   for(const link of links){const match=kinds.exec(new URL(link).hash);if(!match||proofs[match[1]])refuse();proofs[match[1]]=match[2];}
   const events=id[1]==='password-reset'?['PROOF','COMPLETED','CANCELLED','REFUSED']:id[1]==='backup-email'?['PROOF','VERIFIED']:['PROOF','STARTED','WAITING','FINISH','COMPLETED','CANCELLED','REFUSED'];
   for(const event of events){
-   const dto={messageId:id[2],recipient:headers.get('to'),expiresAt,event,
+   const dto={messageId:id[2],recipient:headers.get('to'),expiresAt,mailLocale:headers.get('content-language'),event,
     ...(event==='PROOF'?{token:proofs.token}:{}),
     ...((event==='PROOF'&&id[1]!=='backup-email'||(event==='STARTED'||event==='WAITING')&&proofs.cancel)?{cancelToken:proofs.cancel}:{}),
-    ...(event==='WAITING'?{notBefore:wait?new Date(wait[1]):new Date(Number.NaN)}:{}),
+    ...(event==='WAITING'?{notBefore:instant??new Date(Number.NaN)}:{}),
     ...(event==='FINISH'?{finishToken:proofs.finish}:{})};
    try{const rendered=id[1]==='password-reset'?options.renderPasswordResetMail(dto,options):options.renderEmailRecoveryMail({...dto,flow:id[1]==='backup-email'?'backup_email':'mfa_recovery'},options);
     if(Buffer.from(rendered).equals(message))return {family:'external',message};

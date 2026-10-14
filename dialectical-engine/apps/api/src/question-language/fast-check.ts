@@ -25,7 +25,7 @@ export const QUESTION_LANGUAGE_CHECK_ANSWER_FORM = [
   '"proposed_question": when is_real_mix is true, the whole question written in main_language, keeping its meaning, names, brands and terms; otherwise null }'
 ].join("\n");
 
-export function questionLanguageCheckContract(instruction: string): PromptContract {
+function questionLanguageCheckContract(instruction: string): PromptContract {
   return Object.freeze({ contractId: QUESTION_LANGUAGE_CHECK_CONTRACT_ID, instruction, answerForm: QUESTION_LANGUAGE_CHECK_ANSWER_FORM });
 }
 

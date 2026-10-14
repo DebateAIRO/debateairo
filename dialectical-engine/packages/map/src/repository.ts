@@ -11,7 +11,7 @@ import {
   type Pool
 } from "@debateai/db";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
-import { mapRankKeyPoints } from "./items.js";
+import { mapAlsoRaisedOf } from "./items.js";
 import {
   MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapAngleKind, type MapItem, type MapItemOrigin, type MapMark,
   type MapResult
@@ -19,7 +19,7 @@ import {
 
 /**
  * Debate shape (spec §3.4): the map's storage. Items, the run's choice and the roots that argued each answer, in the
- * three append-only tables of migration 0116. Debate text is sealed per row (carriers core.map_item / core.map_choice)
+ * three append-only tables of migration 0117. Debate text is sealed per row (carriers core.map_item / core.map_choice)
  * on an encrypted run and kept in the clear on a legacy run, exactly as the story's repository does.
  *
  * Every readable column holds a code (ruling T7-PRIV): the repository refuses, typed and before anything is sealed or
@@ -55,14 +55,14 @@ const ROOT_IN_FORCE_SQL = `SELECT position.answer_id, COALESCE(moved.root_node_i
     JOIN core.node AS node ON node.run_id = position.run_id AND node.node_id = COALESCE(moved.root_node_id, position.root_node_id)
    WHERE position.run_id = $1`;
 
-// 0116's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
+// 0117's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
 const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;
 const ANGLE_ID = /^g[1-7]$/u;
 const ANSWER_ID = /^a[1-4]$/u;
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
 const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
-/** 0116's closed sets (map_item_origin_closed, _kind_closed, _leans_closed, _angle_kind_closed). */
+/** 0117's closed sets (map_item_origin_closed, _kind_closed, _leans_closed, _angle_kind_closed). */
 const ORIGINS: ReadonlySet<string> = new Set<MapItemOrigin>(["BLIND", "SHOWN", "GAP"]);
 const KINDS: ReadonlySet<string> = new Set<MapItem["kind"]>(["POINT", "ANSWER"]);
 const LEANS: ReadonlySet<string> = new Set<string>(MAP_LEANS);
@@ -94,7 +94,7 @@ function isPrivateContentErased(error: unknown): boolean {
   return row !== null && row.code === "55000" && row.message === "PRIVATE_CONTENT_ERASED";
 }
 
-/** 0116's attestation guard fires before 0040's barrier: on a run erased as 0040 erases, it answers this first. */
+/** 0117's attestation guard fires before 0040's barrier: on a run erased as 0040 erases, it answers this first. */
 function isAttestationSecretUnresolved(error: unknown): boolean {
   const row = pgError(error);
   return row !== null && row.code === "55000" && row.message === "CONTENT_ATTESTATION_SECRET_UNRESOLVED";
@@ -154,9 +154,11 @@ export class MapChoiceRepository {
     if (breach !== null) throw recordInvalid(breach);
     const answers = (result.choice?.answers ?? []).slice(0, input.answerCount)
       .map((answer, rootIndex) => Object.freeze({ answerId: answer.answerId, statement: answer.statement, rootIndex, filled: answer.filled }));
-    const byId = new Map(result.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
-    const alsoRaised = mapRankKeyPoints((result.choice?.alsoRaised ?? []).flatMap((id) => byId.get(id) ?? []))
-      .map((keyPoint) => Object.freeze({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: [...keyPoint.makers] }));
+    // Ruling W-CUT and review m-4: the chosen answers past answerCount (never argued) and the points only they took are
+    // also raised, not debated; one shared rule (mapAlsoRaisedOf) builds the list for the page and the story alike.
+    const alsoRaised = mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints, mergedAnswers: result.mergedAnswers,
+      arguedAnswers: input.answerCount })
+      .map((entry) => Object.freeze({ keyPointId: entry.keyPointId, claim: entry.claim, makers: [...entry.makers] }));
     const { items: _items, calls: _calls, ...rest } = result;
     const content: ChoiceContent = choiceContent.parse({ answers, alsoRaised, result: rest });
     const opening = result.kind === "MAP" ? "MAP" : "TODAYS_OPENING";
@@ -338,7 +340,7 @@ export class MapChoiceRepository {
   }
 
   /**
-   * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0116's attestation guard's missing secret ONLY
+   * RUN_ERASED for 0040's barrier (or the lease's own check), and for 0117's attestation guard's missing secret ONLY
    * when the run is an ENCRYPTED run (content_encryption_version = 1) whose private content is no longer live: a legacy
    * run is never classed as erased here, and on a live run a missing secret is a defect, and stays loud.
    */

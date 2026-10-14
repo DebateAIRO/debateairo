@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Setelah pemeriksaan usia ditolak, mencegah peramban ini mencoba lagi selama 30 hari. Isinya hanya kata “ditolak”, tanpa data pribadi.",
   "legal.cookies.ageRefusal.life": "30 hari",
   "legal.cookies.locale.kind": "Kuki",
-  "legal.cookies.locale.purpose": "Mengingat bahasa antarmuka yang Anda pilih.",
+  "legal.cookies.locale.purpose": "Mengingat bahasa antarmuka yang Anda pilih, dan menentukan bahasa email yang kami kirimkan kepada Anda.",
   "legal.cookies.locale.life": "1 tahun",
   "legal.cookies.storageTitle": "Disimpan di peramban Anda, bukan dalam kuki",
   "legal.cookies.storageIntro": "Empat item disimpan di penyimpanan peramban Anda: dua di penyimpanan lokal, sampai Anda menghapusnya, dan dua di penyimpanan sesi, sampai Anda menutup tab. Berbeda dengan kuki, item ini tidak dilampirkan pada permintaan Anda; item obrolan bantuan menyimpan salinan percakapan yang Anda lakukan dengan bantuan Dialectical Engine, dan pesan-pesannya sampai ke Dialectical Engine saat Anda mengirimnya.",

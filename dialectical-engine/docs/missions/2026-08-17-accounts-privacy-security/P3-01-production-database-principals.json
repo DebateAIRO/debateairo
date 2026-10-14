@@ -2229,7 +2229,7 @@
     },
     {
       "roleName": "debateai_runtime",
-      "source": "migrations/0117_language_check_spend.sql",
+      "source": "migrations/0118_language_check_spend.sql",
       "grants": [
         "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
       ]

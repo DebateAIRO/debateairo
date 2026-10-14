@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -333,9 +334,9 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at)
       VALUES ($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')
     `, [erasureId, created.userId]);
-    await expect(database.pool.query<{ outcome: string }>(
+    await expect(withMailLocale(database.pool, 'en', (c) => c.query<{ outcome: string }>(
       "SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [erasureId]
-    )).resolves.toMatchObject({ rows: [{ outcome: "PREPARED" }] });
+    ))).resolves.toMatchObject({ rows: [{ outcome: "PREPARED" }] });
     // PREPARE queued the completion notices; the mail transport is verified elsewhere.
     await database.pool.query(`
       UPDATE identity.account_erasure_notification_outbox

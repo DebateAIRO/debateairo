@@ -48,7 +48,10 @@ const PLAN_IDS: ReadonlySet<string> = new Set(["FREE", "PLUS", "PRO", "MAX"]);
 const PLACEHOLDER = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
 
 export function mailMessagesDirectory(): string {
-  return fileURLToPath(new URL("../messages/", import.meta.url));
+  const url = new URL("../messages/", import.meta.url);
+  // C12: a jsdom test environment rewrites import.meta.url to a non-file URL (TOOLING-TRAPS, 2026-09-01); the account copy
+  // (copyOf) then reads the catalogue from the lane root. Node ESM always carries a file URL, so production never takes this.
+  return url.protocol === "file:" ? fileURLToPath(url) : join(process.cwd(), "packages/mail-templates/messages/");
 }
 
 /** One flat string table of this package's `messages/` (also read by order-text.ts); refuses anything else. */
@@ -336,6 +339,17 @@ export function renderMail(
     ""
   ].join("\n");
   return Object.freeze({ subject, text, html });
+}
+
+/**
+ * One catalogue value of one locale for the account mail copy (C12.1, D-62): the same loader and the same `en`
+ * fallback as `lookup` in `renderMail`. A key missing from the locale and from `en` is refused.
+ */
+export function copyOf(locale: string, key: string): string {
+  const { mail: mailCatalogues } = catalogues();
+  const value = mailCatalogues[mailLocaleOf(locale)][key] ?? mailCatalogues.en[key];
+  if (value === undefined) throw new MailTemplateError("MAIL_TEMPLATE_CATALOGUE_INVALID", key);
+  return value;
 }
 
 /** The EU model withdrawal form (Directive 2011/83/EU Annex I(B)) as plain text, attached to M1. */

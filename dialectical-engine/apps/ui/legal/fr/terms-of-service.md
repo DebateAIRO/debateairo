@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.2 · PRISE D’EFFET 12 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.3 · PRISE D’EFFET 12 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.2
+endMarker: FIN DES CONDITIONS · v2.3
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.2 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.3 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -114,7 +114,7 @@ Si vous ne savez pas si une utilisation est autorisée, interrogez-nous avant de
 
 **Votre contenu reste le vôtre.** Vous conservez tous les droits que vous détenez sur les questions, affirmations, annotations et contestations que vous soumettez. Vous nous accordez une licence non exclusive, mondiale et exempte de redevances pour héberger, stocker, reproduire, adapter et traiter ce contenu aux fins de l’exploitation du service : exécuter le débat, le stocker afin que vous puissiez le rouvrir et le rejouer, fournir une assistance, respecter nos obligations légales et — uniquement si vous choisissez de le publier — poursuivre les finalités de la section 9. Cette licence prend fin lorsque le contenu est supprimé, sauf dans la mesure requise par la section 9 ou par la loi.
 
-**Nous n’entraînons pas les modèles sur votre contenu.** Nous n’entraînons pas de modèles sur votre contenu. Nous ne recourons à des fournisseurs d’IA que dans le cadre de conditions qui ne les autorisent pas à utiliser votre contenu pour entraîner ou améliorer leurs modèles ; le Registre des fournisseurs indique, pour chaque fournisseur, si nous l’avons confirmé, et quand.
+**Nous n’entraînons pas les modèles sur votre contenu.** Nous ne recourons à des fournisseurs d’IA que dans le cadre de conditions qui ne les autorisent pas à utiliser votre contenu pour entraîner ou améliorer leurs modèles ; le Registre des fournisseurs indique, pour chaque fournisseur, si nous l’avons confirmé, et quand.
 
 **Comment votre contenu parvient aux fournisseurs d’IA.** Pour exécuter un débat, nous envoyons du texte à un ou plusieurs fournisseurs externes de modèles. Un fournisseur reçoit votre question, les annotations d’orientation que vous définissez et les énoncés composés par le moteur au cours du débat ; il voit donc du texte dérivé de ce que vous avez saisi et construit autour de celui-ci, et non uniquement vos mots d’origine. Il ne reçoit jamais votre adresse e-mail, les identifiants de votre compte, vos enregistrements de session ni vos informations de paiement.
 
@@ -239,7 +239,7 @@ La section 8 traite de votre contenu et du statut des résultats générés. Si 
 
 ## 17. Données à caractère personnel
 
-La manière dont nous traitons les données à caractère personnel est décrite dans la **Politique de confidentialité** disponible à l’adresse dezbatere.ro/privacy. Elle explique ce que nous collectons, la base juridique de chaque finalité, la durée de conservation, les destinataires des données, les transferts concernés et la manière d’exercer vos droits. Trois points ont également leur place ici. La section 7 vous demande de ne pas inclure les données à caractère personnel d’autres personnes dans une question ; si vous le faites, vous en êtes responsable et nous pouvons supprimer le contenu. Si un débat publié sur Dialectical Engine contient des données à caractère personnel vous concernant, vous pouvez nous demander de le retirer sans détenir de compte (section 9). Enfin, nous conservons une trace de votre acceptation des présentes Conditions — la version, l’heure et les informations techniques de la session — à titre de preuve du contrat, comme l’explique la Politique de confidentialité.
+La manière dont nous traitons les données à caractère personnel est décrite dans la **Politique de confidentialité** disponible à l’adresse dezbatere.ro/privacy. Elle explique ce que nous collectons, la base juridique de chaque finalité, la durée de conservation, les destinataires des données, les transferts concernés et la manière d’exercer vos droits. Trois points ont également leur place ici. La section 7 vous demande de ne pas inclure les données à caractère personnel d’autres personnes dans une question ; si vous le faites, vous en êtes responsable et nous pouvons supprimer le contenu. Si un débat publié sur Dialectical Engine contient des données à caractère personnel vous concernant, vous pouvez nous demander de le retirer sans détenir de compte (section 9). Enfin, nous conservons une trace de votre acceptation des présentes Conditions — la version, l’heure et les informations techniques de la session — à titre de preuve du contrat, comme l’explique la Politique de confidentialité. Les e-mails que nous vous envoyons sont rédigés dans la langue que vous avez choisie sur notre site ; la section 13 de la Politique de confidentialité explique comment nous conservons ce choix.
 
 ## 18. Droit applicable et juridictions compétentes
 

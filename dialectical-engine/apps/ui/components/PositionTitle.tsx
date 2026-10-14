@@ -12,7 +12,7 @@ import { localeDirection } from "@/lib/i18n/questionLocale";
  */
 export type PositionTitles = Readonly<{ locale: string; byNodeId: ReadonlyMap<string, string> }>;
 
-export const NO_POSITION_TITLES: PositionTitles = Object.freeze({ locale: "en", byNodeId: new Map<string, string>() });
+const NO_POSITION_TITLES: PositionTitles = Object.freeze({ locale: "en", byNodeId: new Map<string, string>() });
 
 export const PositionTitlesContext = createContext<PositionTitles>(NO_POSITION_TITLES);
 

@@ -5,7 +5,7 @@ import { MAP_FIXED_ANGLE_KINDS, MAP_LIMITS, type MapAngle, type MapSeat } from "
  * The angle ids the map gives out (controller ruling T7-PRIV): `g1`..`gN` in plan order, minted by code. An angle id
  * lands in a readable column (core.map_item.angle_id) on an encrypted run, so it is never a word an AI wrote: the
  * planner's own angle_id (a slug such as "sell-family-home") is private content and lives only in its raw reply, which
- * the runner stores encrypted. N is at most MAP_LIMITS.anglesMax; migration 0116's CHECK holds the same bound.
+ * the runner stores encrypted. N is at most MAP_LIMITS.anglesMax; migration 0117's CHECK holds the same bound.
  */
 export const mapAngleCodeId = (index: number): string => `g${String(index + 1)}`;
 

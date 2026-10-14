@@ -1,5 +1,7 @@
 # Debate Shape Phase 2b (the runner shape) Implementation Plan
 
+> **Renumbered 2026-10-14:** the migrations this plan calls 0116 (the debate shape map) and 0117 (the language check's site cost) are now 0117 and 0118: the merge of `origin/dev` 221d784db brought dev's own 0116 (`0116_mail_locale.sql`) first. The numbers below are historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** When a run's receipt carries a debate shape (P2a's `envelope_basis.shape`), the runner argues the new shape: the

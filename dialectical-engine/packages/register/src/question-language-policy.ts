@@ -12,7 +12,7 @@ import { canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst, type Ca
  */
 export const QUESTION_LANGUAGE_POLICY_ROW_KEY = "questionLanguagePolicy" as const;
 /** Today only Anthropic; GPT-6 Luna is added here, with its transport, once the OpenAI integration exists. */
-export const QUESTION_LANGUAGE_FAST_CHECK_PROVIDERS = Object.freeze(["anthropic"] as const);
+const QUESTION_LANGUAGE_FAST_CHECK_PROVIDERS = Object.freeze(["anthropic"] as const);
 
 export const QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION = [
   "Name the language the question in question_line is written in.",

@@ -6,11 +6,16 @@ import type { PasswordResetPolicy } from "../../../packages/register/src/passwor
 import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
 import { isSingleDeliverableRecipient, MailDeliveryError } from "./mail-channel.js";
 import { passwordResetNoticeAad } from "./password-reset.js";
+import { copyOf } from "@debateai/mail-templates";
+import { catalogLocaleOf, MAIL_LOCALE_VALUES } from "./mail-locale.js";
+import { encodeHeaderText, transferBody } from "./mail-mime.js";
 export type PasswordResetMail = Readonly<{
   messageId: string;
   event: "PROOF" | "COMPLETED" | "CANCELLED" | "REFUSED";
   recipient: string;
   expiresAt: Date;
+  /** C09 (R-13, R-31): the language stored on the row; absent renders en (the pins of password-reset-mail.test.ts). */
+  mailLocale?: string;
   token?: string;
   cancelToken?: string;
 }>;
@@ -22,8 +27,8 @@ export function renderPasswordResetMail(mail: PasswordResetMail, options: Readon
   from: string;
   publicAppUrl: string;
 }>): string {
-  const origin = new URL(options.publicAppUrl), allowed = ["messageId", "event", "recipient", "expiresAt", ...(mail.event === "PROOF" ? ["token", "cancelToken"] : [])];
-  if (Object.keys(mail).some(k => !allowed.includes(k)) || origin.protocol !== "https:" || origin.username || origin.password || !/^noreply@[^@\s,;<>]+$/u.test(options.from) || !isSingleDeliverableRecipient(mail.recipient) || !/^[0-9a-f-]{36}$/i.test(mail.messageId) || !(mail.expiresAt instanceof Date) || !Number.isFinite(mail.expiresAt.getTime()))
+  const origin = new URL(options.publicAppUrl), allowed = ["messageId", "event", "recipient", "expiresAt", "mailLocale", ...(mail.event === "PROOF" ? ["token", "cancelToken"] : [])], locale = mail.mailLocale ?? "en", copy = (key: string) => copyOf(locale, key);
+  if (Object.keys(mail).some(k => !allowed.includes(k)) || !MAIL_LOCALE_VALUES.includes(locale) || origin.protocol !== "https:" || origin.username || origin.password || !/^noreply@[^@\s,;<>]+$/u.test(options.from) || !isSingleDeliverableRecipient(mail.recipient) || !/^[0-9a-f-]{36}$/i.test(mail.messageId) || !(mail.expiresAt instanceof Date) || !Number.isFinite(mail.expiresAt.getTime()))
     throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
   const link = (kind: "token" | "cancel", value: string) => {
     if (!bearer.test(value))
@@ -36,18 +41,19 @@ export function renderPasswordResetMail(mail: PasswordResetMail, options: Readon
   if (mail.event === "PROOF") {
     if (!mail.token || !mail.cancelToken)
       throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
-    subject = "Reset your Dialectical Engine password";
-    body = ["A password reset was requested for your Dialectical Engine account.", "Open this link to choose a new password:", link("token", mail.token), "", `This link expires at ${mail.expiresAt.toISOString()}.`, "You must also enter a code from your current authenticator. The email link alone cannot reset your password.", "Your existing authenticator and unused recovery codes will be retained.", "", "If this was not you, open this link and confirm cancellation:", link("cancel", mail.cancelToken), "Cancelling does not change your password."];
+    subject = copy("auth.pwr.proof.subject");
+    body = [copy("auth.pwr.proof.p1"), copy("auth.pwr.proof.p2"), link("token", mail.token), "", copy("auth.pwr.proof.p3").replace("{expiry}", mail.expiresAt.toISOString()), copy("auth.pwr.proof.p4"), copy("auth.pwr.proof.p5"), "", copy("auth.pwr.proof.p6"), link("cancel", mail.cancelToken), copy("auth.pwr.proof.p7")];
   }
   else {
-    const subjects = { COMPLETED: "Your Dialectical Engine password was changed", CANCELLED: "Dialectical Engine password reset cancelled", REFUSED: "Dialectical Engine password reset stopped" };
-    const statements = { COMPLETED: "Your password was changed. All previous sessions were revoked. Your existing authenticator and unused recovery codes are unchanged. Sign in with your new password and the next code from your authenticator.", CANCELLED: "The password reset request was cancelled. Your password was not changed.", REFUSED: "The password reset request was stopped. Your password was not changed." };
-      if (!Object.hasOwn(subjects, mail.event))
+    const keys = { COMPLETED: "completed", CANCELLED: "cancelled", REFUSED: "refused" };
+      if (!Object.hasOwn(keys, mail.event))
       throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
-    subject = subjects[mail.event];
-    body = [statements[mail.event]];
+    subject = copy(`auth.pwr.${keys[mail.event]}.subject`);
+    body = [copy(`auth.pwr.${keys[mail.event]}.statement`)];
   }
-  return [`From: ${options.from}`, `To: ${mail.recipient}`, `Subject: ${subject}`, `Message-ID: <password-reset-${mail.messageId}@${origin.hostname}>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", "Hello,", "", ...body, "", "The Dialectical Engine team", ""].join("\r\n");
+  const text = [copy("auth.common.greeting"), "", ...body, "", copy("auth.common.signoff"), ""].join("\r\n");
+  const transfer = transferBody(text);
+  return [`From: ${options.from}`, `To: ${mail.recipient}`, `Subject: ${encodeHeaderText(subject)}`, `Content-Language: ${catalogLocaleOf(locale)}`, `Message-ID: <password-reset-${mail.messageId}@${origin.hostname}>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", ...(transfer.contentTransferEncoding === null ? [] : [`Content-Transfer-Encoding: ${transfer.contentTransferEncoding}`]), "", transfer.body].join("\r\n");
 }
 export class SendmailPasswordResetSender implements PasswordResetMailSender {
   constructor(private readonly options: Readonly<{
@@ -133,7 +139,7 @@ export class PasswordResetNotificationWorker {
           const expected = notice.event === "PROOF" ? ["cancelToken", "recipient", "token"] : ["recipient"];
           if (Object.keys(p).sort().join(",") !== expected.join(",") || !isSingleDeliverableRecipient(p.recipient) || notice.event === "PROOF" && (!bearer.test(p.token ?? "") || !bearer.test(p.cancelToken ?? "")))
             throw new MailDeliveryError("PASSWORD_RESET_MAIL_INPUT_INVALID");
-          mail = { messageId: notice.noticeId, event: notice.event, recipient: p.recipient, expiresAt: new Date(notice.expiresAt), ...(notice.event === "PROOF" ? { token: p.token!, cancelToken: p.cancelToken! } : {}) };
+          mail = { messageId: notice.noticeId, event: notice.event, recipient: p.recipient, expiresAt: new Date(notice.expiresAt), mailLocale: notice.mailLocale, ...(notice.event === "PROOF" ? { token: p.token!, cancelToken: p.cancelToken! } : {}) };
         } catch { this.reportDiagnostic("PASSWORD_RESET_NOTICE_PENDING"); }
         finally { plain?.fill(0); key?.fill(0); }
         // Preparation owns the lease; the returned work owns transport and acknowledgement.

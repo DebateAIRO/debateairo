@@ -18,6 +18,7 @@ import {
 } from "@debateai/contract";
 import { microsToDecimal } from "@debateai/billing-core";
 import { clientIpNetworkScope } from "../client-ip.js";
+import { mailLocaleOfCookieHeader } from "../mail-locale.js";
 import { readCardDetails, startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
@@ -52,6 +53,14 @@ function malformed(reply: FastifyReply): FastifyReply {
 
 function ownerOf(request: FastifyRequest): string | null {
   return request.authenticatedSession?.ownerRef ?? null;
+}
+
+/**
+ * S01-C13 (R-09, R-17): the mail language of a user action that sends no body (cancel, withdraw, cancel link): the
+ * dropdown's cookie, resolved as every other mail-triggering request resolves it (`mail-locale.ts`, R-06).
+ */
+function mailLocaleOf(request: FastifyRequest): string {
+  return mailLocaleOfCookieHeader(request.headers.cookie);
 }
 
 /**
@@ -99,8 +108,9 @@ export function installSubscriptionRoutes(
     if (deps === undefined) return notFound(reply);
     const ownerRef = ownerOf(request);
     if (ownerRef === null) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    const mailLocale = mailLocaleOf(request);
     return answer(reply, async () => {
-      await cancelForOwner(deps, ownerRef);
+      await cancelForOwner(deps, ownerRef, mailLocale);
       return reply.status(204).send();
     });
   });
@@ -148,8 +158,9 @@ export function installSubscriptionRoutes(
     if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
     const parsed = BillingWithdrawRequestSchema.safeParse(request.body);
     if (!parsed.success) return malformed(reply);
+    const mailLocale = mailLocaleOf(request);
     return answer(reply, async () => {
-      const result = await withdraw(deps, { authenticated, grantToken: parsed.data.step_up_grant });
+      const result = await withdraw(deps, { authenticated, grantToken: parsed.data.step_up_grant, mailLocale });
       return reply.send(BillingWithdrawResponseSchema.parse({
         refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros), currency: result.currency
       }));
@@ -195,9 +206,10 @@ export function installSubscriptionRoutes(
     }
     const email = parsed.data.email;
     const links = deps.cancelLinks;
+    const mailLocale = mailLocaleOf(request);
     // Answer first. Nothing below can change what this caller is told, or when (spec §2.7).
     setImmediate(() => {
-      links.request(email).catch((error: unknown) =>
+      links.request(email, mailLocale).catch((error: unknown) =>
         console.error(JSON.stringify({ event: "billing.cancel_link.failed", code: failureCode(error) })));
     });
     return reply.status(202).send(accepted);
@@ -210,7 +222,7 @@ export function installSubscriptionRoutes(
       return reply;
     }
     return answer(reply, async () => {
-      const outcome = await deps.cancelLinks.cancelByToken(parsed.data.token);
+      const outcome = await deps.cancelLinks.cancelByToken(parsed.data.token, mailLocaleOf(request));
       if (outcome === "INVALID") refuse(404, "CANCEL_LINK_INVALID");
       // W10 (P2-M18): the token was spent but nothing was cancelled (already cancelled, ended, paused by a dispute,
       // or replaced by a newer plan), so the page never says "your plan is cancelled" for it.

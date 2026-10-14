@@ -317,3 +317,28 @@ test("DL1-F5c: the case surfaces put the bearer in the header and never in a pat
   assert.match(source, /"\/api\/v1\/support\/case\/messages"/, "the reply path names no token");
   assert.doesNotMatch(source, /support\/cases\/\$\{/, "no path may interpolate the bearer");
 });
+
+// ---------------------------------------------------------------- C03.1: the locale cookie carrier (R-09, R-24)
+
+const SESSION_VALUE = "s".repeat(43);
+
+test("C03.1: a well-formed debateai.locale cookie reaches the upstream, beside the auth cookies", async () => {
+  const alone = await forwardedHeadersFor({ cookie: "debateai.locale=ro" });
+  assert.equal(alone.forwarded.get("cookie"), "debateai.locale=ro");
+  const beside = await forwardedHeadersFor({ cookie: `__Host-debateai-session=${SESSION_VALUE}; debateai.locale=de` });
+  const pairs = beside.forwarded.get("cookie").split("; ").sort();
+  assert.deepEqual(pairs, [`__Host-debateai-session=${SESSION_VALUE}`, "debateai.locale=de"].sort());
+});
+
+test("C03.1: the first debateai.locale occurrence wins; a second occurrence is dropped", async () => {
+  const { forwarded } = await forwardedHeadersFor({ cookie: "debateai.locale=ro; debateai.locale=de" });
+  assert.equal(forwarded.get("cookie"), "debateai.locale=ro");
+});
+
+test("C03.1: a malformed debateai.locale value is dropped; the request and its auth cookies still go through", async () => {
+  for (const bad of ["russian", "r0", "r", "ro-ROO", "ro_RO"]) {
+    const { forwarded, response } = await forwardedHeadersFor({ cookie: `__Host-debateai-session=${SESSION_VALUE}; debateai.locale=${bad}` });
+    assert.equal(response.status, 200, `a malformed locale (${bad}) does not refuse the request`);
+    assert.equal(forwarded.get("cookie"), `__Host-debateai-session=${SESSION_VALUE}`, `the malformed locale (${bad}) is not forwarded`);
+  }
+});

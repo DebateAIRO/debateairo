@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka.",
   "legal.cookies.ageRefusal.life": "30 dana",
   "legal.cookies.locale.kind": "Kolačić",
-  "legal.cookies.locale.purpose": "Pamti jezik sučelja koji ste odabrali.",
+  "legal.cookies.locale.purpose": "Pamti jezik sučelja koji ste odabrali i određuje jezik e-poruka koje vam šaljemo.",
   "legal.cookies.locale.life": "1 godina",
   "legal.cookies.storageTitle": "Pohranjeno u vašem pregledniku, a ne u kolačiću",
   "legal.cookies.storageIntro": "U pohrani vašeg preglednika čuvaju se četiri stavke: dvije u lokalnoj pohrani, dok ih ne izbrišete, i dvije u pohrani sesije, dok ne zatvorite karticu. Za razliku od kolačića, ne prilažu se vašim zahtjevima; stavka chata za pomoć čuva kopiju razgovora koji ste vodili s pomoći Dialectical Engine-a, a njegove su poruke stigle do Dialectical Engine-a kada ste ih poslali.",

@@ -27,21 +27,36 @@ import type { EldDatabaseSize, EldReading, EldSegmentReading } from "./eld.js";
  * large   40         16344     12519           5            0                 463            0
  *
  * The large database costs about 138 MB resident in the API (medium about 71 MB, small about 54 MB).
+ *
+ * Measured at the chosen configuration on 2026-10-14 (kept as a record, never asserted: the set is read from the live
+ * Terms and Privacy text, which the owners edit; whole-branch review I-2): 16,344 prose sentences, 13,959 settled on
+ * their own site, 8 wrong-lockable, 0 Romanian/English. The unit test asserts the bars in ELD_TUNING_BARS instead.
  */
 export const ELD_TUNING = Object.freeze({
   database: "large" as EldDatabaseSize,
   minLetters: 30,
   // Ruling L-MIX: a clause is a confident reading with at least this many letters of plain words (chooseSegmentMinLetters).
   segmentMinLetters: 12,
-  measured: Object.freeze({ on: "2026-10-14", sentences: 16_344, settlesOwnSite: 13_959, wrongLockable: 8, wrongLockableRoEn: 0 }),
+  // Measured on 2026-10-14 (a record, not asserted; see above):
   // segmentMinLetters joins mixCaught pure  pureFlagged
   // 12                1036  1032      16862 322   <- chosen (at most 5% flagged, then the most caught)
   // 20                1036   988      16862 151
   // 30                1036   818      16862  34
   // 40                1036   500      16862   4
   // joins = the built RO+EN / EN+RO set, pure = every prose legal sentence + RO without diacritics.
-  measuredMix: Object.freeze({ joins: 1036, mixCaught: 1032, pure: 16_862, pureFlagged: 322 })
 });
+
+/**
+ * The bars the tuning promises, as rates, so an edit to the legal text cannot break them by moving a count
+ * (whole-branch review I-2). chooseEldTuning and chooseSegmentMinLetters (tools/question-language-tune/measure-eld.ts)
+ * choose by the first two; the unit test re-measures the set and asserts all three at the chosen configuration.
+ * - wrongLockableOneIn: at most one prose sentence in this many is read confidently as another of our languages
+ *   (measured 8 in 16,344), and never Romanian as English or English as Romanian;
+ * - pureFlaggedOneIn: at most one single-language question in this many is seen as a mix (measured 322 in 16,862);
+ * - mixCaughtMinPercent: at least this share of the built Romanian+English mixes is seen as a mix (measured 1,032 of
+ *   1,036, 99.6%; the next clause minimum, 20 letters, caught 95.4%).
+ */
+export const ELD_TUNING_BARS = Object.freeze({ wrongLockableOneIn: 2000, pureFlaggedOneIn: 20, mixCaughtMinPercent: 99 });
 
 /**
  * Only in the FALLBACK (fast AI down, or no paid AI): an eld reading that names one of these codes on the given site
@@ -69,7 +84,7 @@ export function eldConfident(reading: EldReading): boolean {
 }
 
 /** Ruling L-MIX: one clause read confidently (its letters are plain words only: never names, brands or acronyms). */
-export function eldSegmentConfident(segment: EldSegmentReading): boolean {
+function eldSegmentConfident(segment: EldSegmentReading): boolean {
   return segment.code !== null && segment.reliable && segment.letters >= ELD_TUNING.segmentMinLetters;
 }
 

@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu.",
   "legal.cookies.ageRefusal.life": "30 dienas",
   "legal.cookies.locale.kind": "Sīkdatne",
-  "legal.cookies.locale.purpose": "Atceras jūsu izvēlēto saskarnes valodu.",
+  "legal.cookies.locale.purpose": "Atceras jūsu izvēlēto saskarnes valodu un nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus.",
   "legal.cookies.locale.life": "1 gads",
   "legal.cookies.storageTitle": "Glabājas jūsu pārlūkprogrammā, nevis sīkdatnēs",
   "legal.cookies.storageIntro": "Jūsu pārlūkprogrammas krātuvē tiek glabāti četri vienumi: divi lokālajā krātuvē, līdz jūs tos notīrāt, un divi sesijas krātuvē, līdz jūs aizverat cilni. Atšķirībā no sīkdatnēm tie netiek pievienoti jūsu pieprasījumiem; palīdzības tērzēšanas vienums glabā sarunas ar Dialectical Engine palīdzību kopiju, un tās ziņojumi nonāca pie Dialectical Engine, kad jūs tos nosūtījāt.",

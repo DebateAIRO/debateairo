@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "O seu conteúdo continua a pertencer-lhe. Mantém quaisquer direitos que detenha sobre as perguntas, alegações, anotações e contestações que envia. Concede-nos uma licença não exclusiva, mundial e gratuita para alojar, armazenar, reproduzir, adaptar e tratar esse conteúdo para efeitos de funcionamento do serviço: executar o debate, armazená-lo para que possa voltar a abri-lo e reproduzi-lo, prestar apoio, cumprir as nossas obrigações legais e — apenas se optar por publicar — prosseguir as finalidades da secção 9. Esta licença termina quando o conteúdo é eliminado, salvo na medida exigida pela secção 9 ou pela lei." },
-      { kind: "p", text: "Não treinamos modelos com o seu conteúdo. Não treinamos modelos com o seu conteúdo. Recorremos a fornecedores de IA apenas ao abrigo de condições que não lhes permitem utilizar o seu conteúdo para treinar ou melhorar os respetivos modelos; o Registo de Fornecedores indica, para cada fornecedor, se o confirmámos e quando." },
+      { kind: "p", text: "Não treinamos modelos com o seu conteúdo. Recorremos a fornecedores de IA apenas ao abrigo de condições que não lhes permitem utilizar o seu conteúdo para treinar ou melhorar os respetivos modelos; o Registo de Fornecedores indica, para cada fornecedor, se o confirmámos e quando." },
       { kind: "p", text: "Como o seu conteúdo chega aos fornecedores de IA. Para executar um debate, enviamos texto a um ou mais fornecedores externos de modelos. O que um fornecedor recebe é a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe durante o debate — pelo que o fornecedor vê texto derivado e construído em torno do que escreveu, e não apenas as suas palavras originais. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento." },
       { kind: "p", text: "O que o chat de apoio envia. O assistente de apoio é também um modelo de IA. Quando lhe escreve, enviamos a sua mensagem a um fornecedor externo de modelos para que o modelo possa responder, juntamente com os artigos de ajuda em que baseia a resposta. Antes do envio, ocultamos tudo o que pareça uma palavra-passe, um código de utilização única ou uma chave. Se pedir para falar com uma pessoa, enviamos também ao modelo a conversa, ocultada da mesma forma, para que redija um breve resumo para o membro da nossa equipa que assumir o seu caso. Não anexamos o seu endereço de correio eletrónico, os identificadores da sua conta nem os seus dados de pagamento, mas o modelo recebe tudo o resto que escrever no chat, pelo que não escreva aí nada que não queira que ele leia." },
       { kind: "p", text: "Quais os fornecedores e onde operam. O nosso Registo de Fornecedores de IA, disponível em dezbatere.ro/providers, faz parte destes Termos. Indica, para cada fornecedor que podemos utilizar: a respetiva entidade jurídica e país; o que recebe e porquê; onde efetua o tratamento; as respetivas condições de conservação; se está ativa a conservação zero de dados para o ponto terminal que utilizamos; se pode utilizar dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem estar localizados fora do seu país e fora do Espaço Económico Europeu. A nossa Política de Privacidade explica as salvaguardas." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dados pessoais",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "A forma como tratamos dados pessoais é estabelecida na Política de Privacidade, disponível em dezbatere.ro/privacy. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na Dialectical Engine contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade." }
+      { kind: "p", text: "A forma como tratamos dados pessoais é estabelecida na Política de Privacidade, disponível em dezbatere.ro/privacy. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na Dialectical Engine contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade. Os e-mails que lhe enviamos são redigidos na língua que escolheu no nosso sítio; a secção 13 da Política de Privacidade explica como guardamos essa escolha." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "0f0c48c0f05eb650b2200d5d1f589380fb8b81f7288b76705b6e62e6ffa4a259",
-  eyebrow: "TERMOS DE SERVIÇO · v2.2 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
+  version: "2.3",
+  sha256: "56748891427a59961c312267c06075917bec379a78a1420405e471c2c27f140a",
+  eyebrow: "TERMOS DE SERVIÇO · v2.3 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.2",
+  endMarker: "FIM DOS TERMOS · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",

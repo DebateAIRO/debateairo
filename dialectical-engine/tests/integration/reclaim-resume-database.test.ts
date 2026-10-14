@@ -392,7 +392,7 @@ describe("0119: an answer's map root moves only from a stale root to a live node
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("REPOINTED");
     expect(await positionOf(repository, runId)).toMatchObject({ rootNodeId: live.root, maker: "maker-1" });
     expect(await repository.writeMapPosition({ runId, answerId: "a1", rootIndex: 0, rootNodeId: live.root, maker: "maker-1" })).toBe("ALREADY_PRESENT");
-    // 0116's row is untouched: the move is its own row.
+    // 0117's row is untouched: the move is its own row.
     expect((await database.pool.query(`SELECT root_node_id::text AS root, maker FROM core.map_position WHERE run_id=$1`, [runId])).rows)
       .toEqual([{ root: dead.root, maker: "maker-0" }]);
     // A second take-over moves it again, from the root now in force.
@@ -433,7 +433,7 @@ describe("0119: an answer's map root moves only from a stale root to a live node
       .rejects.toThrowError(/^append-only or immutable table map_position_repoint rejects DELETE$/u);
     await expect(database.pool.query(`TRUNCATE core.map_position_repoint`))
       .rejects.toThrowError(/^TRUNCATE_REJECTED: append-only or immutable table core\.map_position_repoint rejects TRUNCATE$/u);
-    // 0116's own table is still append-only too.
+    // 0117's own table is still append-only too.
     await expect(database.pool.query(`UPDATE core.map_position SET maker = maker WHERE run_id=$1`, [runId]))
       .rejects.toThrowError(/^append-only or immutable table map_position rejects UPDATE$/u);
   });

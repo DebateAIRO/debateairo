@@ -6,6 +6,8 @@ import {
   buildFramedPrompt,
   readPromptFrame,
   scanPromptTripwires,
+  type FramedMaterialField,
+  type PromptContract,
   type PromptPacket,
   type ProviderCallRequest,
   type ProviderGateway
@@ -49,6 +51,18 @@ import {
   framedQuestionLanguageCheck
 } from "../../apps/api/src/question-language/fast-check.js";
 import type { StoryBody } from "@debateai/contract";
+import { replyLanguageExpectation } from "@debateai/kernel";
+import {
+  mapChooseSpec,
+  mapGapSpec,
+  mapMergeSpec,
+  mapSnowballSpec,
+  type MapAnswerItem,
+  type MapKeyPoint,
+  type MapMergedAnswer,
+  type MapPointItem,
+  type MapSpecContext
+} from "@debateai/map";
 import {
   buildStoryCheckerContract,
   buildStoryMaterial,
@@ -230,6 +244,33 @@ export const INJECTION_CORPUS: readonly Attack[] = Object.freeze([
 
 const QUESTION = "Should the city fund the tram extension?";
 const CLEAN_STATEMENT = "The extension pays for itself within nine years.";
+
+/**
+ * Whole-branch review m-8: the debate shape's map hands model-written text on to the next map AI (the snowball's
+ * points so far, the merge's points and candidate answers, the gap round's and the choose step's key points and merged
+ * answers). Each is built by the shipped spec builders (@debateai/map specs.ts) around one attacked claim.
+ */
+const MAP_CONTEXT: MapSpecContext = {
+  questionLine: QUESTION, languageName: "English", languageTag: "und", replyLanguage: replyLanguageExpectation(QUESTION)
+};
+const mapPoint = (claim: string): MapPointItem => ({
+  itemId: "pt01", seat: { aiRef: "preview:ref-0", maker: "maker-0" }, origin: "BLIND", angleId: null, angleKind: null,
+  listIndex: 0, kind: "POINT", claim, whyItMatters: "It decides the cost.", leans: "context"
+});
+const mapAnswer = (answer: string): MapAnswerItem => ({
+  itemId: "ca01", seat: { aiRef: "preview:ref-1", maker: "maker-1" }, origin: "BLIND", angleId: null, angleKind: null,
+  listIndex: 0, kind: "ANSWER", answer
+});
+const mapKeyPoint = (claim: string): MapKeyPoint => ({
+  keyPointId: "kp01", claim, memberItemIds: ["pt01"], blindMakers: ["maker-0"], gapMakers: [], makers: ["maker-0"],
+  fixedAngleKinds: [], leansAgainst: false
+});
+const mapMergedAnswer = (answer: string): MapMergedAnswer => ({
+  answerId: "an01", answer, memberItemIds: ["ca01"], blindMakers: ["maker-1"], makers: ["maker-1"], fromOppositeCase: false
+});
+const MAP_CLEAN_ANSWER = "Yes, fund it in two phases.";
+const mapPacket = (spec: Readonly<{ contract: PromptContract; material: readonly FramedMaterialField[] }>): PromptPacket =>
+  buildFramedPrompt({ contract: spec.contract, material: spec.material }).packet;
 
 /**
  * FW-B / B-I1 + D-I3 — the support chat's fixtures.
@@ -693,11 +734,12 @@ const HAND_OFFS = [
     }).packet]
   },
   {
-    // Debate shape P2c: the map's raised-but-not-debated points reach the storyteller as their own field.
+    // Debate shape P2c: the map's raised-but-not-debated points reach the storyteller as their own field. Ruling
+    // W-STORY: a material with also_raised is sent with the pack's map passages, so the row builds that contract.
     name: "story:storyteller (also_raised — a map point another model wrote)",
     payloadIn: "also_raised",
     render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
-      contract: buildStorytellerContract(STORY_PACK),
+      contract: buildStorytellerContract(STORY_PACK, true),
       material: toStoryPromptMaterial(
         storyMaterialWith({ question: QUESTION, pointClaim: CLEAN_STATEMENT, alsoRaisedClaim: attack }), null
       )
@@ -732,6 +774,42 @@ const HAND_OFFS = [
     render: (attack: string): readonly PromptPacket[] => [framedQuestionLanguageCheck(
       QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION, attack, { code: "ro", name: "Romanian" }
     )]
+  },
+  // Whole-branch review m-8: the map's seven hand-offs of model-written text (see MAP_CONTEXT above).
+  {
+    name: "map:snowball (points_so_far — earlier AIs' claims)",
+    payloadIn: "points_so_far",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapSnowballSpec(MAP_CONTEXT, [mapPoint(attack)]))]
+  },
+  {
+    name: "map:merge (points — a list AI's claim)",
+    payloadIn: "points",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapMergeSpec(MAP_CONTEXT, [mapPoint(attack), mapAnswer(MAP_CLEAN_ANSWER)]))]
+  },
+  {
+    name: "map:merge (candidate_answers — a list AI's answer)",
+    payloadIn: "candidate_answers",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapMergeSpec(MAP_CONTEXT, [mapPoint(CLEAN_STATEMENT), mapAnswer(attack)]))]
+  },
+  {
+    name: "map:gap (key_points — the merged claims)",
+    payloadIn: "key_points",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapGapSpec(MAP_CONTEXT, [mapKeyPoint(attack)], [mapMergedAnswer(MAP_CLEAN_ANSWER)]))]
+  },
+  {
+    name: "map:gap (answers — the merged answers)",
+    payloadIn: "answers",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapGapSpec(MAP_CONTEXT, [mapKeyPoint(CLEAN_STATEMENT)], [mapMergedAnswer(attack)]))]
+  },
+  {
+    name: "map:choose (key_points — the merged claims)",
+    payloadIn: "key_points",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapChooseSpec(MAP_CONTEXT, [mapKeyPoint(attack)], [mapMergedAnswer(MAP_CLEAN_ANSWER)]))]
+  },
+  {
+    name: "map:choose (answers — the merged answers)",
+    payloadIn: "answers",
+    render: (attack: string): readonly PromptPacket[] => [mapPacket(mapChooseSpec(MAP_CONTEXT, [mapKeyPoint(CLEAN_STATEMENT)], [mapMergedAnswer(attack)]))]
   }
 ] as const;
 
@@ -795,13 +873,17 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // rows already use, so 19 distinct fields stay 19).
     // Debate shape P2c Task 1: 25 -> 26 and 19 -> 20, with the storyteller's also_raised (a map point another model
     // wrote, raised but not debated).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(26);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(20);
+    // Whole-branch review m-8: 26 -> 33 and 20 -> 24, with the map's seven hand-offs: the snowball's points_so_far,
+    // the merge's points and candidate_answers, and the gap round's and the choose step's key_points and answers
+    // (points_so_far, candidate_answers, key_points and answers are new field names; points is the story's too).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(33);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(24);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(5);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("map:"))).toHaveLength(7);
   });
 
   /**

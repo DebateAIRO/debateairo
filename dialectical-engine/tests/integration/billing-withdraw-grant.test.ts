@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingRepository, migrate } from "@debateai/db";
@@ -38,12 +39,12 @@ async function account(): Promise<Readonly<{
     ) VALUES ($1,$2,'recovery_email','{}','verified',clock_timestamp(),clock_timestamp(),
       NULL,NULL,NULL,NULL,'not_requested',NULL)
   `, [randomUUID(), userId]);
-  await database.pool.query(`
+  await withMailLocale(database.pool, 'en', (c) => c.query(`
     INSERT INTO identity.mfa_factor(
       mfa_factor_id,user_id,factor_type,secret_ciphertext,credential_id,public_key,
       state,created_at,verified_at,revoked_at,last_accepted_step
     ) VALUES ($1,$2,'totp','{}',NULL,NULL,'active',clock_timestamp(),clock_timestamp(),NULL,10)
-  `, [factorId, userId]);
+  `, [factorId, userId]));
   await database.pool.query(`
     INSERT INTO identity.session(
       session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,
@@ -155,7 +156,7 @@ describe("P12a the WITHDRAW_SUBSCRIPTION grant on real PostgreSQL", () => {
     await database.pool.query(`UPDATE identity."user" SET state='age_frozen' WHERE user_id=$1`, [who.userId]);
     expect(await consumeAsRuntime([who.userId, who.ownerRef, who.sessionId, tokenHash])).toBe(false);
     // The positive control: the same grant, the account active again, is spent.
-    await database.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [who.userId]);
+    await withMailLocale(database.pool, 'en', (c) => c.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [who.userId]));
     expect(await consumeAsRuntime([who.userId, who.ownerRef, who.sessionId, tokenHash])).toBe(true);
   });
 
@@ -172,10 +173,10 @@ describe("P12a the WITHDRAW_SUBSCRIPTION grant on real PostgreSQL", () => {
   it("never schedules an account erasure with a WITHDRAW_SUBSCRIPTION grant, while a DELETE_ACCOUNT grant does", async () => {
     // Both purposes are account-scoped now; only 0040:5015 (`action='DELETE_ACCOUNT'`) tells them apart.
     const who = await account();
-    const schedule = (tokenHash: string) => database.pool.query<{ erasure_id: string }>(
+    const schedule = (tokenHash: string) => withMailLocale(database.pool, 'en', (c) => c.query<{ erasure_id: string }>(
       "SELECT erasure_id FROM identity.schedule_account_erasure($1,$2,$3,$4)",
       [who.userId, who.ownerRef, who.sessionId, tokenHash]
-    );
+    ));
     const requests = async () => Number((await database.pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM identity.account_erasure_request WHERE user_id=$1", [who.userId]
     )).rows[0]!.n);

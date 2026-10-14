@@ -21,9 +21,9 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./transport.js
  *   deployment                         route    transport                                         who pays
  *   preview + Anthropic gate socket    PREVIEW  the guarded fetch, no key, no spend record        the gate's daily pot
  *   preview, no Anthropic gate socket  NONE     none (reason NO_GATE)                             nothing is called
- *   hosted, 0117's writer absent       NONE     none (reason HOSTED_BEFORE_SPEND_RECORD)          nothing is called
+ *   hosted, 0118's writer absent       NONE     none (reason HOSTED_BEFORE_SPEND_RECORD)          nothing is called
  *   hosted, no Anthropic support key   NONE     none (reason NO_HOSTED_KEY)                       nothing is called
- *   hosted, 0117 + the support key     HOSTED   the support target's key, the exact Anthropic URL the run-less spend record
+ *   hosted, 0118 + the support key     HOSTED   the support target's key, the exact Anthropic URL the run-less spend record
  *   local mode                         NONE     none (reason LOCAL_MODE)                          nothing is called
  *   the row's fastCheck: null          (any)    none (reason POLICY_OFF)                          nothing is called
  *
@@ -127,7 +127,7 @@ function spendFailureCode(error: unknown): string {
 /**
  * The route with no preview configuration (P2L Task 19). Local mode has no paid AI. Hosted turns the fast check on only
  * when BOTH hold, else NONE with the reason:
- *  · `ledger.record_language_check_spend` exists AND the API's role may EXECUTE it (`spend.writerPresent`, the 0117
+ *  · `ledger.record_language_check_spend` exists AND the API's role may EXECUTE it (`spend.writerPresent`, the 0118
  *    probe): without either the API keeps the check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
  *  · and, before either, the fast-check model is on the reviewed provider price table, else the boot refuses
  *    (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED: a price is never guessed);

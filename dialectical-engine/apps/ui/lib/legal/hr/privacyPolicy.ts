@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Kolačić (HttpOnly) — Zadržava vas prijavljenima. Obnavlja se dok upotrebljavate uslugu. — 14 dana",
         "__Host-debateai-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — 14 dana",
         "__Host-debateai-age-refusal — Kolačić (HttpOnly) — Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka. — 30 dana",
-        "debateai.locale — Kolačić — Pamti jezik sučelja koji ste odabrali. — 1 godina",
+        "debateai.locale — Kolačić — Pamti jezik sučelja koji ste odabrali i određuje jezik e-poruka koje vam šaljemo. — 1 godina",
         "__Host-debateai-staff — Kolačić (HttpOnly) — Odvojeni pristup osoblja — Do 8 sati; 15 minuta neaktivnosti",
         "__Host-debateai-staff-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — Do 8 sati; 15 minuta neaktivnosti",
         "__Host-debateai-password-reset — Kolačić (HttpOnly) — Samo ponovno postavljanje lozinke — Do 30 minuta",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Pohrana sesije — Pamti koju poruku o poveznici za preuzimanje treba prikazati u ovoj kartici. — Do zatvaranja kartice, odjave ili nove poveznice"
         ]
       },
+      { kind: "p", text: "Svaka e-poruka koju za vas stavimo u red čekanja zadržava jezik koji ste odabrali dok je ne pošaljemo." },
       { kind: "p", text: "Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
       { kind: "p", text: "Preglednici mogu slati signal „Do Not Track” ili sličan signal. Dialectical Engine vas ne prati, pa takav signal nema što isključiti: usluga radi jednako s njim ili bez njega." },
       { kind: "p", text: "Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-mjesta za ovo web-mjesto u postavkama preglednika. Što tada prestaje raditi: prijava te pamćenje vašeg odabira jezika i načina prikaza; obavijest o kolačićima također će se ponovno prikazati." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju." },
-      { kind: "p", text: "Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.3 zamijenila je verziju 3.2: obuhvaća samo regije u kojima pružamo uslugu, imenuje našu tvrtku te u odjeljku 5 naše pružatelje usluga smještaja, isporuke sadržaja i e-pošte, i opisuje Cloudflareovu provjeru botova." }
+      { kind: "p", text: "Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.4 zamijenila je verziju 3.3: u odjeljku 13. sada stoji da kolačić debateai.locale također određuje jezik kojim pišemo e-poruke koje vam šaljemo, a dodan je odlomak prema kojem svaka e-poruka koju za vas stavimo u red čekanja zadržava jezik koji ste odabrali dok je ne pošaljemo." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "8cf0a6749a055ef97aba345534c475a3c98a60ac4a20471c8e6f6feaae1f13d3",
-  eyebrow: "PRAVILA O PRIVATNOSTI · v3.3 · NA SNAZI OD 12. LISTOPADA 2026.",
+  version: "3.4",
+  sha256: "f34b9bd88d03830c5a6e0d0af800ffed5012a933e9c3032dd445874acc1905d9",
+  eyebrow: "PRAVILA O PRIVATNOSTI · v3.4 · NA SNAZI OD 12. LISTOPADA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",
-  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Pravila o privatnosti",
   sectionIdPrefix: "policy-section-",

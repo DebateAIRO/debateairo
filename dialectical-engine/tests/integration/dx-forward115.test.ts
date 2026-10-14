@@ -10,14 +10,15 @@ import { seedInstalledAuth106 } from "../support/auth106.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const EXPORT = "0115_data_export.sql";
+const MAIL_LOCALE = "0116_mail_locale.sql";
 const NETOPIA = "0111_billing_netopia.sql";
 const BATCH = "0112_auth_db_batch.sql";
 const PART_C = "0113_billing_price_currencies.sql";
 const ROLE_ROTATION = "0114_role_rotation.sql";
-/** The debate shape's map, chained after the export (spec 2026-10-12 §3.4). */
-const MAP = "0116_debate_shape_map.sql";
+/** The debate shape's map, chained after the mail locale (spec 2026-10-12 §3.4). */
+const MAP = "0117_debate_shape_map.sql";
 /** The language check's site cost, chained after the map (question-language spec 2026-10-13). */
-const LANGUAGE_CHECK = "0117_language_check_spend.sql";
+const LANGUAGE_CHECK = "0118_language_check_spend.sql";
 /** The reclaim resume, chained after the language check (spec 2026-10-14-reclaim-resume-design). */
 const RECLAIM = "0119_reclaim_resume.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
@@ -31,15 +32,17 @@ describe("data export forward115", () => {
   beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 180_000);
   afterAll(async () => { await db?.stop(); });
 
-  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the map 0116, the language check 0117 and the reclaim resume 0119 with linked receipts", async () => {
+  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAP, LANGUAGE_CHECK, RECLAIM]);
+    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM]);
     const names = (await ledger(db)).map(row => row.name).filter(name => name.startsWith("011"));
-    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAP, LANGUAGE_CHECK, RECLAIM]);
+    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM]);
     const steps = await receipts(db);
-    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAP, LANGUAGE_CHECK, RECLAIM]);
+    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM]);
     expect(steps[4].previous_manifest_sha256).toBe(steps[3].forward_manifest_sha256);
     expect(steps[4].verifier_sha256).toBe(steps[3].verifier_sha256);
+    expect(steps[5].previous_manifest_sha256).toBe(steps[4].forward_manifest_sha256);
+    expect(steps[5].verifier_sha256).toBe(steps[4].verifier_sha256);
     expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration_resolution WHERE logical_name='0093_billing_runtime_role.sql'")).rows[0].n).toBe(0);
   });
 

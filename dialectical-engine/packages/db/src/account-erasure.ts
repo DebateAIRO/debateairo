@@ -8,6 +8,7 @@ import {
   type RunContentKeyStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
+import { MAIL_LOCALE_SETTING, withMailLocale } from "./mail-locale.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
 const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
@@ -22,6 +23,8 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "identity.account_erasure_cleanup_manifest_with_choice(uuid)",
   "identity.finalize_account_erasure(uuid,timestamptz,timestamptz,integer,integer,integer,integer)",
   "identity.account_erasure_status(uuid)",
+  "identity.account_erasure_notification_mail_locale(uuid,uuid)",
+  "identity.account_erasure_schedule_locale(uuid)",
   "identity.pending_account_key_cleanup(integer)",
   "identity.pending_account_erasure_work(integer)",
   "identity.claim_account_erasure_notifications(integer)",
@@ -92,6 +95,8 @@ export type AccountErasureNotificationClaim = Readonly<{
   addressCiphertext: CryptoEnvelope;
   eventKind: "SCHEDULED" | "CANCELLED" | "COMPLETION";
   executeAt: Date;
+  /** C11.4 (R-13): the language stored on the row; the worker sends the mail in it. */
+  mailLocale: string;
 }>;
 
 type ErasureRoleWitness = Readonly<{
@@ -162,6 +167,32 @@ async function withErasureContentLeases<T>(
     }
     client.release(releaseFailure instanceof Error ? releaseFailure : undefined);
     if (releaseFailure !== undefined) throw releaseFailure;
+  }
+}
+
+/**
+ * C11.3 (R-16, D-96): the erasure worker sets the mail language from the erasure's SCHEDULED row in the same transaction
+ * as prepare_account_erasure, so the COMPLETION rows take that value. The reader is NULL when no SCHEDULED row exists; the
+ * completion's guard then refuses (MAIL_LOCALE_MISSING) and the transaction rolls back. A failed ROLLBACK leaves the
+ * connection in an unknown state: the unlock in withErasureContentLeases then fails on it, and the client leaves the pool.
+ */
+async function withScheduledMailLocale<T>(
+  client: PoolClient,
+  erasureId: string,
+  run: () => Promise<T>
+): Promise<T> {
+  await client.query("BEGIN");
+  try {
+    await client.query(
+      "SELECT set_config($1, identity.account_erasure_schedule_locale($2::uuid), true)",
+      [MAIL_LOCALE_SETTING, erasureId]
+    );
+    const result = await run();
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
   }
 }
 
@@ -364,15 +395,17 @@ export class PostgresAccountErasureRepository {
     sessionId: string;
     grantTokenHash: string;
     deletePublicDebates?: boolean;
+    source?: AuthSourceContext;
   }>): Promise<CurrentAccountErasure | null> {
-    const result = await this.pool.query<{
+    // C11.1 (R-16, D-3 row 10): the SCHEDULED row takes the schedule request's language; a request with no value writes en (V-23).
+    const result = await withMailLocale(this.pool, input.source?.mailLocale ?? "en", (client) => client.query<{
       erasure_id:string;status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:Date;
       cancellation_ref:string;delete_public_debates:boolean;
     }>(
       "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,$5)",
       [input.userId,input.ownerRef,input.sessionId,input.grantTokenHash,
         input.deletePublicDebates === true]
-    );
+    ));
     const row=result.rows[0];
     return row===undefined ? null : Object.freeze({
       erasureId:row.erasure_id,status:row.status,executeAt:row.execute_at,
@@ -409,11 +442,13 @@ export class PostgresAccountErasureRepository {
     ownerRef: string;
     sessionId: string;
     cancellationRef: string;
+    source?: AuthSourceContext;
   }>): Promise<boolean> {
-    const result = await this.pool.query<{ cancelled: boolean }>(
+    // C11.2 (R-16, D-3 row 11): the CANCELLED row takes the cancel request's language; a request with no value writes en (V-23).
+    const result = await withMailLocale(this.pool, input.source?.mailLocale ?? "en", (client) => client.query<{ cancelled: boolean }>(
       "SELECT identity.cancel_current_account_erasure($1,$2,$3,$4) AS cancelled",
       [input.userId,input.ownerRef,input.sessionId,input.cancellationRef]
-    );
+    ));
     return result.rows[0]?.cancelled === true;
   }
 
@@ -441,13 +476,14 @@ export class PostgresAccountErasureRepository {
     expectedLegacyRunIds: readonly string[],
     expectedPublishedRunIds: readonly string[]
   ): Promise<AccountErasureTransitionOutcome> {
-    return withErasureContentLeases(this.pool,expectedRunIds,async (client) => {
-      const result = await client.query<{ outcome: AccountErasureTransitionOutcome }>(
-        "SELECT identity.prepare_account_erasure($1,$2::uuid[],$3::uuid[],$4::uuid[]) AS outcome",
-        [erasureId,expectedRunIds,expectedLegacyRunIds,expectedPublishedRunIds]
-      );
-      return result.rows[0]?.outcome ?? "NOT_FOUND";
-    });
+    return withErasureContentLeases(this.pool,expectedRunIds,(client) =>
+      withScheduledMailLocale(client,erasureId,async () => {
+        const result = await client.query<{ outcome: AccountErasureTransitionOutcome }>(
+          "SELECT identity.prepare_account_erasure($1,$2::uuid[],$3::uuid[],$4::uuid[]) AS outcome",
+          [erasureId,expectedRunIds,expectedLegacyRunIds,expectedPublishedRunIds]
+        );
+        return result.rows[0]?.outcome ?? "NOT_FOUND";
+      }));
   }
 
   async status(erasureId: string): Promise<AccountErasureStatus> {
@@ -508,15 +544,25 @@ export class PostgresAccountErasureRepository {
       event_kind: "SCHEDULED" | "CANCELLED" | "COMPLETION";
       execute_at: Date;
     }>("SELECT * FROM identity.claim_account_erasure_notifications($1)", [limit]);
-    return Object.freeze(result.rows.map((row) => Object.freeze({
-      messageId: row.message_id,
-      claimToken: row.claim_token,
-      userId: row.user_id,
-      erasureId: row.erasure_id,
-      channelType: row.channel_type,
-      addressCiphertext: row.address_ciphertext,
-      eventKind: row.event_kind,
-      executeAt: row.execute_at
+    // C18.5 (D-120): the locale is read per claimed row, inside that row's lease (its message id and claim token).
+    return Object.freeze(await Promise.all(result.rows.map(async (row) => {
+      const locale = await this.pool.query<{ locale: string }>(
+        "SELECT identity.account_erasure_notification_mail_locale($1,$2) AS locale",
+        [row.message_id, row.claim_token]
+      );
+      const mailLocale = locale.rows[0]?.locale;
+      if (mailLocale === undefined) throw new TypeError("ACCOUNT_ERASURE_MAIL_LOCALE_MISSING");
+      return Object.freeze({
+        messageId: row.message_id,
+        claimToken: row.claim_token,
+        userId: row.user_id,
+        erasureId: row.erasure_id,
+        channelType: row.channel_type,
+        addressCiphertext: row.address_ciphertext,
+        eventKind: row.event_kind,
+        executeAt: row.execute_at,
+        mailLocale
+      });
     })));
   }
 

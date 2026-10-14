@@ -1,5 +1,7 @@
 # Debate Shape Phase 2d (practice and proof) Implementation Plan
 
+> **Renumbered 2026-10-14:** the migrations this plan calls 0116 (the debate shape map) and 0117 (the language check's site cost) are now 0117 and 0118: the merge of `origin/dev` 221d784db brought dev's own 0116 (`0116_mail_locale.sql`) first. The numbers below are historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the practice tool run a whole practice debate in the new debate shape, on the live register's exact settings plus the owners' switch, in the throwaway database only. Make its report and transcript show what the shape did. Prove a whole new-shape debate end to end against the scripted gates. Document the operator procedure for the whole-debate comparison of today's shape and the new shape.
@@ -2363,7 +2365,7 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 | 3 | `en-nuclear` | today's shape first |
 | 4 | `en-social-media-age` | new shape first |
 
-Money and time, within the owner's test budget of $5 DeepInfra and $1 Haiku a day:
+Money and time, within the owners' daily test budget:
 
 - **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
   plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
@@ -4560,7 +4562,7 @@ Expected: every one PASS. A red one is reported with its file and case; fix only
 | transcript.json includes the map items and choice | Task 5 (`structure.map`); Task 6 (asserted end to end) |
 | Integration: whole new-shape practice debate: PASS, served answer, READY story with also-raised | Task 6 (case 1, including the storyteller's `also_raised` field) |
 | Integration: a row-absent run identical to today | Task 6 (case 2: no shape key, ask as today, no MAP call, no `also_raised`, transcript keys as today); Task 8 (today's cases re-run). The runner's own byte identity is P2b's test |
-| Whole-debate comparison: today's shape vs new shape, same 4 fixed questions, depth 1, all five AIs, two `--out` folders per question, within $5 DeepInfra + $1 Haiku a day, pass bar first | Task 1 (the four fixed ids); Task 7 (S-8 with the procedure, the money rules and the pass bar) |
+| Whole-debate comparison: today's shape vs new shape, same 4 fixed questions, depth 1, all five AIs, two `--out` folders per question, within the owners' daily test budget, pass bar first | Task 1 (the four fixed ids); Task 7 (S-8 with the procedure, the money rules and the pass bar) |
 | The owners' scoring method never in the repository | Task 7 (the README only says "results are judged by the owners' private method, outside this repository"; a test pins that sentence; no scoring code anywhere) |
 | Spec §5 "a real practice debate with all AIs on the new shape before any preview upload" | Task 7 (S-8's pass bar, and the shape command in "The new debate shape"); Task 7b (the `lang-ro-en-mix` debate on day 1) |
 | The practice version carries the code's judge, composer, conformance and map contract hashes (ruling X3, P2b cross-plan P2d-2; pre-flight PF-D7) | Task 2 (`practiceCodeContractHashRows`, `practiceShapeVersionRows`; a test pins the four rows to `buildDevelopmentRunnerRegisterRows()`); Task 0 (the dev builder seals `mapContractHash`) |

@@ -1,4 +1,5 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
+import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import {
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
@@ -224,28 +225,23 @@ function inArrowOrder<T extends { readonly arrowId: string }>(arrows: readonly T
     .map(({ arrow }) => arrow);
 }
 
-/** The members of P2b's `MapResult` (@debateai/map) this module reads; structural, so the runner keeps one import. */
-export type StoryMapSource = Readonly<{
-  keyPoints: readonly Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>[];
-  choice: Readonly<{ alsoRaised: readonly string[] }> | null;
-}>;
+/** The members of P2b's `MapResult` (@debateai/map) this module reads. */
+export type StoryMapSource = Pick<MapResult, "keyPoints" | "mergedAnswers" | "choice">;
 
 /**
- * Debate shape P2c: the map choice's "also raised, not debated" points, in the choice's
- * order (most-raised first), each with how many different makers raised it. A claim is
- * cleared of node ids like every free text here. No map, or a map that chose nothing:
- * undefined.
+ * Debate shape P2c: the map choice's "also raised, not debated" points, most-raised first, each with how many
+ * different makers raised it. A claim is cleared of node ids like every free text here. No map, or a map that chose
+ * nothing: undefined. Whole-branch review m-3/m-4 (ruling W-CUT): the list is @debateai/map's `mapAlsoRaisedOf`, the
+ * one the debate page's stored list is built with: a chosen answer past the `arguedAnswers` the run argued is listed
+ * too, with the points only it took, and claims that say the same are one entry.
  */
 export function storyAlsoRaisedFrom(
-  map: StoryMapSource | null
+  map: StoryMapSource | null,
+  arguedAnswers: number
 ): readonly { readonly claim: string; readonly raisedBy: number }[] | undefined {
   if (map === null || map.choice === null) return undefined;
-  const byId = new Map(map.keyPoints.map((point) => [point.keyPointId, point] as const));
-  return Object.freeze(map.choice.alsoRaised.flatMap((keyPointId) => {
-    const point = byId.get(keyPointId);
-    if (point === undefined) return [];
-    return [Object.freeze({ claim: withoutNodeIds(point.claim), raisedBy: Math.max(1, new Set(point.makers).size) })];
-  }));
+  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers })
+    .map((entry) => Object.freeze({ claim: withoutNodeIds(entry.claim), raisedBy: Math.max(1, new Set(entry.makers).size) })));
 }
 
 /** The members of P2b's `MapResult` the answers note reads; structural, like `StoryMapSource`. */

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.2 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.3 · HATÁLYOS 2026. OKTÓBER 12.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.2
+endMarker: A FELTÉTELEK VÉGE · v2.3
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.2 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.3 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -114,7 +114,7 @@ Ha nem biztos abban, hogy valami megengedett-e, közzététele előtt kérdezzen
 
 **Az Ön tartalma az Öné marad.** Ön megtartja a beküldött kérdéseihez, állításaihoz, megjegyzéseihez és kifogásaihoz fűződő valamennyi jogát. Ön nem kizárólagos, az egész világra kiterjedő, jogdíjmentes engedélyt ad számunkra e tartalom tárhelyen tartására, tárolására, többszörözésére, átdolgozására és feldolgozására a szolgáltatás működtetése céljából: a vita futtatásához, annak tárolásához, hogy Ön újból megnyithassa és lejátszhassa, támogatás nyújtásához, jogi kötelezettségeink teljesítéséhez, valamint — kizárólag akkor, ha Ön a közzététel mellett dönt — a 9. szakaszban foglalt célokra. Ez az engedély a tartalom törlésekor megszűnik, kivéve, ha a 9. szakasz vagy a jog ettől eltérően rendelkezik.
 
-**Nem tanítjuk be az Ön tartalmán a modelleket.** Nem tanítunk be modelleket az Ön tartalmán. MI-szolgáltatókat kizárólag olyan feltételekkel veszünk igénybe, amelyek nem engedik meg nekik, hogy az Ön tartalmát modelljeik betanítására vagy továbbfejlesztésére használják; a Nyilvántartás szolgáltatónként feltünteti, hogy ezt megerősítettük-e, és mikor.
+**Nem tanítjuk be az Ön tartalmán a modelleket.** MI-szolgáltatókat kizárólag olyan feltételekkel veszünk igénybe, amelyek nem engedik meg nekik, hogy az Ön tartalmát modelljeik betanítására vagy továbbfejlesztésére használják; a Nyilvántartás szolgáltatónként feltünteti, hogy ezt megerősítettük-e, és mikor.
 
 **Hogyan jut el az Ön tartalma az MI-szolgáltatókhoz.** Egy vita futtatásához szöveget küldünk egy vagy több külső modellszolgáltatónak. A szolgáltató megkapja az Ön kérdését, az Ön által beállított irányító megjegyzéseket és a motor által a vita során összeállított állításokat — így nem csupán az Ön eredeti szavait látja, hanem az Ön által beírt szövegből származó és aköré épített szöveget is. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg.
 
@@ -239,7 +239,7 @@ A 8. szakasz szabályozza az Ön tartalmát és a létrehozott kimenetek jogáll
 
 ## 17. Személyes adatok
 
-A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető **Adatvédelmi szabályzat** határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti.
+A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhető **Adatvédelmi szabályzat** határozza meg. Ismerteti, milyen adatokat gyűjtünk, az egyes célok jogalapját, az adatok megőrzési idejét, az adatok címzettjeit, az érintett adattovábbításokat és az Ön jogai gyakorlásának módját. Három kérdés ide is tartozik. A 7. szakasz arra kéri Önt, hogy ne adja meg más személyek személyes adatait egy kérdésben; ha mégis megteszi, azért Ön felel, mi pedig eltávolíthatjuk a tartalmat. Ha egy Dialectical Engine felületén közzétett vita Önre vonatkozó személyes adatot tartalmaz, fiók nélkül is kérheti annak eltávolítását (9. szakasz). Ezenkívül a szerződés bizonyítékaként nyilvántartjuk, hogy Ön elfogadta e Feltételeket — a változatot, az időpontot és a munkamenet technikai adatait —, amint azt az Adatvédelmi szabályzat ismerteti. Az Önnek küldött e-maileket az Ön által a webhelyünkön választott nyelven írjuk; az Adatvédelmi szabályzat 13. szakasza ismerteti, hogyan őrizzük meg ezt a választást.
 
 ## 18. Irányadó jog és a jogviták elbírálásának helye
 

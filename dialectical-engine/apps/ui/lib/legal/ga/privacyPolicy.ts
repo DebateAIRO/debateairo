@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Fianán (HttpOnly) — Coinníonn sé sínithe isteach thú. Athnuaitear é fad is a bhíonn tú ag úsáid na seirbhíse. — 14 lá",
         "__Host-debateai-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — 14 lá",
         "__Host-debateai-age-refusal — Fianán (HttpOnly) — Tar éis seiceáil aoise a dhiúltú, cuireann sé cosc ar an mbrabhsálaí seo triail eile a bhaint as ar feadh 30 lá. Níl ann ach an focal “diúltaithe”, gan aon sonraí pearsanta. — 30 lá",
-        "debateai.locale — Fianán — Meabhraíonn sé teanga an chomhéadain a roghnaigh tú. — 1 bhliain",
+        "debateai.locale — Fianán — Meabhraíonn sé teanga an chomhéadain a roghnaigh tú, agus socraíonn sé teanga na ríomhphost a sheolaimid chugat. — 1 bhliain",
         "__Host-debateai-staff — Fianán (HttpOnly) — Rochtain ar leith don fhoireann — Suas le 8 n-uaire; 15 nóiméad díomhaointis",
         "__Host-debateai-staff-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — Suas le 8 n-uaire; 15 nóiméad díomhaointis",
         "__Host-debateai-password-reset — Fianán (HttpOnly) — Athshocrú focail faire amháin — Suas le 30 nóiméad",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Stóras seisiúin — Cuimhníonn sé cén teachtaireacht faoin nasc íoslódála atá le taispeáint sa chluaisín seo. — Go ndúnfar an cluaisín, go síneofar amach nó go n-osclófar nasc nua"
         ]
       },
+      { kind: "p", text: "Coinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é." },
       { kind: "p", text: "Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí Dialectical Engine." },
       { kind: "p", text: "Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn Dialectical Engine thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é." },
       { kind: "p", text: "Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh an tsuímh seo, nó scrios iad, i socruithe do bhrabhsálaí. Cad a stopann ag obair ansin: síniú isteach, agus cuimhneamh ar do roghanna teanga agus taispeána; taispeánfar an fógra fianán arís freisin." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.3 in ionad leagan 3.2: ní chlúdaíonn sé ach na réigiúin a sheirbhísímid, ainmníonn sé ár gcuideachta agus, i rannán 5, ár soláthraithe óstála, seachadta inneachair agus ríomhphoist, agus déanann sé cur síos ar an tseiceáil ar bhotaí a dhéanann Cloudflare." }
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.4 in ionad leagan 3.3: deir rannán 13 anois go socraíonn an fianán debateai.locale freisin an teanga ina scríobhaimid na ríomhphost a sheolaimid chugat, agus cuireann sé paragraf leis a deir go gcoinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "3c7e9bcb4a38eb4ae604b3072738338049ca537e1dfaa70b9b0dec2524abe8fb",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "3.4",
+  sha256: "eef4f7f442c4558a24b3cbf7b2fefa0abe3c3ced2711b9e2bb1146dff511d18e",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",

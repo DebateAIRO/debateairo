@@ -78,9 +78,10 @@ describe("DPD-S01 erasure HTTP choice",()=>{
       });
       expect(response.statusCode).toBe(202);
       expect(response.json()).toEqual(receipt);
-      expect(schedule).toHaveBeenCalledWith({ authenticated,grantToken:GRANT_TOKEN });
+      expect(schedule).toHaveBeenCalledWith({ authenticated,grantToken:GRANT_TOKEN,
+        source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-1",userAgent:"lightMyRequest" } });
       expect(Object.keys(schedule.mock.calls[0]![0]).sort()).toEqual([
-        "authenticated","grantToken"
+        "authenticated","grantToken","source"
       ]);
     } finally { await api.close(); }
   });
@@ -97,13 +98,14 @@ describe("DPD-S01 erasure HTTP choice",()=>{
       expect(response.statusCode).toBe(202);
       expect(response.json()).toEqual({ ...receipt,delete_public_debates:true });
       expect(schedule).toHaveBeenCalledWith({
-        authenticated,grantToken:GRANT_TOKEN,deletePublicDebates:true
+        authenticated,grantToken:GRANT_TOKEN,deletePublicDebates:true,
+        source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-1",userAgent:"lightMyRequest" }
       });
       schedule.mockClear();
       await api.inject({ method:"DELETE",url:"/v1/account",headers,
         payload:{ ...basePayload,delete_public_debates:false } });
       expect(Object.keys(schedule.mock.calls[0]![0]).sort()).toEqual([
-        "authenticated","grantToken"
+        "authenticated","grantToken","source"
       ]);
     } finally { await api.close(); }
   });

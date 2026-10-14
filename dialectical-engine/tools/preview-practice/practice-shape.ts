@@ -36,7 +36,7 @@ export type PracticeShapeOverride = Readonly<{ policy: DebateShapePolicy | null;
 const POLICY_INVALID_PREFIX = "DEBATE_SHAPE_POLICY_INVALID:";
 
 /** The file's text, read and checked by the register's own parser. A refusal names only the place that is wrong. */
-export function parsePracticeShapePolicyText(text: string): DebateShapePolicy {
+function parsePracticeShapePolicyText(text: string): DebateShapePolicy {
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new PracticeRefusal("PRACTICE_SHAPE_POLICY_INVALID", "$"); }
   let policy: DebateShapePolicy;

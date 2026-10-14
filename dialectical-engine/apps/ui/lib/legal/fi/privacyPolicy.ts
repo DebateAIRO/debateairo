@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Eväste (HttpOnly) — Pitää sinut kirjautuneena. Se uusitaan, kun käytät palvelua. — 14 päivää",
         "__Host-debateai-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — 14 päivää",
         "__Host-debateai-age-refusal — Eväste (HttpOnly) — Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja. — 30 päivää",
-        "debateai.locale — Eväste — Muistaa valitsemasi käyttöliittymän kielen. — 1 vuosi",
+        "debateai.locale — Eväste — Muistaa valitsemasi käyttöliittymän kielen ja määrää kielen, jolla lähetämme sinulle sähköpostit. — 1 vuosi",
         "__Host-debateai-staff — Eväste (HttpOnly) — Erillinen henkilöstön käyttöoikeus — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
         "__Host-debateai-staff-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
         "__Host-debateai-password-reset — Eväste (HttpOnly) — Vain salasanan palautus — Enintään 30 minuuttia",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Istunnon tallennustila — Muistaa, mikä latauslinkkiä koskeva viesti tässä välilehdessä näytetään. — Kunnes välilehti suljetaan, kirjaudut ulos tai avaat uuden linkin"
         ]
       },
+      { kind: "p", text: "Jokainen sinulle jonoon asettamamme sähköposti säilyttää kielen, jonka olit valinnut, kunnes lähetämme sen." },
       { kind: "p", text: "Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
       { kind: "p", text: "Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. Dialectical Engine ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä." },
       { kind: "p", text: "Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivuston evästeet ja sivustotiedot selaimesi asetuksista. Mikä silloin lakkaa toimimasta: sisäänkirjautuminen sekä kieli- ja näyttövalintojesi muistaminen; myös evästeilmoitus näytetään uudelleen." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.3 korvasi version 3.2: se koskee vain alueita, joilla palvelemme, nimeää yhtiömme sekä osiossa 5 säilytys-, sisällönjakelu- ja sähköpostipalveluntarjoajamme ja kuvaa Cloudflaren bottitarkistuksen." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.4 korvasi version 3.3: osiossa 13 kerrotaan nyt, että eväste debateai.locale määrää myös sen kielen, jolla kirjoitamme lähettämämme sähköpostit, ja siihen on lisätty kappale, jonka mukaan jokainen sinulle jonoon asetettu sähköposti säilyttää valitsemasi kielen, kunnes lähetämme sen." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "a8e6b7a8fb0b1bdd1395e07c42dd00d819a1ef74ff6d72e7d08813c625d8ba30",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "3.4",
+  sha256: "4a0ef9970edb58dc0a0aa76f68bf733bf3da3568e42cb5437547792de2f02fe9",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Plik cookie (HttpOnly) — Utrzymuje Twoją sesję logowania. Jest odnawiany, gdy korzystasz z serwisu. — 14 dni",
         "__Host-debateai-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — 14 dni",
         "__Host-debateai-age-refusal — Plik cookie (HttpOnly) — Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych. — 30 dni",
-        "debateai.locale — Plik cookie — Zapamiętuje wybrany przez Ciebie język interfejsu. — 1 rok",
+        "debateai.locale — Plik cookie — Zapamiętuje wybrany przez Ciebie język interfejsu i ustawia język wiadomości e-mail, które do Ciebie wysyłamy. — 1 rok",
         "__Host-debateai-staff — Plik cookie (HttpOnly) — Oddzielny dostęp personelu — Do 8 godzin; 15 minut bezczynności",
         "__Host-debateai-staff-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — Do 8 godzin; 15 minut bezczynności",
         "__Host-debateai-password-reset — Plik cookie (HttpOnly) — Tylko resetowanie hasła — Do 30 minut",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Pamięć sesji — Zapamiętuje, który komunikat o linku do pobrania wyświetlić w tej karcie. — Do zamknięcia karty, wylogowania lub otwarcia nowego linku"
         ]
       },
+      { kind: "p", text: "Każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania." },
       { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem Dialectical Engine informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
       { kind: "p", text: "Przeglądarki mogą wysyłać sygnał „Do Not Track” lub podobny sygnał. Dialectical Engine Cię nie śledzi, więc taki sygnał nie ma czego wyłączyć: usługa działa tak samo z nim i bez niego." },
       { kind: "p", text: "Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dla tej witryny w ustawieniach przeglądarki. Co wtedy przestaje działać: logowanie oraz zapamiętywanie Twojego wyboru języka i trybu wyświetlania; powiadomienie o plikach cookie również pojawi się ponownie." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.3 zastąpiła wersję 3.2: obejmuje wyłącznie regiony, w których świadczymy usługę, podaje nazwę naszej spółki oraz, w sekcji 5, naszych dostawców hostingu, dostarczania treści i poczty elektronicznej, a także opisuje kontrolę botów Cloudflare." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.4 zastąpiła wersję 3.3: sekcja 13 mówi teraz, że plik cookie debateai.locale ustawia także język, w którym piszemy wiadomości e-mail, które wysyłamy, oraz zawiera akapit o tym, że każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "c9d69b55677da3cfd414af4e93c1c4de19f66512f2bd8b69f7b6d991a9c75afa",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v3.3 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
+  version: "3.4",
+  sha256: "558eeab75fd2f63c75a007d2dac18878a0504e1eb4fde257f6ffd3c2357d3b33",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v3.4 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
-  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.3",
+  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Polityki prywatności",
   sectionIdPrefix: "policy-section-",

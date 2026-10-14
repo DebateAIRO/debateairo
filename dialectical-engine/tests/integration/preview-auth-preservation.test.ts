@@ -19,6 +19,7 @@ import { importHistoricalRegisterFixture,registerFixtureRow } from '../support/r
 import { describe, expect, it } from 'vitest';
 import { contractInventory } from '@debateai/contract';
 import { AUTH_DB_BATCH_MIGRATION } from '../../packages/db/src/migration-forward-auth-db-batch.js';
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 // Losing schema/route inventories silently removes strict generated recovery contracts.
 describe('combined current authentication and preview recovery contract',()=>{
  it('inventories strict recovery schemas beside current authentication routes',()=>{
@@ -39,7 +40,7 @@ const envelope=(id:string)=>encrypt(Buffer.alloc(32,19),Buffer.from('synthetic@e
 const codeHash='$argon2id$v=19$m=19456,t=2,p=1$c29tZXJhbmRvbXNhbHQ$'+Buffer.alloc(32,1).toString('base64').replace(/=/g,'');
 let target:TestDatabase,api:Pool,authorization:Pool,legacy:Awaited<ReturnType<typeof seedAccount>>,pending:Awaited<ReturnType<typeof seedAccount>>,oldLedger:unknown[];
 async function seedAccount(kind:'legacy'|'pending'|'totp'|'passkey'|'provider'){
- const client=await target.pool.connect();await client.query('BEGIN');
+ const client=await target.pool.connect();await client.query('BEGIN');await client.query("SELECT set_config('debateai.mail_locale','en',true)");
  try {
  const id=randomUUID(),primary=randomUUID(),backup=randomUUID(),index=createHash('sha256').update(id).digest(),box=envelope(id),factor=randomUUID(),codeId=randomUUID();
  await client.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1::uuid,$2,$3,$3,$4,$1::text,$5,clock_timestamp())`,[id,index,box,kind==='provider'?null:'preserved-password',kind==='pending'?'pending_verification':'active']);
@@ -54,7 +55,7 @@ async function seedAccount(kind:'legacy'|'pending'|'totp'|'passkey'|'provider'){
  await client.query('COMMIT');return{id,index,primary,backup,box,factor,codeId};
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
-async function audited(sql:string,args:unknown[]){const client=await authorization.connect();try{await client.query('BEGIN');await client.query('SELECT identity.begin_runtime_audit_attempt()');const result=await client.query(sql,[...args,source]);await client.query('COMMIT');return result.rows[0].value;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}
+async function audited(sql:string,args:unknown[]){const client=await authorization.connect();try{await client.query('BEGIN');await client.query("SELECT set_config('debateai.mail_locale','en',true)");await client.query('SELECT identity.begin_runtime_audit_attempt()');const result=await client.query(sql,[...args,source]);await client.query('COMMIT');return result.rows[0].value;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}
 describe('actual AUTH106 forward recovery and current account authority',()=>{
  beforeAll(async()=>{
   target=await startTestDatabase();await seedInstalledAuth106(target.pool);legacy=await seedAccount('legacy');pending=await seedAccount('pending');oldLedger=(await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
@@ -74,10 +75,10 @@ describe('actual AUTH106 forward recovery and current account authority',()=>{
   const candidate=(await api.query(`SELECT identity.mfa_recovery_prepare($1,'primary') value`,[legacy.index])).rows[0].value;
   expect(candidate.channels.map((c:{channelId:string})=>c.channelId).sort()).toEqual([legacy.primary,legacy.backup].sort());
   const notices=[legacy.primary,legacy.backup].sort().map(channelId=>({channelId,envelope:legacy.box,...(channelId===legacy.primary?{cancelEnvelope:legacy.box,proofEnvelope:legacy.box}:{})}));
-  expect((await api.query(`SELECT identity.mfa_recovery_start($1,'primary',$2,$3,$4,$5,$6,$7,3,$8) value`,[legacy.index,legacy.id,[legacy.primary,legacy.backup].sort(),link,cancel,JSON.stringify(notices),source,randomUUID()])).rows[0].value).toBe(true);
+  expect((await withMailLocale(api,'en',c=>c.query(`SELECT identity.mfa_recovery_start($1,'primary',$2,$3,$4,$5,$6,$7,3,$8) value`,[legacy.index,legacy.id,[legacy.primary,legacy.backup].sort(),link,cancel,JSON.stringify(notices),source,randomUUID()]))).rows[0].value).toBe(true);
   const prepared=(await api.query('SELECT identity.mfa_recovery_prepare_exchange($1) value',[link])).rows[0].value;expect(prepared.channels.sort()).toEqual([legacy.primary,legacy.backup].sort());expect(prepared.bindingChannelIds).toEqual([legacy.primary]);
   const risk=(await api.query(`SELECT identity.mfa_recovery_risk($1,'link') value`,[link])).rows[0].value;
-  expect((await api.query('SELECT identity.mfa_recovery_exchange($1,$2,$3,$4,$5,$6,$7) value',[link,'preserved-password',session,csrf,legacy.box,risk.fingerprint,source])).rows[0].value).toBe('FACTOR_REQUIRED');
+  expect((await withMailLocale(api,'en',c=>c.query('SELECT identity.mfa_recovery_exchange($1,$2,$3,$4,$5,$6,$7) value',[link,'preserved-password',session,csrf,legacy.box,risk.fingerprint,source]))).rows[0].value).toBe('FACTOR_REQUIRED');
   await target.pool.query("UPDATE identity.channel_binding SET state='verified',verified_at=clock_timestamp() WHERE channel_binding_id=$1",[legacy.backup]);
   let seen=false;for(let i=0;i<10;i++){const notice=(await api.query('SELECT identity.mfa_recovery_claim_notice(60000) value')).rows[0].value;if(!notice)break;if(notice.channelId===legacy.backup&&notice.event==='STARTED'){expect(notice.cancelAllowed).toBe(false);seen=true;}await api.query('SELECT identity.mfa_recovery_finish_notice($1,$2,true,300000,3)',[notice.noticeId,notice.leaseId]);}expect(seen).toBe(true);
  });
@@ -89,7 +90,7 @@ describe('actual AUTH106 forward recovery and current account authority',()=>{
   expect((await target.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1',[a.id])).rows[0].n).toBe(0);
  });
  it('refuses an originally pending legacy account even after activation and denies retired103/raw/forward-receipt authority',async()=>{
-  await target.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`,[pending.id]);expect((await api.query(`SELECT identity.mfa_recovery_prepare($1,'primary') value`,[pending.index])).rows[0].value).toBeNull();
+  await withMailLocale(target.pool,'en',c=>c.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`,[pending.id]));expect((await api.query(`SELECT identity.mfa_recovery_prepare($1,'primary') value`,[pending.index])).rows[0].value).toBeNull();
   for(const actor of [api,authorization]){
    await expect(actor.query("SELECT identity.password_recovery_read('sha256:'||repeat('a',64))")).rejects.toMatchObject({code:'42501'});
    await expect(actor.query('SELECT * FROM identity.mfa_recovery_legacy_cohort')).rejects.toMatchObject({code:'42501'});
@@ -255,8 +256,8 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   // PR-54, PR-58: migrate() also appends 0110 and the forward chain after it (0111, then the auth DB batch 0112, then Part C's 0113, then role rotation's 0114, then the data export's 0115, V-41, then the debate shape's map 0116, then the language check's site cost 0117, then the reclaim resume 0119); each step exactly once, with one step receipt each.
-   const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);expect(chain.at(-7)).toBe(AUTH_DB_BATCH_MIGRATION);expect(chain.at(-6)).toBe('0113_billing_price_currencies.sql');expect(chain.at(-5)).toBe('0114_role_rotation.sql');expect(chain.at(-4)).toBe('0115_data_export.sql');expect(chain.at(-3)).toBe('0116_debate_shape_map.sql');expect(chain.at(-2)).toBe('0117_language_check_spend.sql');expect(chain.at(-1)).toBe('0119_reclaim_resume.sql');
+   // PR-54, PR-58: migrate() also appends 0110 and the forward chain after it (0111, then the auth DB batch 0112, then Part C's 0113, then role rotation's 0114, then the data export's 0115, V-41, then the mail-locale step's 0116, S01-C05, then the debate shape's map 0117, then the language check's site cost 0118, then the reclaim resume 0119); each step exactly once, with one step receipt each.
+   const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);expect(chain.at(-8)).toBe(AUTH_DB_BATCH_MIGRATION);expect(chain.at(-7)).toBe('0113_billing_price_currencies.sql');expect(chain.at(-6)).toBe('0114_role_rotation.sql');expect(chain.at(-5)).toBe('0115_data_export.sql');expect(chain.at(-4)).toBe('0116_mail_locale.sql');expect(chain.at(-3)).toBe('0117_debate_shape_map.sql');expect(chain.at(-2)).toBe('0118_language_check_spend.sql');expect(chain.at(-1)).toBe('0119_reclaim_resume.sql');
    expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1) GROUP BY name ORDER BY name',[chain])).rows).toEqual([...chain].sort().map(name=>({name,n:1})));
    expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual([...chain].sort().map(source_name=>({source_name})));
    expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name NOT IN ('0108_preview_recovery_verified_bindings.sql','0110_account_erasure_public_debates.sql') AND NOT name=ANY($1) ORDER BY name",[chain])).rows).toEqual(before);

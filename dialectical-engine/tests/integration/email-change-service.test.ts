@@ -146,9 +146,10 @@ describe("Turn 14 change-email service", () => {
     expect(pending.expiresAt.getTime() - before).toBeLessThanOrEqual(24 * 3_600_000 + 5_000);
     expect(mail.messages).toEqual([
       { kind: "confirmation", recipient: "ana.popescu@icub.ro", token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
-        expiresAt: pending.expiresAt },
+        expiresAt: pending.expiresAt, display: { locale: "en", timeZone: null } },
       { kind: "notice", recipient: account.email, newEmail: "ana.popescu@icub.ro",
-        cancelToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/), expiresAt: pending.expiresAt }
+        cancelToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/), expiresAt: pending.expiresAt,
+        display: { locale: "en", timeZone: null } }
     ]);
     await expect(service.settings(session(account))).resolves.toEqual({
       email: account.email, recoveryEmail: `recovery.${account.email}`,

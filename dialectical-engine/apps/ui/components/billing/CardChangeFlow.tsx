@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ContractHttpError, postcodeOptional, type BillingCurrency, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
 import { countryName, formatMoney } from "@/lib/billing/format";
+import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { BillingDetailsFields, type BillingDetails } from "./BillingDetailsFields";
@@ -29,7 +30,7 @@ export function CardChangeFlow({
   goToPayment = leaveForPayment
 }: Readonly<{
   catalog?: MessageCatalog;
-  locale: string;
+  locale: LocaleCode;
   /** The renewal sentence's manifest pair in this locale; null: the page offers no check (the server would refuse it). */
   renewalConsent: ConsentPair | null;
   returnedChargeRef?: string | null;
@@ -80,7 +81,7 @@ export function CardChangeFlow({
     setMessageKey(null);
     try {
       const started = await client.startCardChange({
-        locale, renewal_terms: renewalConsent, first_name: details.firstName.trim(), last_name: details.lastName.trim(),
+        locale: catalogLocale(locale), renewal_terms: renewalConsent, first_name: details.firstName.trim(), last_name: details.lastName.trim(),
         phone: details.phone.trim(), street: details.street.trim(), city: city.trim(),
         ...(details.postalCode.trim() === "" ? {} : { postal_code: details.postalCode.trim() })
       });

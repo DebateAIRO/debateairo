@@ -8,9 +8,9 @@
 --   1. core.node: the runtime may change generation_status, only to 'stale', only from another value (one way: a
 --      stale node never comes back), nothing else in the row, and never once the run has served an answer. DELETE
 --      stays refused.
---   2. core.map_position (0116) names the root that argued each chosen answer. Its row cannot be changed: 0116's
+--   2. core.map_position (0117) names the root that argued each chosen answer. Its row cannot be changed: 0117's
 --      chain step digests that table's ACL, column ACLs and triggers in its postcondition evidence (compared on every
---      later migrate()), so a grant or a trigger on it would read as drift of 0116. The re-point is therefore a NEW
+--      later migrate()), so a grant or a trigger on it would read as drift of 0117. The re-point is therefore a NEW
 --      append-only table, core.map_position_repoint: one row per move of an answer's root, from the root in force
 --      (the position's own, or the last re-point's) to a node of the same run. The root in force must be stale and
 --      the new root must not be. Ids and codes only (ruling T7-PRIV: maker is a code token), not a content carrier;
@@ -80,10 +80,10 @@ CREATE TABLE IF NOT EXISTS core.map_position_repoint (
   recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   -- One move away from each root of an answer: the moves of an answer form one chain.
   PRIMARY KEY (run_id, answer_id, from_root_node_id),
-  -- A node argues one answer at most, as 0116's (run_id, root_index) keeps one root per position.
+  -- A node argues one answer at most, as 0117's (run_id, root_index) keeps one root per position.
   CONSTRAINT map_position_repoint_root_unique UNIQUE (run_id, root_node_id),
   -- No foreign key to core.map_position: its row cannot be deleted, the trigger below refuses a move of an absent
-  -- position, and a referencing key would make a TRUNCATE of 0116's table fail on the key before 0116's own guard.
+  -- position, and a referencing key would make a TRUNCATE of 0117's table fail on the key before 0117's own guard.
   CONSTRAINT map_position_repoint_from_same_run FOREIGN KEY (run_id, from_root_node_id) REFERENCES core.node(run_id, node_id),
   CONSTRAINT map_position_repoint_root_same_run FOREIGN KEY (run_id, root_node_id) REFERENCES core.node(run_id, node_id),
   CONSTRAINT map_position_repoint_moves CHECK (from_root_node_id <> root_node_id),

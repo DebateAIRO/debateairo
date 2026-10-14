@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Po zamietnutej kontrole veku zabráni tomuto prehliadaču skúsiť to znova počas 30 dní. Obsahuje iba slovo „zamietnuté“, žiadne osobné údaje.",
   "legal.cookies.ageRefusal.life": "30 dní",
   "legal.cookies.locale.kind": "Súbor cookie",
-  "legal.cookies.locale.purpose": "Pamätá si, aký jazyk rozhrania ste si zvolili.",
+  "legal.cookies.locale.purpose": "Pamätá si, aký jazyk rozhrania ste si zvolili, a určuje jazyk e-mailov, ktoré vám posielame.",
   "legal.cookies.locale.life": "1 rok",
   "legal.cookies.storageTitle": "Uložené vo vašom prehliadači, nie v súbore cookie",
   "legal.cookies.storageIntro": "V úložisku vášho prehliadača sú uložené štyri položky: dve v lokálnom úložisku, kým ich nevymažete, a dve v úložisku relácie, kým nezatvoríte kartu. Na rozdiel od súborov cookie sa neprikladajú k vašim požiadavkám; položka chatu pomoci uchováva kópiu konverzácie, ktorú ste viedli s pomocou Dialectical Engine, a jej správy sa k Dialectical Engine dostali v momente, keď ste ich odoslali.",

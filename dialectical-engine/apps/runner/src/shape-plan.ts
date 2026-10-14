@@ -85,7 +85,7 @@ export function shapePositionCount(answers: number, makersLeft: number): number 
   if (!Number.isSafeInteger(answers) || answers < 2 || !Number.isSafeInteger(makersLeft) || makersLeft < 0) {
     throw new TypeError("SHAPE_POSITION_COUNT_INVALID");
   }
-  // Ruling T-P5, defence in depth: never more positions than the map stores (MAP_LIMITS.chooseAnswersMax, 0116's
+  // Ruling T-P5, defence in depth: never more positions than the map stores (MAP_LIMITS.chooseAnswersMax, 0117's
   // a1..a4), whatever the receipt says; the register already refuses a plan above it.
   return Math.max(2, Math.min(answers, makersLeft, MAP_LIMITS.chooseAnswersMax));
 }

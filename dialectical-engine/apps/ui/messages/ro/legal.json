@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "După ce o verificare a vârstei este refuzată, împiedică acest browser să încerce din nou timp de 30 de zile. Conține doar cuvântul „refuzat”, fără date personale.",
   "legal.cookies.ageRefusal.life": "30 de zile",
   "legal.cookies.locale.kind": "Modul cookie",
-  "legal.cookies.locale.purpose": "Reține limba interfeței pe care ați ales-o.",
+  "legal.cookies.locale.purpose": "Reține limba interfeței pe care ați ales-o și stabilește limba e-mailurilor pe care vi le trimitem.",
   "legal.cookies.locale.life": "1 an",
   "legal.cookies.storageTitle": "Stocate în browser, nu într-un cookie",
   "legal.cookies.storageIntro": "În spațiul de stocare al browserului se păstrează patru elemente: două în stocarea locală, până când le ștergeți, și două în stocarea de sesiune, până când închideți fila. Spre deosebire de modulele cookie, nu sunt atașate cererilor dvs.; elementul chatului de ajutor păstrează o copie a unei conversații purtate cu ajutorul Dialectical Engine, ale cărei mesaje au ajuns la Dialectical Engine în momentul în care le-ați trimis.",

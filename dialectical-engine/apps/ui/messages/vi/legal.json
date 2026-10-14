@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân.",
   "legal.cookies.ageRefusal.life": "30 ngày",
   "legal.cookies.locale.kind": "Tệp cookie",
-  "legal.cookies.locale.purpose": "Ghi nhớ ngôn ngữ giao diện bạn đã chọn.",
+  "legal.cookies.locale.purpose": "Ghi nhớ ngôn ngữ giao diện bạn đã chọn, và đặt ngôn ngữ của các email chúng tôi gửi cho bạn.",
   "legal.cookies.locale.life": "1 năm",
   "legal.cookies.storageTitle": "Lưu trong trình duyệt của bạn, không phải trong cookie",
   "legal.cookies.storageIntro": "Bốn mục được giữ trong bộ nhớ của trình duyệt: hai mục trong bộ nhớ cục bộ, cho đến khi bạn xóa, và hai mục trong bộ nhớ phiên, cho đến khi bạn đóng thẻ. Khác với cookie, chúng không được đính kèm vào các yêu cầu của bạn; mục trò chuyện trợ giúp giữ một bản sao cuộc trò chuyện bạn đã có với bộ phận trợ giúp của Dialectical Engine, và các tin nhắn trong đó đã đến Dialectical Engine khi bạn gửi chúng.",

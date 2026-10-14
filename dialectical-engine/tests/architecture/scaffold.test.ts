@@ -96,7 +96,7 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   // 36 -> 37: the payments-netopia package row (NETOPIA spec §2.4).
   // 37 -> 36: the first card processor's package row, removed with it (NETOPIA spec §2.19).
   // 36 -> 37: the map package row (debate shape spec 2026-10-12, Phase 1). @debateai/map depends on kernel,
-  // providers and db (Phase 2b Task 8: the map repository over migration 0116); apps/runner's row names it, and so
+  // providers and db (Phase 2b Task 8: the map repository over migration 0117); apps/runner's row names it, and so
   // does apps/api's (Phase 2c: the debate page's map view reads the map choice through it).
   it("matches all 37 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();

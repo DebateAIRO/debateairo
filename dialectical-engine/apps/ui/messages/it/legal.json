@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Dopo una verifica dell’età rifiutata, impedisce a questo browser di riprovare per 30 giorni. Contiene solo la parola «rifiutato», nessun dato personale.",
   "legal.cookies.ageRefusal.life": "30 giorni",
   "legal.cookies.locale.kind": "File cookie",
-  "legal.cookies.locale.purpose": "Ricorda la lingua dell’interfaccia che hai scelto.",
+  "legal.cookies.locale.purpose": "Ricorda la lingua dell’interfaccia che hai scelto e imposta la lingua delle e-mail che ti inviamo.",
   "legal.cookies.locale.life": "1 anno",
   "legal.cookies.storageTitle": "Dati salvati nel tuo browser, non in un cookie",
   "legal.cookies.storageIntro": "Nell’archiviazione del tuo browser sono conservati quattro elementi: due nell’archiviazione locale, finché non li cancelli, e due nell’archiviazione di sessione, finché non chiudi la scheda. A differenza dei cookie, non vengono allegati alle tue richieste; l’elemento della chat di assistenza conserva una copia di una conversazione che hai avuto con l’assistenza di Dialectical Engine, i cui messaggi sono arrivati a Dialectical Engine quando li hai inviati.",

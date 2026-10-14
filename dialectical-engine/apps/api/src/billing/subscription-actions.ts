@@ -53,7 +53,9 @@ export async function requestCancelLocked(
     entitlements: Pick<EntitlementRepository, "append">;
     publicAppUrl: string;
   }>,
-  client: PoolClient, locked: LockedSubscription, now: Date, source: "SETTINGS" | "EMAIL_LINK"
+  client: PoolClient, locked: LockedSubscription, now: Date, source: "SETTINGS" | "EMAIL_LINK",
+  /** S01-C13 (R-17): the MLV of the cancel request (the dropdown at that action); absent, M7 keeps the profile's language. */
+  mailLocale?: string
 ): Promise<CancelOutcome> {
   const written = await writeCancelLocked(deps, client, locked, now, source);
   if (written.outcome !== "REQUESTED") return written.outcome;
@@ -75,7 +77,8 @@ export async function requestCancelLocked(
         // Only a paused plan carries the flag: every other M7 keeps its params exactly as before P2-W10.
         ...(paused ? { paused: "true" } : {})
       },
-      notBefore: now
+      notBefore: now,
+      ...(mailLocale === undefined ? {} : { locale: mailLocale })
     });
   }
   return "REQUESTED";
@@ -134,12 +137,13 @@ export async function writeCancelLocked(
  * The Settings cancel. Not gated on the Terms re-acceptance (spec §2.3.2's billing-route refusal): the one-click
  * cancel of Terms §12 must work whatever the person has or has not accepted, and it commits them to nothing new.
  */
-export async function cancelForOwner(deps: SubscriptionRouteDeps, ownerRef: string): Promise<void> {
+export async function cancelForOwner(deps: SubscriptionRouteDeps, ownerRef: string, mailLocale?: string): Promise<void> {
   const outcome = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
     // P2-M12: the clock is read once the lock is held, so a grace or hold row a writer dated while this waited for
     // the lock never outranks the cancel's FREE row (`billing.entitlement_at` takes the latest `effective_at`).
-    return locked === null ? "NOT_CANCELLABLE" as const : requestCancelLocked(deps, client, locked, deps.clock(), "SETTINGS");
+    return locked === null ? "NOT_CANCELLABLE" as const
+      : requestCancelLocked(deps, client, locked, deps.clock(), "SETTINGS", mailLocale);
   });
   if (outcome === "NOT_CANCELLABLE") refuse(409, "NOT_SUBSCRIBED");
   if (outcome === "REQUESTED") deps.audit("billing.cancel", { source: "SETTINGS" });

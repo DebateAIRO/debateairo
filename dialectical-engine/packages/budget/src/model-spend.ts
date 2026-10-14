@@ -64,11 +64,11 @@ export type ModelSpendSource =
   | "RUN"
   | "SUPPORT"
   | "STORY"
-  /** the fast language check before a debate: a run-less site cost (0117), written only by ledger.record_language_check_spend */
+  /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK";
 
 /**
- * Question language, P2L Task 19 (migration 0117): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
+ * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
  * function the API's runtime role may execute (pre-flight PF-L58, option (a)). Its signature, as `to_regprocedure`
  * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
  */
@@ -87,7 +87,7 @@ export type LanguageCheckSpendEntry = Readonly<{
 }>;
 
 /**
- * The boot probe: does the one writer exist on this database (0117 applied) AND may the role this pool connects as
+ * The boot probe: does the one writer exist on this database (0118 applied) AND may the role this pool connects as
  * EXECUTE it? Either missing is false (the hosted API keeps the fast check off). Read-only.
  */
 export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
@@ -99,7 +99,7 @@ export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">)
   return result.rows[0]?.present === true;
 }
 
-/** One language check's site cost, through the one writer (0117). The database's CHECKs refuse a negative count. */
+/** One language check's site cost, through the one writer (0118). The database's CHECKs refuse a negative count. */
 export async function recordLanguageCheckSpend(pool: Pick<Pool, "query">, entry: LanguageCheckSpendEntry): Promise<void> {
   await pool.query("SELECT ledger.record_language_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
     [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
@@ -977,7 +977,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
-    // P2L Task 19, pre-flight PF-L58 option (a): a language check's site cost has ONE writer, the 0117 function
+    // P2L Task 19, pre-flight PF-L58 option (a): a language check's site cost has ONE writer, the 0118 function
     // (recordLanguageCheckSpend). This direct INSERT refuses the source before any query.
     if (entry.spendSource === "LANGUAGE_CHECK") {
       throw new TypedDomainError(

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SITE_LANGUAGES_ELD_LACKS, loadEldReader } from "../../apps/api/src/question-language/eld.js";
-import { ELD_CONFUSED_SITES, ELD_SITE_ALIASES, ELD_TUNING, eldConfident, eldSeesMix } from "../../apps/api/src/question-language/eld-tuning.js";
+import {
+  ELD_CONFUSED_SITES, ELD_SITE_ALIASES, ELD_TUNING, ELD_TUNING_BARS, eldConfident, eldSeesMix
+} from "../../apps/api/src/question-language/eld-tuning.js";
 import {
   LEGAL_LOCALES, excludedLines, legalSentences, mixedQuestions, nonProseReason, proseSentences, pureControls, withoutDiacritics
 } from "../../tools/question-language-tune/legal-sentences.js";
@@ -21,7 +23,10 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
     expect(chooseEldTuning([row({ roPlainWrong: 1 })])).toBeNull();
   });
 
-  it("the recorded configuration still holds on the set (a floor to keep, not a target)", async () => {
+  // Whole-branch review I-2: the set is read from the live Terms and Privacy text, which the owners edit, so the tests
+  // below assert the RATES the tuning promises (ELD_TUNING_BARS), never a count measured on 2026-10-14 (those stay as
+  // comments in eld-tuning.ts). A tuning that no longer meets its own bars still fails here.
+  it("the chosen configuration meets its bars on the set: no ro/en confusion, at most one wrong-lockable sentence in 2,000", async () => {
     const reader = await loadEldReader(ELD_TUNING.database);
     let sentences = 0;
     let wrongLockable = 0;
@@ -37,9 +42,10 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
       }
     }
     expect(LEGAL_LOCALES).toHaveLength(35);
-    expect(sentences).toBe(ELD_TUNING.measured.sentences);
+    // Precondition: a set large enough for the rate to mean something (16,344 sentences on 2026-10-14).
+    expect(sentences).toBeGreaterThanOrEqual(ELD_TUNING_BARS.wrongLockableOneIn);
     expect(roEn).toBe(0);
-    expect(wrongLockable).toBeLessThanOrEqual(ELD_TUNING.measured.wrongLockable);
+    expect(wrongLockable * ELD_TUNING_BARS.wrongLockableOneIn).toBeLessThanOrEqual(sentences);
     // Precondition first: the set has Romanian prose, and eld is confident on some of it, so the loop cannot pass by
     // reading nothing. Each sentence is then asserted (a reading that is not confident claims nothing: it stands as "ro").
     const roClaims = proseSentences("ro").map((sentence) => {
@@ -49,13 +55,17 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
     expect(roClaims.length).toBeGreaterThan(0);
     expect(roClaims.filter((claim) => claim.confident).length).toBeGreaterThan(0);
     for (const claim of roClaims) expect(claim.confident ? claim.code : "ro", claim.sentence.slice(0, 40)).toBe("ro");
-  }, 120_000);
+  });
 
-  it("CR-2: the recorded confused sites are exactly the sites the set confuses at the chosen configuration", async () => {
+  // Whole-branch review I-2: a site the set no longer confuses may stay listed (it only costs a fast check); a site the
+  // set confuses that is NOT listed would let eld settle it alone, so that is what must never happen.
+  it("CR-2: every site the set confuses at the chosen configuration is a recorded always-check site", async () => {
     expect(confusedSites({ ro: { en: 0 }, hr: { sl: 2 }, en: {} })).toEqual(["hr"]);
-    expect(ELD_CONFUSED_SITES).toEqual(confusedSites(await siteConfusions(ELD_TUNING.database, ELD_TUNING.minLetters)));
+    const confused = confusedSites(await siteConfusions(ELD_TUNING.database, ELD_TUNING.minLetters));
+    expect(confused.length).toBeGreaterThan(0);
+    for (const site of confused) expect(ELD_CONFUSED_SITES, site).toContain(site);
     for (const site of ELD_CONFUSED_SITES) expect(LEGAL_LOCALES).toContain(site);
-  }, 120_000);
+  });
 
   it("L-MIX: the clause choice rule — at most 5% of pure questions flagged, then the most mixes caught, then the longer minimum", () => {
     expect(chooseSegmentMinLetters([mixRow({ mixCaught: 990, pureFlagged: 1001 }), mixRow({ segmentMinLetters: 30, mixCaught: 950 })])?.segmentMinLetters).toBe(30);
@@ -63,16 +73,18 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
     expect(chooseSegmentMinLetters([mixRow({ pureFlagged: 1001 })])).toBeNull();
   });
 
-  it("L-MIX: the recorded clause numbers hold on the built mixed set and the pure controls (exact; eld is deterministic)", async () => {
+  it("L-MIX: the chosen clause minimum meets its bars on the built mixed set and the pure controls", async () => {
     const reader = await loadEldReader(ELD_TUNING.database);
     const joins = mixedQuestions();
     const pure = pureControls();
-    expect(joins.length).toBe(ELD_TUNING.measuredMix.joins);
-    expect(pure.length).toBe(ELD_TUNING.measuredMix.pure);
-    expect(joins.filter((question) => eldSeesMix(reader.read(question.text))).length).toBe(ELD_TUNING.measuredMix.mixCaught);
-    expect(pure.filter((question) => eldSeesMix(reader.read(question.text))).length).toBe(ELD_TUNING.measuredMix.pureFlagged);
-    expect(ELD_TUNING.measuredMix.pureFlagged * 20).toBeLessThanOrEqual(ELD_TUNING.measuredMix.pure);
-  }, 120_000);
+    // Preconditions: both sets are there (1,036 joins and 16,862 pure questions on 2026-10-14).
+    expect(joins.length).toBeGreaterThanOrEqual(100);
+    expect(pure.length).toBeGreaterThanOrEqual(ELD_TUNING_BARS.pureFlaggedOneIn);
+    const caught = joins.filter((question) => eldSeesMix(reader.read(question.text))).length;
+    const flagged = pure.filter((question) => eldSeesMix(reader.read(question.text))).length;
+    expect(caught * 100).toBeGreaterThanOrEqual(joins.length * ELD_TUNING_BARS.mixCaughtMinPercent);
+    expect(flagged * ELD_TUNING_BARS.pureFlaggedOneIn).toBeLessThanOrEqual(pure.length);
+  });
 
   it("L-MIX: the practice cases — a Romanian question with an English clause is a mix; borrowed words are not", async () => {
     const reader = await loadEldReader(ELD_TUNING.database);
@@ -95,7 +107,7 @@ describe("eld's confidence, tuned on the legal-page set (question-language spec 
     expect(nonProseReason("Should Romania adopt the euro before 2030, and what happens to the S.R.L. companies?")).toBeNull();
     const all = LEGAL_LOCALES.reduce((sum, locale) => sum + legalSentences(locale).length, 0);
     const prose = LEGAL_LOCALES.reduce((sum, locale) => sum + proseSentences(locale).length, 0);
-    expect(prose).toBe(ELD_TUNING.measured.sentences);
+    expect(prose).toBeGreaterThan(0);
     expect(excludedLines()).toHaveLength(all - prose);
   });
 

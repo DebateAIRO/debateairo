@@ -1,6 +1,6 @@
 import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMapView } from "@debateai/contract";
 import { normalizeRunOwnership, type RunOwnershipAccess } from "@debateai/db";
-import { mapAnswersArgued } from "@debateai/map";
+import { mapAnswersArgued, mapMergeAlsoRaised } from "@debateai/map";
 
 /**
  * DEBATE SHAPE P2c (spec 2026-10-12 §3.3 step 8, §3.4) — the debate page's view of the map:
@@ -107,11 +107,6 @@ function clip(text: string, limit: number): string {
   return `${kept}…`;
 }
 
-/** Two spellings of one claim (case, spacing, Unicode form) are one claim. */
-function claimKey(claim: string): string {
-  return claim.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase();
-}
-
 /**
  * The view. Each position's node is the one the map recorded for it; it is kept only when it is
  * a UUID the answer holds (`answerNodeIds`), so a title never points at a node the page cannot
@@ -134,17 +129,9 @@ export function debateMapViewFrom(record: MapViewSource, nodeIds: ReadonlySet<st
     seen.add(nodeId);
     return [{ node_id: nodeId, answer: clip(answer.statement, DEBATE_MAP_VIEW_LIMITS.maxAnswerChars) }];
   }).slice(0, DEBATE_MAP_VIEW_LIMITS.maxPositions);
-  const merged = new Map<string, { claim: string; makers: Set<string>; order: number }>();
-  for (const [order, item] of record.alsoRaised.entries()) {
-    const claim = item.claim.trim();
-    if (claim === "") continue;
-    const key = claimKey(claim);
-    const known = merged.get(key);
-    if (known === undefined) merged.set(key, { claim, makers: new Set(item.makers), order });
-    else for (const maker of item.makers) known.makers.add(maker);
-  }
-  const alsoRaised = [...merged.values()]
-    .sort((left, right) => right.makers.size - left.makers.size || left.order - right.order)
+  // Review m-4: the one also-raised rule the story uses too (@debateai/map mapMergeAlsoRaised); the stored list is already
+  // in its order, so this only guards a row stored before it.
+  const alsoRaised = mapMergeAlsoRaised(record.alsoRaised)
     .slice(0, DEBATE_MAP_VIEW_LIMITS.maxAlsoRaised)
     .map((item) => clip(item.claim, DEBATE_MAP_VIEW_LIMITS.maxClaimChars));
   return DebateMapViewSchema.parse({ positions, also_raised: alsoRaised });

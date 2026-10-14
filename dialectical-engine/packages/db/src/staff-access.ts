@@ -2,6 +2,8 @@ import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { cancelAndDestroyPrivateClient } from './private-stream.js';
 import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof } from '@debateai/kernel';
 import type { CryptoEnvelope } from '@debateai/crypto';
+import type { AuthSourceContext } from './identity.js';
+import { withMailLocale } from './mail-locale.js';
 /** Internal encrypted intent: constructed by the trusted alert application, never a browser DTO. */
 export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
@@ -271,6 +273,7 @@ export interface StaffWebAuthnRepository {
         publicKey: string;
         newCounter: number;
         transports: readonly StaffCredentialTransport[];
+        source?: AuthSourceContext | undefined;
     }>): Promise<Readonly<{
         receipt: SecurityReceipt;
         credentialId: string;
@@ -561,6 +564,14 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
         } };
         return dispose;
     }
+    private async callOn<T>(client: PoolClient, sql: string, values: readonly unknown[]): Promise<T> {
+        const result = await client.query<{
+            value: T;
+        }>(sql, [...values]);
+        if (result.rows[0] === undefined)
+            throw new Error('STAFF_DATABASE_RESULT_MISSING');
+        return result.rows[0].value;
+    }
     private async call<T>(sql: string, values: readonly unknown[]): Promise<T> {
         const result = await this.pool.query<{
             value: T;
@@ -615,7 +626,7 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
         challengeId: string;
     }>): Promise<void> { await this.call('SELECT staff.fail_owned_webauthn($1,$2,$3) AS value', [input.userId, input.ordinarySessionId, input.challengeId]); }
     async completeWebAuthnRegistration(input: Parameters<StaffWebAuthnRepository['completeWebAuthnRegistration']>[0]): ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']> {
-        const value = await this.call<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>>('SELECT staff.complete_owned_webauthn_registration($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::jsonb,$10::text[],$11::jsonb) AS value', [input.userId, input.ordinarySessionId, input.challengeId, input.operationId, input.factorId, input.credentialId, input.publicKey, input.newCounter, input.deviceLabelEnvelope, input.transports, input.alertIntent]);
+        const value = await withMailLocale(this.pool, input.source?.mailLocale ?? 'en', (client) => this.callOn<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>>(client, 'SELECT staff.complete_owned_webauthn_registration($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::jsonb,$10::text[],$11::jsonb) AS value', [input.userId, input.ordinarySessionId, input.challengeId, input.operationId, input.factorId, input.credentialId, input.publicKey, input.newCounter, input.deviceLabelEnvelope, input.transports, input.alertIntent]));
         return Object.freeze({ ...value, receipt: receipt(value.receipt) });
     }
     async completeWebAuthnAssertion(input: StaffAssertionCompletion): ReturnType<StaffWebAuthnRepository['completeWebAuthnAssertion']> {

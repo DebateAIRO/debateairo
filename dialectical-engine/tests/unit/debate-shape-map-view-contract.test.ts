@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, PublicDebateSchema, contractInventory, type PublicDebate
 } from "@debateai/contract";
+import { MAP_LIMITS } from "@debateai/map";
 import { CHECKED_TEXT_PATHS, extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 
 /** Debate shape P2c (spec 2026-10-12 §3.3 step 8, §3.4): what the debate page reads from the map. */
@@ -40,6 +41,13 @@ describe("debate shape P2c — the debate map view contract", () => {
       positions: Array.from({ length: DEBATE_MAP_VIEW_LIMITS.maxPositions + 1 }, (_, index) => ({ node_id: `n${String(index)}`, answer: "A." })),
       also_raised: []
     }).success).toBe(false);
+  });
+
+  // Whole-branch review m-5: one limit everywhere. The page shows at most the answers the map can choose and store
+  // (MAP_LIMITS.chooseAnswersMax; 0117's answer ids a1..a4; the register's plan answers 2..4, debate-shape-policy test).
+  it("shows at most the answers the map can choose (one limit: four)", () => {
+    expect(DEBATE_MAP_VIEW_LIMITS.maxPositions).toBe(MAP_LIMITS.chooseAnswersMax);
+    expect(DEBATE_MAP_VIEW_LIMITS.maxPositions).toBe(4);
   });
 
   it("rides a public snapshot only when present, so every older snapshot still parses", () => {

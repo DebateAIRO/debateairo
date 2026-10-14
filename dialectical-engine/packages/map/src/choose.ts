@@ -29,7 +29,7 @@ export function mapOppositeTemplate(statement: string, languageTag: string): str
  * The chosen answers' ids (controller ruling T7-PRIV): `a1`..`aN` in choice order, filled answers included, minted by
  * code. A chosen answer's id lands in a readable column (core.map_position.answer_id) on an encrypted run, so it is never
  * the chooser's own answer_id (a slug such as "sell-family-home"): that one stays in the raw reply, which the runner
- * stores encrypted. N is at most MAP_LIMITS.chooseAnswersMax; migration 0116's CHECK holds the same bound.
+ * stores encrypted. N is at most MAP_LIMITS.chooseAnswersMax; migration 0117's CHECK holds the same bound.
  */
 export const mapChosenAnswerCodeId = (index: number): string => `a${String(index + 1)}`;
 
@@ -101,7 +101,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   const marks: MapMarkRecord[] = [];
   const ranked = mapRankKeyPoints(input.keyPoints);
   const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
-  // The answer ids are a1..aN with N at most chooseAnswersMax (0116's CHECK), whatever the caller's P says.
+  // The answer ids are a1..aN with N at most chooseAnswersMax (0117's CHECK), whatever the caller's P says.
   const maxAnswers = Math.min(input.maxAnswers, MAP_LIMITS.chooseAnswersMax);
   // Only the key points the chooser was shown: the check refuses any other id; this holds for any reply (T7-PRIV).
   const shownKeyPoints = (ids: readonly string[]): string[] => ids.filter((id) => byId.has(id));

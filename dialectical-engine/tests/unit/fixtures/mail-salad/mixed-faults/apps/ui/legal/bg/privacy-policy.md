@@ -1,0 +1,37 @@
+<!-- legal-chrome
+summaryTitle: In short
+eyebrow: ПОЛИТИКА · v3.4
+title: Fixture
+lede: Fixture lede.
+endMarker: END
+bodyLabel: Body
+annexTitle: Annex
+jumps:
+01 WHO WE ARE
+-->
+
+# Политика за поверителност
+
+**Version 3.3 · Effective 12 октомври 2026 г. · Предишни версии на dezbatere.ro/privacy/versions**
+
+**In short.** Пазим езика, който сте избрали на сайта, за имейлите, които ви изпращаме.
+
+## 13. Бисквитки и данни в браузъра
+
+Dialectical Engine използва една бисквитка: `debateai.locale`. **Политиката за бисквитки** на dezbatere.ro/cookies я описва.
+
+| Име | Тип | Цел | Срок |
+|---|---|---|---|
+| `debateai.locale` | Бисквитка | Remembers the interface language you picked, and sets the language of the emails we send you. | 1 година |
+
+Each email we queue for you keeps the language you had selected until we send it.
+
+Никоя друга страна не събира информация за онлайн дейността ви във времето и между уебсайтовете чрез Dialectical Engine.
+
+Браузърите могат да изпращат сигнал „Do Not Track“ или подобен сигнал. Dialectical Engine не ви проследява.
+
+За да откажете тези елементи, блокирайте или изтрийте бисквитките и данните на този сайт в настройките на браузъра си.
+
+## 14. Промени в тази политика
+
+Тази политика е актуализирана на 12 октомври 2026 г. Версия 3.4 замени версия 3.3.

@@ -93,7 +93,7 @@ const scrutinyBudget = (roundsMax: number, pointsMax: number) =>
   z.object({ roundsPerPoint: whole(1, roundsMax), pointsPerDebate: whole(1, pointsMax) }).strict();
 const planSchema = z.object({
   mapAIs: whole(2, 9),
-  // Ruling T-P5: 2..4, the map's own bound (MAP_LIMITS.chooseAnswersMax; migration 0116's answer ids a1..a4), so a
+  // Ruling T-P5: 2..4, the map's own bound (MAP_LIMITS.chooseAnswersMax; migration 0117's answer ids a1..a4), so a
   // published plan never asks the map's storage for a fifth answer after the map is paid.
   answers: whole(2, 4),
   graders: whole(1, 5),

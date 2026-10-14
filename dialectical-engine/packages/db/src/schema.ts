@@ -376,7 +376,7 @@ export const runRoleRotation = core.table("run_role_rotation", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
-// Debate shape (0116): the map's material, never graded claims. Append-only. core.map_item (one row per point or
+// Debate shape (0117): the map's material, never graded claims. Append-only. core.map_item (one row per point or
 // candidate answer an AI wrote) and core.map_choice (one per run) are content carriers in 0063's mechanism: on an
 // encrypted run `content` is the JSON sentinel and the text lives in the envelope. core.map_position (which root
 // argued which chosen answer) holds ids and codes only.

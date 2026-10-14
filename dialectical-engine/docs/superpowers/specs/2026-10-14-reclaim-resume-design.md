@@ -75,7 +75,7 @@ The new copy runs the debate from the start, exactly as a first copy would. Two 
   `reject_mutation` on `core.node`; DELETE stays refused, and an erased encrypted run refuses the mark
   (`PRIVATE_CONTENT_ERASED`). The chain refuses to start a runner while 0119 is pending, so no runner without the grant
   ever reaches the set-aside.
-- `core.map_position` itself cannot be changed: 0116's chain step digests its ACL and triggers on every later
+- `core.map_position` itself cannot be changed: 0117's chain step digests its ACL and triggers on every later
   `migrate()`, so a grant or trigger there would read as drift. The move is a NEW append-only table,
   `core.map_position_repoint` (run, answer, from root, to root, maker; ids and codes only): a trigger allows a move only
   from the root in force, only when that root is stale, and only to a live node of the same run; 0040's erasure

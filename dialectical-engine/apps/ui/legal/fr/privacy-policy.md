@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v3.3 · EN VIGUEUR LE 12 OCTOBRE 2026
+eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v3.4 · EN VIGUEUR LE 12 OCTOBRE 2026
 title: Ce que nous conservons, et pourquoi
 lede: Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.
-endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.3
+endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Texte de la Politique de confidentialité
 annexTitle: Annexe B — Dispositions régionales relatives à la confidentialité
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.3 · Effective 12 octobre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 octobre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Notre fournisseur d'hébergement stocke votre compte et vos débats à Londres, au Royaume-Uni ; la section 5 précise où vos données sont envoyées par ailleurs. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées ; lorsque vous la programmez, vous choisissez si vos débats publiés sont aussi retirés ou restent publics sous votre pseudonyme retiré. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte.
 
@@ -183,7 +183,7 @@ Dialectical Engine utilise 20 éléments, tous strictement nécessaires au servi
 | `__Host-debateai-session` | Fichier cookie (HttpOnly) | Vous maintient connecté. Il est renouvelé tant que vous utilisez le service. | 14 jours |
 | `__Host-debateai-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | 14 jours |
 | `__Host-debateai-age-refusal` | Fichier cookie (HttpOnly) | Après le refus d’une vérification d’âge, empêche ce navigateur de réessayer pendant 30 jours. Il ne contient que le mot « refusé », aucune donnée personnelle. | 30 jours |
-| `debateai.locale` | Fichier cookie | Mémorise la langue d’interface que vous avez choisie. | 1 an |
+| `debateai.locale` | Fichier cookie | Mémorise la langue d’interface que vous avez choisie, et définit la langue des e-mails que nous vous envoyons. | 1 an |
 | `__Host-debateai-staff` | Fichier cookie (HttpOnly) | Accès du personnel séparé | Jusqu’à 8 heures ; 15 minutes d’inactivité |
 | `__Host-debateai-staff-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | Jusqu’à 8 heures ; 15 minutes d’inactivité |
 | `__Host-debateai-password-reset` | Fichier cookie (HttpOnly) | Réinitialisation du mot de passe uniquement | Jusqu’à 30 minutes |
@@ -201,6 +201,8 @@ Dialectical Engine utilise 20 éléments, tous strictement nécessaires au servi
 | `debateai.exportPending` | Stockage de session | Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative. | Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte |
 | `debateai.exportLinkOutcome` | Stockage de session | Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet. | Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien |
 
+Chaque e-mail que nous mettons en file d’attente pour vous conserve la langue que vous aviez sélectionnée jusqu’à son envoi.
+
 Aucun autre tiers ne collecte, par l'intermédiaire de Dialectical Engine, d'informations sur vos activités en ligne au fil du temps et sur différents sites web.
 
 Les navigateurs peuvent envoyer un signal « Do Not Track » ou un signal similaire. Dialectical Engine ne vous suit pas : un tel signal n'a donc rien à désactiver, et le service fonctionne de la même manière avec ou sans lui.
@@ -211,7 +213,7 @@ Pour refuser ces éléments, bloquez ou supprimez les cookies et les données de
 
 Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version.
 
-La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.3 a remplacé la version 3.2 : elle ne couvre que les régions où nous opérons, désigne notre société et, à la section 5, nos fournisseurs d'hébergement, de diffusion de contenu et de messagerie, et décrit la vérification anti-robot de Cloudflare.
+La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.4 a remplacé la version 3.3 : la section 13 indique désormais que le cookie debateai.locale règle aussi la langue dans laquelle nous rédigeons les e-mails que nous vous envoyons, et elle ajoute un paragraphe précisant que chaque e-mail que nous mettons en file d’attente pour vous conserve la langue que vous aviez sélectionnée jusqu’à son envoi.
 
 ## Annex B — Dispositions régionales relatives à la confidentialité
 

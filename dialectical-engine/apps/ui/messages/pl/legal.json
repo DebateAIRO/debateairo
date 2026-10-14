@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych.",
   "legal.cookies.ageRefusal.life": "30 dni",
   "legal.cookies.locale.kind": "Plik cookie",
-  "legal.cookies.locale.purpose": "Zapamiętuje wybrany przez Ciebie język interfejsu.",
+  "legal.cookies.locale.purpose": "Zapamiętuje wybrany przez Ciebie język interfejsu i ustawia język wiadomości e-mail, które do Ciebie wysyłamy.",
   "legal.cookies.locale.life": "1 rok",
   "legal.cookies.storageTitle": "Przechowywane w Twojej przeglądarce, a nie w pliku cookie",
   "legal.cookies.storageIntro": "W pamięci Twojej przeglądarki przechowywane są cztery elementy: dwa w pamięci lokalnej, dopóki ich nie wyczyścisz, i dwa w pamięci sesji, dopóki nie zamkniesz karty. W odróżnieniu od plików cookie nie są dołączane do Twoich żądań; element czatu pomocy przechowuje kopię rozmowy, którą prowadziłeś z pomocą Dialectical Engine, a jej wiadomości dotarły do Dialectical Engine w chwili, gdy je wysłałeś.",

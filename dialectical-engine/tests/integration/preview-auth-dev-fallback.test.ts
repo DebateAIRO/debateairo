@@ -167,8 +167,9 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0113_billing_price_currencies.sql',
     '0114_role_rotation.sql',
     '0115_data_export.sql',
-    '0116_debate_shape_map.sql',
-    '0117_language_check_spend.sql',
+    '0116_mail_locale.sql',
+    '0117_debate_shape_map.sql',
+    '0118_language_check_spend.sql',
     '0119_reclaim_resume.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;

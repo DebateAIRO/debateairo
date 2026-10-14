@@ -1,13 +1,11 @@
 # Spec: a better debate shape (angle map + focused arguing)
 
-Status: SPEC. Approved by the owner in chat on 2026-10-12. Every design choice in it was made in chat. The owner
-pre-approved this written spec, the plan and the build: "yes, write the spec and also implement it, I only want to be
-notified at the end … Only if something is off I should be notified". Base: origin/release/2026-10-12-r14 (4be76a3e3).
+Status: SPEC. Approved by the owner on 2026-10-12. Every design choice in it was made by the owners, who also approved
+the plan and the build. Base: origin/release/2026-10-12-r14 (4be76a3e3).
 Branch `design/2026-10-12-debate-shape`. Phase 2 builds on Project 1's call scheduler (spec
 `2026-10-12-parallel-calls-design.md` on branch `feat/2026-10-12-parallel-calls`).
 
-Research behind this spec: the owners' private research folder `docs/research/2026-10-12-debate-shape/`, outside this
-repository. It holds 40+ papers, measurements from earlier debates and cost models. The comparison method that decides
+Research behind this spec is the owners' private material, outside this repository. The comparison method that decides
 between openings and judges the new shape is the owners' private method and is deliberately not in this repository.
 
 ## In plain words
@@ -49,13 +47,8 @@ The work runs in two phases:
   from that data.
 - **Phase 2** builds the whole shape into the runner, behind an owners' switch.
 
-Expected cost per debate (preview prices, rough):
-
-| Plan | Depth 1 | Depth 2 |
-|---|---|---|
-| Free, 3 AIs | $0.15 → $0.17 | $0.24 → $0.21 |
-| Premium, 5 AIs | $0.44 → $0.30 | $0.67 → $0.45 |
-| Premium, 7 AIs | $0.98 → $0.30 | $1.39 → $0.45 |
+Expected cost per debate (rough): about the same on Free, and lower on Premium, the more so the more AIs a plan uses.
+The owners keep the per-plan figures with their private material.
 
 ## Owner rulings this spec rests on (2026-10-12, in chat)
 
@@ -69,7 +62,7 @@ Expected cost per debate (preview prices, rough):
 | S6 | Depth mode: Adaptive by default. Fixed is offered on Premium. Free is adaptive with ceiling 2. |
 | S7 | Depth of scrutiny: small budgets, Premium only. Deep = up to 2 extra rounds on a point and 6 extra points per debate. Exhaustive = 3 rounds and 15 points. Free stays Standard. |
 | S8 | "Max tokens" becomes Answer length: Short / Standard / Detailed = about 300 / 700 / 1,500 words, a target never a hard cut, for every plan. The story keeps its own shape. |
-| S9 | The owners pre-approved spec, plan and build; notify only at the end or when something is off. `gh pr merge` still needs the owner's yes. |
+| S9 | The owners approved the spec, the plan and the build. |
 
 ## 1. Stage 1, the map (shared by Phase 1 and Phase 2)
 
@@ -137,7 +130,7 @@ redaction and outside-the-repository report folder as `formats`.
   AI and maker, exactly what it could see (blind, or the ids of what it was shown), its order position, timing, tokens,
   cost, format check and the reply text. `report.json` and `report.md` hold counts, cost, time, slips and fallbacks per
   arm. The tool computes no quality score; scoring is the owners' private method.
-- **Measurement run.** One run, all five preview AIs, within the owner's test budget ($5 DeepInfra + $1 Haiku; expected
+- **Measurement run.** One run, all five preview AIs, within the owners' test budget (expected
   about $0.5–1). Before the run there is a `--dry` mode with scripted answers, which spends nothing.
 - **Decision.** The owners' private method picks the opening. The owner is told only when the data contradicts S1.
 

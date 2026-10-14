@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v3.3 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v3.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
-endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.3
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Privaatsuspoliitika tekst
 annexTitle: Lisa B — Piirkondlikud privaatsustingimused
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 3.3 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
@@ -183,7 +183,7 @@ Dialectical Engine kasutab 20 üksust, mis kõik on teie tellitud teenuse jaoks 
 | `__Host-debateai-session` | Küpsis (HttpOnly) | Hoiab teid sisselogituna. Seda pikendatakse, kuni te teenust kasutate. | 14 päeva |
 | `__Host-debateai-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | 14 päeva |
 | `__Host-debateai-age-refusal` | Küpsis (HttpOnly) | Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid. | 30 päeva |
-| `debateai.locale` | Küpsis | Jätab meelde teie valitud liidese keele. | 1 aasta |
+| `debateai.locale` | Küpsis | Jätab meelde teie valitud liidese keele ja määrab keele, milles me teile e-kirju saadame. | 1 aasta |
 | `__Host-debateai-staff` | Küpsis (HttpOnly) | Eraldi töötajate juurdepääs | Kuni 8 tundi; 15 minutit tegevusetust |
 | `__Host-debateai-staff-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | Kuni 8 tundi; 15 minutit tegevusetust |
 | `__Host-debateai-password-reset` | Küpsis (HttpOnly) | Ainult parooli lähtestamine | Kuni 30 minutit |
@@ -201,6 +201,8 @@ Dialectical Engine kasutab 20 üksust, mis kõik on teie tellitud teenuse jaoks 
 | `debateai.exportPending` | Seansi salvestusruum | Hoiab e-kirjaga saadetud ekspordilinki sellel vahekaardil sisselogimiseks ja uuesti proovimiseks. | Kuni vahekaardi sulgemise, väljalogimise, uue lingi, esimese õnnestunud allalaadimise või vigase lingi või vale konto tulemuseni |
 | `debateai.exportLinkOutcome` | Seansi salvestusruum | Jätab meelde, millist allalaadimislingi teadet sellel vahekaardil näidata. | Kuni vahekaardi sulgemise, väljalogimise või uue lingini |
 
+Iga e-kiri, mille teie jaoks järjekorda paneme, säilitab keele, mille te valisite, kuni me selle saadame.
+
 Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel.
 
 Brauserid võivad saata signaali „Do Not Track“ või muu sarnase signaali. Dialectical Engine ei jälgi teid, seega pole sellisel signaalil midagi välja lülitada: teenus töötab samamoodi nii signaaliga kui ka ilma.
@@ -211,7 +213,7 @@ Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja sa
 
 Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
 
-Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.3 asendas versiooni 3.2: see hõlmab ainult piirkondi, kus teenust pakume, nimetab meie ettevõtte ning jaotises 5 meie majutus-, sisuedastus- ja meiliteenuse pakkujad ning kirjeldab Cloudflare'i robotikontrolli.
+Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.4 asendas versiooni 3.3: jaotis 13 ütleb nüüd, et küpsis debateai.locale määrab ka keele, milles kirjutame teile saadetavad e-kirjad, ning lisandub lõik, mille kohaselt iga järjekorda pandud e-kiri säilitab keele, mille olete valinud, kuni me selle saadame.
 
 ## Annex B — Piirkondlikud privaatsustingimused
 

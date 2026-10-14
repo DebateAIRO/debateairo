@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.2 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.3 · GÜLTIG AB 12. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.2
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.3
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.2 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.3 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -114,7 +114,7 @@ Wenn Sie nicht sicher sind, ob etwas erlaubt ist, fragen Sie uns, bevor Sie es v
 
 **Ihre Inhalte bleiben Ihre Inhalte.** Sie behalten alle Rechte, die Sie an den von Ihnen übermittelten Fragen, Behauptungen, Anmerkungen und Anfechtungen haben. Sie räumen uns eine nicht ausschließliche, weltweite und unentgeltliche Lizenz ein, diese Inhalte zum Betrieb des Dienstes zu hosten, zu speichern, zu vervielfältigen, anzupassen und zu verarbeiten: um die Debatte durchzuführen, sie zu speichern, damit Sie sie erneut öffnen und wiedergeben können, Support zu leisten, unsere gesetzlichen Pflichten zu erfüllen und – nur wenn Sie sich für eine Veröffentlichung entscheiden – für die in Abschnitt 9 genannten Zwecke. Diese Lizenz endet mit der Löschung der Inhalte, soweit Abschnitt 9 oder das Gesetz nichts anderes erfordert.
 
-**Wir trainieren nicht mit Ihren Inhalten.** Wir trainieren keine Modelle mit Ihren Inhalten. Wir setzen KI-Anbieter nur zu Bedingungen ein, die es ihnen nicht erlauben, Ihre Inhalte zum Trainieren oder Verbessern ihrer Modelle zu nutzen; das Verzeichnis der KI-Anbieter zeigt für jeden Anbieter, ob und wann wir dies bestätigt haben.
+**Wir trainieren nicht mit Ihren Inhalten.** Wir setzen KI-Anbieter nur zu Bedingungen ein, die es ihnen nicht erlauben, Ihre Inhalte zum Trainieren oder Verbessern ihrer Modelle zu nutzen; das Verzeichnis der KI-Anbieter zeigt für jeden Anbieter, ob und wann wir dies bestätigt haben.
 
 **Wie Ihre Inhalte KI-Anbieter erreichen.** Zur Durchführung einer Debatte senden wir Text an einen oder mehrere externe Modellanbieter. Ein Anbieter erhält Ihre Frage, die von Ihnen festgelegten Steuerungsanmerkungen und Aussagen, die das System während der Debatte zusammensetzt – ein Anbieter sieht also Text, der aus Ihren Eingaben abgeleitet und um sie herum aufgebaut wurde, nicht nur Ihre ursprünglichen Worte. Ihre E-Mail-Adresse, Ihre Kontokennungen, Ihre Sitzungsaufzeichnungen oder Ihre Zahlungsdaten erhält er niemals.
 
@@ -239,7 +239,7 @@ Abschnitt 8 behandelt Ihre Inhalte und den Status erzeugter Ergebnisse. Wenn Sie
 
 ## 17. Personenbezogene Daten
 
-Wie wir personenbezogene Daten verarbeiten, ist in der **Datenschutzerklärung** unter dezbatere.ro/privacy dargelegt. Sie erläutert, was wir erheben, auf welcher Rechtsgrundlage die einzelnen Zwecke beruhen, wie lange wir Daten aufbewahren, wer Daten empfängt, welche Übermittlungen stattfinden und wie Sie Ihre Rechte ausüben können. Drei Punkte gehören ebenfalls hierher. Abschnitt 7 fordert Sie auf, keine personenbezogenen Daten anderer Personen in eine Frage aufzunehmen; tun Sie es dennoch, sind Sie dafür verantwortlich, und wir können den Inhalt entfernen. Enthält eine auf Dialectical Engine veröffentlichte Debatte personenbezogene Daten über Sie, können Sie auch ohne Konto deren Entfernung verlangen (Abschnitt 9). Außerdem halten wir Ihre Zustimmung zu diesen Nutzungsbedingungen – Fassung, Zeitpunkt und technische Einzelheiten der Sitzung – als Nachweis des Vertrags fest, wie die Datenschutzerklärung erläutert.
+Wie wir personenbezogene Daten verarbeiten, ist in der **Datenschutzerklärung** unter dezbatere.ro/privacy dargelegt. Sie erläutert, was wir erheben, auf welcher Rechtsgrundlage die einzelnen Zwecke beruhen, wie lange wir Daten aufbewahren, wer Daten empfängt, welche Übermittlungen stattfinden und wie Sie Ihre Rechte ausüben können. Drei Punkte gehören ebenfalls hierher. Abschnitt 7 fordert Sie auf, keine personenbezogenen Daten anderer Personen in eine Frage aufzunehmen; tun Sie es dennoch, sind Sie dafür verantwortlich, und wir können den Inhalt entfernen. Enthält eine auf Dialectical Engine veröffentlichte Debatte personenbezogene Daten über Sie, können Sie auch ohne Konto deren Entfernung verlangen (Abschnitt 9). Außerdem halten wir Ihre Zustimmung zu diesen Nutzungsbedingungen – Fassung, Zeitpunkt und technische Einzelheiten der Sitzung – als Nachweis des Vertrags fest, wie die Datenschutzerklärung erläutert. E-Mails, die wir Ihnen senden, sind in der Sprache verfasst, die Sie auf unserer Website gewählt haben. Abschnitt 13 der Datenschutzerklärung erläutert, wie wir diese Wahl speichern.
 
 ## 18. Anwendbares Recht und Gerichtsstand
 
