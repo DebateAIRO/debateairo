@@ -41,6 +41,13 @@ import {
   buildSupportDraftSummaryPrompt
 } from "../../apps/api/src/support/prompt.js";
 import { wirePacket } from "../support/framed-packet.js";
+import { QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION } from "@debateai/register";
+import {
+  QUESTION_LANGUAGE_CHECK_ANSWER_FORM,
+  QUESTION_LANGUAGE_CHECK_CONTRACT_ID,
+  assertQuestionLanguageInstructionFrameable,
+  framedQuestionLanguageCheck
+} from "../../apps/api/src/question-language/fast-check.js";
 import type { StoryBody } from "@debateai/contract";
 import {
   buildStoryCheckerContract,
@@ -697,6 +704,17 @@ const HAND_OFFS = [
         storyCandidateWith(attack)
       )
     }).packet]
+  },
+  /**
+   * Question language (P2L Task 5): the fast language check reads the asker's question before any debate exists. It
+   * is the one hand-off that runs with no debate around it, so it is driven by the same attacks as every other.
+   */
+  {
+    name: "language:fast-check (question_line — the asker's text)",
+    payloadIn: "question_line",
+    render: (attack: string): readonly PromptPacket[] => [framedQuestionLanguageCheck(
+      QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION, attack, { code: "ro", name: "Romanian" }
+    )]
   }
 ] as const;
 
@@ -756,12 +774,50 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // Debate shape (Phase 2b Task 4): 21 -> 24 and 16 -> 19, with the attack leg's
     // consideration (a map point another model wrote) and the assigned root's
     // assigned_answer and map_points.
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(24);
+    // Question language (P2L Task 5): 24 -> 25, with the fast language check's question_line (a field name the judge
+    // rows already use, so 19 distinct fields stay 19).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(25);
     expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(19);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(4);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
+  });
+
+  /**
+   * Question language (P2L Task 5): the fast check's instruction is the OWNERS' editable text (row
+   * questionLanguagePolicy). Owner text is trusted, not evidence, so it is not a hand-off row; what must hold is that no
+   * edit can remove the code's frame. Every attack, written as the owners' instruction, is either refused at boot by
+   * its own code (it carries a frame token) or framed with the code's safety frame and answer form byte for byte.
+   */
+  it("an owner instruction cannot remove the fast language check's frame (P2L Task 5)", () => {
+    const frameOf = (instruction: string): string => maskedSafetyFrame(framedQuestionLanguageCheck(
+      instruction, QUESTION, { code: "ro", name: "Romanian" }
+    ).messages[0]!.content);
+    const reference = frameOf(QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION);
+    const refused: string[] = [];
+    for (const attack of INJECTION_CORPUS) {
+      let code: unknown = null;
+      try {
+        assertQuestionLanguageInstructionFrameable(attack.text);
+      } catch (error) {
+        code = (error as { code?: unknown }).code;
+      }
+      if (code !== null) {
+        expect(code).toBe("QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN");
+        refused.push(attack.id);
+        continue;
+      }
+      const packet = framedQuestionLanguageCheck(attack.text, QUESTION, { code: "ro", name: "Romanian" });
+      expect(assertFramedPrompt(packet).contractId).toBe(QUESTION_LANGUAGE_CHECK_CONTRACT_ID);
+      expect(packet.messages[0]!.content.startsWith(attack.text)).toBe(true);
+      expect(frameOf(attack.text)).toBe(reference);
+      expect(reference).toContain(QUESTION_LANGUAGE_CHECK_ANSWER_FORM);
+    }
+    // The fence forgeries carry the fence prefix, a reserved token; the rest are framed. Named, so neither half is empty.
+    expect(refused.length).toBeGreaterThan(0);
+    expect(refused.length).toBeLessThan(INJECTION_CORPUS.length);
   });
 
   it("drives the support contracts the API actually sends (SYNC3 / R1: the v2 JSON drafts)", async () => {
@@ -890,7 +946,7 @@ describe("V-11 layer 5 — the corpus is what the tripwire scan is calibrated ag
     // `ro-fence-forgery` (a forged boundary marker with a Romanian
     // end-of-evidence line). `ro-fake-system` is `flagged: TRUE` and was never
     // one of them. Every one of the four is CONTAINED by layer 1, which the
-    // rows above measured for all twenty-one hand-offs. The scan is a flag on a
+    // rows above measured for every hand-off. The scan is a flag on a
     // step, never a filter, and this row exists so the difference cannot be
     // forgotten.
     const unflagged = INJECTION_CORPUS.filter((attack) => !attack.flagged);

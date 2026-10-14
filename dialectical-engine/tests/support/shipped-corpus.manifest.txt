@@ -136,6 +136,7 @@ apps/api/src/publication-check/verdict.ts
 apps/api/src/publications.ts
 apps/api/src/question-language/eld-tuning.ts
 apps/api/src/question-language/eld.ts
+apps/api/src/question-language/fast-check.ts
 apps/api/src/recovery-email.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
