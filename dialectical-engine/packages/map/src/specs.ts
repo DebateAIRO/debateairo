@@ -40,6 +40,7 @@ import {
   type MapReplyCheck,
   type MapSnowballReply
 } from "./replies.js";
+import { mapAnglesSalvage, mapChooseSalvage, mapGapSalvage, mapListSalvage, type MapReplySalvage } from "./salvage.js";
 import type { MapAngle, MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem, MapStep } from "./types.js";
 
 /** One map call, fully described: the contract (in the question's language), its material, its check. */
@@ -79,7 +80,7 @@ export function mapLockedLanguage(ctx: Pick<MapSpecContext, "languageTag" | "lan
 }
 
 function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName, material: readonly FramedMaterialField[],
-  schema: z.ZodType<T>, check: MapReplyCheck<T>): MapStepSpec<T> {
+  schema: z.ZodType<T>, check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): MapStepSpec<T> {
   const lock = mapLockedLanguage(ctx);
   const contract = mapContractInLanguage((ctx.contracts ?? mapPromptContracts())[name], lock, ctx.languageName);
   return Object.freeze({
@@ -87,9 +88,9 @@ function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName,
     contract,
     // With a lock, the question_language field comes LAST; without one, the same material as today.
     material: Object.freeze(withQuestionLanguageField(material, lock).map((entry) => Object.freeze({ ...entry }))),
-    classify: (content: string, reply?: ModelReplyFacts) => mapClassifyReply(content, reply, schema, check).classification,
+    classify: (content: string, reply?: ModelReplyFacts) => mapClassifyReply(content, reply, schema, check, salvage).classification,
     read: (content: string, reply?: ModelReplyFacts) => {
-      const out = mapClassifyReply(content, reply, schema, check);
+      const out = mapClassifyReply(content, reply, schema, check, salvage);
       if (out.value === null) throw new TypedDomainError("MAP_REPLY_UNREADABLE", `MAP_REPLY_UNREADABLE: the ${step} reply did not pass its check`);
       return out.value;
     }
@@ -100,21 +101,21 @@ const mapQuestionField = (ctx: MapSpecContext): FramedMaterialField => ({ name: 
 const mapByItemId = <T extends MapItem>(list: readonly T[]): T[] => [...list].sort((a, b) => a.itemId.localeCompare(b.itemId));
 
 export function mapAnglesSpec(ctx: MapSpecContext): MapStepSpec<MapAnglesReply> {
-  return mapSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], mapAnglesReplySchema, mapAnglesCheck);
+  return mapSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], mapAnglesReplySchema, mapAnglesCheck, mapAnglesSalvage);
 }
 
 export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapStepSpec<MapListReply> {
   return angle === null
-    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], mapListReplySchema, mapListCheck(ctx.replyLanguage))
+    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], mapListReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage)
     : mapSpecOf("LIST", ctx, "listAngle", [mapQuestionField(ctx), { name: "angle_label", content: angle.label },
-      { name: "angle_focus", content: angle.focus }], mapListReplySchema, mapListCheck(ctx.replyLanguage));
+      { name: "angle_focus", content: angle.focus }], mapListReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage);
 }
 
 /** Snowball (arm A): the claims so far as a short plain list, never who wrote them. */
 export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPointItem[]): MapStepSpec<MapSnowballReply> {
   return mapSpecOf("SNOWBALL", ctx, "listSnowball", [mapQuestionField(ctx),
     { name: "points_so_far", content: JSON.stringify(mapByItemId(pointsSoFar).map((point) => point.claim)) }],
-  mapSnowballReplySchema, mapListCheck(ctx.replyLanguage));
+  mapSnowballReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage);
 }
 
 /** Merge: every item with its opaque id, in id order; never its author, list or angle. */
@@ -132,7 +133,7 @@ export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[
   return mapSpecOf("GAP", ctx, "gap", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => keyPoint.claim)) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => answer.answer)) }],
-  mapGapReplySchema, mapGapCheck(ctx.replyLanguage));
+  mapGapReplySchema, mapGapCheck(ctx.replyLanguage), mapGapSalvage);
 }
 
 /**
@@ -146,13 +147,14 @@ export type MapRaisedByCounts = "BLIND" | "ALL";
 /** Choose: each key point tagged by code with its distinct makers (blind by default) and its first fixed angle kind. */
 export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[],
   options: Readonly<{ raisedByCounts?: MapRaisedByCounts }> = {}): MapStepSpec<MapChooseReply> {
+  const shownIds: ReadonlySet<string> = new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId));
   const raisedBy = (keyPoint: MapKeyPoint): number =>
     (options.raisedByCounts === "ALL" ? keyPoint.makers : keyPoint.blindMakers).length;
   return mapSpecOf("CHOOSE", ctx, "choose", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
       raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer }))) }],
-  mapChooseReplySchema, mapChooseCheck(new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId)), ctx.replyLanguage));
+  mapChooseReplySchema, mapChooseCheck(shownIds, ctx.replyLanguage), mapChooseSalvage(shownIds));
 }
 
 /**

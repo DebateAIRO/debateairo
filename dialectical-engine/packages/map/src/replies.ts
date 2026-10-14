@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ReplyLanguageExpectation } from "@debateai/kernel";
-import { decodeModelJson, type ContentClassification, type ModelReplyFacts } from "@debateai/providers";
+import { decodeModelJson, type ContentClassification, type ModelJsonRepair, type ModelReplyFacts } from "@debateai/providers";
+import type { MapReplySalvage } from "./salvage.js";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
 import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
 
@@ -83,29 +84,40 @@ export type MapReplyCheck<T> = (value: T) => readonly MapReplyIssue[];
 
 /**
  * Reads one reply: the shared tolerant decode (code fence, outermost object, inner straight quote, closing brackets on
- * a normally finished reply), the strict schema, then the step's own content check.
+ * a normally finished reply), the step's code salvage when it has one (`salvage.ts`, ruling MAP-SALVAGE: on the decoded
+ * JSON before the schema, then on the parsed value before the content check), the strict schema, then the step's own
+ * content check. Without a salvage, a reply is read exactly as before.
+ *
+ * `repairs`: every repair an ACCEPTED reply needed, in order (the decode's, then the salvage's); empty for a refused one.
+ * The classification's one `jsonRepair` names the first salvage repair when there is one (the reply's content was
+ * changed), else the decode's.
  */
 export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | undefined, schema: z.ZodType<T>,
-  check: MapReplyCheck<T>): Readonly<{ classification: ContentClassification; value: T | null }> {
+  check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): Readonly<{ classification: ContentClassification; value: T | null;
+  repairs: readonly ModelJsonRepair[] }> {
+  const refused = (classification: ContentClassification) => Object.freeze({ classification, value: null, repairs: Object.freeze([]) });
   const decoded = decodeModelJson(content, reply);
-  if (!decoded.ok) {
-    return Object.freeze({ classification: { parseStatus: "PARSE_FAILED" as const, parseError: "MAP_REPLY_NOT_JSON" }, value: null });
-  }
-  const parsed = schema.safeParse(decoded.value);
+  if (!decoded.ok) return refused({ parseStatus: "PARSE_FAILED", parseError: "MAP_REPLY_NOT_JSON" });
+  const before = salvage.decoded?.(decoded.value) ?? { value: decoded.value, repairs: [] };
+  const parsed = schema.safeParse(before.value);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((issue) => ({ code: issue.code,
       path: issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment))), message: "SCHEMA_FAILED" }));
-    return Object.freeze({ classification: { parseStatus: "SCHEMA_FAILED" as const, parseError: JSON.stringify(issues) }, value: null });
+    return refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) });
   }
-  const problems = check(parsed.data);
+  const after = salvage.parsed?.(parsed.data) ?? { value: parsed.data, repairs: [] };
+  const problems = check(after.value);
   if (problems.length > 0) {
     const issues = problems.map((problem) => ({ code: "custom", path: [...problem.path], message: problem.code }));
-    return Object.freeze({ classification: { parseStatus: "SCHEMA_FAILED" as const, parseError: JSON.stringify(issues) }, value: null });
+    return refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) });
   }
-  const classification: ContentClassification = decoded.repair === null
+  const salvaged = [...before.repairs, ...after.repairs];
+  const repairs: ModelJsonRepair[] = [...(decoded.repair === null ? [] : [decoded.repair]), ...salvaged];
+  const named = salvaged[0] ?? decoded.repair;
+  const classification: ContentClassification = named === null
     ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "PARSED", parseError: null, jsonRepair: decoded.repair };
-  return Object.freeze({ classification, value: parsed.data });
+    : { parseStatus: "PARSED", parseError: null, jsonRepair: named };
+  return Object.freeze({ classification, value: after.value, repairs: Object.freeze(repairs) });
 }
 
 /**
