@@ -911,7 +911,7 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 | 4 | `en-nuclear` | today's shape first |
 | 5 | `en-social-media-age` | new shape first |
 
-Money and time, within the owner's test budget of $5 DeepInfra and $1 Haiku a day:
+Money and time, within the owners' daily test budget:
 
 - **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
   plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs

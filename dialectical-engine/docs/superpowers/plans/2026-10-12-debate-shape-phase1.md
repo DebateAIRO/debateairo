@@ -4806,7 +4806,7 @@ echo "exit: $?"
 
 ````markdown
 The openings comparison: one run, all five AIs, after a fresh S-3 gate status (about 350 calls; expected about $0.5
-to $1 within the test budget of $5 DeepInfra and $1 Haiku; several hours, because the slow models take 30 to 170
+to $1 within the owners' test budget; several hours, because the slow models take 30 to 170
 seconds a call):
 
 ```sh
