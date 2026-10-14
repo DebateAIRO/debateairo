@@ -21,8 +21,10 @@ const mapPoint = z.object({
 
 export const mapAnglesReplySchema = z.object({
   // Question-language spec 2026-10-13 (L7, deviation 5): REQUIRED in the answer form, OPTIONAL here. A missing one
-  // records nothing and costs no re-ask. It is a code, never prose: mapAnglesCheck never reads it.
-  question_language: z.string().trim().min(1).max(35).optional(),
+  // records nothing and costs no re-ask. It is a code, never prose: mapAnglesCheck never reads it. Final review M3: it
+  // is measured only, so an unusable one (null, "", an object, more than 35 characters) reads as missing, never as a
+  // schema failure (no patch, no re-ask, no fallback angles). The rest of the reply stays strict.
+  question_language: z.string().trim().min(1).max(35).optional().catch(undefined),
   angles: z.array(z.object({
     angle_id: mapId,
     kind: z.enum(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC"]),

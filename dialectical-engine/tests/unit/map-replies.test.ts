@@ -51,6 +51,24 @@ describe("map replies: angles", () => {
       "MAP_ANGLE_ID_REUSED@angles.3.angle_id", "MAP_ANGLE_KINDS_WRONG@angles"]);
   });
 
+  it("final review M3: the planner's measured-only question_language never costs a re-ask, whatever it holds", () => {
+    for (const value of [null, "", "   ", { code: "ro" }, "x".repeat(36), 7, ["ro"]]) {
+      const out = mapClassifyReply(JSON.stringify({ question_language: value, ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck);
+      expect(out.classification, JSON.stringify(value)).toEqual({ parseStatus: "PARSED", parseError: null });
+      expect(out.value?.question_language, JSON.stringify(value)).toBeUndefined();
+      expect(out.value?.angles).toHaveLength(4);
+    }
+    // A usable code is kept (trimmed); a missing one reads undefined, as before.
+    expect(mapClassifyReply(JSON.stringify({ question_language: " ro ", ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck).value?.question_language)
+      .toBe("ro");
+    expect(mapClassifyReply(JSON.stringify({ question_language: "x".repeat(35), ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck).value?.question_language)
+      .toBe("x".repeat(35));
+    expect(mapClassifyReply(JSON.stringify(ANGLES), STOP, mapAnglesReplySchema, mapAnglesCheck).value?.question_language).toBeUndefined();
+    // The schema stays strict for every other key.
+    expect(mapClassifyReply(JSON.stringify({ question_language: "ro", extra: 1, ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck)
+      .classification.parseStatus).toBe("SCHEMA_FAILED");
+  });
+
   it("refuses an angle kind the planner may not use (GENERAL is the code's own)", () => {
     const general = { angles: [...ANGLES.angles.slice(0, 3), { ...ANGLES.angles[3], kind: "GENERAL" }] };
     expect(mapClassifyReply(JSON.stringify(general), STOP, mapAnglesReplySchema, mapAnglesCheck).classification.parseStatus).toBe("SCHEMA_FAILED");

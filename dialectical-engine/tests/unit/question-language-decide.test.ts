@@ -100,6 +100,36 @@ describe("the question-language decision table (question-language spec 2026-10-1
       .toEqual({ kind: "LOCK", language: RO, source: "FALLBACK_SITE" });
   });
 
+  it("final review I3: eld names nothing, a short CJK, Hangul, Hebrew or Greek question is read from its script, never the site", () => {
+    const none: EldReading = { code: null, reliable: false, letters: 0, segments: [] };
+    const cases: readonly (readonly [string, string])[] = [
+      ["人工智能会取代人类的工作吗", "zh"],
+      ["인공지능이 일자리를 대체할까요", "ko"],
+      ["AIは私たちの仕事を奪うのでしょうか", "ja"],
+      ["האם ישראל צריכה לאמץ את האירו?", "he"],
+      ["Πρέπει η Ελλάδα να φύγει από το ευρώ;", "el"]
+    ];
+    for (const [question, code] of cases) {
+      const language = questionLanguageOf(code, question)!;
+      expect(fallbackLock(EN, none, question, true), code).toEqual({ kind: "LOCK", language, source: "LOCAL_ELD" });
+      expect(fallbackLock(EN, none, question, false), code).toEqual({ kind: "LOCK", language, source: "FALLBACK_ELD" });
+      expect(fallbackLock(EN, unsure, question, false), code).toEqual({ kind: "LOCK", language, source: "FALLBACK_ELD" });
+      expect(decideAfterFast(EN, none, { kind: "DOWN", reason: "TIMEOUT" }, question, MAX), code)
+        .toEqual({ kind: "LOCK", language, source: "FALLBACK_ELD" });
+      expect(decideBeforeFast(EN, none, question, { fastCheckAvailable: false, fastCheckAllowed: true }), code)
+        .toEqual({ kind: "LOCK", language, source: "LOCAL_ELD" });
+    }
+    // A Latin question with eld naming nothing: the site, as before.
+    expect(fallbackLock(RO, none, "Should Romania adopt the euro before 2030?", false)).toEqual({ kind: "LOCK", language: RO, source: "FALLBACK_SITE" });
+    expect(fallbackLock(RO, none, "Should Romania adopt the euro before 2030?", true)).toEqual({ kind: "LOCK", language: RO, source: "LOCAL_SITE" });
+    // Fewer than 12 letters: the site.
+    expect(fallbackLock(EN, none, "人工智能好吗", false)).toEqual({ kind: "LOCK", language: EN, source: "FALLBACK_SITE" });
+    expect(fallbackLock(EN, none, "AI 会取代人类的工作吗", true)).toEqual({ kind: "LOCK", language: EN, source: "LOCAL_SITE" });
+    // eld's own confident reading still wins over the script.
+    expect(fallbackLock(EN, sure("ja"), "人工智能会取代人类的工作吗", false))
+      .toEqual({ kind: "LOCK", language: questionLanguageOf("ja")!, source: "FALLBACK_ELD" });
+  });
+
   it("script subtags: a two-script language takes the question's own script", () => {
     const cyrillic = "Да ли Србија треба да уведе порез на угљеник следеће године?";
     const latin = "Da li Srbija treba da uvede porez na ugljenik sledeće godine?";

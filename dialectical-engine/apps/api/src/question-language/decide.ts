@@ -1,4 +1,6 @@
-import { exhaustive, lockedReplyLanguageExpectation, questionLanguageOf, replyTextLanguageVerdict, type QuestionLanguage } from "@debateai/kernel";
+import {
+  exhaustive, lockedReplyLanguageExpectation, majorityScript, questionLanguageOf, replyTextLanguageVerdict, type QuestionLanguage
+} from "@debateai/kernel";
 import { SITE_LANGUAGES_ELD_LACKS, type EldReading } from "./eld.js";
 import { ELD_CONFUSED_SITES, ELD_SITE_ALIASES, eldConfident, eldSeesMix } from "./eld-tuning.js";
 import type { FastCheckReading, FastCheckRewriteRefusal } from "./fast-check.js";
@@ -12,8 +14,10 @@ import type { FastCheckReading, FastCheckRewriteRefusal } from "./fast-check.js"
  *   confident, top = site, site not       not called                   LOCK site            ELD_SITE
  *     always-ask (CR-2), no mix (L-MIX)
  *   anything else, no paid AI / no gate   not called                   LOCK eld's top (aliased) if confident  LOCAL_ELD
- *     (L-ROUTE) / signed out (L-NOCONSENT)                                 else site                          LOCAL_SITE
+ *     (L-ROUTE) / signed out (L-NOCONSENT)                                 else the script's one language (I3)  LOCAL_ELD
+ *                                                                          else site                          LOCAL_SITE
  *   anything else                         DOWN (any reason)            LOCK eld's top (aliased) if confident  FALLBACK_ELD
+ *                                                                          else the script's one language (I3)  FALLBACK_ELD
  *                                                                          else site                          FALLBACK_SITE
  *   anything else                         ONE language M               LOCK M (even M ≠ site, L5)             FAST
  *   anything else                         MIX, rewrite discarded       LOCK main            FAST_MIX_NO_OFFER + reader's code
@@ -21,8 +25,19 @@ import type { FastCheckReading, FastCheckRewriteRefusal } from "./fast-check.js"
  *   anything else                         MIX, rewrite blank, too      LOCK main            FAST_MIX_NO_OFFER + own code
  *                                           long, unchanged, other
  *                                           language, or one language
+ *                                           seen (this table's own
+ *                                           re-check: from the real
+ *                                           reader a mix naming only
+ *                                           its main language arrives
+ *                                           as DOWN, UNREADABLE, so it
+ *                                           takes the DOWN row; final
+ *                                           review M4)
  *   anything else                         MIX, a valid rewrite         OFFER (main first, each language once, ≤ 6)
- *   an OFFER for the same person and question made less than 15 minutes ago (CR-5)  LOCK as the fallback   REPEAT_OFFER
+ *   an OFFER for the same person and question made less than 15 minutes ago (CR-5)
+ *                                                                      LOCK the fast AI's main language (L-REPEAT)  REPEAT_OFFER
+ *
+ * "The script's one language" (final review I3): when eld names nothing, a question of at least 12 letters mostly in
+ * Hangul (ko), Han or kana (ja with any kana, else zh), Hebrew (he) or Greek (el); never for the site-settle rule.
  *
  * A mix the clause rule misses is settled by eld (ELD_SITE): today's lock, no offer (the ruling's accepted cost).
  */
@@ -86,10 +101,37 @@ function eldLanguage(site: QuestionLanguage, eld: EldReading, questionLine: stri
   return questionLanguageOf(eld.code, questionLine);
 }
 
-/** Fast AI down (local = false) or no fast AI at all (local = true): eld's top when confident, else the site language. */
+/** The script-only reading's floor: as many letters as the kernel's own script readings need. */
+const SCRIPT_READING_MIN_LETTERS = 12;
+
+/**
+ * Final review I3: a short space-less question (Chinese, Japanese, Korean) or a short Hebrew or Greek one gives eld too
+ * few plain letters (eld.ts drops a space-less clause holding "AI" or a digit), so eld names nothing. Its script still
+ * names exactly one candidate: Hangul → ko; Han or kana with any kana → ja; Han with no kana → zh; Hebrew → he;
+ * Greek → el. Read from the RAW question's letters (never eld's plain words): at least 12 letters, most of them in that
+ * script. Any other script (Latin, Cyrillic, Arabic, …) names several languages: null, and the site decides.
+ */
+function scriptLanguage(questionLine: string): QuestionLanguage | null {
+  const letters = questionLine.match(/\p{L}/gu)?.length ?? 0;
+  if (letters < SCRIPT_READING_MIN_LETTERS) return null;
+  const script = majorityScript(questionLine);
+  const code = script === "Hangul" ? "ko"
+    : script === "CJK" ? (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(questionLine) ? "ja" : "zh")
+      : script === "Hebrew" ? "he"
+        : script === "Greek" ? "el"
+          : null;
+  return code === null ? null : questionLanguageOf(code, questionLine);
+}
+
+/**
+ * Fast AI down (local = false) or no fast AI at all (local = true): eld's top when confident; else, when the question's
+ * script names exactly one language (I3, `scriptLanguage`), that language; else the site language. The script reading
+ * shares the *_ELD sources (the local reading, not the site): no new LockSource, so every switch on the source holds.
+ * The L-KEEP settle rule (`eldSettles`) never reads the script: a fallback only.
+ */
 export function fallbackLock(site: QuestionLanguage, eld: EldReading, questionLine: string, local: boolean): LanguageLock {
-  const fromEld = eldLanguage(site, eld, questionLine);
-  return fromEld === null ? lock(site, local ? "LOCAL_SITE" : "FALLBACK_SITE") : lock(fromEld, local ? "LOCAL_ELD" : "FALLBACK_ELD");
+  const fromLocal = eldLanguage(site, eld, questionLine) ?? scriptLanguage(questionLine);
+  return fromLocal === null ? lock(site, local ? "LOCAL_SITE" : "FALLBACK_SITE") : lock(fromLocal, local ? "LOCAL_ELD" : "FALLBACK_ELD");
 }
 
 /**

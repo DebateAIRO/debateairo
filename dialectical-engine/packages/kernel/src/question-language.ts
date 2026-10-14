@@ -154,9 +154,16 @@ function scriptOfCode(primary: string): ReplyScript | undefined {
 }
 
 /**
- * What a reply is checked against: the locked code and its script, read from the CODE (own table, script subtag, our
- * 35, then the code's default script: Thai → Other, Persian → Arabic); the question's letters only when the code names
- * no script. A kept-wording question in Latin letters never makes a Thai lock expect Latin replies.
+ * What a reply is checked against: the locked code and its script. The script is read from the CODE first (own table,
+ * then a script subtag, then our 35 → Latin). Then, in this order:
+ *  · a plain two-script code (sr uz az kk mn with no script subtag; none of them is in our 35) never takes CLDR's
+ *    script: it takes the question's majority script when the question has at least 12 letters, else null (only a
+ *    clear reply in another script is refused). Final review I1: a short Latin Serbian question locks plain "sr".
+ *  · the code's default script (CLDR likely subtags: Thai → Other, Persian → Arabic), EXCEPT that a question of at
+ *    least 12 letters whose majority script is NON-Latin and differs from CLDR's is read in its own script (Sorani
+ *    Kurdish or Iranian Azerbaijani in Arabic letters, Punjabi in Shahmukhi). This reads the question's script, never
+ *    its language: a kept-wording question in Latin letters (romanized Thai) never makes a Thai lock expect Latin.
+ *  · the question's letters only when the code names no script at all.
  */
 export function lockedReplyLanguageExpectation(language: QuestionLanguage, questionLine: string): ReplyLanguageExpectation {
   const [primaryRaw, ...rest] = language.code.split("-");
@@ -166,10 +173,15 @@ export function lockedReplyLanguageExpectation(language: QuestionLanguage, quest
   const known = replyScriptOfTag(primary) ?? fromSubtag;
   if (known !== undefined) return Object.freeze({ tag: primary, script: known });
   if (Object.hasOwn(ARGUMENT_LANGUAGE_NAMES, primary)) return Object.freeze({ tag: primary, script: "Latin" });
-  const ofCode = scriptOfCode(primary);
-  if (ofCode !== undefined) return Object.freeze({ tag: primary, script: ofCode });
   const letters = questionLine.match(/\p{L}/gu)?.length ?? 0;
-  return Object.freeze({ tag: primary, script: letters >= SCRIPT_LETTERS_MIN ? majorityScript(questionLine) : null });
+  const questionScript = letters >= SCRIPT_LETTERS_MIN ? majorityScript(questionLine) : null;
+  if (TWO_SCRIPT_LANGUAGES.has(primary)) return Object.freeze({ tag: primary, script: questionScript });
+  const ofCode = scriptOfCode(primary);
+  if (ofCode !== undefined) {
+    const own = questionScript !== null && questionScript !== "Latin" && questionScript !== ofCode ? questionScript : ofCode;
+    return Object.freeze({ tag: primary, script: own });
+  }
+  return Object.freeze({ tag: primary, script: questionScript });
 }
 
 /** Today's check without a lock; the locked check with one (never a re-guess of the question). */

@@ -193,6 +193,28 @@ describe("root 0's worst-case call", () => {
     }
   });
 
+  it("final review M14: a LOCKED root 0's real repair packets (up to a 64-byte name) never frame above the locked repair room", () => {
+    const input = { questionLine: QUESTION, argumentLanguageName: "Romanian", completionTokenCeiling: CEILING };
+    const locators = [{ code: "SCHEMA_FAILED", path: "claim" }, { code: `Z${"9".repeat(63)}`, path: "-".repeat(200) }];
+    // Material at the map's limits in the two characters that grow on the way (a double quote, and U+0001 the most).
+    const assignedLegs = ["\"", "\u0001"].map((grows) => ({ kind: "assigned-root" as const,
+      assignedAnswer: grows.repeat(rootZeroMapMaterialChars.answer), mapPoints: grows.repeat(rootZeroMapMaterialChars.points) }));
+    const locks = [{ code: "ro", name: "Romanian" }, { code: "az-Cyrl", name: "Azerbaijani (Cyrillic script)" },
+      { code: "sr-Cyrl", name: "Ж".repeat(32) }];
+    expect(new TextEncoder().encode(locks[2]!.name).length).toBe(64);
+    for (const lock of locks) {
+      const lockedRepairBound = rootZeroRepairRequestBytes({ ...input, questionLanguage: lock });
+      for (const leg of [{ kind: "primary-root" as const }, ...assignedLegs]) {
+        for (const claim of ["unknown", "resolved"] as const) {
+          for (const locator of locators) {
+            const repair = buildFramedRepairPrompt(framedJudgePromptForTest(leg, QUESTION, "Romanian", claim, lock), locator);
+            expect(lockedRepairBound, `${lock.code} ${leg.kind} ${claim} ${locator.code}`).toBeGreaterThanOrEqual(bodyBytes(repair) + 256);
+          }
+        }
+      }
+    }
+  });
+
   it("T12-R3: the room covers root 0's first attempt AND one retry — the larger of a length retry and a format repair", () => {
     const input = { questionLine: QUESTION, argumentLanguageName: "English" };
     const attempts = rootZeroRoomAttempts({ ...input, tokenCeiling: CEILING });

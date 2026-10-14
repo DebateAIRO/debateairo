@@ -143,6 +143,40 @@ describe("the locked question language (question-language spec 2026-10-13, rulin
       { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
   });
 
+  it("a code whose script comes only from CLDR takes the question's non-Latin script (final review I1)", () => {
+    // Sorani Kurdish is written in Arabic letters; CLDR says ku → Latn. The question's own script wins.
+    const kurdish = { code: "ku", name: "Kurdish" };
+    const soraniQuestion = "ئایا حکومەت دەبێت دراوی نیشتمانی بپارێزێت لە جیاتی یۆرۆ؟";
+    const soraniReply = { statement: "حکومەت دەبێت دراوی نیشتمانی بپارێزێت بۆ هاوڵاتیان و کۆمپانیاکانی وڵات و ئابووری." };
+    expect(lockedReplyLanguageExpectation(kurdish, soraniQuestion)).toEqual({ tag: "ku", script: "Arabic" });
+    expect(replyLanguageCheckFor(soraniQuestion, kurdish, ["statement"])(soraniReply)).toEqual([]);
+    expect(replyLanguageCheckFor(soraniQuestion, kurdish, ["statement"])(FRENCH_REPLY)).toEqual([
+      { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
+    // Punjabi in Shahmukhi: CLDR says pa → Guru (read as Other).
+    expect(lockedReplyLanguageExpectation({ code: "pa", name: "Punjabi" }, "کیہ پنجاب نوں یورو دی تھاں اپنی کرنسی رکھنی چاہیدی اے؟"))
+      .toEqual({ tag: "pa", script: "Arabic" });
+    // A Latin question (romanized Thai) never moves the script: it is a script reading, not a language guess.
+    expect(lockedReplyLanguageExpectation({ code: "th", name: "Thai" }, "Ratthaban khuan raksa sakun ngoen baht wai mai?"))
+      .toEqual({ tag: "th", script: "Other" });
+    // Fewer than 12 letters: CLDR's script stands.
+    expect(lockedReplyLanguageExpectation(kurdish, "ئایا یۆرۆ؟")).toEqual({ tag: "ku", script: "Latin" });
+  });
+
+  it("a plain two-script code reads the question's script, never CLDR's (final review I1)", () => {
+    const serbian = { code: "sr", name: "Serbian" };
+    expect(lockedReplyLanguageExpectation(serbian, "Да ли евро?")).toEqual({ tag: "sr", script: null });
+    expect(lockedReplyLanguageExpectation(serbian, SCRIPT_LINES[2]!)).toEqual({ tag: "sr", script: "Cyrillic" });
+    expect(lockedReplyLanguageExpectation(serbian, SCRIPT_LINES[1]!)).toEqual({ tag: "sr", script: "Latin" });
+    // Iranian Azerbaijani in Arabic letters (CLDR says az → Latn).
+    expect(lockedReplyLanguageExpectation({ code: "az", name: "Azerbaijani" }, "آیا ایران اؤز پول واحدینی ساخلاماليدیر؟"))
+      .toEqual({ tag: "az", script: "Arabic" });
+    // A script subtag still names the script outright.
+    expect(lockedReplyLanguageExpectation({ code: "sr-Latn", name: "Serbian (Latin script)" }, "Да ли евро?"))
+      .toEqual({ tag: "sr", script: "Latin" });
+    // None of the five is in our 35, so no branch above the two-script rule can name a script for them.
+    for (const code of ["sr", "uz", "az", "kk", "mn"]) expect(Object.hasOwn(ARGUMENT_LANGUAGE_NAMES, code), code).toBe(false);
+  });
+
   it("replyLanguageCheckFor: today's check without a lock, the locked check with one", () => {
     const question = "Ar trebui sa renuntam la leu si sa trecem la euro cat mai repede?";
     expect(replyLanguageCheckFor(question, null, ["statement"])(FRENCH_REPLY))
