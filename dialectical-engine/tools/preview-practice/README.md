@@ -378,8 +378,9 @@ echo "exit: $?"
 
 Debate mode, with a debate-shape row, also asks with a site language:
 
-- `--site-language <code>`: one of the site's 35 languages. Left out, it is the question's own language as the old
-  guesser reads it, if the site has that language; else English.
+- `--site-language <code>`: one of the site's 35 languages. Left out, a language case asked by its id (for example
+  `--question lang-sr-latn`) is asked on its own site from the table above, as the language mode asks it. Any other
+  question is asked on its own language as the old guesser reads it, if the site has that language; else English.
 - `--language-choice use|keep`: how the pop-up is answered when the ask offers a rewrite. The default is `keep`: the
   person keeps their own wording. With `use`, the debate argues the rewritten question, while `transcript.json` still
   names the case's own question.

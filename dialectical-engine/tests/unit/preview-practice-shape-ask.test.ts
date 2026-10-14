@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
 import { OPENINGS_QUESTIONS } from "../../tools/preview-practice/practice-openings-questions.js";
+import { PRACTICE_LANGUAGE_CASES } from "../../tools/preview-practice/practice-questions.js";
 import { parsePracticeRegisterExport, type PracticeRegisterImportReceipt } from "../../tools/preview-practice/practice-register-import.js";
 import type { PracticeSettings, PracticeSockets } from "../../tools/preview-practice/practice-settings.js";
 
@@ -147,6 +148,23 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     // The export already held a row with the same bytes (value and source ref): the key is in neither list.
     expect(await rowOf(codeNext(["judgeContractHash"]))).toBe("UNCHANGED");
     expect(seen.published).toEqual([]);
+  });
+
+  it("a language case asked by id is asked on the case's own site, unless --site-language says otherwise (final review M-6)", async () => {
+    const sites: unknown[] = [];
+    for (const language of [undefined, { siteLanguage: null, choice: "keep" }, { siteLanguage: "en", choice: "keep" }]) {
+      seen.requests.length = 0;
+      await debate({ questionId: "lang-sr-latn", shape: { policy: debateShapePolicyStartValues(), ask: {} },
+        ...(language === undefined ? {} : { language }) });
+      expect(seen.requests[0]!.question_line).toBe(PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-sr-latn")!.questionLine);
+      sites.push(seen.requests[0]!.site_language);
+    }
+    // lang-sr-latn is asked on the Romanian site (the case table), as language mode asks it.
+    expect(sites).toEqual(["ro", "ro", "en"]);
+    // Any other question keeps the question's own language as its default site.
+    seen.requests.length = 0;
+    await debate({ questionId: "en-nuclear", shape: { policy: debateShapePolicyStartValues(), ask: {} } });
+    expect(seen.requests[0]!.site_language).toBe("en");
   });
 
   it("no shape: today's debate (the live version, depth only, nothing published)", async () => {

@@ -116,6 +116,16 @@ export function practiceSiteLanguageFor(questionLine: string): string {
   return practiceSiteLanguageOfTag(detectArgumentLanguage(questionLine).tag);
 }
 
+/**
+ * The site language a practice debate asks on: `--site-language` when given; else, for a language case asked by its
+ * id, the case's own site (the one language mode asks it on, so the lock and the offer can be compared; final review
+ * M-6); else the question's own language (practiceSiteLanguageFor).
+ */
+export function practiceDebateSiteLanguage(question: Readonly<{ id: string; questionLine: string }>, given: string | null | undefined): string {
+  if (given !== null && given !== undefined) return given;
+  return PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === question.id)?.site ?? practiceSiteLanguageFor(question.questionLine);
+}
+
 /** The same ask again after the one-language offer, exactly as the site's pop-up sends it (P2L Task 9). */
 export function practiceLanguageResubmission(request: AskRequest, offer: Readonly<{ check_ref: string; proposed_question: string }>,
   choice: PracticeLanguageChoice): AskRequest {

@@ -35,8 +35,8 @@ import {
 } from "./practice-lanes.js";
 import {
   practiceDebateLanguageBlock,
+  practiceDebateSiteLanguage,
   practiceLanguageResubmission,
-  practiceSiteLanguageFor,
   readPracticeMapLanguage,
   type PracticeDebateLanguage,
   type PracticeDebateLanguageBlock,
@@ -483,7 +483,7 @@ export async function runPracticeDebate(input: Readonly<{
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceDebateQuestion(input.questionId);
     // The site language goes with the question only when the ask reads it (a debate-shape row); else the ask is today's.
-    const siteLanguage = shapeRow === null ? null : input.language?.siteLanguage ?? practiceSiteLanguageFor(question.questionLine);
+    const siteLanguage = shapeRow === null ? null : practiceDebateSiteLanguage(question, input.language?.siteLanguage);
     const request = {
       question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
       risk_tier: "casual", tier_source: "ASKER",
