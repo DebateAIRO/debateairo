@@ -17,6 +17,13 @@
  "f-jsx-markup-split-sites": 18,
  "g-format-sites": 16,
  "excluded_count": 6822,
+ "deleted_since_measured": [
+  {
+   "file": "apps/ui/lib/scrutinyDepth.ts",
+   "rows": 6,
+   "deleted_by": "debate shape P2c (2026-10): the Scrutiny control's words moved to the newDebate catalogue; the rows below are kept as measured"
+  }
+ ],
  "rows": [
   {
    "file": "apps/ui/app/admin/workers/page.tsx",
