@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STORY_BODY_LIMITS, type StoryBody } from "@debateai/contract";
-import { schemaFailureLocator, type ContentClassification } from "@debateai/providers";
+import { schemaFailureLocator, type ContentClassification, type FramedSizeLimit } from "@debateai/providers";
 import {
   STORY_ENGINE_TOKENS,
   classifyCheckerContent,
@@ -67,10 +67,19 @@ function story(): StoryBody {
   };
 }
 
-function refused(result: ContentClassification): { code: string; path: string } {
+function refused(result: ContentClassification): { code: string; path: string; limit?: FramedSizeLimit } {
   if (result.parseStatus === "PARSED") throw new Error("expected the classifier to refuse the content");
   return { ...schemaFailureLocator(result) };
 }
+
+/** The refusals below that broke a size limit, and the limit their repair states (practice 2026-10-14). */
+const STATED_SIZE_LIMITS: Readonly<Record<string, Omit<FramedSizeLimit, "path">>> = {
+  "a blank confidence sentence": { bound: "at least", size: 1, unit: "characters" },
+  "a confidence sentence over 300 characters": { bound: "at most", size: 300, unit: "characters" },
+  "a story with no reasons": { bound: "at least", size: 1, unit: "items" },
+  "four reasons": { bound: "at most", size: 3, unit: "items" },
+  "a reason over 700 characters": { bound: "at most", size: 700, unit: "characters" }
+};
 
 describe("verdict story — the story classifier", () => {
   it("accepts a well-formed story and parses it unchanged", () => {
@@ -86,7 +95,11 @@ describe("verdict story — the story classifier", () => {
   it("refuses a headline over 160 characters with a code and the member's path", () => {
     const body = story();
     body.short.headline = "h".repeat(161);
-    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path: "short.headline" });
+    // Practice 2026-10-14: a size refusal's repair also states the limit the model must keep.
+    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({
+      code: "SCHEMA_FAILED", path: "short.headline",
+      limit: { path: "short.headline", bound: "at most", size: 160, unit: "characters" }
+    });
   });
 
   it("refuses a member the form does not have", () => {
@@ -161,10 +174,13 @@ describe("verdict story — the story classifier", () => {
     ["a story without why", (body: StoryBody): void => {
       delete (body as Partial<StoryBody>).why;
     }, "why"]
-  ])("refuses %s", (_name, mutate, path) => {
+  ])("refuses %s", (name, mutate, path) => {
     const body = story();
     mutate(body);
-    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path });
+    // Practice 2026-10-14: a size refusal's repair also states the limit; every other refusal is a code and a path.
+    const limit = STATED_SIZE_LIMITS[name];
+    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX)))
+      .toEqual({ code: "SCHEMA_FAILED", path, ...(limit === undefined ? {} : { limit: { path, ...limit } }) });
   });
 
   it.each([
@@ -496,7 +512,9 @@ describe("verdict story — the story classifier", () => {
     });
 
     it("refuses 9 entries: the form caps the paths at 8", () => {
-      expect(refused(classifyStoryContent(withPaths(positions), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+      expect(refused(classifyStoryContent(withPaths(positions), wide))).toEqual({
+        code: "SCHEMA_FAILED", path: "short.paths", limit: { path: "short.paths", bound: "at most", size: 8, unit: "items" }
+      });
     });
   });
 
