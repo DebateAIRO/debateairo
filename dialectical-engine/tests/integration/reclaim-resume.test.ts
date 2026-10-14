@@ -188,7 +188,19 @@ async function argueInCopy(seedName: string, copy: string, seed: AdmittedRun, va
       const first = await harness.previewRunner(gates, "resend", runnerOptions);
       await expect(first.runner.executeWorkItem(seed.workItemId, { executionLimitMs: 3_600_000, signal: abort.signal }))
         .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
-      nodesWhenLost = (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, [seed.runId])).rows[0]!.n;
+      // Calls running together: the lost copy's calls already sent still land, and their chains save what they were
+      // answered, after the copy itself has given up. Wait until they have (every request answered, the node count
+      // still for a second), as a crashed copy writes nothing more; a copy still writing is the fence's case.
+      const nodeCount = async () => (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, [seed.runId])).rows[0]!.n;
+      const settleBy = Date.now() + 30_000;
+      for (let last = -1, stillSince = Date.now(); ;) {
+        const now = await nodeCount();
+        if (now !== last) { last = now; stillSince = Date.now(); }
+        if (gates.arrivals.every((arrival) => arrival.answeredAt !== null) && Date.now() - stillSince >= 1_000) break;
+        if (Date.now() > settleBy) throw new Error("test: the lost copy's calls did not settle within 30 s");
+        await new Promise((resolve) => { setTimeout(resolve, 100); });
+      }
+      nodesWhenLost = await nodeCount();
       lostAtSequence = Number((await pool.query<{ s: string }>(
         `SELECT coalesce(max(sequence), 0)::text AS s FROM ledger.ledger_entry WHERE run_id=$1`, [seed.runId])).rows[0]!.s);
       // The claim lapses (a crashed copy renews it no more); the next dispatch claims the work item again.
