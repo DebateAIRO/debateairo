@@ -10,7 +10,7 @@ import {
   SESSION_COOKIE_NAME,
   type AskApplication
 } from "@debateai/api";
-import { PublicDebateSchema, type Answer, type PublicDebate, type PublicStoryShort } from "@debateai/contract";
+import { PublicDebateSchema, type Answer, type DebateMapView, type PublicDebate, type PublicStoryShort } from "@debateai/contract";
 import {
   MemoryPublicationKeyStore,
   PublicationCipher,
@@ -103,7 +103,7 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort } = {}) {
+function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView } = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
   const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
@@ -129,7 +129,8 @@ function publicationFakes(options: { preflight?: boolean; story?: PublicStorySho
     return create(...args);
   }) as PublicationCipher["create"];
   const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-29T12:00:00.000Z"),
-    repository, options.story === undefined ? undefined : { readStoryShort: async () => options.story! });
+    repository, options.story === undefined ? undefined : { readStoryShort: async () => options.story! },
+    options.mapView === undefined ? undefined : { readMapView: async () => options.mapView! });
   /** The snapshot that was encrypted and handed to the repository, decrypted back. */
   const decryptStored = async (): Promise<PublicDebate> => {
     const last = stored.at(-1)!;
@@ -367,6 +368,33 @@ describe("hate-speech S02 publish path", () => {
         PSEUDONYM, snapshot.public_ref, snapshot.published_at]) {
         expect(wire, identifier).not.toContain(identifier);
       }
+    });
+
+    // Debate shape P2c Task 5: a shaped debate's map view rides the snapshot, and the judge reads its answers and
+    // also-raised points as ARGUMENTS (Task 4) before anything is published; a debate without one carries none.
+    it("a shaped debate's map view is copied into the snapshot and checked with it; today's debate carries none", async () => {
+      const mapView: DebateMapView = {
+        positions: [{ node_id: "node:position", answer: "MAP-ANSWER-MARK" }], also_raised: ["ALSO-RAISED-MARK"]
+      };
+      const judge = createPartJudgeStub({});
+      const { check } = contentCheck(judge);
+      const { application, decryptStored } = publicationFakes({ mapView });
+      const result = await application.publish({
+        runId: RUN_ID, answer: servedAnswer(), authenticated, grantToken: GRANT_TOKEN, source: SOURCE, contentCheck: check
+      });
+      expect(result?.state).toBe("PUBLISHED");
+      const snapshot = await decryptStored();
+      expect(snapshot.map_view).toEqual(mapView);
+      const material = JSON.stringify(judge.packets);
+      for (const marker of ["MAP-ANSWER-MARK", "ALSO-RAISED-MARK"]) expect(material, marker).toContain(marker);
+
+      const today = publicationFakes();
+      const todayResult = await today.application.publish({
+        runId: RUN_ID, answer: servedAnswer(), authenticated, grantToken: GRANT_TOKEN, source: SOURCE,
+        contentCheck: contentCheck(createPartJudgeStub({})).check
+      });
+      expect(todayResult?.state).toBe("PUBLISHED");
+      expect("map_view" in await today.decryptStored()).toBe(false);
     });
   });
 

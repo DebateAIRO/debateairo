@@ -29,6 +29,7 @@ import {
   DataExportRequestSchema,
   DataExportStatusSchema,
   DataExportDownloadRequestSchema,
+  DebateMapViewSchema,
   EmailChangeCancelledSchema,
   EmailChangeConfirmedSchema,
   EmailChangeLinkRequestSchema,
@@ -253,6 +254,7 @@ import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
+import { answerRootNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { DataExportApplication } from "./data-export/service.js";
 import {
@@ -1417,6 +1419,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
   { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
   { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
+  { route: "GET /v1/answers/{id}/map", auth: "user", resource: "run-owner", action: "read-map-view" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -1714,6 +1717,11 @@ export interface ApiOptions {
    * closed 404 when it is absent, and the story route then knows no floor.
    */
   readonly disclosures?: AnswerDisclosureApplication;
+  /**
+   * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the owner's read of the debate's map
+   * view. Optional like `disclosures`; without it the route answers its closed 404.
+   */
+  readonly mapViews?: AnswerMapViewApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3667,6 +3675,29 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return disclosure === null
       ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
       : reply.send(disclosure);
+  });
+
+  // Debate shape P2c (spec 2026-10-12 §3.3 step 8, §3.4): the debate page's map view.
+  // The answer read is the first ownership check, as for the disclosure; the application
+  // checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
+  // "Not yours", "malformed", "no reader" and "no map choice" (incl. an erased run) are one
+  // closed 404. The view is read against the answer's own ROOT nodes, so a title never names a
+  // reply or a node the page cannot show. A corrupt map row stays the closed 500 (PF-C19).
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/map", routePolicy("GET /v1/answers/{id}/map"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const mapViews = options.mapViews;
+    if (!answerId.success || mapViews === undefined) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    const ownership = ownershipFor(request);
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    const view = await mapViews.readMapView({
+      runId: answer.run_ref,
+      nodeIds: answerRootNodeIds(answer),
+      ownership
+    });
+    return view === null
+      ? reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" })
+      : reply.send(DebateMapViewSchema.parse(view));
   });
 
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {

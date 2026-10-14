@@ -118,6 +118,7 @@ apps/api/src/mail-channel.ts
 apps/api/src/mail-domain-check.ts
 apps/api/src/mail-mime.ts
 apps/api/src/main.ts
+apps/api/src/map-views.ts
 apps/api/src/mfa.ts
 apps/api/src/onboarding-evidence.ts
 apps/api/src/owner-read.ts

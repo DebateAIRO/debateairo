@@ -6,6 +6,7 @@ import {
   StoryLanguageTagSchema,
   type Answer,
   type AnswerFloor,
+  type DebateMapView,
   type Edge,
   type MakerLineage,
   type Node,
@@ -24,6 +25,7 @@ import {
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
+import { NO_MAP_VIEWS, answerRootNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
@@ -262,6 +264,35 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
 }
 
 /**
+ * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map view copied into the snapshot, so
+ * the public page can list what was raised but not debated and title each position. Like the
+ * story and the floor, it never blocks publishing. A failed read publishes no view, and the
+ * log records only a bounded diagnostic, never the error's text. It is read as the publisher
+ * (owner-scoped, like the story and the floor), so the map reader's own owner check applies
+ * here too (pre-flight PF-C16), and against the answer's root nodes, as the owner's route reads it.
+ * The snapshot then goes through the publication content check with the rest (Task 4).
+ */
+export async function readPublishableMapView(
+  mapViews: AnswerMapViewApplication,
+  input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<DebateMapView | null> {
+  try {
+    return await mapViews.readMapView({
+      runId: input.runId,
+      nodeIds: answerRootNodeIds(input.answer),
+      ownership: { ownerRef: input.authenticated.ownerRef, legacyAskerId: null }
+    });
+  } catch (error) {
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.publication.map_view_not_published",
+      requestId: input.source.requestId,
+      diagnostic: storyReadDiagnostic(error)
+    })));
+    return null;
+  }
+}
+
+/**
  * FIX-HS2-p1 sd-B1 (ruling R-P): how the publish path holds the run's private-content lease. `run` opens one lease
  * (a pooled client) for the callback; `readAnswer` reads the owner's answer under it. `publish` builds the snapshot
  * under one lease, awaits the content check under NONE, and commits under a fresh one after re-reading the answer.
@@ -348,7 +379,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly cipher: PublicationCipher,
     private readonly clock: () => Date = () => new Date(),
     private readonly cleanupRepository: PostgresPublicationRepository = repository,
-    private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES
+    private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES,
+    private readonly mapViews: AnswerMapViewApplication = NO_MAP_VIEWS
   ) {}
 
   async preflightGrant(input: Readonly<{
@@ -466,6 +498,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     const storyShort = await readPublishableStory(this.stories, input);
     const language = await readPublishableLanguage(this.repository, input);
     const floor = await readPublishableFloor(this.repository, input);
+    const mapView = await readPublishableMapView(this.mapViews, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     const publicDebate = PublicDebateSchema.parse({
@@ -489,7 +522,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
       },
       ...(storyShort === null ? {} : { story_short: storyShort }),
       ...(language === null ? {} : { language }),
-      ...(floor === null ? {} : { floor })
+      ...(floor === null ? {} : { floor }),
+      ...(mapView === null ? {} : { map_view: mapView })
     });
     return Object.freeze({ publicDebate, publicationRef, occurredAt, pseudonym });
   }

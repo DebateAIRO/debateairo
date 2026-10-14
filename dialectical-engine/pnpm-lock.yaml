@@ -213,6 +213,9 @@ importers:
       '@debateai/mail-templates':
         specifier: workspace:*
         version: link:../../packages/mail-templates
+      '@debateai/map':
+        specifier: workspace:*
+        version: link:../../packages/map
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:../../packages/obs-capture

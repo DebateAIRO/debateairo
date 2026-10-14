@@ -162,6 +162,8 @@ import { createPublicationContentCheck } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
+import { MapChoiceRepository } from "@debateai/map";
+import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -1105,6 +1107,13 @@ const publicationCipher = environment.PUBLICATION_ENABLED === "true"
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
     )))
   : undefined;
+// Debate shape P2c (spec 2026-10-12 §3.3 step 8): the debate page's map view, for the
+// owner's route and for the snapshot a publication takes, on the same runtime pool. P2b's
+// reader checks no owner, so the view asks core.run_is_owned_by first (pre-flight PF-C16).
+const mapViews = new RepositoryAnswerMapViewApplication(
+  new MapChoiceRepository(pool),
+  runOwnerCheckFrom((text, values) => pool.query<{ owned: boolean }>(text, values))
+);
 const publications = publicationCipher === undefined
   ? undefined
   : new PostgresPublicationApplication(
@@ -1112,7 +1121,8 @@ const publications = publicationCipher === undefined
       publicationCipher,
       undefined,
       new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
-      new RepositoryPublicationStoryReader(storyRepository)
+      new RepositoryPublicationStoryReader(storyRepository),
+      mapViews
     );
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
@@ -1566,6 +1576,7 @@ const api = buildApi({
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
+  mapViews,
   ...(dataExport === undefined ? {} : { dataExport }),
   // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
   // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
