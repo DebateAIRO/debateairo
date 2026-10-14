@@ -20,7 +20,14 @@ import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import { callFamilyOf, practiceMapStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import { OPENINGS_QUESTIONS } from "../../tools/preview-practice/practice-openings-questions.js";
 import { PRACTICE_COMPARISON_QUESTION_IDS, practiceDebateQuestion } from "../../tools/preview-practice/practice-questions.js";
-import { practiceShapeOverrideFromArgs } from "../../tools/preview-practice/practice-shape.js";
+import {
+  practiceShapeBlock,
+  practiceShapeLines,
+  practiceShapeOverrideFromArgs,
+  type PracticeShapeFacts
+} from "../../tools/preview-practice/practice-shape.js";
+import { practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
+import { reportMarkdown, type PracticeReport } from "../../tools/preview-practice/practice-report.js";
 import {
   composePracticeNextRegisterVersion,
   parsePracticeRegisterExport,
@@ -223,5 +230,89 @@ describe("practice: map calls in the practice's own accounting", () => {
     expect(recheckReply("MAP:merge", "not json").issues.length).toBeGreaterThan(0);
     expect(recheckReply("MAP:other", "{}")).toEqual({ family: "MAP", issues: ["UNMAPPED"] });
     expect(recheckReply("SOMETHING:ELSE", "{}")).toEqual({ family: "UNMAPPED", issues: ["UNMAPPED"] });
+  });
+});
+
+// Pre-flight PF-D14: the map AIs' count sits on its own line (the plan's literal rule for lines that name the depth).
+const SIZES = Object.freeze({ plan: "premium", depthMode: "adaptive", scrutiny: "standard", answerLength: "standard",
+  mapAIs: 5,
+  answers: 4, graders: 3, pointsPerAnswer: 4, deeperTopPoints: 2, gapRounds: 2, closeCallExtraGraders: 1, opening: "ANGLE_MAP" });
+const FACTS: PracticeShapeFacts = Object.freeze({
+  storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+  sizes: SIZES,
+  marks: { "CHOOSE_QUOTA_FILLED": 1, "PANEL-CLOSE-CALL-EXTENDED": 3, "SCRUTINY-EXTENDED": 2, "PANEL-PARTIAL": 1 },
+  choice: { opening: "MAP", answers: 2, alsoRaised: 7 },
+  mapCallSiteKeys: ["MAP:angles", "MAP:list:0", "MAP:list:1", "MAP:list:1:2", "MAP:merge", "MAP:gap:1", "MAP:choose"]
+});
+const blockOf = (facts: PracticeShapeFacts | null, unreadable?: string) => practiceShapeBlock({ source: "FLAG", registerVersion: "6", row: "ADDED",
+  asked: { scrutiny: "deep" }, facts, ...(unreadable === undefined ? {} : { unreadable }) });
+
+describe("practice debate shape: what the run did", () => {
+  it("counts what the debate-shape run did", () => {
+    expect(blockOf(FACTS)).toEqual({
+      source: "FLAG", registerVersion: "6", row: "ADDED", asked: { depthMode: null, scrutiny: "deep", answerLength: null },
+      storedDepthParams: FACTS.storedDepthParams, sizes: SIZES, opening: "ANGLE_MAP", mapMarks: { CHOOSE_QUOTA_FILLED: 1 },
+      chosenAnswers: 2, alsoRaised: 7, panelCloseCallExtensions: 3, scrutinyExtensions: 2,
+      mapCallsByStep: { angles: 1, list: 3, merge: 1, gap: 1, choose: 1 }, notExercised: null
+    });
+  });
+
+  it("says when the new shape was not exercised", () => {
+    // Pre-flight PF-D12: a fallen-back map still stores its choice (opening TODAYS_OPENING, no answers, nothing also raised).
+    const fellBack = blockOf({ ...FACTS, marks: { MAP_UNAVAILABLE_TODAYS_OPENING: 1 }, choice: { opening: "TODAYS_OPENING", answers: 0, alsoRaised: 0 },
+      mapCallSiteKeys: ["MAP:angles", "MAP:list:0"] });
+    expect(fellBack).toMatchObject({ opening: "TODAYS_OPENING", notExercised: "MAP_UNAVAILABLE_TODAYS_OPENING", chosenAnswers: 0,
+      alsoRaised: 0, mapMarks: { MAP_UNAVAILABLE_TODAYS_OPENING: 1 } });
+    // The stored opening says it alone too: an answer that was never served carries no mark.
+    expect(blockOf({ ...FACTS, marks: {}, choice: { opening: "TODAYS_OPENING", answers: 0, alsoRaised: 0 } }))
+      .toMatchObject({ opening: "TODAYS_OPENING", notExercised: "MAP_UNAVAILABLE_TODAYS_OPENING" });
+    // Ruling C-TWO (controller ruling D-NOTARGUED, pre-flight PF-D11): the map gave one answer, so today's opening was argued.
+    expect(blockOf({ ...FACTS, choice: { opening: "MAP", answers: 1, alsoRaised: 4 } })).toMatchObject({ opening: "TODAYS_OPENING",
+      notExercised: "MAP_ANSWERS_NOT_ARGUED", chosenAnswers: 1, alsoRaised: 4 });
+    // A shape run that stored no map at all (it stopped before the map) is not the shape shown to run (pre-flight PF-D12).
+    expect(blockOf({ ...FACTS, choice: null })).toMatchObject({ opening: null, notExercised: "NO_MAP_STORED", chosenAnswers: null,
+      alsoRaised: null });
+    expect(blockOf({ ...FACTS, sizes: null })).toMatchObject({ opening: null, notExercised: "NO_SHAPE_ON_RECEIPT" });
+    expect(blockOf(null, "CONTENT_CIPHER_UNAVAILABLE")).toMatchObject({ notExercised: "FACTS_UNREADABLE:CONTENT_CIPHER_UNAVAILABLE" });
+    // Refused at the ask: the verdict already fails the run; the block only says nothing ran.
+    expect(blockOf(null)).toEqual({ source: "FLAG", registerVersion: "6", row: "ADDED", asked: { depthMode: null, scrutiny: "deep", answerLength: null },
+      storedDepthParams: null, sizes: null, opening: null, mapMarks: {}, chosenAnswers: null, alsoRaised: null, panelCloseCallExtensions: 0,
+      scrutinyExtensions: 0, mapCallsByStep: { angles: 0, list: 0, merge: 0, gap: 0, choose: 0 }, notExercised: null });
+  });
+
+  it("a shape run that did not exercise the shape is NOT_PROVEN, never PASS", () => {
+    const base: PracticeVerdictInput = { harnessError: null, completed: true, servedAnswer: true, storyOutcome: "READY", formatFailures: 0,
+      failedCalls: 0, gateHalted: false, gateStopped: false, notExercisedModels: [], unbilledRefusals: 0, p90ByModel: {} };
+    expect(practiceVerdict(base)).toMatchObject({ verdict: "PASS", exitCode: 0, reasons: [] });
+    expect(practiceVerdict({ ...base, shapeNotExercised: [] })).toMatchObject({ verdict: "PASS", reasons: [] });
+    expect(practiceVerdict({ ...base, shapeNotExercised: ["MAP_UNAVAILABLE_TODAYS_OPENING"] }))
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["SHAPE_NOT_EXERCISED:MAP_UNAVAILABLE_TODAYS_OPENING"] });
+    expect(practiceVerdict({ ...base, shapeNotExercised: ["MAP_ANSWERS_NOT_ARGUED"] }))
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["SHAPE_NOT_EXERCISED:MAP_ANSWERS_NOT_ARGUED"] });
+    expect(practiceVerdict({ ...base, completed: false, shapeNotExercised: ["NO_SHAPE_ON_RECEIPT"] }).verdict).toBe("FAIL");
+  });
+
+  it("report.md says it in plain words, counts and codes only", () => {
+    const report = { schema: "preview-practice-report-v1", mode: "debate", verdict: "PASS", exitCode: 0, reasons: [],
+      startedAt: "2026-10-12T10:00:00.000Z", finishedAt: "2026-10-12T11:00:00.000Z", shape: blockOf(FACTS) } as unknown as PracticeReport;
+    const markdown = reportMarkdown(report);
+    expect(markdown).toContain("Debate shape (from --shape-policy, in this throwaway register only: version 6, row added):");
+    expect(markdown).toContain("- asked: depth mode default, scrutiny deep, answer length default; stored: "
+      + "{\"depth\":1,\"depthMode\":\"adaptive\",\"scrutiny\":\"standard\",\"answerLength\":\"standard\"}");
+    expect(markdown).toContain("- opening used: ANGLE_MAP");
+    expect(markdown).toContain("- map calls (every try, as the ledger recorded them): angles 1, list 3, merge 1, gap 1, choose 1");
+    expect(markdown).toContain("- chosen answers: 2; also raised, not debated: 7");
+    expect(markdown).toContain("- map marks: CHOOSE_QUOTA_FILLED x1");
+    // Pre-flight PF-D19 (T14-P): the close call called for extra graders; one that then failed still leaves the mark.
+    expect(markdown).toContain("- points whose close call called for extra graders: 3; points scrutinised further: 2");
+    expect(practiceShapeLines(blockOf({ ...FACTS, sizes: null })).join("\n")).toContain("- the new shape was not exercised: NO_SHAPE_ON_RECEIPT");
+    expect(practiceShapeLines(blockOf({ ...FACTS, choice: { opening: "MAP", answers: 1, alsoRaised: 4 } })).join("\n"))
+      .toContain("- the new shape was not exercised: MAP_ANSWERS_NOT_ARGUED");
+  });
+
+  it("a report without the block reads as today", () => {
+    const report = { schema: "preview-practice-report-v1", mode: "debate", verdict: "PASS", exitCode: 0, reasons: [],
+      startedAt: "2026-10-12T10:00:00.000Z", finishedAt: "2026-10-12T11:00:00.000Z" } as unknown as PracticeReport;
+    expect(reportMarkdown(report)).not.toContain("Debate shape");
   });
 });

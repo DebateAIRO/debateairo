@@ -184,6 +184,13 @@ export type PracticeVerdictInput = Readonly<{
    * of the debate (debate). Not a failure: NOT_PROVEN for that model. Optional: none when absent.
    */
   busyModels?: readonly string[];
+  /**
+   * Debate shape (plan 2026-10-12-debate-shape-phase2d): why a debate asked for the new shape did not run it (the map
+   * was unavailable and the opening fell back to today's; the map gave fewer than two answers, so today's opening was
+   * argued, ruling C-TWO; no map was stored; the run was admitted without the shape; its facts could not be read). Not
+   * a failure: NOT_PROVEN, as the shape was not shown to work. Optional: none when absent.
+   */
+  shapeNotExercised?: readonly string[];
   /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -225,7 +232,8 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const notProven = [
     ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
-    ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`)
+    ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),
+    ...[...(input.shapeNotExercised ?? [])].sort().map((why) => `SHAPE_NOT_EXERCISED:${why}`)
   ];
   if (input.interrupted === true) notProven.push("RUN_INTERRUPTED");
   const warn: string[] = [];

@@ -12,6 +12,7 @@ import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
+import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
 import {
   latencySummary,
   percentile,
@@ -384,6 +385,7 @@ export function debateReport(input: Readonly<{
     gatePauses: gatePauses(input.observer),
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
     busyModels: busyDuringRun,
+    shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -398,6 +400,8 @@ export function debateReport(input: Readonly<{
     time: Object.freeze({ admissionSeconds: Math.round(r.seconds.admission), debateSeconds: Math.round(r.seconds.debate) }),
     register: r.register,
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
+    // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
+    ...(r.shape === undefined ? {} : { shape: r.shape }),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -449,6 +453,8 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const totals = report.totals as Record<string, unknown> | undefined;
   if (totals !== undefined) lines.push("Totals:", "", ...Object.entries(totals).map(([key, value]) => `- ${key}: ${String(value)}`), "");
+  const shape = typeof report.shape === "object" && report.shape !== null ? report.shape as PracticeShapeBlock : undefined;
+  if (shape !== undefined) lines.push(...practiceShapeLines(shape));
   const gates = report.gates as Record<string, GateBlock> | undefined;
   if (gates !== undefined) {
     lines.push("Gates:", "");

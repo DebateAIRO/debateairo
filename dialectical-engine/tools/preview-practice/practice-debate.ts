@@ -44,7 +44,15 @@ import {
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
 import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
-import type { PracticeShapeOverride } from "./practice-shape.js";
+import {
+  practiceMapReaders,
+  practiceShapeBlock,
+  readPracticeShapeFacts,
+  type PracticeShapeBlock,
+  type PracticeShapeFacts,
+  type PracticeShapeOverride,
+  type PracticeShapeSource
+} from "./practice-shape.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
 import { recordPracticeTranscript } from "./practice-transcript.js";
 import {
@@ -158,6 +166,8 @@ export type PracticeDebateResult = Readonly<{
    * blanked (by kind; empty when nothing). `error` names why it could not be written. Not part of report.json.
    */
   transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
+  /** Debate shape: what the shape run did (practice-shape.ts); absent when the debate ran without a debate-shape row. */
+  shape?: PracticeShapeBlock;
 }>;
 
 const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER", "UNMAPPED"]);
@@ -404,6 +414,8 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const shapeSource = input.shape !== undefined && input.shape.policy !== null ? "FLAG" as const
       : shapeRow !== null ? "REGISTER" as const : null;
+    const shapeBlockOf = (source: PracticeShapeSource, facts: PracticeShapeFacts | null, unreadable?: string): PracticeShapeBlock =>
+      practiceShapeBlock({ source, registerVersion, row: shapeRowChange, asked, facts, ...(unreadable === undefined ? {} : { unreadable }) });
     // Content encryption ON, as on the live preview, with a key that lives only in this process.
     const users = new PracticeUserDekStore();
     configureContentEncryption(pool, new ContentCipher(new MemoryRunContentKeyStore(users, async (ownerRef) => {
@@ -472,7 +484,8 @@ export async function runPracticeDebate(input: Readonly<{
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
         byModelAndSite: [], probes, failures: [], formatFailures: 0, callsByModel: {}, repairKindsByModel: {}, answersByModel: {}, jsonRepairs: [],
         failedCalls: 0, refusedCalls: 0,
-        remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary()
+        remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
+        ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) })
       });
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
@@ -549,6 +562,17 @@ export async function runPracticeDebate(input: Readonly<{
       }
     }
     const collected = await collect(pool, job.runId);
+    // Debate shape: what the shape run did, read before the database goes. A reading that breaks costs only this block
+    // (NOT_PROVEN: the shape was not shown to run), never the report.
+    let shape: PracticeShapeBlock | undefined;
+    if (shapeSource !== null) {
+      try {
+        shape = shapeBlockOf(shapeSource, await readPracticeShapeFacts(pool, job.runId, answerId, practiceMapReaders(pool)));
+      } catch (error) {
+        shape = shapeBlockOf(shapeSource, null, codeOf(error));
+        progress(`debate shape: what the run did could not be read (${codeOf(error)})`);
+      }
+    }
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
     remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
     return Object.freeze({
@@ -563,7 +587,8 @@ export async function runPracticeDebate(input: Readonly<{
       ...collected, probes: Object.freeze(probes), remaining,
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
       parallel: runner.callStats.summary(),
-      ...(transcript === undefined ? {} : { transcript })
+      ...(transcript === undefined ? {} : { transcript }),
+      ...(shape === undefined ? {} : { shape })
     });
   } finally {
     remaining.deepinfra.after ??= await readRemaining(remainingPorts.deepinfra);
