@@ -206,14 +206,26 @@ export type ShapeDebateRun = Readonly<{
  * Haiku request built as several fenced blocks — a repair after a refused reply — arrives as ONE user turn. Each block
  * opens and closes with the fence on its own line and holds one single-line JSON envelope, so the joins are exactly the
  * blank lines between a closing and an opening fence; they are undone here so the door's own reader reads the packet the
- * runner built. A DeepInfra body is the packet as built.
+ * runner built. A DeepInfra body is the packet as built. The fence is never spelled here (the packet-read guard): a join
+ * is a blank line whose neighbouring lines are the same line — one block's closing fence and the next block's opening
+ * fence — and a single-line envelope never holds a blank line.
  */
-const BLOCK_JOIN = /(?<=\|#)\n\n(?=#\|DEBATEAI-FENCE-)/u;
+function unjoinedBlocksOf(content: string): string[] {
+  const blocks: string[] = [];
+  for (const piece of content.split("\n\n")) {
+    const previous = blocks.at(-1);
+    const closing = previous?.slice(previous.lastIndexOf("\n") + 1);
+    const opening = piece.split("\n", 1)[0];
+    if (previous !== undefined && (closing === "" || closing !== opening)) blocks[blocks.length - 1] = `${previous}\n\n${piece}`;
+    else blocks.push(piece);
+  }
+  return blocks;
+}
 function builtPacketOf(request: GateRecord): PromptPacket {
   const packet = wirePacket(stubChatBody(request.provider, request.body));
   if (request.provider !== "anthropic") return packet as PromptPacket;
   return { messages: packet.messages.flatMap((message) => message.role === "user"
-    ? message.content.split(BLOCK_JOIN).map((content) => ({ role: "user", content }))
+    ? unjoinedBlocksOf(message.content).map((content) => ({ role: "user", content }))
     : [message]) } as PromptPacket;
 }
 
