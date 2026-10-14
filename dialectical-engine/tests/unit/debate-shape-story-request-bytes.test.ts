@@ -24,16 +24,21 @@ import {
  * The pack's also_raised / answers_note passages live in their own files (common-map.md, checker-map.md) and ride
  * only with a material that sends one of those fields.
  *
- * The baseline below was measured at origin/dev 7f0f8ede9 by running THIS file's computation (`requestsFor`, copied
+ * The baseline below was measured at origin/dev 57cd66d81 by running THIS file's computation (`requestsFor`, copied
  * into a scratch script) against origin/dev's packages/story/src and story-shapes/ (extracted with `git archive`),
  * with the providers frame of this branch (whose only change to the frame is a refactor of the reserved-token check
  * into `promptTextHasReservedToken`). Re-measure only for a deliberate change to today's story requests, never to
  * make a debate-shape change pass. Before this fix the same computation on this branch gave 219,822 bytes
  * (sha 499913f0...), the extra ~1.6 KB storyteller and ~0.7 KB checker text the review measured.
+ *
+ * History: first measured at origin/dev 7f0f8ede9 (sha 28d95204..., 211,910 bytes). Re-measured at 57cd66d81 because
+ * dev's #168 ("a size refusal's repair states its limit") lengthened two safety-frame sentences every request carries
+ * (+232 bytes per packet, six packets: 213,302 bytes). Dev's packages/story and story-shapes did not change, so the
+ * four contract hashes (the frame is no part of them) are the same.
  */
 const ORIGIN_DEV_NO_MAP_REQUESTS = Object.freeze({
-  sha256: "28d95204602692f41088cde2a519d943517dd31ce90ff78bb05a3d466846058c",
-  bytes: 211_910,
+  sha256: "6bcac248989ed2ebff887e17340e607f75fa02be3ba8950adaee9f9d0256f349",
+  bytes: 213_302,
   // storyteller, checker (no language on record); storyteller, checker (Romanian)
   contractHashes: [
     "162d69075ca9b8cb49690810ca3a487ff6e4ecc499a89500f554f6c379f145c4",

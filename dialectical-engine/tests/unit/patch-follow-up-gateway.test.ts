@@ -285,6 +285,23 @@ describe("the story checker's sealed bound of two: the patch only, then the call
     expect(executions[1]!.requestBody.startsWith(first.slice(0, first.lastIndexOf('],"response_format"')))).toBe(true);
   });
 
+  it("practice 2026-10-14: an objection over its cap gets a patch POST that states the cap, and a reply within it is accepted", async () => {
+    // The real R15 verdict, its objection one character past checker v3's 4000.
+    const tooLong = JSON.stringify({ ...JSON.parse(fixture("story-format-replies", "mimo-checker-r15-646-long-objection.txt")) as object,
+      objection: "x".repeat(4001) });
+    const { gateway, executions } = deepInfraHarness([{ content: tooLong }, { content: JSON.stringify({ objection: "x".repeat(3990) }) }]);
+    const result = await gateway.call(checkerRequest());
+    expect(executions).toHaveLength(2);
+    expect(readPromptFrame({ messages: bodyOf(executions[1]!).messages as never }).fields.slice(-4)).toEqual([
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_paths", content: "objection" },
+      { name: "machine_rejection_limits", content: "objection: at most 4000 characters" },
+      { name: "machine_reply_form", content: "PATCH" }
+    ]);
+    expect(result.repairForm).toBe("PATCH");
+    expect((JSON.parse(result.content) as { objection: string }).objection).toHaveLength(3990);
+  });
+
   it("a patch that does not do ends the call after two POSTs (no third)", async () => {
     const { gateway, executions } = deepInfraHarness([{ content: CHECKER_SLIP }, { content: "{\"criteria\": true}" }, { content: CHECKER_SLIP }]);
     await expect(gateway.call(checkerRequest())).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2 });
