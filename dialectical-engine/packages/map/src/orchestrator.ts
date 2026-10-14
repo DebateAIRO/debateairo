@@ -187,6 +187,7 @@ class MapRun {
       arm: this.arm,
       ...parts,
       stoppedBy: this.stoppedBy,
+      plannerLanguage: null,
       marks: Object.freeze([...this.marks]),
       notes: Object.freeze([...this.notes]),
       // Pushed as calls finish; returned in plan order, never finish order.

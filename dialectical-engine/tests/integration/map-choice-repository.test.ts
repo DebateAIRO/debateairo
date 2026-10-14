@@ -23,7 +23,7 @@ const seat = (n: number) => ({ aiRef: `preview:ref-${String(n)}`, maker: `maker-
 // Every id is code-minted (ruling T7-PRIV): angles g1.., items pt01../ca01.., key points kp01.., merged answers an01..,
 // chosen answers a1..
 const RESULT: MapResult = Object.freeze({
-  arm: "C", kind: "MAP", stoppedBy: null,
+  arm: "C", kind: "MAP", stoppedBy: null, plannerLanguage: null,
   angles: [{ angleId: "g1", kind: "OPPOSITE_CASE", label: "The other side", focus: "The case against." }],
   items: [
     { itemId: "pt01", seat: seat(0), origin: "BLIND", angleId: "g1", angleKind: "OPPOSITE_CASE", listIndex: 0, kind: "POINT", claim: "It costs a lot.", whyItMatters: "Money.", leans: "against_some_answer" },

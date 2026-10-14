@@ -48,7 +48,9 @@ export const MAP_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBA
 export type MapMark = typeof MAP_MARKS[number];
 
 /** What happened along the way that is not a mark: kept for the practice record and the owners' reading. */
-export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED", "MAP_STOPPED"] as const);
+export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED", "MAP_STOPPED",
+  // Question language (spec 2026-10-13, L7; ruling CR-3): the angle planner named another language than the lock. Measurement only, for operators: never a condition mark, never shown, never acted on.
+  "LANGUAGE_PLANNER_DISAGREES"] as const);
 export type MapNote = typeof MAP_NOTES[number];
 
 export const MAP_STEPS = Object.freeze(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"] as const);
@@ -155,4 +157,6 @@ export type MapResult = Readonly<{
   calls: readonly MapCallRecord[];
   /** The code of the stop (money, attempts, lane) that ended the map early; null when it ran to its end. */
   stoppedBy: string | null;
+  /** What the angle planner named in question_language, as a primary subtag; null when it named nothing usable (operators only). */
+  plannerLanguage: string | null;
 }>;

@@ -182,7 +182,7 @@ describe("the runner's map caller", () => {
 /** Fix round 1: where the run's map comes from — the stored one, or a new one, and the stored one when another copy won. */
 describe("resolveShapeMap", () => {
   const result = (stoppedBy: string | null, tag: string): MapResult => ({ arm: "C", kind: "MAP", angles: [], items: [], keyPoints: [],
-    mergedAnswers: [], framingChallenges: [tag], choice: null, marks: [], notes: [], calls: [], stoppedBy }) as MapResult;
+    mergedAnswers: [], framingChallenges: [tag], choice: null, marks: [], notes: [], calls: [], stoppedBy, plannerLanguage: null }) as MapResult;
   const spendStopOfCode = (code: string) => code === "RUN_COST_ENVELOPE_MONEY_REACHED" ? "MONEY" as const
     : code === "RUN_COST_ENVELOPE_EXHAUSTED" ? "ATTEMPTS" as const : null;
   const storeOf = (stored: MapResult | null, onWrite: () => "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED", written: unknown[] = []) => {
