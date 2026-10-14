@@ -95,7 +95,9 @@ import {
   LegalStatusResponseSchema,
   GeoAvailabilityResponseSchema,
   AskRoomQuerySchema,
-  AskRoomResponseSchema
+  AskRoomResponseSchema,
+  QUESTION_LANGUAGE_CHOICE_NEEDED,
+  QuestionLanguageChoiceNeededSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -157,6 +159,15 @@ import {
   type PersonRoomPick
 } from "./person-room-picker.js";
 import {
+  QuestionLanguageChoiceNeeded,
+  ownerScopeOf,
+  questionLanguageAskContractMember,
+  runLanguageOf,
+  type QuestionLanguageLock,
+  type QuestionLanguagePort
+} from "./question-language/decider.js";
+export { QuestionLanguageChoiceNeeded, type QuestionLanguagePort } from "./question-language/decider.js";
+import {
   RoleAssignmentSchema,
   pickRotatedRoles,
   rotationPinFields,
@@ -182,7 +193,6 @@ import {
 import {
   AGE_RULE_VERSION,
   checkDob,
-  detectArgumentLanguage,
   dobFromIso,
   isMailAddress,
   meetsMinimumAge,
@@ -1822,12 +1832,19 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 403 | 409 | 422 | 429 {
   if (code === ASK_SIGN_IN_REQUIRED) return 401;
   // Step 1: the same 403 the route answers when it refuses a person outside the preview's team.
   if (code === PREVIEW_TEAM_ONLY) return 403;
+  // Question language (spec 2026-10-13): a stale, forged or mismatched choice; the page checks the question again.
+  if (QUESTION_LANGUAGE_CHOICE_REFUSALS.has(code)) return 409;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
+
+/** Question language (spec 2026-10-13): the refusals of the person's answer to an offer (reference.ts, decider.ts). */
+const QUESTION_LANGUAGE_CHOICE_REFUSALS: ReadonlySet<string> = new Set([
+  "QUESTION_LANGUAGE_CHECK_INVALID", "QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHOICE_MISMATCH"
+]);
 
 /**
  * I6 (re-review) — WHAT THE CALLER IS TOLD.
@@ -2541,6 +2558,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // Budget spec §2.7 (B6b): 422 with the waiting run and its expected start,
     // and nothing else. Every other refusal keeps the envelope below.
+    // Question language (spec 2026-10-13): a real mix ends the request with the offer; no run exists. The decider
+    // sends only an offer the contract accepts (PF-L19: one it refuses becomes the lock), so this parse holds.
+    if (knownError instanceof QuestionLanguageChoiceNeeded) {
+      return reply.status(409).send(QuestionLanguageChoiceNeededSchema.parse({
+        error: QUESTION_LANGUAGE_CHOICE_NEEDED, message: QUESTION_LANGUAGE_CHOICE_NEEDED, offer: knownError.offer
+      }));
+    }
     if (knownError instanceof AskAlreadyWaitingRefusal) {
       return reply.status(422).send(AskAlreadyWaitingSchema.parse({
         error: "ASK_ALREADY_WAITING",
@@ -4014,6 +4038,8 @@ export interface RunCreationSettings {
    * Absent: every ask's depth_params is today's `{ depth }` and every basis today's, byte for byte.
    */
   readonly debateShapePolicy?: DebateShapePolicy;
+  /** Question language (spec 2026-10-13): read only with `debateShapePolicy`; the first step of submit. */
+  readonly questionLanguage?: QuestionLanguagePort;
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
@@ -4642,6 +4668,19 @@ export class PostgresAskApplication implements AskApplication {
     // Debate shape (spec 2026-10-12 §3.2): every ask is normalised for its plan key before anything reads it, so the
     // stored depth_params is `{ depth }` exactly (no row) or all four settings (the row), never anything in between.
     const shapePolicy = this.settings.debateShapePolicy ?? null;
+    // Question language (spec 2026-10-13, ruling L8): with the shape row, the language is decided first — after the
+    // route's crisis, consent, team, admission and country checks, before billing, admission and any lock. A refusal
+    // of the person's choice is a 409 the page answers by checking again; an offer ends the request with a 409.
+    // Ruling L-NOCONSENT (pre-flight PF-L30): the route records consent only for signed-in people, so a legacy
+    // principal never reaches the fast AI (eld + site language, no offer). The step stays before billing (CR-1).
+    const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || this.settings.questionLanguage === undefined
+      ? null
+      : await this.settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
+        fastCheckAllowed: principal.kind === "server" })
+        .catch((error: unknown) => {
+          if (error instanceof TypedDomainError) markAskRefusal(error);
+          throw error;
+        });
     let shapePlan: DebateShapePlanKey = debateShapePlanKeyOf(null, requestedAsk.plan_tier);
     let ask: AskRequest = normaliseAskForDebateShape(requestedAsk, shapePolicy, shapePlan);
     let plannedAsk: AskRequest = ask;
@@ -4681,7 +4720,7 @@ export class PostgresAskApplication implements AskApplication {
     // the reply carries what the server applied (QUEUED or WAITING).
     if (this.settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, shapePlan, fundingBasis
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, shapePlan, questionLanguageLock, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -4692,7 +4731,7 @@ export class PostgresAskApplication implements AskApplication {
       ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
     try {
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock, shapePlan);
-    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const argumentLanguage = runLanguageOf(questionLanguageLock, ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
     // after that, and the run then exists with nothing to start it.
@@ -4728,7 +4767,8 @@ export class PostgresAskApplication implements AskApplication {
             decision_scope: ask.decision_scope,
             steering_presets: ask.steering_presets,
             steering_annotations: ask.steering_annotations,
-            critic_unavailable_cap: criticUnavailableCap
+            critic_unavailable_cap: criticUnavailableCap,
+            ...questionLanguageAskContractMember(questionLanguageLock)
           },
           batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
         },lease.client);
@@ -4910,13 +4950,14 @@ export class PostgresAskApplication implements AskApplication {
     room: AskRoomPort,
     substitutedAt: Date | null,
     shapePlan: DebateShapePlanKey,
+    questionLanguageLock: QuestionLanguageLock | null,
     fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
     const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
-    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const argumentLanguage = runLanguageOf(questionLanguageLock, ask.question_line);
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -4997,7 +5038,8 @@ export class PostgresAskApplication implements AskApplication {
               decision_scope: runAsk.decision_scope,
               steering_presets: runAsk.steering_presets,
               steering_annotations: runAsk.steering_annotations,
-              critic_unavailable_cap: evaluated.criticUnavailableCap
+              critic_unavailable_cap: evaluated.criticUnavailableCap,
+              ...questionLanguageAskContractMember(questionLanguageLock)
             },
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
           }, lease.client);
