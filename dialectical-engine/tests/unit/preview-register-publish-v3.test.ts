@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues } from '@debateai/register';
+import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 import {
@@ -211,6 +212,68 @@ describe('publish kit v3: composing from the current version', () => {
   });
 });
 
+describe('publish kit v3: the optional debateShapePolicy row and the sealed map hash (ruling L-KIT)', () => {
+  const policy = debateShapePolicyStartValues();
+  const MAP_HASH_KEY = 'mapContractHash';
+  /** No argument = the seventh parameter left out (its default); one argument = passed as the seventh. */
+  const v3 = async (...debateShape: [] | [unknown]) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON, undefined, undefined, null, ...debateShape)] as Row[];
+  const v2 = async (debateShape: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, debateShape as any)] as Row[];
+  const shapeRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY);
+  const edit = (rows: Row[], key: string, change: (value: any) => any) => rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical(change(JSON.parse(row.valueJsonText))) } : row);
+
+  it('passes the policy through to kit v2: the same row as v2 builds; off = the start values disabled; null or nothing = no row', async () => {
+    const given = await v3(policy);
+    expect(shapeRow(given)).toEqual(shapeRow(await v2(policy)));
+    expect(JSON.parse(shapeRow(given)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
+    expect(JSON.parse(shapeRow(await v3('off'))!.valueJsonText)).toEqual({ ...JSON.parse(JSON.stringify(policy)), enabled: false });
+    const absent = await v3();
+    expect(shapeRow(absent)).toBeUndefined();
+    expect(shapeRow(await v3(null))).toBeUndefined();
+    expect(await v3(null)).toEqual(absent);
+    expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
+    const bad = JSON.parse(JSON.stringify(policy));
+    bad.plans.free.mapAIs = 10;
+    await expect(v3(bad)).rejects.toThrow('DEBATE_SHAPE_POLICY_INVALID:plans.free.mapAIs');
+  });
+
+  it('the source always holds the sealed map hash, the code\'s own; a malformed one is refused when composing', async () => {
+    const f = await fixture();
+    for (const rows of [await v3(), await v3(policy), await v3('off')])
+      expect(rows.find(row => row.rowKey === MAP_HASH_KEY)!.valueJsonText).toBe(JSON.stringify(mapPromptContractHash()));
+    const malformed = edit(await v3(), MAP_HASH_KEY, () => 'not-a-hash');
+    expect(refusal(() => compose(malformed, f.v12))).toContain('MAP_CONTRACT_HASH_INVALID');
+  });
+
+  it('R19: a base row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
+    const f = await fixture();
+    const base = sorted([...await v2(policy), ...owned()]);
+    const plan = compose(await v3(), base);
+    expect(shapeRow(plan.rows as Row[])).toEqual(shapeRow(base));
+    expect(plan.delta.map(entry => entry.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
+    const source = await v3();
+    expect(refusal(() => compose(source, broken))).toContain('DEBATE_SHAPE_POLICY_INVALID');
+  });
+
+  it('asks the hosted runner\'s own boot refusals before anything is sealed: a foreign or missing map hash with a shape row', async () => {
+    const f = await fixture();
+    const rows = [...compose(await v3(policy), f.v12).rows] as Row[];
+    expect(shapeRow(rows)).toBeDefined();
+    expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
+    expect(refusal(() => assertHostedPreviewBootRows(edit(rows, MAP_HASH_KEY, () => 'e'.repeat(64)) as any))).toContain('MAP_CONTRACT_HASH_MISMATCH');
+    expect(refusal(() => assertHostedPreviewBootRows(rows.filter(row => row.rowKey !== MAP_HASH_KEY) as any))).toContain('DEBATE_SHAPE_MAP_HASH_UNSEALED');
+    // A disabled row still needs its sealed map hash (the runner finishes the shaped runs admitted before the switch).
+    const off = [...compose(await v3('off'), f.v12).rows] as Row[];
+    expect(refusal(() => assertHostedPreviewBootRows(off.filter(row => row.rowKey !== MAP_HASH_KEY) as any))).toContain('DEBATE_SHAPE_MAP_HASH_UNSEALED');
+    // No shape row = today's boot: the map hash row is never read.
+    const today = [...compose(await v3(), f.v12).rows] as Row[];
+    expect(() => assertHostedPreviewBootRows(today.filter(row => row.rowKey !== MAP_HASH_KEY) as any)).not.toThrow();
+    expect(() => assertHostedPreviewBootRows(edit(today, MAP_HASH_KEY, () => 'e'.repeat(64)) as any)).not.toThrow();
+  });
+});
+
 describe('the native operator chooses the kit by the plan', () => {
   const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
   const body = text.slice(text.indexOf('export async function runNativeOperator('));
@@ -218,7 +281,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {

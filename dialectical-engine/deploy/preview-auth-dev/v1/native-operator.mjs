@@ -128,7 +128,7 @@ export async function runNativeOperator() {
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null)
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null)
    :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);

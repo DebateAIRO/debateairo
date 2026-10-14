@@ -22,6 +22,10 @@
 // recomposed snapshot. On top, v3 asks of the composed rows the questions a hosted API asks at boot that need no
 // database (cost envelope and band, the room read's and the support budgets, the country gate's scope, billing
 // readiness and its four admission scopes, the story family and one day holding one run plus its story).
+// Debate shape (ruling L-KIT): the operator's optional debateShapePolicy row passes through to v2's builder (v2's
+// optional key, so v3's closure admits it); the sealed mapContractHash (a required v2 key) is parsed; a carried
+// debateShapePolicy row is parsed like v2 does; and when the composed rows hold the shape, the hosted runner's own
+// boot refusals (MAP_CONTRACT_HASH_MISMATCH, DEBATE_SHAPE_MAP_HASH_UNSEALED) are asked before anything is sealed.
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
@@ -32,9 +36,12 @@ import {
   billingPolicyFromValue, billingPlansFromValue, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue, COUNTRY_POLICY_ROW_KEY, readStoryPolicy,
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
-  type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
+  DEBATE_SHAPE_POLICY_ROW_KEY, parseDebateShapePolicy, MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash,
+  type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { costEnvelopeGuardPolicy } from '@debateai/budget';
+import { mapPromptContractHash } from '@debateai/map';
+import { resolveDebateShapeRunnerSettings } from '../../../apps/runner/src/debate-shape-boot.js';
 import { buildDevelopmentStoryRegisterRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet } from '../../../packages/providers/src/preview-models.js';
@@ -108,11 +115,12 @@ const withSuffix = (sourceRef:string,suffix:string) => {
 
 /**
  * v2's source build with the hosted story row and the owner's three rows. `hosted` is checked first (the owner's
- * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy).
+ * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy, debate shape).
+ * `debateShape` is v2's sixth argument, passed through (default null: no row; 'off': the start values disabled).
  */
-export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
   const choice=previewHostedBillingChoice(hosted);
-  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency);
+  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape);
   const byKey=new Map(local.map(row=>[row.rowKey,row]));
   // The hosted builder's story rows: every one but the money row must be v2's, so the hosted build differs by that row alone.
   const story=buildDevelopmentStoryRegisterRows({synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:previewCheckerRoleRef(checker)},'hosted')
@@ -241,6 +249,15 @@ export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow
   if(admission.billingNotify===null)fail('BILLING_ADMISSION_UNSEALED');
   if(policy.enabled&&country===null)fail('BILLING_CONFIGURATION_INCOMPLETE');
   if(policy.enabled&&(admission.billingQuote===null||admission.billingCheckout===null||admission.billingCancelLink===null))fail('BILLING_ADMISSION_UNSEALED');
+  // The hosted runner's own boot read (apps/runner/src/debate-shape-boot.ts): with a debateShapePolicy row (enabled or
+  // not), the sealed mapContractHash must be present and the code's, or it throws the runner's typed refusal. No shape
+  // row = today's boot: the map hash row is never read.
+  const shape=map.get(DEBATE_SHAPE_POLICY_ROW_KEY);
+  if(shape!==undefined){
+    const hash=map.get(MAP_CONTRACT_HASH_ROW_KEY);
+    resolveDebateShapeRunnerSettings({policy:parseDebateShapePolicy(JSON.parse(shape.valueJsonText)),
+      mapContractHash:hash===undefined?null:parseMapContractHash(JSON.parse(hash.valueJsonText)),codeMapContractHash:mapPromptContractHash()});
+  }
 }
 
 export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
@@ -256,7 +273,12 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
   if(!sourceKeysReviewedV3(source.map(row=>row.rowKey)))fail('source-key-list');
   const optional=PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 as readonly string[];
   const carried=base.filter(row=>optional.includes(row.rowKey)&&!sourceMap.has(row.rowKey));
-  for(const row of carried)if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+  for(const row of carried){
+    if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+    if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
+  }
+  // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
+  parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
   assertProviderRows(baseMap,'base');
