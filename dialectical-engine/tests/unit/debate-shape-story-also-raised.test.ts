@@ -19,6 +19,7 @@ import {
 /**
  * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's points that were raised but not debated
  * reach the storyteller as `also_raised`, in whatever the story budget leaves once the debate fits.
+ * Controller ruling C-ORDER: the models get each point's claim in order (most-raised first), never a count.
  */
 
 const SHAPES: ReadonlySet<string> = new Set(["general"]);
@@ -71,7 +72,7 @@ function snapshot(overrides: Partial<StoryRunSnapshot> = {}): StoryRunSnapshot {
     nodes: [
       node({ nodeId: "position:a", isPosition: true, claim: "The city should fund it.", finalStrength: 0.612345 }),
       node({ nodeId: "position:b", isPosition: true, claim: "The city should not fund it.", finalStrength: 0.4, authorModel: "model:beta" }),
-      node({ nodeId: "point:c", claim: "Fares cover running costs by year nine." }),
+      node({ nodeId: "point:c", claim: "Fares cover running costs by year nine.", authorModel: "model:gamma" }),
       node({ nodeId: "point:d", claim: "Construction overruns are common." })
     ],
     arrows: [
@@ -145,15 +146,19 @@ describe("debate shape P2c — also raised, not debated, in the story material",
       .toBe(JSON.stringify(toStoryPromptMaterial(plain.material, null)));
   });
 
-  it("sends also_raised after omitted, most-raised first, with only a claim and how many raised it", () => {
+  it("sends also_raised after omitted, most-raised first, with only each claim and never a count (C-ORDER)", () => {
     const result = built(build({ alsoRaised: ALSO_RAISED }));
     expect(toStoryPromptMaterial(result.material, null).map((entry) => entry.name)).toEqual([...CORE_FIELDS, "also_raised"]);
     expect(fieldOf(result, "also_raised") as StoryMaterialAlsoRaised[]).toEqual([
-      { claim: "Bus routes could be cut once the tram runs.", raised_by: 3 },
-      { claim: "Construction would close the main bridge for a year.", raised_by: 3 },
-      { claim: "Cycle lanes are a cheaper alternative.", raised_by: 2 },
-      { claim: "The tram would change property prices along the line.", raised_by: 1 }
+      { claim: "Bus routes could be cut once the tram runs." },
+      { claim: "Construction would close the main bridge for a year." },
+      { claim: "Cycle lanes are a cheaper alternative." },
+      { claim: "The tram would change property prices along the line." }
     ]);
+    // No count reaches the models: the field's JSON holds the claims and nothing else.
+    const field = toStoryPromptMaterial(result.material, null).find((entry) => entry.name === "also_raised");
+    expect(field?.content).not.toContain("raised_by");
+    expect(field?.content).not.toMatch(/[0-9]/u);
     // The checker reads the same material.
     const checker = toCheckerPromptMaterial(result.material, story()).map((entry) => entry.name);
     expect(checker).toContain("also_raised");
@@ -166,8 +171,20 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     const result = built(build({ alsoRaised: [{ claim: "   ", raisedBy: 5 }, { claim: "Odd count.", raisedBy: Number.NaN }, ...many] }));
     const items = fieldOf(result, "also_raised") as StoryMaterialAlsoRaised[];
     expect(items).toHaveLength(12);
-    expect(items.every((item) => item.claim.trim() !== "" && item.raised_by >= 1)).toBe(true);
-    expect(items[0]).toEqual({ claim: "Odd count.", raised_by: 1 });
+    expect(items.every((item) => item.claim.trim() !== "" && Object.keys(item).join() === "claim")).toBe(true);
+    expect(items[0]).toEqual({ claim: "Odd count." });
+  });
+
+  it("ranks a count above the panel as the panel, so a bad count cannot jump the queue", () => {
+    // The fixture's points have three distinct authors: a count of 99 ranks as 3, ties keep the map's order.
+    const result = built(build({ alsoRaised: [
+      { claim: "Every AI raised this one.", raisedBy: 3 },
+      { claim: "A count no map can produce.", raisedBy: 99 },
+      { claim: "Two raised this one.", raisedBy: 2 }
+    ] }));
+    expect(result.material.alsoRaised).toEqual([
+      { claim: "Every AI raised this one." }, { claim: "A count no map can produce." }, { claim: "Two raised this one." }
+    ]);
   });
 
   it("never moves the ladder: also-raised points only use the bytes the debate leaves free", () => {
@@ -178,10 +195,10 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     expect(tight.compressionStep).toBe(0);
     expect("alsoRaised" in tight.material).toBe(false);
     expect(tight.material.bytes).toBe(plain.material.bytes);
-    // 100 spare bytes: room for the most-raised point only (71 bytes of JSON), never for the second.
+    // 100 spare bytes: room for the most-raised point only (57 bytes of JSON), never for the second (122).
     const roomy = built(build({ alsoRaised: ALSO_RAISED }, plain.material.bytes + 100));
     expect(roomy.compressionStep).toBe(0);
-    expect(roomy.material.alsoRaised).toEqual([{ claim: "Bus routes could be cut once the tram runs.", raised_by: 3 }]);
+    expect(roomy.material.alsoRaised).toEqual([{ claim: "Bus routes could be cut once the tram runs." }]);
     expect(roomy.material.bytes).toBeLessThanOrEqual(plain.material.bytes + 100);
   });
 
@@ -205,12 +222,13 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     expect(seenSteps.has(5)).toBe(true);
   });
 
-  it("refuses the field's own keys in a story, as every underscore key of the material", () => {
+  it("refuses the field's own name in a story, as every underscore key of the material", () => {
     expect(STORY_ENGINE_TOKENS).toContain("also_raised");
-    expect(STORY_ENGINE_TOKENS).toContain("raised_by");
+    // C-ORDER: no count key is sent, so none is a material key either.
+    expect(STORY_ENGINE_TOKENS).not.toContain("raised_by");
     const result = built(build({ alsoRaised: ALSO_RAISED }));
     const body = story();
-    body.long.sections[2]!.paragraphs[0]!.text = "Two models gave it a raised_by of three.";
+    body.long.sections[2]!.paragraphs[0]!.text = "The points under also_raised were left out.";
     const refused = classifyStoryContent(JSON.stringify(body), result.index);
     expect(refused.parseStatus).toBe("SCHEMA_FAILED");
     expect(refused.parseError).toContain("STORY_TEXT_ENGINE_TOKEN");

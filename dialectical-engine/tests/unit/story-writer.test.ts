@@ -1122,7 +1122,7 @@ describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () 
     for (const call of calls) {
       const fields = readPromptFrame(call.packet).fields;
       expect(fields.find((field) => field.name === "also_raised")?.content)
-        .toBe(JSON.stringify([{ claim: "Ask the school about a mid-year move.", raised_by: 2 }]));
+        .toBe(JSON.stringify([{ claim: "Ask the school about a mid-year move." }]));
       expect(fields.find((field) => field.name === "answers_note")?.content)
         .toBe(JSON.stringify(STORY_ANSWERS_NOTE_ANSWERS_FILLED));
       const names = fields.map((field) => field.name);

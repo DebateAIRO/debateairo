@@ -51,8 +51,9 @@ export interface StorySnapshotArrow {
 
 /**
  * Debate shape P2c (spec 2026-10-12 §3.3 step 8): one map point that was raised but not
- * debated. `raisedBy` is how many different makers raised it. The claim is model text:
- * evidence, like every claim.
+ * debated. `raisedBy` is how many different makers raised it: it only ranks the points
+ * (most-raised first) and never reaches the models (controller ruling C-ORDER: no count
+ * the storyteller could repeat). The claim is model text: evidence, like every claim.
  */
 export interface StorySnapshotAlsoRaised {
   readonly claim: string;
@@ -187,10 +188,13 @@ export interface StoryMaterialOmitted {
   readonly attacks: number;
 }
 
-/** Debate shape P2c: a raised-but-not-debated point as the models read it. It has no reference. */
+/**
+ * Debate shape P2c: a raised-but-not-debated point as the models read it. It has no
+ * reference, and no count (controller ruling C-ORDER): the list's order alone says which
+ * came up most, so user text has no number of AIs to repeat.
+ */
 export interface StoryMaterialAlsoRaised {
   readonly claim: string;
-  readonly raised_by: number;
 }
 
 export interface StoryMaterialVerdict {
@@ -224,7 +228,10 @@ export interface StoryMaterial {
   readonly hinges: readonly string[];
   readonly setAside: readonly { readonly id: string; readonly reason: string }[];
   readonly omitted: readonly StoryMaterialOmitted[];
-  /** Debate shape P2c: present only when at least one also-raised point fitted the budget. */
+  /**
+   * Debate shape P2c: present only when at least one also-raised point fitted the budget.
+   * Most-raised first, ties in the map's order; the order is all the models learn of how often.
+   */
   readonly alsoRaised?: readonly StoryMaterialAlsoRaised[];
   /**
    * Debate shape P2c, owner ruling C-STORY: the sentence of the snapshot's `answersNote`.
@@ -263,7 +270,7 @@ const STORY_THRESHOLD_KEYS: StoryKeyList<StoryMaterialVerdict["thresholds"]> = {
 };
 const STORY_OMITTED_KEYS: StoryKeyList<StoryMaterialOmitted> = { position_ref: true, supports: true, attacks: true };
 const STORY_SET_ASIDE_KEYS: StoryKeyList<StoryMaterial["setAside"][number]> = { id: true, reason: true };
-const STORY_ALSO_RAISED_KEYS: StoryKeyList<StoryMaterialAlsoRaised> = { claim: true, raised_by: true };
+const STORY_ALSO_RAISED_KEYS: StoryKeyList<StoryMaterialAlsoRaised> = { claim: true };
 /** The fenced field names (`storyCoreFields`, plus the second draft's `prior_objection`). */
 const STORY_MATERIAL_FIELD_NAMES = Object.freeze([
   "question", "verdict", "served_statement", "positions", "points", "hinges", "set_aside", "omitted", "also_raised",
@@ -407,7 +414,8 @@ function storyEngineTokens(material: StoryMaterial): ReadonlySet<string> {
     material.question,
     ...material.positions.map((position) => position.claim),
     ...material.points.map((point) => point.claim),
-    // Debate shape P2c: a raised point is the person's side of the debate, as a claim is.
+    // Debate shape P2c: a raised point is the person's side of the debate, as a claim is. So, like a debated claim,
+    // an also-raised claim that uses an engine word as its own ("Open RAN") frees that word for the story (accepted).
     ...(material.alsoRaised ?? []).map((item) => item.claim)
   ].join("\n");
   return new Set(STORY_ENGINE_TOKENS.filter((token) =>
@@ -436,6 +444,8 @@ function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
     ...material.points.flatMap((point) => [
       point.claim, point.best_case ?? "", point.objection ?? "", ...(point.review_reasons ?? [])
     ]),
+    // Debate shape P2c: like a debated claim, an also-raised claim that states a figure frees that figure for the
+    // story even when it equals a score or threshold ("0,70 lei" against a 0.7 cut). Accepted: it is the person's side.
     ...(material.alsoRaised ?? []).map((item) => item.claim)
   ]);
   const texts = new Set<string>();
@@ -657,17 +667,23 @@ function storyFieldBytes(fields: readonly FramedMaterialField[]): number {
   return fields.reduce((total, field) => total + Buffer.byteLength(field.content, "utf8"), 0);
 }
 
-/** Debate shape P2c: non-blank points, most-raised first (ties keep the map's order), at most STORY_ALSO_RAISED_MAX. */
-function storyAlsoRaisedRanked(items: readonly StorySnapshotAlsoRaised[]): readonly StorySnapshotAlsoRaised[] {
+/**
+ * Debate shape P2c: non-blank points, most-raised first (ties keep the map's order), at most STORY_ALSO_RAISED_MAX.
+ * A count is ranking input only. It is read as a whole number from 1 up to `panelSize` (the distinct authors of the
+ * debate's points): a missing or bad count is one, and a count above the panel, which no real map can produce, ranks
+ * as the panel and cannot jump the points the whole panel raised.
+ */
+function storyAlsoRaisedRanked(items: readonly StorySnapshotAlsoRaised[], panelSize: number): readonly string[] {
   return items
     .map((item, order) => ({
-      item: { claim: item.claim.trim(), raisedBy: Number.isFinite(item.raisedBy) ? Math.max(1, Math.trunc(item.raisedBy)) : 1 },
+      claim: item.claim.trim(),
+      raisedBy: Number.isFinite(item.raisedBy) ? Math.min(panelSize, Math.max(1, Math.trunc(item.raisedBy))) : 1,
       order
     }))
-    .filter(({ item }) => item.claim !== "")
-    .sort((left, right) => right.item.raisedBy - left.item.raisedBy || left.order - right.order)
+    .filter((item) => item.claim !== "")
+    .sort((left, right) => right.raisedBy - left.raisedBy || left.order - right.order)
     .slice(0, STORY_ALSO_RAISED_MAX)
-    .map(({ item }) => item);
+    .map((item) => item.claim);
 }
 
 /**
@@ -678,16 +694,13 @@ function storyAlsoRaisedRanked(items: readonly StorySnapshotAlsoRaised[]): reado
  */
 function storyWithAlsoRaised(
   material: StoryMaterial,
-  ranked: readonly StorySnapshotAlsoRaised[],
+  ranked: readonly string[],
   claimChars: number | null,
   budgetBytes: number
 ): StoryMaterial {
   if (ranked.length === 0) return material;
   const limit = claimChars === null ? STORY_ALSO_RAISED_CLAIM_CHARS : Math.min(claimChars, STORY_ALSO_RAISED_CLAIM_CHARS);
-  const items = ranked.map((item): StoryMaterialAlsoRaised => Object.freeze({
-    claim: storyClip(item.claim, limit),
-    raised_by: item.raisedBy
-  }));
+  const items = ranked.map((claim): StoryMaterialAlsoRaised => Object.freeze({ claim: storyClip(claim, limit) }));
   for (let count = items.length; count > 0; count -= 1) {
     const kept = Object.freeze(items.slice(0, count));
     const bytes = material.bytes + Buffer.byteLength(JSON.stringify(kept), "utf8");
@@ -884,7 +897,9 @@ export function buildStoryMaterial(input: {
         .map((entry) => Object.freeze({ id: ref(entry.nodeId), reason: entry.reason }))),
       omitted: Object.freeze(omitted),
       // Owner ruling C-STORY: the answers note is the debate's own material at every ladder step, so it is never
-      // dropped and its bytes count like any core field's. Absent on every other run: today's bytes.
+      // dropped and its bytes count like any core field's. Absent on every other run: today's bytes. Accepted cost:
+      // at the very edge of its budget a fallback run can fit one ladder step later than it would without the note,
+      // or, at step 7, not fit at all (STORY_MATERIAL_TOO_LARGE). Only fallback runs ever carry it.
       ...(snapshot.answersNote === undefined ? {} : { answersNote: STORY_ANSWERS_NOTE_TEXT[snapshot.answersNote] })
     };
     return { material: Object.freeze({ ...core, bytes: storyFieldBytes(storyCoreFields(core)) }), visible };
@@ -893,7 +908,10 @@ export function buildStoryMaterial(input: {
   // The positions' references, strongest first: the order they were numbered and
   // listed in, and the order the checks read "the strongest `pathCap`" from.
   const positionOrder: readonly string[] = Object.freeze(positionNodes.map((node) => ref(node.nodeId)));
-  const alsoRaised = storyAlsoRaisedRanked(snapshot.alsoRaised ?? []);
+  // The panel, as the snapshot knows it: the distinct authors of its points (at least one).
+  const authors = new Set(snapshot.nodes.flatMap((node) => node.authorModel === null ? [] : [node.authorModel]));
+  const panelSize = Math.max(1, authors.size);
+  const alsoRaised = storyAlsoRaisedRanked(snapshot.alsoRaised ?? [], panelSize);
   let lastBytes = 0;
   for (const [step, shrink] of STORY_SHRINK_LADDER.entries()) {
     const fitted = materialAt(shrink);

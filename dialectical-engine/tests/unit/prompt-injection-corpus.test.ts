@@ -337,7 +337,12 @@ function digestWith(statement: string): SynthesisDigest {
 const STORY_PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 const STORY_SHAPE_IDS: ReadonlySet<string> = new Set(STORY_PACK.shapes.map((shape) => shape.id));
 
-function storyMaterialWith(input: { readonly question: string; readonly pointClaim: string }): StoryMaterial {
+function storyMaterialWith(input: {
+  readonly question: string;
+  readonly pointClaim: string;
+  /** Debate shape P2c: a map point another model wrote, raised but not debated. */
+  readonly alsoRaisedClaim?: string;
+}): StoryMaterial {
   const point = (nodeId: string, claim: string, isPosition: boolean) => ({
     nodeId, claim, isPosition, wayOfKnowing: "REASONING" as const, baseScore: 0.5, finalStrength: 0.5,
     excludedReason: null, authorModel: "model:fixture", panelDispersion: 0.1, criticSummary: null
@@ -363,7 +368,8 @@ function storyMaterialWith(input: { readonly question: string; readonly pointCla
     ],
     arrows: [{ sourceNodeId: "point:c", targetNodeId: "position:a", polarity: "support" }],
     sensitivity: [{ removedNodeId: "point:c", leverage: 0.2 }],
-    setAside: []
+    setAside: [],
+    ...(input.alsoRaisedClaim === undefined ? {} : { alsoRaised: [{ claim: input.alsoRaisedClaim, raisedBy: 1 }] })
   };
   const result = buildStoryMaterial({ snapshot, enrichment: new Map(), budgetBytes: 40_000, shapeIds: STORY_SHAPE_IDS });
   if (result.kind !== "OK") throw new Error("the corpus story material must fit the low budget");
@@ -687,6 +693,17 @@ const HAND_OFFS = [
     }).packet]
   },
   {
+    // Debate shape P2c: the map's raised-but-not-debated points reach the storyteller as their own field.
+    name: "story:storyteller (also_raised — a map point another model wrote)",
+    payloadIn: "also_raised",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: buildStorytellerContract(STORY_PACK),
+      material: toStoryPromptMaterial(
+        storyMaterialWith({ question: QUESTION, pointClaim: CLEAN_STATEMENT, alsoRaisedClaim: attack }), null
+      )
+    }).packet]
+  },
+  {
     name: "story:storyteller RETRY (prior_objection — the checker's own words)",
     payloadIn: "prior_objection",
     render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
@@ -776,12 +793,14 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // assigned_answer and map_points.
     // Question language (P2L Task 5): 24 -> 25, with the fast language check's question_line (a field name the judge
     // rows already use, so 19 distinct fields stay 19).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(25);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(19);
+    // Debate shape P2c Task 1: 25 -> 26 and 19 -> 20, with the storyteller's also_raised (a map point another model
+    // wrote, raised but not debated).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(26);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(20);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
-    expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(4);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(5);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
   });
 
