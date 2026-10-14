@@ -953,6 +953,36 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(transcript.run.registerVersion).toBe("6");
   }, 900_000);
 
+  it("hosted: --register-next --hosted-billing --shape-policy (the merge of #165): kit v3's next version carries the row, the hosted runner and ask run the new shape and lock the language: PASS (exit 0)", async () => {
+    // Controller ruling D-REGNEXT in hosted mode: the policy reaches kit v3's own source build (as the plan's
+    // --debate-shape), and both hosted compositions read the row, its map hash and the question-language decider as the
+    // two main.ts files do.
+    const before = exportDigest();
+    const { stubs, env, common, quiet } = await scenario();
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
+      hostedBilling, "--depth", "1", "--shape-policy", SHAPE_POLICY_START], env, quiet);
+    const report = outcome.report as unknown as ShapeReport & {
+      register: { codeNext: { composer?: string } }; deployment?: { mode: string; room: boolean; billingInPractice: string } };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { composer: "preview-register-composer-v3" } });
+    expect(report.register.codeNext!.addedKeys).toEqual(expect.arrayContaining([DEBATE_SHAPE_POLICY_ROW_KEY, "storyCostEnvelopePolicy"]));
+    expect(report.deployment).toMatchObject({ mode: "hosted", room: true, billingInPractice: "off" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    expect(report.shape).toMatchObject({ source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", notExercised: null,
+      sizes: { plan: "premium", mapAIs: 5, opening: "ANGLE_MAP" } });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+  }, 900_000);
+
   // Final review M-5: the one-language offer and its answer, through the real decider and the ask's own resubmission
   // (the signed check reference, the owner's scope). The fast check reads lang-ro-en-mix as a real mix with a usable
   // rewrite (the dry script's reading); every other request is the doubles' own.
