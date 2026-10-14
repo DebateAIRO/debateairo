@@ -341,8 +341,9 @@ export type PracticeLanguageNotRun = Readonly<{ id: string; code: string }>;
 
 /**
  * One case against the pass bar (P2L amendment P2d-4). A lock from a fallback (the fast check down) proves nothing
- * about the check: NOT_PROVEN, whatever the lock. Else a wrong lock, or a real mix with no offer, is FAIL; the
- * no-offer reason carries the decider's record code, which says why (pre-flight PF-D22). The planner never counts.
+ * about the check: NOT_PROVEN, whatever the lock. Else a wrong lock, a real mix with no offer, or an offer on a case
+ * that must not get one (ruling D-NOOFFER), is FAIL; the no-offer reason carries the decider's record code, which says
+ * why (pre-flight PF-D22). The planner never counts.
  */
 export function practiceLanguageCaseVerdict(record: PracticeLanguageCaseRecord): Readonly<{ verdict: "PASS" | "FAIL" | "NOT_PROVEN"; reasons: readonly string[] }> {
   if (record.lockSource === "FALLBACK_ELD" || record.lockSource === "FALLBACK_SITE") {
@@ -350,7 +351,10 @@ export function practiceLanguageCaseVerdict(record: PracticeLanguageCaseRecord):
   }
   const reasons = [
     ...(record.lock === record.expected.lock ? [] : [`LANGUAGE_WRONG_LOCK:${record.id}`]),
-    ...(record.expected.offer && !record.offered ? [`LANGUAGE_MIX_NOT_OFFERED:${record.id}:${record.recordCode}`] : [])
+    ...(record.expected.offer && !record.offered ? [`LANGUAGE_MIX_NOT_OFFERED:${record.id}:${record.recordCode}`] : []),
+    // Controller ruling D-NOOFFER: a rewrite offered where the case table says none is due (borrowed words never make a
+    // mix, spec L4/L5) would pop up on the site for every such question: FAIL, whatever the lock.
+    ...(!record.expected.offer && record.offered ? [`LANGUAGE_UNEXPECTED_OFFER:${record.id}`] : [])
   ];
   return Object.freeze({ verdict: reasons.length === 0 ? "PASS" : "FAIL", reasons: Object.freeze(reasons) });
 }

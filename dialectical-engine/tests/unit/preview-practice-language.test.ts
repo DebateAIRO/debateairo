@@ -214,6 +214,18 @@ describe("practice language: the verdict (P2L amendment P2d-4, on the practice's
     expect(practiceLanguageVerdict([settled], [])).toEqual({ verdict: "FAIL", exitCode: 20, reasons: ["LANGUAGE_MIX_NOT_OFFERED:de-mix-settled:ELD_SITE"] });
   });
 
+  it("a rewrite offered on a case that must not get one is FAIL (controller ruling D-NOOFFER: borrowed words never count, spec L4/L5)", () => {
+    // The fast check reads the borrowed "startup" and "AI" as a real mix, with a usable rewrite: the lock is right (ro),
+    // but the person would see the pop-up, which the case table says must not happen.
+    const borrowed = recordOf(caseOf("lang-ro-borrowed"), unsure, { kind: "MIX", main: RO, seen: [RO, EN],
+      proposed: "Merită să lucrez la o firmă nouă de inteligență artificială în loc de o corporație?" });
+    expect(borrowed).toMatchObject({ lock: "ro", lockSource: "OFFER", offered: true, expected: { lock: "ro", offer: false } });
+    expect(practiceLanguageVerdict([borrowed], [])).toEqual({ verdict: "FAIL", exitCode: 20, reasons: ["LANGUAGE_UNEXPECTED_OFFER:lang-ro-borrowed"] });
+    // The case's own expected reading (one language) still passes.
+    expect(practiceLanguageVerdict([recordOf(caseOf("lang-ro-borrowed"), unsure, expectedReading(caseOf("lang-ro-borrowed")))], []))
+      .toEqual({ verdict: "PASS", exitCode: 0, reasons: [] });
+  });
+
   it("a fast check that was down makes the case NOT_PROVEN, even with the right lock", () => {
     const down = recordOf(caseOf("lang-ro-plain"), unsure, { kind: "DOWN", reason: "TIMEOUT" });
     expect(down).toMatchObject({ lock: "ro", lockSource: "FALLBACK_SITE" });

@@ -342,6 +342,9 @@ With the new shape on, the site fixes the language of each question before the d
 The verdict:
 
 - FAIL: a question locked to the wrong language, or the mixed question not offered a rewrite.
+- FAIL: a rewrite offered on a question whose "Offer the rewrite" is "no" (`LANGUAGE_UNEXPECTED_OFFER`), even when
+  the language is right. For example `lang-ro-borrowed`: borrowed words such as "startup" or "AI" never make a
+  question mixed, so the site must not show the pop-up for it.
 - NOT_PROVEN: the fast AI did not answer, so the language came from a fallback. Run it again later.
 - PASS otherwise. Then the owners read each rewrite in `report.md`, where it stands beside the question, and decide
   whether it keeps the meaning.
