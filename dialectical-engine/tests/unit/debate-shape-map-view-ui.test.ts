@@ -81,13 +81,13 @@ describe("debate shape P2c — positionTitlesFrom", () => {
     const qwen = previewModel(/qwen/iu);
     const unknown = "acme-lab/acme-7b-chat";
     // A preview model: its maker's display name, even when the recorded maker is not a plain name.
-    expect(positionAiName({ maker: "provider:zai", model_id: glm }, ENGLISH_TITLE)).toBe("Z.AI");
+    expect(positionAiName({ maker: "provider:zai", model_id: glm })).toBe("Z.AI");
     // Qwen: its maker's name, never "Qwen (local)" from the interface's compose words.
-    expect(positionAiName({ maker: "Alibaba", model_id: qwen }, ENGLISH_TITLE)).toBe("Alibaba");
+    expect(positionAiName({ maker: "Alibaba", model_id: qwen })).toBe("Alibaba");
     // A model the UI does not know: the recorded maker when it is a plain name, else nothing.
-    expect(positionAiName({ maker: "Acme", model_id: unknown }, ENGLISH_TITLE)).toBe("Acme");
-    expect(positionAiName({ maker: "provider:acme", model_id: unknown }, ENGLISH_TITLE)).toBeNull();
-    expect(positionAiName({ maker: unknown, model_id: unknown }, ENGLISH_TITLE)).toBeNull();
+    expect(positionAiName({ maker: "Acme", model_id: unknown })).toBe("Acme");
+    expect(positionAiName({ maker: "provider:acme", model_id: unknown })).toBeNull();
+    expect(positionAiName({ maker: unknown, model_id: unknown })).toBeNull();
 
     const glmNode: PositionTitleNode = { node_id: "n-glm", maker_lineage: { maker: "Z.AI", model_id: glm } };
     const qwenNode: PositionTitleNode = { node_id: "n-qwen", maker_lineage: { maker: "Alibaba", model_id: qwen } };

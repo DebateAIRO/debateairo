@@ -1,5 +1,5 @@
 import { ContractHttpError, type Answer, type ContractClient, type DebateMapView } from "@debateai/contract";
-import { modelMeta } from "../models.js";
+import { modelKey } from "../models.js";
 import { PREVIEW_MODEL_MAKERS } from "../previewPlanRoster.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 
@@ -29,8 +29,14 @@ export type PositionTitleLineage = Readonly<{ maker: string; model_id: string }>
 /** The two members of an answer's (owner) or a snapshot's (public) node a title needs. */
 export type PositionTitleNode = Readonly<{ node_id: string; maker_lineage: PositionTitleLineage | null }>;
 
-/** The model families whose `modelMeta` name is a plain family name in every language ("GPT", "Claude"). */
-const PLAIN_FAMILIES: ReadonlySet<string> = new Set(["claude", "gpt", "gemini", "grok"]);
+/**
+ * The model families named by a plain family name in every language, by their `modelKey`: the
+ * names `modelMeta` gives them. Read here by key, so no catalogue is involved (`modelMeta` reads
+ * the interface's compose words, which a title in the question's language must not use).
+ */
+const PLAIN_FAMILY_NAMES: ReadonlyMap<string, string> = new Map([
+  ["claude", "Claude"], ["gpt", "GPT"], ["gemini", "Gemini"], ["grok", "Grok"]
+]);
 
 /** A recorded maker that reads as a display name: no id, path or code characters. */
 const PLAIN_MAKER_NAME = /^[\p{L}\p{N}][\p{L}\p{N} .&'-]{0,39}$/u;
@@ -46,13 +52,11 @@ const ANSWER_CLOSE = /[\s.!?。！？؟]+$/u;
  *    give the raw id, or "{name} (local)" in the interface's language, not the question's.
  * 3. The node's recorded maker, when it is a plain display name ("OpenAI").
  * 4. Otherwise null: the position gets no title.
- * `catalog` is the question's catalogue, handed to `modelMeta` so no call falls back to the
- * interface's English; the family names rule 1 returns read the same in every language.
  */
-export function positionAiName(lineage: PositionTitleLineage, catalog: MessageCatalog): string | null {
+export function positionAiName(lineage: PositionTitleLineage): string | null {
   const modelId = lineage.model_id;
-  const meta = modelMeta(modelId, catalog);
-  if (PLAIN_FAMILIES.has(meta.key) && !modelId.toLowerCase().includes("local")) return meta.name;
+  const family = PLAIN_FAMILY_NAMES.get(modelKey(modelId));
+  if (family !== undefined && !modelId.toLowerCase().includes("local")) return family;
   const previewMaker = Object.hasOwn(PREVIEW_MODEL_MAKERS, modelId) ? PREVIEW_MODEL_MAKERS[modelId] : undefined;
   if (previewMaker !== undefined) return previewMaker;
   const maker = lineage.maker.trim();
@@ -78,7 +82,7 @@ export function positionTitlesFrom(
   for (const position of view.positions) {
     const lineage = byId.get(position.node_id)?.maker_lineage ?? null;
     if (lineage === null) continue;
-    const ai = positionAiName(lineage, storyCatalog);
+    const ai = positionAiName(lineage);
     const answer = position.answer.trim().replace(ANSWER_CLOSE, "");
     if (ai === null || answer === "") continue;
     titles.set(position.node_id, t(storyCatalog, "public.positionTitle", { answer, ai }));
