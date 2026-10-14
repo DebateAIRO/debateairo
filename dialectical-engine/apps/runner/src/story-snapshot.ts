@@ -62,6 +62,11 @@ export interface StorySnapshotSource {
   readonly questionLine: string;
   /** The question's language the run recorded (its frozen head's tag and English name), or null. */
   readonly argumentLanguage: { readonly tag: string; readonly name: string } | null;
+  /**
+   * Question-language spec 2026-10-13: true only when the run's shape receipt says the language was locked, so the
+   * story writes in that lock; the caller decides by the receipt, never by the stored tag. Absent: today's story.
+   */
+  readonly languageLocked?: boolean;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
@@ -275,6 +280,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     resolveProvider: source.resolveProvider,
     stepLease: source.stepLease,
     costFallback: source.costFallback,
-    ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers })
+    ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers }),
+    ...(source.languageLocked === true ? { languageLocked: true as const } : {})
   });
 }

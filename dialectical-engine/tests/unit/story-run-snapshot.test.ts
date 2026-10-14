@@ -143,6 +143,13 @@ describe("buildStoryRunSnapshot", () => {
     expect(buildStoryRunSnapshot({ ...source(), argumentLanguage: null }).argumentLanguage).toBeNull();
   });
 
+  it("marks the language as the run's lock only when the caller says so (question-language spec 2026-10-13)", () => {
+    expect(buildStoryRunSnapshot({ ...source(), languageLocked: true }).languageLocked).toBe(true);
+    // Today's run: no member at all, so the writer builds today's bytes.
+    expect(Object.hasOwn(buildStoryRunSnapshot(source()), "languageLocked")).toBe(false);
+    expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), languageLocked: false }), "languageLocked")).toBe(false);
+  });
+
   it("drops an arrow onto an edge to a null target", () => {
     expect(buildStoryRunSnapshot(source()).arrows).toEqual([
       { sourceNodeId: CHILD, targetNodeId: ROOT, polarity: "attack" },

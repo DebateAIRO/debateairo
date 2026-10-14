@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, questionLanguageSentence, type QuestionLanguage } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { assembleStorytellerInstruction, type StoryPack } from "./pack.js";
 
@@ -129,14 +129,23 @@ export function buildStoryCheckerContract(pack: StoryPack): PromptContract {
  * the storyteller's instruction ends inside the last shape's guidance, and the
  * directive must not read as part of that shape. A run with no language on
  * record gets the directive's own fallback, "the same language as the question".
+ *
+ * Question-language spec 2026-10-13: on a shape run the caller (the writer, told by the runner's shape receipt)
+ * passes the run's locked language, and the ONE named sentence (`questionLanguageSentence`) takes the directive's
+ * place, after the same blank line. Without a lock (null or absent) this is today's contract, byte for byte. The
+ * sentence is code, never sealed text: it enters the per-call `storyContractHash`, as today's directive does.
  */
 export function storyContractInArgumentLanguage(
   contract: PromptContract,
-  argumentLanguageName: string | null
+  argumentLanguageName: string | null,
+  questionLanguage?: QuestionLanguage | null
 ): PromptContract {
+  const languageLine = questionLanguage === null || questionLanguage === undefined
+    ? argumentLanguageDirective(argumentLanguageName ?? "")
+    : questionLanguageSentence(questionLanguage);
   return Object.freeze({
     ...contract,
-    instruction: `${contract.instruction}\n\n${argumentLanguageDirective(argumentLanguageName ?? "")}`
+    instruction: `${contract.instruction}\n\n${languageLine}`
   });
 }
 

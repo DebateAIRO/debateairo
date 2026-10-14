@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError, argumentLanguageDirective } from "@debateai/kernel";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -414,6 +414,121 @@ describe("StoryWriter — the question's language (R1)", () => {
     const { writer, inserted } = harness(providing(provider));
     await writer.writeAfterSettle({ ...SNAPSHOT, argumentLanguage: { tag: "x".repeat(36), name: "Romanian" } });
     expect(inserted[0]).toMatchObject({ outcome: "READY", languageTag: null });
+  });
+});
+
+describe("StoryWriter — the locked language on a shape run (question-language spec 2026-10-13)", () => {
+  const RO_LOCK = Object.freeze({ code: "ro", name: "Romanian" });
+  // Plain Romanian without diacritics: the lock, never a re-guess of this line, decides the reply's language.
+  const LOCKED: StoryWriteInput = Object.freeze<StoryWriteInput>({
+    ...SNAPSHOT,
+    questionLine: "Ar trebui echipa sa adopte saptamana de lucru de patru zile?",
+    argumentLanguage: { tag: "ro", name: "Romanian" },
+    languageLocked: true
+  });
+  const systemOf = (packet: ProviderCallRequest["packet"]): string[] =>
+    packet.messages.filter((message) => message.role === "system").map((message) => message.content);
+
+  interface StoryTexts {
+    readonly headline: string; readonly summary: string; readonly confidence: string; readonly line: string;
+    readonly change: string; readonly reason: string; readonly titles: readonly string[]; readonly paragraph: string;
+  }
+  const storyIn = (texts: StoryTexts): string => JSON.stringify({
+    shape_id: PACK.defaultShape,
+    short: {
+      headline: texts.headline,
+      summary: texts.summary,
+      confidence: texts.confidence,
+      paths: [{ position_ref: "P1", fate: "HELD_UP", line: texts.line, node_refs: ["P1", "P2"] }],
+      change: { text: texts.change, node_refs: ["P1"] }
+    },
+    why: { reasons: [{ text: texts.reason, node_refs: ["P2"] }] },
+    long: { sections: texts.titles.map((title) => ({ title, paragraphs: [{ text: texts.paragraph, node_refs: ["P1"] }] })) },
+    reviewer_note: null
+  });
+  const ROMANIAN_STORY = storyIn({
+    headline: "Săptămâna de patru zile a rezistat, cu o singură întrebare deschisă.",
+    summary: "Ai întrebat dacă echipa ar trebui să adopte săptămâna de patru zile; dezbaterea spune că da, dar costurile nu sunt încă lămurite.",
+    confidence: "Destul de siguri, atâta timp cât costurile cu salariile rămân la fel.",
+    line: "Adoptarea ei a rezistat în fața obiecțiilor și a rămas cea mai bună cale.",
+    change: "Cifre care arată o creștere a costurilor cu salariile ar schimba răspunsul.",
+    reason: "Obiecția despre costuri (P2) nu a adus nicio cifră și nu a fost susținută de nimeni.",
+    titles: ["Cum am citit întrebarea", "Ce spune dezbaterea", "Ce ar schimba răspunsul"],
+    paragraph: "Dezbaterea a arătat că săptămâna de patru zile este o idee bună pentru echipă și că nu are costuri mari."
+  });
+  const FRENCH_STORY = storyIn({
+    headline: "La semaine de quatre jours a tenu, avec une seule question ouverte.",
+    summary: "Vous avez demandé si l'équipe devait adopter la semaine de quatre jours ; le débat dit oui, mais les coûts ne sont pas encore clairs.",
+    confidence: "Assez sûrs, tant que les coûts de la paie restent les mêmes.",
+    line: "Son adoption a tenu face aux objections et reste la meilleure voie.",
+    change: "Des chiffres montrant une hausse des coûts de la paie changeraient la réponse.",
+    reason: "L'objection sur les coûts (P2) n'a donné aucun chiffre et n'a été soutenue par personne.",
+    titles: ["Notre lecture de la question", "Ce que dit le débat", "Ce qui changerait la réponse"],
+    paragraph: "Le débat a montré que la semaine de quatre jours est une bonne idée pour l'équipe et qu'elle ne coûte pas cher."
+  });
+  const FRENCH_OBJECTION = JSON.stringify({
+    ...(JSON.parse(CHECKER_OBJECTS) as Record<string, unknown>),
+    objection: "Le résumé exagère la conclusion du débat et ne dit pas que les coûts de la paie restent une question ouverte; voir P2."
+  });
+  const lockedByContract = (request: ProviderCallRequest): string => isStoryteller(request) ? ROMANIAN_STORY : CHECKER_SATISFIED;
+
+  it("sends the one named sentence in the one system message and question_language as the last material field", async () => {
+    const { provider, calls } = scripted(lockedByContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(LOCKED);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", languageTag: "ro" });
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(systemOf(call.packet)).toHaveLength(1);
+      expect(call.packet.messages[0]?.content).toContain(questionLanguageSentence(RO_LOCK));
+      expect(call.packet.messages[0]?.content).not.toContain(argumentLanguageDirective("Romanian"));
+      const fields = readPromptFrame(call.packet).fields;
+      expect(fields.at(-1)).toEqual({ name: "question_language", content: JSON.stringify(RO_LOCK) });
+      expect(fields.filter((field) => field.name === "question_language")).toHaveLength(1);
+    }
+    expect(readPromptFrame(calls[0]!.packet).contractId).toBe(STORYTELLER_CONTRACT_ID);
+    // The per-call hash is of the contract actually sent, the named sentence included (recorded, not sealed).
+    expect(calls[0]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK), "Romanian", RO_LOCK))
+    );
+    expect(calls[1]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK), "Romanian", RO_LOCK))
+    );
+  });
+
+  it("refuses a French story and a French objection under TEXT_NOT_IN_QUESTION_LANGUAGE, against the lock", async () => {
+    const { provider, calls } = scripted(lockedByContract);
+    const { writer } = harness(providing(provider));
+    await writer.writeAfterSettle(LOCKED);
+    const storyteller = calls[0]!.classifyContent!(FRENCH_STORY);
+    expect(storyteller.parseStatus).toBe("SCHEMA_FAILED");
+    expect(storyteller.parseError).toContain(TEXT_NOT_IN_QUESTION_LANGUAGE);
+    expect(calls[0]!.classifyContent!(ROMANIAN_STORY).parseStatus).toBe("PARSED");
+    const checker = calls[1]!.classifyContent!(FRENCH_OBJECTION);
+    expect(checker.parseStatus).toBe("SCHEMA_FAILED");
+    expect(checker.parseError).toContain(TEXT_NOT_IN_QUESTION_LANGUAGE);
+  });
+
+  it("a storyteller that only ever answers in French ends FAILED/STORY_WRITE_REJECTED", async () => {
+    const { provider } = scripted((request) => isStoryteller(request) ? FRENCH_STORY : CHECKER_SATISFIED);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(LOCKED);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", languageTag: "ro" });
+  });
+
+  it("control: the same run without the lock keeps today's directive, today's material and today's hash", async () => {
+    const { provider, calls } = scripted(lockedByContract);
+    const { writer } = harness(providing(provider));
+    const { languageLocked: _dropped, ...unlocked } = LOCKED;
+    await writer.writeAfterSettle(unlocked);
+    for (const call of calls) {
+      expect(call.packet.messages[0]?.content).toContain(argumentLanguageDirective("Romanian"));
+      expect(call.packet.messages[0]?.content).not.toContain(questionLanguageSentence(RO_LOCK));
+      expect(readPromptFrame(call.packet).fields.map((field) => field.name)).not.toContain("question_language");
+    }
+    expect(calls[0]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK), "Romanian"))
+    );
   });
 });
 

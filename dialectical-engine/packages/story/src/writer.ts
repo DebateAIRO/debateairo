@@ -1,7 +1,7 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError, replyLanguageCheck } from "@debateai/kernel";
+import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -162,6 +162,12 @@ export type StoryWriteInput = StoryRunSnapshot & {
   readonly costFallback?: StoryCostFallback;
   /** P4-D: the run's own story roles (`StoryRunRoleMakers`); absent on every other run. */
   readonly roleMakers?: StoryRunRoleMakers;
+  /**
+   * Question-language spec 2026-10-13: set by the runner only when the run's shape receipt says the language was
+   * locked; then `argumentLanguage` {tag, name} IS the lock (one named sentence, a last `question_language` material
+   * field, replies checked against it). Absent on every other run: today's story bytes.
+   */
+  readonly languageLocked?: true;
 };
 
 /**
@@ -523,9 +529,15 @@ export class StoryWriter {
 
     // Both prompts carry dev's argument-language directive (spec §14.1), so the
     // story and the checker's objection come out in the question's language.
+    // Question-language spec 2026-10-13: on a locked (shape) run, the run's language is the lock — its one named
+    // sentence, a last `question_language` field and the locked reply check. A stored pair the kernel would not
+    // have locked reads back as no lock: today's directive and today's check.
     const languageName = input.argumentLanguage?.name ?? null;
-    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack), languageName);
-    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack), languageName);
+    const lock = input.languageLocked === true && input.argumentLanguage !== null
+      ? questionLanguageFromRun(input.argumentLanguage.tag, input.argumentLanguage.name)
+      : null;
+    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack), languageName, lock);
+    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
     /**
@@ -556,8 +568,8 @@ export class StoryWriter {
      */
     const repairedRounds = new Set<number>();
     // Reply language (2026-10-12): each draft and each objection is checked against the question's language.
-    const storyInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_BODY_PROSE);
-    const checkerInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_CHECKER_PROSE);
+    const storyInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_BODY_PROSE);
+    const checkerInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_CHECKER_PROSE);
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
         const reading = rememberingAcceptedReply((content, reply) =>
@@ -570,7 +582,7 @@ export class StoryWriter {
           bound: policy.storytellerBound,
           contract: storytellerContract,
           contractHash: storytellerHash,
-          material: toStoryPromptMaterial(built.material, priorObjection),
+          material: withQuestionLanguageField(toStoryPromptMaterial(built.material, priorObjection), lock),
           classifyContent: reading.classifyContent
         });
         // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
@@ -606,7 +618,7 @@ export class StoryWriter {
           bound: policy.checkerBound,
           contract: checkerContract,
           contractHash: checkerHash,
-          material: toCheckerPromptMaterial(built.material, candidate),
+          material: withQuestionLanguageField(toCheckerPromptMaterial(built.material, candidate), lock),
           classifyContent: reading.classifyContent
         });
         // Task M7: the planned checker is always asked first; a fallback checker
