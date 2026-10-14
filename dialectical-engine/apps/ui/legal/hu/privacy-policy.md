@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.3 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.4 · HATÁLYOS 2026. OKTÓBER 12.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
-endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.3
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Az Adatvédelmi szabályzat szövege
 annexTitle: B. melléklet — Regionális adatvédelmi feltételek
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 3.3 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást.
 
@@ -183,7 +183,7 @@ A Dialectical Engine 20 elemet használ, amelyek mind feltétlenül szükségese
 | `__Host-debateai-session` | Süti (HttpOnly) | Bejelentkezve tartja Önt. A szolgáltatás használata közben folyamatosan megújul. | 14 nap |
 | `__Host-debateai-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | 14 nap |
 | `__Host-debateai-age-refusal` | Süti (HttpOnly) | Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. | 30 nap |
-| `debateai.locale` | Süti | Megjegyzi, milyen nyelvű felületet választott. | 1 év |
+| `debateai.locale` | Süti | Megjegyzi, milyen nyelvű felületet választott, és azt is, milyen nyelven írjuk az Önnek küldött e-maileket. | 1 év |
 | `__Host-debateai-staff` | Süti (HttpOnly) | Külön munkatársi hozzáférés | Legfeljebb 8 óra; 15 perc inaktivitás |
 | `__Host-debateai-staff-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | Legfeljebb 8 óra; 15 perc inaktivitás |
 | `__Host-debateai-password-reset` | Süti (HttpOnly) | Csak jelszó-visszaállítás | Legfeljebb 30 perc |
@@ -201,6 +201,8 @@ A Dialectical Engine 20 elemet használ, amelyek mind feltétlenül szükségese
 | `debateai.exportPending` | Munkamenet-tárhely | Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. | A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig |
 | `debateai.exportLinkOutcome` | Munkamenet-tárhely | Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. | A lap bezárásáig, kijelentkezésig vagy új hivatkozásig |
 
+Minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük.
+
 Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően.
 
 A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A Dialectical Engine nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik.
@@ -211,7 +213,7 @@ Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban t
 
 Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot.
 
-Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.3-as verzió a 3.2-s verzió helyébe lépett: csak az általunk kiszolgált régiókra vonatkozik, megnevezi vállalatunkat, az 5. szakaszban pedig tárhelyszolgáltatónkat, tartalomkézbesítési és e-mail-szolgáltatónkat, továbbá leírja a Cloudflare robotellenőrzését.
+Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.4-es verzió a 3.3-as verzió helyébe lépett: a 13. szakasz most úgy rendelkezik, hogy a debateai.locale süti az Önnek küldött e-mailek nyelvét is beállítja, és új bekezdést tartalmaz, amely szerint minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük.
 
 ## Annex B — Regionális adatvédelmi feltételek
 

@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Efter en nekad ålderskontroll hindrar den den här webbläsaren från att försöka igen i 30 dagar. Den innehåller bara ordet ”nekad”, inga personuppgifter.",
   "legal.cookies.ageRefusal.life": "30 dagar",
   "legal.cookies.locale.kind": "Kaka",
-  "legal.cookies.locale.purpose": "Kommer ihåg vilket gränssnittsspråk du har valt.",
+  "legal.cookies.locale.purpose": "Kommer ihåg vilket gränssnittsspråk du har valt och anger språket för de e-postmeddelanden vi skickar dig.",
   "legal.cookies.locale.life": "1 år",
   "legal.cookies.storageTitle": "Lagras i din webbläsare, inte i en cookie",
   "legal.cookies.storageIntro": "Fyra poster sparas i webbläsarens lagring: två i lokal lagring, tills du rensar dem, och två i sessionslagring, tills du stänger fliken. Till skillnad från cookies skickas de inte med dina förfrågningar; hjälpchattens post innehåller en kopia av ett samtal du har haft med Dialectical Engine:s hjälp, och dess meddelanden nådde Dialectical Engine när du skickade dem.",

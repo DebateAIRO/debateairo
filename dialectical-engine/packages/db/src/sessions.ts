@@ -6,6 +6,7 @@ import {
 } from "@debateai/crypto";
 import { guardedAuthorityQuery } from "./staff-access.js";
 import type { AuthSourceContext } from "./identity.js";
+import { withMailLocale } from "./mail-locale.js";
 
 export interface LoginIdentityRecord {
   readonly userId: string;
@@ -324,7 +325,10 @@ export class PostgresSessionRepository {
     recoveryCodeHash?:string;
   }>): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
-    return this.transaction(async (client) => {
+    // C07.5 (R-11, R-14, D-56): both branches write a RECOVERY_CODE_USED row, so the request's mail language is set in the
+    // same transaction, on the same connection, before the audit attempt is begun and the write runs.
+    return withMailLocale(this.pool, input.source.mailLocale ?? "en", async (client) => {
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
       if(input.challenge.firstStep==='PROVIDER') {
         const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
           challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,

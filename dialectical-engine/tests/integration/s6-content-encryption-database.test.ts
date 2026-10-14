@@ -2559,6 +2559,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     try {
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_erasure_runtime");
+      await roleClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       const first = await roleClient.query<{
         erasure_id:string|null;status:string;execute_at:Date;cancellation_ref:string;
       }>(
@@ -2605,6 +2606,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         [scheduledUserId,scheduledOwnerRef,siblingSessionId,
           first.rows[0]!.cancellation_ref]
       )).rows[0]?.cancelled).toBe(false);
+      await roleClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       expect((await roleClient.query<{ cancelled: boolean }>(
         "SELECT identity.cancel_current_account_erasure($1,$2,$3,$4) AS cancelled",
         [scheduledUserId,scheduledOwnerRef,schedulingSessionId,
@@ -2630,6 +2632,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       );
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_erasure_runtime");
+      await roleClient.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       const second=await roleClient.query<{
         erasure_id:string; cancellation_ref:string;
       }>("SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",[

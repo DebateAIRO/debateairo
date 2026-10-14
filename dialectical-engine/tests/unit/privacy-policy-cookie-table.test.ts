@@ -5,8 +5,9 @@ import { LEGAL_BROWSER_STORAGE, LEGAL_COOKIES, type LegalInventoryItem } from ".
 
 /**
  * S01 PP13 side of R18, and R12-R13 (SPEC-v2; PLAN "PP13 shape", D-34, D-38). Every locale's Privacy Policy §13 —
- * the lines between its `## 13.` and `## 14.` headings in `apps/ui/legal/<loc>/privacy-policy.md` — is five blocks:
- * an intro paragraph, one markdown table of the twenty items of record, and three paragraphs. The table names exactly
+ * the lines between its `## 13.` and `## 14.` headings in `apps/ui/legal/<loc>/privacy-policy.md` — is six blocks:
+ * an intro paragraph, one markdown table of the twenty items of record, the paragraph on the language of queued
+ * emails (SPEC-v3 R-37, block index 2), and three paragraphs. The table names exactly
  * the items `/cookies` lists (LISTED = LEGAL_COOKIES then LEGAL_BROWSER_STORAGE), and each row's kind and lifetime cells
  * are that locale's own `/cookies` strings (`apps/ui/messages/<loc>/legal.json`), character for character.
  */
@@ -136,12 +137,13 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
   it("the English §13 carries the four statements and none of the removed sentences", () => {
     const section = section13("en");
     const found = blocks(section);
-    expect(found.map(({ kind }) => kind)).toEqual(["p", "table", "p", "p", "p"]);
+    expect(found.map(({ kind }) => kind)).toEqual(["p", "table", "p", "p", "p", "p"]);
     const phrases: Record<number, readonly string[]> = {
       0: ["20 items", "13 cookies", "7 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
-      2: ["no other party", "across websites"],
-      3: ["Do Not Track", "with or without"],
-      4: ["block or delete", "browser settings", "stops working", "signing in", "language", "display"]
+      2: ["keeps the language you had selected until we send it"],
+      3: ["no other party", "across websites"],
+      4: ["Do Not Track", "with or without"],
+      5: ["block or delete", "browser settings", "stops working", "signing in", "language", "display"]
     };
     const lacking = Object.entries(phrases).flatMap(([index, list]) =>
       list.filter((phrase) => !(found[Number(index)]?.text ?? "").toLowerCase().includes(phrase.toLowerCase())).map((phrase) => `block ${index} lacks ${phrase}`)
@@ -149,6 +151,18 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     expect(lacking).toEqual([]);
     for (const absent of ["two cookies", "region", "United Kingdom"]) {
       expect(section.toLowerCase(), `en §13 still says ${absent}`).not.toContain(absent.toLowerCase());
+    }
+  });
+
+  it("the English 3.4 summary names the two 3.4 changes and no 3.3-only change", () => {
+    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
+    const summary = line.split("Version 3.4 replaced version 3.3:")[1] ?? "";
+    expect(summary, "the version 3.4 summary follows the version line").not.toBe("");
+    for (const phrase of ["regions we serve", "names our company", "content-delivery", "Cloudflare bot check"]) {
+      expect(summary, `the 3.4 summary still names the 3.3 change "${phrase}"`).not.toContain(phrase);
+    }
+    for (const keyword of ["debateai.locale", "language", "queue"]) {
+      expect(summary, `the 3.4 summary does not name the 3.4 change "${keyword}"`).toContain(keyword);
     }
   });
 
@@ -162,7 +176,7 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
         misses.push(`${locale}: blocks ${kinds.join(",")} differ from en`);
         continue;
       }
-      if (!(found[3]?.text ?? "").includes("Do Not Track")) misses.push(`${locale}: block 3 lacks the literal Do Not Track`);
+      if (!(found[4]?.text ?? "").includes("Do Not Track")) misses.push(`${locale}: block 4 lacks the literal Do Not Track`);
       if (!(found[0]?.text ?? "").includes("dezbatere.ro/cookies")) misses.push(`${locale}: block 0 lacks dezbatere.ro/cookies`);
       found.forEach((block, index) => {
         if (block.kind === "p" && block.text.trim() === english[index]?.text.trim()) misses.push(`${locale}: paragraph ${index} equals en`);

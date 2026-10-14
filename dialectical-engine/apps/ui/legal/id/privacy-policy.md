@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KEBIJAKAN PRIVASI · v3.3 · BERLAKU 12 OKTOBER 2026
+eyebrow: KEBIJAKAN PRIVASI · v3.4 · BERLAKU 12 OKTOBER 2026
 title: Apa yang kami simpan, dan alasannya
 lede: Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.
-endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.3
+endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Teks Kebijakan Privasi
 annexTitle: Lampiran B — Ketentuan privasi regional
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KUKI
 -->
 
-**Version 3.3 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Penyedia hos kami menyimpan akun dan debat Anda di London, Britania Raya; bagian 5 menjelaskan ke mana lagi data Anda dikirim. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun.
 
@@ -183,7 +183,7 @@ Dialectical Engine menggunakan 20 item, semuanya mutlak diperlukan untuk layanan
 | `__Host-debateai-session` | Kuki (HttpOnly) | Menjaga Anda tetap masuk. Kuki ini diperbarui selama Anda menggunakan layanan. | 14 hari |
 | `__Host-debateai-csrf` | Kuki | Mencegah situs web lain mengirimkan formulir atas nama Anda. | 14 hari |
 | `__Host-debateai-age-refusal` | Kuki (HttpOnly) | Setelah pemeriksaan usia ditolak, mencegah peramban ini mencoba lagi selama 30 hari. Isinya hanya kata “ditolak”, tanpa data pribadi. | 30 hari |
-| `debateai.locale` | Kuki | Mengingat bahasa antarmuka yang Anda pilih. | 1 tahun |
+| `debateai.locale` | Kuki | Mengingat bahasa antarmuka yang Anda pilih, dan menentukan bahasa email yang kami kirimkan kepada Anda. | 1 tahun |
 | `__Host-debateai-staff` | Kuki (HttpOnly) | Akses staf terpisah | Hingga 8 jam; 15 menit tidak aktif |
 | `__Host-debateai-staff-csrf` | Kuki | Mencegah situs web lain mengirimkan formulir atas nama Anda. | Hingga 8 jam; 15 menit tidak aktif |
 | `__Host-debateai-password-reset` | Kuki (HttpOnly) | Hanya pengaturan ulang kata sandi | Hingga 30 menit |
@@ -201,6 +201,8 @@ Dialectical Engine menggunakan 20 item, semuanya mutlak diperlukan untuk layanan
 | `debateai.exportPending` | Penyimpanan sesi | Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. | Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah |
 | `debateai.exportLinkOutcome` | Penyimpanan sesi | Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. | Hingga tab ditutup, keluar, atau tautan baru dibuka |
 
+Setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya.
+
 Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine.
 
 Browser dapat mengirim sinyal “Do Not Track” atau sinyal serupa. Dialectical Engine tidak melacak Anda, sehingga tidak ada yang perlu dimatikan oleh sinyal tersebut: layanan berfungsi sama dengan atau tanpa sinyal itu.
@@ -211,7 +213,7 @@ Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di
 
 Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru.
 
-Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.3 menggantikan versi 3.2: kebijakan ini hanya mencakup wilayah yang kami layani, menyebutkan nama perusahaan kami dan, di bagian 5, penyedia hos, pengiriman konten, dan email kami, serta menjelaskan pemeriksaan bot Cloudflare.
+Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.4 menggantikan versi 3.3: bagian 13 kini menyatakan bahwa kuki debateai.locale juga menentukan bahasa tempat kami menulis email yang kami kirimkan kepada Anda, dan menambahkan paragraf yang menyatakan bahwa setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya.
 
 ## Annex B — Ketentuan privasi regional
 

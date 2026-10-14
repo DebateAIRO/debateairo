@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.2 · ÚČINNÉ OD 12. ŘÍJNA 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.3 · ÚČINNÉ OD 12. ŘÍJNA 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.2
+endMarker: KONEC PODMÍNEK · v2.3
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.2 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.3 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -114,7 +114,7 @@ Nejste-li si jisti, zda je něco dovoleno, zeptejte se nás před zveřejněním
 
 **Váš obsah zůstává vaším.** Ponecháváte si veškerá práva, která máte k otázkám, tvrzením, anotacím a námitkám, jež zadáte. Udělujete nám nevýhradní, celosvětovou a bezúplatnou licenci tento obsah hostovat, ukládat, rozmnožovat, upravovat a zpracovávat za účelem provozu služby: vedení debaty, jejího ukládání, abyste ji mohli znovu otevřít a přehrát, poskytování podpory, plnění našich právních povinností a — pouze pokud se rozhodnete obsah zveřejnit — pro účely uvedené v oddílu 9. Tato licence končí vymazáním obsahu, s výjimkou případů, kdy oddíl 9 nebo zákon vyžaduje něco jiného.
 
-**Na vašem obsahu netrénujeme.** Modely na vašem obsahu netrénujeme. Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr poskytovatelů u každého z nich uvádí, zda jsme to potvrdili, a kdy.
+**Na vašem obsahu netrénujeme.** Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr poskytovatelů u každého z nich uvádí, zda jsme to potvrdili, a kdy.
 
 **Jak se váš obsah dostává k poskytovatelům AI.** Za účelem vedení debaty posíláme text jednomu či více externím poskytovatelům modelů. Poskytovatel obdrží vaši otázku, vámi nastavené řídicí anotace a výroky, které systém sestavuje v průběhu debaty — vidí tedy text odvozený z toho, co jste zadali, a vytvořený na tomto základě, nikoli pouze vaše původní slova. Nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu, záznamy relací ani platební údaje.
 
@@ -239,7 +239,7 @@ Oddíl 8 upravuje váš obsah a postavení vygenerovaných výstupů. Domnívát
 
 ## 17. Osobní údaje
 
-Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobních údajů** na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na Dialectical Engine vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů.
+Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobních údajů** na adrese dezbatere.ro/privacy. Vysvětlují, co shromažďujeme, právní základ každého účelu, dobu uchovávání, příjemce údajů, související předávání a způsob uplatnění vašich práv. Tři body patří i sem. Oddíl 7 vás žádá, abyste do otázky nevkládali osobní údaje jiných osob; pokud tak učiníte, odpovídáte za ně a my můžeme obsah odstranit. Obsahuje-li debata zveřejněná na Dialectical Engine vaše osobní údaje, můžete nás požádat o jejich odstranění, aniž byste měli účet (oddíl 9). A uchováváme záznam o vašem přijetí těchto Podmínek — verzi, čas a technické údaje relace — jako důkaz smlouvy, jak vysvětlují Zásady ochrany osobních údajů. E-maily, které vám zasíláme, jsou psány v jazyce, který jste zvolili na našem webu; oddíl 13 Zásad ochrany osobních údajů vysvětluje, jak tuto volbu uchováváme.
 
 ## 18. Rozhodné právo a soudní příslušnost
 

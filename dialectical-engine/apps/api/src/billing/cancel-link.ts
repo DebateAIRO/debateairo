@@ -52,7 +52,11 @@ const DAY_MS = 86_400_000;
 export class CancelLinkService {
   constructor(private readonly deps: CancelLinkDeps) {}
 
-  async request(email: string): Promise<"SENT" | "SILENT"> {
+  /**
+   * `mailLocale` is the MLV of the link request (S01-C13, R-17): M9 is sent in it, and the billing profile's language
+   * only when the request names none.
+   */
+  async request(email: string, mailLocale?: string): Promise<"SENT" | "SILENT"> {
     let normalized: string;
     let blindIndex: Buffer;
     try {
@@ -67,12 +71,13 @@ export class CancelLinkService {
     const ownerRef = await this.deps.identities.ownerRefByEmailBlindIndex(blindIndex);
     if (ownerRef !== null) {
       return this.issue(ownerRef, async (customerId, profile) =>
-        (await this.deps.recipients.currentAddress(customerId)) ?? profile.email);
+        (await this.deps.recipients.currentAddress(customerId)) ?? profile.email, mailLocale);
     }
     // No account holds that address. After an erasure the address kept with the billing profile still names the
     // person, so an erased owner whose plan the sweep has not ended yet is matched by it, and M9 goes there.
     const erased = await this.erasedOwnerByProfileAddress(normalized);
-    return erased === null ? "SILENT" : this.issue(erased, async (_customerId, profile) => profile.email);
+    return erased === null ? "SILENT"
+      : this.issue(erased, async (_customerId, profile) => profile.email, mailLocale);
   }
 
   /**
@@ -107,7 +112,7 @@ export class CancelLinkService {
    * answer. P2-W10: a plan paused by a card dispute (SUSPENDED) is live and cancellable too.
    */
   private async issue(
-    ownerRef: string, recipient: (customerId: string, profile: BillingProfile) => Promise<string>
+    ownerRef: string, recipient: (customerId: string, profile: BillingProfile) => Promise<string>, mailLocale?: string
   ): Promise<"SENT" | "SILENT"> {
     const mail = this.deps.mail;
     if (mail === undefined) return "SILENT";
@@ -137,7 +142,7 @@ export class CancelLinkService {
     });
     if (!issued) return "SILENT";
     await mail.sendTemplated(Object.freeze({
-      messageId: randomUUID(), to, templateId: "M9", locale: profile.locale,
+      messageId: randomUUID(), to, templateId: "M9", locale: mailLocale ?? profile.locale,
       params: Object.freeze({ cancelLinkUrl: cancelLinkUrl(this.deps.publicAppUrl, token) }),
       attachments: Object.freeze([])
     }));
@@ -145,8 +150,11 @@ export class CancelLinkService {
     return "SENT";
   }
 
-  /** One use per token, within 24 hours; the cancel itself is Settings' own (`requestCancelLocked`, M7 included). */
-  async cancelByToken(token: string): Promise<"CANCELLED" | "NOTHING_TO_CANCEL" | "INVALID"> {
+  /**
+   * One use per token, within 24 hours; the cancel itself is Settings' own (`requestCancelLocked`, M7 included). The
+   * MLV of the page's request (S01-C13) is M7's language, as the Settings cancel's is.
+   */
+  async cancelByToken(token: string, mailLocale?: string): Promise<"CANCELLED" | "NOTHING_TO_CANCEL" | "INVALID"> {
     const now = this.deps.clock();
     const outcome = await this.deps.billing.withTransaction(async (client) => {
       const used = await this.deps.billing.useCancelToken(client, cancelTokenSha256(token), now);
@@ -156,7 +164,7 @@ export class CancelLinkService {
       const locked = await lockedSubscription(this.deps, client, first.ownerRef);
       if (locked === null || locked.state.subscriptionId !== used.subscriptionId) return "NOTHING_TO_CANCEL" as const;
       // P2-M12: the cancel is dated once the owner lock is held (the token was checked at the first reading).
-      return await requestCancelLocked(this.deps, client, locked, this.deps.clock(), "EMAIL_LINK") === "REQUESTED"
+      return await requestCancelLocked(this.deps, client, locked, this.deps.clock(), "EMAIL_LINK", mailLocale) === "REQUESTED"
         ? "CANCELLED" as const : "NOTHING_TO_CANCEL" as const;
     });
     if (outcome === "CANCELLED") this.deps.audit("billing.cancel", { source: "EMAIL_LINK" });

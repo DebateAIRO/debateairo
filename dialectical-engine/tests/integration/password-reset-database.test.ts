@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomUUID, createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { encrypt, createEmailBlindIndex } from "@debateai/crypto";
@@ -30,11 +31,11 @@ async function account() {
   const id = randomUUID(), index = createEmailBlindIndex(blind, `${id}@example.test`), envelope = box(id), channel = randomUUID(), backup = randomUUID(), factor = randomUUID();
   await db.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,$3,$3,'old-password-hash',$4,'active',clock_timestamp())`, [id, index, envelope, `reset-${id}`]);
   await db.pool.query(`INSERT INTO identity.channel_binding(channel_binding_id,user_id,channel_type,address_ciphertext,state,verified_at) VALUES($1,$3,'email',$4,'verified',clock_timestamp()),($2,$3,'recovery_email',$4,'verified',clock_timestamp())`, [channel, backup, id, envelope]);
-  await db.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp())`, [factor, id, envelope]);
+  await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp())`, [factor, id, envelope]));
   return { id, index, envelope, channel, backup, factor, link: hash(), cancel: hash(), session: hash(), csrf: hash() };
 }
 async function start(a: Awaited<ReturnType<typeof account>>, register = 3) {
-  return (await db.pool.query(`SELECT identity.password_reset_start($1,$2,$3,$4,$5,$6,$7,$8,$9) AS outcome`, [a.index, a.id, [a.channel, a.backup].sort(), box(a.id), a.link, a.cancel, JSON.stringify([a.channel, a.backup].sort().map(channelId => ({ channelId, envelope: box(a.id), ...(channelId === a.channel ? { proofEnvelope: box(a.id) } : {}) }))), source, register])).rows[0].outcome;
+  return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_start($1,$2,$3,$4,$5,$6,$7,$8,$9) AS outcome`, [a.index, a.id, [a.channel, a.backup].sort(), box(a.id), a.link, a.cancel, JSON.stringify([a.channel, a.backup].sort().map(channelId => ({ channelId, envelope: box(a.id), ...(channelId === a.channel ? { proofEnvelope: box(a.id) } : {}) }))), source, register]))).rows[0].outcome;
 }
 async function open(a: Awaited<ReturnType<typeof account>>) {
   expect(await start(a)).toBe(true);
@@ -42,7 +43,7 @@ async function open(a: Awaited<ReturnType<typeof account>>) {
 }
 async function complete(a: Awaited<ReturnType<typeof account>>, step?: number, expectedLast: number | null = null, factor = a.factor, secret = a.envelope) {
   const dbStep = step ?? Number((await db.pool.query(`SELECT floor(extract(epoch FROM clock_timestamp())/30)::bigint AS step`)).rows[0].step);
-  return (await db.pool.query(`SELECT identity.password_reset_complete($1,$2,$3,$4,$5,$6,$7) AS outcome`, [a.session, password, factor, secret, expectedLast, dbStep, source])).rows[0].outcome;
+  return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_complete($1,$2,$3,$4,$5,$6,$7) AS outcome`, [a.session, password, factor, secret, expectedLast, dbStep, source]))).rows[0].outcome;
 }
 async function startCurrentRecovery(a:Awaited<ReturnType<typeof account>>,token=hash()){
  const client=await currentRecovery.connect();try{await client.query('BEGIN');await client.query('SELECT identity.begin_runtime_audit_attempt()');const result=(await client.query('SELECT identity.start_consumer_recovery($1,$2,$3) value',[a.index,token,source])).rows[0].value;await client.query('COMMIT');return result;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
@@ -124,7 +125,7 @@ describe("ordinary password-only reset database authority", () => {
     if (kind === "password")
       await db.pool.query(`UPDATE identity."user" SET password_hash='other-password' WHERE user_id=$1`, [a.id]);
     if (kind === "factor")
-      await db.pool.query(`UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1`, [a.factor]);
+      await withMailLocale(db.pool, 'en', (c) => c.query(`UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1`, [a.factor]));
     if (kind === "seed")
       await db.pool.query(`UPDATE identity.mfa_factor SET secret_ciphertext=$1 WHERE mfa_factor_id=$2`, [box(randomUUID()), a.factor]);
     expect(await complete(a)).toBe("INVALID");
@@ -132,7 +133,7 @@ describe("ordinary password-only reset database authority", () => {
   it("refuses a newly selected active authenticator even if the old factor remains active", async () => {
     const a = await account();
     await open(a);
-    await db.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,'totp',$2,'active',clock_timestamp())`, [a.id, box(randomUUID())]);
+    await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,'totp',$2,'active',clock_timestamp())`, [a.id, box(randomUUID())]));
     expect(await complete(a)).toBe("INVALID");
   });
   it("cancels only its own binding and permits the surviving current saved-code recovery start", async () => {
@@ -140,7 +141,7 @@ describe("ordinary password-only reset database authority", () => {
     await db.pool.query(`INSERT INTO identity.recovery_code(user_id,code_hash,code_slot) VALUES($1,'saved-code',1)`, [a.id]);
     await open(a);
     await open(other);
-    expect((await db.pool.query(`SELECT identity.password_reset_cancel_session($1,$2) AS result`, [a.session, source])).rows[0].result).toBe("CANCELLED");
+    expect((await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_cancel_session($1,$2) AS result`, [a.session, source]))).rows[0].result).toBe("CANCELLED");
     expect((await db.pool.query(`SELECT identity.password_reset_read($1) AS receipt`, [a.session])).rows[0].receipt).toMatchObject({ stage: "CANCELLED" });
     expect((await db.pool.query(`SELECT identity.password_reset_read($1) AS receipt`, [other.session])).rows[0].receipt).toMatchObject({ stage: "PASSWORD_REQUIRED" });
     expect(await startCurrentRecovery(a)).toMatchObject({userId:a.id});
@@ -191,7 +192,7 @@ describe("ordinary password-only reset database authority", () => {
     const a = await account();
     await open(a);
     for (let i = 0; i < 5; i++)
-      await db.pool.query(`SELECT identity.password_reset_failure($1,$2)`, [a.session, source]);
+      await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_failure($1,$2)`, [a.session, source]));
     expect(await complete(a)).toBe("INVALID");
     a.link = hash();
     a.cancel = hash();

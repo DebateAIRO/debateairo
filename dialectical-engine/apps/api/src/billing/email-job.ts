@@ -77,6 +77,12 @@ export type BillingEmailRequest = Readonly<{
    * announces and the announced total. Ids and an amount, no personal text.
    */
   notice?: Readonly<{ subscriptionId: string; periodEnd: Date; announcedTotalMicros: number }>;
+  /**
+   * S01-C13 (R-12, R-17): the mail language (MLV) of the user action that queued the row. Written as the payload key
+   * `locale` only when given. A customer row sends it in place of the billing profile's language; a row with no key
+   * (every system row, R-18) sends the profile's, as before.
+   */
+  locale?: string;
 }>;
 
 type EmailOutboxJob = Readonly<{
@@ -104,6 +110,7 @@ export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
     payload["notice.period_end"] = request.notice.periodEnd.toISOString();
     payload["notice.announced_total_micros"] = request.notice.announcedTotalMicros;
   }
+  if (request.locale !== undefined) payload.locale = request.locale;
   for (const attachment of request.attachments ?? []) {
     for (const [name, value] of Object.entries(attachment.fields)) payload[`attach.${attachment.kind}.${name}`] = value;
   }
@@ -168,7 +175,9 @@ export function createEmailJobHandler(deps: Readonly<{
       // email; the address kept with the profile only once the account is erased. A failed read throws: the worker
       // retries rather than send to an address the account may no longer have.
       to = (await deps.recipients.currentAddress(customerId)) ?? profile.email;
-      locale = profile.locale;
+      // S01-C13 (R-18): the row's own language (a user action's, R-12) wins; a system row has none and keeps the profile's.
+      const requested = job.payload.locale;
+      locale = typeof requested === "string" && requested.length > 0 ? requested : profile.locale;
     } else {
       return dead("EMAIL_PAYLOAD_INVALID");
     }

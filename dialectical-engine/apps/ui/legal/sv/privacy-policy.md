@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: INTEGRITETSPOLICY · v3.3 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: INTEGRITETSPOLICY · v3.4 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad vi lagrar och varför
 lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
-endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.3
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Integritetspolicyns text
 annexTitle: Bilaga B — Regionala integritetsvillkor
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.3 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Vår värdleverantör lagrar ditt konto och dina debatter i London i Storbritannien; avsnitt 5 anger vart dina uppgifter i övrigt skickas. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
 
@@ -183,7 +183,7 @@ Dialectical Engine använder 20 objekt, som alla är strikt nödvändiga för de
 | `__Host-debateai-session` | Kaka (HttpOnly) | Håller dig inloggad. Den förnyas medan du använder tjänsten. | 14 dagar |
 | `__Host-debateai-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | 14 dagar |
 | `__Host-debateai-age-refusal` | Kaka (HttpOnly) | Efter en nekad ålderskontroll hindrar den den här webbläsaren från att försöka igen i 30 dagar. Den innehåller bara ordet ”nekad”, inga personuppgifter. | 30 dagar |
-| `debateai.locale` | Kaka | Kommer ihåg vilket gränssnittsspråk du har valt. | 1 år |
+| `debateai.locale` | Kaka | Kommer ihåg vilket gränssnittsspråk du har valt och anger språket för de e-postmeddelanden vi skickar dig. | 1 år |
 | `__Host-debateai-staff` | Kaka (HttpOnly) | Separat personalåtkomst | Upp till 8 timmar; 15 minuters inaktivitet |
 | `__Host-debateai-staff-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | Upp till 8 timmar; 15 minuters inaktivitet |
 | `__Host-debateai-password-reset` | Kaka (HttpOnly) | Endast lösenordsåterställning | Upp till 30 minuter |
@@ -201,6 +201,8 @@ Dialectical Engine använder 20 objekt, som alla är strikt nödvändiga för de
 | `debateai.exportPending` | Sessionslagring | Sparar exportlänken från e-postmeddelandet i den här fliken för inloggning och nya försök. | Tills fliken stängs, du loggar ut, en ny länk öppnas, den första nedladdningen lyckas eller länken bedöms ogiltig eller tillhör fel konto |
 | `debateai.exportLinkOutcome` | Sessionslagring | Minns vilket meddelande om nedladdningslänken som ska visas i den här fliken. | Tills fliken stängs, du loggar ut eller en ny länk öppnas |
 
+Varje e-postmeddelande vi köar åt dig behåller det språk du hade valt tills vi skickar det.
+
 Ingen annan part samlar via Dialectical Engine in information om dina aktiviteter på nätet över tid och på olika webbplatser.
 
 Webbläsare kan skicka en ”Do Not Track”-signal eller en liknande signal. Dialectical Engine spårar dig inte, så det finns inget för en sådan signal att stänga av: tjänsten fungerar likadant med eller utan den.
@@ -211,7 +213,7 @@ För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdat
 
 När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen.
 
-Denna policy uppdaterades senast den 12 oktober 2026. Version 3.3 ersatte version 3.2: den omfattar endast de regioner vi betjänar, anger vårt företag och, i avsnitt 5, våra leverantörer av hosting, innehållsdistribution och e-post, samt beskriver Cloudflares botkontroll.
+Denna policy uppdaterades senast den 12 oktober 2026. Version 3.4 ersatte version 3.3: avsnitt 13 anger nu att kakan debateai.locale också anger på vilket språk vi skriver de e-postmeddelanden vi skickar dig, och ett nytt stycke anger att varje e-postmeddelande vi köar åt dig behåller det språk du hade valt tills vi skickar det.
 
 ## Annex B — Regionala integritetsvillkor
 

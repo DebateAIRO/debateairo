@@ -1,6 +1,8 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { ConsumerSecurityNoticeReconciler } from '../../apps/api/src/consumer-security-notices.js';
 import { PostgresConsumerSecurityNoticeRepository } from '@debateai/db';
 import { renderAccountEmail } from '../../apps/api/src/account-mail-template.mjs';
+import { copyOf } from '@debateai/mail-templates';
 import type {PoolClient} from "pg";
 import { EmailChangeService } from "../../apps/api/src/email-change.js";
 import { randomUUID } from "node:crypto";
@@ -81,7 +83,7 @@ it('recovery channel changes atomically enqueue only the verified primary notice
  await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
  await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
  const delivered:string[]=[];
- const reconciler=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(auth),profileUsers,{sendConsumerSecurityNotice:async(message)=>{expect(message.recipient).toBe(a.email);expect(message.eventKind).toBe('METHOD_CHANGED');const mail=renderAccountEmail({template:'security-method-changed-v1',recipient:message.recipient,messageId:message.messageId,expiresAt:message.happenedAt});delivered.push(mail.text);}});
+ const reconciler=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(auth),profileUsers,{sendConsumerSecurityNotice:async(message)=>{expect(message.recipient).toBe(a.email);expect(message.eventKind).toBe('METHOD_CHANGED');const mail=renderAccountEmail({template:'security-method-changed-v1',recipient:message.recipient,messageId:message.messageId,expiresAt:message.happenedAt,copy:(key:string)=>copyOf('en',key)});delivered.push(mail.text);}});
  // Other independently-created fixture accounts are excluded from this controlled run.
  await db.pool.query('DELETE FROM identity.consumer_security_notice WHERE user_id<>$1',[a.userId]);
  await reconciler.reconcile(1);expect(delivered).toHaveLength(1);expect(await notices()).toHaveLength(0);
@@ -269,7 +271,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
     }, profileSource);
     const g = await profileGrant(db.pool, a, "READ_PHONE_PROFILE"), id = randomUUID();
     await db.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')", [id, a.userId]);
-    expect((await db.pool.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [id])).rows[0].outcome).toBe("PREPARED");
+    expect((await withMailLocale(db.pool, 'en', (c) => c.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [id]))).rows[0].outcome).toBe("PREPARED");
     expect(await profile().phoneProfile(a,profileSource)).toBeNull();
     await expect(profile().revealPhoneProfile(a, g, profileSource)).rejects.toMatchObject({
       code: "STEP_UP_REQUIRED"
@@ -419,7 +421,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
     const repository = new PostgresSessionRepository(auth, profileAudit);
     for (const action of ["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL"] as const) {
       const a = await profileAccount(db.pool), factorId = randomUUID(), secretCiphertext = encrypt(profileKeys.get(a.userId)!, Buffer.from("fixture-totp-secret"), profileAad(a.userId, "mfa_factor.secret_ciphertext"));
-      await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3::jsonb,'active',clock_timestamp())", [factorId, a.userId, JSON.stringify(secretCiphertext)]);
+      await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3::jsonb,'active',clock_timestamp())", [factorId, a.userId, JSON.stringify(secretCiphertext)]));
       const identity = (await db.pool.query('SELECT audit_token,password_hash FROM identity."user" WHERE user_id=$1', [a.userId])).rows[0], grantToken = generateVerificationToken(), grantId = randomUUID(), now = new Date(), replacementTokenHash = hashToken("session", generateVerificationToken());
       expect(await repository.rotateAfterStepUp({
         identity: {
@@ -475,6 +477,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
           token: mail.messages[0]!.token
         }, profileSource)]);
       await waitForSecurityWait();
+      await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       expect((await client.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [id])).rows[0].outcome).toBe("PREPARED");
       await client.query("COMMIT");
       transactionOpen = false;

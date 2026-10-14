@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ditt innehåll förblir ditt. Du behåller alla rättigheter som du har till de frågor, påståenden, anteckningar och ifrågasättanden som du skickar in. Du ger oss en icke-exklusiv, världsomspännande och royaltyfri licens att hysa, lagra, återge, anpassa och behandla innehållet i syfte att driva tjänsten: genomföra debatten, lagra den så att du kan öppna och spela upp den igen, tillhandahålla support, fullgöra våra rättsliga skyldigheter och — endast om du väljer att publicera — för de ändamål som anges i avsnitt 9. Licensen upphör när innehållet raderas, utom i den mån avsnitt 9 eller lagen kräver annat." },
-      { kind: "p", text: "Vi tränar inte på ditt innehåll. Vi tränar inte modeller på ditt innehåll. Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när." },
+      { kind: "p", text: "Vi tränar inte på ditt innehåll. Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när." },
       { kind: "p", text: "Hur ditt innehåll når AI-leverantörer. För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter." },
       { kind: "p", text: "Vad supportchatten skickar. Supportassistenten är också en AI-modell. När du skriver till den skickar vi ditt meddelande till en extern modelleverantör så att modellen kan svara, tillsammans med de hjälpartiklar som den grundar sitt svar på. Innan vi skickar maskerar vi allt som ser ut som ett lösenord, en engångskod eller en nyckel. Om du ber att få tala med en person skickar vi även samtalet, maskerat på samma sätt, till modellen så att den kan skriva en kort sammanfattning till den medlem i vårt team som tar över ditt ärende. Vi bifogar inte din e-postadress, dina kontoidentifierare eller dina betalningsuppgifter, men modellen tar emot allt annat du skriver i chatten, så skriv inte något där som du inte vill att den ska läsa." },
       { kind: "p", text: "Vilka leverantörer och var. Vårt register över AI-leverantörer på dezbatere.ro/providers är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personuppgifter",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Hur vi behandlar personuppgifter anges i integritetspolicyn på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på Dialectical Engine innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn." }
+      { kind: "p", text: "Hur vi behandlar personuppgifter anges i integritetspolicyn på dezbatere.ro/privacy. Den förklarar vad vi samlar in, den rättsliga grunden för varje ändamål, hur länge vi behåller uppgifter, vilka som tar emot uppgifter, vilka överföringar som sker och hur du utövar dina rättigheter. Tre punkter hör även hemma här. Enligt avsnitt 7 ska du inte ange andra personers personuppgifter i en fråga; om du ändå gör det ansvarar du för detta, och vi kan ta bort innehållet. Om en debatt som publicerats på Dialectical Engine innehåller personuppgifter om dig kan du begära att vi tar bort dem utan att ha ett konto (avsnitt 9). Vi bevarar dessutom en uppgift om ditt godkännande av dessa villkor — version, tidpunkt och sessionens tekniska uppgifter — som bevis för avtalet, i enlighet med integritetspolicyn. E-postmeddelanden som vi skickar till dig skrivs på det språk du valde på vår webbplats; avsnitt 13 i integritetspolicyn förklarar hur vi behåller det valet." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "c78f110d15acbb05d267b5162da906ff4e2535093585d3474df8c6825d234f51",
-  eyebrow: "ANVÄNDARVILLKOR · v2.2 · GÄLLER FRÅN 12 OKTOBER 2026",
+  version: "2.3",
+  sha256: "aa432ed87f9ea9c28b2dbcb3028e3dd9ab22de714e1f1b203ff7c274ab68edb9",
+  eyebrow: "ANVÄNDARVILLKOR · v2.3 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.2",
+  endMarker: "SLUT PÅ VILLKOREN · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

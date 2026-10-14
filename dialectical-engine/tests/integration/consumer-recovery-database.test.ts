@@ -10,6 +10,7 @@ const codeHash = '$argon2id$v=19$m=19456,t=2,p=1$c29tZXJhbmRvbXNhbHQ$' + Buffer.
 async function audited(sql: string, values: unknown[]) { const c = await runtime.connect(); try {
     await c.query('BEGIN');
     await c.query('SELECT identity.begin_runtime_audit_attempt()');
+    await c.query("SELECT set_config('debateai.mail_locale', 'en', true)");
     const r = await c.query(sql, [...values, source]);
     await c.query('COMMIT');
     return r.rows[0].value;
@@ -115,6 +116,7 @@ describe('consumer token plus saved-code recovery', () => {
         try {
             await c.query('BEGIN');
             await c.query('SET LOCAL ROLE debateai_erasure_runtime');
+            await c.query("SELECT set_config('debateai.mail_locale', 'en', true)");
             expect((await c.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) value", [id])).rows[0].value).toBe('PREPARED');
             await c.query('COMMIT');
         }

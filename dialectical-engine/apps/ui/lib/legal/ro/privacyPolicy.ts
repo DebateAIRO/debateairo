@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Modul cookie (HttpOnly) — Vă menține autentificat. Se reînnoiește cât timp folosiți serviciul. — 14 zile",
         "__Host-debateai-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — 14 zile",
         "__Host-debateai-age-refusal — Modul cookie (HttpOnly) — După ce o verificare a vârstei este refuzată, împiedică acest browser să încerce din nou timp de 30 de zile. Conține doar cuvântul „refuzat”, fără date personale. — 30 de zile",
-        "debateai.locale — Modul cookie — Reține limba interfeței pe care ați ales-o. — 1 an",
+        "debateai.locale — Modul cookie — Reține limba interfeței pe care ați ales-o și stabilește limba e-mailurilor pe care vi le trimitem. — 1 an",
         "__Host-debateai-staff — Modul cookie (HttpOnly) — Acces separat pentru personal — Cel mult 8 ore; expiră după 15 minute de inactivitate",
         "__Host-debateai-staff-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 8 ore; expiră după 15 minute de inactivitate",
         "__Host-debateai-password-reset — Modul cookie (HttpOnly) — Doar resetarea parolei — Cel mult 30 de minute",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Stocare de sesiune — Reține ce mesaj despre linkul de descărcare trebuie afișat în această filă. — Până la închiderea filei, deconectare sau un link nou"
         ]
       },
+      { kind: "p", text: "Fiecare e-mail pe care vi-l punem în coadă păstrează limba pe care ați selectat-o până când îl trimitem." },
       { kind: "p", text: "Nicio altă parte nu colectează, prin intermediul Dialectical Engine, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web." },
       { kind: "p", text: "Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. Dialectical Engine nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el." },
       { kind: "p", text: "Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și datele site-ului pentru acest site din setările browserului dumneavoastră. Ce nu mai funcționează atunci: autentificarea și reținerea alegerilor dumneavoastră privind limba și modul de afișare; notificarea privind modulele cookie va fi, de asemenea, afișată din nou." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.3 a înlocuit versiunea 3.2: se referă numai la regiunile pe care le deservim, indică denumirea societății noastre și, în secțiunea 5, pe furnizorii noștri de găzduire, de distribuire a conținutului și de e-mail, și descrie verificarea anti-robot efectuată de Cloudflare." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.4 a înlocuit versiunea 3.3: secțiunea 13 spune acum că modulul cookie debateai.locale stabilește și limba în care vă trimitem e-mailurile, iar un paragraf nou arată că fiecare e-mail pus în coadă pentru dumneavoastră păstrează limba selectată până la trimitere." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "29790cedfe28357acf67402270b7d70bdefe744e997441691967105cc6ed40c1",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.3 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "3.4",
+  sha256: "a56e4146475064a6e6c6d62208ffba6400023c6eaae233261569bd6739ead811",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
-  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Textul Politicii de confidențialitate",
   sectionIdPrefix: "policy-section-",

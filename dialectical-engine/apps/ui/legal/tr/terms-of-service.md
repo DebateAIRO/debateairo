@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.2 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.2
+endMarker: KOŞULLARIN SONU · v2.3
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.2 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.3 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -114,7 +114,7 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 **İçeriğiniz size ait olmaya devam eder.** Gönderdiğiniz sorular, iddialar, açıklamalar ve itirazlar üzerindeki haklarınızı korursunuz. Hizmeti işletmek amacıyla söz konusu içeriği barındırmak, saklamak, çoğaltmak, uyarlamak ve işlemek üzere bize münhasır olmayan, dünya çapında ve bedelsiz bir lisans verirsiniz: tartışmayı yürütmek, yeniden açıp oynatabilmeniz için saklamak, destek sunmak, hukuki yükümlülüklerimizi yerine getirmek ve — yalnızca yayımlamayı seçerseniz — 9. bölümdeki amaçlar. Bu lisans, 9. bölümün veya hukukun gerektirdiği durumlar dışında, içerik silindiğinde sona erer.
 
-**İçeriğinizle eğitim yapmayız.** Modelleri içeriğinizle eğitmeyiz. Yapay zekâ sağlayıcılarını yalnızca içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sağlayıcı Sicilimiz, her sağlayıcı için bunu doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir.
+**İçeriğinizle eğitim yapmayız.** Yapay zekâ sağlayıcılarını yalnızca içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sağlayıcı Sicilimiz, her sağlayıcı için bunu doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir.
 
 **İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır.** Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz.
 
@@ -239,7 +239,7 @@ Yayımlanmış tartışmalardan, Dialectical Engine'e atıfta bulunarak ve özg�
 
 ## 17. Kişisel veriler
 
-Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlilik Politikası**'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. Dialectical Engine'de yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız.
+Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlilik Politikası**'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. Dialectical Engine'de yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız. Size gönderdiğimiz e-postalar, sitemizde seçtiğiniz dilde yazılır; bu seçimi nasıl koruduğumuzu Gizlilik Politikasının 13. bölümü açıklar.
 
 ## 18. Uygulanacak hukuk ve uyuşmazlıkların görüleceği yer
 

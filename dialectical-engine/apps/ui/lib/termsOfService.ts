@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Your content stays yours. You keep any rights you have in the questions, claims, annotations and challenges you submit. You grant us a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, adapt and process that content for the purposes of operating the service: running the debate, storing it so you can reopen and replay it, providing support, meeting our legal obligations, and — only if you choose to publish — the purposes in section 9. This licence ends when the content is deleted, except as section 9 or the law requires." },
-      { kind: "p", text: "We do not train on your content. We do not train models on your content. We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Provider Register shows, for each provider, whether we have confirmed this, and when." },
+      { kind: "p", text: "We do not train on your content. We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Provider Register shows, for each provider, whether we have confirmed this, and when." },
       { kind: "p", text: "How your content reaches AI providers. To run a debate we send text to one or more external model providers. What a provider receives is your question, the steering annotations you set, and statements the engine composes during the debate — so a provider sees text derived from and built around what you typed, not only your original words. It never receives your email address, your account identifiers, your session records or your payment details." },
       { kind: "p", text: "What the support chat sends. The support assistant is also an AI model. When you write to it, we send your message to an external model provider so the model can answer, together with the help articles it bases its answer on. Before sending, we mask anything that looks like a password, a one-time code or a key. If you ask to speak to a person, we also send the conversation, masked the same way, to the model so it can write a short summary for the member of our team who takes your case. We do not attach your email address, your account identifiers or your payment details, but the model receives anything else you type in the chat, so do not write there anything you would not want it to read." },
       { kind: "p", text: "Which providers, and where. Our AI Provider Register at dezbatere.ro/providers is part of these Terms. It lists each provider we may use: its legal entity and country; what it receives and why; where it processes; its retention terms; whether zero-data-retention is active for the endpoint we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; and the date we last verified each entry. Providers may be located outside your country and outside the European Economic Area. Our Privacy Policy explains the safeguards." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personal data",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "How we handle personal data is set out in the Privacy Policy at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on Dialectical Engine contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains." }
+      { kind: "p", text: "How we handle personal data is set out in the Privacy Policy at dezbatere.ro/privacy. It explains what we collect, the legal basis for each purpose, how long we keep things, who receives data, the transfers involved, and how to exercise your rights. Three points belong here as well. Section 7 asks you not to put other people's personal data into a question; if you do, you are responsible for that, and we may remove the content. If a debate published on Dialectical Engine contains personal data about you, you can ask us to remove it without holding an account (section 9). And we keep a record of your acceptance of these Terms — version, time, and the technical details of the session — as evidence of the contract, as the Privacy Policy explains. Emails we send you are written in the language you chose on our site; section 13 of the Privacy Policy explains how we keep that choice." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "982a39b7457f6518cf460ddb0a501dfa1a2a4f39ccdc9fd7890d99fc0c5969cc",
-  eyebrow: "TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026",
+  version: "2.3",
+  sha256: "0535525218bb7c975ea4f8459bc2011a494efed363bee79d6382805ad5981f6c",
+  eyebrow: "TERMS OF SERVICE · v2.3 · EFFECTIVE 12 OCTOBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.2",
+  endMarker: "END OF TERMS · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

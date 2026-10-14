@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "אחרי שבדיקת גיל נדחתה, מונעת מהדפדפן הזה לנסות שוב במשך 30 ימים. היא מכילה רק את המילה ”נדחה”, ללא מידע אישי.",
   "legal.cookies.ageRefusal.life": "30 ימים",
   "legal.cookies.locale.kind": "עוגייה",
-  "legal.cookies.locale.purpose": "זוכרת את שפת הממשק שבחרתם.",
+  "legal.cookies.locale.purpose": "זוכרת את שפת הממשק שבחרתם, ומגדירה את השפה של הדוא״ל שאנו שולחים אליכם.",
   "legal.cookies.locale.life": "1 שנה",
   "legal.cookies.storageTitle": "נשמרים בדפדפן שלכם, לא בעוגייה",
   "legal.cookies.storageIntro": "ארבעה פריטים נשמרים באחסון הדפדפן שלכם: שניים באחסון המקומי, עד שתמחקו אותם, ושניים באחסון ההפעלה, עד שתסגרו את הכרטיסייה. בשונה מעוגיות, הם אינם מצורפים לבקשות שלכם; פריט צ'אט העזרה שומר עותק של שיחה שניהלתם עם העזרה של Dialectical Engine, והודעותיה הגיעו ל-Dialectical Engine כששלחתם אותן.",

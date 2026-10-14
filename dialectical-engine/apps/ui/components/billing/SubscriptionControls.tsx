@@ -5,7 +5,7 @@ import { ContractHttpError, type BillingCurrency, type ContractClient } from "@d
 import { contractClient } from "@/lib/api";
 import { formatLongDate, formatMoney, planName } from "@/lib/billing/format";
 import type { PaidPlanId } from "@/lib/billing/plans";
-import type { LocaleCode } from "@/lib/i18n/locales";
+import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { ChargeStatusPoller } from "./ChargeStatusPoller";
@@ -441,7 +441,7 @@ export function SubscriptionControls({
                     let started: Awaited<ReturnType<SubscriptionClient["upgradeSubscription"]>>;
                     try {
                       started = await client.upgradeSubscription(upgrade.planId, upgrade.quote.quote_ref, {
-                        locale, renewal_terms: renewalConsent
+                        locale: catalogLocale(locale), renewal_terms: renewalConsent
                       });
                     } catch (failure) {
                       // N19b (A3 (a)): a failed start holds this quote's one use, so it is never sent again; choosing

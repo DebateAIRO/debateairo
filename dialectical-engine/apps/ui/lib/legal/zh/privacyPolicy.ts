@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Cookie 文件 (HttpOnly) — 让您保持登录状态。在您使用服务期间会自动续期。 — 14 天",
         "__Host-debateai-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 14 天",
         "__Host-debateai-age-refusal — Cookie 文件 (HttpOnly) — 年龄验证被拒绝后，在 30 天内阻止此浏览器再次尝试。其中只保存“已拒绝”一词，不含任何个人数据。 — 30 天",
-        "debateai.locale — Cookie 文件 — 记住您选择的界面语言。 — 1 年",
+        "debateai.locale — Cookie 文件 — 记住您选择的界面语言，并决定我们发送给您的电子邮件所用的语言。 — 1 年",
         "__Host-debateai-staff — Cookie 文件 (HttpOnly) — 单独的员工访问 — 最多8小时；闲置15分钟",
         "__Host-debateai-staff-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 最多8小时；闲置15分钟",
         "__Host-debateai-password-reset — Cookie 文件 (HttpOnly) — 仅重置密码 — 最多30分钟",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — 会话存储 — 记住此标签页应显示哪条下载链接提示。 — 直到关闭标签页、退出登录或打开新链接"
         ]
       },
+      { kind: "p", text: "我们为您排队待发的每封邮件，都会保留您当时选择的语言，直至邮件发出。" },
       { kind: "p", text: "没有任何其他方通过 Dialectical Engine 收集有关您长期以及跨网站的在线活动的信息。" },
       { kind: "p", text: "浏览器可以发送“Do Not Track”信号或类似信号。Dialectical Engine 不会跟踪您，因此这类信号没有任何可关闭的对象：无论是否发送该信号，服务的运行方式都相同。" },
       { kind: "p", text: "如需拒绝这些项目，请在浏览器设置中阻止或删除本网站的 cookie 和网站数据。随后将停止运作的功能：登录，以及对您的语言和显示方式选择的记忆；cookie 通知也会再次显示。" }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "变更本政策时，我们会发布新版本，概述所作变更并载明新的生效日期，同时在 dezbatere.ro/privacy/versions 保留历史版本。如果变更新增目的或接收方，我们会在新处理活动开始之前，通过电子邮件和产品内通知告知您，并留出时间供您反对。如果新目的以您的同意为依据，例如我们将来希望使用内容改进模型，我们会另行明确征求该项同意；我们绝不会将接受更新后的《条款》视为同意新的处理活动。对于不会改变我们实际做法的澄清，我们只会发布新版本。" },
-      { kind: "p", text: "本政策最后更新于 2026 年 10 月 12 日。第 3.3 版取代了第 3.2 版：新版仅涵盖我们提供服务的地区，写明了我们的公司名称，并在第 5 节写明了我们的托管、内容分发和电子邮件提供商，同时说明了 Cloudflare 机器人检测。" }
+      { kind: "p", text: "本政策最后更新于 2026 年 10 月 12 日。第 3.4 版取代了第 3.3 版：第 13 节现在说明，cookie debateai.locale 还决定我们发送给您的电子邮件所用的语言，并新增一段说明：我们为您排队待发的每封邮件，都会保留您当时选择的语言，直至邮件发出。" }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "c90fd824bb7d25ac86c8309855a8a0970fa4cf787894c2131ba03ffb5d487df9",
-  eyebrow: "隐私政策 · v3.3 · 生效日期 2026 年 10 月 12 日",
+  version: "3.4",
+  sha256: "94773db2ca498178b11eeb67b7b3ecd912317b0d6fbe568bac41b83100f75cbe",
+  eyebrow: "隐私政策 · v3.4 · 生效日期 2026 年 10 月 12 日",
   title: "我们存储哪些内容及其原因",
   lede: "以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。",
-  endMarker: "政策结束 · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "政策结束 · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "隐私政策正文",
   sectionIdPrefix: "policy-section-",

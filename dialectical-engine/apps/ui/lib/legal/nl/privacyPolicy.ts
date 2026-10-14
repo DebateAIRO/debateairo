@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Cookiebestand (HttpOnly) — Houdt u aangemeld. Het cookie wordt verlengd zolang u de dienst gebruikt. — 14 dagen",
         "__Host-debateai-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — 14 dagen",
         "__Host-debateai-age-refusal — Cookiebestand (HttpOnly) — Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. — 30 dagen",
-        "debateai.locale — Cookiebestand — Onthoudt de interfacetaal die u hebt gekozen. — 1 jaar",
+        "debateai.locale — Cookiebestand — Onthoudt de interfacetaal die u hebt gekozen, en bepaalt de taal van de e-mails die wij u sturen. — 1 jaar",
         "__Host-debateai-staff — Cookiebestand (HttpOnly) — Afzonderlijke medewerkerstoegang — Tot 8 uur; 15 minuten inactiviteit",
         "__Host-debateai-staff-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 8 uur; 15 minuten inactiviteit",
         "__Host-debateai-password-reset — Cookiebestand (HttpOnly) — Alleen wachtwoordreset — Tot 30 minuten",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Sessieopslag — Onthoudt welk bericht over de downloadlink in dit tabblad moet worden getoond. — Tot het tabblad sluit, u zich afmeldt of een nieuwe link opent"
         ]
       },
+      { kind: "p", text: "Elke e-mail die wij voor u in de wachtrij zetten, behoudt de taal die u had gekozen totdat wij hem verzenden." },
       { kind: "p", text: "Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
       { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. Dialectical Engine volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
       { kind: "p", text: "Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voor deze site in uw browserinstellingen. Wat er dan niet meer werkt: het aanmelden en het onthouden van uw keuzes voor taal en weergave; ook de cookiemelding wordt opnieuw getoond." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie." },
-      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.3 verving versie 3.2: het beleid behandelt alleen de regio's die wij bedienen, noemt onze vennootschap en, in hoofdstuk 5, onze hosting-, contentleverings- en e-mailaanbieders, en beschrijft de Cloudflare-botcontrole." }
+      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.4 verving versie 3.3: hoofdstuk 13 zegt nu dat het cookie debateai.locale ook de taal bepaalt waarin wij de e-mails schrijven die wij u sturen, en voegt een alinea toe die zegt dat elke e-mail die wij voor u in de wachtrij zetten de taal behoudt die u had gekozen totdat wij hem verzenden." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "f9da5a80e10b07fed87a21146874f27ba11cb703d88be35d6fcc96695c16f8e8",
-  eyebrow: "PRIVACYBELEID · v3.3 · VAN KRACHT OP 12 OKTOBER 2026",
+  version: "3.4",
+  sha256: "b0d5b3d2de1bfdf6b91bb3e309c9ac8887bc7a3155e40bec9cfd69deb9b02e69",
+  eyebrow: "PRIVACYBELEID · v3.4 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",
-  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst van het privacybeleid",
   sectionIdPrefix: "policy-section-",

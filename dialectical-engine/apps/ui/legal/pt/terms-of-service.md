@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.2 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.3 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.2
+endMarker: FIM DOS TERMOS · v2.3
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.2 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.3 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -114,7 +114,7 @@ Se tiver dúvidas sobre se algo é permitido, pergunte-nos antes de o publicar.
 
 **O seu conteúdo continua a pertencer-lhe.** Mantém quaisquer direitos que detenha sobre as perguntas, alegações, anotações e contestações que envia. Concede-nos uma licença não exclusiva, mundial e gratuita para alojar, armazenar, reproduzir, adaptar e tratar esse conteúdo para efeitos de funcionamento do serviço: executar o debate, armazená-lo para que possa voltar a abri-lo e reproduzi-lo, prestar apoio, cumprir as nossas obrigações legais e — apenas se optar por publicar — prosseguir as finalidades da secção 9. Esta licença termina quando o conteúdo é eliminado, salvo na medida exigida pela secção 9 ou pela lei.
 
-**Não treinamos modelos com o seu conteúdo.** Não treinamos modelos com o seu conteúdo. Recorremos a fornecedores de IA apenas ao abrigo de condições que não lhes permitem utilizar o seu conteúdo para treinar ou melhorar os respetivos modelos; o Registo de Fornecedores indica, para cada fornecedor, se o confirmámos e quando.
+**Não treinamos modelos com o seu conteúdo.** Recorremos a fornecedores de IA apenas ao abrigo de condições que não lhes permitem utilizar o seu conteúdo para treinar ou melhorar os respetivos modelos; o Registo de Fornecedores indica, para cada fornecedor, se o confirmámos e quando.
 
 **Como o seu conteúdo chega aos fornecedores de IA.** Para executar um debate, enviamos texto a um ou mais fornecedores externos de modelos. O que um fornecedor recebe é a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe durante o debate — pelo que o fornecedor vê texto derivado e construído em torno do que escreveu, e não apenas as suas palavras originais. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento.
 
@@ -239,7 +239,7 @@ A secção 8 abrange o seu conteúdo e o estatuto dos resultados gerados. Se con
 
 ## 17. Dados pessoais
 
-A forma como tratamos dados pessoais é estabelecida na **Política de Privacidade**, disponível em dezbatere.ro/privacy. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na Dialectical Engine contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade.
+A forma como tratamos dados pessoais é estabelecida na **Política de Privacidade**, disponível em dezbatere.ro/privacy. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na Dialectical Engine contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade. Os e-mails que lhe enviamos são redigidos na língua que escolheu no nosso sítio; a secção 13 da Política de Privacidade explica como guardamos essa escolha.
 
 ## 18. Lei aplicável e tribunais competentes para os litígios
 

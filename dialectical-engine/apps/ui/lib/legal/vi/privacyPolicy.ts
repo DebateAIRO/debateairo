@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Tệp cookie (HttpOnly) — Duy trì trạng thái đăng nhập của bạn. Cookie này được gia hạn trong thời gian bạn sử dụng dịch vụ. — 14 ngày",
         "__Host-debateai-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — 14 ngày",
         "__Host-debateai-age-refusal — Tệp cookie (HttpOnly) — Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân. — 30 ngày",
-        "debateai.locale — Tệp cookie — Ghi nhớ ngôn ngữ giao diện bạn đã chọn. — 1 năm",
+        "debateai.locale — Tệp cookie — Ghi nhớ ngôn ngữ giao diện bạn đã chọn, và đặt ngôn ngữ của các email chúng tôi gửi cho bạn. — 1 năm",
         "__Host-debateai-staff — Tệp cookie (HttpOnly) — Quyền truy cập nhân viên riêng — Tối đa 8 giờ; 15 phút không hoạt động",
         "__Host-debateai-staff-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 8 giờ; 15 phút không hoạt động",
         "__Host-debateai-password-reset — Tệp cookie (HttpOnly) — Chỉ đặt lại mật khẩu — Tối đa 30 phút",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Bộ nhớ phiên — Ghi nhớ thông báo về liên kết tải xuống cần hiển thị trong thẻ này. — Cho đến khi đóng thẻ, đăng xuất hoặc mở liên kết mới"
         ]
       },
+      { kind: "p", text: "Mỗi email chúng tôi lưu lại để gửi cho bạn giữ nguyên ngôn ngữ bạn đã chọn cho đến khi chúng tôi gửi email đó." },
       { kind: "p", text: "Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
       { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. Dialectical Engine không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
       { kind: "p", text: "Để từ chối các mục này, hãy chặn hoặc xóa cookie và dữ liệu trang web của trang này trong phần cài đặt trình duyệt. Khi đó, những gì ngừng hoạt động: việc đăng nhập và việc ghi nhớ lựa chọn ngôn ngữ và chế độ hiển thị của bạn; thông báo cookie cũng sẽ hiển thị lại." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới." },
-      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.3 thay thế phiên bản 3.2: phiên bản này chỉ bao gồm các khu vực chúng tôi phục vụ, nêu tên công ty của chúng tôi và, tại mục 5, các nhà cung cấp dịch vụ lưu trữ, phân phối nội dung và email của chúng tôi, đồng thời mô tả bước kiểm tra bot của Cloudflare." }
+      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.4 thay thế phiên bản 3.3: mục 13 nay nêu rõ cookie debateai.locale cũng đặt ngôn ngữ mà chúng tôi dùng để viết các email gửi cho bạn, và bổ sung một đoạn cho biết mỗi email chúng tôi lưu lại để gửi cho bạn giữ nguyên ngôn ngữ bạn đã chọn cho đến khi chúng tôi gửi email đó." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "d65c148d3f5ae7223bbd53853157212ef068720fbc59dd767bd1219ebd745e82",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.3 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
+  version: "3.4",
+  sha256: "30635810e7ccdf2e1f474e46fa4a084d1790f2735e7c941e8ef64555e9acbf62",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

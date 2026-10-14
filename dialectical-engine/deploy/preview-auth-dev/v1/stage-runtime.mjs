@@ -217,7 +217,7 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   const exchange=await request('/v1/auth/mfa-recovery/exchange',{token:mailToken(proof,'/recover-authenticator'),password:a.password});check(exchange.body.status==='factor_required','MFA_EXCHANGE');
   const cookie=cookies(exchange,'__Host-debateai-mfa-recovery',299),headers={cookie,'x-mfa-recovery-csrf-token':csrf(cookie,'__Host-debateai-mfa-recovery-csrf')};
   await scopeNegatives('/v1/auth/mfa-recovery/totp/begin',{},cookie,'x-mfa-recovery-csrf-token');
-  const notice=await waitMail(captureRoot,a.backupEmail,'Subject: DebateAI authenticator recovery started');check(!notice.text.includes('#cancel=')&&!notice.text.includes('#token='),'PENDING_NOTICE');
+  const notice=await waitMail(captureRoot,a.backupEmail,'Subject: Dialectical Engine authenticator recovery started');check(!notice.text.includes('#cancel=')&&!notice.text.includes('#token='),'PENDING_NOTICE');
   const begin=await request('/v1/auth/mfa-recovery/totp/begin',{},200,headers);nextSecret=crypto.decodeBase32(begin.body.secret);
   await request('/v1/auth/mfa-recovery/totp/verify',{code:totp(nextSecret,-1)},200,headers);
   const codes=await request('/v1/auth/mfa-recovery/codes/generate',{},200,headers);check(codes.body.recovery_codes.length>0,'RECOVERY_CODES');
@@ -234,7 +234,7 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   await request('/v1/account/backup-email/verify/start',{password:a.password,code:totp(oldSecret,1)},202,normalHeaders);
   const backup=await waitMail(captureRoot,a.backupEmail,'/verify-backup-email#token=');
   check((await request('/v1/account/backup-email/verify/confirm',{token:mailToken(backup,'/verify-backup-email')})).body.status==='verified','BACKUP_VERIFIED');
-  const unchanged=await captured(captureRoot,a.backupEmail,'Subject: DebateAI authenticator recovery started');check(unchanged?.sha256===notice.sha256&&!unchanged.text.includes('#cancel='),'OLD_NOTICE_IMMUTABLE');
+  const unchanged=await captured(captureRoot,a.backupEmail,'Subject: Dialectical Engine authenticator recovery started');check(unchanged?.sha256===notice.sha256&&!unchanged.text.includes('#cancel='),'OLD_NOTICE_IMMUTABLE');
   proofs['legacy-primary-recovery']=passed({passwordPreserved:true,waitingHours:24,oldSessionKept:true,oldAuthenticatorKept:true,freshLogin:true,completed:false});proofs['pending-backup-notice-no-cancel']=passed({noticeSha256:notice.sha256,laterVerified:true,unchanged:true});
  }finally{oldSecret.fill(0);nextSecret?.fill(0);}
  const reset=accounts.reset,secret=Buffer.from(reset.totpSecret,'base64');

@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Jūsų turinys lieka jūsų. Išsaugote visas turimas teises į jūsų pateikiamus klausimus, teiginius, pastabas ir prieštaravimus. Suteikiate mums neišimtinę, visame pasaulyje galiojančią, neatlygintiną licenciją teikti šio turinio prieglobą, jį saugoti, atgaminti, pritaikyti ir tvarkyti paslaugos teikimo tikslais: debatams vykdyti ir saugoti, kad galėtumėte juos vėl atverti ir pakartoti, pagalbai teikti, mūsų teisinėms prievolėms vykdyti ir — tik jei nuspręsite paskelbti — 9 skyriuje nurodytais tikslais. Ši licencija baigiasi ištrynus turinį, išskyrus atvejus, kai pagal 9 skyrių ar teisės aktus reikalaujama kitaip." },
-      { kind: "p", text: "Jūsų turinio nenaudojame mokymui. Nemokome modelių naudodami jūsų turinį. DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada." },
+      { kind: "p", text: "Jūsų turinio nenaudojame mokymui. DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada." },
       { kind: "p", text: "Kaip jūsų turinys pasiekia DI paslaugų teikėjus. Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų." },
       { kind: "p", text: "Ką siunčia pagalbos pokalbis. Pagalbos asistentas taip pat yra DI modelis. Kai jam rašote, jūsų žinutę kartu su pagalbos straipsniais, kuriais jis grindžia atsakymą, siunčiame išoriniam modelių teikėjui, kad modelis galėtų atsakyti. Prieš siųsdami užmaskuojame viską, kas atrodo kaip slaptažodis, vienkartinis kodas ar raktas. Jei paprašote pasikalbėti su žmogumi, modeliui siunčiame ir pokalbį, užmaskuotą tokiu pačiu būdu, kad jis parašytų trumpą santrauką mūsų komandos nariui, perimančiam jūsų atvejį. Nepridedame jūsų el. pašto adreso, paskyros identifikatorių ar mokėjimo duomenų, tačiau modelis gauna visa kita, ką įrašote į pokalbį, todėl nerašykite ten nieko, ko nenorėtumėte, kad jis perskaitytų." },
       { kind: "p", text: "Kurie paslaugų teikėjai ir kur jie veikia. Mūsų DI paslaugų teikėjų registras adresu dezbatere.ro/providers yra šių Sąlygų dalis. Jame nurodytas kiekvienas paslaugų teikėjas, kurį galime naudoti: jo juridinis asmuo ir šalis; ką ir kodėl jis gauna; kur tvarko duomenis; jo saugojimo sąlygos; ar mūsų naudojamam prieigos taškui taikomas visiškas duomenų nesaugojimas; ar pagal mūsų sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Paslaugų teikėjai gali būti įsisteigę ne jūsų šalyje ir už Europos ekonominės erdvės ribų. Apsaugos priemonės paaiškintos mūsų Privatumo politikoje." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Asmens duomenys",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Kaip tvarkome asmens duomenis, nustatyta Privatumo politikoje adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei Dialectical Engine paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje." }
+      { kind: "p", text: "Kaip tvarkome asmens duomenis, nustatyta Privatumo politikoje adresu dezbatere.ro/privacy. Joje paaiškinta, ką renkame, koks yra kiekvieno tikslo teisinis pagrindas, kiek laiko saugome duomenis, kas juos gauna, kokie perdavimai atliekami ir kaip pasinaudoti savo teisėmis. Čia taip pat svarbūs trys dalykai. 7 skyriuje prašome į klausimą neįtraukti kitų asmenų duomenų; jei juos vis dėlto įtraukiate, už tai atsakote, o mes galime turinį pašalinti. Jei Dialectical Engine paskelbtuose debatuose yra jūsų asmens duomenų, galite prašyti juos pašalinti neturėdami paskyros (9 skyrius). Be to, saugome jūsų sutikimo su šiomis Sąlygomis įrašą — versiją, laiką ir techninius seanso duomenis — kaip sutarties įrodymą, kaip paaiškinta Privatumo politikoje. El. laiškai, kuriuos siunčiame jums, rašomi kalba, kurią pasirinkote mūsų svetainėje; Privatumo politikos 13 skyriuje paaiškinta, kaip išsaugome šį pasirinkimą." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "c0c3ffe330f5700c7cb0241f663b933cf6874c0afbfd20a764ab8c5acc3cfdd7",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.2 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "2.3",
+  sha256: "b58308359c2a67c88631876051e817b96c2829f41d4d83cac83e3954378476a0",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.2",
+  endMarker: "SĄLYGŲ PABAIGA · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

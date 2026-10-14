@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Teie sisu jääb teile. Teile jäävad kõik õigused, mis teil on esitatud küsimuste, väidete, annotatsioonide ja vastuväidete suhtes. Annate meile lihtlitsentsi, mis kehtib kogu maailmas ja mille eest ei maksta litsentsitasu, selle sisu majutamiseks, säilitamiseks, reprodutseerimiseks, kohandamiseks ja töötlemiseks teenuse käitamise eesmärgil: väitluse läbiviimiseks, selle säilitamiseks, et saaksite selle uuesti avada ja taasesitada, kasutajatoe pakkumiseks, meie juriidiliste kohustuste täitmiseks ning — ainult juhul, kui otsustate sisu avaldada — jaotises 9 nimetatud eesmärkidel. Litsents lõpeb sisu kustutamisel, välja arvatud juhul, kui jaotis 9 või seadus nõuab teisiti." },
-      { kind: "p", text: "Me ei kasuta teie sisu mudelite treenimiseks. Me ei kasuta teie sisu mudelite treenimiseks. Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud." },
+      { kind: "p", text: "Me ei kasuta teie sisu mudelite treenimiseks. Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud." },
       { kind: "p", text: "Kuidas teie sisu jõuab tehisintellekti pakkujateni. Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid." },
       { kind: "p", text: "Mida kasutajatoe vestlus saadab. Kasutajatoe assistent on samuti tehisintellekti mudel. Kui te talle kirjutate, saadame teie sõnumi koos abiartiklitega, millel tema vastus põhineb, välisele mudelipakkujale, et mudel saaks vastata. Enne saatmist maskeerime kõik, mis näeb välja nagu parool, ühekordne kood või võti. Kui palute inimesega rääkida, saadame mudelile ka vestluse, samamoodi maskeerituna, et see kirjutaks lühikese kokkuvõtte meie meeskonna liikmele, kes teie juhtumi üle võtab. Me ei lisa teie e-posti aadressi, konto tunnuseid ega makseandmeid, kuid mudel saab kõik muu, mida vestlusesse kirjutate, seega ärge kirjutage sinna midagi, mida te ei soovi, et mudel loeks." },
       { kind: "p", text: "Millised pakkujad ja kus. Meie tehisintellekti pakkujate register aadressil dezbatere.ro/providers on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Isikuandmed",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Isikuandmete töötlemist kirjeldatakse Privaatsuspoliitikas aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui Dialectical Engine-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas." }
+      { kind: "p", text: "Isikuandmete töötlemist kirjeldatakse Privaatsuspoliitikas aadressil dezbatere.ro/privacy. Selles selgitatakse, mida me kogume, iga eesmärgi õiguslikku alust, andmete säilitamise aega, andmete vastuvõtjaid, asjaomaseid edastamisi ning seda, kuidas oma õigusi kasutada. Lisaks rõhutame siin kolme asja. Jaotises 7 palutakse teil mitte lisada küsimusse teiste inimeste isikuandmeid; kui te seda siiski teete, vastutate nende eest ja me võime sisu eemaldada. Kui Dialectical Engine-s avaldatud väitlus sisaldab teie isikuandmeid, võite konto olemasolust olenemata paluda meil need eemaldada (jaotis 9). Samuti säilitame andmed selle kohta, et nõustusite nende Tingimustega — versioon, aeg ja seansi tehnilised üksikasjad — lepingu tõendina, nagu on selgitatud Privaatsuspoliitikas. Teile saadetavad e-kirjad on kirjutatud keeles, mille valisite meie saidil; Privaatsuspoliitika jaotis 13 selgitab, kuidas me selle valiku säilitame." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "1bd1f8540b659a73061baa6e83599b08190ef2632ac779579407f25751eb887e",
-  eyebrow: "TEENUSETINGIMUSED · v2.2 · KEHTIB ALATES 12. OKTOOBRIST 2026",
+  version: "2.3",
+  sha256: "56c4751d65861ad4f10d50b956b1a09d1ea17a2fc9e0c259ad469716c04c132c",
+  eyebrow: "TEENUSETINGIMUSED · v2.3 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.2",
+  endMarker: "TINGIMUSTE LÕPP · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

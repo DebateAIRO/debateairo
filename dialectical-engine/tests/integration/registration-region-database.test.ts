@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate, PostgresIdentityRepository, type PendingAccountInput, type SignUpAcceptanceRow } from "@debateai/db";
@@ -140,7 +141,7 @@ describe("registration region on real PostgreSQL", () => {
     await database.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [input.userId]);
     const erasureId = randomUUID();
     await database.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES ($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')", [erasureId, input.userId]);
-    expect((await database.pool.query<{ outcome: string }>("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [erasureId])).rows[0]?.outcome).toBe("PREPARED");
+    expect((await withMailLocale(database.pool, 'en', (c) => c.query<{ outcome: string }>("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [erasureId]))).rows[0]?.outcome).toBe("PREPARED");
     await database.pool.query("UPDATE identity.account_erasure_notification_outbox SET claim_token=gen_random_uuid(),claim_expires_at=NULL,acknowledged_at=clock_timestamp(),last_error_code=NULL WHERE user_id=$1 AND acknowledged_at IS NULL", [input.userId]);
     const eraser = await database.pool.connect();
     try {

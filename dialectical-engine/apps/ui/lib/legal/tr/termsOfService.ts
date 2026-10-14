@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "İçeriğiniz size ait olmaya devam eder. Gönderdiğiniz sorular, iddialar, açıklamalar ve itirazlar üzerindeki haklarınızı korursunuz. Hizmeti işletmek amacıyla söz konusu içeriği barındırmak, saklamak, çoğaltmak, uyarlamak ve işlemek üzere bize münhasır olmayan, dünya çapında ve bedelsiz bir lisans verirsiniz: tartışmayı yürütmek, yeniden açıp oynatabilmeniz için saklamak, destek sunmak, hukuki yükümlülüklerimizi yerine getirmek ve — yalnızca yayımlamayı seçerseniz — 9. bölümdeki amaçlar. Bu lisans, 9. bölümün veya hukukun gerektirdiği durumlar dışında, içerik silindiğinde sona erer." },
-      { kind: "p", text: "İçeriğinizle eğitim yapmayız. Modelleri içeriğinizle eğitmeyiz. Yapay zekâ sağlayıcılarını yalnızca içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sağlayıcı Sicilimiz, her sağlayıcı için bunu doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir." },
+      { kind: "p", text: "İçeriğinizle eğitim yapmayız. Yapay zekâ sağlayıcılarını yalnızca içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sağlayıcı Sicilimiz, her sağlayıcı için bunu doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir." },
       { kind: "p", text: "İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır. Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz." },
       { kind: "p", text: "Destek sohbeti neleri gönderir. Destek asistanı da bir yapay zekâ modelidir. Ona yazdığınızda, modelin yanıt verebilmesi için mesajınızı, modelin yanıtını dayandırdığı yardım makaleleriyle birlikte harici bir model sağlayıcısına göndeririz. Göndermeden önce parolaya, tek kullanımlık koda veya anahtara benzeyen her şeyi maskeleriz. Bir kişiyle görüşmeyi talep ederseniz, modelin talebinizi devralan ekip üyemiz için kısa bir özet yazabilmesi amacıyla konuşmayı da aynı şekilde maskelenmiş olarak modele göndeririz. E-posta adresinizi, hesap tanımlayıcılarınızı veya ödeme bilgilerinizi eklemeyiz, ancak model sohbete yazdığınız diğer her şeyi alır; bu nedenle orada modelin okumasını istemeyeceğiniz hiçbir şey yazmayın." },
       { kind: "p", text: "Hangi sağlayıcılar ve nerede. dezbatere.ro/providers adresindeki Yapay Zekâ Sağlayıcı Sicilimiz bu Koşulların bir parçasıdır. Sicil, kullanabileceğimiz her sağlayıcı için şu hususları listeler: tüzel kişiliği ve ülkesi; neyi, neden aldığı; işlemenin nerede yapıldığı; saklama koşulları; kullandığımız uç nokta için sıfır veri saklamanın etkin olup olmadığı; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağı; dayandığımız aktarım mekanizması ve her kaydı son doğruladığımız tarih. Sağlayıcılar ülkenizin ve Avrupa Ekonomik Alanı'nın dışında bulunabilir. Güvenceler Gizlilik Politikamızda açıklanmıştır." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kişisel veriler",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki Gizlilik Politikası'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. Dialectical Engine'de yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız." }
+      { kind: "p", text: "Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki Gizlilik Politikası'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. Dialectical Engine'de yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız. Size gönderdiğimiz e-postalar, sitemizde seçtiğiniz dilde yazılır; bu seçimi nasıl koruduğumuzu Gizlilik Politikasının 13. bölümü açıklar." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "348fb16b0fb8f387e58aa122faac6c86d947bba3df424767694c401d935caa0a",
-  eyebrow: "HİZMET KOŞULLARI · v2.2 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
+  version: "2.3",
+  sha256: "64256e5e5669535d24e5b70e28643f137db340996536c167f44929b9eaea5869",
+  eyebrow: "HİZMET KOŞULLARI · v2.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.2",
+  endMarker: "KOŞULLARIN SONU · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

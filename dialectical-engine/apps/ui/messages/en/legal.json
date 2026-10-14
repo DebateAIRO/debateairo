@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "After an age check is refused, stops this browser from trying again for 30 days. It holds only the word “refused”, no personal data.",
   "legal.cookies.ageRefusal.life": "30 days",
   "legal.cookies.locale.kind": "Cookie",
-  "legal.cookies.locale.purpose": "Remembers the interface language you picked.",
+  "legal.cookies.locale.purpose": "Remembers the interface language you picked, and sets the language of the emails we send you.",
   "legal.cookies.locale.life": "1 year",
   "legal.cookies.storageTitle": "Stored in your browser, not in a cookie",
   "legal.cookies.storageIntro": "Four items are kept in your browser's storage: two in local storage, until you clear it, and two in session storage, until you close the tab. Unlike cookies, they are not attached to your requests; the help-chat item holds a copy of a conversation you had with Dialectical Engine's help, whose messages reached Dialectical Engine when you sent them.",

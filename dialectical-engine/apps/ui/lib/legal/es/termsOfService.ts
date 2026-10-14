@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Su contenido sigue siendo suyo. Usted conserva todos los derechos que tenga sobre las preguntas, afirmaciones, anotaciones y cuestionamientos que envíe. Nos concede una licencia no exclusiva, mundial y libre de regalías para alojar, almacenar, reproducir, adaptar y tratar dicho contenido con el fin de operar el servicio: ejecutar el debate, almacenarlo para que pueda volver a abrirlo y reproducirlo, prestar soporte, cumplir nuestras obligaciones legales y —solo si decide publicarlo— cumplir los fines de la sección 9. Esta licencia finaliza cuando se elimina el contenido, salvo en la medida en que lo exija la sección 9 o la ley." },
-      { kind: "p", text: "No entrenamos modelos con su contenido. No entrenamos modelos con su contenido. Solo recurrimos a proveedores de IA en condiciones que no les permiten utilizar su contenido para entrenar o mejorar sus modelos; el Registro de proveedores indica, para cada proveedor, si lo hemos confirmado y cuándo." },
+      { kind: "p", text: "No entrenamos modelos con su contenido. Solo recurrimos a proveedores de IA en condiciones que no les permiten utilizar su contenido para entrenar o mejorar sus modelos; el Registro de proveedores indica, para cada proveedor, si lo hemos confirmado y cuándo." },
       { kind: "p", text: "Cómo llega su contenido a los proveedores de IA. Para ejecutar un debate, enviamos texto a uno o varios proveedores externos de modelos. Lo que recibe un proveedor es su pregunta, las anotaciones de orientación que establece y las declaraciones que el motor redacta durante el debate; por tanto, el proveedor ve texto derivado y construido en torno a lo que usted escribió, no solo sus palabras originales. Nunca recibe su dirección de correo electrónico, los identificadores de su cuenta, sus registros de sesión ni sus datos de pago." },
       { kind: "p", text: "Qué envía el chat de soporte. El asistente de soporte también es un modelo de IA. Cuando usted le escribe, enviamos su mensaje a un proveedor externo de modelos para que el modelo pueda responder, junto con los artículos de ayuda en los que basa su respuesta. Antes del envío, ocultamos todo lo que parezca una contraseña, un código de un solo uso o una clave. Si pide hablar con una persona, también enviamos al modelo la conversación, ocultada de la misma manera, para que redacte un breve resumen para el miembro de nuestro equipo que se haga cargo de su caso. No adjuntamos su dirección de correo electrónico, los identificadores de su cuenta ni sus datos de pago, pero el modelo recibe todo lo demás que usted escriba en el chat, así que no escriba allí nada que no quiera que lea." },
       { kind: "p", text: "Qué proveedores y dónde. Nuestro Registro de proveedores de IA, disponible en dezbatere.ro/providers, forma parte de estos Términos. Enumera cada proveedor que podemos utilizar: su entidad jurídica y país; qué recibe y por qué; dónde realiza el tratamiento; sus plazos de conservación; si se aplica la conservación cero de datos al punto de conexión que utilizamos; si puede usar las entradas para entrenamiento conforme a nuestro contrato; el mecanismo de transferencia en el que nos basamos; y la fecha en que verificamos por última vez cada entrada. Los proveedores pueden estar situados fuera de su país y del Espacio Económico Europeo. Nuestra Política de privacidad explica las garantías aplicables." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Datos personales",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "La forma en que tratamos los datos personales se expone en la Política de privacidad, disponible en dezbatere.ro/privacy. Esta explica qué recopilamos, la base jurídica de cada finalidad, durante cuánto tiempo conservamos los elementos, quién recibe los datos, las transferencias realizadas y cómo ejercer sus derechos. Otros tres aspectos también deben indicarse aquí. La sección 7 le pide que no incluya datos personales de otras personas en una pregunta; si lo hace, usted será responsable y podremos retirar el contenido. Si un debate publicado en Dialectical Engine contiene datos personales sobre usted, puede pedirnos que lo retiremos sin necesidad de tener una cuenta (sección 9). Asimismo, conservamos un registro de su aceptación de estos Términos —versión, hora y datos técnicos de la sesión— como prueba del contrato, según explica la Política de privacidad." }
+      { kind: "p", text: "La forma en que tratamos los datos personales se expone en la Política de privacidad, disponible en dezbatere.ro/privacy. Esta explica qué recopilamos, la base jurídica de cada finalidad, durante cuánto tiempo conservamos los elementos, quién recibe los datos, las transferencias realizadas y cómo ejercer sus derechos. Otros tres aspectos también deben indicarse aquí. La sección 7 le pide que no incluya datos personales de otras personas en una pregunta; si lo hace, usted será responsable y podremos retirar el contenido. Si un debate publicado en Dialectical Engine contiene datos personales sobre usted, puede pedirnos que lo retiremos sin necesidad de tener una cuenta (sección 9). Asimismo, conservamos un registro de su aceptación de estos Términos —versión, hora y datos técnicos de la sesión— como prueba del contrato, según explica la Política de privacidad. Los correos electrónicos que le enviamos se redactan en el idioma que eligió en nuestro sitio; la sección 13 de la Política de privacidad explica cómo conservamos esa elección." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "f269384bf2fc23bae5c95ba9dba61ffda813f624f99c821aae27683bb1f023d1",
-  eyebrow: "TÉRMINOS DE SERVICIO · v2.2 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
+  version: "2.3",
+  sha256: "ea36b647b1a48ee8dccca11640981166ddcb574c258ee17a4964daa2a27fbe53",
+  eyebrow: "TÉRMINOS DE SERVICIO · v2.3 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",
-  endMarker: "FIN DE LOS TÉRMINOS · v2.2",
+  endMarker: "FIN DE LOS TÉRMINOS · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto de los Términos de servicio",
   sectionIdPrefix: "terms-section-",

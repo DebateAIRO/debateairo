@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — 쿠키 (HttpOnly) — 로그인 상태를 유지합니다. 서비스를 이용하는 동안 갱신됩니다. — 14일",
         "__Host-debateai-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 14일",
         "__Host-debateai-age-refusal — 쿠키 (HttpOnly) — 연령 확인이 거부된 후 이 브라우저가 30일 동안 다시 시도하지 못하게 합니다. ‘거부됨’이라는 단어만 담고 있으며 개인정보는 없습니다. — 30일",
-        "debateai.locale — 쿠키 — 귀하가 선택한 인터페이스 언어를 기억합니다. — 1년",
+        "debateai.locale — 쿠키 — 귀하가 선택한 인터페이스 언어를 기억하며, 당사가 보내는 이메일의 언어도 설정합니다. — 1년",
         "__Host-debateai-staff — 쿠키 (HttpOnly) — 별도의 직원 접근 — 최대 8시간; 15분 비활동",
         "__Host-debateai-staff-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 최대 8시간; 15분 비활동",
         "__Host-debateai-password-reset — 쿠키 (HttpOnly) — 비밀번호 재설정만 — 최대 30분",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — 세션 스토리지 — 이 탭에 표시할 다운로드 링크 메시지를 기억합니다. — 탭을 닫거나 로그아웃하거나 새 링크를 열 때까지"
         ]
       },
+      { kind: "p", text: "당사가 귀하를 위해 대기열에 넣는 각 이메일은 발송될 때까지 귀하가 선택했던 언어를 유지합니다." },
       { kind: "p", text: "Dialectical Engine를 통해 다른 어떤 당사자도 시간 경과에 따라 여러 웹사이트에 걸쳐 귀하의 온라인 활동에 관한 정보를 수집하지 않습니다." },
       { kind: "p", text: "브라우저는 “Do Not Track” 신호 또는 이와 유사한 신호를 보낼 수 있습니다. Dialectical Engine는 귀하를 추적하지 않으므로 이러한 신호로 끌 대상이 없습니다. 서비스는 신호가 있든 없든 똑같이 작동합니다." },
       { kind: "p", text: "이 항목들을 거부하려면 브라우저 설정에서 이 사이트의 쿠키와 사이트 데이터를 차단하거나 삭제하세요. 그러면 작동하지 않게 되는 것: 로그인, 그리고 언어 및 화면 표시 선택의 기억입니다. 쿠키 안내도 다시 표시됩니다." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "본 방침을 변경할 때 당사는 변경 사항의 요약과 새 시행일을 포함한 새 버전을 게시하고 이전 버전을 dezbatere.ro/privacy/versions에 보관합니다. 새로운 목적 또는 새로운 수령자를 추가하는 변경의 경우 새 처리를 시작하기 전에 이메일과 제품 내에서 귀하에게 알리고 이의를 제기할 시간을 드립니다. 새로운 목적이 귀하의 동의에 의존하는 경우, 예를 들어 향후 콘텐츠를 모델 개선에 사용하려는 경우 그 동의를 별도로 구체적으로 요청하며, 업데이트된 이용약관의 수락을 새로운 처리에 대한 동의로 간주하지 않습니다. 당사의 처리에 아무런 변화가 없는 설명의 명확화는 새 버전만 게시합니다." },
-      { kind: "p", text: "본 방침의 최종 업데이트일은 2026년 10월 12일입니다. 버전 3.3은 버전 3.2를 대체했습니다. 당사가 서비스를 제공하는 지역만을 다루고, 당사 회사를 명시하며, 제5조에서 호스팅, 콘텐츠 전송 및 이메일 제공업체를 직접 명시하고, Cloudflare 봇 확인을 설명합니다." }
+      { kind: "p", text: "본 방침의 최종 업데이트일은 2026년 10월 12일입니다. 버전 3.4는 버전 3.3을 대체했습니다: 제13조는 이제 쿠키 debateai.locale이 당사가 보내는 이메일의 작성 언어도 설정한다고 명시하며, 당사가 귀하를 위해 대기열에 넣는 각 이메일은 발송될 때까지 귀하가 선택했던 언어를 유지한다는 단락을 추가합니다." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "0e9afe8d54434a10ade108bafe8cc44f7e31ee6ec7eee96dbce856bc0e38e520",
-  eyebrow: "개인정보 처리방침 · v3.3 · 시행일 2026년 10월 12일",
+  version: "3.4",
+  sha256: "bd30056d94aa2dc1688e87a950f6d3b350f7c239f0dabf2634ae34393ef63e48",
+  eyebrow: "개인정보 처리방침 · v3.4 · 시행일 2026년 10월 12일",
   title: "당사가 저장하는 정보와 그 이유",
   lede: "GDPR (EU) 2016/679에 따른 귀하의 권리와 당사의 의무를 알기 쉽게 설명합니다. 총 14개 조항과 부속서 B — 끝까지 스크롤하십시오.",
-  endMarker: "방침 끝 · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "방침 끝 · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "개인정보 처리방침 본문",
   sectionIdPrefix: "policy-section-",

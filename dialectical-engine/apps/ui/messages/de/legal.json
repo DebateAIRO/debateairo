@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Nach einer abgelehnten Altersprüfung hindert er diesen Browser 30 Tage lang an einem neuen Versuch. Er enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten.",
   "legal.cookies.ageRefusal.life": "30 Tage",
   "legal.cookies.locale.kind": "Cookie-Datei",
-  "legal.cookies.locale.purpose": "Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche.",
+  "legal.cookies.locale.purpose": "Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche und legt die Sprache der E-Mails fest, die wir Ihnen senden.",
   "legal.cookies.locale.life": "1 Jahr",
   "legal.cookies.storageTitle": "In Ihrem Browser gespeichert, nicht in einem Cookie",
   "legal.cookies.storageIntro": "Vier Einträge liegen im Speicher Ihres Browsers: zwei im lokalen Speicher, bis Sie sie löschen, und zwei im Sitzungsspeicher, bis Sie den Tab schließen. Anders als Cookies werden sie nicht an Ihre Anfragen angehängt; der Eintrag des Hilfe-Chats enthält eine Kopie eines Gesprächs, das Sie mit der Hilfe von Dialectical Engine geführt haben, und dessen Nachrichten sind beim Senden bei Dialectical Engine angekommen.",

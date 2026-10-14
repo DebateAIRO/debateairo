@@ -28,6 +28,7 @@ describe("the database calls", () => {
     expect(statements).toEqual([
       { sql: "BEGIN" },
       { sql: "SELECT identity.begin_runtime_audit_attempt()" },
+      { sql: "SELECT set_config($1, $2, true)", args: ["debateai.mail_locale", "en"] },
       { sql: "SELECT identity.mfa_recovery_pending_cancel($1,$2) AS value", args: [consumerSecuritySession(identity), JSON.stringify({ ipArgon2id: `argon2id-audit:v1:${"a".repeat(64)}`, userAgentArgon2id: `argon2id-audit:v1:${"b".repeat(64)}` })] },
       { sql: "COMMIT" }
     ]);

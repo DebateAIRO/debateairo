@@ -12,6 +12,7 @@ async function mutation(name: string, input: unknown) {
     try {
         await c.query('BEGIN');
         await c.query('SELECT identity.begin_runtime_audit_attempt()');
+        await c.query("SELECT set_config('debateai.mail_locale', 'en', true)");
         const r = await c.query(`SELECT identity.${name}($1,$2) AS value`, [input, source]);
         await c.query('COMMIT');
         return r.rows[0].value;
@@ -32,7 +33,7 @@ async function account() {
     await database.pool.query(`INSERT INTO identity.consumer_passkey_subject VALUES($1,$2)`, [userId, token()]);
     const factors = [randomUUID(), randomUUID()];
     for (const id of factors)
-        await database.pool.query(`INSERT INTO identity.consumer_passkey_credential(consumer_credential_id,user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,'AQID',0,'multiDevice',true,'example.test','https://example.test')`, [id, userId, token()]);
+        await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query(`INSERT INTO identity.consumer_passkey_credential(consumer_credential_id,user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,'AQID',0,'multiDevice',true,'example.test','https://example.test')`, [id, userId, token()]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
     return { userId, sessionId, passwordHashSnapshot: fixturePasswordHash, passwordUsable: true, tokenHash: hashToken('session', sessionToken), factors };
 }
 async function grant(a: Awaited<ReturnType<typeof account>>, factor: string) {
@@ -76,7 +77,7 @@ describe('consumer security execute-only authority', () => {
         const a = await account(), one = randomUUID(), two = randomUUID();
         await database.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)', [a.userId]);
         for (const id of [one, two])
-            await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`, [id, a.userId]);
+            await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`, [id, a.userId]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
         expect(await mutation('remove_consumer_auth_method', { ...a, factorId: one, grantHash: await grant(a, one) })).toBe(true);
         await expect(mutation('remove_consumer_auth_method', { ...a, factorId: two, grantHash: await grant(a, two) })).rejects.toThrow('CONSUMER_LAST_METHOD');
         expect((await database.pool.query("SELECT count(*)::int n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'", [a.userId])).rows[0].n).toBe(1);
@@ -86,7 +87,7 @@ describe('consumer security execute-only authority', () => {
         await mutation('remove_consumer_auth_method', { ...a, factorId: a.factors[0], grantHash: await grant(a, a.factors[0]!) });
         const claimed = (await runtime.query('SELECT * FROM identity.claim_consumer_security_notices(100)')).rows.find(x => x.user_id === a.userId);
         expect(claimed).toBeTruthy();
-        await database.pool.query("SELECT identity.enqueue_consumer_security_notice_internal($1,'METHOD_CHANGED')", [a.userId]);
+        await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query("SELECT identity.enqueue_consumer_security_notice_internal($1,'METHOD_CHANGED')", [a.userId]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
         expect((await runtime.query('SELECT identity.ack_consumer_security_notice($1,$2) value', [claimed.notice_id, claimed.claim_token])).rows[0].value).toBe(true);
         expect((await database.pool.query('SELECT count(*)::int n FROM identity.consumer_security_notice WHERE user_id=$1', [a.userId])).rows[0].n).toBe(1);
         await expect(runtime.query('SELECT * FROM identity.claim_consumer_security_notices(101)')).rejects.toThrow();
@@ -133,6 +134,7 @@ describe('consumer security execute-only authority', () => {
         const c = await runtime.connect();
         await c.query('BEGIN');
         await c.query('SELECT identity.begin_runtime_audit_attempt()');
+        await c.query("SELECT set_config('debateai.mail_locale', 'en', true)");
         try {
             await expect(c.query('SELECT identity.remove_consumer_auth_method($1,$2)', [{ ...a, factorId: a.factors[0], grantHash: h }, { ...source, phone: '+0000' }])).rejects.toThrow('CONSUMER_SECURITY_AUDIT_INVALID');
         }
@@ -146,7 +148,7 @@ describe('consumer security execute-only authority', () => {
     it('does not count a TOTP with a malformed or stale password snapshot as a complete path', async () => {
         const a = await account();
         await database.pool.query('DELETE FROM identity.consumer_passkey_credential WHERE consumer_credential_id=$1', [a.factors[1]]);
-        await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`, [randomUUID(), a.userId]);
+        await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`, [randomUUID(), a.userId]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
         const input = { ...a, passwordHashSnapshot: 'fixture-password', passwordUsable: false };
         const methods = (await runtime.query('SELECT identity.read_consumer_auth_methods($1) value', [input])).rows[0].value;
         expect(methods.methods.find((m: {
@@ -159,7 +161,7 @@ describe('consumer security execute-only authority', () => {
     });
     it('projects only usable step-up paths with NULL passwords, exact admitted providers and current snapshots', async()=>{
       const a=await account(),configuration='sha256:'+ 'aa'.repeat(32);
-      await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`,[randomUUID(),a.userId]);
+      await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`,[randomUUID(),a.userId]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
       const read=async(input:unknown)=>(await runtime.query('SELECT identity.read_consumer_auth_methods($1) value',[input])).rows[0].value;
       expect((await read(a)).available_step_up_methods).toEqual(['passkey','password_totp']);
       await database.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration) VALUES($1,'google','https://accounts.google.com','test-app',$2,$3)`,[a.userId,randomUUID(),configuration]);

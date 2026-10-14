@@ -1,7 +1,14 @@
 import { spawn } from "node:child_process";
 import { normalizeMailDisplay, serializeAccountMail, singleRecipient, type MailDisplay, type AccountMailInput } from "./account-mail-template.mjs";
+// C12 (R-15, R-30, R-31, D-62): every account mail's copy is the catalogue of its display locale, read by copyOf;
+// an absent display is English (D4, V-8). The request carries the display; the copy is derived here, once.
+type AccountMailRequest = Omit<AccountMailInput, "copy">;
+function accountCopyOf(display: MailDisplay | undefined): (key: string) => string {
+  const locale = display?.locale ?? "en";
+  return (key) => copyOf(locale, key);
+}
 import { randomUUID } from "node:crypto";
-import { MailTemplateError, mailAttachmentFactsOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
+import { MailTemplateError, MAIL_TEMPLATES, copyOf, mailAttachmentFactsOf, mailLocaleOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 import { isMailAddress } from "@debateai/kernel";
 
@@ -29,8 +36,8 @@ function isPublicAppUrl(value: string): boolean {
 }
 
 /** Render validation errors stay opaque at the transport boundary. */
-function renderMail(input: AccountMailInput, from: string): string {
-  try { return serializeAccountMail(input, from); }
+function renderMail(input: AccountMailRequest, from: string): string {
+  try { return serializeAccountMail({ ...input, copy: accountCopyOf(input.display) }, from); }
   catch { throw new MailDeliveryError("MAIL_INPUT_INVALID"); }
 }
 
@@ -51,6 +58,8 @@ export interface SecurityNotificationMail {
   readonly recipient:string;
   readonly eventKind:"SCHEDULED"|"CANCELLED"|"COMPLETION";
   readonly executeAt:Date;
+  /** C11.6 (D-101, R-13): the language of the row the worker sends; required, so a notice never falls back to English by default. */
+  readonly display:MailDisplay;
 }
 
 export interface SecurityNotificationSender {
@@ -130,7 +139,7 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
     const templates = { SCHEDULED: "security-scheduled-v1", CANCELLED: "security-cancelled-v1", COMPLETION: "security-completion-v1" } as const;
     const template = templates[mail.eventKind];
     if (template === undefined) throw new MailDeliveryError("MAIL_INPUT_INVALID");
-    const message = renderMail({ template, recipient: mail.recipient, expiresAt: mail.executeAt, messageId: mail.messageId }, this.options.from);
+    const message = renderMail({ template, recipient: mail.recipient, expiresAt: mail.executeAt, messageId: mail.messageId, ...(mail.display === undefined ? {} : { display: mail.display }) }, this.options.from);
     await sendRenderedMail(message, this.options);
   }
 }
@@ -141,9 +150,9 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
 // note to that address instead of a link (the requester is never told). Both
 // bearers ride the URL fragment of the Settings page, like the verify link.
 export type EmailChangeMail =
-  | Readonly<{ kind: "confirmation"; recipient: string; token: string; expiresAt: Date }>
-  | Readonly<{ kind: "notice"; recipient: string; newEmail: string; cancelToken: string; expiresAt: Date }>
-  | Readonly<{ kind: "address-unavailable"; recipient: string }>;
+  | Readonly<{ kind: "confirmation"; recipient: string; token: string; expiresAt: Date; display?: MailDisplay }>
+  | Readonly<{ kind: "notice"; recipient: string; newEmail: string; cancelToken: string; expiresAt: Date; display?: MailDisplay }>
+  | Readonly<{ kind: "address-unavailable"; recipient: string; display?: MailDisplay }>;
 
 export interface EmailChangeMailSender {
   sendEmailChange(mail: EmailChangeMail): Promise<void>;
@@ -236,11 +245,12 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
       || (mail.kind === "notice" && !isSingleDeliverableRecipient(mail.newEmail))) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     }
-    const input: AccountMailInput = mail.kind === "confirmation"
-      ? { template: "email-change-confirm-v1", recipient: mail.recipient, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "confirm", mail.token)) }
+    const display = mail.display === undefined ? {} : { display: mail.display };
+    const input: AccountMailRequest = mail.kind === "confirmation"
+      ? { template: "email-change-confirm-v1", recipient: mail.recipient, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "confirm", mail.token)), ...display }
       : mail.kind === "notice"
-        ? { template: "email-change-notice-v1", recipient: mail.recipient, newEmail: mail.newEmail, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken)) }
-        : { template: "email-change-unavailable-v1", recipient: mail.recipient };
+        ? { template: "email-change-notice-v1", recipient: mail.recipient, newEmail: mail.newEmail, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken)), ...display }
+        : { template: "email-change-unavailable-v1", recipient: mail.recipient, ...display };
     await sendRenderedMail(renderMail(input, this.options.from), this.options);
   }
 }
@@ -250,6 +260,7 @@ export type RecoveryEmailMail = Readonly<{
   recipient: string;
   token: string;
   expiresAt: Date;
+  display?: MailDisplay;
 }>;
 export interface RecoveryEmailMailSender {
   sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void>;
@@ -283,7 +294,7 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
   async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
     if (!isSingleDeliverableRecipient(mail.recipient) || !(mail.expiresAt instanceof Date) || !Number.isFinite(mail.expiresAt.getTime()))
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
-    const message = renderMail({ template: "recovery-v1", recipient: mail.recipient, url: new URL(recoveryEmailLink(this.options.publicAppUrl, mail.token)), expiresAt: mail.expiresAt }, this.options.from);
+    const message = renderMail({ template: "recovery-v1", recipient: mail.recipient, url: new URL(recoveryEmailLink(this.options.publicAppUrl, mail.token)), expiresAt: mail.expiresAt, ...(mail.display === undefined ? {} : { display: mail.display }) }, this.options.from);
     await sendRenderedMail(message, {
       ...this.options, exitFailureCode: "SENDMAIL_EXIT_FAILED"
     });
@@ -292,22 +303,23 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
 
 export type ConsumerSecurityNoticeKind='METHOD_CHANGED'|'CODES_REGENERATED'|'RECOVERY_PROVED'|'RECOVERY_COMPLETED'|'RECOVERY_CODE_USED';
 export interface ConsumerSecurityNoticeSender {
-  sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>;
+  /** C07.7 (R-13): required; the worker passes the row's stored language, so no notice can default to English. */
+  sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date;display:MailDisplay}>):Promise<void>;
 }
 /** Task9 purposes require their reviewed wrapper/template revision at deployment. */
 export class SendmailConsumerAccountSender implements ConsumerSecurityNoticeSender {
   constructor(private readonly options:Readonly<{executable:string;from:string;timeoutMs:number;publicAppUrl:string}>){
     if(!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)||!options.executable.trim()||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isPublicAppUrl(options.publicAppUrl))throw new TypeError('OWN_MAIL_CONFIGURATION_INVALID');
   }
-  async sendRecovery(mail:Readonly<{recipient:string;token:string;expiresAt:Date}>):Promise<void>{
+  async sendRecovery(mail:Readonly<{recipient:string;token:string;expiresAt:Date;display?:MailDisplay}>):Promise<void>{
     if(!isSingleDeliverableRecipient(mail.recipient)||!/^[A-Za-z0-9_-]{43}$/.test(mail.token))throw new MailDeliveryError('MAIL_INPUT_INVALID');
     const url=new URL('/recover',this.options.publicAppUrl);url.hash='token='+mail.token;
-    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options);
+    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt,...(mail.display===undefined?{}:{display:mail.display})},this.options.from),this.options);
   }
-  async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>{
+  async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date;display?:MailDisplay}>):Promise<void>{
     const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1',RECOVERY_CODE_USED:'security-recovery-code-used-v1'} as const;
     const template=templates[mail.eventKind];if(!template)throw new MailDeliveryError('MAIL_INPUT_INVALID');
-    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options);
+    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt,...(mail.display===undefined?{}:{display:mail.display})},this.options.from),this.options);
   }
 }
 
@@ -349,8 +361,10 @@ function composeTemplatedMessage(from: string, mail: TemplatedMail, boundary: st
     throw error;
   }
   try {
+    // R-31: a user mail names its language in the header block. An owner template's text is English (V-4), so it says en.
+    const contentLanguage = MAIL_TEMPLATES[mail.templateId].catalogue === "owner" ? "en" : mailLocaleOf(mail.locale);
     return buildTemplatedMessage({
-      from, to: mail.to, messageId: mail.messageId ?? null, ...rendered, attachments, boundary
+      from, to: mail.to, messageId: mail.messageId ?? null, ...rendered, attachments, boundary, contentLanguage
     });
   } catch {
     throw new MailDeliveryError("MAIL_INPUT_INVALID");

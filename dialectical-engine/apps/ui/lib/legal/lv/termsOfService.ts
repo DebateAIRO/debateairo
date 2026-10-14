@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Jūsu saturs paliek jūsu īpašums. Jūs saglabājat visas tiesības, kas jums ir uz iesniegtajiem jautājumiem, apgalvojumiem, piezīmēm un iebildumiem. Jūs piešķirat mums neekskluzīvu, visā pasaulē spēkā esošu bezatlīdzības licenci mitināt, glabāt, reproducēt, pielāgot un apstrādāt šo saturu pakalpojuma darbības nodrošināšanai: debašu norisei, to glabāšanai, lai jūs tās varētu atkārtoti atvērt un atskaņot, atbalsta sniegšanai, mūsu juridisko pienākumu izpildei un — tikai tad, ja izvēlaties publicēt, — 9. sadaļā minētajiem nolūkiem. Šī licence beidzas, kad saturs ir dzēsts, izņemot 9. sadaļā vai tiesību aktos noteiktos gadījumus." },
-      { kind: "p", text: "Mēs neapmācām modeļus ar jūsu saturu. Mēs neapmācām modeļus ar jūsu saturu. MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši, un kad." },
+      { kind: "p", text: "Mēs neapmācām modeļus ar jūsu saturu. MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši, un kad." },
       { kind: "p", text: "Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem. Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju." },
       { kind: "p", text: "Ko nosūta atbalsta tērzēšana. Arī atbalsta asistents ir MI modelis. Kad jūs tam rakstāt, mēs nosūtām jūsu ziņojumu ārējam modeļu pakalpojumu sniedzējam, lai modelis varētu atbildēt, kopā ar palīdzības rakstiem, uz kuriem tas balsta atbildi. Pirms nosūtīšanas mēs maskējam visu, kas izskatās pēc paroles, vienreizēja koda vai atslēgas. Ja lūdzat sazināties ar cilvēku, mēs modelim nosūtām arī sarunu, maskētu tādā pašā veidā, lai tas uzrakstītu īsu kopsavilkumu mūsu komandas dalībniekam, kurš pārņem jūsu lietu. Mēs nepievienojam jūsu e-pasta adresi, konta identifikatorus vai maksājumu informāciju, taču modelis saņem visu pārējo, ko ierakstāt tērzēšanā, tāpēc nerakstiet tur neko, ko nevēlaties, lai tas izlasītu." },
       { kind: "p", text: "Kuri pakalpojumu sniedzēji un kur. Mūsu MI pakalpojumu sniedzēju reģistrs vietnē dezbatere.ro/providers ir šo Noteikumu sastāvdaļa. Tajā par katru iespējamo pakalpojumu sniedzēju norādīts: tā juridiskā persona un valsts; ko un kādēļ tas saņem; kur tas veic apstrādi; tā glabāšanas noteikumi; vai mūsu izmantotajam galapunktam ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas drīkst izmantot ievaddatus apmācībai; mūsu izmantotais nosūtīšanas mehānisms; un datums, kad pēdējoreiz pārbaudījām katru ierakstu. Pakalpojumu sniedzēji var atrasties ārpus jūsu valsts un Eiropas Ekonomikas zonas. Mūsu Privātuma politikā paskaidroti aizsardzības pasākumi." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Personas dati",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tas, kā mēs rīkojamies ar personas datiem, ir noteikts Privātuma politikā vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā Dialectical Engine publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā." }
+      { kind: "p", text: "Tas, kā mēs rīkojamies ar personas datiem, ir noteikts Privātuma politikā vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā Dialectical Engine publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā. E-pasta ziņojumi, ko mēs jums sūtām, ir rakstīti valodā, kuru izvēlējāties mūsu vietnē; Privātuma politikas 13. sadaļā paskaidrots, kā mēs saglabājam šo izvēli." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "601f55649e2089401e0a357fe0ee15e604222502db4085a0781f09df56de7f09",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.2 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
+  version: "2.3",
+  sha256: "36e55e29f42abdce5c56493cf4272216ae6d43c9fee477170e3951b98dfb493a",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.2",
+  endMarker: "NOTEIKUMU BEIGAS · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

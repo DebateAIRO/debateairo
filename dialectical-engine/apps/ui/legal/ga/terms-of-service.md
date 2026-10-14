@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.2 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.2
+endMarker: DEIREADH NA dTÉARMAÍ · v2.3
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.2 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.3 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -114,7 +114,7 @@ Mura bhfuil tú cinnte an gceadaítear rud éigin, cuir ceist orainn sula gcuire
 
 **Fanann d'ábhar i do sheilbh.** Coinníonn tú aon cheart atá agat sna ceisteanna, sna maímh, sna nótaí agus sna dúshláin a chuireann tú isteach. Deonaíonn tú ceadúnas neamheisiach, domhanda agus saor ó ríchíos dúinn chun an t-ábhar sin a óstáil, a stóráil, a atáirgeadh, a oiriúnú agus a phróiseáil chun an tseirbhís a oibriú: an díospóireacht a reáchtáil, í a stóráil ionas gur féidir leat í a athoscailt agus a athsheinm, tacaíocht a sholáthar, ár n-oibleagáidí dlíthiúla a chomhlíonadh, agus — ach amháin má roghnaíonn tú foilsiú — na críocha i rannán 9. Tagann deireadh leis an gceadúnas seo nuair a scriostar an t-ábhar, ach amháin de réir mar a éilíonn rannán 9 nó an dlí.
 
-**Ní dhéanaimid oiliúint ar d'ábhar.** Ní dhéanaimid samhlacha a oiliúint ar d'ábhar. Ní úsáidimid soláthraithe IS ach amháin faoi théarmaí nach gceadaíonn dóibh d'ábhar a úsáid chun a samhlacha a oiliúint nó a fheabhsú; léiríonn an Clár Soláthraithe, i gcás gach soláthraí, an ndearna muid é seo a dheimhniú, agus cathain.
+**Ní dhéanaimid oiliúint ar d'ábhar.** Ní úsáidimid soláthraithe IS ach amháin faoi théarmaí nach gceadaíonn dóibh d'ábhar a úsáid chun a samhlacha a oiliúint nó a fheabhsú; léiríonn an Clár Soláthraithe, i gcás gach soláthraí, an ndearna muid é seo a dheimhniú, agus cathain.
 
 **An chaoi a sroicheann d'ábhar soláthraithe IS.** Chun díospóireacht a reáchtáil, seolaimid téacs chuig soláthraí seachtrach samhlacha amháin nó níos mó. Is iad do cheist, na nótaí stiúrtha a shocraíonn tú, agus ráitis a chumann an t-inneall le linn na díospóireachta a fhaigheann soláthraí — mar sin feiceann soláthraí téacs a dhíorthaítear ón méid a chlóscríobh tú agus a tógadh timpeall air, ní hamháin do bhunfhocail. Ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais, do thaifid sheisiúin ná do shonraí íocaíochta riamh.
 
@@ -239,7 +239,7 @@ Clúdaítear d'ábhar agus stádas aschur ginte i rannán 8. Má chreideann tú 
 
 ## 17. Sonraí pearsanta
 
-Leagtar amach sa **Bheartas Príobháideachais** ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar Dialectical Engine, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais.
+Leagtar amach sa **Bheartas Príobháideachais** ag dezbatere.ro/privacy conas a láimhseálaimid sonraí pearsanta. Mínítear ann an méid a bhailímid, an bunús dlíthiúil le gach cuspóir, cá fhad a choinnímid nithe, cé a fhaigheann sonraí, na haistrithe atá i gceist, agus conas do chearta a fheidhmiú. Baineann trí phointe leis an áit seo freisin. Iarrtar ort i rannán 7 gan sonraí pearsanta daoine eile a chur i do cheist; má dhéanann tú é, tá tú freagrach astu, agus féadfaimid an t-ábhar a bhaint. Má tá sonraí pearsanta fút i ndíospóireacht a foilsíodh ar Dialectical Engine, is féidir leat iarraidh orainn í a bhaint gan cuntas a bheith agat (rannán 9). Agus coinnímid taifead de do ghlacadh leis na Téarmaí seo — an leagan, an t-am, agus sonraí teicniúla an tseisiúin — mar fhianaise ar an gconradh, mar a mhínítear sa Bheartas Príobháideachais. Scríobhtar na ríomhphoist a sheolaimid chugat sa teanga a roghnaigh tú ar ár suíomh; mínítear i rannán 13 den Bheartas Príobháideachais conas a choinnímid an rogha sin.
 
 ## 18. An dlí rialaithe agus an áit ina n-éistear díospóidí
 

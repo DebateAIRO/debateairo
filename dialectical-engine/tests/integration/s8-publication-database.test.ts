@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -2518,13 +2519,13 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     expect(retry?.deletePublicDebates).toBe(true);
     expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[first!.erasureId])).rows[0]?.delete_public_debates).toBe(true);
     const oldClient=await identityWithGrant("old-client");
-    const oldClientRow=(await erasurePool.query<{
+    const oldClientRow=(await withMailLocale(erasurePool, 'en', (c) => c.query<{
       erasure_id:string;status:string;execute_at:Date;cancellation_ref:string;
     }>(
       "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",
       [oldClient.identity.userId,oldClient.identity.ownerRef,
         oldClient.identity.sessionId,oldClient.grantTokenHash]
-    )).rows[0]!;
+    ))).rows[0]!;
     expect(Object.keys(oldClientRow).sort()).toEqual([
       "cancellation_ref","erasure_id","execute_at","status"
     ]);
@@ -2676,11 +2677,11 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     for (const ref of before) expect(ref.statusCode).toBe(200);
     const beforeList=(await httpSnapshot(refs)).list;
     for (const ref of refs) expect(beforeList).toContain(ref);
-    const scheduled=(await erasurePool.query<{ erasure_id:string }>(
+    const scheduled=(await withMailLocale(erasurePool, 'en', (c) => c.query<{ erasure_id:string }>(
       "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",
       [fixture.identity.userId,fixture.identity.ownerRef,
         fixture.identity.sessionId,fixture.grantTokenHash]
-    )).rows[0]!;
+    ))).rows[0]!;
     await due(fixture.identity.userId);
     const keyReadable=vi.fn((ref:string)=>publicationCipher.keyReadable(ref));
     const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,{

@@ -3,7 +3,7 @@ import { StaffRegistrationVerifyRequestSchema, StaffAuthenticationVerifyRequestS
 import type { StaffRegistrationOptionsResponseSchema, StaffAuthenticationOptionsResponseSchema } from '@debateai/contract';
 import type { z } from 'zod';
 import type { ActionBinding, StaffContext, StaffProof, InvitationContext, InvitationProof, OwnerPossessionContext } from '@debateai/kernel';
-import type { StaffWebAuthnRepository, StaffOrdinarySession, StaffEnrollmentIntentFactory, StaffCeremonyRead, StaffCeremonyScope, StaffCeremonyContext, StaffCeremonyPurpose, StaffCeremonyChallenge } from '@debateai/db';
+import type { StaffWebAuthnRepository, StaffOrdinarySession, StaffEnrollmentIntentFactory, StaffCeremonyRead, StaffCeremonyScope, StaffCeremonyContext, StaffCeremonyPurpose, StaffCeremonyChallenge, AuthSourceContext } from '@debateai/db';
 import { decodeBase64url, encodeBase64url, invalid } from './webauthn-codec.js';
 import { verifyRegistration, verifyAssertion } from './webauthn-verifier.js';
 type CreationOptions = z.infer<typeof StaffRegistrationOptionsResponseSchema>;
@@ -77,7 +77,7 @@ export class StaffWebAuthnService {
             invalid();
         return challenge;
     }
-    async finishRegistration(base: StaffOrdinarySession, response: unknown, intentFactory: StaffEnrollmentIntentFactory): Promise<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>> {
+    async finishRegistration(base: StaffOrdinarySession, response: unknown, intentFactory: StaffEnrollmentIntentFactory, source?: AuthSourceContext): Promise<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>> {
         const challenge = await this.read(base, 'REGISTRATION', response, null, null, null);
         let verified: ReturnType<typeof verifyRegistration>;
         let transports: NonNullable<z.infer<typeof StaffRegistrationVerifyRequestSchema>['credential']['response']['transports']>;
@@ -97,7 +97,7 @@ export class StaffWebAuthnService {
         const factorId = randomUUID(), intent = await intentFactory({ ...base, operationId: challenge.operationId, factorId, credentialId: verified.credentialId });
         if (intent.operationId !== challenge.operationId || intent.factorId !== factorId)
             invalid();
-        return this.repository.completeWebAuthnRegistration({ ...base, ...intent, challengeId: challenge.challengeId, credentialId: verified.credentialId, publicKey: verified.publicKey, newCounter: verified.counter, transports });
+        return this.repository.completeWebAuthnRegistration({ ...base, ...intent, challengeId: challenge.challengeId, credentialId: verified.credentialId, publicKey: verified.publicKey, newCounter: verified.counter, transports, source });
     }
     beginElevation(base: StaffOrdinarySession): Promise<RequestOptions> { return this.begin(base, 'ELEVATION', null, null, {}) as Promise<RequestOptions>; }
     private async assertion(base: StaffOrdinarySession, purpose: Exclude<StaffCeremonyPurpose, 'REGISTRATION'>, response: unknown, context: StaffCeremonyContext | null, binding: ActionBinding | null, scope: StaffCeremonyScope): Promise<Readonly<{

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.2 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.3 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.2
+endMarker: KONIEC WARUNKÓW · v2.3
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.2 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.3 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -114,7 +114,7 @@ Jeżeli nie masz pewności, czy dana treść jest dozwolona, skontaktuj się z n
 
 **Twoje treści pozostają Twoją własnością.** Zachowujesz wszelkie prawa przysługujące Ci do przesyłanych pytań, twierdzeń, adnotacji i zastrzeżeń. Udzielasz nam niewyłącznej, ogólnoświatowej i nieodpłatnej licencji na hosting, przechowywanie, powielanie, adaptowanie i przetwarzanie tych treści w celu obsługi usługi: prowadzenia debaty, przechowywania jej w sposób umożliwiający ponowne otwarcie i odtworzenie, zapewniania wsparcia, wykonywania naszych obowiązków prawnych oraz — wyłącznie jeżeli zdecydujesz się na publikację — w celach określonych w sekcji 9. Licencja ta wygasa z chwilą usunięcia treści, z wyjątkiem przypadków wymaganych przez sekcję 9 lub prawo.
 
-**Nie trenujemy modeli na Twoich treściach.** Nie trenujemy modeli na Twoich treściach. Korzystamy z dostawców AI wyłącznie na warunkach, które nie pozwalają im wykorzystywać Twoich treści do trenowania lub ulepszania ich modeli; Rejestr Dostawców AI pokazuje dla każdego dostawcy, czy to potwierdziliśmy, i kiedy.
+**Nie trenujemy modeli na Twoich treściach.** Korzystamy z dostawców AI wyłącznie na warunkach, które nie pozwalają im wykorzystywać Twoich treści do trenowania lub ulepszania ich modeli; Rejestr Dostawców AI pokazuje dla każdego dostawcy, czy to potwierdziliśmy, i kiedy.
 
 **W jaki sposób Twoje treści trafiają do dostawców AI.** W celu przeprowadzenia debaty przesyłamy tekst jednemu lub większej liczbie zewnętrznych dostawców modeli. Dostawca otrzymuje Twoje pytanie, ustawione przez Ciebie adnotacje sterujące oraz wypowiedzi tworzone przez silnik w toku debaty — widzi zatem tekst wyprowadzony z tego, co wpisujesz, i utworzony wokół tej treści, a nie wyłącznie Twoje pierwotne słowa. Dostawca nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta, zapisów sesji ani danych płatniczych.
 
@@ -239,7 +239,7 @@ Sekcja 8 reguluje kwestie Twoich treści i status wygenerowanych wyników. Jeże
 
 ## 17. Dane osobowe
 
-Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatności**, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w Dialectical Engine zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności.
+Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatności**, dostępna pod adresem dezbatere.ro/privacy. Wyjaśnia ona, jakie dane zbieramy, jaka podstawa prawna ma zastosowanie do każdego celu, jak długo przechowujemy poszczególne dane, kto je otrzymuje, jakie przekazywanie danych ma miejsce oraz jak wykonywać swoje prawa. W tym miejscu należy również wskazać trzy kwestie. Sekcja 7 wymaga, aby w pytaniach nie podawać danych osobowych innych osób; jeżeli je podasz, odpowiadasz za to, a my możemy usunąć treść. Jeżeli debata opublikowana w Dialectical Engine zawiera Twoje dane osobowe, możesz zażądać ich usunięcia bez posiadania konta (sekcja 9). Ponadto przechowujemy zapis akceptacji przez Ciebie niniejszych Warunków — wersję, czas i dane techniczne sesji — jako dowód zawarcia umowy, zgodnie z Polityką prywatności. Wiadomości e-mail, które do Ciebie wysyłamy, są napisane w języku wybranym przez Ciebie w naszym serwisie; sekcja 13 Polityki prywatności wyjaśnia, jak przechowujemy ten wybór.
 
 ## 18. Prawo właściwe i sądy rozpatrujące spory
 

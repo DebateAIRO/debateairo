@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from '../support/staffOwnerRecoveryFixture.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomUUID } from "node:crypto";
@@ -52,7 +53,7 @@ async function invitationProof(invitationId:string,target:Awaited<ReturnType<typ
 }
 async function passkey(a:Awaited<ReturnType<typeof account>>,credentialId:string) {
   const factorId=randomUUID();
-  await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($4,$1,'passkey',$2,'{"format":"COSE_KEY_BASE64URL_V1","value":"YQ"}','active',now(),now(),'localhost','https://localhost',true,false,false,$3,0)`,[a.userId,credentialId,{...envelope,keyId:`passkey-label:${factorId}:v1`},factorId]);
+  await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($4,$1,'passkey',$2,'{"format":"COSE_KEY_BASE64URL_V1","value":"YQ"}','active',now(),now(),'localhost','https://localhost',true,false,false,$3,0)`,[a.userId,credentialId,{...envelope,keyId:`passkey-label:${factorId}:v1`},factorId]));
 }
 async function prerequisite(a:Awaited<ReturnType<typeof account>>,purpose='KEY_PREREGISTRATION',commandId:string|null=null,nonce:string|null=null,step=2) {
   const handle=hash(randomUUID()),replacement=hash(randomUUID());
@@ -401,7 +402,7 @@ it('governed erasure cascades invitations and severs mapping while fixture alert
   const stored=(await database.pool.query('SELECT o.key_ref,o.encrypted_payload FROM staff.alert_outbox o JOIN staff.audit_event a USING(event_id) WHERE a.operation_id=$1',[op])).rows[0];
   expect(stored.key_ref).toBe(auditToken);const readable=await users.load(target.userId);expect(decrypt(readable,stored.encrypted_payload,aad).toString()).toBe('fixture metadata alert');readable.fill(0);
   const erasure=randomUUID();await database.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')",[erasure,target.userId]);
-  expect((await database.pool.query("SELECT identity.prepare_account_erasure($1,'{}','{}','{}') AS result",[erasure])).rows[0].result).toBe('PREPARED');
+  expect((await withMailLocale(database.pool, 'en', (c) => c.query("SELECT identity.prepare_account_erasure($1,'{}','{}','{}') AS result",[erasure]))).rows[0].result).toBe('PREPARED');
   const notifications=(await database.pool.query('SELECT * FROM identity.claim_account_erasure_notifications(10)')).rows;
   for(const notification of notifications){expect(notification.erasure_id).toBe(erasure);expect((await database.pool.query('SELECT identity.ack_account_erasure_notification($1,$2) AS done',[notification.message_id,notification.claim_token])).rows[0].done).toBe(true);}
   expect(await users.destroy(target.userId)).toBe('DESTROYED');const cleanup=(await database.pool.query('SELECT clock_timestamp() AS time')).rows[0].time;
@@ -499,7 +500,7 @@ it('invalidates an invitation when its issuing Owner designation disappears with
  expect((await database.pool.query('SELECT signature_counter FROM identity.mfa_factor WHERE user_id=$1 AND credential_id=$2',[target.userId,credential])).rows[0].signature_counter).toBe('0');
 });
 it('persistent authority requires both verified email and an active verified TOTP factor',async()=>{
- const actor=await staff();await database.pool.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1",[actor.factorId]);
+ const actor=await staff();await withMailLocale(database.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1",[actor.factorId]));
  expect((await runtime.query('SELECT staff.read_context($1,$2,$3) AS context',[actor.userId,actor.sessionId,actor.tokenHash])).rows[0].context).toBeNull();
  const another=await staff();await database.pool.query("UPDATE identity.channel_binding SET state='revoked' WHERE user_id=$1 AND channel_type='email'",[another.userId]);
  expect((await runtime.query('SELECT staff.read_context($1,$2,$3) AS context',[another.userId,another.sessionId,another.tokenHash])).rows[0].context).toBeNull();

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: PRIVACY POLICY · v3.4 · EFFECTIVE 12 OCTOBER 2026
 title: What we store, and why
 lede: Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.
-endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.3
+endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Privacy Policy text
 annexTitle: Annex B — Regional privacy terms
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.3 · Effective 12 October 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 October 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. Debates are private unless you publish them. Deleting your account destroys the keys to your private data; when you schedule it, you choose whether your published debates are taken down too or stay public under your retired pseudonym. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account.
 
@@ -183,7 +183,7 @@ Dialectical Engine uses 20 items, all strictly necessary for the service you ask
 | `__Host-debateai-session` | Cookie (HttpOnly) | Keeps you signed in. It is renewed while you use the service. | 14 days |
 | `__Host-debateai-csrf` | Cookie | Stops other websites from submitting forms in your name. | 14 days |
 | `__Host-debateai-age-refusal` | Cookie (HttpOnly) | After an age check is refused, stops this browser from trying again for 30 days. It holds only the word “refused”, no personal data. | 30 days |
-| `debateai.locale` | Cookie | Remembers the interface language you picked. | 1 year |
+| `debateai.locale` | Cookie | Remembers the interface language you picked, and sets the language of the emails we send you. | 1 year |
 | `__Host-debateai-staff` | Cookie (HttpOnly) | Separate staff access | Up to 8 hours; 15-minute idle expiry |
 | `__Host-debateai-staff-csrf` | Cookie | Stops other websites from submitting forms in your name. | Up to 8 hours; 15-minute idle expiry |
 | `__Host-debateai-password-reset` | Cookie (HttpOnly) | Password reset only | Up to 30 minutes |
@@ -201,6 +201,8 @@ Dialectical Engine uses 20 items, all strictly necessary for the service you ask
 | `debateai.exportPending` | Session storage | Keeps the emailed export link in this tab for sign-in and retry. | Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result |
 | `debateai.exportLinkOutcome` | Session storage | Remembers which download-link message to show in this tab. | Until tab close, sign-out, or a new link |
 
+Each email we queue for you keeps the language you had selected until we send it.
+
 No other party collects information about your online activities over time and across websites through Dialectical Engine.
 
 Browsers can send a “Do Not Track” signal or a similar signal. Dialectical Engine does not track you, so there is nothing for such a signal to switch off: the service works the same with or without it.
@@ -211,7 +213,7 @@ To refuse these items, block or delete cookies and site data for this site in yo
 
 When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version.
 
-This policy was last updated on 12 October 2026. Version 3.3 replaced version 3.2: it covers only the regions we serve, names our company and, in section 5, our hosting, content-delivery and email providers, and describes the Cloudflare bot check.
+This policy was last updated on 12 October 2026. Version 3.4 replaced version 3.3: section 13 now says that the cookie debateai.locale also sets the language in which we write the emails we send you, and it adds a paragraph saying that each email we queue for you keeps the language you had selected until we send it.
 
 ## Annex B — Regional privacy terms
 
