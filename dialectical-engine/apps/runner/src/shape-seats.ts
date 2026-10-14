@@ -60,3 +60,14 @@ export function shapeMakerBar(avoidMakers: readonly (string | null | undefined)[
   const barred = avoidMakers.filter((maker): maker is string => typeof maker === "string" && maker !== "");
   return barred.length === 0 ? undefined : (member) => !barred.includes(member.maker);
 }
+
+/**
+ * Final review M-1 (owner principle: positions argued by different AIs) — the bar a shaped ROOT puts on who may answer
+ * it: never a maker that already answered ANOTHER root (`otherRootMakers`, read each time a member is weighed, so a root
+ * answered meanwhile counts), for its main, its backup and a cheaper maker a refused call moves to (B9). Its own seat's
+ * maker always stays allowed: a SHARE hand-over puts one seat in two positions by design.
+ */
+export function shapeRootMakerBar(ownMaker: string, otherRootMakers: () => readonly (string | null | undefined)[]):
+  (member: Readonly<{ maker: string }>) => boolean {
+  return (member) => member.maker === ownMaker || !otherRootMakers().includes(member.maker);
+}

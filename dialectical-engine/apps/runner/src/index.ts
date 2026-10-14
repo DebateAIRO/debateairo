@@ -226,7 +226,9 @@ import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
-import { shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeSeatOrder, shapeWriterSeat } from "./shape-seats.js";
+import {
+  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
+} from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -5903,6 +5905,9 @@ export class WalkingSkeletonRunner {
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
     // keeps its backup; the ledger read still seeds `positionAnswerers`.
     const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /** Final review M-1: a shaped root's maker bar narrows its POSITION rule (main and backup); none is today's rule. */
+    const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined
+      ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);
     /**
      * Model scorecard A16c (controller carries 12 and 16) — THE SYNTHESIS SEATS
      * TAKE PART IN R3's 80-20 SPLIT, through the same site-pure ordinal every
@@ -7223,7 +7228,7 @@ export class WalkingSkeletonRunner {
       const childPlan = seatCallPlan(
         input.seat,
         input.callSiteKey,
-        input.seat.role === "POSITION" ? positionRule(input.seat) : input.makerBar
+        input.seat.role === "POSITION" ? positionSeatRule(input.seat, input.makerBar) : input.makerBar
       );
       if (input.makerBar !== undefined) movedCallBars.set(seatBaseCallSiteKey(input.callSiteKey), input.makerBar);
       const childAttempt = await cooldownAttempt({
@@ -7864,6 +7869,9 @@ export class WalkingSkeletonRunner {
         leg: rootLegOf(rootIndex),
         callSiteKey: rootCallSiteKey(rootIndex),
         role: rootIndex === 1 ? "secondary root author" : "additional maker root author",
+        // Final review M-1 (shaped only): this root's backup or moved call never lands on a maker arguing another root.
+        ...(shapePlan === null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+          () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)) }),
         ...ROOT_SAVE,
         plannedLegCount: 1
       };
@@ -7946,8 +7954,11 @@ export class WalkingSkeletonRunner {
       scoredNodeIds: ReadonlySet<string> } | null = null;
     /** Adaptive (spec §3.3 step 5): set once the round-1 boundary chose the chains to keep. */
     let adaptiveChosen = false;
-    /** True on a shaped run whose deeper rounds are adaptive: a deeper leg runs only under a chain the choice kept. */
-    const adaptiveShape = shapePlan !== null && shapeRun !== null && shapeRun.settings.depthMode === "adaptive";
+    /**
+     * True on a shaped run whose deeper rounds are adaptive: a deeper leg runs only under a chain the choice kept. Final
+     * review M-2: read from the RECEIPT (`shape.depthMode`, what the price was made from), never from the run's settings.
+     */
+    const adaptiveShape = shapePlan !== null && shapeRun !== null && shapeRun.shape.depthMode === "adaptive";
     /**
      * Spec §3.3 step 5 (adaptive; contract deviation 6) — THE CHAINS PER POSITION KEPT AT THE ROUND-1 BOUNDARY: the
      * receipt's `deeperTopPoints` per position with the highest root leverage (`shapeSelectChains`; a frozen or unscored
@@ -8298,6 +8309,8 @@ export class WalkingSkeletonRunner {
         // Pre-flight PF-B43, as `crossExchangeSeatFor`: a site an earlier pass already recorded keeps its slot (the
         // attempt ceiling is exact only under that precondition, packages/register/src/index.ts).
         const recorded = recordedSlotBySite.get(shapeLeg.callSiteKey);
+        // Final review M-1: a backup or a moved call never answers as the maker of the position it replies to.
+        const crossBar = shapeMakerBar([answeredMakers[target]]);
         const call = {
           authorIndex: shapeLeg.rootIndex,
           seat: Object.freeze({
@@ -8310,6 +8323,7 @@ export class WalkingSkeletonRunner {
             pinned: null
           }),
           leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          ...(crossBar === undefined ? {} : { makerBar: crossBar }),
           callSiteKey: shapeLeg.callSiteKey,
           role: "cross-root response",
           childKind: "support" as const,

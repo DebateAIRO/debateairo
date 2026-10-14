@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildShapePlan, shapeLegCanRun, shapePositionsForTodaysOpening } from "../../apps/runner/src/shape-plan.js";
-import { shapeMakerBar } from "../../apps/runner/src/shape-seats.js";
+import { shapeMakerBar, shapeRootMakerBar } from "../../apps/runner/src/shape-seats.js";
 
 const RUNNER = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
 const slice = (from: string, to: string): string => {
@@ -31,11 +31,52 @@ describe("the writer rule bars the avoided maker for every member and every move
     expect(leg).toContain("const makerBar = shapeLeg === null ? undefined : shapeMakerBar([answeredMakers[leg.parentIndex]]);");
     expect(leg).toContain("...(makerBar === undefined ? {} : { makerBar }),");
     const author = slice("const authorAndPanel = async (", "const childReduced = reduceAssessment({");
-    expect(author).toContain("input.seat.role === \"POSITION\" ? positionRule(input.seat) : input.makerBar");
+    expect(author).toContain("input.seat.role === \"POSITION\" ? positionSeatRule(input.seat, input.makerBar) : input.makerBar");
+    // Final review M-1: a POSITION seat's own rule stays, and a shaped root's bar narrows it for main and backup alike;
+    // without a bar (today's roots) the rule is today's, the same function.
+    expect(RUNNER).toContain("const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined\n      ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);");
     expect(author).toContain("if (input.makerBar !== undefined) movedCallBars.set(seatBaseCallSiteKey(input.callSiteKey), input.makerBar);");
     const fallback = slice("const bodyGatewayFor = (", "onServed:");
     expect(fallback).toContain("const bar = movedCallBars.get(seatBaseCallSiteKey(request.callSiteKey));");
     expect(fallback).toContain("candidate.maker !== author && (bar === undefined || bar(candidate))");
+  });
+});
+
+/**
+ * Final review M-1: a cheaper-model move (B9) or a backup on a shaped ROOT or CROSS-REPLY had no maker bar, so a refused
+ * root could move to the maker already arguing another position (two positions by one AI), and a cross-reply to the very
+ * maker it answers. Shaped path only: today's roots and cross-exchanges pass no bar.
+ */
+describe("a shaped root or cross-reply never lands on a maker arguing another position (M-1)", () => {
+  it("a root's bar refuses the makers that answered the OTHER roots, read at call time, never its own seat's maker", () => {
+    const answered: (string | undefined)[] = ["maker-a", undefined, "maker-c"];
+    const bar = shapeRootMakerBar("maker-b", () => answered.filter((_maker, index) => index !== 1));
+    expect(bar({ maker: "maker-a" })).toBe(false);
+    expect(bar({ maker: "maker-c" })).toBe(false);
+    expect(bar({ maker: "maker-d" })).toBe(true);
+    expect(bar({ maker: "maker-b" })).toBe(true);
+    // A root answered later is barred from then on (the bar reads the makers when a member is weighed).
+    answered[3] = "maker-d";
+    expect(bar({ maker: "maker-d" })).toBe(false);
+    // A SHARE hand-over: the root's own seat's maker already argues another position by design, and stays allowed.
+    expect(shapeRootMakerBar("maker-a", () => ["maker-a"])({ maker: "maker-a" })).toBe(true);
+  });
+
+  it("is wired on the shaped path only: shaped roots and cross-replies pass a bar, registered for a moved call", () => {
+    const root = slice("const rootChain = async (", "let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;");
+    expect(root).toContain("...(shapePlan === null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,");
+    const cross = slice("const argueShapeCross = async (", "let authored: Awaited<ReturnType<typeof authorAndPanel>>;");
+    expect(cross).toContain("const crossBar = shapeMakerBar([answeredMakers[target]]);");
+    expect(cross).toContain("...(crossBar === undefined ? {} : { makerBar: crossBar }),");
+    // Today's cross-exchanges and the root 0 call pass none.
+    expect(slice("const openFirstPosition = async (", "let primaryAttempt = await openFirstPosition(")).not.toContain("makerBar");
+  });
+});
+
+describe("the adaptive or fixed rounds are the receipt's (final review M-2)", () => {
+  it("reads the depth mode the price was made from (the receipt's shape), never the run's settings", () => {
+    expect(RUNNER).toContain("const adaptiveShape = shapePlan !== null && shapeRun !== null && shapeRun.shape.depthMode === \"adaptive\";");
+    expect(RUNNER).not.toContain("shapeRun.settings.depthMode");
   });
 });
 
