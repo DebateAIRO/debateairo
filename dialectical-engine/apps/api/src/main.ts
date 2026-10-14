@@ -1,5 +1,9 @@
 import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
+import { previewProviderSocket } from "@debateai/providers";
+import { readQuestionLanguagePolicy } from "@debateai/register";
+import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
+import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -630,6 +634,25 @@ const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTo
 const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 // The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
 const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+// Question language (spec 2026-10-13): only with the debate shape row in force (row absent, or `enabled: false`: no
+// row read, no eld load, today's boot). The row is optional (absent = start values); a malformed row, an owner text
+// carrying a frame token, or an unreviewed preview model refuses the boot. The fast check is a site cost: nothing
+// charges the person for it.
+const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => composeQuestionLanguage({
+  policy: await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION),
+  // Ruling L-ROUTE: a configured preview is PREVIEW (the guarded fetch with the Anthropic gate socket) or NONE, never
+  // HOSTED; without a preview the hosted side builds no transport until Task 19 (boot.ts hostedQuestionLanguageRoute).
+  route: questionLanguageRouteFor({
+    previewConfigured: previewConfig !== undefined,
+    previewFetch,
+    anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, "anthropic"),
+    hosted: () => hostedQuestionLanguageRoute(environment.DEPLOYMENT_MODE)
+  }),
+  clock: () => new Date(),
+  maxQuestionBytes: askQuestionMaxBytes(),
+  // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
+  referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
+}));
 const modelPicker = await composeAskModelPicker({
   boot,
   pool,
@@ -991,6 +1014,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
   // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Question language (spec 2026-10-13): the decider, composed above only with the shape row in force.
+  ...(questionLanguage === undefined ? {} : { questionLanguage }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,

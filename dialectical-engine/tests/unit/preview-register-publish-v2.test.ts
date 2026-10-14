@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
@@ -318,7 +318,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
@@ -372,7 +372,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
     const calls = text.split('publisher.buildPreviewSourceRowsV2(');
     expect(calls).toHaveLength(2); // the operator's one builder call
-    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null\);/);
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null\);/);
     // What it hands over is the plan's value exactly as the plan check accepted it.
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
@@ -397,7 +397,7 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
@@ -446,6 +446,61 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
     bad.plans.free.mapAIs = 10;
     expect(operator.validateNativePlan({ ...plan, debateShape: bad })).toBeTruthy(); // shape only (pre-flight PF-B20)
     await expect(build(bad)).rejects.toThrow('DEBATE_SHAPE_POLICY_INVALID:plans.free.mapAIs');
+  });
+});
+
+describe('publish kit v2: the optional questionLanguagePolicy row (absent by default, question-language spec 2026-10-13)', () => {
+  const policy = questionLanguagePolicyStartValues();
+  const build = async (questionLanguage?: unknown) =>
+    [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, null, questionLanguage as any)] as Row[];
+
+  it('adds exactly one row when supplied and nothing by default; it is optional, never in the reviewed closure', async () => {
+    const absent = await build(), given = await build(policy);
+    expect(absent.map(row => row.rowKey)).not.toContain(QUESTION_LANGUAGE_POLICY_ROW_KEY);
+    expect(await build(null)).toEqual(absent);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(QUESTION_LANGUAGE_POLICY_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== QUESTION_LANGUAGE_POLICY_ROW_KEY)).toEqual(absent);
+    expect(JSON.parse(given.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
+    // The fast check switched off is a policy value, not a word.
+    const off = await build({ ...policy, fastCheck: null });
+    expect(JSON.parse(off.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)!.valueJsonText).fastCheck).toBeNull();
+  });
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    await expect(build({ ...policy, fastCheck: { ...policy.fastCheck!, provider: 'openai' } })).rejects.toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.fastCheck.provider');
+    await expect(build({ ...policy, instruction: ' ' })).rejects.toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.instruction');
+  });
+  it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
+    const f = await fixture();
+    const published = compose(await build(policy), f.v9);
+    expect(published.addedKeys).toEqual([ROTATION_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    const base = [...published.rows] as Row[];
+    const kept = compose(f.source, base, '10');
+    expect(kept.rows.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)).toEqual(base.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY));
+    expect(kept.delta).toEqual([]);
+    const broken = base.map(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"QUESTION_LANGUAGE_POLICY"', '"X"') } : row);
+    expect(() => compose(f.source, broken, '10')).toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.kind');
+  });
+  it('a new value replaces the base version\'s row (changed in the delta); switching the fast check off is one changed row', async () => {
+    const f = await fixture();
+    const on = compose(await build(policy), f.v9);
+    const switched = compose(await build({ ...policy, fastCheck: null }), [...on.rows] as Row[], '10');
+    expect(switched.changedKeys).toEqual([QUESTION_LANGUAGE_POLICY_ROW_KEY]);
+    expect(switched.addedKeys).toEqual([]);
+  });
+  it('the native plan check takes a plain object only, on plan and publish only; the parser refuses a bad policy when the rows are built', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const value = JSON.parse(JSON.stringify(policy));
+    expect(operator.validateQuestionLanguageChoice(value)).toBe(value);
+    for (const bad of ['off', 'on', null, [], 7, true]) expect(() => operator.validateQuestionLanguageChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const plan = { schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+      sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9',
+      selectedBaseSnapshotSha256: 'd'.repeat(64), publicationId: id, approval: null };
+    for (const operation of ['plan', 'publish']) expect(operator.validateNativePlan({ ...plan, operation, questionLanguage: value })).toBeTruthy();
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...plan, operation, questionLanguage: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    expect(() => operator.validateNativePlan({ ...plan, questionLanguage: 'off' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const bad = { ...value, version: 2 };
+    expect(operator.validateNativePlan({ ...plan, questionLanguage: bad })).toBeTruthy(); // shape only
+    await expect(build(bad)).rejects.toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.version');
   });
 });
 

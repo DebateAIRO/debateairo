@@ -37,6 +37,9 @@
  *    left out, no such row is sealed and the runner makes one call at a time per debate. Likewise optional, the
  *    `debateShapePolicy` (spec 2026-10-12, debate shape): the policy without its kind, sealed as the ADDITIVE
  *    `debateShapePolicy` row under the file's sourceRef; left out, no such row is sealed and the engine keeps today's shape.
+ *    Likewise optional, the `questionLanguagePolicy` (question-language spec 2026-10-13): the policy without its kind,
+ *    sealed as the ADDITIVE `questionLanguagePolicy` row under the file's sourceRef; left out, no such row is sealed and
+ *    an API with the debate shape in force uses the code's start values.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -119,6 +122,9 @@ import {
   debateShapeWriterCeiling,
   parseDebateShapePolicy,
   type DebateShapePolicy,
+  QUESTION_LANGUAGE_POLICY_ROW_KEY,
+  parseQuestionLanguagePolicy,
+  questionLanguagePolicyRow,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -221,7 +227,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
   "callConcurrencyPolicy",
   // Debate shape (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the engine keeps today's shape.
-  "debateShapePolicy"
+  "debateShapePolicy",
+  // Question language (spec 2026-10-13): OPTIONAL. Left out, no row is sealed (the code's start values apply).
+  "questionLanguagePolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -417,6 +425,8 @@ export type HostedRegisterFile = Readonly<{
   callConcurrencyPolicy?: unknown;
   /** Optional (spec 2026-10-12): the debate shape policy without its kind; absent = no debateShapePolicy row. */
   debateShapePolicy?: unknown;
+  /** Optional (spec 2026-10-13): the question-language policy without its kind; absent = no questionLanguagePolicy row. */
+  questionLanguagePolicy?: unknown;
 }>;
 
 /**
@@ -479,7 +489,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
-    ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {})
+    ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
+    ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {})
   });
 }
 
@@ -824,6 +835,22 @@ function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
 }
 
 /**
+ * The questionLanguagePolicy row for the file's optional member (question-language spec 2026-10-13), exactly as
+ * debateShapeRowOf: the member is the policy without its `kind`; a member that is not an object, carries `kind`, or
+ * that the register's own parser refuses is refused with the file's own code, so a malformed member never seals.
+ */
+function questionLanguageRowOf(member: unknown, sourceRef: string): ReturnType<typeof questionLanguagePolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  }
+  try {
+    return questionLanguagePolicyRow(parseQuestionLanguagePolicy({ kind: "QUESTION_LANGUAGE_POLICY", ...member }), sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  }
+}
+
+/**
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
@@ -866,6 +893,9 @@ export async function planHostedRegisterPublication(
   // Debate shape (P2b Task 6, pre-flight PF-B21): the member in force (absent, or `enabled: false`, = none), for the
   // Free answer-job check below.
   const debateShapeInForcePolicy = debateShapeInForce(debateShape === null ? null : debateShape.policy);
+  // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
+  const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
+    : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -1012,12 +1042,22 @@ export async function planHostedRegisterPublication(
     valueJsonText: debateShapeRow.valueJsonText,
     sourceRef: debateShapeRow.sourceRef
   })];
+  // Question language (spec 2026-10-13) is ADDITIVE too, for the same reason.
+  if (questionLanguageRow !== null && codeOwnedRows.some((row) => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const questionLanguageRows: readonly RegisterPublicationRow[] = questionLanguageRow === null ? [] : [Object.freeze({
+    rowKey: questionLanguageRow.rowKey,
+    valueJsonText: questionLanguageRow.valueJsonText,
+    sourceRef: questionLanguageRow.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
     ...roleRotationRows,
     ...callConcurrencyRows,
-    ...debateShapeRows
+    ...debateShapeRows,
+    ...questionLanguageRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {

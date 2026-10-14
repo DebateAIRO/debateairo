@@ -34,6 +34,9 @@ import {
   callConcurrencyPolicyRow,
   debateShapePolicyRow,
   debateShapePolicyStartValues,
+  questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
+  readQuestionLanguagePolicy,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   readAdmissionPolicy,
@@ -576,6 +579,43 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     const version = registerVersionToSafeLegacyNumber(given.registerVersion);
     await expect(readDebateShapePolicy(database.pool, version)).resolves.toEqual(debateShapePolicyStartValues());
     await expect(readMapContractHash(database.pool, version)).resolves.toBe(mapPromptContractHash());
+  }, 120_000);
+
+  // Question language (P2L Task 12): the optional questionLanguagePolicy member becomes one additive row, read back by
+  // the API's own reader; a file without the member seals none.
+  it("seals questionLanguagePolicy as the row the publishers build, read back by the API's reader; a file without the member seals none", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    const absent = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    expect(absent.outcome).toBe("CREATED");
+    await expect(readQuestionLanguagePolicy(database.pool, registerVersionToSafeLegacyNumber(absent.registerVersion))).resolves.toBeNull();
+
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const before = await versionCount();
+    const given = await publishHostedRegister({ plan: await planOf({ ...hostedFile(), questionLanguagePolicy: member }), operations });
+    expect(given.outcome).toBe("CREATED");
+    expect(await versionCount()).toBe(before + 1);
+    const expected = questionLanguagePolicyRow(questionLanguagePolicyStartValues(), "task-14b integration: first hosted register");
+    const sealed = await database.pool.query<{ value_json: unknown; source_ref: string }>(
+      "SELECT value_json,source_ref FROM register.register_row WHERE register_version=$1 AND row_key='questionLanguagePolicy'",
+      [given.registerVersion]
+    );
+    expect(sealed.rows).toEqual([{ value_json: JSON.parse(expected.valueJsonText), source_ref: expected.sourceRef }]);
+    await expect(readQuestionLanguagePolicy(database.pool, registerVersionToSafeLegacyNumber(given.registerVersion)))
+      .resolves.toEqual(questionLanguagePolicyStartValues());
+  }, 120_000);
+
+  it.each([
+    ["a provider the register does not know", (m: any) => { m.fastCheck.provider = "openai"; }],
+    ["a member carrying the row's kind", (m: any) => { m.kind = "QUESTION_LANGUAGE_POLICY"; }],
+    ["a member present as JSON null", () => null]
+  ])("refuses a questionLanguagePolicy member with %s before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues()));
+    const changed = change(member);
+    const before = await versionCount();
+    const code = await planOf({ ...hostedFile(), questionLanguagePolicy: changed === null ? null : member })
+      .then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
+    expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+    expect(await versionCount()).toBe(before);
   }, 120_000);
 
   it("a version sealing debateShapePolicy without its mapContractHash (a hand-made plan) is sealed, then refused DEBATE_SHAPE_MAP_HASH_UNSEALED", async () => {

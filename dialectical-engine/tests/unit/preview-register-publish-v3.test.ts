@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues } from '@debateai/register';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
@@ -274,6 +274,52 @@ describe('publish kit v3: the optional debateShapePolicy row and the sealed map 
   });
 });
 
+describe('publish kit v3: the optional questionLanguagePolicy row (ruling L-KIT, P2L Task 12)', () => {
+  const policy = questionLanguagePolicyStartValues();
+  const shape = debateShapePolicyStartValues();
+  /** v3's seventh argument is the debate shape and its eighth the question language (v2's seventh). */
+  const v3 = async (debateShape: unknown, ...language: [] | [unknown]) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON, undefined, undefined, null, debateShape, ...language)] as Row[];
+  const v2 = async (language: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, null, language as any)] as Row[];
+  const languageRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY);
+
+  it('passes the policy through to kit v2: the same row as v2 builds; null or nothing = no row; a malformed policy is refused', async () => {
+    const given = await v3(null, policy);
+    expect(languageRow(given)).toEqual(languageRow(await v2(policy)));
+    expect(JSON.parse(languageRow(given)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
+    const absent = await v3(null);
+    expect(languageRow(absent)).toBeUndefined();
+    expect(await v3(null, null)).toEqual(absent);
+    expect(given.filter(row => row.rowKey !== QUESTION_LANGUAGE_POLICY_ROW_KEY)).toEqual(absent);
+    await expect(v3(null, { ...policy, version: 2 })).rejects.toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.version');
+  });
+
+  it('R19: a base row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
+    const base = sorted([...await v2(policy), ...owned()]);
+    const source = await v3(null);
+    const plan = compose(source, base);
+    expect(languageRow([...plan.rows] as Row[])).toEqual(languageRow(base));
+    expect(plan.delta.map(entry => entry.rowKey)).not.toContain(QUESTION_LANGUAGE_POLICY_ROW_KEY);
+    const broken = base.map(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"QUESTION_LANGUAGE_POLICY"', '"X"') } : row);
+    expect(refusal(() => compose(source, broken))).toContain('QUESTION_LANGUAGE_POLICY_INVALID:$.kind');
+  });
+
+  it('asks the API\'s question-language boot refusals before anything is sealed, only with the debate shape in force', async () => {
+    const f = await fixture();
+    const framed = { ...policy, instruction: 'Name it. --- SAFETY FRAME' };
+    const offPreview = { ...policy, fastCheck: { ...policy.fastCheck!, model: 'claude-opus-5-5' } };
+    // With the shape in force: the start values pass; an owner text carrying a frame token, or a model the preview's
+    // Anthropic gate does not review, is refused when composing (the API would refuse to boot on the sealed version).
+    const composed = async (debateShape: unknown, language: unknown) => compose(await v3(debateShape, language), f.v12);
+    await expect(composed(shape, policy)).resolves.toBeDefined();
+    await expect(composed(shape, framed)).rejects.toThrow('QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN');
+    await expect(composed(shape, offPreview)).rejects.toThrow('QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW');
+    // Without the shape in force (no row, or the row disabled) the API never reads the row at boot: parsed only.
+    await expect(composed(null, framed)).resolves.toBeDefined();
+    await expect(composed('off', offPreview)).resolves.toBeDefined();
+  });
+});
+
 describe('the native operator chooses the kit by the plan', () => {
   const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
   const body = text.slice(text.indexOf('export async function runNativeOperator('));
@@ -281,7 +327,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {

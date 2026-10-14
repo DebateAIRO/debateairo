@@ -47,6 +47,8 @@ import {
   readEngineVersion,
   readStoryPolicy,
   debateShapePolicyStartValues,
+  questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
 import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
@@ -412,6 +414,42 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(shapeLines.length).toBeGreaterThanOrEqual(2);
     for (const line of shapeLines) expect(line).not.toContain('"kind"');
     expect(registerReadme).toContain("the plan prints `debate_shape=present`");
+  });
+
+  it("question language (P2L Task 12): the optional member seals one ADDITIVE row, the publishers' own; no member, no row", async () => {
+    const without = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    expect(without.rows.map((row) => row.rowKey)).not.toContain("questionLanguagePolicy");
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const file = { ...validFile(), questionLanguagePolicy: member };
+    const parsed = parseHostedRegisterFile(bytesOf(file));
+    const given = await planHostedRegisterPublication(parsed);
+    const expected = questionLanguagePolicyRow(questionLanguagePolicyStartValues(), parsed.sourceRef);
+    expect(given.rows.filter((row) => row.rowKey === "questionLanguagePolicy"))
+      .toEqual([{ rowKey: expected.rowKey, valueJsonText: expected.valueJsonText, sourceRef: expected.sourceRef }]);
+    expect(given.rows.filter((row) => row.rowKey !== "questionLanguagePolicy")).toEqual(without.rows);
+    // The fast check switched off is a value of the member, never a word.
+    const off = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: { ...member, fastCheck: null } })));
+    expect(JSON.parse(off.rows.find((row) => row.rowKey === "questionLanguagePolicy")!.valueJsonText).fastCheck).toBeNull();
+    // The register's runbook names the member without its kind, and its refusal as code.
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    const lines = registerReadme.split("\n").filter((line) => line.includes("`questionLanguagePolicy`"));
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+    for (const line of lines) expect(line).not.toContain('"kind"');
+    expect(registerReadme).toContain("`HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID`");
+  });
+
+  it.each([
+    ["a member carrying the row's kind", (m: Record<string, unknown>) => ({ ...m, kind: "QUESTION_LANGUAGE_POLICY" })],
+    ["a member present as JSON null", () => null],
+    ["a member that is an array", () => []],
+    ["a provider the register does not know", (m: Record<string, unknown>) => ({ ...m, fastCheck: { ...(m.fastCheck as object), provider: "openai" } })],
+    ["a blank instruction", (m: Record<string, unknown>) => ({ ...m, instruction: " " })],
+    ["an unknown field", (m: Record<string, unknown>) => ({ ...m, notes: "x" })]
+  ])("question language: refuses a questionLanguagePolicy member with %s before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const code = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: change(member) })))
+      .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
+    expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
   });
 
   it("prints a plan with no credential path and no secret", async () => {

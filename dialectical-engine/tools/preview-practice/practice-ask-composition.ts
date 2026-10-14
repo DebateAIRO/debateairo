@@ -16,7 +16,7 @@
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, type RunCreationSettings } from "@debateai/api";
-import type { AskRequest } from "@debateai/contract";
+import { askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { ProviderProbeRepository, readRoleRotationCounts } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
@@ -45,12 +45,16 @@ import {
   readEnvelopeFormulaInputs,
   readModelScorecard,
   readPanelDiscoveryPolicy,
+  readQuestionLanguagePolicy,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier
 } from "@debateai/register";
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
+import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
+import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
+import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
 /** The read-only "what is left today" answer of each gate, over the forwarded sockets. */
@@ -82,6 +86,8 @@ export async function composePracticeAsk(input: Readonly<{
   dispatcher: Dispatcher;
   teamUserIds: readonly string[];
   log?: (line: string) => void;
+  /** Question language (P2d's report): each lock or offer the decider makes. Never wired to a logger. */
+  onQuestionLanguage?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
 }>) {
   const { pool, settings } = input;
   const version = settings.runner.REGISTER_VERSION;
@@ -121,6 +127,23 @@ export async function composePracticeAsk(input: Readonly<{
   const debateShapePolicy = await readDebateShapePolicy(pool, version);
   // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
   const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+  // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
+  // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
+  // blind-index key here, so the check reference key is per process.
+  const questionLanguage = debateShapeInForcePolicy === null ? undefined : await composeQuestionLanguage({
+    policy: await readQuestionLanguagePolicy(pool, version),
+    route: questionLanguageRouteFor({
+      previewConfigured: true,
+      previewFetch,
+      // The forwarded Anthropic gate socket, when the practice has a port on it (the seam main.ts reads from the config).
+      anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,
+      hosted: () => { throw new TypeError("PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE"); }
+    }),
+    clock: () => new Date(),
+    maxQuestionBytes: askQuestionMaxBytes(),
+    referenceKey: newQuestionLanguageReferenceKey(),
+    ...(input.onQuestionLanguage === undefined ? {} : { onDecided: input.onQuestionLanguage })
+  });
   const modelPicker = await composeAskModelPicker({
     boot: BOOT,
     pool,
@@ -147,6 +170,7 @@ export async function composePracticeAsk(input: Readonly<{
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
     ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+    ...(questionLanguage === undefined ? {} : { questionLanguage }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
       panelSize: basis.panelSize,
