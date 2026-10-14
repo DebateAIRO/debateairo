@@ -66,36 +66,37 @@ export function questionLanguageRouteFor(input: Readonly<{ previewConfigured: bo
   return input.hosted();
 }
 
-/** The reviewed provider table's Haiku row: the floor of every hosted language-check price (Task 4 note, Task 19). */
-const HAIKU_PRICE_ROW_MODEL = "claude-haiku-5-5";
-
 /** USD micro-units per million tokens, from a nano-USD-per-token price (USD/M x 1000 nano = USD/M x 1e6 micros). */
 const microsPerMillion = (nanoPerToken: bigint): number => Number(nanoPerToken * 1000n);
 
 /**
+ * The fast-check model's row on the reviewed provider price table (preview-models.ts), Anthropic only. Hosted never
+ * guesses a price (fix round 1, never under-count): a model off the table refuses the boot by name.
+ */
+function pricedFastCheckRow(model: string): PreviewModelRow {
+  const row = previewModelRow(model);
+  if (row === undefined || row.provider !== "anthropic") throw refusal("QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED");
+  return row;
+}
+
+/**
  * The per-million price a hosted language check is recorded at (the money law: never under-count). Input: the larger
- * of the row's input price at the 5-minute cache-write rate (1.25x, rounded up) and the provider table's cache-write
- * input price; output: the larger of the row's and the table's. The frame is always cacheable (the fast check's system
- * goes as the two-block form with the one cache mark, transport.ts), so the cache-write rate always applies. The table
- * is the reviewed Anthropic rows (preview-models.ts): Haiku's row, and the configured model's own row when it has one;
- * at more than the row's upper-step threshold of input tokens, each row's upper step.
+ * of the row's input price at the 5-minute cache-write rate (1.25x, rounded up) and the reviewed table row's
+ * cache-write input price; output: the larger of the row's and the table row's. The frame is always cacheable (the fast
+ * check's system goes as the two-block form with the one cache mark, transport.ts), so the cache-write rate always
+ * applies. At more than the table row's upper-step threshold of input tokens, its upper step. A model off the table
+ * throws QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED.
  */
 export function hostedLanguageCheckPrice(rowPrice: Readonly<{ input: number; output: number }>, model: string,
   inputTokens: number): Readonly<{ input: number; output: number }> {
-  const haiku = previewModelRow(HAIKU_PRICE_ROW_MODEL);
-  if (haiku === undefined || haiku.provider !== "anthropic") throw refusal("QUESTION_LANGUAGE_PRICE_TABLE_UNAVAILABLE");
-  const own = previewModelRow(model);
-  const rows: PreviewModelRow[] = [haiku, ...(own !== undefined && own.provider === "anthropic" && own !== haiku ? [own] : [])];
-  let input = Math.ceil((rowPrice.input * 5) / 4);
-  let output = rowPrice.output;
-  for (const row of rows) {
-    const step = row.upperStep !== undefined && inputTokens > row.upperStep.aboveChargedInputTokens ? row.upperStep : row;
-    const cacheWrite = step.cacheWriteInputNanoUsdPerToken;
-    const tableInput = cacheWrite === undefined ? Math.ceil((microsPerMillion(step.inputNanoUsdPerToken) * 5) / 4) : microsPerMillion(cacheWrite);
-    input = Math.max(input, tableInput);
-    output = Math.max(output, microsPerMillion(step.outputNanoUsdPerToken));
-  }
-  return Object.freeze({ input, output });
+  const row = pricedFastCheckRow(model);
+  const step = row.upperStep !== undefined && inputTokens > row.upperStep.aboveChargedInputTokens ? row.upperStep : row;
+  const cacheWrite = step.cacheWriteInputNanoUsdPerToken;
+  const tableInput = cacheWrite === undefined ? Math.ceil((microsPerMillion(step.inputNanoUsdPerToken) * 5) / 4) : microsPerMillion(cacheWrite);
+  return Object.freeze({
+    input: Math.max(Math.ceil((rowPrice.input * 5) / 4), tableInput),
+    output: Math.max(rowPrice.output, microsPerMillion(step.outputNanoUsdPerToken))
+  });
 }
 
 /** The one line a failed record writes: the event and a code, never question, reply or database text. */
@@ -109,8 +110,10 @@ function spendFailureCode(error: unknown): string {
 /**
  * The route with no preview configuration (P2L Task 19). Local mode has no paid AI. Hosted turns the fast check on only
  * when BOTH hold, else NONE with the reason:
- *  · `ledger.record_language_check_spend` exists (`spend.writerPresent`, the 0117 probe): without it the API keeps the
- *    check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
+ *  · `ledger.record_language_check_spend` exists AND the API's role may EXECUTE it (`spend.writerPresent`, the 0117
+ *    probe): without either the API keeps the check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
+ *  · and, before either, the fast-check model is on the reviewed provider price table, else the boot refuses
+ *    (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED: a price is never guessed);
  *  · the support model target (apps/api/src/support/model.ts, parsed ABOVE the question-language boot step, pre-flight
  *    PF-L36) is an Anthropic Messages target whose key `readCredential` reads through the custody loader (else
  *    NO_HOSTED_KEY). No key is read from anywhere else, and none before the writer is known to exist.
@@ -131,6 +134,8 @@ export async function hostedQuestionLanguageRoute(input: Readonly<{
   if (input.mode !== "hosted") return Object.freeze({ kind: "NONE", reason: "LOCAL_MODE" });
   const fastCheck = input.fastCheck;
   if (fastCheck === null) return Object.freeze({ kind: "NONE", reason: "POLICY_OFF" });
+  // Fix round 1: a model off the reviewed price table refuses the boot (typed), before the database or the key.
+  pricedFastCheckRow(fastCheck.model);
   if (!(await input.spend.writerPresent())) return Object.freeze({ kind: "NONE", reason: "HOSTED_BEFORE_SPEND_RECORD" });
   const credential = input.readCredential();
   if (credential === undefined) return Object.freeze({ kind: "NONE", reason: "NO_HOSTED_KEY" });

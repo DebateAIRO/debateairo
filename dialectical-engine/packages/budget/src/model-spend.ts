@@ -86,9 +86,16 @@ export type LanguageCheckSpendEntry = Readonly<{
   outputTokens: number;
 }>;
 
-/** The boot probe: does the one writer exist on this database (0117 applied)? Read-only. */
+/**
+ * The boot probe: does the one writer exist on this database (0117 applied) AND may the role this pool connects as
+ * EXECUTE it? Either missing is false (the hosted API keeps the fast check off). Read-only.
+ */
 export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
-  const result = await pool.query<{ present: unknown }>("SELECT to_regprocedure($1) IS NOT NULL AS present", [LANGUAGE_CHECK_SPEND_WRITER]);
+  const result = await pool.query<{ present: unknown }>(
+    // A role without USAGE on the ledger schema cannot even name the function (to_regprocedure raises 42501): false.
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'ledger', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [LANGUAGE_CHECK_SPEND_WRITER]);
   return result.rows[0]?.present === true;
 }
 

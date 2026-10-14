@@ -100,6 +100,22 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
       hosted: () => localRoute })).toEqual({ kind: "NONE", reason: "LOCAL_MODE" });
   });
 
+  it("fix round 1: hosted refuses the boot for a fast-check model off the reviewed price table (never guessed); the preview is unchanged", async () => {
+    for (const model of ["claude-opus-5-5", "zai-org/GLM-5.3-Flash"]) {
+      const deps = hostedDeps({ fastCheck: { ...start.fastCheck!, model } });
+      await expect(hostedQuestionLanguageRoute(deps.input)).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED" });
+      // Refused before the database is asked or the key is read.
+      expect(deps.probes).toBe(0);
+      expect(deps.keyReads).toBe(0);
+    }
+    // Local mode and a switched-off check never price anything, so they never refuse.
+    expect(await hostedQuestionLanguageRoute(hostedDeps({ mode: "local", fastCheck: { ...start.fastCheck!, model: "claude-opus-5-5" } }).input))
+      .toEqual({ kind: "NONE", reason: "LOCAL_MODE" });
+    // The preview route is the gate's to price: the boot check there is today's (an unreviewed model is refused by name).
+    expect(() => assertQuestionLanguagePolicyBootable({ ...start, fastCheck: { ...start.fastCheck!, model: "claude-opus-5-5" } }, previewRoute))
+      .toThrow("QUESTION_LANGUAGE_FAST_CHECK_MODEL_NOT_ON_PREVIEW");
+  });
+
   it("Task 19: with 0117's writer and the support target's key the route is HOSTED, and each check is one run-less site cost", async () => {
     const deps = hostedDeps({});
     const route = await hostedQuestionLanguageRoute(deps.input);
@@ -142,8 +158,8 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     expect(hostedLanguageCheckPrice({ input: 1, output: 1 }, "claude-haiku-5-5", 310)).toEqual({ input: 125_000, output: 500_000 });
     // The row above the table: the row's, its input at 1.25x (rounded up).
     expect(hostedLanguageCheckPrice({ input: 900_001, output: 4_000_000 }, "claude-haiku-5-5", 310)).toEqual({ input: 1_125_002, output: 4_000_000 });
-    // A model the table does not review still never prices under Haiku's row.
-    expect(hostedLanguageCheckPrice({ input: 0, output: 0 }, "claude-opus-5-5", 310)).toEqual({ input: 125_000, output: 500_000 });
+    // A model the table does not review has no price to cross-check: refused, never guessed (fix round 1).
+    expect(() => hostedLanguageCheckPrice({ input: 0, output: 0 }, "claude-opus-5-5", 310)).toThrow("QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED");
     // Above the vendor's upper step (more than 100,000 input tokens): the upper step's cache-write and output prices.
     expect(hostedLanguageCheckPrice({ input: 100_000, output: 500_000 }, "claude-haiku-5-5", 100_001)).toEqual({ input: 625_000, output: 2_500_000 });
     expect(hostedLanguageCheckPrice({ input: 100_000, output: 500_000 }, "claude-haiku-5-5", 100_000)).toEqual({ input: 125_000, output: 500_000 });

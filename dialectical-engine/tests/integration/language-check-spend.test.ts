@@ -68,6 +68,26 @@ describe("0117: the language check's site cost (one writer, the day's pot)", () 
     expect(await asRuntime((client) => languageCheckSpendWriterPresent(client))).toBe(true);
   });
 
+  it("fix round 1: the probe is false for a role that may not EXECUTE the writer, and false when the writer is absent", async () => {
+    // debateai_replay may read ledger.model_spend but holds no EXECUTE on the writer.
+    const client = await database.pool.connect();
+    try {
+      await client.query("SET ROLE debateai_replay");
+      expect(await languageCheckSpendWriterPresent(client)).toBe(false);
+      await client.query("RESET ROLE");
+      // The writer absent (dropped inside a transaction that is rolled back): false, for the runtime role too.
+      await client.query("BEGIN");
+      await client.query(`DROP FUNCTION ${LANGUAGE_CHECK_SPEND_WRITER}`);
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      expect(await languageCheckSpendWriterPresent(client)).toBe(false);
+      await client.query("ROLLBACK");
+    } finally {
+      await client.query("RESET ROLE").catch(() => undefined);
+      client.release();
+    }
+    expect(await asRuntime((runtime) => languageCheckSpendWriterPresent(runtime))).toBe(true);
+  });
+
   it("the runtime role records one check through the function, and the day's pot grows by its charge", async () => {
     const store = new PostgresModelSpendStore(database.pool);
     const before = await store.readDaySpentMicros("2026-10-13");

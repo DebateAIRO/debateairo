@@ -5,6 +5,7 @@ import {
   PostgresModelSpendStore,
   costEnvelopeDay,
   languageCheckChargeMicros,
+  languageCheckSpendWriterPresent,
   costEnvelopeGuardPolicy,
   DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
@@ -560,6 +561,16 @@ describe("P2L Task 19 — the language check's charge and its one writer", () =>
     ] as const) {
       expect(() => languageCheckChargeMicros(usage, price)).toThrow("MODEL_SPEND_LANGUAGE_CHECK_CHARGE_INVALID");
     }
+  });
+
+  it("fix round 1: the boot probe answers true only when the writer exists AND the API's role may EXECUTE it", async () => {
+    const sqls: string[] = [];
+    const answering = (present: unknown) => ({ query: async (sql: string) => { sqls.push(sql); return { rows: [{ present }] }; } }) as never;
+    expect(await languageCheckSpendWriterPresent(answering(true))).toBe(true);
+    for (const present of [false, null, undefined, "t"]) expect(await languageCheckSpendWriterPresent(answering(present))).toBe(false);
+    expect(sqls[0]).toMatch(/to_regprocedure\(\$1\)/u);
+    expect(sqls[0]).toMatch(/has_function_privilege\(current_user, *to_regprocedure\(\$1\), *'EXECUTE'\)/u);
+    expect(sqls[0]).toMatch(/has_schema_privilege\(current_user, *'ledger', *'USAGE'\)/u);
   });
 
   it("recordSpend refuses a LANGUAGE_CHECK row before any query: the database function is its one writer", async () => {
