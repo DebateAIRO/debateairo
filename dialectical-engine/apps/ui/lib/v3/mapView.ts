@@ -46,10 +46,12 @@ const ANSWER_CLOSE = /[\s.!?。！？؟]+$/u;
  *    give the raw id, or "{name} (local)" in the interface's language, not the question's.
  * 3. The node's recorded maker, when it is a plain display name ("OpenAI").
  * 4. Otherwise null: the position gets no title.
+ * `catalog` is the question's catalogue, handed to `modelMeta` so no call falls back to the
+ * interface's English; the family names rule 1 returns read the same in every language.
  */
-export function positionAiName(lineage: PositionTitleLineage): string | null {
+export function positionAiName(lineage: PositionTitleLineage, catalog: MessageCatalog): string | null {
   const modelId = lineage.model_id;
-  const meta = modelMeta(modelId);
+  const meta = modelMeta(modelId, catalog);
   if (PLAIN_FAMILIES.has(meta.key) && !modelId.toLowerCase().includes("local")) return meta.name;
   const previewMaker = Object.hasOwn(PREVIEW_MODEL_MAKERS, modelId) ? PREVIEW_MODEL_MAKERS[modelId] : undefined;
   if (previewMaker !== undefined) return previewMaker;
@@ -76,7 +78,7 @@ export function positionTitlesFrom(
   for (const position of view.positions) {
     const lineage = byId.get(position.node_id)?.maker_lineage ?? null;
     if (lineage === null) continue;
-    const ai = positionAiName(lineage);
+    const ai = positionAiName(lineage, storyCatalog);
     const answer = position.answer.trim().replace(ANSWER_CLOSE, "");
     if (ai === null || answer === "") continue;
     titles.set(position.node_id, t(storyCatalog, "public.positionTitle", { answer, ai }));
