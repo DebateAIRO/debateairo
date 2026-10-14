@@ -2655,6 +2655,7 @@ export {
   rememberingAcceptedReply,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
+  type MapReplySalvageRepair,
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";

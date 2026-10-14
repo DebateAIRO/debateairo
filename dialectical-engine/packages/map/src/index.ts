@@ -3,6 +3,7 @@ export * from "./text.js";
 export * from "./items.js";
 export * from "./prompts.js";
 export * from "./replies.js";
+export * from "./salvage.js";
 export * from "./specs.js";
 export * from "./keypoints.js";
 export * from "./choose.js";

@@ -28,6 +28,7 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceMapKeyPointIdsOf,
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
@@ -218,6 +219,9 @@ export function buildTranscriptAttempts(input: Readonly<{
     if (messageList !== null) {
       try { replyForm = practiceReplyFormOf(messageList as Parameters<typeof practiceReplyFormOf>[0]); } catch { replyForm = null; }
     }
+    // Ruling MAP-SALVAGE: a choose reply's ids the run did not hold are known only from the call's own prompt.
+    const mapKeyPointIds = messageList === null || !entry.callSiteKey.startsWith("MAP:choose") ? null
+      : practiceMapKeyPointIdsOf(messageList as Parameters<typeof practiceMapKeyPointIdsOf>[0]);
     const recorded = typeof artifact?.metadata === "object" && artifact.metadata !== null
       ? (artifact.metadata as { usage?: unknown }).usage ?? null : null;
     const recordedRow = typeof recorded === "object" && recorded !== null ? recorded as Record<string, unknown> : {};
@@ -262,7 +266,7 @@ export function buildTranscriptAttempts(input: Readonly<{
         errorCode: artifact?.parseErrorCode ?? null,
         errorDetail: artifact?.parseErrorDetail ?? null,
         issues: issueListFromParseError(artifact?.parseErrorDetail ?? null),
-        jsonRepair: entry.outcome === "OK" && content !== null ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey) : null,
+        jsonRepair: entry.outcome === "OK" && content !== null ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds) : null,
         finishReason
       }),
       replyForm,

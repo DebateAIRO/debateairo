@@ -28,6 +28,7 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceMapKeyPointIdsOf,
   practiceReplyFormOf,
   practiceReviewEdgeCountOf,
   recheckReply,
@@ -265,6 +266,12 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const messages = await promptMessagesOf(attemptId);
     return messages === null ? null : practiceReviewEdgeCountOf(messages);
   };
+  /** Ruling MAP-SALVAGE: a choose call's key point ids, from its own prompt, so a dropped unknown id is counted. */
+  const mapKeyPointIdsOf = async (attemptId: string | null, callSiteKey: string): Promise<ReadonlySet<string> | null> => {
+    if (!callSiteKey.startsWith("MAP:choose")) return null;
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? null : practiceMapKeyPointIdsOf(messages);
+  };
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
     const site = callFamilyOf(entry.call_site_key);
@@ -296,7 +303,8 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
-      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key);
+      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key,
+        await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key));
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     if (formatFailed && artifact !== undefined) {
