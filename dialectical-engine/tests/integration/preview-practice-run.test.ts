@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { migrate } from "@debateai/db";
 import {
   canonicalRegisterJson,
@@ -26,7 +26,7 @@ import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployme
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
-import { startPreviewGateStubs, stubChatBody, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import { startPreviewGateStubs, stubChatBody, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
@@ -778,6 +778,100 @@ describe("preview practice: debate mode", () => {
   it("debate shape (P2d Task 2): the command hands the ask settings to the debate, which refuses them on a register without a debate-shape row before any AI is asked (HARNESS_ERROR, exit 40)", async () => {
     const { stubs, env, common, quiet } = await scenario();
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--answer-length", "short"], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
+    expect(stubs.requests).toEqual([]);
+  }, 300_000);
+});
+
+describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 §5)", () => {
+  const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
+  type ShapeReport = {
+    verdict: string; reasons: string[]; ask: unknown; register: { steps: { path: string }[] };
+    run: { runId: string; workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
+    byModelAndSite: { model: string; site: string }[];
+    shape?: { source: string; registerVersion: string; row: string | null; storedDepthParams: unknown; sizes: Record<string, unknown> | null;
+      opening: string | null; mapMarks: Record<string, number>; chosenAnswers: number | null; alsoRaised: number | null;
+      panelCloseCallExtensions: number; scrutinyExtensions: number; mapCallsByStep: Record<string, number>; notExercised: string | null };
+  };
+  const exportDigest = () => createHash("sha256").update(readFileSync(registerExportPath)).digest("hex");
+  /** How many also-raised points the storyteller was handed (its `also_raised` field, P2c), over all its answered calls. */
+  const storytellerAlsoRaised = (requests: readonly GateRecord[]): number => requests
+    .filter((request) => request.kind === "STORYTELLER" && request.answer === "OK")
+    .map((request) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields
+      .find((field) => field.name === "also_raised")?.content)
+    .reduce((sum, content) => sum + (content === undefined ? 0 : (JSON.parse(content) as unknown[]).length), 0);
+
+  it("--shape-policy (the owners' start values): the map, the chosen answers argued, a served answer and a READY story handed what was also raised: PASS (exit 0)", async () => {
+    const before = exportDigest();
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, quiet);
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    // The export is only read; the import itself is today's; the practice's own version is one above it.
+    expect(exportDigest()).toBe(before);
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION"]);
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    // Both compositions read the row: the ask path stored the four settings, admission froze the sizes, the runner ran the map.
+    expect(report.shape).toMatchObject({
+      source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", chosenAnswers: 2, notExercised: null,
+      storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+      sizes: { plan: "premium", depthMode: "adaptive", scrutiny: "standard", answerLength: "standard", mapAIs: 5, graders: 3, opening: "ANGLE_MAP" }
+    });
+    expect(report.shape!.alsoRaised).toBeGreaterThan(0);
+    expect(report.shape!.mapCallsByStep).toMatchObject({ angles: 1, merge: 1, choose: 1 });
+    expect(report.shape!.mapCallsByStep.list).toBeGreaterThanOrEqual(2);
+    expect(report.shape!.mapCallsByStep.gap).toBeGreaterThanOrEqual(1);
+    expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(true);
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The ask's one fast language check ran (the row-absent case below sends none; pre-flight PF-D15).
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(stubs.requests.filter((request) => request.kind === "MAP" && request.answer === "OK").length).toBeGreaterThanOrEqual(5);
+    expect(storytellerAlsoRaised(stubs.requests)).toBeGreaterThan(0);
+    // The transcript holds the map and ran on the practice's version.
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as {
+      run: { registerVersion: string }; attempts: { family: string }[];
+      structure: { map?: { choice: { alsoRaised: unknown[] } | null; items: unknown[] } };
+    };
+    expect(transcript.run.registerVersion).toBe("6");
+    expect(transcript.attempts.some((attempt) => attempt.family === "MAP")).toBe(true);
+    expect(transcript.structure.map?.choice?.alsoRaised.length ?? 0).toBeGreaterThan(0);
+    expect(transcript.structure.map?.items.length ?? 0).toBeGreaterThan(0);
+  }, 900_000);
+
+  it("no --shape-policy and a register without the row: today's shape, nothing new in the report, no map call", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect("shape" in report).toBe(false);
+    expect(report.ask).toEqual({ questionId: "ro", depth: 1, planTier: "premium" });
+    expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(false);
+    expect(stubs.requests.some((request) => request.kind === "MAP")).toBe(false);
+    // Without the row the ask builds, calls and reads nothing new (P2L): no fast language check either.
+    expect(stubs.requests.some((request) => request.kind === "QUESTION_LANGUAGE")).toBe(false);
+    expect(storytellerAlsoRaised(stubs.requests)).toBe(0);
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string }; structure: object };
+    expect(transcript.run.registerVersion).toBe("5");
+    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story"]);
+  }, 600_000);
+
+  it("refuses a malformed --shape-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched", async () => {
+    const bad = join(folder, `shape-bad-${randomUUID()}.json`);
+    await writeFile(bad, JSON.stringify({ ...(JSON.parse(readFileSync(SHAPE_POLICY_START, "utf8")) as object), version: 2 }));
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--shape-policy", bad], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_POLICY_INVALID"]);
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 60_000);
+
+  it("--depth-mode without a debate-shape row: refused before any model call (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth-mode", "fixed"], env, quiet);
     expect(outcome.exitCode).toBe(40);
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
     expect(stubs.requests).toEqual([]);
