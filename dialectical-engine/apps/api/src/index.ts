@@ -3682,8 +3682,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   // Debate shape P2c (spec 2026-10-12 §3.3 step 8, §3.4): the debate page's map view.
-  // The answer read is the first ownership check, as for the disclosure; the application
-  // checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
+  // Ruling C-MAPREAD: the page asks on every load and most debates have no map, so the first
+  // gate is `findMapRun` — one owner query that names the answer's run, then one lookup of the
+  // map choice — and a debate with no map answers 404 before the full answer read or any
+  // content lease. A caller who does not own the answer gets the same 404 after the owner
+  // query alone. Only then is the answer read (owner-scoped, for its nodes), and the
+  // application checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
   // "Not yours", "malformed", "no reader" and "no map choice" (incl. an erased run) are one
   // closed 404. Titles land on the nodes the map recorded (C-ROOTS), kept only when the
   // answer holds them, so a title never names a node the page cannot show. A corrupt map
@@ -3693,8 +3697,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const mapViews = options.mapViews;
     if (!answerId.success || mapViews === undefined) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const ownership = ownershipFor(request);
+    const mapRunId = await mapViews.findMapRun({ answerId: answerId.data, ownership });
+    if (mapRunId === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
-    if (answer === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    if (answer === null || answer.run_ref !== mapRunId) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const view = await mapViews.readMapView({
       runId: answer.run_ref,
       nodeIds: answerNodeIds(answer),

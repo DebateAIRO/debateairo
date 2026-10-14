@@ -13,6 +13,11 @@ import { normalizeRunOwnership, type RunOwnershipAccess } from "@debateai/db";
  * P2b's map reader takes a bare run id and checks no owner. So the read here asks
  * `core.run_is_owned_by` first and reads nothing for a caller who does not own the run: a
  * second gate behind the route's owner-scoped answer read (pre-flight PF-C16).
+ *
+ * Ruling C-MAPREAD: the page asks for the map on every load, and most debates have none. So
+ * the route first asks `findMapRun` (one owner query that also names the answer's run, then
+ * one primary-key lookup of the map choice's opening) and answers 404 before any full answer
+ * read or content lease when there is no map.
  */
 
 /**
@@ -25,21 +30,35 @@ export interface MapViewSource {
 }
 
 export interface MapChoiceReader {
+  /**
+   * The opening the run's map choice recorded, or null when the run has none: one primary-key lookup of a code
+   * column, with no content lease and no decryption (ruling C-MAPREAD).
+   */
+  readMapOpeningForRun(runId: string): Promise<"MAP" | "TODAYS_OPENING" | null>;
   readMapChoiceForRun(runId: string): Promise<MapViewSource | null>;
 }
 
 /** Does this caller own this run? The same predicate every owner read uses. */
 export interface RunOwnerCheck {
   owns(runId: string, ownership: RunOwnershipAccess): Promise<boolean>;
+  /** The run of this answer when the caller owns it, else null: one owner query, no content read. */
+  ownedRunOfAnswer(answerId: string, ownership: RunOwnershipAccess): Promise<string | null>;
 }
 
 /** One query on the runtime pool; main.ts passes `pool.query`. */
 export type RunOwnerQuery = (
   text: string,
   values: unknown[]
-) => Promise<Readonly<{ rows: readonly Readonly<{ owned?: unknown }>[] }>>;
+) => Promise<Readonly<{ rows: readonly Readonly<{ owned?: unknown; run_id?: unknown }>[] }>>;
 
 const RUN_OWNED_SQL = "SELECT core.run_is_owned_by($1,$2,$3) AS owned";
+
+/**
+ * Ruling C-MAPREAD: the answer's run, only for its owner, in the ownership query itself. serve.answer's primary key
+ * leads with answer_id, and no content column is read, so no content lease is taken.
+ */
+const ANSWER_RUN_OWNED_SQL = `SELECT answer.run_id::text AS run_id FROM serve.answer AS answer
+  WHERE answer.answer_id = $1 AND core.run_is_owned_by(answer.run_id,$2,$3) LIMIT 1`;
 
 /**
  * `core.run_is_owned_by(p_run_id uuid, p_owner_ref uuid, p_legacy_asker_id text)` (migration
@@ -51,6 +70,11 @@ export function runOwnerCheckFrom(query: RunOwnerQuery): RunOwnerCheck {
     owns: async (runId: string, ownership: RunOwnershipAccess): Promise<boolean> => {
       const result = await query(RUN_OWNED_SQL, [runId, ownership.ownerRef, ownership.legacyAskerId]);
       return result.rows[0]?.owned === true;
+    },
+    ownedRunOfAnswer: async (answerId: string, ownership: RunOwnershipAccess): Promise<string | null> => {
+      const result = await query(ANSWER_RUN_OWNED_SQL, [answerId, ownership.ownerRef, ownership.legacyAskerId]);
+      const runId = result.rows[0]?.run_id;
+      return typeof runId === "string" ? runId : null;
     }
   });
 }
@@ -129,8 +153,33 @@ export type MapViewReadInput = Readonly<{
   ownership: RunOwnershipAccess;
 }>;
 
+/** Which answer, read as whom (ruling C-MAPREAD). */
+export type MapRunFindInput = Readonly<{
+  answerId: string;
+  ownership: RunOwnershipAccess;
+}>;
+
 export interface AnswerMapViewApplication {
+  /**
+   * Ruling C-MAPREAD — the route's cheap gate, before the full answer read: the run of the caller's own answer, only
+   * when that run's map opened the debate; else null. At most one owner query and one map-choice lookup, no content
+   * lease, no decryption. A caller who does not own the answer learns nothing about its map: the owner query runs
+   * first and the map is not looked up for them.
+   */
+  findMapRun(input: MapRunFindInput): Promise<string | null>;
   readMapView(input: MapViewReadInput): Promise<DebateMapView | null>;
+}
+
+/** What a publication needs: the view of a run it already holds (its answer was read as the publisher). */
+export type MapViewReader = Pick<AnswerMapViewApplication, "readMapView">;
+
+/** An ownership naming nobody (or both principals) is refused before any query, as `StoryRepository.readForAnswer` does. */
+function ownershipOrNull(ownership: RunOwnershipAccess): RunOwnershipAccess | null {
+  try {
+    return normalizeRunOwnership({ ownerRef: ownership.ownerRef, legacyAskerId: ownership.legacyAskerId });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -146,16 +195,17 @@ export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplicat
     private readonly owner: RunOwnerCheck
   ) {}
 
+  async findMapRun(input: MapRunFindInput): Promise<string | null> {
+    const ownership = ownershipOrNull(input.ownership);
+    if (ownership === null) return null;
+    const runId = await this.owner.ownedRunOfAnswer(input.answerId, ownership);
+    if (runId === null) return null;
+    return await this.reader.readMapOpeningForRun(runId) === "MAP" ? runId : null;
+  }
+
   async readMapView(input: MapViewReadInput): Promise<DebateMapView | null> {
-    let ownership: RunOwnershipAccess;
-    try {
-      ownership = normalizeRunOwnership({
-        ownerRef: input.ownership.ownerRef,
-        legacyAskerId: input.ownership.legacyAskerId
-      });
-    } catch {
-      return null;
-    }
+    const ownership = ownershipOrNull(input.ownership);
+    if (ownership === null) return null;
     if (!await this.owner.owns(input.runId, ownership)) return null;
     const record = await this.reader.readMapChoiceForRun(input.runId);
     if (record === null || record.answers.length === 0) return null;
@@ -165,5 +215,6 @@ export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplicat
 
 /** No reader composed (local tools, older deployments): never a view. */
 export const NO_MAP_VIEWS: AnswerMapViewApplication = Object.freeze({
+  findMapRun: async () => null,
   readMapView: async () => null
 });

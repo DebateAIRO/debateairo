@@ -291,6 +291,8 @@ function servingDisclosures(reads: unknown[]): AnswerDisclosureApplication {
  */
 function servingMapViews(reads: unknown[]): AnswerMapViewApplication {
   return {
+    // Ruling C-MAPREAD: the pre-check would find a map, so only the route's own gates can stop the read.
+    findMapRun: async () => OWNED_RUN_ID,
     readMapView: async (input) => {
       reads.push(input);
       return { positions: [], also_raised: ["A point that was raised."] };

@@ -10,6 +10,7 @@ import {
   type StoryEncryptedOwner
 } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { runOwnerCheckFrom } from "../../apps/api/src/map-views.js";
 
 /**
  * Debate shape, Task 8: the map's repository over migration 0116 (core.map_item, core.map_choice, core.map_position),
@@ -242,6 +243,25 @@ describe("MapChoiceRepository (0116)", () => {
     const choice = await readMapChoiceForRun(database.pool, runId);
     expect(choice!.answers[0]).toMatchObject({ rootNodeId, maker: "maker-0" });
     expect(choice!.answers[1]).toMatchObject({ rootNodeId: null, maker: null });
+  });
+
+  // Ruling C-MAPREAD: the debate page's cheap gate. The opening is a code column, read without a lease.
+  it("looks up a run's map opening in one read: MAP, today's opening, or none", async () => {
+    const repository = new MapChoiceRepository(database.pool);
+    const mapped = await newRun("encrypted");
+    await repository.writeMapRun({ runId: mapped, result: RESULT, answerCount: 2 });
+    expect(await repository.readMapOpeningForRun(mapped)).toBe("MAP");
+    const fellBack = await newRun("legacy");
+    await repository.writeMapRun({ runId: fellBack, result: { ...RESULT, kind: "UNAVAILABLE", choice: null } as MapResult, answerCount: 2 });
+    expect(await repository.readMapOpeningForRun(fellBack)).toBe("TODAYS_OPENING");
+    expect(await repository.readMapOpeningForRun(await newRun("encrypted"))).toBeNull();
+  });
+
+  it("the map route's owner query names the answer's run for its owner only (SQL checked against the schema)", async () => {
+    const check = runOwnerCheckFrom((text, values) => database.pool.query<{ run_id?: string }>(text, values));
+    // No answer with this id: no run, whoever asks.
+    expect(await check.ownedRunOfAnswer(randomUUID(), { ownerRef: theOwner().ownerRef, legacyAskerId: null })).toBeNull();
+    expect(await check.ownedRunOfAnswer(randomUUID(), { ownerRef: null, legacyAskerId: "asker:nobody" })).toBeNull();
   });
 
   it("a run with no map reads as absent", async () => {

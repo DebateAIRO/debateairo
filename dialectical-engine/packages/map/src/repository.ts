@@ -209,6 +209,19 @@ export class MapChoiceRepository {
     }
   }
 
+  /**
+   * Debate shape P2c, ruling C-MAPREAD: the opening the run's map choice recorded, or null when the run has none. One
+   * primary-key lookup of a code column (ids and codes only: not a content carrier), so no content lease and no
+   * decryption: the debate page asks on every load, and most debates have no map. An erased run keeps its row, so this
+   * may say MAP for it; `readMapChoiceForRun` then reads it as absent.
+   */
+  async readMapOpeningForRun(runId: string): Promise<"MAP" | "TODAYS_OPENING" | null> {
+    const row = (await this.pool.query<{ opening: string }>(`SELECT opening FROM core.map_choice WHERE run_id = $1`, [runId])).rows[0];
+    if (row === undefined) return null;
+    if (row.opening !== "MAP" && row.opening !== "TODAYS_OPENING") throw rowInvalid("core.map_choice opening");
+    return row.opening;
+  }
+
   async readMapChoiceForRun(runId: string): Promise<MapChoiceRecord | null> {
     const read = await this.#leasedRead(runId, null, () => this.#readChoiceLeased(runId));
     if (read === null) return null;

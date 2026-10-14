@@ -25,7 +25,7 @@ import {
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
-import { NO_MAP_VIEWS, answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
+import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
@@ -273,7 +273,7 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
  * The snapshot then goes through the publication content check with the rest (Task 4).
  */
 export async function readPublishableMapView(
-  mapViews: AnswerMapViewApplication,
+  mapViews: MapViewReader,
   input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
 ): Promise<DebateMapView | null> {
   try {
@@ -380,7 +380,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly clock: () => Date = () => new Date(),
     private readonly cleanupRepository: PostgresPublicationRepository = repository,
     private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES,
-    private readonly mapViews: AnswerMapViewApplication = NO_MAP_VIEWS
+    private readonly mapViews: MapViewReader = NO_MAP_VIEWS
   ) {}
 
   async preflightGrant(input: Readonly<{

@@ -1112,7 +1112,7 @@ const publicationCipher = environment.PUBLICATION_ENABLED === "true"
 // reader checks no owner, so the view asks core.run_is_owned_by first (pre-flight PF-C16).
 const mapViews = new RepositoryAnswerMapViewApplication(
   new MapChoiceRepository(pool),
-  runOwnerCheckFrom((text, values) => pool.query<{ owned: boolean }>(text, values))
+  runOwnerCheckFrom((text, values) => pool.query<{ owned?: boolean; run_id?: string }>(text, values))
 );
 const publications = publicationCipher === undefined
   ? undefined

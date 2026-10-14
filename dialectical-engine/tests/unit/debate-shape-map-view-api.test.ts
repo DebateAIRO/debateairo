@@ -4,7 +4,7 @@ import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMa
 import type { RunOwnershipAccess } from "@debateai/db";
 import {
   NO_MAP_VIEWS, RepositoryAnswerMapViewApplication, answerNodeIds, debateMapViewFrom, runOwnerCheckFrom,
-  type AnswerMapViewApplication, type MapViewReadInput, type MapViewSource, type RunOwnerCheck
+  type AnswerMapViewApplication, type MapRunFindInput, type MapViewReadInput, type MapViewReader, type MapViewSource, type RunOwnerCheck
 } from "../../apps/api/src/map-views.js";
 import { readPublishableMapView } from "../../apps/api/src/publications.js";
 import {
@@ -31,7 +31,7 @@ const URL_OF = `/v1/answers/${STORY_TEST_ANSWER_ID}/map`;
 /** What the route and the publication pass for this signed-in caller (pre-flight PF-C16). */
 const OWNERSHIP: RunOwnershipAccess = Object.freeze({ ownerRef: OWNER.authenticated.ownerRef, legacyAskerId: null });
 /** An owner check that always says yes, for the tests about the view's content. */
-const OWNED: RunOwnerCheck = Object.freeze({ owns: async () => true });
+const OWNED: RunOwnerCheck = Object.freeze({ owns: async () => true, ownedRunOfAnswer: async () => STORY_TEST_RUN_ID });
 
 /** Two opening positions, the second of which replies to the first, and one reply that attacks the first. */
 const ROOT_A = "a0000000-0000-4000-8000-00000000000a";
@@ -81,11 +81,49 @@ function application(answer: Answer | null, reads: unknown[] = []): AskApplicati
   };
 }
 
-function views(view: DebateMapView | null, calls: MapViewReadInput[] = []): AnswerMapViewApplication {
+/** A view reader whose cheap pre-check (ruling C-MAPREAD) finds the answer's run, unless `located` says otherwise. */
+function views(
+  view: DebateMapView | null,
+  calls: MapViewReadInput[] = [],
+  located: string | null = STORY_TEST_RUN_ID,
+  finds: MapRunFindInput[] = []
+): AnswerMapViewApplication {
   return {
+    findMapRun: async (input) => {
+      finds.push(input);
+      return located;
+    },
     readMapView: async (input) => {
       calls.push(input);
       return view;
+    }
+  };
+}
+
+/** A map choice reader that records every call: the cheap opening lookup and the leased choice read apart. */
+function recordingReader(opening: "MAP" | "TODAYS_OPENING" | null, record: MapViewSource | null, log: string[]) {
+  return {
+    readMapOpeningForRun: async (runId: string) => {
+      log.push(`opening:${runId}`);
+      return opening;
+    },
+    readMapChoiceForRun: async (runId: string) => {
+      log.push(`choice:${runId}`);
+      return record;
+    }
+  };
+}
+
+/** An owner check that records every call, and owns `runOfAnswer`'s run only when `owned`. */
+function recordingOwner(owned: boolean, log: string[]): RunOwnerCheck {
+  return {
+    owns: async (runId) => {
+      log.push(`owns:${runId}`);
+      return owned;
+    },
+    ownedRunOfAnswer: async (answerId) => {
+      log.push(`owner:${answerId}`);
+      return owned ? STORY_TEST_RUN_ID : null;
     }
   };
 }
@@ -168,7 +206,9 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
   });
 
   it("reads no view when the run has no map choice, or the choice named no answer", async () => {
-    const reader = (record: MapViewSource | null) => new RepositoryAnswerMapViewApplication({ readMapChoiceForRun: async () => record }, OWNED);
+    const reader = (record: MapViewSource | null) => new RepositoryAnswerMapViewApplication({
+      readMapOpeningForRun: async () => "MAP", readMapChoiceForRun: async () => record
+    }, OWNED);
     const input: MapViewReadInput = { runId: STORY_TEST_RUN_ID, nodeIds: roots, ownership: OWNERSHIP };
     expect(await reader(null).readMapView(input)).toBeNull();
     expect(await reader({ answers: [], alsoRaised: [{ claim: "Orphan.", makers: ["A"] }] }).readMapView(input)).toBeNull();
@@ -182,6 +222,7 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
     const mapReads: string[] = [];
     const ownerChecks: { runId: string; ownership: RunOwnershipAccess }[] = [];
     const reader = {
+      readMapOpeningForRun: async () => "MAP" as const,
       readMapChoiceForRun: async (runId: string) => {
         mapReads.push(runId);
         return record;
@@ -191,7 +232,8 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
       owns: async (runId, ownership) => {
         ownerChecks.push({ runId, ownership });
         return owned;
-      }
+      },
+      ownedRunOfAnswer: async () => (owned ? STORY_TEST_RUN_ID : null)
     });
     const input: MapViewReadInput = { runId: STORY_TEST_RUN_ID, nodeIds: roots, ownership: OWNERSHIP };
 
@@ -227,6 +269,110 @@ describe("debate shape P2c — the map view from P2b's map choice", () => {
     expect(await check([{ owned: false }]).owns(STORY_TEST_RUN_ID, OWNERSHIP)).toBe(false);
     expect(await check([]).owns(STORY_TEST_RUN_ID, OWNERSHIP)).toBe(false);
     expect(await check([{ owned: "true" }]).owns(STORY_TEST_RUN_ID, OWNERSHIP)).toBe(false);
+  });
+});
+
+describe("debate shape P2c — ruling C-MAPREAD: no map costs one owner query and one map-choice lookup", () => {
+  const find: MapRunFindInput = { answerId: STORY_TEST_ANSWER_ID, ownership: OWNERSHIP };
+
+  it("asks the owner query first; for a run not the caller's it looks nothing else up", async () => {
+    const log: string[] = [];
+    const app = new RepositoryAnswerMapViewApplication(recordingReader("MAP", null, log), recordingOwner(false, log));
+    expect(await app.findMapRun(find)).toBeNull();
+    expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`]);
+  });
+
+  it("an ownership naming nobody is refused before any query", async () => {
+    const log: string[] = [];
+    const app = new RepositoryAnswerMapViewApplication(recordingReader("MAP", null, log), recordingOwner(true, log));
+    expect(await app.findMapRun({ ...find, ownership: { ownerRef: null, legacyAskerId: null } })).toBeNull();
+    expect(log).toEqual([]);
+  });
+
+  it("finds no map for the caller's run with no map choice, or one that fell back to today's opening, and never reads the choice", async () => {
+    for (const opening of [null, "TODAYS_OPENING"] as const) {
+      const log: string[] = [];
+      const app = new RepositoryAnswerMapViewApplication(recordingReader(opening, null, log), recordingOwner(true, log));
+      expect(await app.findMapRun(find)).toBeNull();
+      expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`, `opening:${STORY_TEST_RUN_ID}`]);
+    }
+  });
+
+  it("names the caller's run when its map opened the debate", async () => {
+    const log: string[] = [];
+    const app = new RepositoryAnswerMapViewApplication(recordingReader("MAP", null, log), recordingOwner(true, log));
+    expect(await app.findMapRun(find)).toBe(STORY_TEST_RUN_ID);
+    expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`, `opening:${STORY_TEST_RUN_ID}`]);
+  });
+
+  it("resolves the answer's run in the owner query itself (core.run_is_owned_by), and only a text run id counts", async () => {
+    const queries: { text: string; values: unknown[] }[] = [];
+    const check = (rows: readonly Readonly<{ run_id?: unknown }>[]) => runOwnerCheckFrom(async (text, values) => {
+      queries.push({ text, values });
+      return { rows };
+    });
+    expect(await check([{ run_id: STORY_TEST_RUN_ID }]).ownedRunOfAnswer(STORY_TEST_ANSWER_ID, OWNERSHIP)).toBe(STORY_TEST_RUN_ID);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]!.text).toMatch(/FROM serve\.answer AS answer/u);
+    expect(queries[0]!.text).toMatch(/core\.run_is_owned_by\(answer\.run_id,\$2,\$3\)/u);
+    expect(queries[0]!.values).toEqual([STORY_TEST_ANSWER_ID, OWNERSHIP.ownerRef, OWNERSHIP.legacyAskerId]);
+    expect(await check([]).ownedRunOfAnswer(STORY_TEST_ANSWER_ID, OWNERSHIP)).toBeNull();
+    expect(await check([{ run_id: 7 }]).ownedRunOfAnswer(STORY_TEST_ANSWER_ID, OWNERSHIP)).toBeNull();
+  });
+
+  it("the route answers a run with no map without the full answer read or the leased map read", async () => {
+    for (const opening of [null, "TODAYS_OPENING"] as const) {
+      const log: string[] = [];
+      const reads: unknown[] = [];
+      const app = new RepositoryAnswerMapViewApplication(recordingReader(opening, null, log), recordingOwner(true, log));
+      const server = api({ answer: answerOf(), mapViews: app, reads });
+      const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "MAP_VIEW_NOT_FOUND" });
+      // One owner query, one map-choice lookup, and nothing else: no answer read, no leased choice read.
+      expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`, `opening:${STORY_TEST_RUN_ID}`]);
+      expect(reads).toEqual([]);
+      await server.close();
+    }
+  });
+
+  it("the route answers a caller who does not own the answer with the same 404, after the owner query alone", async () => {
+    const log: string[] = [];
+    const reads: unknown[] = [];
+    const app = new RepositoryAnswerMapViewApplication(recordingReader("MAP", null, log), recordingOwner(false, log));
+    const server = api({ answer: answerOf(), mapViews: app, reads });
+    const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "MAP_VIEW_NOT_FOUND" });
+    expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`]);
+    expect(reads).toEqual([]);
+    await server.close();
+  });
+
+  it("the route reads the answer only once a map exists, then reads the view of that same run", async () => {
+    const log: string[] = [];
+    const reads: unknown[] = [];
+    const record: MapViewSource = {
+      answers: [{ statement: "Move gradually.", rootNodeId: ROOT_A }, { statement: "Move now.", rootNodeId: ROOT_B }],
+      alsoRaised: []
+    };
+    const app = new RepositoryAnswerMapViewApplication(recordingReader("MAP", record, log), recordingOwner(true, log));
+    const server = api({ answer: answerOf(), mapViews: app, reads });
+    const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+    expect(response.statusCode).toBe(200);
+    expect(reads).toHaveLength(1);
+    expect(log).toEqual([`owner:${STORY_TEST_ANSWER_ID}`, `opening:${STORY_TEST_RUN_ID}`, `owns:${STORY_TEST_RUN_ID}`, `choice:${STORY_TEST_RUN_ID}`]);
+    await server.close();
+  });
+
+  it("the route refuses an answer whose run is not the run the pre-check found", async () => {
+    const calls: MapViewReadInput[] = [];
+    const server = api({ answer: answerOf(), mapViews: views({ positions: [], also_raised: ["x"] }, calls, "f0000000-0000-4000-8000-00000000000f") });
+    const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "MAP_VIEW_NOT_FOUND" });
+    expect(calls).toEqual([]);
+    await server.close();
   });
 });
 
@@ -301,7 +447,7 @@ describe("debate shape P2c — the published copy", () => {
     expect(calls.map((call) => [...call.nodeIds].sort())).toEqual([[ROOT_A, ROOT_B, REPLY]]);
     expect(await readPublishableMapView(NO_MAP_VIEWS, input)).toBeNull();
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const failing: AnswerMapViewApplication = { readMapView: async () => { throw new Error("database unreachable"); } };
+    const failing: MapViewReader = { readMapView: async () => { throw new Error("database unreachable"); } };
     expect(await readPublishableMapView(failing, input)).toBeNull();
     expect(logged).toHaveBeenCalledTimes(1);
     expect(String(logged.mock.calls[0]![0])).toContain("api.publication.map_view_not_published");
