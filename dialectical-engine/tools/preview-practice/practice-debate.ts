@@ -63,6 +63,7 @@ import {
   type PracticeShapeBlock,
   type PracticeShapeFacts,
   type PracticeShapeOverride,
+  type PracticeShapeRowChange,
   type PracticeShapeSource
 } from "./practice-shape.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
@@ -414,10 +415,12 @@ export async function runPracticeDebate(input: Readonly<{
     // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
     const reportedRegister: PracticeRegisterImportReceipt = shapeVersion === null ? receipt
       : Object.freeze({ ...receipt, registerVersion: shapeVersion.registerVersion, importedRegisterVersion: receipt.registerVersion });
-    // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta).
-    const shapeRowChange: "ADDED" | "REPLACED" | null = shapeVersion !== null ? shapeVersion.row
+    // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta:
+    // a row whose bytes, value and source ref, equal the export's is in neither list, UNCHANGED; final review M-3).
+    const shapeRowChange: PracticeShapeRowChange | null = shapeVersion !== null ? shapeVersion.row
       : input.shape === undefined || input.shape.policy === null || receipt.codeNext === undefined ? null
-        : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED" : "REPLACED";
+        : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED"
+          : receipt.codeNext.changedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "REPLACED" : "UNCHANGED";
     // The row the debate runs on, read as the ask path and the runner read it (absent: today's shape, byte for byte).
     // A row switched off (P2b's `enabled: false`, the preview's rollback) is no row, as the API reads it.
     const readRow = await readDebateShapePolicy(pool, settings.runner.REGISTER_VERSION);

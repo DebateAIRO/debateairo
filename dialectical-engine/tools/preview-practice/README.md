@@ -250,7 +250,8 @@ block holds:
 - `registerVersion`: the throwaway version the debate ran on. `report.json`'s `register` block names the same version;
   when the practice published its own version on top (`--shape-policy` without `--register-next`), that block keeps the
   export's newest version as `importedRegisterVersion`;
-- `row`: ADDED or REPLACED;
+- `row`: ADDED or REPLACED; with `--register-next`, UNCHANGED when the export already held this very row (same value,
+  same source);
 - `asked`: the three settings as given;
 - `storedDepthParams`: what the ask path stored for the run;
 - `sizes`: the sizes frozen on the run's money receipt (plan, map AIs, answers, graders, close-call extra graders,

@@ -308,6 +308,8 @@ describe("practice debate shape: what the run did", () => {
     // Pre-flight PF-D19 (T14-P): the close call called for extra graders; one that then failed still leaves the mark.
     expect(markdown).toContain("- points whose close call called for extra graders: 3; points scrutinised further: 2");
     expect(practiceShapeLines(blockOf({ ...FACTS, sizes: null })).join("\n")).toContain("- the new shape was not exercised: NO_SHAPE_ON_RECEIPT");
+    // Final review M-3: --register-next on an export that already held the very row.
+    expect(practiceShapeLines({ ...blockOf(FACTS), row: "UNCHANGED" }).join("\n")).toContain("version 6, row unchanged):");
     expect(practiceShapeLines(blockOf({ ...FACTS, choice: { opening: "MAP", answers: 1, alsoRaised: 4 } })).join("\n"))
       .toContain("- the new shape was not exercised: MAP_ANSWERS_NOT_ARGUED");
   });

@@ -86,8 +86,8 @@ const SETTINGS = { runner: { REGISTER_VERSION: 5 }, previewConfig: { premium_mod
 const SOCKETS = { deepinfra: "/nowhere/deepinfra.sock", anthropic: "/nowhere/anthropic.sock" } as PracticeSockets;
 const ASK = Object.freeze({ depthMode: "fixed", scrutiny: "deep", answerLength: "short" } as const);
 const LIVE: PracticeRegisterImportReceipt = Object.freeze({ registerVersion: "5", steps: [] });
-const codeNext = (addedKeys: readonly string[]): PracticeRegisterImportReceipt => Object.freeze({ registerVersion: "6", steps: [],
-  codeNext: { baseRegisterVersion: "5", addedKeys, changedKeys: [], deltaSha256: "b".repeat(64) } });
+const codeNext = (addedKeys: readonly string[], changedKeys: readonly string[] = []): PracticeRegisterImportReceipt => Object.freeze({
+  registerVersion: "6", steps: [], codeNext: { baseRegisterVersion: "5", addedKeys, changedKeys, deltaSha256: "b".repeat(64) } });
 
 function debate(extra: Readonly<Record<string, unknown>>) {
   return runPracticeDebate({ settings: SETTINGS, sockets: SOCKETS, register: REGISTER, budgetPorts: {} as never, observer: {} as never,
@@ -133,6 +133,20 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     // The import's receipt already names the code's next version: it is reported as it is (M-2).
     expect(result.register).toBe(seen.receipt);
     expect(result.shape?.registerVersion).toBe("6");
+  });
+
+  it("--shape-policy with --register-next: shape.row says what the code's next version did to the row: ADDED, REPLACED or UNCHANGED (final review M-3)", async () => {
+    const rowOf = async (receipt: PracticeRegisterImportReceipt) => {
+      seen.receipt = receipt;
+      seen.versions.add("6");
+      seen.rows.set(6, debateShapePolicyStartValues());
+      return (await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: {} } })).shape?.row;
+    };
+    expect(await rowOf(codeNext([DEBATE_SHAPE_POLICY_ROW_KEY]))).toBe("ADDED");
+    expect(await rowOf(codeNext(["judgeContractHash"], [DEBATE_SHAPE_POLICY_ROW_KEY]))).toBe("REPLACED");
+    // The export already held a row with the same bytes (value and source ref): the key is in neither list.
+    expect(await rowOf(codeNext(["judgeContractHash"]))).toBe("UNCHANGED");
+    expect(seen.published).toEqual([]);
   });
 
   it("no shape: today's debate (the live version, depth only, nothing published)", async () => {

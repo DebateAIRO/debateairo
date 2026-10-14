@@ -117,12 +117,18 @@ export type PracticeShapeFacts = Readonly<{
   mapCallSiteKeys: readonly string[];
 }>;
 
+/**
+ * What the debate-shape row did in the version the debate ran on: ADDED (the export had none), REPLACED (the export's
+ * own was superseded), UNCHANGED (`--register-next` only: the code's next version carries the export's row byte for byte).
+ */
+export type PracticeShapeRowChange = "ADDED" | "REPLACED" | "UNCHANGED";
+
 export type PracticeShapeBlock = Readonly<{
   source: PracticeShapeSource;
   /** The throwaway register version the debate ran on. */
   registerVersion: string;
-  /** FLAG only: ADDED or REPLACED; null for REGISTER. */
-  row: "ADDED" | "REPLACED" | null;
+  /** FLAG only: ADDED, REPLACED or UNCHANGED; null for REGISTER. */
+  row: PracticeShapeRowChange | null;
   /** The three settings as given on the command line (null: the site's default). */
   asked: Readonly<{ depthMode: string | null; scrutiny: string | null; answerLength: string | null }>;
   storedDepthParams: Readonly<Record<string, unknown>> | null;
@@ -203,7 +209,7 @@ const MAP_UNAVAILABLE = "MAP_UNAVAILABLE_TODAYS_OPENING";
 
 /** The report's block. `facts` null: nothing was admitted (or, with `unreadable`, the facts could not be read). Pure. */
 export function practiceShapeBlock(input: Readonly<{
-  source: PracticeShapeSource; registerVersion: string; row: "ADDED" | "REPLACED" | null; asked: PracticeShapeAsk;
+  source: PracticeShapeSource; registerVersion: string; row: PracticeShapeRowChange | null; asked: PracticeShapeAsk;
   facts: PracticeShapeFacts | null; unreadable?: string;
 }>): PracticeShapeBlock {
   const facts = input.facts;
@@ -248,7 +254,7 @@ export function practiceShapeBlock(input: Readonly<{
 /** The report.md paragraph: counts and codes, never model text. */
 export function practiceShapeLines(block: PracticeShapeBlock): readonly string[] {
   const where = block.source === "FLAG"
-    ? `from --shape-policy, in this throwaway register only: version ${block.registerVersion}, row ${block.row === "REPLACED" ? "replaced" : "added"}`
+    ? `from --shape-policy, in this throwaway register only: version ${block.registerVersion}, row ${block.row === null ? "added" : block.row.toLowerCase()}`
     : `from the imported register's own row, version ${block.registerVersion}`;
   const asked = `depth mode ${block.asked.depthMode ?? "default"}, scrutiny ${block.asked.scrutiny ?? "default"}, `
     + `answer length ${block.asked.answerLength ?? "default"}`;
