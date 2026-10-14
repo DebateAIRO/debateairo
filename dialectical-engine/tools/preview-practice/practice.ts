@@ -17,6 +17,7 @@
  *             --call-concurrency sets how many AI calls go at once for this practice only (practice-parallel.ts).
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
+ *             --shape-policy FILE runs it in the new debate shape, in the throwaway register only (practice-shape.ts).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
  *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
@@ -67,6 +68,7 @@ import {
 } from "./practice-openings-questions.js";
 import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
+import { practiceDebateQuestion } from "./practice-questions.js";
 import { composePracticeNextRegisterVersion, parsePracticeRegisterExport, PracticeRegisterError } from "./practice-register-import.js";
 import {
   abortedReport,
@@ -84,6 +86,7 @@ import {
   readPracticeSampleLog,
   remainingLine
 } from "./practice-samples-log.js";
+import { practiceShapeOverrideFromArgs } from "./practice-shape.js";
 import { writeSideBySideFile } from "./practice-side-by-side.js";
 import {
   assertGateStatusAllowsPractice,
@@ -108,7 +111,8 @@ type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "report"; flags
 
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
-  "--side-by-side", "--questions", "--arms", "--call-concurrency"]);
+  "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
+  "--answer-length"]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
 
 /**
@@ -347,6 +351,11 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--transcript (debate mode only)");
     }
     if (args.switches.has("--dry") && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--dry (openings mode only)");
+    // Debate shape (spec 2026-10-12 §5): the four debate-only flags, read and checked here, before any socket, settings
+    // file or gate is touched; a policy file that does not pass the register's own check never starts a paid run.
+    const shapeOverride = practiceShapeOverrideFromArgs(args.mode, args.flags);
+    // The debate's question, a fixed id only, checked here too (it used to fail only once the database had started).
+    const debateQuestionId = args.mode === "debate" ? practiceDebateQuestion(args.flags.get("--question") ?? "ro").id : "ro";
     for (const flag of ["--questions", "--arms"]) {
       if (args.flags.has(flag) && args.mode !== "openings") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (openings mode only)`);
     }
@@ -557,7 +566,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     const result = await runPracticeDebate({
       settings, sockets, register: register!, registerNext,
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
-      questionId: args.flags.get("--question") ?? "ro",
+      questionId: debateQuestionId,
+      ...(shapeOverride === null ? {} : { shape: shapeOverride }),
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
