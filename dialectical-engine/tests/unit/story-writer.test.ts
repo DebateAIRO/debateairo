@@ -1128,6 +1128,15 @@ describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () 
       const names = fields.map((field) => field.name);
       expect(names.indexOf("answers_note")).toBe(names.indexOf("also_raised") + 1);
     }
+    // Ruling W-STORY: with a map field in the material, both prompts carry the pack's map passages.
+    expect(calls[0]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK, true), "Romanian"))
+    );
+    expect(calls[1]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK, true), "Romanian"))
+    );
+    expect(calls[0]?.packet.messages[0]?.content).toContain(PACK.commonMap);
+    expect(calls[1]?.packet.messages[0]?.content).toContain(PACK.checkerMap);
     const plain = scripted(byContract);
     await harness(providing(plain.provider)).writer.writeAfterSettle(SNAPSHOT);
     expect(plain.calls).toHaveLength(2);
@@ -1135,6 +1144,15 @@ describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () 
       const names = readPromptFrame(call.packet).fields.map((field) => field.name);
       expect(names).not.toContain("also_raised");
       expect(names).not.toContain("answers_note");
+      // Ruling W-STORY: and neither prompt says a word about them (today's instructions, byte for byte).
+      expect(call.packet.messages[0]?.content).not.toContain("also_raised");
+      expect(call.packet.messages[0]?.content).not.toContain("answers_note");
     }
+    expect(plain.calls[0]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK), "Romanian"))
+    );
+    expect(plain.calls[1]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK), "Romanian"))
+    );
   });
 });

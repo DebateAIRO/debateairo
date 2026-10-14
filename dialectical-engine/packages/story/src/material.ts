@@ -663,6 +663,14 @@ function storyCoreFields(core: StoryMaterialCore): FramedMaterialField[] {
   ];
 }
 
+/**
+ * Debate shape (ruling W-STORY): whether the material sends one of the two map fields, by the same rule
+ * `storyCoreFields` sends them. Only then do the story contracts carry the pack's map passages.
+ */
+export function storyMaterialHasMapFields(material: Pick<StoryMaterial, "alsoRaised" | "answersNote">): boolean {
+  return (material.alsoRaised !== undefined && material.alsoRaised.length > 0) || material.answersNote !== undefined;
+}
+
 function storyFieldBytes(fields: readonly FramedMaterialField[]): number {
   return fields.reduce((total, field) => total + Buffer.byteLength(field.content, "utf8"), 0);
 }

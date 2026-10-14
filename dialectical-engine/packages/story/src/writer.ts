@@ -31,6 +31,7 @@ import {
   buildStoryMaterial,
   pointNumbersFrom,
   restoreStoryRefs,
+  storyMaterialHasMapFields,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
   type StoryNodeEnrichment,
@@ -540,8 +541,11 @@ export class StoryWriter {
     const lock = input.languageLocked === true && input.argumentLanguage !== null
       ? questionLanguageFromRun(input.argumentLanguage.tag, input.argumentLanguage.name)
       : null;
-    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack), languageName, lock);
-    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack), languageName, lock);
+    // Debate shape (ruling W-STORY): the pack's map passages ride only with a material that sends a map field; every
+    // other story gets the instructions it got before the debate shape, byte for byte.
+    const mapFields = storyMaterialHasMapFields(built.material);
+    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack, mapFields), languageName, lock);
+    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack, mapFields), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
     /**

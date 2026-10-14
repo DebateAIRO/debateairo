@@ -1,6 +1,7 @@
 export {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
+  assembleStoryCheckerInstruction,
   assembleStorytellerInstruction,
   loadStoryPack,
   resolveStoryPackDir,
@@ -39,6 +40,7 @@ export {
   buildStoryMaterial,
   pointNumbersFrom,
   restoreStoryRefs,
+  storyMaterialHasMapFields,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
   type StoryAnswersNoteKind,
