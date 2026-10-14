@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Après le refus d’une vérification d’âge, empêche ce navigateur de réessayer pendant 30 jours. Il ne contient que le mot « refusé », aucune donnée personnelle.",
   "legal.cookies.ageRefusal.life": "30 jours",
   "legal.cookies.locale.kind": "Fichier cookie",
-  "legal.cookies.locale.purpose": "Mémorise la langue d’interface que vous avez choisie.",
+  "legal.cookies.locale.purpose": "Mémorise la langue d’interface que vous avez choisie, et définit la langue des e-mails que nous vous envoyons.",
   "legal.cookies.locale.life": "1 an",
   "legal.cookies.storageTitle": "Stockés dans votre navigateur, et non dans des cookies",
   "legal.cookies.storageIntro": "Quatre éléments sont conservés dans le stockage de votre navigateur : deux dans le stockage local, jusqu’à ce que vous les effaciez, et deux dans le stockage de session, jusqu’à la fermeture de l’onglet. Contrairement aux cookies, ils ne sont pas joints à vos requêtes ; l’élément du chat d’aide conserve une copie d’une conversation que vous avez eue avec l’aide de Dialectical Engine, dont les messages sont parvenus à Dialectical Engine au moment où vous les avez envoyés.",

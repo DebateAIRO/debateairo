@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja.",
   "legal.cookies.ageRefusal.life": "30 päivää",
   "legal.cookies.locale.kind": "Eväste",
-  "legal.cookies.locale.purpose": "Muistaa valitsemasi käyttöliittymän kielen.",
+  "legal.cookies.locale.purpose": "Muistaa valitsemasi käyttöliittymän kielen ja määrää kielen, jolla lähetämme sinulle sähköpostit.",
   "legal.cookies.locale.life": "1 vuosi",
   "legal.cookies.storageTitle": "Tallennettu selaimeesi, ei evästeeseen",
   "legal.cookies.storageIntro": "Selaimesi tallennustilassa säilytetään neljä kohdetta: kaksi paikallisessa tallennustilassa, kunnes tyhjennät ne, ja kaksi istunnon tallennustilassa, kunnes suljet välilehden. Toisin kuin evästeitä, niitä ei liitetä pyyntöihisi; ohjekeskustelun kohde säilyttää kopion keskustelusta, jonka kävit Dialectical Engine:n ohjeen kanssa, ja sen viestit saapuivat Dialectical Engine:lle, kun lähetit ne.",

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import {realpathSync} from 'node:fs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -12,8 +13,8 @@ async function candidate() {
  const userId=randomUUID(),factorId=randomUUID(),credentialIds=[`key_${randomUUID().replaceAll('-','')}`,`key_${randomUUID().replaceAll('-','')}`];
  await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,'{}','{}','synthetic-password',$3,'active',now())`,[userId,createHash('sha256').update(userId).digest(),userId]);
  await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'email','{}','verified',now(),now())`,[userId]);
- await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`,[factorId,userId]);
- for(const credentialId of credentialIds){const id=randomUUID();await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,'{"format":"COSE_KEY_BASE64URL_V1","value":"YQ"}','active',now(),now(),'localhost','https://localhost',true,false,false,$4,0)`,[id,userId,credentialId,{v:1,keyId:`passkey-label:${id}:v1`,nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}]);}
+ await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`,[factorId,userId]));
+ for(const credentialId of credentialIds){const id=randomUUID();await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,'{"format":"COSE_KEY_BASE64URL_V1","value":"YQ"}','active',now(),now(),'localhost','https://localhost',true,false,false,$4,0)`,[id,userId,credentialId,{v:1,keyId:`passkey-label:${id}:v1`,nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}]));}
  return {userId,credentialIds};
 }
 beforeAll(async()=>{

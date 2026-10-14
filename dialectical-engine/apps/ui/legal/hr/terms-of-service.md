@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.2 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.3 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.2
+endMarker: KRAJ UVJETA · v2.3
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.2 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.3 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -114,7 +114,7 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 
 **Vaš sadržaj ostaje vaš.** Zadržavate sva prava koja imate na pitanja, tvrdnje, bilješke i osporavanja koja šaljete. Dajete nam neisključivu, svjetsku i besplatnu licenciju za smještaj, pohranu, umnožavanje, prilagodbu i obradu tog sadržaja u svrhu rada usluge: provedbe rasprave, njezine pohrane kako biste je mogli ponovno otvoriti i reproducirati, pružanja podrške, ispunjavanja naših pravnih obveza te — samo ako je odlučite objaviti — u svrhe iz odjeljka 9. Ta licencija prestaje kada se sadržaj izbriše, osim kada odjeljak 9. ili zakon zahtijeva drukčije.
 
-**Ne treniramo modele na vašem sadržaju.** Ne treniramo modele na vašem sadržaju. Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar pružatelja usluga umjetne inteligencije za svakog pružatelja navodi jesmo li to potvrdili i kada.
+**Ne treniramo modele na vašem sadržaju.** Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar pružatelja usluga umjetne inteligencije za svakog pružatelja navodi jesmo li to potvrdili i kada.
 
 **Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije.** Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju.
 
@@ -239,7 +239,7 @@ Odjeljak 8. uređuje vaš sadržaj i status generiranog izlaznog sadržaja. Ako 
 
 ## 17. Osobni podaci
 
-Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatnosti** na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na Dialectical Engine-u sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti.
+Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatnosti** na dezbatere.ro/privacy. Ona objašnjavaju što prikupljamo, pravnu osnovu za svaku svrhu, koliko dugo čuvamo pojedine podatke, tko prima podatke, uključene prijenose i kako ostvariti svoja prava. Ovdje valja istaknuti još tri točke. Odjeljak 7. traži od vas da u pitanje ne unosite osobne podatke drugih osoba; ako to ipak učinite, odgovorni ste za njih, a mi možemo ukloniti sadržaj. Ako rasprava objavljena na Dialectical Engine-u sadržava vaše osobne podatke, možete zatražiti da je uklonimo iako nemate račun (odjeljak 9.). Čuvamo i zapis o vašem prihvaćanju ovih Uvjeta — verziju, vrijeme i tehničke pojedinosti sesije — kao dokaz ugovora, kako je objašnjeno u Pravilima o privatnosti. E-poruke koje vam šaljemo pišemo na jeziku koji ste odabrali na našoj stranici; odjeljak 13. Pravila o privatnosti objašnjavaju kako čuvamo taj izbor.
 
 ## 18. Mjerodavno pravo i mjesto rješavanja sporova
 

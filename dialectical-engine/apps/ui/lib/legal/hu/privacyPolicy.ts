@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Süti (HttpOnly) — Bejelentkezve tartja Önt. A szolgáltatás használata közben folyamatosan megújul. — 14 nap",
         "__Host-debateai-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — 14 nap",
         "__Host-debateai-age-refusal — Süti (HttpOnly) — Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. — 30 nap",
-        "debateai.locale — Süti — Megjegyzi, milyen nyelvű felületet választott. — 1 év",
+        "debateai.locale — Süti — Megjegyzi, milyen nyelvű felületet választott, és azt is, milyen nyelven írjuk az Önnek küldött e-maileket. — 1 év",
         "__Host-debateai-staff — Süti (HttpOnly) — Külön munkatársi hozzáférés — Legfeljebb 8 óra; 15 perc inaktivitás",
         "__Host-debateai-staff-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 8 óra; 15 perc inaktivitás",
         "__Host-debateai-password-reset — Süti (HttpOnly) — Csak jelszó-visszaállítás — Legfeljebb 30 perc",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Munkamenet-tárhely — Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. — A lap bezárásáig, kijelentkezésig vagy új hivatkozásig"
         ]
       },
+      { kind: "p", text: "Minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük." },
       { kind: "p", text: "Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
       { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A Dialectical Engine nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
       { kind: "p", text: "Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban tiltsa le vagy törölje ennek az oldalnak a sütijeit és webhelyadatait. Ami ezután nem működik: a bejelentkezés, valamint a nyelv- és megjelenítési választásának megjegyzése; a sütikről szóló tájékoztatás is ismét megjelenik." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.3-as verzió a 3.2-s verzió helyébe lépett: csak az általunk kiszolgált régiókra vonatkozik, megnevezi vállalatunkat, az 5. szakaszban pedig tárhelyszolgáltatónkat, tartalomkézbesítési és e-mail-szolgáltatónkat, továbbá leírja a Cloudflare robotellenőrzését." }
+      { kind: "p", text: "Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.4-es verzió a 3.3-as verzió helyébe lépett: a 13. szakasz most úgy rendelkezik, hogy a debateai.locale süti az Önnek küldött e-mailek nyelvét is beállítja, és új bekezdést tartalmaz, amely szerint minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "7918495f9fe1dc532958a3604a7db0d4b4f57e7ff61c0bdf0ae3b7f8a4765450",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.3 · HATÁLYOS 2026. OKTÓBER 12.",
+  version: "3.4",
+  sha256: "83f27af4aae392a0b906f6afa8f44d7389fb01d5e45e536c7e42995af5ab0feb",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.4 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",

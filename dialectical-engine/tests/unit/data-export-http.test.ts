@@ -153,7 +153,7 @@ describe("data export HTTP boundary", () => {
       expect(dataExport.request).toHaveBeenCalledWith({
         userId: authenticated.userId, sessionId: authenticated.session.session_id,
         grantToken: GRANT_TOKEN, locale: "en",
-        source: { ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
+        source: { ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
       });
       await api.close();
     });
@@ -170,7 +170,7 @@ describe("data export HTTP boundary", () => {
     expect(dataExport.request).toHaveBeenCalledWith({
       userId: authenticated.userId, sessionId: authenticated.session.session_id,
       grantToken: GRANT_TOKEN, locale: "en",
-      source: { ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
+      source: { ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
     });
     await api.close();
   });
@@ -205,7 +205,7 @@ describe("data export HTTP boundary", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.rawPayload).toEqual(bytes);
     expect(dataExport.download).toHaveBeenCalledWith(authenticated.userId, LINK_TOKEN, {
-      ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
+      ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
     });
     await api.close();
   });
@@ -225,7 +225,7 @@ describe("data export HTTP boundary", () => {
       expect(response.statusCode).toBe(code);
       expect(response.json()).toEqual({ error });
       expect(dataExport.download).toHaveBeenCalledWith(authenticated.userId, LINK_TOKEN, {
-        ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
+        ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
       });
       await api.close();
     });
@@ -252,10 +252,10 @@ describe("data export HTTP boundary", () => {
       expect(dataExport.request).toHaveBeenCalledWith({
         userId: authenticated.userId, sessionId: authenticated.session.session_id,
         grantToken: GRANT_TOKEN, locale: "en",
-        source: { ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
+        source: { ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0] }
       });
       expect(dataExport.download).toHaveBeenCalledWith(authenticated.userId, LINK_TOKEN, {
-        ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[1]
+        ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[1]
       });
       expect(emitted.join("\n")).not.toContain(GRANT_TOKEN);
       expect(emitted.join("\n")).not.toContain(LINK_TOKEN);
@@ -275,7 +275,7 @@ describe("data export HTTP boundary", () => {
     expect(response.json()).toEqual({ error: "EXPORT_UNAVAILABLE" });
     expect(response.headers["content-type"]).not.toBe("application/zip");
     expect(dataExport.download).toHaveBeenCalledWith(authenticated.userId, LINK_TOKEN, {
-      ip: "127.0.0.1", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
+      ip: "127.0.0.1", mailLocale: "en", userAgent: "dx-http-test-browser", requestId: sourceIds[0]
     });
     await api.close();
   });

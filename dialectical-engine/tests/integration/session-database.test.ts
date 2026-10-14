@@ -348,6 +348,7 @@ describe("S5 sessions on real PostgreSQL", () => {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_runtime");
       await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       const consumed = await client.query(`SELECT identity.consume_recovery_code_with_audit($1,$2,NULL,clock_timestamp(),$3::jsonb) AS valid`,
         [identity.userId, recoveryCodeId, JSON.stringify({ ipArgon2id: `argon2id-audit:v1:${"ab".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"cd".repeat(32)}` })]);
       expect(consumed.rows[0].valid).toBe(true);

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.2 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.3 · BERLAKU 12 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.2
+endMarker: AKHIR KETENTUAN · v2.3
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.2 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.3 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -114,7 +114,7 @@ Jika Anda tidak yakin apakah sesuatu diperbolehkan, tanyakan kepada kami sebelum
 
 **Konten Anda tetap menjadi milik Anda.** Anda mempertahankan setiap hak yang Anda miliki atas pertanyaan, klaim, anotasi, dan tantangan yang Anda kirimkan. Anda memberi kami lisensi non-eksklusif, berlaku di seluruh dunia, dan bebas royalti untuk menghos, menyimpan, memperbanyak, mengadaptasi, dan memproses konten tersebut untuk tujuan mengoperasikan layanan: menjalankan debat, menyimpannya agar Anda dapat membuka dan memutarnya kembali, memberikan dukungan, memenuhi kewajiban hukum kami, dan — hanya jika Anda memilih untuk memublikasikan — tujuan dalam bagian 9. Lisensi ini berakhir saat konten dihapus, kecuali jika bagian 9 atau hukum mewajibkan lain.
 
-**Kami tidak melatih model dengan konten Anda.** Kami tidak melatih model dengan konten Anda. Kami menggunakan penyedia AI hanya berdasarkan ketentuan yang tidak mengizinkan mereka menggunakan konten Anda untuk melatih atau meningkatkan model mereka; Daftar menunjukkan, untuk setiap penyedia, apakah kami telah mengonfirmasi hal ini, dan kapan.
+**Kami tidak melatih model dengan konten Anda.** Kami menggunakan penyedia AI hanya berdasarkan ketentuan yang tidak mengizinkan mereka menggunakan konten Anda untuk melatih atau meningkatkan model mereka; Daftar menunjukkan, untuk setiap penyedia, apakah kami telah mengonfirmasi hal ini, dan kapan.
 
 **Cara konten Anda diteruskan kepada penyedia AI.** Untuk menjalankan debat, kami mengirim teks kepada satu atau lebih penyedia model eksternal. Yang diterima penyedia adalah pertanyaan Anda, anotasi pengarahan yang Anda tetapkan, dan pernyataan yang disusun mesin selama debat — sehingga penyedia melihat teks yang diturunkan dari dan dibangun seputar hal yang Anda ketik, bukan hanya kata-kata asli Anda. Penyedia tidak pernah menerima alamat email, pengenal akun, catatan sesi, atau rincian pembayaran Anda.
 
@@ -239,7 +239,7 @@ Bagian 8 mengatur konten Anda dan status keluaran yang dihasilkan. Jika Anda mey
 
 ## 17. Data pribadi
 
-Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezbatere.ro/privacy. Kebijakan tersebut menjelaskan hal yang kami kumpulkan, dasar hukum untuk setiap tujuan, jangka waktu penyimpanan, pihak yang menerima data, transfer yang dilakukan, dan cara menggunakan hak Anda. Tiga poin juga perlu dinyatakan di sini. Bagian 7 meminta Anda agar tidak memasukkan data pribadi orang lain ke dalam pertanyaan; jika Anda tetap melakukannya, Anda bertanggung jawab atas hal tersebut, dan kami dapat menghapus kontennya. Jika debat yang dipublikasikan di Dialectical Engine berisi data pribadi tentang Anda, Anda dapat meminta kami menghapusnya tanpa memiliki akun (bagian 9). Kami juga menyimpan catatan penerimaan Anda atas Ketentuan ini — versi, waktu, dan rincian teknis sesi — sebagai bukti kontrak, sebagaimana dijelaskan dalam Kebijakan Privasi.
+Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezbatere.ro/privacy. Kebijakan tersebut menjelaskan hal yang kami kumpulkan, dasar hukum untuk setiap tujuan, jangka waktu penyimpanan, pihak yang menerima data, transfer yang dilakukan, dan cara menggunakan hak Anda. Tiga poin juga perlu dinyatakan di sini. Bagian 7 meminta Anda agar tidak memasukkan data pribadi orang lain ke dalam pertanyaan; jika Anda tetap melakukannya, Anda bertanggung jawab atas hal tersebut, dan kami dapat menghapus kontennya. Jika debat yang dipublikasikan di Dialectical Engine berisi data pribadi tentang Anda, Anda dapat meminta kami menghapusnya tanpa memiliki akun (bagian 9). Kami juga menyimpan catatan penerimaan Anda atas Ketentuan ini — versi, waktu, dan rincian teknis sesi — sebagai bukti kontrak, sebagaimana dijelaskan dalam Kebijakan Privasi. Email yang kami kirimkan kepada Anda ditulis dalam bahasa yang Anda pilih di situs kami; bagian 13 Kebijakan Privasi menjelaskan cara kami menyimpan pilihan tersebut.
 
 ## 18. Hukum yang berlaku dan tempat sengketa diperiksa
 

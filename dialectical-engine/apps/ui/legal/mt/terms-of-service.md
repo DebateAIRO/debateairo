@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.2 · EFFETTIVI 12 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.3 · EFFETTIVI 12 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.2
+endMarker: TMIEM IT-TERMINI · v2.3
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.2 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.3 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -114,7 +114,7 @@ Jekk m’intix ċert jekk xi ħaġa hijiex permessa, staqsina qabel tippubblikah
 
 **Il-kontenut tiegħek jibqa’ tiegħek.** Int iżżomm kwalunkwe dritt li għandek fil-mistoqsijiet, il-pretensjonijiet, l-annotazzjonijiet u l-isfidi li tissottometti. Int tagħtina liċenzja mhux esklużiva, dinjija u mingħajr royalties biex nospitaw, naħżnu, nirriproduċu, nadattaw u nipproċessaw dak il-kontenut għall-finijiet tat-tħaddim tas-servizz: biex inħaddmu d-dibattitu, naħżnuh sabiex tkun tista’ terġa’ tiftħu u tirriproduċih, nipprovdu appoġġ, nissodisfaw l-obbligi legali tagħna, u — biss jekk tagħżel li tippubblika — għall-finijiet fit-taqsima 9. Din il-liċenzja tintemm meta jitħassar il-kontenut, ħlief kif titlob it-taqsima 9 jew il-liġi.
 
-**Ma nħarrġux fuq il-kontenut tiegħek.** Ma nħarrġux mudelli fuq il-kontenut tiegħek. Nużaw fornituri tal-IA biss b’termini li ma jippermettulhomx jużaw il-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom; ir-Reġistru tal-Fornituri juri, għal kull fornitur, jekk ikkonfermajniex dan, u meta.
+**Ma nħarrġux fuq il-kontenut tiegħek.** Nużaw fornituri tal-IA biss b’termini li ma jippermettulhomx jużaw il-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom; ir-Reġistru tal-Fornituri juri, għal kull fornitur, jekk ikkonfermajniex dan, u meta.
 
 **Kif il-kontenut tiegħek jasal għand il-fornituri tal-IA.** Biex inħaddmu dibattitu nibagħtu test lil fornitur estern wieħed jew aktar tal-mudelli. Dak li jirċievi fornitur huwa l-mistoqsija tiegħek, l-annotazzjonijiet ta’ direzzjoni li tagħti, u dikjarazzjonijiet li tikkomponi l-magna matul id-dibattitu — għalhekk fornitur jara test derivat minn dak li ttajpjajt u mibni madwaru, mhux biss il-kliem oriġinali tiegħek. Qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek, ir-rekords tas-sessjoni tiegħek jew id-dettalji tal-ħlas tiegħek.
 
@@ -239,7 +239,7 @@ It-taqsima 8 tkopri l-kontenut tiegħek u l-istatus tar-riżultati ġġenerati. 
 
 ## 17. Data personali
 
-Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Privatezza** fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq Dialectical Engine jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza.
+Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Privatezza** fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq Dialectical Engine jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza. L-emails li nibagħtulek jinkitbu fil-lingwa li għażilt fuq is-sit tagħna; it-taqsima 13 tal-Politika dwar il-Privatezza tispjega kif inżommu dik l-għażla.
 
 ## 18. Liġi applikabbli u fejn jinstema’ t-tilwim
 

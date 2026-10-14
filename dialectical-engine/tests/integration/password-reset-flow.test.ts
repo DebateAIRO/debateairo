@@ -42,7 +42,7 @@ async function fixture(withCodes = true) {
   const password = await hashPassword(argon, "old strong password", auth.password.argon2id);
   await db.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,$3,$4,$5,$6,'active',clock_timestamp())`, [id, createEmailBlindIndex(blind, email), address, secondary, password, `reset-${id}`]);
   await db.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,verified_at) VALUES($1,'email',$2,'verified',clock_timestamp()),($1,'recovery_email',$3,'verified',clock_timestamp())`, [id, address, secondary]);
-  await db.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,$2,'totp',$3,'active',clock_timestamp())`, [factor, id, seed]);
+  await db.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,verified_at) SELECT $1::uuid,$2::uuid,'totp',$3::jsonb,'active',clock_timestamp() FROM (SELECT set_config('debateai.mail_locale','en',true)) AS carrier`, [factor, id, seed]);
   if (withCodes)
     await db.pool.query(`INSERT INTO identity.recovery_code(user_id,code_hash,code_slot) VALUES($1,$2,1)`, [id, await hashRecoveryCode(argon, generateRecoveryCodes()[0]!, mfa.recoveryCodes.argon2id)]);
   return { id, email, backup, factor, secret, seed, password, address };
@@ -211,7 +211,7 @@ describe("genuine native-role password-only HTTP reset", () => {
     await expect(service.complete({ sessionToken: ticket.sessionToken, password: "erasure must win password", code: totpCodeAtStep(a.secret, Math.floor(Date.now() / 30000)) }, source)).rejects.toThrow("PASSWORD_RESET_INVALID");
     const erasurePool = createPool(credentialUrls.get("ERASURE_DATABASE_URL")!);
     try {
-      expect((await erasurePool.query(`SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome`, [erasure])).rows[0].outcome).toBe("PREPARED");
+      expect((await erasurePool.query(`SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome FROM (SELECT set_config('debateai.mail_locale','en',true)) AS carrier`, [erasure])).rows[0].outcome).toBe("PREPARED");
       const ack = await db.pool.query(`UPDATE identity.account_erasure_notification_outbox SET claim_token=gen_random_uuid(),claim_expires_at=NULL,acknowledged_at=clock_timestamp(),last_error_code=NULL WHERE user_id=$1 AND acknowledged_at IS NULL`, [a.id]);
       expect(ack.rowCount).toBeGreaterThan(0);
       expect((await erasurePool.query(`SELECT identity.finalize_account_erasure($1,clock_timestamp(),clock_timestamp(),0,0,1,0) AS outcome`, [erasure])).rows[0].outcome).toBe("COMMITTED");

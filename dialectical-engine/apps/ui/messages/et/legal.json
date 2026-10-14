@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid.",
   "legal.cookies.ageRefusal.life": "30 päeva",
   "legal.cookies.locale.kind": "Küpsis",
-  "legal.cookies.locale.purpose": "Jätab meelde teie valitud liidese keele.",
+  "legal.cookies.locale.purpose": "Jätab meelde teie valitud liidese keele ja määrab keele, milles me teile e-kirju saadame.",
   "legal.cookies.locale.life": "1 aasta",
   "legal.cookies.storageTitle": "Talletatud teie brauseris, mitte küpsises",
   "legal.cookies.storageIntro": "Teie brauseri salvestusruumis hoitakse nelja kirjet: kaks kohalikus salvestusruumis, kuni te need kustutate, ja kaks seansi salvestusruumis, kuni te vahekaardi sulgete. Erinevalt küpsistest ei lisata neid teie päringutele; abivestluse kirje hoiab koopiat vestlusest, mille pidasite Dialectical Engine abiga, ja selle sõnumid jõudsid Dialectical Engine-ni siis, kui te need saatsite.",

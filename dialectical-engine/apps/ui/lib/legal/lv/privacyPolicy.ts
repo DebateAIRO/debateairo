@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Sīkdatne (HttpOnly) — Saglabā jūsu pierakstīšanās sesiju. Tā tiek atjaunota, kamēr lietojat pakalpojumu. — 14 dienas",
         "__Host-debateai-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — 14 dienas",
         "__Host-debateai-age-refusal — Sīkdatne (HttpOnly) — Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu. — 30 dienas",
-        "debateai.locale — Sīkdatne — Atceras jūsu izvēlēto saskarnes valodu. — 1 gads",
+        "debateai.locale — Sīkdatne — Atceras jūsu izvēlēto saskarnes valodu un nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus. — 1 gads",
         "__Host-debateai-staff — Sīkdatne (HttpOnly) — Atsevišķa personāla piekļuve — Līdz 8 stundām; 15 minūtes neaktivitātes",
         "__Host-debateai-staff-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — Līdz 8 stundām; 15 minūtes neaktivitātes",
         "__Host-debateai-password-reset — Sīkdatne (HttpOnly) — Tikai paroles atiestatīšana — Līdz 30 minūtēm",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Sesijas krātuve — Atceras, kurš lejupielādes saites ziņojums jārāda šajā cilnē. — Līdz cilnes aizvēršanai, izrakstīšanai vai jaunai saitei"
         ]
       },
+      { kind: "p", text: "Katrs e-pasta ziņojums, ko mēs jums sagatavojam, saglabā valodu, kuru izvēlējāties, līdz mēs to nosūtām." },
       { kind: "p", text: "Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },
       { kind: "p", text: "Pārlūkprogrammas var sūtīt signālu “Do Not Track” vai līdzīgu signālu. Dialectical Engine jūs neizseko, tāpēc šādam signālam nav ko izslēgt: pakalpojums darbojas vienādi gan ar to, gan bez tā." },
       { kind: "p", text: "Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet vai dzēsiet šīs vietnes sīkdatnes un vietnes datus. Kas tad pārstāj darboties: pierakstīšanās un jūsu valodas un attēlojuma izvēles atcerēšanās; arī paziņojums par sīkdatnēm tiks parādīts atkārtoti." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.3 aizstāja versiju 3.2: tā aptver tikai tos reģionus, kuros sniedzam pakalpojumu, nosauc mūsu uzņēmumu, 5. sadaļā — mūsu mitināšanas, satura piegādes un e-pasta pakalpojumu sniedzējus, kā arī apraksta Cloudflare robotu pārbaudi." }
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.4 aizstāja versiju 3.3: 13. sadaļā tagad norādīts, ka sīkdatne debateai.locale nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus, un pievienota rindkopa, ka katrs jums sagatavotais e-pasta ziņojums saglabā valodu, kuru izvēlējāties, līdz to nosūtām." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "74ada76be77adbca81a8a01ef889643801d489875687d1f15f0422950834acc0",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
+  version: "3.4",
+  sha256: "9a61bf8e9753c79c2dc214f63a9e8fdfbf9cb00fea6c0e098816fb4b48f3929b",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -405,23 +406,23 @@ describe('native auth106 to Dev integration lineage',()=>{
   await db.pool.query('DELETE FROM identity.password_recovery_retry_lock WHERE user_id=$1',[legacyUser]);
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[legacyUser])).rows[0].allowed).toBe(true);
   await db.pool.query("UPDATE identity.\"user\" SET state='pending_mfa' WHERE user_id=$1",[pendingUser]);
-  await db.pool.query("UPDATE identity.\"user\" SET state='active' WHERE user_id=$1",[pendingUser]);
+  await withMailLocale(db.pool, 'en', (c) => c.query("UPDATE identity.\"user\" SET state='active' WHERE user_id=$1",[pendingUser]));
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[pendingUser])).rows[0].allowed).toBe(false);
-  await db.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
-   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[noTotpUser]);
+  await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
+   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[noTotpUser]));
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[noTotpUser])).rows[0].allowed).toBe(false);
   const backdatedUser=randomUUID();
   await db.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,created_at)
    VALUES($1,$2,'{}','{}','synthetic-legacy-password',$3,'active',clock_timestamp(),'2020-01-01T00:00:00Z')`,[backdatedUser,createHash('sha256').update(backdatedUser).digest(),backdatedUser]);
   await db.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at)
    VALUES($1,'email','{}','verified',clock_timestamp(),clock_timestamp())`,[backdatedUser]);
-  await db.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
-   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[backdatedUser]);
+  await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
+   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[backdatedUser]));
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[backdatedUser])).rows[0].allowed).toBe(false);
   expect((await db.pool.query('SELECT user_id FROM identity.mfa_recovery_legacy_cohort ORDER BY user_id')).rows).toEqual([{user_id:legacyUser}]);
-  await db.pool.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1",[legacyFactor]);
-  await db.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
-   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[legacyUser]);
+  await withMailLocale(db.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1",[legacyFactor]));
+  await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
+   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[legacyUser]));
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[legacyUser])).rows[0].allowed).toBe(true);
   const providerTx=await db.pool.connect();
   try{
@@ -431,8 +432,8 @@ describe('native auth106 to Dev integration lineage',()=>{
    expect((await providerTx.query('SELECT identity.mfa_recovery_eligible($1) allowed',[legacyUser])).rows[0].allowed).toBe(false);
   }finally{await providerTx.query('ROLLBACK');providerTx.release();}
   await db.pool.query('INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)',[legacyUser,'B'.repeat(43)]);
-  await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
-   VALUES($1,'legacy-passkey','YQ',0,'singleDevice',false,'example.test','https://example.test')`,[legacyUser]);
+  await withMailLocale(db.pool, 'en', (c) => c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
+   VALUES($1,'legacy-passkey','YQ',0,'singleDevice',false,'example.test','https://example.test')`,[legacyUser]));
   expect((await db.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[legacyUser])).rows[0].allowed).toBe(false);
   const ledger=(await db.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
   const receiptRows=(await db.pool.query('SELECT * FROM public.debateai_schema_migration_resolution')).rows;
@@ -522,8 +523,8 @@ describe('native auth106 to Dev integration lineage',()=>{
    expect(new Date(times.created_at).getTime()).toBeLessThan(new Date(times.applied_at).getTime());
    await after.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at)
     VALUES($1,'email','{}','verified',clock_timestamp(),clock_timestamp())`,[user]);
-   await after.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
-    VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[user]);
+   await withMailLocale(after.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
+    VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[user]));
    expect((await after.pool.query('SELECT user_id FROM identity.mfa_recovery_legacy_cohort WHERE user_id=$1',[user])).rows).toEqual([]);
    expect((await after.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[user])).rows[0].allowed).toBe(false);
   }finally{if(barrierOpen)await barrier.query('ROLLBACK').catch(()=>{});await Promise.allSettled([migration,insert]);barrier.release();writer.release();await after.stop();}

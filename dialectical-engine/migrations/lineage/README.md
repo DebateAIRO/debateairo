@@ -82,6 +82,20 @@ verifier in force; no `replayVerifierSql`: its checks are its postcondition dige
 story column, the two disclosure columns and the twelve CHECKs, with 0076's replaced rule absent). If `origin/dev` takes 0114 first, renumber this step at merge time
 (its manifest, loader name and `previous` follow), as C1's recipe above says.
 
+## Mail locale (0116)
+
+The fifth chain step, after the data export's 0115 (mission email-locale, S01-C05; SPEC-v3 R-11, D-95, V-20 and V-22):
+`0116_mail_locale.sql`, `mail-locale-forward0116.json`, `packages/db/src/migration-forward0116.ts`. It also defines the erasure worker's reader `identity.account_erasure_schedule_locale` (C11.6, D-108) and its per-claim reader `identity.account_erasure_notification_mail_locale(uuid,uuid)` (C18.2, D-120; the claim function keeps its 0040 signature). It adds `mail_locale`
+to the five queued-mail tables and to `identity.social_flow`, a BEFORE INSERT fill (`identity.fill_mail_locale`: the
+transaction's setting when the INSERT names no value) and a BEFORE INSERT guard (`identity.require_mail_locale`:
+MAIL_LOCALE_MISSING for a NULL or an unknown value). It redefines seven writers, four readers and the two social functions.
+It does NOT redefine the six bodies that applied steps pin: `password_reset_start` (108), `schedule_account_erasure` with
+five arguments and `prepare_account_erasure` (110), and `mfa_recovery_notice_event`, `mfa_recovery_begin_wait` and
+`mfa_recovery_claim_notice` (0112). Their inserts take the carrier from the fill. The MFA worker reads its locale through
+`identity.mail_locale_of_mfa_claim`, which carries no `mfa_recovery_` prefix, so the batch verifier's naming rules do not
+see it. The step's replay verifier re-checks the writers, the sealed bodies and both triggers on every `migrate()`. No
+earlier file is edited.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the

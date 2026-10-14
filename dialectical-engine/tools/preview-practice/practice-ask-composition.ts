@@ -8,18 +8,52 @@
  * wiring is mirrored here, and tests/unit/preview-practice-wiring-drift.test.ts fails when the settings main.ts hands
  * PostgresAskApplication gain a key this file does not hand it (hosted-only keys excepted).
  *
+ * HOSTED mode (owner rulings 2026-10-13) adds main.ts's hosted ask wiring, in `composePracticeAskMoney` below: the
+ * sealed-envelope and support-scope boot refusals, the daily guard over both money rows, and, with the band, THE ROOM
+ * (the site's day at its close edge, the waiting line, the estimate from recent runs), the picker's per-run money
+ * limits and the refusal of a run ceiling below one call. The boot questions are asked of the register exactly as the
+ * server's API asks them, billing included (assertBillingReady with the register's own billingPolicy), so a version
+ * the hosted API would refuse to start on is refused here too.
+ *
+ * BILLING IS KEPT OFF in the practice's ask, whatever the register says (the server's own "hosted, billing off"
+ * composition, H6 of deploy/preview-release/v1/README.md): no `billing` member (the server-decided plan tier, the
+ * person's plan windows and the run's charge scope), and the room built with no person allowance, no entitlements and
+ * no plans. Why: with billing on, a person's ask is held to the plan that person bought through NETOPIA's sandbox; the
+ * practice's throwaway person has bought nothing (a real purchase needs NETOPIA, Quaderno and the server's key files,
+ * which the practice must never touch), so it would run as an unpaid Free account and its walls would measure a
+ * fabricated person, not the release. Billing's own flows (checkout, NETOPIA's notify message, invoices, mail) are
+ * tested on the server with the sandbox cards (H7/H8). Everything the debate path spends is still held to the hosted
+ * rules: the per-run ceiling, the story's own ceiling, the site's day, the priced targets.
+ *
  * Differences from main.ts, all on purpose:
  *  - The gate ports (paid calls and the read-only "what is left" answer) are the forwarded sockets, watched by the
  *    practice's gate watcher, not the configuration's server paths.
  *  - The team is the practice's one throwaway person; the dispatcher is the practice's own (no Hatchet).
  *  - All pools are the throwaway database's (its superuser): a missing grant on the live roles would not show here.
+ *  - Hosted: billing kept off (above); the room's money ledger and waiting line are the throwaway database's, so the
+ *    site's day holds only this practice's spend; no waker is started (a practice ask that would WAIT is reported as
+ *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, so an internal-funding selection refuses
+ *    (INTERNAL_FUNDING_UNAVAILABLE), as on the preview, whose api.env must name none (README H1).
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
-import { ProviderProbeRepository, readRoleRotationCounts } from "@debateai/db";
+import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
+import {
+  CostEnvelopeGuard,
+  NO_PERSON_ALLOWANCE,
+  PostgresModelSpendStore,
+  PostgresRecentRunUsageSource,
+  RecentRunsCostEstimator,
+  assertRunCeilingCoversOneCall,
+  costEnvelopeGuardPolicy,
+  mostOneRunMaySpendMicros
+} from "@debateai/budget";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { firstCallPlanModels } from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
   assertPreviewProviderTargets,
@@ -35,19 +69,33 @@ import {
   type PreviewGateRemaining
 } from "@debateai/providers";
 import {
+  assertAskRoomAdmissionSealed,
+  assertBillingReady,
+  assertHostedCostEnvelopesSealed,
+  assertHostedSupportAdmissionSealed,
   computeStructuralCeilingBasis,
+  costEnvelopeBand,
+  costEnvelopeCeilings,
+  readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
+  readBillingPlans,
+  readBillingPolicy,
   readCallTokenCeilings,
+  readCostEnvelopePolicy,
   readDeploymentRiskTier,
   readEngineVersion,
   readEnvelopeFormulaInputs,
+  readJudgeTokenCeiling,
   readModelScorecard,
   readPanelDiscoveryPolicy,
+  readStoryPolicyFromRegister,
   readStructuralCeilingPolicyInputs,
-  resolveEffectiveRiskTier
+  resolveEffectiveRiskTier,
+  type DeploymentMode
 } from "@debateai/register";
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
-import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
+import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
@@ -59,6 +107,128 @@ export function practiceRemainingPorts(settings: PracticeSettings, sockets: Prac
   return Object.freeze({
     deepinfra: (signal?: AbortSignal): Promise<PreviewGateRemaining> => deepinfra.remaining(signal),
     anthropic: (signal?: AbortSignal): Promise<PreviewGateRemaining> => anthropic.remaining(signal)
+  });
+}
+
+/**
+ * HOSTED only (null in local mode, where main.ts builds none of it): apps/api/src/main.ts's money stages, in its order
+ * and with its statements (tests/unit/preview-practice-hosted.test.ts pins them): "support-admission-scopes",
+ * "cost-envelope-policy" and the daily guard, then "ask-room" with billing kept off (see the file's head).
+ */
+export async function composePracticeAskMoney(input: Readonly<{
+  pool: Pool;
+  /** The room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision), distinct from `pool`; hosted only. */
+  roomDecisionPool?: Pool;
+  registerVersion: number;
+  deploymentMode: DeploymentMode;
+  declaredProviderTargets: Parameters<typeof buildApiProviderPriceMap>[0];
+  log?: (line: string) => void;
+}>) {
+  const { pool } = input;
+  const environment = Object.freeze({ DEPLOYMENT_MODE: input.deploymentMode, REGISTER_VERSION: input.registerVersion });
+  if (environment.DEPLOYMENT_MODE !== "hosted") return null;
+  assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
+  const admissionPolicy = await readAdmissionPolicy(pool, environment.REGISTER_VERSION);
+  assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);
+  const costEnvelopeRows = await (async () => {
+    const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
+    const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+      .catch((error: unknown) => {
+        input.log?.(JSON.stringify({ kind: "DEBATEAI_STORY", event: "STORY_POLICY_UNREADABLE",
+          code: error instanceof TypedDomainError ? error.code : "UNTYPED" }));
+        return null;
+      });
+    return Object.freeze({ runPolicy, guardPolicy: costEnvelopeGuardPolicy(runPolicy, storyPolicy) });
+  })();
+  const costEnvelopeGuard = new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopeRows.guardPolicy });
+  // main.ts's "ask-room" stage: the readiness question with the register's OWN billingPolicy (refuses exactly as the
+  // hosted API's boot does). Its answer (the plans when billing is on) is kept only for the report and the boot's
+  // run-ceiling question: the practice's room is built with billing off.
+  const registerBillingPlans = assertBillingReady({
+    policy: await readBillingPolicy(pool, environment.REGISTER_VERSION),
+    plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
+    envelope: costEnvelopeRows.runPolicy
+  });
+  const billingPlans = null;
+  const band = costEnvelopeBand(costEnvelopeRows.runPolicy);
+  let askRoom: AskRoom | undefined;
+  if (band === null) {
+    const stranded = await new RunWaitRepository(pool).countWaiting();
+    if (stranded > 0) {
+      throw new TypedDomainError(
+        "WAITING_LINE_REQUIRES_BAND",
+        "Questions are waiting in line, and a register version without the band has no waker to start them"
+      );
+    }
+  } else {
+    assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
+    const spend = new PostgresModelSpendStore(pool);
+    const entitlements = null;
+    const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+    const selectedFunding = await allowances.readPolicy();
+    // The preview's api.env names no internal allowance (README H1), so main.ts's `configuredFunding` is undefined there.
+    if (selectedFunding !== null) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
+    const personAllowance = NO_PERSON_ALLOWANCE;
+    const estimator = new RecentRunsCostEstimator({
+      source: new PostgresRecentRunUsageSource(pool),
+      prices: buildApiProviderPriceMap(input.declaredProviderTargets, environment.DEPLOYMENT_MODE),
+      maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)
+    });
+    if (input.roomDecisionPool === undefined) throw new TypeError("PRACTICE_ROOM_POOL_REQUIRED");
+    const room = new AskRoom({
+      lockPool: input.roomDecisionPool,
+      spend,
+      line: new RunWaitRepository(pool),
+      estimator,
+      personAllowance,
+      entitlements,
+      billingPlans,
+      dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
+      closeBasisPoints: band.closeBasisPoints,
+      waitingLinePerPerson: band.waitingLinePerPerson
+    });
+    askRoom = room;
+  }
+  return Object.freeze({
+    costEnvelopeRows, costEnvelopeGuard, askRoom,
+    /** What the register says (the practice runs billing off either way). */
+    billingInRegister: registerBillingPlans === null ? "off" as const : "on" as const,
+    /** The boot's run-ceiling question prices Free on its own roster when billing is on (main.ts, paid plans S4b). */
+    registerBillingEnabled: registerBillingPlans !== null
+  });
+}
+
+/**
+ * main.ts's "run-ceiling-covers-one-call" stage (hosted, with the band): a run ceiling below the first position's own
+ * call at the cheapest price among each plan's models refuses (RUN_CEILING_BELOW_ONE_CALL). Asked with the register's
+ * own billing state, as the server's boot asks it.
+ */
+async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
+  pool: Pool;
+  registerVersion: number;
+  money: NonNullable<Awaited<ReturnType<typeof composePracticeAskMoney>>>;
+  declaredProviderTargets: Parameters<typeof firstPositionCallProjections>[0]["targets"];
+  scorecardState: string;
+}>): Promise<void> {
+  const { pool, money: { costEnvelopeRows }, declaredProviderTargets } = input;
+  const billingEnabled = input.money.registerBillingEnabled;
+  if (costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
+  const firstCalls = firstPositionCallProjections({
+    targets: declaredProviderTargets,
+    judgeTokenCeiling: await readJudgeTokenCeiling(pool, input.registerVersion),
+    questionMaxBytes: askQuestionMaxBytes()
+  });
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstCalls,
+      rosters: firstCallPlanModels({
+        scorecardInForce: input.scorecardState === "VALID",
+        rosters: PLAN_TIER_ROSTERS,
+        models: firstCalls.map((call) => call.model),
+        ownRosterOnly: billingEnabled ? ["free"] : []
+      })
+    })
   });
 }
 
@@ -79,6 +249,8 @@ export async function composePracticeAsk(input: Readonly<{
   budgetPorts: PreviewBudgetPorts;
   dispatcher: Dispatcher;
   teamUserIds: readonly string[];
+  /** Hosted only: the room's own decision pool (distinct from the others). Absent in local mode, where no room exists. */
+  roomDecisionPool?: Pool;
   log?: (line: string) => void;
 }>) {
   const { pool, settings } = input;
@@ -114,6 +286,15 @@ export async function composePracticeAsk(input: Readonly<{
     probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS,
     probeControlsFor: previewProbeControls, fetchImplementation: previewFetch, previewRound: true
   });
+  // Hosted only: the money stages (null in local mode, which builds none of them).
+  const money = await composePracticeAskMoney({
+    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, declaredProviderTargets,
+    ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool }),
+    ...(input.log === undefined ? {} : { log: input.log })
+  });
+  const costEnvelopeRows = money?.costEnvelopeRows;
+  const costEnvelopeGuard = money?.costEnvelopeGuard;
+  const askRoom = money?.askRoom;
   const callTokenCeilings = await readCallTokenCeilings(pool, version);
   const modelPicker = await composeAskModelPicker({
     boot: BOOT,
@@ -121,12 +302,18 @@ export async function composePracticeAsk(input: Readonly<{
     deploymentMode: settings.runner.DEPLOYMENT_MODE,
     registerVersion: version,
     targets: declaredProviderTargets,
-    perRunCeilingMicros: null,
+    perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,
     callTokenCeilings,
-    moneyPolicy: null,
+    moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
+    // Billing kept off in the practice (the file's head says why); on the preview it changes nothing here, because the
+    // picker's billing rules apply only under a VALID scorecard, which the preview refuses (PREVIEW_SCORECARD_CONFLICT).
     billingEnabled: false,
     log: (line) => input.log?.(line)
   });
+  if (money !== null) {
+    await assertPracticeRunCeilingCoversOneCall({ pool, registerVersion: version, money, declaredProviderTargets,
+      scorecardState: modelPicker.scorecard.state });
+  }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
   const runSettings: RunCreationSettings = {
@@ -136,6 +323,12 @@ export async function composePracticeAsk(input: Readonly<{
     registerVersion: version,
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
+    // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.
+    ...(askRoom !== undefined
+      ? { room: askRoom, waitingLine: askRoom }
+      : costEnvelopeGuard === undefined ? {} : {
+          assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
+        }),
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
@@ -169,5 +362,7 @@ export async function composePracticeAsk(input: Readonly<{
   const application = new PostgresAskApplication(pool, input.dispatcher, runSettings, undefined, input.provisionPool,
     Object.freeze({ server: input.serverAdmissionPool, legacy: input.legacyAdmissionPool }));
   return Object.freeze({ application, rotationOn: answerRoleRotation.state === "ON", declaredProviderTargets,
-    configuredProviders: deploymentMakers.configuredProviders });
+    configuredProviders: deploymentMakers.configuredProviders,
+    hosted: money === null ? null : Object.freeze({ room: askRoom !== undefined, billingInRegister: money.billingInRegister,
+      billingInPractice: "off" as const }) });
 }

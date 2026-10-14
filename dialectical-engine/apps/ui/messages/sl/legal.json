@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Po zavrnjenem preverjanju starosti temu brskalniku 30 dni preprečuje nov poskus. Vsebuje le besedo »zavrnjeno«, nobenih osebnih podatkov.",
   "legal.cookies.ageRefusal.life": "30 dni",
   "legal.cookies.locale.kind": "Piškotek",
-  "legal.cookies.locale.purpose": "Zapomni si jezik vmesnika, ki ste ga izbrali.",
+  "legal.cookies.locale.purpose": "Zapomni si jezik vmesnika, ki ste ga izbrali, in nastavlja jezik e-poštnih sporočil, ki vam jih pošiljamo.",
   "legal.cookies.locale.life": "1 leto",
   "legal.cookies.storageTitle": "Shranjeno v vašem brskalniku, ne v piškotku",
   "legal.cookies.storageIntro": "V shrambi vašega brskalnika so shranjeni štirje elementi: dva v lokalni shrambi, dokler ju ne izbrišete, in dva v shrambi seje, dokler ne zaprete zavihka. Za razliko od piškotkov se ne pripenjajo vašim zahtevam; element klepeta za pomoč hrani kopijo pogovora, ki ste ga imeli s pomočjo Dialectical Engine, njegova sporočila pa so do Dialectical Engine prispela, ko ste jih poslali.",

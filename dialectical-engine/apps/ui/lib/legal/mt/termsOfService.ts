@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Il-kontenut tiegħek jibqa’ tiegħek. Int iżżomm kwalunkwe dritt li għandek fil-mistoqsijiet, il-pretensjonijiet, l-annotazzjonijiet u l-isfidi li tissottometti. Int tagħtina liċenzja mhux esklużiva, dinjija u mingħajr royalties biex nospitaw, naħżnu, nirriproduċu, nadattaw u nipproċessaw dak il-kontenut għall-finijiet tat-tħaddim tas-servizz: biex inħaddmu d-dibattitu, naħżnuh sabiex tkun tista’ terġa’ tiftħu u tirriproduċih, nipprovdu appoġġ, nissodisfaw l-obbligi legali tagħna, u — biss jekk tagħżel li tippubblika — għall-finijiet fit-taqsima 9. Din il-liċenzja tintemm meta jitħassar il-kontenut, ħlief kif titlob it-taqsima 9 jew il-liġi." },
-      { kind: "p", text: "Ma nħarrġux fuq il-kontenut tiegħek. Ma nħarrġux mudelli fuq il-kontenut tiegħek. Nużaw fornituri tal-IA biss b’termini li ma jippermettulhomx jużaw il-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom; ir-Reġistru tal-Fornituri juri, għal kull fornitur, jekk ikkonfermajniex dan, u meta." },
+      { kind: "p", text: "Ma nħarrġux fuq il-kontenut tiegħek. Nużaw fornituri tal-IA biss b’termini li ma jippermettulhomx jużaw il-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom; ir-Reġistru tal-Fornituri juri, għal kull fornitur, jekk ikkonfermajniex dan, u meta." },
       { kind: "p", text: "Kif il-kontenut tiegħek jasal għand il-fornituri tal-IA. Biex inħaddmu dibattitu nibagħtu test lil fornitur estern wieħed jew aktar tal-mudelli. Dak li jirċievi fornitur huwa l-mistoqsija tiegħek, l-annotazzjonijiet ta’ direzzjoni li tagħti, u dikjarazzjonijiet li tikkomponi l-magna matul id-dibattitu — għalhekk fornitur jara test derivat minn dak li ttajpjajt u mibni madwaru, mhux biss il-kliem oriġinali tiegħek. Qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek, ir-rekords tas-sessjoni tiegħek jew id-dettalji tal-ħlas tiegħek." },
       { kind: "p", text: "X’jibgħat iċ-chat tal-appoġġ. L-assistent tal-appoġġ huwa wkoll mudell tal-IA. Meta tiktiblu, nibagħtu l-messaġġ tiegħek lil fornitur estern tal-mudelli biex il-mudell ikun jista’ jwieġeb, flimkien mal-artikli ta’ għajnuna li fuqhom jibbaża t-tweġiba tiegħu. Qabel ma nibagħtu, naħbu kull ħaġa li tidher qisha password, kodiċi li jintuża darba biss jew ċavetta. Jekk titlob li titkellem ma’ persuna, nibagħtu wkoll il-konversazzjoni lill-mudell, moħbija bl-istess mod, biex jikteb sommarju qasir għall-membru tat-tim tagħna li jieħu f’idejh il-każ tiegħek. Ma nżidux l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek jew id-dettalji tal-ħlas tiegħek, iżda l-mudell jirċievi kull ħaġa oħra li tikteb fiċ-chat, għalhekk tiktibx hemmhekk xi ħaġa li ma tridx li jaqra." },
       { kind: "p", text: "Liema fornituri, u fejn. Ir-Reġistru tal-Fornituri tal-IA tagħna fuq dezbatere.ro/providers huwa parti minn dawn it-Termini. Huwa jelenka kull fornitur li nistgħu nużaw: l-entità ġuridika u l-pajjiż tiegħu; dak li jirċievi u għaliex; fejn jipproċessa; it-termini taż-żamma tiegħu; jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jkunu jinsabu barra pajjiżek u barra ż-Żona Ekonomika Ewropea. Il-Politika dwar il-Privatezza tagħna tispjega s-salvagwardji." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Data personali",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Il-mod kif nittrattaw id-data personali huwa stabbilit fil-Politika dwar il-Privatezza fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq Dialectical Engine jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza." }
+      { kind: "p", text: "Il-mod kif nittrattaw id-data personali huwa stabbilit fil-Politika dwar il-Privatezza fuq dezbatere.ro/privacy. Hija tispjega x’niġbru, il-bażi legali għal kull skop, għal kemm żmien inżommu l-affarijiet, min jirċievi d-data, it-trasferimenti involuti, u kif teżerċita d-drittijiet tiegħek. Hawnhekk ukoll japplikaw tliet punti. It-taqsima 7 titolbok ma ddaħħalx data personali ta’ persuni oħra f’mistoqsija; jekk tagħmel dan, int responsabbli għaliha, u nistgħu nneħħu l-kontenut. Jekk dibattitu ppubblikat fuq Dialectical Engine jkun fih data personali dwarek, tista’ titlobna nneħħuha mingħajr ma jkollok kont (it-taqsima 9). U nżommu rekord tal-aċċettazzjoni tiegħek ta’ dawn it-Termini — il-verżjoni, il-ħin, u d-dettalji tekniċi tas-sessjoni — bħala evidenza tal-kuntratt, kif tispjega l-Politika dwar il-Privatezza. L-emails li nibagħtulek jinkitbu fil-lingwa li għażilt fuq is-sit tagħna; it-taqsima 13 tal-Politika dwar il-Privatezza tispjega kif inżommu dik l-għażla." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "c157b9b35c58253d0dd3848dbe305cdba0705f9d5688318b4a69f0b8711e08cc",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.2 · EFFETTIVI 12 TA’ OTTUBRU 2026",
+  version: "2.3",
+  sha256: "7349514f189630c459b5f12fdde16bf731ec84cad56f6c972463d17635cff8b5",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.3 · EFFETTIVI 12 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.2",
+  endMarker: "TMIEM IT-TERMINI · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

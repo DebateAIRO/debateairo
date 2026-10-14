@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext, PendingAccountInput } from './identity.js';
 import { ProfileTransactions, type ProfileSession } from './account-profile.js';
+import { withMailLocale } from './mail-locale.js';
 import { isDeclaredRegion } from '@debateai/kernel';
 export interface SocialSignupAuthority {
     readonly proofHash: string;
@@ -79,11 +80,12 @@ export class PostgresSocialIdentityRepository {
         this.tx = new ProfileTransactions(pool, audit);
         this.signupTx = new ProfileTransactions(signupPool, audit);
     }
-    async begin(input: SocialFlowSeed): Promise<{
+    async begin(input: SocialFlowSeed, source: AuthSourceContext): Promise<{
         expiresAt: string;
     }> {
         await this.pool.query('SELECT identity.prune_social_flows()');
-        return (await this.pool.query('SELECT identity.begin_social_flow($1) value', [input])).rows[0].value;
+        // C08.1 (R-09, D-58): every flow row records the request's mail language; the value is read only by the LINK callback (0116:24-31).
+        return withMailLocale(this.pool, source.mailLocale ?? 'en', async (client) => (await client.query('SELECT identity.begin_social_flow($1) value', [input])).rows[0].value);
     }
     async claim(input: Pick<SocialFlowSeed, 'stateHash' | 'cookieHash' | 'bindingHash' | 'provider' | 'configuration'>): Promise<SocialFlowClaim | null> { return (await this.pool.query('SELECT identity.claim_social_flow($1) value', [input])).rows[0].value; }
     async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback($1,$2) value', [input, audit])).rows[0].value); }

@@ -341,13 +341,16 @@ describe("practice start refusals", () => {
     expect(settings.runner).toMatchObject({ REGISTER_VERSION: 11, DEPLOYMENT_MODE: "local", CLAIM_MS: 3_000_000 });
     expect(settings.previewConfig.scope_id).toBe("preview-practice-unit");
   });
-  it("refuses a key outside the allow-list (a database address, a team list), a key-shaped value, hosted mode, a credential", () => {
+  it("refuses a key outside the allow-list (a database address, a team list), a key-shaped value, a credential; admits hosted mode", () => {
     expect(() => parsePracticeSettings([...lines, "DATABASE_URL=postgresql://x"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
     expect(() => parsePracticeSettings([...lines, "PREVIEW_TEAM_USER_IDS_JSON=[]"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("JUDGEMENT_PRODUCER=")
       ? `JUDGEMENT_PRODUCER=${["sk", "x".repeat(4) + "Q9".repeat(8)].join("-")}` : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_KEY_SHAPED");
-    expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n")))
-      .toThrow("PRACTICE_REQUIRES_LOCAL_MODE");
+    // 2026-10-14 (the hosted preview, owner's ask "make the practice tool available also for the hosted part"): hosted
+    // mode is practised now, no longer refused (PRACTICE_REQUIRES_LOCAL_MODE is gone); its own rules are in
+    // tests/unit/preview-practice-hosted.test.ts.
+    expect(parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n"))
+      .runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
       ? 'PROVIDER_DISCOVERY_TARGETS_JSON=[{"authorization_file":"/x"}]' : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID");
     expect(() => parsePracticeSettings(lines.filter((line) => !line.startsWith("CLAIM_MS=")).join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_MISSING");

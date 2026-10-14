@@ -17,6 +17,7 @@ export interface ConsumerRecoveryMailSender {
         recipient: string;
         token: string;
         expiresAt: Date;
+        display?: Readonly<{ locale: string; timeZone: string | null }>;
     }>): Promise<void>;
 }
 export interface ConsumerRecoveryApplication {
@@ -57,6 +58,8 @@ export class ConsumerRecoveryService implements ConsumerRecoveryApplication {
         const reserved = await this.repository.start(index, tokenHash, source);
         if (reserved === null)
             return null;
+        // C12.6: the request's mail language rides in the detached send (R-15); absent renders English.
+        const mailLocale = source.mailLocale ?? 'en';
         return async () => { try {
             await this.repository.withDeliveryLease(reserved.userId, tokenHash, async (record) => { let dek: Buffer | undefined, plain: Buffer | undefined; try {
                 dek = await this.d.users.load(record.userId);
@@ -64,7 +67,7 @@ export class ConsumerRecoveryService implements ConsumerRecoveryApplication {
                 const recipient = plain.toString('utf8');
                 if (!isSingleDeliverableRecipient(recipient))
                     throw new Error('MAIL_INPUT_INVALID');
-                await this.d.mail.sendRecovery({ recipient, token, expiresAt: new Date(record.expiresAt) });
+                await this.d.mail.sendRecovery({ recipient, token, expiresAt: new Date(record.expiresAt), display: { locale: mailLocale, timeZone: null } });
             }
             finally {
                 plain?.fill(0);

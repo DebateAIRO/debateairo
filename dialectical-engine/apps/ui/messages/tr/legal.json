@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Bir yaş kontrolü reddedildikten sonra bu tarayıcının 30 gün boyunca yeniden denemesini engeller. Yalnızca “reddedildi” sözcüğünü içerir, kişisel veri içermez.",
   "legal.cookies.ageRefusal.life": "30 gün",
   "legal.cookies.locale.kind": "Çerez",
-  "legal.cookies.locale.purpose": "Seçtiğiniz arayüz dilini hatırlar.",
+  "legal.cookies.locale.purpose": "Seçtiğiniz arayüz dilini hatırlar ve size gönderdiğimiz e-postaların dilini de belirler.",
   "legal.cookies.locale.life": "1 yıl",
   "legal.cookies.storageTitle": "Çerezde değil, tarayıcınızda saklananlar",
   "legal.cookies.storageIntro": "Tarayıcınızın depolama alanında dört öğe tutulur: ikisi yerel depolamada, siz temizleyene kadar; ikisi oturum depolamasında, sekmeyi kapatana kadar. Çerezlerin aksine isteklerinize eklenmezler; yardım sohbeti öğesi, Dialectical Engine yardımıyla yaptığınız bir konuşmanın kopyasını tutar ve bu konuşmanın mesajları siz gönderdiğinizde Dialectical Engine'e ulaşmıştır.",

@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { buildApi, type AskApplication } from '../../apps/api/src/index.js';
 import { SOCIAL_FLOW_COOKIE } from '../../apps/api/src/social-auth.js';
 import { ConsumerSecurityService } from '../../apps/api/src/consumer-security.js';
@@ -278,7 +279,7 @@ describe('actual signed-provider and restricted-database journeys', () => {
                 throw new Error('EXPECTED_SESSION');
             const session = (await h.sessions.authenticate(authenticated.sessionToken, h.source))!, profile = consumerSecuritySession(session), factor = randomUUID(), key = consumerFixture();
             await db.pool.query('INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)', [session.userId, key.handle]);
-            await db.pool.query("INSERT INTO identity.consumer_passkey_credential(consumer_credential_id,user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,$4,0,'multiDevice',true,'app.example.test',$5)", [factor, session.userId, key.credentialId, Buffer.from(key.k.wire).toString('base64url'), origin]);
+            await withMailLocale(db.pool, 'en', (c) => c.query("INSERT INTO identity.consumer_passkey_credential(consumer_credential_id,user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,$4,0,'multiDevice',true,'app.example.test',$5)", [factor, session.userId, key.credentialId, Buffer.from(key.k.wire).toString('base64url'), origin]));
             const issue = async (action: string, provider: string | null, factorId: string | null) => { const token = randomUUID(); const digest = 'sha256:' + Buffer.from(token).toString('hex').padEnd(64, '0').slice(0, 64); await db.pool.query("INSERT INTO identity.step_up_grant(step_up_grant_id,token_hash,session_id,user_id,action,target_account_id,target_factor_id,target_provider,issued_at,expires_at) VALUES($1,$2,$3,$4,$5,$4,$6,$7,statement_timestamp(),statement_timestamp()+interval '5 minutes')", [randomUUID(), digest, profile.sessionId, profile.userId, action, factorId, provider]); return digest; };
             const security = new PostgresConsumerSecurityRepository(runtime, audit), password = { passwordHashSnapshot: null, passwordUsable: false, admittedProviders: [configurations[0]!.configuration] };
             const removed = await issue('REMOVE_AUTH_METHOD', null, factor), unlinked = await issue('UNLINK_PROVIDER', 'google', null);

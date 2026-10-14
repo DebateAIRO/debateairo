@@ -227,7 +227,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-session — Fichier cookie (HttpOnly) — Vous maintient connecté. Il est renouvelé tant que vous utilisez le service. — 14 jours",
         "__Host-debateai-csrf — Fichier cookie — Empêche d’autres sites web de soumettre des formulaires en votre nom. — 14 jours",
         "__Host-debateai-age-refusal — Fichier cookie (HttpOnly) — Après le refus d’une vérification d’âge, empêche ce navigateur de réessayer pendant 30 jours. Il ne contient que le mot « refusé », aucune donnée personnelle. — 30 jours",
-        "debateai.locale — Fichier cookie — Mémorise la langue d’interface que vous avez choisie. — 1 an",
+        "debateai.locale — Fichier cookie — Mémorise la langue d’interface que vous avez choisie, et définit la langue des e-mails que nous vous envoyons. — 1 an",
         "__Host-debateai-staff — Fichier cookie (HttpOnly) — Accès du personnel séparé — Jusqu’à 8 heures ; 15 minutes d’inactivité",
         "__Host-debateai-staff-csrf — Fichier cookie — Empêche d’autres sites web de soumettre des formulaires en votre nom. — Jusqu’à 8 heures ; 15 minutes d’inactivité",
         "__Host-debateai-password-reset — Fichier cookie (HttpOnly) — Réinitialisation du mot de passe uniquement — Jusqu’à 30 minutes",
@@ -246,6 +246,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.exportLinkOutcome — Stockage de session — Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet. — Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien"
         ]
       },
+      { kind: "p", text: "Chaque e-mail que nous mettons en file d’attente pour vous conserve la langue que vous aviez sélectionnée jusqu’à son envoi." },
       { kind: "p", text: "Aucun autre tiers ne collecte, par l'intermédiaire de Dialectical Engine, d'informations sur vos activités en ligne au fil du temps et sur différents sites web." },
       { kind: "p", text: "Les navigateurs peuvent envoyer un signal « Do Not Track » ou un signal similaire. Dialectical Engine ne vous suit pas : un tel signal n'a donc rien à désactiver, et le service fonctionne de la même manière avec ou sans lui." },
       { kind: "p", text: "Pour refuser ces éléments, bloquez ou supprimez les cookies et les données de ce site dans les paramètres de votre navigateur. Ce qui cesse alors de fonctionner : la connexion, ainsi que la mémorisation de vos choix de langue et d'affichage ; le bandeau d'information sur les cookies s'affichera aussi de nouveau." }
@@ -257,7 +258,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version." },
-      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.3 a remplacé la version 3.2 : elle ne couvre que les régions où nous opérons, désigne notre société et, à la section 5, nos fournisseurs d'hébergement, de diffusion de contenu et de messagerie, et décrit la vérification anti-robot de Cloudflare." }
+      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.4 a remplacé la version 3.3 : la section 13 indique désormais que le cookie debateai.locale règle aussi la langue dans laquelle nous rédigeons les e-mails que nous vous envoyons, et elle ajoute un paragraphe précisant que chaque e-mail que nous mettons en file d’attente pour vous conserve la langue que vous aviez sélectionnée jusqu’à son envoi." }
     ]
   },
   {
@@ -329,12 +330,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.3",
-  sha256: "cd219ad2f5328d0192b8d0c08c9bd6ea3ef628625f612e706fc6d273994c9bd4",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.3 · EN VIGUEUR LE 12 OCTOBRE 2026",
+  version: "3.4",
+  sha256: "0c49d7e346435e3affd99bfa41f9b739f9ad337faa58f48c9f508c5eb30fe98b",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.4 · EN VIGUEUR LE 12 OCTOBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
-  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.3",
+  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.4",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texte de la Politique de confidentialité",
   sectionIdPrefix: "policy-section-",

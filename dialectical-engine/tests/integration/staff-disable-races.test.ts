@@ -1,3 +1,4 @@
+import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
@@ -21,11 +22,11 @@ async function staff(owner = false) {
         await database.pool.query('INSERT INTO staff.owner_designation(staff_id) VALUES($1)', [staffId]);
     }
     const one = fixture(key(), 1, randomBytes(32)), passkeyId = randomUUID();
-    await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,$4,'active',now(),now(),$5,$6,true,false,false,$7,0)`, [passkeyId, userId, one.expected.credentialId, { format: 'COSE_KEY_BASE64URL_V1', value: b64(one.k.wire) }, rpId, origin, { ...env, keyId: 'passkey-label:' + passkeyId + ':v1' }]);
+    await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,$4,'active',now(),now(),$5,$6,true,false,false,$7,0)`, [passkeyId, userId, one.expected.credentialId, { format: 'COSE_KEY_BASE64URL_V1', value: b64(one.k.wire) }, rpId, origin, { ...env, keyId: 'passkey-label:' + passkeyId + ':v1' }]));
     await database.pool.query('INSERT INTO identity.staff_webauthn_metadata(mfa_factor_id,user_id,user_handle_sha256,transports) VALUES($1,$2,$3,$4)', [passkeyId, userId, digest(one.handle), ['usb']]);
     if (owner) {
         const two = fixture(key(), 1, randomBytes(32)), id = randomUUID();
-        await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,$4,'active',now(),now(),$5,$6,true,false,false,$7,0)`, [id, userId, two.expected.credentialId, { format: 'COSE_KEY_BASE64URL_V1', value: b64(two.k.wire) }, rpId, origin, { ...env, keyId: 'passkey-label:' + id + ':v1' }]);
+        await withMailLocale(database.pool, 'en', (c) => c.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,credential_id,public_key,state,created_at,verified_at,relying_party_id,credential_origin,user_verification_required,backup_eligible,backup_state,device_label_ciphertext,signature_counter) VALUES($1,$2,'passkey',$3,$4,'active',now(),now(),$5,$6,true,false,false,$7,0)`, [id, userId, two.expected.credentialId, { format: 'COSE_KEY_BASE64URL_V1', value: b64(two.k.wire) }, rpId, origin, { ...env, keyId: 'passkey-label:' + id + ':v1' }]));
         await database.pool.query('INSERT INTO identity.staff_webauthn_metadata(mfa_factor_id,user_id,user_handle_sha256,transports) VALUES($1,$2,$3,$4)', [id, userId, digest(two.handle), ['usb']]);
     }
     const ownerRef = (await database.pool.query('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0].owner_ref as string;

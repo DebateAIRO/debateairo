@@ -1,0 +1,52 @@
+# Preview-only egress proxy for the HOSTED preview API (owner rulings 2026-10-13): the API keeps IPAddressDeny=any and
+# reaches NETOPIA's and Quaderno's sandboxes, and nothing else, through this loopback proxy (127.0.0.1:3180).
+# Install only for the hosted preview: deploy/preview-release/v1/README.md "Hosted preview with NETOPIA sandbox billing".
+# It runs the one root-owned copy of deploy/preview-auth-dev/v1/egress-proxy.mjs installed (0644) at
+# /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs; the file needs no other file of the release.
+[Unit]
+Description=Preview egress proxy (NETOPIA and Quaderno sandboxes only) for the hosted preview API
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+# Its own throwaway identity: it reads no key, no environment file and no database.
+DynamicUser=yes
+# @QUADERNO_ACCOUNT@ is replaced at install by the one Quaderno sandbox account's label (https://<label>.sandbox-quadernoapp.com/api);
+# left as it is, the proxy refuses to start.
+ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/egress-v1/egress-proxy.mjs --quaderno-account @QUADERNO_ACCOUNT@
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+InaccessiblePaths=-/etc/debateai -/etc/debateai-v3-preview -/var/lib/debateai -/var/lib/debateai-v3-preview -/var/lib/postgresql -/run/postgresql -/var/run/postgresql -/run/debateai-v3-preview -/run/debateai-preview-turnstile
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+# AF_UNIX for the local resolver, INET/INET6 for its listener and the two sandboxes.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# The proxy refuses every non-public address it resolves; systemd refuses the inside ranges again. Loopback stays open:
+# its own listener and the local DNS stub (127.0.0.53).
+IPAddressDeny=10.0.0.0/8 100.64.0.0/10 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 fc00::/7 fe80::/10 multicast
+LimitNOFILE=256
+TasksMax=32
+[Install]
+WantedBy=multi-user.target

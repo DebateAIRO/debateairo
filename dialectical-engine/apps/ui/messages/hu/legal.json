@@ -88,7 +88,7 @@
   "legal.cookies.ageRefusal.purpose": "Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem.",
   "legal.cookies.ageRefusal.life": "30 nap",
   "legal.cookies.locale.kind": "Süti",
-  "legal.cookies.locale.purpose": "Megjegyzi, milyen nyelvű felületet választott.",
+  "legal.cookies.locale.purpose": "Megjegyzi, milyen nyelvű felületet választott, és azt is, milyen nyelven írjuk az Önnek küldött e-maileket.",
   "legal.cookies.locale.life": "1 év",
   "legal.cookies.storageTitle": "A böngészőben tárolva, nem sütiben",
   "legal.cookies.storageIntro": "A böngészője tárhelyén négy elemet őrzünk: kettőt a helyi tárhelyen, amíg Ön nem törli őket, és kettőt a munkamenet-tárhelyen, amíg be nem zárja a lapot. A sütikkel ellentétben ezeket nem csatolja a böngésző a kéréseihez; a súgócsevegés eleme egy olyan beszélgetés másolatát őrzi, amelyet a Dialectical Engine súgójával folytatott, és amelynek üzenetei elküldésükkor jutottak el a Dialectical Engine-hez.",

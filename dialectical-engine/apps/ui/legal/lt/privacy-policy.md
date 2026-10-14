@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PRIVATUMO POLITIKA · v3.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PRIVATUMO POLITIKA · v3.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Ką saugome ir kodėl
 lede: Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.
-endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.3
+endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.4
 bodyLabel: Privatumo politikos tekstas
 annexTitle: B priedas — Regioninės privatumo sąlygos
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SLAPUKAI
 -->
 
-**Version 3.3 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Mūsų prieglobos paslaugų teikėjas jūsų paskyrą ir debatus saugo Londone, Jungtinėje Karalystėje; 5 skyriuje nurodyta, kur dar siunčiami jūsų duomenys. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros.
 
@@ -183,7 +183,7 @@ Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūs�
 | `__Host-debateai-session` | Slapukas (HttpOnly) | Išlaiko jus prisijungusius. Atnaujinamas, kol naudojatės paslauga. | 14 dienų |
 | `__Host-debateai-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | 14 dienų |
 | `__Host-debateai-age-refusal` | Slapukas (HttpOnly) | Atmetus amžiaus patikrą, 30 dienų neleidžia šiai naršyklei bandyti dar kartą. Jame yra tik žodis „atmesta“, jokių asmens duomenų. | 30 dienų |
-| `debateai.locale` | Slapukas | Įsimena jūsų pasirinktą sąsajos kalbą. | 1 metai |
+| `debateai.locale` | Slapukas | Įsimena jūsų pasirinktą sąsajos kalbą ir nustato kalbą, kuria rašome jums siunčiamus el. laiškus. | 1 metai |
 | `__Host-debateai-staff` | Slapukas (HttpOnly) | Atskira darbuotojų prieiga | Iki 8 valandų; 15 minučių neveiklumo |
 | `__Host-debateai-staff-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | Iki 8 valandų; 15 minučių neveiklumo |
 | `__Host-debateai-password-reset` | Slapukas (HttpOnly) | Tik slaptažodžio atkūrimas | Iki 30 minučių |
@@ -201,6 +201,8 @@ Dialectical Engine naudoja 20 elementų – visi jie yra griežtai būtini jūs�
 | `debateai.exportPending` | Seanso saugykla | Šiame skirtuke saugo el. paštu atsiųstą eksporto nuorodą prisijungimui ir pakartotiniam bandymui. | Iki skirtuko uždarymo, atsijungimo, naujos nuorodos, pirmo sėkmingo atsisiuntimo arba netinkamos nuorodos ar kitos paskyros rezultato |
 | `debateai.exportLinkOutcome` | Seanso saugykla | Prisimena, kurį atsisiuntimo nuorodos pranešimą rodyti šiame skirtuke. | Iki skirtuko uždarymo, atsijungimo arba naujos nuorodos |
 
+Kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime.
+
 Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse.
 
 Naršyklės gali siųsti signalą „Do Not Track“ arba panašų signalą. Dialectical Engine jūsų neseka, todėl tokiam signalui nėra ko išjungti: paslauga veikia vienodai su juo arba be jo.
@@ -211,7 +213,7 @@ Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arb
 
 Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją.
 
-Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.3 versija pakeitė 3.2 versiją: ji apima tik tuos regionus, kuriuose teikiame paslaugą, įvardija mūsų bendrovę, 5 skyriuje – mūsų prieglobos, turinio pristatymo ir el. pašto paslaugų teikėjus, ir aprašo Cloudflare robotų patikrą.
+Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.4 versija pakeitė 3.3 versiją: 13 skyriuje dabar nurodyta, kad slapukas debateai.locale taip pat nustato kalbą, kuria rašome jums siunčiamus el. laiškus, ir pridėta pastraipa, kad kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime.
 
 ## Annex B — Regioninės privatumo sąlygos
 

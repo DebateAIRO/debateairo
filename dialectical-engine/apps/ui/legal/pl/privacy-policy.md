@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: POLITYKA PRYWATNOŚCI · v3.3 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026
+eyebrow: POLITYKA PRYWATNOŚCI · v3.4 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026
 title: Co przechowujemy i dlaczego
 lede: Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.
-endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.3
+endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.4
 bodyLabel: Tekst Polityki prywatności
 annexTitle: Załącznik B — Regionalne warunki prywatności
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PLIKI COOKIE
 -->
 
-**Version 3.3 · Effective 12 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.4 · Effective 12 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Nasz dostawca hostingu przechowuje Twoje konto i Twoje debaty w Londynie, w Zjednoczonym Królestwie; sekcja 5 wskazuje, dokąd jeszcze trafiają Twoje dane. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim wycofanym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta.
 
@@ -183,7 +183,7 @@ Dialectical Engine używa 20 elementów, z których wszystkie są bezwzględnie 
 | `__Host-debateai-session` | Plik cookie (HttpOnly) | Utrzymuje Twoją sesję logowania. Jest odnawiany, gdy korzystasz z serwisu. | 14 dni |
 | `__Host-debateai-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | 14 dni |
 | `__Host-debateai-age-refusal` | Plik cookie (HttpOnly) | Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych. | 30 dni |
-| `debateai.locale` | Plik cookie | Zapamiętuje wybrany przez Ciebie język interfejsu. | 1 rok |
+| `debateai.locale` | Plik cookie | Zapamiętuje wybrany przez Ciebie język interfejsu i ustawia język wiadomości e-mail, które do Ciebie wysyłamy. | 1 rok |
 | `__Host-debateai-staff` | Plik cookie (HttpOnly) | Oddzielny dostęp personelu | Do 8 godzin; 15 minut bezczynności |
 | `__Host-debateai-staff-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | Do 8 godzin; 15 minut bezczynności |
 | `__Host-debateai-password-reset` | Plik cookie (HttpOnly) | Tylko resetowanie hasła | Do 30 minut |
@@ -201,6 +201,8 @@ Dialectical Engine używa 20 elementów, z których wszystkie są bezwzględnie 
 | `debateai.exportPending` | Pamięć sesji | Przechowuje w tej karcie link do eksportu otrzymany e-mailem na czas logowania i ponownej próby. | Do zamknięcia karty, wylogowania, otwarcia nowego linku, pierwszego udanego pobrania lub wyniku wskazującego nieprawidłowy link albo inne konto |
 | `debateai.exportLinkOutcome` | Pamięć sesji | Zapamiętuje, który komunikat o linku do pobrania wyświetlić w tej karcie. | Do zamknięcia karty, wylogowania lub otwarcia nowego linku |
 
+Każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania.
+
 Żaden inny podmiot nie zbiera za pośrednictwem Dialectical Engine informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach.
 
 Przeglądarki mogą wysyłać sygnał „Do Not Track” lub podobny sygnał. Dialectical Engine Cię nie śledzi, więc taki sygnał nie ma czego wyłączyć: usługa działa tak samo z nim i bez niego.
@@ -211,7 +213,7 @@ Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dl
 
 Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję.
 
-Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.3 zastąpiła wersję 3.2: obejmuje wyłącznie regiony, w których świadczymy usługę, podaje nazwę naszej spółki oraz, w sekcji 5, naszych dostawców hostingu, dostarczania treści i poczty elektronicznej, a także opisuje kontrolę botów Cloudflare.
+Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.4 zastąpiła wersję 3.3: sekcja 13 mówi teraz, że plik cookie debateai.locale ustawia także język, w którym piszemy wiadomości e-mail, które wysyłamy, oraz zawiera akapit o tym, że każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania.
 
 ## Annex B — Regionalne warunki prywatności
 

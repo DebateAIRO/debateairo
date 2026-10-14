@@ -29,6 +29,11 @@ export type WithdrawalRequest = Readonly<{
   source: "SETTINGS" | "OWNER";
   /** Runs under the owner lock before anything is written; the route spends the step-up grant here. */
   authorize: (client: PoolClient) => Promise<void>;
+  /**
+   * S01-C13 (R-17): the MLV of the withdraw request, the language of M8 and M8_RECEIVED. The owner's command (P14c)
+   * names none: those rows keep the billing profile's language.
+   */
+  mailLocale?: string;
 }>;
 
 /**
@@ -174,17 +179,21 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
       const recipient = { kind: "CUSTOMER", customerId: customer.customerId } as const;
+      // S01-C13 (R-17): the withdraw request's language, when the request carries one.
+      const language = request.mailLocale === undefined ? {} : { locale: request.mailLocale };
       await enqueueEmail(deps.billing, client, !byOwner && allocations.length === 0
         ? {
           template: "M8", recipient, dedupeRef: state.subscriptionId,
-          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros), currency: state.currency }, notBefore: now
+          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros), currency: state.currency }, notBefore: now,
+          ...language
         }
         : {
           template: "M8_RECEIVED", recipient, dedupeRef: state.subscriptionId,
           params: byOwner
             ? { plan: state.planId, withdrawalDate }
             : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
-          notBefore: now
+          notBefore: now,
+          ...language
         });
     }
     if (byOwner) {
@@ -210,10 +219,11 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
 
 /** The Settings route: now, with the step-up grant (P12a) spent under the owner lock. */
 export async function withdraw(deps: WithdrawalDeps, input: Readonly<{
-  authenticated: AuthenticatedSession; grantToken: string;
+  authenticated: AuthenticatedSession; grantToken: string; mailLocale?: string;
 }>): Promise<WithdrawalOutcome> {
   return recordWithdrawal(deps, {
     ownerRef: input.authenticated.ownerRef, withdrewAt: deps.clock(), source: "SETTINGS",
+    ...(input.mailLocale === undefined ? {} : { mailLocale: input.mailLocale }),
     authorize: async (client) => {
       const consumed = await deps.billing.consumeWithdrawalGrant(client, {
         userId: input.authenticated.userId, ownerRef: input.authenticated.ownerRef,

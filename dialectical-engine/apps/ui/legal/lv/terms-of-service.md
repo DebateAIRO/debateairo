@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.2 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.2
+endMarker: NOTEIKUMU BEIGAS · v2.3
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.2 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.3 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -114,7 +114,7 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 
 **Jūsu saturs paliek jūsu īpašums.** Jūs saglabājat visas tiesības, kas jums ir uz iesniegtajiem jautājumiem, apgalvojumiem, piezīmēm un iebildumiem. Jūs piešķirat mums neekskluzīvu, visā pasaulē spēkā esošu bezatlīdzības licenci mitināt, glabāt, reproducēt, pielāgot un apstrādāt šo saturu pakalpojuma darbības nodrošināšanai: debašu norisei, to glabāšanai, lai jūs tās varētu atkārtoti atvērt un atskaņot, atbalsta sniegšanai, mūsu juridisko pienākumu izpildei un — tikai tad, ja izvēlaties publicēt, — 9. sadaļā minētajiem nolūkiem. Šī licence beidzas, kad saturs ir dzēsts, izņemot 9. sadaļā vai tiesību aktos noteiktos gadījumus.
 
-**Mēs neapmācām modeļus ar jūsu saturu.** Mēs neapmācām modeļus ar jūsu saturu. MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši, un kad.
+**Mēs neapmācām modeļus ar jūsu saturu.** MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši, un kad.
 
 **Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem.** Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju.
 
@@ -239,7 +239,7 @@ Jūs drīkstat citēt publicētas debates un ievietot saites uz tām, norādot D
 
 ## 17. Personas dati
 
-Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā** vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā Dialectical Engine publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā.
+Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā** vietnē dezbatere.ro/privacy. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā Dialectical Engine publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā. E-pasta ziņojumi, ko mēs jums sūtām, ir rakstīti valodā, kuru izvēlējāties mūsu vietnē; Privātuma politikas 13. sadaļā paskaidrots, kā mēs saglabājam šo izvēli.
 
 ## 18. Piemērojamie tiesību akti un strīdu izskatīšanas vieta
 

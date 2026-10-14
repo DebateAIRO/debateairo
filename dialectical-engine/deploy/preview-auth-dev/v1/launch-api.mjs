@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
 import { prepareLaunch } from './launch-plan.mjs';
-import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from './environment.mjs';
+import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment,installHostedEgress } from './environment.mjs';
 import { afterApiListen,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 export async function launchApi(argv) {
@@ -16,6 +16,8 @@ export async function launchApi(argv) {
  const entry=join(engine,'apps/api/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/api/src/main.ts');
  if(!main)refuse('PREVIEW_API_MAIN_UNBOUND');
  process.chdir(engine);installNarrowEnvironment(selected.environment);
+ // Hosted (owner rulings 2026-10-13): the API's https calls go through the loopback egress proxy, before main is imported.
+ installHostedEgress(selected.deploymentMode);
  return afterApiListen({binding:{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,sourceManifestSha256:plan.sourceManifest.sha256,operatorManifestSha256:plan.operatorManifestSha256,contractSha256:source.contractSha256,apiMainSha256:main.sha256},publication:plan.publication,identity:await linuxProcessIdentity(),
   readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE}),
   importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_API_STARTED ${JSON.stringify(event)}\n`)});

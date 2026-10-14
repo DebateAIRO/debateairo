@@ -131,7 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nội dung của bạn vẫn thuộc về bạn. Bạn giữ mọi quyền mình có đối với các câu hỏi, nhận định, chú thích và chất vấn đã gửi. Bạn cấp cho chúng tôi giấy phép không độc quyền, trên toàn thế giới, miễn tiền bản quyền để lưu trữ, bảo quản, sao chép, điều chỉnh và xử lý nội dung đó nhằm vận hành dịch vụ: tiến hành cuộc tranh luận, lưu trữ để bạn có thể mở lại và phát lại, cung cấp hỗ trợ, thực hiện nghĩa vụ pháp lý của chúng tôi và — chỉ khi bạn chọn công khai — phục vụ các mục đích tại mục 9. Giấy phép này chấm dứt khi nội dung bị xóa, trừ trường hợp mục 9 hoặc pháp luật có yêu cầu khác." },
-      { kind: "p", text: "Chúng tôi không huấn luyện bằng nội dung của bạn. Chúng tôi không huấn luyện mô hình bằng nội dung của bạn. Chúng tôi chỉ sử dụng các nhà cung cấp AI theo những điều khoản không cho phép họ dùng nội dung của bạn để huấn luyện hoặc cải thiện mô hình của họ; Sổ đăng ký nhà cung cấp AI cho biết, với từng nhà cung cấp, chúng tôi đã xác nhận điều này hay chưa và vào thời điểm nào." },
+      { kind: "p", text: "Chúng tôi không huấn luyện bằng nội dung của bạn. Chúng tôi chỉ sử dụng các nhà cung cấp AI theo những điều khoản không cho phép họ dùng nội dung của bạn để huấn luyện hoặc cải thiện mô hình của họ; Sổ đăng ký nhà cung cấp AI cho biết, với từng nhà cung cấp, chúng tôi đã xác nhận điều này hay chưa và vào thời điểm nào." },
       { kind: "p", text: "Cách nội dung của bạn được chuyển đến các nhà cung cấp AI. Để tiến hành một cuộc tranh luận, chúng tôi gửi văn bản đến một hoặc nhiều nhà cung cấp mô hình bên ngoài. Nội dung một nhà cung cấp nhận được là câu hỏi của bạn, các chú thích định hướng bạn thiết lập và các phát biểu do công cụ tổng hợp trong quá trình tranh luận — vì vậy nhà cung cấp thấy văn bản được phái sinh và xây dựng xoay quanh nội dung bạn nhập, chứ không chỉ những từ ngữ ban đầu của bạn. Nhà cung cấp không bao giờ nhận địa chỉ email, mã định danh tài khoản, hồ sơ phiên hoặc thông tin thanh toán của bạn." },
       { kind: "p", text: "Những gì cuộc trò chuyện hỗ trợ gửi đi. Trợ lý hỗ trợ cũng là một mô hình AI. Khi bạn viết cho trợ lý, chúng tôi gửi tin nhắn của bạn đến một nhà cung cấp mô hình bên ngoài để mô hình có thể trả lời, cùng với các bài viết trợ giúp mà mô hình dựa vào để trả lời. Trước khi gửi, chúng tôi che mọi thứ trông giống mật khẩu, mã dùng một lần hoặc khóa. Nếu bạn yêu cầu nói chuyện với một người, chúng tôi cũng gửi cuộc trò chuyện, được che theo cùng cách, đến mô hình để mô hình viết một bản tóm tắt ngắn cho thành viên trong nhóm của chúng tôi tiếp nhận trường hợp của bạn. Chúng tôi không đính kèm địa chỉ email, mã định danh tài khoản hoặc thông tin thanh toán của bạn, nhưng mô hình nhận mọi nội dung khác bạn nhập vào cuộc trò chuyện, vì vậy đừng viết ở đó bất cứ điều gì bạn không muốn mô hình đọc." },
       { kind: "p", text: "Nhà cung cấp nào và tại đâu. Sổ đăng ký nhà cung cấp AI của chúng tôi tại dezbatere.ro/providers là một phần của các Điều khoản này. Sổ đăng ký liệt kê từng nhà cung cấp chúng tôi có thể sử dụng: pháp nhân và quốc gia của họ; dữ liệu họ nhận và lý do; nơi họ xử lý; điều khoản lưu giữ; liệu chế độ không lưu giữ dữ liệu có được kích hoạt cho điểm cuối chúng tôi sử dụng hay không; liệu họ có thể dùng dữ liệu đầu vào để huấn luyện theo hợp đồng với chúng tôi hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; và ngày chúng tôi xác minh lần gần nhất đối với mỗi mục. Các nhà cung cấp có thể ở ngoài quốc gia của bạn và ngoài Khu vực Kinh tế Châu Âu. Chính sách quyền riêng tư của chúng tôi giải thích các biện pháp bảo đảm." },
@@ -253,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dữ liệu cá nhân",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong Chính sách quyền riêng tư tại dezbatere.ro/privacy. Chính sách giải thích dữ liệu chúng tôi thu thập, cơ sở pháp lý cho từng mục đích, thời hạn lưu giữ, bên nhận dữ liệu, hoạt động chuyển dữ liệu liên quan và cách thực hiện các quyền của bạn. Ba điểm cũng thuộc mục này. Mục 7 yêu cầu bạn không đưa dữ liệu cá nhân của người khác vào một câu hỏi; nếu làm vậy, bạn chịu trách nhiệm và chúng tôi có thể gỡ nội dung. Nếu một cuộc tranh luận được công khai trên Dialectical Engine chứa dữ liệu cá nhân về bạn, bạn có thể yêu cầu chúng tôi gỡ bỏ mà không cần có tài khoản (mục 9). Và chúng tôi lưu hồ sơ về việc bạn chấp nhận các Điều khoản này — phiên bản, thời điểm và chi tiết kỹ thuật của phiên — làm bằng chứng về hợp đồng, như được giải thích trong Chính sách quyền riêng tư." }
+      { kind: "p", text: "Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong Chính sách quyền riêng tư tại dezbatere.ro/privacy. Chính sách giải thích dữ liệu chúng tôi thu thập, cơ sở pháp lý cho từng mục đích, thời hạn lưu giữ, bên nhận dữ liệu, hoạt động chuyển dữ liệu liên quan và cách thực hiện các quyền của bạn. Ba điểm cũng thuộc mục này. Mục 7 yêu cầu bạn không đưa dữ liệu cá nhân của người khác vào một câu hỏi; nếu làm vậy, bạn chịu trách nhiệm và chúng tôi có thể gỡ nội dung. Nếu một cuộc tranh luận được công khai trên Dialectical Engine chứa dữ liệu cá nhân về bạn, bạn có thể yêu cầu chúng tôi gỡ bỏ mà không cần có tài khoản (mục 9). Và chúng tôi lưu hồ sơ về việc bạn chấp nhận các Điều khoản này — phiên bản, thời điểm và chi tiết kỹ thuật của phiên — làm bằng chứng về hợp đồng, như được giải thích trong Chính sách quyền riêng tư. Các email chúng tôi gửi cho bạn được viết bằng ngôn ngữ bạn đã chọn trên trang của chúng tôi; mục 13 của Chính sách quyền riêng tư giải thích cách chúng tôi giữ lựa chọn đó." }
     ]
   },
   {
@@ -351,12 +351,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.2",
-  sha256: "575499a7940921e91fb35251ccdb5e4fe68b6f67633d9dd7e8a05d9571a04a2d",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.2 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
+  version: "2.3",
+  sha256: "cc440028ea3ed5a1ebf8d090c5bd84bed60741b72d487a709c0c337cff50ccc6",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.3 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.2",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.3",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

@@ -14,6 +14,7 @@ import { COUNTRY_CODES } from "@/lib/billing/countries";
 import { countryName, formatMoney, planName, renewDayLabel, taxLabel } from "@/lib/billing/format";
 import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import type { PaidPlanId } from "@/lib/billing/plans";
+import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { BillingDetailsFields, type BillingDetails } from "./BillingDetailsFields";
@@ -48,7 +49,7 @@ export function CheckoutFlow({
   paymentMarks = NO_MARKS
 }: Readonly<{
   planId: PaidPlanId;
-  locale: string;
+  locale: LocaleCode;
   catalog?: MessageCatalog;
   consents: CheckoutConsents | null;
   client?: CheckoutClient;
@@ -173,7 +174,7 @@ export function CheckoutFlow({
     try {
       const answer = await client.startBillingCheckout({
         quote_ref: quote.quote_ref,
-        locale,
+        locale: catalogLocale(locale),
         consents: { renewal_terms: consents.renewal, immediate_start: consents.immediateStart },
         ...(quote.country_confirm_needed ? { country_confirmed: true as const } : {})
       });
