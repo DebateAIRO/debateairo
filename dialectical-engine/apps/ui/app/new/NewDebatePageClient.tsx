@@ -214,6 +214,8 @@ function NewDebateForm({
   useEffect(() => {
     if (topicFocusRequest > 0) topicField.current?.focus();
   }, [topicFocusRequest]);
+  // The box grows with its content; "Use this version" changes it without a keystroke (L-USE-STICKS).
+  useEffect(() => { grow(topicField.current); }, [topic]);
   // Budget spec §2.11: the room for the ask this form would send. It is a
   // word (FITS/CLOSE/FULL/ALREADY_WAITING), never a figure.
   // Debate shape P2c (Contract deviation 7): true once a room read has said the deployment's shape row is
@@ -338,9 +340,13 @@ function NewDebateForm({
         modelStrength: strengthControl.locked ? null : modelStrength
       }, submitTime, catalog);
       // Question language (spec 2026-10-13; ruling CR-5, D1 order). Every ask carries the page's
-      // language. A real mix is offered once per press; a second offer in the same press is answered
-      // with the person's own wording. A stale reference is never sent again: the question is checked
-      // once more, without a choice. Every other refusal goes on to today's handling below.
+      // language — but only once the room read has said the shape row is in force (ruling
+      // L-SITELANG-GATED, the same condition that builds the server's decider). Otherwise the call is
+      // today's, byte for byte, and no offer can come back. A real mix is offered once per press; a
+      // second offer in the same press is answered with the person's own wording. A stale reference is
+      // never sent again: the question is checked once more, without a choice. Every other refusal goes
+      // on to today's handling below.
+      const sendsLanguage = shapeSettings;
       const siteLanguage = catalogLocale(pageLocale);
       const question = topic.trim();
       let next: Readonly<{ line: string; choice?: QuestionLanguageChoice }> = { line: question };
@@ -351,8 +357,10 @@ function NewDebateForm({
       let debate: { id: string } | null = null;
       while (debate === null) {
         try {
-          debate = await createDebate(next.line, config, token, undefined,
-            next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice });
+          debate = !sendsLanguage
+            ? await createDebate(next.line, config, token)
+            : await createDebate(next.line, config, token, undefined,
+              next.choice === undefined ? { siteLanguage } : { siteLanguage, choice: next.choice });
         } catch (refusal) {
           // Today's one retry after the consent screen; it is not one of the four asks.
           if (isSensitiveDataConsentRefusal(refusal) && !consentRetried) {
@@ -374,10 +382,16 @@ function NewDebateForm({
               setTopicFocusRequest((request) => request + 1);
               return;
             }
-            next = answer === "USE"
-              ? { line: offer.proposed_question,
-                choice: { check_ref: offer.check_ref, choice: "USE_REWRITE", original_question_line: question } }
-              : { line: question, choice: { check_ref: offer.check_ref, choice: "KEEP_MINE" } };
+            if (answer === "USE") {
+              // Ruling L-USE-STICKS: the box takes the rewrite, so a refusal on the answering call (plan,
+              // daily limit, a waiting question, the network) never leaves the mixed wording for the next
+              // press. `question` stays the press's own words, for the stale re-check below.
+              setTopic(offer.proposed_question);
+              next = { line: offer.proposed_question,
+                choice: { check_ref: offer.check_ref, choice: "USE_REWRITE", original_question_line: question } };
+            } else {
+              next = { line: question, choice: { check_ref: offer.check_ref, choice: "KEEP_MINE" } };
+            }
             continue;
           }
           if (next.choice !== undefined && !rechecked && isQuestionLanguageCheckStale(refusal)) {

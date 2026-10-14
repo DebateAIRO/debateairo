@@ -117,12 +117,12 @@ export function QuestionLanguageChoiceDialog({
           </div>
           {/* The consent screen's body and statement styles: the proposal reads as the one thing to weigh. */}
           <div className="sensitiveConsentBody">
+            {/* The label keeps the page's language; only the rewrite is in its own (and lines up by its own direction). */}
             <blockquote
               className="sensitiveConsentStatement questionLanguageProposal"
-              lang={offer.main_language.code}
               aria-label={t(catalog, "newDebate.languageCheck.proposalLabel")}
             >
-              <bdi>{offer.proposed_question}</bdi>
+              <bdi lang={offer.main_language.code} dir="auto">{offer.proposed_question}</bdi>
             </blockquote>
           </div>
           <div className="policyFoot">

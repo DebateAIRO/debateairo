@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(), validateSession: vi.fn(), readSession: vi.fn(),
-  readSensitiveDataConsent: vi.fn(), giveSensitiveDataConsent: vi.fn(), push: vi.fn()
+  readSensitiveDataConsent: vi.fn(), giveSensitiveDataConsent: vi.fn(), push: vi.fn(), getAskRoom: vi.fn()
 }));
 const createDebate = mocks.createDebate;
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -22,7 +22,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../apps/ui/lib/api.js")>();
   return { ...actual, COOKIE_SESSION_MARKER: "cookie-session", createDebate: mocks.createDebate, validateSession: mocks.validateSession,
     contractClient: { readSession: mocks.readSession, readSensitiveDataConsent: mocks.readSensitiveDataConsent,
-      giveSensitiveDataConsent: mocks.giveSensitiveDataConsent } };
+      giveSensitiveDataConsent: mocks.giveSensitiveDataConsent, getAskRoom: mocks.getAskRoom } };
 });
 vi.mock("@/components/AuthGate", () => ({
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("test-token")
@@ -44,11 +44,18 @@ const OFFER = { check_ref: "ref.sig", main_language: { code: "ro", name: "Romani
   languages_seen: [{ code: "ro", name: "Romanian" }, { code: "en", name: "English" }],
   proposed_question: "Ar trebui România să adopte euro sau să aștepte până cresc salariile?" };
 
-async function renderNew(locale: "ro" | "en" | "el") {
+// Ruling L-SITELANG-GATED: the page sends its language only once the room read says the shape row is in force
+// (P2c's shape_settings flag). Every pop-up case below runs with it on; the flag-off cases say so.
+const SHAPE_ROOM = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, shape_settings: true } as const;
+const { shape_settings: _flag, ...PLAIN_ROOM } = SHAPE_ROOM;
+
+async function renderNew(locale: "ro" | "en" | "el" | "en-US" | "en-GB") {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
-  await act(async () => { root.render(<NewDebatePageClient locale={locale} {...catalogsFor(locale)} />); });
+  const catalogs = catalogsFor(locale.startsWith("en") ? "en" : locale);
+  await act(async () => { root.render(<NewDebatePageClient locale={locale} {...catalogs} />); });
+  await act(async () => { for (let index = 0; index < 8; index += 1) await Promise.resolve(); });
   return { host, root };
 }
 async function askWith(host: HTMLElement, text: string) {
@@ -67,6 +74,7 @@ beforeEach(() => {
   mocks.readSensitiveDataConsent.mockReset().mockResolvedValue({ status: "given" });
   mocks.giveSensitiveDataConsent.mockReset().mockResolvedValue({ status: "given" });
   mocks.push.mockReset();
+  mocks.getAskRoom.mockReset().mockResolvedValue(SHAPE_ROOM);
 });
 afterEach(() => { createDebate.mockReset(); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 
@@ -85,7 +93,7 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     await askWith(host, MIXED);
     const dialog = document.querySelector('[data-dialog="question-language"]')!;
     expect(dialog.textContent).toContain("Întrebarea ta amestecă limbile");
-    expect(dialog.querySelector("blockquote")!.getAttribute("lang")).toBe("ro");
+    expect(dialog.querySelector("blockquote bdi")!.getAttribute("lang")).toBe("ro");   // M2: on the <bdi>
     expect(dialog.textContent).toContain(OFFER.proposed_question);
     expect(dialog.textContent).not.toMatch(/eld|score|model|check_ref/iu);
     await act(async () => { button("Folosește varianta propusă").click(); });
@@ -120,7 +128,9 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
   });
 
   it("'Edit' and Esc send nothing more and put the person back in the question box", async () => {
-    for (const close of [() => button("Edit").click(), () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))]) {
+    for (const close of [() => button("Edit").click(), () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
+      // M3: a click on the backdrop itself (the scrim is the event's target).
+      () => (document.querySelector(".policyScrim") as HTMLElement).click()]) {
       createDebate.mockReset();
       createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER));
       const { host, root } = await renderNew("en");
@@ -192,5 +202,73 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     const { host } = await renderNew("en");
     await askWith(host, MIXED);
     expect(document.querySelector('[data-dialog="question-language"]')!.textContent).toContain("Your question mixes Romanian and Klingon.");
+  });
+
+  // Fix round 1 (task-18-review.md).
+
+  it("L-USE-STICKS (I1): after 'Use this version', a refusal on the answering call leaves the proposed question in the box", async () => {
+    createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER))
+      .mockRejectedValueOnce(new ContractHttpError("UNPROCESSABLE", 422, "ASK_PLAN_TIER_INVALID: refused", "ASK_PLAN_TIER_INVALID"));
+    const { host } = await renderNew("en");
+    await askWith(host, MIXED);
+    await act(async () => { button("Use this version").click(); });
+    expect(createDebate).toHaveBeenCalledTimes(2);
+    expect((host.querySelector("textarea") as HTMLTextAreaElement).value).toBe(OFFER.proposed_question);
+    expect(host.querySelector(".error")).not.toBeNull();
+  });
+
+  it("M1: an en-US or en-GB page sends its language as \"en\"", async () => {
+    for (const locale of ["en-US", "en-GB"] as const) {
+      createDebate.mockReset().mockResolvedValue({ id: "run-1" });
+      const { host, root } = await renderNew(locale);
+      await askWith(host, "Should the city fund the tram line?");
+      expect(createDebate).toHaveBeenCalledWith("Should the city fund the tram line?", expect.anything(), "test-token", undefined, { siteLanguage: "en" });
+      root.unmount();
+    }
+  });
+
+  it("M5: a press stops after four asks, then shows today's banner (L-STALE-BANNER)", async () => {
+    const expired = () => new ContractHttpError("SERVER_FAILURE", 409, "QUESTION_LANGUAGE_CHECK_EXPIRED: QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHECK_EXPIRED");
+    createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER))
+      .mockRejectedValueOnce(expired())
+      .mockRejectedValueOnce(new QuestionLanguageChoiceNeededError({ ...OFFER, check_ref: "ref2.sig" }))
+      // A server that keeps offering: without the limit the page would answer each offer with KEEP_MINE forever.
+      .mockRejectedValue(new QuestionLanguageChoiceNeededError({ ...OFFER, check_ref: "ref3.sig" }));
+    const { host } = await renderNew("en");
+    await askWith(host, MIXED);
+    await act(async () => { button("Keep my wording").click(); });
+    await act(async () => { for (let index = 0; index < 8; index += 1) await Promise.resolve(); });
+    expect(createDebate).toHaveBeenCalledTimes(4);
+    expect(document.querySelector('[data-dialog="question-language"]')).toBeNull();
+    const en = catalogue("en", "newDebate");
+    expect(host.querySelector(".error")!.textContent).toBe(
+      `${en["requestFailure.subject.DEBATE_CREATE"]} ${en["requestFailure.kind.BUSY"]}`);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("L-SITELANG-GATED (M6): with the shape row absent, or the room read failed, the ask is today's call", async () => {
+    for (const roomRead of [() => mocks.getAskRoom.mockResolvedValue(PLAIN_ROOM),
+      () => mocks.getAskRoom.mockRejectedValue(new Error("room unavailable in render test"))]) {
+      roomRead();
+      createDebate.mockReset().mockResolvedValue({ id: "run-1" });
+      const { host, root } = await renderNew("ro");
+      await askWith(host, "Ar trebui România să adopte euro?");
+      expect(createDebate).toHaveBeenCalledTimes(1);
+      expect(createDebate.mock.calls[0]).toEqual(["Ar trebui România să adopte euro?", expect.anything(), "test-token"]);
+      root.unmount();
+    }
+  });
+
+  it("M2: the rewrite's own language sits on the <bdi>, the label's element keeps the page's", async () => {
+    createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER));
+    const { host } = await renderNew("en");
+    await askWith(host, MIXED);
+    const quote = document.querySelector('[data-dialog="question-language"] blockquote')!;
+    expect(quote.hasAttribute("lang")).toBe(false);
+    expect(quote.getAttribute("aria-label")).toBe("Suggested version");
+    const bdi = quote.querySelector("bdi")!;
+    expect(bdi.getAttribute("lang")).toBe("ro");
+    expect(bdi.getAttribute("dir")).toBe("auto");
+    expect(bdi.textContent).toBe(OFFER.proposed_question);
   });
 });

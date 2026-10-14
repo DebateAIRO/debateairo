@@ -1,4 +1,4 @@
-import { ContractHttpError, type AskRequest, type ContractClient, type QuestionLanguageOffer } from "@debateai/contract";
+import { AskRequestSchema, ContractHttpError, type AskRequest, type ContractClient, type QuestionLanguageOffer } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- the root test compiler has no JSX mode; Vitest transpiles this TSX module.
@@ -54,6 +54,18 @@ describe("P2L Task 18 — the ask's language fields on the wire", () => {
     await createDebate("Q?", CONFIG, "test-token", client, { siteLanguage: "ro", choice });
     expect(withChoice[1]).toMatchObject({ site_language: "ro", question_language_choice: choice });
     expect(today).toEqual([]);
+  });
+
+  it("M4: the strict contract accepts exactly what the page builds: no choice, USE_REWRITE and KEEP_MINE", async () => {
+    const { client, withChoice } = capturingClient();
+    await createDebate("Q mixed?", CONFIG, "test-token", client, { siteLanguage: "ro" });
+    await createDebate(OFFER.proposed_question, CONFIG, "test-token", client, { siteLanguage: "ro",
+      choice: { check_ref: OFFER.check_ref, choice: "USE_REWRITE", original_question_line: "Q mixed?" } });
+    await createDebate("Q mixed?", CONFIG, "test-token", client, { siteLanguage: "en",
+      choice: { check_ref: OFFER.check_ref, choice: "KEEP_MINE" } });
+    expect(withChoice).toHaveLength(3);
+    for (const ask of withChoice) expect(AskRequestSchema.parse(ask)).toEqual(ask);
+    expect(withChoice.map((ask) => ask.question_language_choice?.choice)).toEqual([undefined, "USE_REWRITE", "KEEP_MINE"]);
   });
 
   it("an offer is thrown as QuestionLanguageChoiceNeededError carrying the server's offer", async () => {
