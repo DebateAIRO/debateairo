@@ -33,6 +33,19 @@ describe("LG-A decode: the syntax pass, tried after every repair before it", () 
     expect(decodedRepairsOf(decoded)).toEqual(["MODEL_TOKEN_DROPPED"]);
   });
 
+  it("drops a comma that a leaked model token separates from the closing brace (Task 3 review)", () => {
+    const decoded = decodedOk("{\"a\":1,<|im_end|>}");
+    expect(decoded.value).toEqual({ a: 1 });
+    expect(decodedRepairsOf(decoded)).toEqual(["TRAILING_COMMA", "MODEL_TOKEN_DROPPED"]);
+  });
+
+  it("names the code fence too when the pass reads a fence's body (L34, Task 3 review)", () => {
+    const decoded = decodedOk("```json\n{\"a\":1,}\n```");
+    expect(decoded.value).toEqual({ a: 1 });
+    expect(decodedRepairsOf(decoded)).toEqual(["CODE_FENCE", "TRAILING_COMMA"]);
+    expect(decoded.repair).toBe("CODE_FENCE");
+  });
+
   it("reads a key written with its colon inside the quotes", () => {
     const decoded = decodedOk("{\"severity\":0.2,\"description:\" \"none\"}");
     expect(decoded.value).toEqual({ severity: 0.2, description: "none" });
@@ -91,5 +104,36 @@ describe("LG-A decode: the syntax pass, tried after every repair before it", () 
       value: { a: "x", b: [1] }, repairs: ["TRAILING_COMMA", "UNASKED_KEYS"] });
     expect(classifyStructuredArtifact(reply, schema, STOP, { unaskedKeys: true })).toEqual({ parseStatus: "PARSED", parseError: null,
       jsonRepair: "TRAILING_COMMA", jsonRepairs: ["TRAILING_COMMA", "UNASKED_KEYS"] });
+  });
+});
+
+/**
+ * Task 3 review: a straight quote inside a text makes the pass read part of that text as outside it, where a dropped
+ * comma, token or colon would change the AI's words. After such a repair INNER_QUOTE is never tried on the cleaned
+ * text; the reply is refused and left to the structure-repair call, which keeps every word.
+ */
+describe("LG-A decode: the syntax pass never changes a word", () => {
+  it.each([
+    ["a leaked token between two inner quotes", "{\"a\":\"he wrote \"<|im_end|>\" here\",}"],
+    ["a trailing comma between two inner quotes", "{\"a\":\"he typed \"[1, 2,]\" in the box\",\"b\":[3,]}"],
+    ["a comma before a brace between two inner quotes", "{\"a\":\"say \"a,}\" b\",\"c\":[1,]}"]
+  ])("refuses %s rather than change its words", (_name, text) => {
+    expect(decodeModelJson(text, STOP).ok).toBe(false);
+    expect(modelJsonSyntaxRepair(text, STOP)).toBeNull();
+    expect(parseStructuredArtifact(text, z.unknown(), STOP).kind).toBe("PARSE_FAILURE");
+  });
+});
+
+/** CI-1b (model text is untrusted): the syntax pass is linear; an unbounded search for `|>` made unclosed `<|` quadratic. */
+describe("LG-A decode: the syntax pass answers in linear time", () => {
+  const WITHIN_MS = 500;
+  it.each([
+    ["100 000 unclosed model-token openers", `{${"<|".repeat(100000)}}`],
+    ["100 000 unclosed openers with a letter, closed once at the end", `{"a":1,${"<|a".repeat(100000)}|>}`]
+  ])("answers %s inside the bound", (_name, text) => {
+    const started = performance.now();
+    expect(decodeModelJson(text, STOP).ok).toBe(false);
+    expect(parseStructuredArtifact(text, z.unknown(), STOP).kind).toBe("PARSE_FAILURE");
+    expect(performance.now() - started).toBeLessThan(WITHIN_MS);
   });
 });

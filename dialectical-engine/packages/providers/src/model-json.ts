@@ -453,12 +453,38 @@ const SYNTAX_REPAIR_LIMITS = Object.freeze({
   bracketPlacesMax: 64
 });
 const MODEL_TOKEN_BODY = /^[A-Za-z0-9_]+$/u;
+/**
+ * The syntax pass's repairs made OUTSIDE strings. After one of them the cleaned text is never read with INNER_QUOTE: a
+ * straight quote inside a text makes the pass read part of that text as outside, so a comma, token or colon dropped
+ * there would change the AI's words (Task 3 review: `"he typed "[1, 2,]" in the box"`). Such a reply is refused here and
+ * left to the structure-repair call, which keeps every word.
+ */
+const OUTSIDE_STRING_REPAIRS: readonly ModelJsonDecodeRepair[] = Object.freeze(["TRAILING_COMMA", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED"]);
+
+/**
+ * The end of the leaked model token `<|name|>` that starts at `index`, or null. The closing `|>` is looked for only
+ * inside the token window (`modelTokenMaxChars`), so each `<|` costs at most that many characters (CI-1b: model text is
+ * untrusted; an unbounded search made many unclosed `<|` quadratic).
+ */
+function modelTokenEnd(text: string, index: number): number | null {
+  if (text[index] !== "<" || text[index + 1] !== "|") return null;
+  const window = text.slice(index + 2, index + SYNTAX_REPAIR_LIMITS.modelTokenMaxChars);
+  const close = window.indexOf("|>");
+  return close > 0 && MODEL_TOKEN_BODY.test(window.slice(0, close)) ? index + 2 + close + 2 : null;
+}
+
+/** The next character that is neither a blank nor a leaked model token (so `1,<|im_end|>}` still ends in `,}`). */
+function nextSignificantPastTokens(text: string, from: number): string | undefined {
+  let index = nextSignificant(text, from);
+  for (let end = modelTokenEnd(text, index); end !== null; end = modelTokenEnd(text, index)) index = nextSignificant(text, end);
+  return text[index];
+}
 
 /**
  * LG-A, one linear pass over a JSON-like text (strings read as JSON reads them; an escaped quote stays inside):
  *  · RAW_LINE_BREAK — a raw line break, carriage return or tab inside a string, escaped;
  *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
- *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks between), dropped;
+ *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
  *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
  * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case).
  */
@@ -499,17 +525,14 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       index = cursor + 1;
       continue;
     }
-    if (character === "<" && text[index + 1] === "|") {
-      const close = text.indexOf("|>", index + 2);
-      if (close > index + 2 && close + 2 - index <= SYNTAX_REPAIR_LIMITS.modelTokenMaxChars
-        && MODEL_TOKEN_BODY.test(text.slice(index + 2, close))) {
-        made.add("MODEL_TOKEN_DROPPED");
-        index = close + 2;
-        continue;
-      }
+    const tokenEnd = modelTokenEnd(text, index);
+    if (tokenEnd !== null) {
+      made.add("MODEL_TOKEN_DROPPED");
+      index = tokenEnd;
+      continue;
     }
     if (character === ",") {
-      const next = text[nextSignificant(text, index + 1)];
+      const next = nextSignificantPastTokens(text, index + 1);
       if (next === "}" || next === "]") { made.add("TRAILING_COMMA"); index += 1; continue; }
       if (top?.kind === "object") top.expectKey = true;
     } else if (character === "{") stack.push({ kind: "object", expectKey: true });
@@ -580,27 +603,31 @@ function insertOneBracket(text: string): { readonly value: unknown } | null {
 
 /**
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
- * one code fence, else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then strict JSON, then (iv)
- * INNER_QUOTE on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned
- * text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing decodes to one
- * object. The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ * one code fence (named CODE_FENCE too), else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then
+ * strict JSON, then (iv) INNER_QUOTE on the cleaned text, only when the clean made no repair outside strings
+ * (`OUTSIDE_STRING_REPAIRS`: never a changed word); only for a reply that finished normally, then (vi) CLOSING_BRACKETS
+ * on the cleaned text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing
+ * decodes to one object. The repairs are named once each, in MODEL_JSON_REPAIRS order.
  */
 export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
   if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
-  const base = (modelJsonFenceBody(content) ?? content).trim();
+  const fenced = modelJsonFenceBody(content);
+  const base = (fenced ?? content).trim();
   if (!base.startsWith("{")) return null;
   const cleaned = syntaxClean(base);
   const done = (value: unknown, more: readonly ModelJsonDecodeRepair[]) => {
-    const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...more]);
+    const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
     return Object.freeze({ value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
   };
   if (cleaned.made.size > 0) {
     const strict = parsed(cleaned.text);
     if (strict !== null && isPlainObject(strict.value)) return done(strict.value, []);
-    const quoted = escapeInnerQuotes(cleaned.text);
-    const unquoted = quoted === null ? null : parsed(quoted);
-    if (unquoted !== null && isPlainObject(unquoted.value)) return done(unquoted.value, ["INNER_QUOTE"]);
+    if (!OUTSIDE_STRING_REPAIRS.some((repair) => cleaned.made.has(repair))) {
+      const quoted = escapeInnerQuotes(cleaned.text);
+      const unquoted = quoted === null ? null : parsed(quoted);
+      if (unquoted !== null && isPlainObject(unquoted.value)) return done(unquoted.value, ["INNER_QUOTE"]);
+    }
   }
   if (!modelReplyFinishedNormally(reply)) return null;
   if (cleaned.made.size > 0) {
