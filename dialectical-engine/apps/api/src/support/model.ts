@@ -739,6 +739,36 @@ export class AnthropicMessagesAdapter extends SupportHttpAdapter {
   }
 }
 
+/** The target's credential: inline, or its declared file resolved through the custody-checked loader. */
+function supportTargetAuthorizationHeader(
+  target: SupportModelTarget,
+  readAuthorizationHeader: (path: string) => string
+): string | undefined {
+  return target.authorizationFile === undefined
+    ? target.authorizationHeader
+    : resolveProviderTargetCredentials(
+      [providerView(target)],readAuthorizationHeader
+    )[0]?.authorizationHeader;
+}
+
+/**
+ * P2L Task 19 (pre-flight PF-L36): the key the HOSTED fast language check borrows — the support target's own
+ * Anthropic key, read at the API's question-language boot step through the same custody loader this module's adapter
+ * uses, and through the same shape check. `undefined` when there is no target or it is not the Anthropic Messages wire
+ * on Anthropic's own base URL (the relay, another vendor): then the hosted fast check stays off. No other key exists.
+ */
+export function supportAnthropicMessagesKey(
+  target: SupportModelTarget | undefined,
+  readAuthorizationHeader: (path: string) => string
+): string | undefined {
+  if (target === undefined || target.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
+    || target.baseUrl !== ANTHROPIC_MESSAGES_BASE_URL) return undefined;
+  const key = supportTargetAuthorizationHeader(target, readAuthorizationHeader);
+  if (key === undefined) notRatified();
+  assertAnthropicCredentialShape(key);
+  return key;
+}
+
 /**
  * The one place a parsed support target becomes a live transport.
  *
@@ -759,11 +789,7 @@ export function createSupportModelAdapter(
     reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
   }>
 ): SupportModelAdapter {
-  const authorizationHeader = target.authorizationFile === undefined
-    ? target.authorizationHeader
-    : resolveProviderTargetCredentials(
-      [providerView(target)],options.readAuthorizationHeader
-    )[0]?.authorizationHeader;
+  const authorizationHeader = supportTargetAuthorizationHeader(target, options.readAuthorizationHeader);
   if (authorizationHeader === undefined) notRatified();
   const input: SupportModelAdapterInput = {
     baseUrl: target.baseUrl,

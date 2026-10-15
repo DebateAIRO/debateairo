@@ -252,8 +252,9 @@ describe("the story and its checker", () => {
 
   it("the writer gives both its calls the question's language check", () => {
     const writer = readFileSync(new URL("../../packages/story/src/writer.ts", import.meta.url), "utf8");
-    expect(writer).toContain("const storyInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_BODY_PROSE);");
-    expect(writer).toContain("const checkerInQuestionLanguage = replyLanguageCheck(input.questionLine, STORY_CHECKER_PROSE);");
+    // P2L Task 16: the check is the locked one when the run is locked, today's replyLanguageCheck otherwise.
+    expect(writer).toContain("const storyInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_BODY_PROSE);");
+    expect(writer).toContain("const checkerInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_CHECKER_PROSE);");
     expect(writer).toContain("classifyStoryContent(content, built.index, reply, storyInQuestionLanguage)");
     expect(writer).toContain("classifyCheckerContent(content, reply, checkerInQuestionLanguage)");
   });

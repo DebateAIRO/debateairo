@@ -39,6 +39,11 @@ export type WaitingRun = Readonly<{
   waitsFor: WaitReason["waitsFor"] | null;
   personRecheckAt: Date | null;
   reasonAt: Date | null;
+  /**
+   * Debate shape (spec 2026-10-12 §3.6): the run's stored shape settings and receipt plan, raw — present only for a
+   * run asked under the register's debateShapePolicy row. Read carefully by the estimate (`waitingShapeClassOf`).
+   */
+  shapeSettings?: Readonly<Record<string, unknown>>;
 }>;
 
 type WaitingRow = {
@@ -53,10 +58,15 @@ type WaitingRow = {
   waits_for: WaitReason["waitsFor"] | null;
   person_recheck_at: Date | null;
   reason_at: Date | null;
+  shape_settings: Record<string, unknown> | null;
 };
 
 const WAITING_COLUMNS = `run_id, waiting_since, owner_ref::text AS owner_ref, legacy_asker_id,
-  plan_tier, composition_budget_tier, depth, maker_count, waits_for, person_recheck_at, reason_at`;
+  plan_tier, composition_budget_tier, depth, maker_count, waits_for, person_recheck_at, reason_at,
+  (SELECT CASE WHEN shape_run.depth_params ? 'depthMode' THEN jsonb_build_object(
+      'depthMode', shape_run.depth_params->'depthMode', 'scrutiny', shape_run.depth_params->'scrutiny',
+      'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan') END
+   FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings`;
 
 function waitingRun(row: WaitingRow): WaitingRun {
   return Object.freeze({
@@ -70,7 +80,8 @@ function waitingRun(row: WaitingRow): WaitingRun {
     makerCount: row.maker_count,
     waitsFor: row.waits_for,
     personRecheckAt: row.person_recheck_at,
-    reasonAt: row.reason_at
+    reasonAt: row.reason_at,
+    ...(row.shape_settings === null ? {} : { shapeSettings: Object.freeze({ ...row.shape_settings }) })
   });
 }
 
@@ -159,14 +170,14 @@ export class RunWaitRepository {
   async oldestWaiting(limit: number): Promise<ReadonlyArray<WaitingRun>> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) throw new TypeError("RUN_WAIT_LIMIT_INVALID");
     const result = await this.pool.query<WaitingRow>(
-      `SELECT ${WAITING_COLUMNS} FROM core.run_waiting_v ORDER BY waiting_since, run_id LIMIT $1`, [limit]
+      `SELECT ${WAITING_COLUMNS} FROM core.run_waiting_v AS line ORDER BY waiting_since, run_id LIMIT $1`, [limit]
     );
     return Object.freeze(result.rows.map(waitingRun));
   }
 
   async readWaiting(runId: string): Promise<WaitingRun | null> {
     const result = await this.pool.query<WaitingRow>(
-      `SELECT ${WAITING_COLUMNS} FROM core.run_waiting_v WHERE run_id = $1`, [runId]
+      `SELECT ${WAITING_COLUMNS} FROM core.run_waiting_v AS line WHERE run_id = $1`, [runId]
     );
     const row = result.rows[0];
     return row === undefined ? null : waitingRun(row);

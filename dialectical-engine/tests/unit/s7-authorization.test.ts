@@ -11,6 +11,7 @@ import {
 } from "../support/httpSession.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
 import type { AnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
+import type { AnswerMapViewApplication } from "../../apps/api/src/map-views.js";
 import { storedStoryRecord } from "../support/storyApiFixtures.js";
 
 const OWNED_RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -125,6 +126,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
   { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
   { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
+  { route: "GET /v1/answers/{id}/map", auth: "user", resource: "run-owner", action: "read-map-view" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -282,6 +284,21 @@ function servingDisclosures(reads: unknown[]): AnswerDisclosureApplication {
     }
   };
 }
+/**
+ * Debate shape P2c (pre-flight PF-C15): a composed map view reader that WOULD serve a view,
+ * for the same reason as `servingStories`: every read past the map route's own gates turns
+ * the denied and malformed rows red.
+ */
+function servingMapViews(reads: unknown[]): AnswerMapViewApplication {
+  return {
+    // Ruling C-MAPREAD: the pre-check would find a map, so only the route's own gates can stop the read.
+    findMapRun: async () => OWNED_RUN_ID,
+    readMapView: async (input) => {
+      reads.push(input);
+      return { positions: [], also_raised: ["A point that was raised."] };
+    }
+  };
+}
 const USER_HEADERS=testSessionHeaders(USER_IDENTITY);
 const USER_MUTATION_HEADERS=testSessionHeaders(USER_IDENTITY,true);
 
@@ -314,7 +331,8 @@ describe("S7 deny-by-default authorization", () => {
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
-    expect(contractInventory.routes).toHaveLength(166);
+    // Debate shape P2c adds GET /v1/answers/{id}/map.
+    expect(contractInventory.routes).toHaveLength(167);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -516,6 +534,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/ledger-digest`, error: "LEDGER_DIGEST_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/story`, error: "STORY_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/disclosure`, error: "DISCLOSURE_NOT_FOUND" },
+    { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/map`, error: "MAP_VIEW_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/${NODE_ID}`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: `/v1/answers/${ANSWER_ID}/investigations/gap:test`,
@@ -531,10 +550,12 @@ describe("S7 deny-by-default authorization", () => {
     const foreignIdentity=testHttpIdentity("s7-foreign");
     const storyReads: unknown[] = [];
     const disclosureReads: unknown[] = [];
+    const mapReads: unknown[] = [];
     const api = buildApi({
       application,sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN,
       stories: servingStories(storyReads),
-      disclosures: servingDisclosures(disclosureReads)
+      disclosures: servingDisclosures(disclosureReads),
+      mapViews: servingMapViews(mapReads)
     });
     const foreign = await api.inject({
       ...route, headers:testSessionHeaders(foreignIdentity,route.method==="POST")
@@ -543,6 +564,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(foreign.json()).toEqual({ error: route.error });
     expect(storyReads).toEqual([]);
     expect(disclosureReads).toEqual([]);
+    expect(mapReads).toEqual([]);
     await api.close();
   });
 
@@ -552,6 +574,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/ledger-digest", error: "LEDGER_DIGEST_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/story", error: "STORY_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/disclosure", error: "DISCLOSURE_NOT_FOUND" },
+    { method: "GET" as const, url: "/v1/answers/not-a-uuid/map", error: "MAP_VIEW_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/not-a-uuid`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: "/v1/answers/not-a-uuid/investigations/gap:test",
@@ -564,11 +587,13 @@ describe("S7 deny-by-default authorization", () => {
   ])("maps malformed resource IDs on $method $url to the closed 404 face", async (route) => {
     const storyReads: unknown[] = [];
     const disclosureReads: unknown[] = [];
+    const mapReads: unknown[] = [];
     const api = buildApi({
       application: fixtureApplication(),
       sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN,
       stories: servingStories(storyReads),
-      disclosures: servingDisclosures(disclosureReads)
+      disclosures: servingDisclosures(disclosureReads),
+      mapViews: servingMapViews(mapReads)
     });
     const response = await api.inject({
       ...route, headers: route.method==="POST" ? USER_MUTATION_HEADERS : USER_HEADERS
@@ -577,6 +602,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(response.json()).toEqual({ error: route.error });
     expect(storyReads).toEqual([]);
     expect(disclosureReads).toEqual([]);
+    expect(mapReads).toEqual([]);
     await api.close();
   });
 

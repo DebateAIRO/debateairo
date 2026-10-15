@@ -481,18 +481,36 @@ describe("the runner's wiring (source pins)", () => {
     // The assigned book reads the configured makers (never the sit-out copies, which are already laned).
     const assigned = code.slice(code.indexOf("const assignedConfigured: ReadonlyMap<string, ConfiguredSeatMaker>"), code.indexOf("assignedSeats = buildAssignedRunSeatBook({"));
     expect(assigned).toContain("new Map([...configuredByProviderRef].map(([ref, maker]) => {\n          const provider = throughCallLane(ref, maker.provider);");
-    // sitOutMaker (which lanes) runs over the configured makers once, and on an out-of-panel role's UNWRAPPED maker.
-    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(2);
+    // sitOutMaker (which lanes) runs over the configured makers once, on an out-of-panel role's UNWRAPPED maker, and
+    // (debate shape, c5e0b2862, PF-B40) on a map seat's UNWRAPPED maker outside the claim-eligible list — kept, so that
+    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(3);
     expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
     expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
+    expect(code).toContain([
+      "const eligible = configuredMakers.find((maker) => maker.providerRef === aiRef);",
+      "            if (eligible !== undefined) return eligible;",
+      "            const configured = configuredByProviderRef.get(aiRef);",
+      "            if (configured === undefined) return null;",
+      "            const wrapped = mapOnlyMembers.get(aiRef) ?? sitOutMaker(configured);",
+      "            mapOnlyMembers.set(aiRef, wrapped);"
+    ].join("\n"));
+    // ...and that book is the runner's makers, never the sit-out copies (which are already laned). Reclaim resume
+    // (spec 2026-10-14): on a run taken over from an earlier copy each maker's gateway is first wrapped by the replay
+    // gateway, the innermost wrapper — it lanes nothing; a recorded call it answers still took its slot above it, and
+    // asks the debate's keep-alive first, as a real call does.
+    expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));");
+    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall());\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
     expect(code).toContain("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
   });
 
   it("the lane's beforeSlot is the runner setting, and the panel asks together only when the debate's calls run together", () => {
     expect(RUNNER).toContain("...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })");
-    // Ruling R32: one place decides it, from the lane.
-    expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(1);
-    expect(RUNNER).toContain("askTogether: callsRunTogether,");
+    // Ruling R32: one place decides it, from the lane. Two panels pass it on, never anything else: the node's panel
+    // and (debate shape, 9602e79c7) its close-call extension, which asks its extra graders the same way.
+    expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(2);
+    expect(RUNNER.match(/askTogether: callsRunTogether,/gu) ?? []).toHaveLength(2);
+    expect(RUNNER.match(/const callsRunTogether = /gu) ?? []).toHaveLength(1);
     expect(RUNNER).toContain("const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;");
   });
 

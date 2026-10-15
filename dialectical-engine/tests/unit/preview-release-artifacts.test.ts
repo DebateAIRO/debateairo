@@ -841,6 +841,70 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     expect(existsSync(out)).toBe(false);
   });
 
+  /** Debate shape (P2b Task 6): the owners' start values, with their kind, as the operator would type them. */
+  const SHAPE = JSON.parse(JSON.stringify(registerModule.debateShapePolicyStartValues()));
+
+  it('plan --debate-shape: the plan carries the policy or the word off, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-shape.json');
+    const plan = read(await run(t.nativePlan('plan', ['--debate-shape', JSON.stringify(SHAPE)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, debateShape: SHAPE });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.debateShape).toEqual(SHAPE);
+    const off = read(await run(t.nativePlan('plan', ['--debate-shape', 'off']).with(-1, join(t.s.art, 'native-plan-shape-off.json')), t.s.layout));
+    expect(off).toEqual({ ...t.plan, debateShape: 'off' });
+    expect(Object.hasOwn(t.plan, 'debateShape')).toBe(false);
+  });
+
+  it.each([
+    ['text that is neither off nor JSON', 'plan', ['--debate-shape', 'OFF']],
+    ['a JSON array', 'plan', ['--debate-shape', '[1]']],
+    ['JSON null', 'plan', ['--debate-shape', 'null']],
+    ['a JSON string other than off', 'plan', ['--debate-shape', '"on"']],
+    ['the option on verify', 'verify', ['--debate-shape', 'off']],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--debate-shape', 'off']]
+  ])('refuses --debate-shape with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--debate-shape'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  /** Question language (P2L Task 12): the owners' start values, with their kind, as the operator would type them. */
+  const LANGUAGE = JSON.parse(JSON.stringify(registerModule.questionLanguagePolicyStartValues()));
+
+  it('plan --question-language: the plan carries the policy, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-language.json');
+    const plan = read(await run(t.nativePlan('plan', ['--question-language', JSON.stringify(LANGUAGE)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, questionLanguage: LANGUAGE });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.questionLanguage).toEqual(LANGUAGE);
+    // The fast check switched off is a policy, never a word.
+    const off = { ...LANGUAGE, fastCheck: null };
+    const offPlan = read(await run(t.nativePlan('plan', ['--question-language', JSON.stringify(off)]).with(-1, join(t.s.art, 'native-plan-language-off.json')), t.s.layout));
+    expect(offPlan).toEqual({ ...t.plan, questionLanguage: off });
+    expect(Object.hasOwn(t.plan, 'questionLanguage')).toBe(false);
+  });
+
+  it.each([
+    ['the word off', 'plan', ['--question-language', 'off']],
+    ['a JSON array', 'plan', ['--question-language', '[1]']],
+    ['JSON null', 'plan', ['--question-language', 'null']],
+    ['a JSON string', 'plan', ['--question-language', '"off"']],
+    ['the option on verify', 'verify', ['--question-language', '{}']],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--question-language', '{}']]
+  ])('refuses --question-language with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--question-language'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
   it('refuses the option on publish: publish takes the policy only from its --from plan', async () => {
     const t = await staged();
     const out = join(t.s.art, 'native-plan-concurrency.json');

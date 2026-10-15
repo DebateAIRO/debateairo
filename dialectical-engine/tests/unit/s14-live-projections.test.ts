@@ -40,7 +40,7 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
     // Model scorecard A16: 37 -> 38 (BACKUP-MODEL-USED, minted mid-list beside
     // DEGRADED-DIVERSITY); the tail below is still read and still unchanged.
-    expect(CONDITION_MARKS).toHaveLength(38);
+    expect(CONDITION_MARKS).toHaveLength(46);
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     // The retired `web/lib/v3Presentation` renderer and its label-text pin left

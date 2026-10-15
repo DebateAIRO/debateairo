@@ -18,12 +18,18 @@
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
-//       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--hosted-billing '<JSON object>']
+//       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>'] [--question-language '<JSON object>']
+//       [--hosted-billing '<JSON object>']
 //       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
 //        --call-concurrency '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}' publishes that row;
 //        --hosted-billing '{"billing":"off","perRunCeilingMicros":…,"dailyCeilingMicros":…,"askRoomReads":{"limit":…,"windowMs":…,"capacity":…}}'
 //        composes a HOSTED version with kit v3 (the owner's values); verify and apply-and-plan carry it from --from)
+//       (--debate-shape only with --operation plan; publish carries the plan's choice; default: the base's debate shape
+//        row kept as it is, or none; --debate-shape off publishes the row disabled: the preview's rollback)
+//       (--question-language only with --operation plan; publish carries the plan's choice; default: the base's
+//        question-language row kept as it is, or none (the code's start values); no off word: '"fastCheck": null' in the
+//        policy switches the fast language check off)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -91,7 +97,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--hosted-billing'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--hosted-billing'] }
 });
 
 export class Refusal extends Error {
@@ -430,6 +436,22 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--call-concurrency']);
   let concurrencyValue;
   if (concurrencyText !== undefined) try { concurrencyValue = strictJson(Buffer.from(concurrencyText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  // Debate shape (P2b Task 6): changes only when the operator gives it for a new `plan`, as the word off or one JSON
+  // object (native-operator.mjs validateDebateShapeChoice below; either kit, v2 or v3, runs the register's parser
+  // through publish-register-v2.ts's builder); without it the kit keeps the base version's row unchanged, or builds
+  // none if the base has none (R19).
+  const shapeText = options['--debate-shape'];
+  if (shapeText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--debate-shape']);
+  let shapeValue;
+  if (shapeText === 'off') shapeValue = 'off';
+  else if (shapeText !== undefined) try { shapeValue = strictJson(Buffer.from(shapeText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--debate-shape']); }
+  // Question language (P2L Task 12): the same plumbing, one JSON object only (no off word: the policy's
+  // "fastCheck": null switches the fast check off); native-operator.mjs validateQuestionLanguageChoice below, and the
+  // register's own parser in either kit before any row is built.
+  const languageText = options['--question-language'];
+  if (languageText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--question-language']);
+  let languageValue;
+  if (languageText !== undefined) try { languageValue = strictJson(Buffer.from(languageText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--question-language']); }
   // The hosted preview (owner rulings 2026-10-13): the owner's billing switch, ceilings and room-read budget, as one JSON
   // object, for a new `plan` only (native-operator.mjs validateHostedBillingChoice below; publish-register-v3.ts checks it again).
   const hostedText = options['--hosted-billing'];
@@ -444,6 +466,16 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (concurrencyText !== undefined) {
     const check = deps.validateCallConcurrencyChoice ?? (await nativeOperator()).validateCallConcurrencyChoice;
     try { concurrencyChoice = check(concurrencyValue); } catch { refuse('ARGUMENTS_REFUSED', ['--call-concurrency']); }
+  }
+  let shapeChoice;
+  if (shapeText !== undefined) {
+    const check = deps.validateDebateShapeChoice ?? (await nativeOperator()).validateDebateShapeChoice;
+    try { shapeChoice = check(shapeValue); } catch { refuse('ARGUMENTS_REFUSED', ['--debate-shape']); }
+  }
+  let languageChoice;
+  if (languageText !== undefined) {
+    const check = deps.validateQuestionLanguageChoice ?? (await nativeOperator()).validateQuestionLanguageChoice;
+    try { languageChoice = check(languageValue); } catch { refuse('ARGUMENTS_REFUSED', ['--question-language']); }
   }
   let hostedChoice;
   if (hostedText !== undefined) {
@@ -505,6 +537,10 @@ async function nativePlanCommand(options, { layout, deps }) {
   // The same for the call-concurrency policy: present only when the plan's operator gave one.
   const callConcurrency = operation === 'plan' ? concurrencyChoice
     : operation === 'publish' ? from.value.callConcurrency : undefined;
+  // The same for the debate shape choice (P2b Task 6): the word off or the policy object the plan's operator gave.
+  const debateShape = operation === 'plan' ? shapeChoice : operation === 'publish' ? from.value.debateShape : undefined;
+  // The same for the question-language policy (P2L Task 12): the policy object the plan's operator gave.
+  const questionLanguage = operation === 'plan' ? languageChoice : operation === 'publish' ? from.value.questionLanguage : undefined;
   // The hosted inputs: a new plan's own; every other operation carries the --from plan's, so publish recomposes the
   // approved snapshot and verify and apply-and-plan compose from a hosted base with kit v3.
   const hostedBilling = operation === 'plan' ? hostedChoice : from.value.hostedBilling;
@@ -515,6 +551,8 @@ async function nativePlanCommand(options, { layout, deps }) {
     ...(checkerChoice === undefined ? {} : { checkerChoice }),
     ...(rotationChoice === undefined ? {} : { roleRotation: rotationChoice }),
     ...(callConcurrency === undefined ? {} : { callConcurrency }),
+    ...(debateShape === undefined ? {} : { debateShape }),
+    ...(questionLanguage === undefined ? {} : { questionLanguage }),
     ...(hostedBilling === undefined ? {} : { hostedBilling })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }

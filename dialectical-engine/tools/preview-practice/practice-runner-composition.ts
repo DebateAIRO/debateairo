@@ -107,6 +107,7 @@ import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-po
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { readDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -145,6 +146,8 @@ export async function composePracticeRunnerMoney(input: Readonly<{
   declaredProviderTargets: readonly ProviderDiscoveryTarget[];
   judgeTokenCeiling: number;
   storyPolicy: StoryPolicy | null;
+  /** The debate shape main.ts resolved at boot (null without the row): the first call is priced with the locked language. */
+  debateShape: Awaited<ReturnType<typeof readDebateShapeRunnerSettings>>;
   log?: (line: string) => void;
 }>) {
   const { pool, environment, declaredProviderTargets, storyPolicy } = input;
@@ -194,7 +197,10 @@ export async function composePracticeRunnerMoney(input: Readonly<{
     const firstCalls = firstPositionCallProjections({
       targets: declaredProviderTargets,
       judgeTokenCeiling: input.judgeTokenCeiling,
-      questionMaxBytes: askQuestionMaxBytes()
+      questionMaxBytes: askQuestionMaxBytes(),
+      // Ruling L-B9R (P2L Task 17), as main.ts: with ANY debateShapePolicy row (enabled false too) a run's first call may
+      // carry the locked language, so it is priced at the longest lock too. No row: today's price.
+      questionLanguageLocked: input.debateShape !== null
     });
     assertRunCeilingCoversOneCall({
       bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
@@ -248,6 +254,12 @@ export async function composePracticeRunner(input: Readonly<{
   const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
   // As main.ts: a register that does not carry this code's prompt fingerprints refuses the start.
   assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
+  /**
+   * Debate shape (spec 2026-10-12 §3.1, §4; controller ruling PF10), as apps/runner/src/main.ts resolves it, in both
+   * modes: the optional row (absent = today's shape; malformed = refused, DEBATE_SHAPE_POLICY_INVALID) and, only with
+   * it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH).
+   */
+  const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
   const storyLog = input.storyLog ?? (() => undefined);
   const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
     .catch((error: unknown) => {
@@ -283,7 +295,7 @@ export async function composePracticeRunner(input: Readonly<{
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
   // Hosted only (null in local mode): main.ts's per-run and daily envelopes, the story's money row and the shared wall.
   const money = await composePracticeRunnerMoney({ pool, environment, declaredProviderTargets,
-    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling, storyPolicy, log: (line) => { console.warn(line); } });
+    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling, storyPolicy, debateShape, log: (line) => { console.warn(line); } });
   const costEnvelopeGuard = money?.costEnvelopeGuard;
   const storyCeilingMicros = money?.storyCeilingMicros ?? null;
   const envelopeBand = money?.envelopeBand ?? null;
@@ -436,6 +448,8 @@ export async function composePracticeRunner(input: Readonly<{
     // Parallel AI calls (spec 2026-10-12 §3.2, §3.6), as main.ts: the one scheduler's lane per debate, each ref's
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
+    // Debate shape, as main.ts: resolved at boot above; null without the row (today's runner).
+    debateShape,
     callSubjects: previewCallSubjects(previewConfig),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),

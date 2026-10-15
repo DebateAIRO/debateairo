@@ -34,7 +34,12 @@
  *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
  *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
  *    "perModelPerRunner" }`, sealed as the ADDITIVE `callConcurrencyPolicy` row under the file's sourceRef;
- *    left out, no such row is sealed and the runner makes one call at a time per debate.
+ *    left out, no such row is sealed and the runner makes one call at a time per debate. Likewise optional, the
+ *    `debateShapePolicy` (spec 2026-10-12, debate shape): the policy without its kind, sealed as the ADDITIVE
+ *    `debateShapePolicy` row under the file's sourceRef; left out, no such row is sealed and the engine keeps today's shape.
+ *    Likewise optional, the `questionLanguagePolicy` (question-language spec 2026-10-13): the policy without its kind,
+ *    sealed as the ADDITIVE `questionLanguagePolicy` row under the file's sourceRef; left out, no such row is sealed and
+ *    an API with the debate shape in force uses the code's start values.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -83,6 +88,8 @@ import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
+  previewModelRow,
+  promptTextHasReservedToken,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import {
@@ -93,6 +100,7 @@ import {
   BILLING_POLICY_ROW_KEY,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
+  DEBATE_SHAPE_POLICY_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
   MODEL_SCORECARD_MAX_BYTES,
@@ -111,6 +119,18 @@ import {
   buildConfiguredProviderSetDeploymentRow,
   callConcurrencyPolicyFromValue,
   callConcurrencyPolicyRow,
+  debateShapeInForce,
+  debateShapePolicyRow,
+  debateShapeWriterCeiling,
+  parseDebateShapePolicy,
+  type DebateShapePolicy,
+  QUESTION_LANGUAGE_POLICY_ROW_KEY,
+  parseQuestionLanguagePolicy,
+  questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
+  readDebateShapePolicy,
+  readQuestionLanguagePolicy,
+  type QuestionLanguagePolicy,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
@@ -169,6 +189,7 @@ import {
 } from "./dev-deployment-register.js";
 import type { DevelopmentConfiguredProvider } from "./dev-provider-panel.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
+import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 
 /** The operator file's declared shape. A new shape is a new format string, never a silent change. */
 export const HOSTED_REGISTER_FILE_FORMAT = "debateai.hosted-register.v1" as const;
@@ -210,7 +231,11 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
   "answerRoleRotation",
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
-  "callConcurrencyPolicy"
+  "callConcurrencyPolicy",
+  // Debate shape (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the engine keeps today's shape.
+  "debateShapePolicy",
+  // Question language (spec 2026-10-13): OPTIONAL. Left out, no row is sealed (the code's start values apply).
+  "questionLanguagePolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -404,6 +429,10 @@ export type HostedRegisterFile = Readonly<{
   answerRoleRotation?: unknown;
   /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
   callConcurrencyPolicy?: unknown;
+  /** Optional (spec 2026-10-12): the debate shape policy without its kind; absent = no debateShapePolicy row. */
+  debateShapePolicy?: unknown;
+  /** Optional (spec 2026-10-13): the question-language policy without its kind; absent = no questionLanguagePolicy row. */
+  questionLanguagePolicy?: unknown;
 }>;
 
 /**
@@ -465,7 +494,9 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
-    ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {})
+    ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
+    ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
+    ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {})
   });
 }
 
@@ -790,6 +821,75 @@ function callConcurrencyRowOf(member: unknown, sourceRef: string): ReturnType<ty
 }
 
 /**
+ * The debateShapePolicy row for the file's optional member (spec 2026-10-12 §3.1). The member is the policy without
+ * its `kind` (the row adds it); a member that is not an object, carries `kind`, or that the register's own parser
+ * refuses is refused with the file's own code (never the parser's message), so a malformed member can never seal a
+ * malformed row. Returns the parsed policy beside the row (fix round 1), so the plan reads the member once.
+ */
+function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
+  row: ReturnType<typeof debateShapePolicyRow>; policy: DebateShapePolicy;
+}> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
+  }
+  try {
+    const policy = parseDebateShapePolicy({ kind: "DEBATE_SHAPE_POLICY", ...member });
+    return Object.freeze({ row: debateShapePolicyRow(policy, sourceRef), policy });
+  } catch {
+    return refuse("HOSTED_REGISTER_DEBATE_SHAPE_INVALID");
+  }
+}
+
+/**
+ * P2L final review I4: what the hosted API's question-language boot step (apps/api/src/question-language/boot.ts, run
+ * with the debate shape in force and no preview configured) refuses of a parsed policy, asked here without the API:
+ *  · an owner instruction carrying a token the safety frame reserves (QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN) —
+ *    the providers' one rule, promptTextHasReservedToken, the same buildFramedPrompt refuses by;
+ *  · a fast check whose model is not an Anthropic row of the reviewed provider price table
+ *    (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED, boot.ts pricedFastCheckRow: the same table, the same condition).
+ * The fast check switched off (`fastCheck: null`) is never priced, so its model is never asked.
+ */
+function hostedQuestionLanguageBootable(policy: QuestionLanguagePolicy): boolean {
+  if (promptTextHasReservedToken(policy.instruction)) return false;
+  return policy.fastCheck === null || previewModelRow(policy.fastCheck.model)?.provider === "anthropic";
+}
+
+/**
+ * The questionLanguagePolicy row for the file's optional member (question-language spec 2026-10-13), exactly as
+ * debateShapeRowOf: the member is the policy without its `kind`; a member that is not an object, carries `kind`, or
+ * that the register's own parser refuses is refused with the file's own code, so a malformed member never seals.
+ * I4: so is a member the hosted API would refuse at boot (hostedQuestionLanguageBootable): a sealed version cannot be
+ * edited, so it is refused here, before anything is sealed, whether or not this file puts the debate shape in force.
+ */
+function questionLanguageRowOf(member: unknown, sourceRef: string): ReturnType<typeof questionLanguagePolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  }
+  let policy: QuestionLanguagePolicy;
+  let row: ReturnType<typeof questionLanguagePolicyRow>;
+  try {
+    policy = parseQuestionLanguagePolicy({ kind: "QUESTION_LANGUAGE_POLICY", ...member });
+    row = questionLanguagePolicyRow(policy, sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  }
+  return hostedQuestionLanguageBootable(policy) ? row : refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+}
+
+/**
+ * I4, the readiness half: the API's question-language boot step over the SEALED version, exactly when the API asks it
+ * (the debate shape row in force; absent or `enabled: false` = the row is never read, as at boot). The row absent =
+ * the start values. A malformed row refuses with the register's own code (as at boot); a row the hosted API would
+ * refuse (hostedQuestionLanguageBootable) with HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID, so a version sealed before
+ * the publisher refused it is never reported ready.
+ */
+export async function assertHostedQuestionLanguageBootReady(pool: Pick<Pool, "query">, version: number): Promise<void> {
+  if (debateShapeInForce(await readDebateShapePolicy(pool, version)) === null) return;
+  const policy = (await readQuestionLanguagePolicy(pool, version)) ?? questionLanguagePolicyStartValues();
+  if (!hostedQuestionLanguageBootable(policy)) refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+}
+
+/**
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
@@ -825,6 +925,16 @@ export async function planHostedRegisterPublication(
   // (one call at a time per debate, as before).
   const callConcurrencyRow = file.callConcurrencyPolicy === undefined ? null
     : callConcurrencyRowOf(file.callConcurrencyPolicy, file.sourceRef);
+  // Debate shape (spec 2026-10-12): the same, for the optional debateShapePolicy member. Absent = no row (today's shape).
+  const debateShape = file.debateShapePolicy === undefined ? null
+    : debateShapeRowOf(file.debateShapePolicy, file.sourceRef);
+  const debateShapeRow = debateShape === null ? null : debateShape.row;
+  // Debate shape (P2b Task 6, pre-flight PF-B21): the member in force (absent, or `enabled: false`, = none), for the
+  // Free answer-job check below.
+  const debateShapeInForcePolicy = debateShapeInForce(debateShape === null ? null : debateShape.policy);
+  // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
+  const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
+    : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -962,11 +1072,31 @@ export async function planHostedRegisterPublication(
     valueJsonText: callConcurrencyRow.valueJsonText,
     sourceRef: callConcurrencyRow.sourceRef
   })];
+  // Debate shape (spec 2026-10-12) is ADDITIVE too, for the same reason.
+  if (debateShapeRow !== null && codeOwnedRows.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const debateShapeRows: readonly RegisterPublicationRow[] = debateShapeRow === null ? [] : [Object.freeze({
+    rowKey: debateShapeRow.rowKey,
+    valueJsonText: debateShapeRow.valueJsonText,
+    sourceRef: debateShapeRow.sourceRef
+  })];
+  // Question language (spec 2026-10-13) is ADDITIVE too, for the same reason.
+  if (questionLanguageRow !== null && codeOwnedRows.some((row) => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const questionLanguageRows: readonly RegisterPublicationRow[] = questionLanguageRow === null ? [] : [Object.freeze({
+    rowKey: questionLanguageRow.rowKey,
+    valueJsonText: questionLanguageRow.valueJsonText,
+    sourceRef: questionLanguageRow.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
     ...roleRotationRows,
-    ...callConcurrencyRows
+    ...callConcurrencyRows,
+    ...debateShapeRows,
+    ...questionLanguageRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1016,7 +1146,10 @@ export async function planHostedRegisterPublication(
     const firstCalls = firstPositionCallProjections({
       targets,
       judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
-      questionMaxBytes: askQuestionMaxBytes()
+      questionMaxBytes: askQuestionMaxBytes(),
+      // Ruling L-B9R (P2L Task 17): the runner's boot prices the longest lock whenever the version carries ANY
+      // debateShapePolicy row (enabled false too), so the plan asks the same.
+      questionLanguageLocked: debateShape !== null
     });
     assertRunCeilingCoversOneCall({
       bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
@@ -1057,7 +1190,12 @@ export async function planHostedRegisterPublication(
       scorecard: scorecard.scorecard,
       targets,
       freeRosterModelIds: PLAN_TIER_ROSTERS.free,
-      answerTokenCeilingByRole: { ANSWER_WRITER: ceilings.synthesizer, ANSWER_CHECKER: ceilings.evaluator }
+      // Debate shape (P2b Task 6, pre-flight PF-B22): with the member in force a Free `detailed` answer asks the writer
+      // for up to the member's largest writer bound, and Free's writer has no fallback.
+      answerTokenCeilingByRole: {
+        ANSWER_WRITER: debateShapeWriterCeiling(ceilings.synthesizer, debateShapeInForcePolicy),
+        ANSWER_CHECKER: ceilings.evaluator
+      }
     })) {
       refuse(SCORECARD_FREE_ANSWER_UNSCORED);
     }
@@ -1175,6 +1313,11 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     ...renderModelScorecardLines(plan.modelScorecard),
+    // Debate shape (PF4, M3; P2b Task 6): said BEFORE sealing, so the operator sees the version carries the shape and
+    // its sealed map prompts. Absent: no line (today's text).
+    ...(plan.rows.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)
+      ? ["debate_shape=present (the runner argues the debate shape; this version also seals mapContractHash)"]
+      : []),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
 }
@@ -1302,6 +1445,13 @@ export async function verifyHostedRegisterBootReadiness(
   await readAnswerRoleRotationPolicy(pool, version);
   // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.
   await readCallConcurrencyPolicy(pool, version);
+  // Debate shape (spec 2026-10-12 §3.1, §4): optional (ABSENT = today's shape, and the map hash row is then never
+  // read); a malformed row refuses both boots. The runner's own boot read (apps/runner/src/main.ts), so a version the
+  // runner would refuse (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH) is never reported ready. The row
+  // is read raw, as the runner reads it: a disabled row (enabled: false) still needs its sealed map hash.
+  await readDebateShapeRunnerSettings(pool, version);
+  // Question language (P2L final review I4): main.ts's question-language step, with the shape in force only.
+  await assertHostedQuestionLanguageBootReady(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

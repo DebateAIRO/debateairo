@@ -1,6 +1,6 @@
 "use client";
 
-import type { Answer, AnswerFloor } from "@debateai/contract";
+import type { Answer, AnswerFloor, DebateMapView } from "@debateai/contract";
 import DebatePageClient from "./DebatePageClient";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
@@ -30,7 +30,8 @@ export default function DebatePageGate({
   questionLocale = null,
   storyLocale,
   storyCatalog,
-  initialFloor
+  initialFloor,
+  initialMapView = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -54,6 +55,8 @@ export default function DebatePageGate({
   storyCatalog: MessageCatalog;
   /** A components-only answer's floor, from the server's read (spec 2026-09-26 §14.4.4); null when none was read. */
   initialFloor: AnswerFloor | null;
+  /** Debate shape P2c: the map view, from the server's read beside the answer; null when none was read. */
+  initialMapView?: DebateMapView | null;
 }) {
   return (
     <>
@@ -76,6 +79,7 @@ export default function DebatePageGate({
           storyLocale={storyLocale}
           storyCatalog={storyCatalog}
           initialFloor={initialFloor}
+          initialMapView={initialMapView}
         />
       )}
       </AuthGate>

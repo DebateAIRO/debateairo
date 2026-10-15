@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, questionLanguageSentence, type QuestionLanguage } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
-import { assembleStorytellerInstruction, type StoryPack } from "./pack.js";
+import { assembleStoryCheckerInstruction, assembleStorytellerInstruction, type StoryPack } from "./pack.js";
 
 /**
  * THE TWO STORY CONTRACTS (spec §5.2). The instruction half is the owners'
@@ -104,18 +104,23 @@ export const STORY_CHECKER_ANSWER_FORM = STORY_CHECKER_V2_ANSWER_FORM.replace(
   `"objection": null | non-empty string of at most ${STORY_CHECKER_LIMITS.maxObjectionChars} characters,`
 );
 
-export function buildStorytellerContract(pack: StoryPack): PromptContract {
+/**
+ * Debate shape (whole-branch review I-1, ruling W-STORY): `mapFields` is true only when the material sent carries
+ * `also_raised` or `answers_note` (`storyMaterialHasMapFields`); then the pack's map passages ride in the instruction.
+ * Left false, the contract is the one every story got before the debate shape, byte for byte (same id, same hash).
+ */
+export function buildStorytellerContract(pack: StoryPack, mapFields = false): PromptContract {
   return Object.freeze({
     contractId: STORYTELLER_CONTRACT_ID,
-    instruction: assembleStorytellerInstruction(pack),
+    instruction: assembleStorytellerInstruction(pack, mapFields),
     answerForm: STORYTELLER_ANSWER_FORM
   });
 }
 
-export function buildStoryCheckerContract(pack: StoryPack): PromptContract {
+export function buildStoryCheckerContract(pack: StoryPack, mapFields = false): PromptContract {
   return Object.freeze({
     contractId: STORY_CHECKER_CONTRACT_ID,
-    instruction: pack.checker,
+    instruction: assembleStoryCheckerInstruction(pack, mapFields),
     answerForm: STORY_CHECKER_ANSWER_FORM
   });
 }
@@ -129,14 +134,23 @@ export function buildStoryCheckerContract(pack: StoryPack): PromptContract {
  * the storyteller's instruction ends inside the last shape's guidance, and the
  * directive must not read as part of that shape. A run with no language on
  * record gets the directive's own fallback, "the same language as the question".
+ *
+ * Question-language spec 2026-10-13: on a shape run the caller (the writer, told by the runner's shape receipt)
+ * passes the run's locked language, and the ONE named sentence (`questionLanguageSentence`) takes the directive's
+ * place, after the same blank line. Without a lock (null or absent) this is today's contract, byte for byte. The
+ * sentence is code, never sealed text: it enters the per-call `storyContractHash`, as today's directive does.
  */
 export function storyContractInArgumentLanguage(
   contract: PromptContract,
-  argumentLanguageName: string | null
+  argumentLanguageName: string | null,
+  questionLanguage?: QuestionLanguage | null
 ): PromptContract {
+  const languageLine = questionLanguage === null || questionLanguage === undefined
+    ? argumentLanguageDirective(argumentLanguageName ?? "")
+    : questionLanguageSentence(questionLanguage);
   return Object.freeze({
     ...contract,
-    instruction: `${contract.instruction}\n\n${argumentLanguageDirective(argumentLanguageName ?? "")}`
+    instruction: `${contract.instruction}\n\n${languageLine}`
   });
 }
 

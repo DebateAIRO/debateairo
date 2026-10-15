@@ -47,6 +47,11 @@ export interface RunKeepAlive {
   assertMayCall(): void;
   /** A model call finished, answered or failed. */
   progressed(): void;
+  /**
+   * The claim deadline this copy last set (at claim, then at each renewal). Reclaim resume: the runner's one write that
+   * can change rows another copy saved (setting nodes aside) is fenced on it, as a renewal is.
+   */
+  heldUntil(): Date;
   stop(): void;
 }
 
@@ -147,6 +152,9 @@ export function startRunKeepAlive(input: Readonly<{
       } catch (error) {
         reportFailed(error);
       }
+    },
+    heldUntil() {
+      return heldUntil;
     },
     stop() {
       stopped = true;

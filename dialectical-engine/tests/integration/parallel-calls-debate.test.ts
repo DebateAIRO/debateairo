@@ -13,11 +13,10 @@
 // positions they answer exist, and a reply beyond a round boundary waits for that boundary's freeze/stop decision.
 // Task 12 (part 3 of 3): stops and failures while calls are in flight (spec §2.3).
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { createHash } from "node:crypto";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { JudgementRepository } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
-import { PREVIEW_PROVIDER_REF_MODELS, readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
 import {
   DEEPSEEK,
   FIVE_MAKER_REFS,
@@ -34,7 +33,9 @@ import {
 import { expansionPhaseStop } from "@debateai/runner";
 import type { GateArrival, GateOverride, GateRequest } from "../support/preview-gate-stubs.js";
 import { framedField, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { requestedReviewEdges, reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
+import { requestedReviewEdges } from "../support/reviewBearings.js";
+import { scriptedAnswers } from "../support/scripted-answers.js";
+import { copyDatabase, savedDebate, untilUnused, type SavedDebate } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -47,30 +48,12 @@ const harness = previewDebateHarness({ pool: () => database.pool, stubClosers })
 const MIGRATED_COPY = "parallel_calls_migrated";
 const databaseUrl = (name: string): string => database.connectionString.replace(/\/[^/?]+(?=\?|$)/u, `/${name}`);
 
-/** Waits until no session is connected to `name` (a template must have none), within a deadline. */
-async function untilUnused(name: string, deadlineMs: number): Promise<void> {
-  const deadline = Date.now() + deadlineMs;
-  for (;;) {
-    const { rows } = await admin.query<{ sessions: string }>(
-      `SELECT count(*)::text AS sessions FROM pg_stat_activity WHERE datname=$1`, [name]);
-    if (rows[0]?.sessions === "0") return;
-    if (Date.now() > deadline) throw new Error(`test: database ${name} still has ${rows[0]?.sessions ?? "?"} sessions`);
-    await new Promise((resolve) => { setTimeout(resolve, 250); });
-  }
-}
-
-/** A copy of database `from` (PostgreSQL's CREATE DATABASE … TEMPLATE: the same rows, ids included). */
-async function copyDatabase(from: string, to: string): Promise<void> {
-  await untilUnused(from, 60_000);
-  await admin.query(`CREATE DATABASE "${to}" TEMPLATE "${from}"`);
-}
-
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   admin = createPool(databaseUrl("postgres"), { max: 1 });
   // The shared pool's idle sessions close after node-postgres's ten idle seconds; then the migrated database is copied.
-  await copyDatabase("debateai_s00", MIGRATED_COPY);
+  await copyDatabase(admin, "debateai_s00", MIGRATED_COPY);
 }, 600_000);
 afterEach(async () => {
   await Promise.all(stubClosers.splice(0).map((close) => close()));
@@ -847,7 +830,7 @@ async function savedAcrossVariants(
   }>
 ) {
   const seedName = `parallel_calls_${label}_seed`;
-  await copyDatabase(MIGRATED_COPY, seedName);
+  await copyDatabase(admin, MIGRATED_COPY, seedName);
   const seedPool = createPool(databaseUrl(seedName));
   let debate: AdmittedRun;
   try {
@@ -865,7 +848,7 @@ async function savedAcrossVariants(
   }[] = [];
   for (const variant of variants) {
     const copy = `parallel_calls_${label}_${variant.name.replace("-", "_")}`;
-    await copyDatabase(seedName, copy);
+    await copyDatabase(admin, seedName, copy);
     const pool = createPool(databaseUrl(copy));
     try {
       const run = previewDebateHarness({ pool: () => pool, stubClosers });
@@ -895,65 +878,12 @@ async function savedAcrossVariants(
     } finally {
       await pool.end();
     }
-    await untilUnused(copy, 60_000);
+    await untilUnused(admin, copy, 60_000);
     await admin.query(`DROP DATABASE "${copy}"`);
   }
-  await untilUnused(seedName, 60_000);
+  await untilUnused(admin, seedName, 60_000);
   await admin.query(`DROP DATABASE "${seedName}"`);
   return runs;
-}
-
-/* ------------------------------------------------------------------ scripted answers, keyed by what was asked */
-
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
-const digestOf = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
-/** The call's own fence and canary, as the provider door reads them; null for a packet with no frame. */
-function framedTokensOf(chat: string): Readonly<{ fence: string; canary: string }> | null {
-  try {
-    const frame = readPromptFrame(wirePacket(chat) as PromptPacket);
-    return { fence: frame.fence, canary: frame.canary };
-  } catch {
-    return null;
-  }
-}
-/** A number in [0, 1] with two decimals, from 8 hex digits of a digest. */
-const share = (hex: string): number => Math.round((Number.parseInt(hex.slice(0, 8), 16) / 0xffffffff) * 100) / 100;
-
-/**
- * Answers that depend only on WHAT a call asked, never on when it arrived: the request's model, kind and text, with
- * the run's question, every random id (node, edge) and each prompt's random fence and canary taken out. A debate argued twice from the same run therefore
- * gets the same answer to the same call, whatever order the calls come in.
- */
-function scriptedAnswers(question: string, bearings?: Readonly<{ support: number; attack: number }>) {
-  return (request: GateRequest, chat: string): GateOverride | null => {
-    // Every framed prompt carries its own random fence and canary (the prompt-injection boundary): not what was asked.
-    // They are read through the frame's own reader (never a hand-rolled pattern) and masked in every message.
-    const frame = framedTokensOf(chat);
-    const unframed = frame === null ? chat
-      : chat.split(frame.fence).join("#|<fence>|#").split(frame.canary).join("<canary>");
-    const asked = unframed.split(question).join("<question>").replace(UUID, "<id>");
-    const digest = digestOf(`${request.model}\n${request.kind}\n${asked}`);
-    const level = share(digest);
-    switch (request.kind) {
-      case "JUDGE": return { content: JSON.stringify({
-        statement: `Point ${digest.slice(0, 12)}.`, way_of_knowing: "REASONING", locator: null,
-        restatement_text: `Point ${digest.slice(0, 12)}, restated.`, restatement_status: "PASS", value_laden: false, claim_type: "unknown",
-        steelman: { summary: `Steelman ${digest.slice(12, 20)}.`, fidelity: level },
-        critic: { summary: `Counter ${digest.slice(20, 28)}.`, counterargumentStrength: share(digest.slice(8)), basis: "PLAUSIBLE_COUNTER" },
-        evidence: { quality: 0.6, relevance: 0.6 }, context: { fit: 0.6, ambiguityFlags: [] }, fallacy: { severity: 0.2, fatalFlags: [] }
-      }) };
-      case "PANEL": return { content: JSON.stringify({
-        steelman: { summary: `Panel ${digest.slice(0, 12)}.`, fidelity: level },
-        critic: { summary: "Panel member counter.", counterargumentStrength: share(digest.slice(8)), basis: "PLAUSIBLE_COUNTER" },
-        evidence: { quality: 0.5, relevance: 0.5 }, context: { fit: 0.5, ambiguityFlags: [] }, fallacy: { severity: 0.3, fatalFlags: [] }
-      }) };
-      case "REVIEW": return { content: withRequestDerivedBearings(reviewArtifact(
-        level < 0.5 ? "agree" : "dispute", [`Review ${digest.slice(0, 12)}.`],
-        bearings ?? { support: share(digest.slice(16)), attack: share(digest.slice(24)) }
-      ), chat) };
-      default: return null;
-    }
-  };
 }
 
 /**
@@ -1068,51 +998,4 @@ function seededRandom(seed: number): () => number {
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-/* ------------------------------------------------------------------ what a run saved, with its random ids named */
-
-type SavedDebate = Readonly<{
-  nodes: readonly unknown[]; edges: readonly unknown[]; reduced: readonly unknown[]; reviews: readonly unknown[];
-  answer: unknown; composed: unknown; factBundle: unknown;
-}>;
-
-/** Keys that are a row's own place on the clock or a digest over random ids: not content. */
-const VOLATILE_KEYS = new Set([
-  "created_at_seq", "at_seq", "sealed_at_seq", "relevant_as_of", "content_hash", "replay_handle", "input_hash"
-]);
-
-/**
- * What one run saved, read back with SQL, every random id replaced by a stable name: a node by its place in the save
- * order (`node#k`, which is the plan order this proves), an edge likewise, a model's answer by the call site and
- * member that produced it. Rows a recorder writes are listed in the order they were written.
- */
-async function savedDebate(pool: Pool, runId: string, answerId: string): Promise<SavedDebate> {
-  const rows = async (sql: string, values: readonly unknown[]): Promise<Record<string, unknown>[]> =>
-    (await pool.query<{ row: Record<string, unknown> }>(sql, [...values])).rows.map((entry) => entry.row);
-  const nodes = await rows(`SELECT to_jsonb(node) AS row FROM core.node AS node WHERE run_id=$1 ORDER BY created_at_seq`, [runId]);
-  const edges = await rows(`SELECT to_jsonb(edge) AS row FROM core.edge AS edge WHERE run_id=$1 ORDER BY created_at_seq`, [runId]);
-  const names = new Map<string, string>();
-  nodes.forEach((node, index) => names.set(String(node.node_id), `node#${String(index)}`));
-  edges.forEach((edge, index) => names.set(String(edge.edge_id), `edge#${String(index)}`));
-  const nameIds = (text: string): string => text.replace(UUID, (id) => names.get(id.toLowerCase()) ?? "<id>");
-  // A model's answer is named by the call that produced it: its call site (node ids named) and the member that answered.
-  const artifacts = await pool.query<{ raw_artifact_ref: string; call_site_key: string; actor_ref: string }>(
-    `SELECT raw_artifact_ref::text, call_site_key, actor_ref FROM ledger.ledger_entry
-      WHERE run_id=$1 AND raw_artifact_ref IS NOT NULL AND call_site_key IS NOT NULL`, [runId]);
-  for (const artifact of artifacts.rows) {
-    names.set(artifact.raw_artifact_ref, `answer(${nameIds(artifact.call_site_key)} @ ${artifact.actor_ref})`);
-  }
-  const named = (value: unknown): unknown => JSON.parse(JSON.stringify(value, (key, field: unknown) =>
-    VOLATILE_KEYS.has(key) ? undefined : typeof field === "string" ? nameIds(field) : field));
-  const reduced = await rows(`SELECT to_jsonb(reduced) AS row FROM ledger.reduced_judgement AS reduced WHERE run_id=$1 ORDER BY at_seq`, [runId]);
-  const reviews = await rows(`SELECT to_jsonb(review) AS row FROM ledger.node_review AS review WHERE run_id=$1 ORDER BY at_seq`, [runId]);
-  const answer = await rows(`SELECT to_jsonb(answer) AS row FROM serve.answer AS answer WHERE answer_id=$1 ORDER BY answer_version`, [answerId]);
-  const factBundle = await rows(`SELECT to_jsonb(bundle) AS row FROM serve.fact_bundle AS bundle WHERE run_id=$1 ORDER BY version`, [runId]);
-  const composed = await rows(`SELECT to_jsonb(composed) AS row FROM serve.composed_text AS composed
-      JOIN serve.fact_bundle AS bundle ON bundle.fact_bundle_id = composed.fact_bundle_id WHERE bundle.run_id=$1 ORDER BY composed.attempt`, [runId]);
-  return Object.freeze({
-    nodes: named(nodes) as unknown[], edges: named(edges) as unknown[], reduced: named(reduced) as unknown[],
-    reviews: named(reviews) as unknown[], answer: named(answer), composed: named(composed), factBundle: named(factBundle)
-  });
 }

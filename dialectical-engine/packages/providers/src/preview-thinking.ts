@@ -63,6 +63,9 @@ export function parsePreviewThinkingLevels(value: unknown): PreviewThinkingLevel
 export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; lane?: string }>): PreviewThinkingStep | null {
   if (request.lane === "story" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)) return "story_writer";
   if (request.lane === "story" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey)) return "story_checker";
+  // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
+  // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
+  if (/^MAP:/u.test(request.callSiteKey)) return "opening";
   const role = debateRoleFromCallSiteKey(request.callSiteKey);
   if (role === null) return null;
   switch (role) {

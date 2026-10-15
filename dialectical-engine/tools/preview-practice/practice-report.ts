@@ -11,7 +11,15 @@ import { join, resolve, sep } from "node:path";
 import type { PracticeDebateResult } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
+import {
+  practiceDebateLanguageLines,
+  practiceLanguageLines,
+  type PracticeDebateLanguageBlock,
+  type PracticeLanguageCaseRecord,
+  type PracticeLanguageNotRun
+} from "./practice-language.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
+import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
 import {
   latencySummary,
   percentile,
@@ -27,7 +35,7 @@ import {
 } from "./practice-verdict.js";
 
 export const PRACTICE_REPORT_SCHEMA = "preview-practice-report-v1" as const;
-const GATES: readonly PracticeGateName[] = ["deepinfra", "anthropic"];
+export const GATES: readonly PracticeGateName[] = ["deepinfra", "anthropic"];
 
 /** The default report folder: a fresh folder under the system temp folder. */
 export function defaultReportDirectory(mode: string, now: Date = new Date()): string {
@@ -59,10 +67,19 @@ type GateBlock = Readonly<{
   spentUsdByRemaining: string | null;
 }>;
 
-function usd(nano: bigint): string {
+export function usd(nano: bigint): string {
   const sign = nano < 0n ? "-" : "";
   const abs = nano < 0n ? -nano : nano;
   return `${sign}${String(abs / 1_000_000_000n)}.${String(abs % 1_000_000_000n).padStart(9, "0")}`;
+}
+
+/**
+ * What a gate spent by its own count: its remaining money before the run less after it, or null without both. It
+ * includes any live-site spend in the same window: a check, never the source of the cost figures. Formats and openings
+ * report it the same way.
+ */
+export function spentUsdByRemaining(beforeNanoUsd: bigint | null, afterNanoUsd: bigint | null): string | null {
+  return beforeNanoUsd === null || afterNanoUsd === null ? null : usd(beforeNanoUsd - afterNanoUsd);
 }
 
 function gateBlock(observer: PracticeGateObserver, gate: PracticeGateName,
@@ -76,12 +93,11 @@ function gateBlock(observer: PracticeGateObserver, gate: PracticeGateName,
     wireLatencyMs: latencySummary(observer.events.filter((event) => event.gate === gate && event.outcome !== "STOPPED").map((event) => event.latencyMs)),
     remainingBefore: view(before),
     remainingAfter: view(after),
-    // Includes any live-site spend in the same window: a check, never the source of the cost figures.
-    spentUsdByRemaining: before === null || after === null ? null : usd(before.remainingNanoUsd - after.remainingNanoUsd)
+    spentUsdByRemaining: spentUsdByRemaining(before?.remainingNanoUsd ?? null, after?.remainingNanoUsd ?? null)
   });
 }
 
-function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly number[] }>[]): Record<string, number> {
+export function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly number[] }>[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const model of new Set(rows.map((row) => row.model))) {
     const all = rows.filter((row) => row.model === model).flatMap((row) => [...row.latencies]);
@@ -91,7 +107,7 @@ function p90ByModel(rows: readonly Readonly<{ model: string; latencies: readonly
   return out;
 }
 
-function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<PracticeGateName, unknown>> | null): boolean {
+export function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<PracticeGateName, unknown>> | null): boolean {
   const refused = GATES.some((gate) => observer.summary(gate).gateRefused > 0 || observer.summary(gate).vendorError > 0);
   const notActive = after === null ? false : GATES.some((gate) => {
     const value = after[gate] as { state?: string } | null;
@@ -101,7 +117,7 @@ function gateHalted(observer: PracticeGateObserver, after: Readonly<Record<Pract
 }
 
 /** The brake stopped a gate for a refusal, a vendor error or an unreadable answer (not the operator, not its own pauses). */
-function gateStopped(observer: PracticeGateObserver): boolean {
+export function gateStopped(observer: PracticeGateObserver): boolean {
   return GATES.some((gate) => {
     const stop = observer.stopped(gate);
     return stop !== null && !/^OPERATOR_/u.test(stop.reason) && !practiceStopIsPause(stop);
@@ -109,7 +125,7 @@ function gateStopped(observer: PracticeGateObserver): boolean {
 }
 
 /** The gates the practice paused itself for connection failures in a row, as `gate:reason`. */
-function gatePauses(observer: PracticeGateObserver): readonly string[] {
+export function gatePauses(observer: PracticeGateObserver): readonly string[] {
   return GATES.flatMap((gate) => {
     const stop = observer.stopped(gate);
     return practiceStopIsPause(stop) ? [`${gate}:${stop!.reason}`] : [];
@@ -376,6 +392,7 @@ export function debateReport(input: Readonly<{
     gatePauses: gatePauses(input.observer),
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
     busyModels: busyDuringRun,
+    shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -392,6 +409,10 @@ export function debateReport(input: Readonly<{
     // Hosted mode only: the room or the daily guard, billing (register / practice), the ceilings, the settings set aside.
     ...(r.deployment === undefined ? {} : { deployment: r.deployment }),
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
+    // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
+    ...(r.shape === undefined ? {} : { shape: r.shape }),
+    // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).
+    ...(r.language === undefined ? {} : { language: r.language }),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -434,7 +455,9 @@ export function harnessErrorReport(mode: string, code: string, startedAt: Date, 
 
 /** The short, content-free summary a person reads first. No reply text, ever. */
 export function reportMarkdown(report: PracticeReport): string {
-  const lines = [`# Preview practice (${String(report.mode)}): ${report.verdict}`, "",
+  // An openings --dry run says so in its title: its costs are the price list's estimate for the script's made-up tokens.
+  const dry = report.dry === true ? ", dry: scripted answers, nothing spent" : "";
+  const lines = [`# Preview practice (${String(report.mode)}${dry}): ${report.verdict}`, "",
     `Exit code ${String(report.exitCode)}. Started ${String(report.startedAt)}, finished ${String(report.finishedAt)}.`, ""];
   if (report.reasons.length > 0) {
     lines.push("Why:", "", ...report.reasons.map((reason) => `- ${reason}`), "");
@@ -451,6 +474,15 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const totals = report.totals as Record<string, unknown> | undefined;
   if (totals !== undefined) lines.push("Totals:", "", ...Object.entries(totals).map(([key, value]) => `- ${key}: ${String(value)}`), "");
+  const shape = typeof report.shape === "object" && report.shape !== null ? report.shape as PracticeShapeBlock : undefined;
+  if (shape !== undefined) lines.push(...practiceShapeLines(shape));
+  const language = report.mode === "debate" && typeof report.language === "object" && report.language !== null
+    ? report.language as PracticeDebateLanguageBlock : undefined;
+  if (language !== undefined) lines.push(...practiceDebateLanguageLines(language));
+  if (report.mode === "language" && Array.isArray(report.cases)) {
+    lines.push(...practiceLanguageLines(report.cases as readonly PracticeLanguageCaseRecord[],
+      Array.isArray(report.notRun) ? report.notRun as readonly PracticeLanguageNotRun[] : []));
+  }
   const gates = report.gates as Record<string, GateBlock> | undefined;
   if (gates !== undefined) {
     lines.push("Gates:", "");
@@ -487,6 +519,17 @@ export function reportMarkdown(report: PracticeReport): string {
         + `by full re-ask ${String(entry.repairedByFullAsk ?? 0)}, otherwise ${String(entry.repairedOtherwise ?? 0)}), `
         + `${String(entry.unrecovered)} never fixed`
         + `${entry.slipRateExceeded ? " (over the slip rule)" : ""}; tolerant repairs ${JSON.stringify(entry.jsonRepairs)}`);
+    }
+    lines.push("");
+  }
+  const byArm = report.byArm as readonly Readonly<{ arm: string; questions: number; calls: number; costUsd: string; wallSeconds: number;
+    unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;
+  if (byArm !== undefined && byArm.length > 0) {
+    lines.push("Openings per arm (counts, cost and time only; T today's opening, A snowball, B blind lists, C angle map):", "",
+      "| arm | questions | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
+    for (const row of byArm) {
+      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.calls)} | ${JSON.stringify(row.statuses)} | ${row.costUsd} | `
+        + `${String(row.wallSeconds)} | ${String(row.unavailable)} | ${JSON.stringify(row.marks)} | ${JSON.stringify(row.notes)} |`);
     }
     lines.push("");
   }
@@ -542,7 +585,12 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("", ...bands.map((band) => `- ${band}`), ...(bands.length === 0 ? [] : [""]));
   }
   const failures = report.failures as readonly unknown[] | undefined;
-  lines.push(`Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
+  // Openings keep reply text in "failures" only for a call whose format never passed; the formats wording is unchanged.
+  // The language mode keeps no "failures" (a planner's failed call is its case's planner status and code).
+  if (report.mode !== "language") lines.push(report.mode === "openings"
+    ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
+      + "reply text only for calls whose format never passed)."
+    : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
   return lines.join("\n");
 }
 

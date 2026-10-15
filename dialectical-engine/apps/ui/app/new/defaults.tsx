@@ -1,4 +1,4 @@
-import type { Deployment, PlanTier, Session } from "@debateai/contract";
+import type { DepthParams, Deployment, PlanTier, Session } from "@debateai/contract";
 import { TypedDomainError, type ModelStrength } from "@debateai/kernel";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -9,6 +9,23 @@ export const DECISION_SCOPE_DEFAULT = "personal" as const;
 // QUESTION FOR V: ratify this provisional product value or require an
 // explicit user choice. It is intentionally not derived from deployment data.
 export const PROVISIONAL_COMPOSITION_BUDGET_DEFAULT = "low" as const;
+
+/*
+ * Debate shape P2c (spec 2026-10-12 §3.2, rulings S6–S8): the three choices the ask carries in
+ * depth_params, typed by the contract (P2a) so the page never restates them. The API normalises
+ * each one per plan again; the page only keeps itself honest.
+ */
+export type DepthMode = NonNullable<DepthParams["depthMode"]>;
+export type Scrutiny = NonNullable<DepthParams["scrutiny"]>;
+export type AnswerLength = NonNullable<DepthParams["answerLength"]>;
+export const DEPTH_MODES: readonly DepthMode[] = ["adaptive", "fixed"];
+export const SCRUTINY_LEVELS: readonly Scrutiny[] = ["standard", "deep", "exhaustive"];
+export const ANSWER_LENGTHS: readonly AnswerLength[] = ["short", "standard", "detailed"];
+
+/** S6: Fixed is offered on Premium; Free is adaptive (its depth ceiling 2). */
+export function fixedDepthAllowedFor(planTier: PlanTier): boolean {
+  return planTier !== "free";
+}
 
 export function dateTimeLocalValue(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -58,6 +75,10 @@ export type NewDebateAskDefaults = {
   readonly riskTierWasEdited?: boolean;
   /** A21: the asker's choice, or null/absent — then the ask omits it and the deployment's default applies. */
   readonly modelStrength?: ModelStrength | null;
+  /** Debate shape P2c: absent sends nothing, so the API's default applies and older callers keep working. */
+  readonly depthMode?: DepthMode;
+  readonly scrutiny?: Scrutiny;
+  readonly answerLength?: AnswerLength;
 };
 
 export function buildNewDebateAskConfig(
@@ -85,6 +106,9 @@ export function buildNewDebateAskConfig(
     steering_annotations: [],
     ...(defaults.modelStrength === undefined || defaults.modelStrength === null
       ? {}
-      : { model_strength: defaults.modelStrength })
+      : { model_strength: defaults.modelStrength }),
+    ...(defaults.depthMode === undefined ? {} : { depth_mode: defaults.depthMode }),
+    ...(defaults.scrutiny === undefined ? {} : { scrutiny: defaults.scrutiny }),
+    ...(defaults.answerLength === undefined ? {} : { answer_length: defaults.answerLength })
   };
 }

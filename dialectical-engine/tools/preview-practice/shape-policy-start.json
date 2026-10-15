@@ -1,0 +1,46 @@
+{
+  "kind": "DEBATE_SHAPE_POLICY",
+  "version": 1,
+  "plans": {
+    "free": {
+      "mapAIs": 3, "answers": 3, "graders": 2, "pointsPerAnswer": 3, "deeperTopPoints": 1, "gapRoundsMax": 1,
+      "closeCallExtraGraders": 2, "fixedDepthAllowed": false,
+      "scrutiny": { "deep": null, "exhaustive": null, "scrutinyLeverageMin": 0.05, "scrutinyWeakBelow": 0.5 },
+      "opening": "ANGLE_MAP"
+    },
+    "plus": {
+      "mapAIs": 4, "answers": 3, "graders": 3, "pointsPerAnswer": 4, "deeperTopPoints": 2, "gapRoundsMax": 2,
+      "closeCallExtraGraders": 2, "fixedDepthAllowed": true,
+      "scrutiny": { "deep": { "roundsPerPoint": 2, "pointsPerDebate": 6 }, "exhaustive": { "roundsPerPoint": 3, "pointsPerDebate": 15 },
+        "scrutinyLeverageMin": 0.05, "scrutinyWeakBelow": 0.5 },
+      "opening": "ANGLE_MAP"
+    },
+    "pro": {
+      "mapAIs": 5, "answers": 4, "graders": 3, "pointsPerAnswer": 4, "deeperTopPoints": 2, "gapRoundsMax": 2,
+      "closeCallExtraGraders": 2, "fixedDepthAllowed": true,
+      "scrutiny": { "deep": { "roundsPerPoint": 2, "pointsPerDebate": 6 }, "exhaustive": { "roundsPerPoint": 3, "pointsPerDebate": 15 },
+        "scrutinyLeverageMin": 0.05, "scrutinyWeakBelow": 0.5 },
+      "opening": "ANGLE_MAP"
+    },
+    "max": {
+      "mapAIs": 7, "answers": 4, "graders": 3, "pointsPerAnswer": 4, "deeperTopPoints": 2, "gapRoundsMax": 2,
+      "closeCallExtraGraders": 2, "fixedDepthAllowed": true,
+      "scrutiny": { "deep": { "roundsPerPoint": 2, "pointsPerDebate": 6 }, "exhaustive": { "roundsPerPoint": 3, "pointsPerDebate": 15 },
+        "scrutinyLeverageMin": 0.05, "scrutinyWeakBelow": 0.5 },
+      "opening": "ANGLE_MAP"
+    },
+    "premium": {
+      "mapAIs": 5, "answers": 4, "graders": 3, "pointsPerAnswer": 4, "deeperTopPoints": 2, "gapRoundsMax": 2,
+      "closeCallExtraGraders": 2, "fixedDepthAllowed": true,
+      "scrutiny": { "deep": { "roundsPerPoint": 2, "pointsPerDebate": 6 }, "exhaustive": { "roundsPerPoint": 3, "pointsPerDebate": 15 },
+        "scrutinyLeverageMin": 0.05, "scrutinyWeakBelow": 0.5 },
+      "opening": "ANGLE_MAP"
+    }
+  },
+  "answerLength": {
+    "short": { "words": 300, "writerBound": 8192 },
+    "standard": { "words": 700, "writerBound": 12288 },
+    "detailed": { "words": 1500, "writerBound": 16384 }
+  },
+  "mapStepBounds": { "merge": 32768, "choose": 32768 }
+}

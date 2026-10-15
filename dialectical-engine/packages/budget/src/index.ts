@@ -2,7 +2,14 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { ExpansionDepthSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import { SERVE_LEG } from "@debateai/register";
+import {
+  DEBATE_SHAPE_FORMULA_VERSION,
+  SERVE_LEG,
+  debateShapeOfReceipt,
+  debateShapeReceiptSchema,
+  debateShapeSiteCounts,
+  type DebateShapeCeilingInput
+} from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
@@ -24,6 +31,7 @@ export {
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
+  RUN_COST_ENVELOPE_ROOM_KEPT,
   STORY_COST_ENVELOPE_REACHED,
   chargeMicrosForUsage,
   chargeableUsage,
@@ -37,6 +45,7 @@ export {
   readReportedUsage,
   readUsageCounters,
   runCostEnvelopeReached,
+  runCostEnvelopeRoomKept,
   sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
@@ -54,12 +63,17 @@ export {
 export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
+  LANGUAGE_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
+  languageCheckChargeMicros,
+  languageCheckSpendWriterPresent,
   mostOneRunMaySpendMicros,
+  recordLanguageCheckSpend,
   type CostEnvelopeGuardInput,
   type InFlightSpend,
+  type LanguageCheckSpendEntry,
   type ModelSpendEntry,
   type ModelSpendSource,
   type ModelSpendStore,
@@ -105,7 +119,9 @@ export {
   type RecentRunCharge,
   type RecentRunUsage,
   type RecentRunUsageSource,
-  type RunSettingsClass
+  type RunSettingsClass,
+  type RunShapeClass,
+  waitingShapeClassOf
 } from "./estimate.js";
 
 /** Budget spec 2026-09-28 §2.6 (B3): the day lock, then the person lock, for every room decision. */
@@ -193,7 +209,9 @@ const costEnvelopeBasisSchema = z.object({
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
-  bounds_source_ref: z.string().trim().min(1)
+  bounds_source_ref: z.string().trim().min(1),
+  /** Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt. */
+  shape: debateShapeReceiptSchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -222,6 +240,19 @@ const costEnvelopeBasisSchema = z.object({
    * disclosed, and nothing here recomputes them from panel size and depth. A
    * receipt with a self-consistent serve leg and a wrong author count parses.
    */
+  /**
+   * I1 (P2a final review): the leg is one site per synthesis role per round, and the two roles share ONE sealed loop
+   * bound (`SERVE_LEG.sites` refuses unequal bounds), so every receipt this parser can accept was minted even. An odd
+   * count cannot split between the answer writer and the checker, and a reader that cannot split it must never fall
+   * back to pricing the run as something else.
+   */
+  if (basis.serve_leg.synthesis_loop_sites % 2 !== 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["serve_leg", "synthesis_loop_sites"],
+      message: `synthesis-loop sites ${basis.serve_leg.synthesis_loop_sites} are odd: the writer and the checker share them evenly`
+    });
+  }
   const billed = SERVE_LEG.billed(basis.serve_leg);
   if (basis.call_sites.serve !== billed) {
     ctx.addIssue({
@@ -256,6 +287,60 @@ const costEnvelopeBasisSchema = z.object({
       });
     }
   }
+  /**
+   * Debate shape (spec 2026-10-12 §3.6): a shape receipt and its formula name go together, and its legs are the ones
+   * its own sizes give (`debateShapeSiteCounts`, the constructor's rule, READ here, never restated), so a receipt can
+   * never bill a shape its own numbers do not support, nor carry sizes the debaters cannot fill.
+   */
+  const shape = basis.shape;
+  if ((basis.formula_version === DEBATE_SHAPE_FORMULA_VERSION) !== (shape !== undefined)) {
+    ctx.addIssue({ code: "custom", path: ["shape"], message: `formula ${basis.formula_version} and its shape member disagree` });
+  }
+  if (shape !== undefined) {
+    /**
+     * T4-ABSORB (c): this refinement also runs on a receipt that already failed a non-aborting check (a depth of 0),
+     * and the site count throws a plain TypeError there. A bad receipt is an ISSUE, so the refusal stays
+     * RUN_COST_ENVELOPE_UNRESOLVED and never escapes the parser as a thrown TypeError.
+     */
+    let counts: ReturnType<typeof debateShapeSiteCounts> | null = null;
+    try {
+      counts = debateShapeSiteCounts(debateShapeOfReceipt(shape), basis.depth);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites cannot be counted at ${basis.depth} rounds (${error instanceof Error ? error.message : String(error)})` });
+    }
+    if (counts !== null
+      && (counts.mapSites !== shape.map_sites || counts.nodes !== shape.nodes || counts.crossNodes !== shape.cross_nodes)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites ${shape.map_sites}/${shape.nodes}/${shape.cross_nodes} disagree with its sizes` });
+    }
+    // T4-ABSORB (b): standard scrutiny has no budget, and a budget is never standard (as the ceiling's shape check).
+    const noScrutiny = shape.scrutiny === "standard";
+    if (noScrutiny !== (shape.scrutiny_rounds_per_point === 0) || noScrutiny !== (shape.scrutiny_points_per_debate === 0)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "scrutiny"],
+        message: `scrutiny ${shape.scrutiny} with ${shape.scrutiny_rounds_per_point} rounds and ${shape.scrutiny_points_per_debate} points`
+          + " disagrees: standard scrutiny means 0 rounds and 0 points" });
+    }
+    if (basis.call_sites.author !== shape.map_sites + shape.nodes) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "author"], message: `author sites ${basis.call_sites.author} are not map plus nodes` });
+    }
+    if (basis.call_sites.panel !== (shape.graders + shape.close_call_extra_graders) * shape.nodes) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "panel"], message: `panel sites ${basis.call_sites.panel} are not graders per node` });
+    }
+    // T4-ABSORB (b): the ceiling bills r x nodes reviewer sites with the sealed r >= 1; r is not on the receipt, so
+    // the leg must be a whole, positive number of reviews on every node.
+    if (basis.call_sites.reviewer < shape.nodes || basis.call_sites.reviewer % shape.nodes !== 0) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "reviewer"],
+        message: `reviewer sites ${basis.call_sites.reviewer} are not whole reviews per node (${shape.nodes} nodes)` });
+    }
+    if (shape.answers > basis.panel_size || shape.map_ais > basis.panel_size
+      || shape.graders + shape.close_call_extra_graders > basis.panel_size - 1) {
+      ctx.addIssue({ code: "custom", path: ["shape", "answers"], message: `the shape's sizes exceed ${basis.panel_size} debaters` });
+    }
+    if ((basis.per_site_attempts.cross_exchange_site !== undefined) !== (shape.backup_sequences === 1)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "backup_sequences"], message: "the backup flag and the per-site attempts disagree" });
+    }
+  }
 });
 
 export interface CostEnvelopeBasis {
@@ -272,6 +357,11 @@ export interface CostEnvelopeBasis {
    * minted before the member existed, whose every call sees the whole ceiling.
    */
   readonly serveReserveAttempts: number;
+  /**
+   * Debate shape: the sizes the run was admitted with (DR-185-shape-v1 only); absent on every other receipt. The ONE
+   * reader of a shaped receipt (PF7): later readers take the sizes from here, never from `wire.shape`.
+   */
+  readonly shape?: DebateShapeCeilingInput;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -320,6 +410,7 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
       selected: parsed.data.serve_leg.selected
     }),
     serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
+    ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
     wire: Object.freeze(parsed.data)
   });
 }

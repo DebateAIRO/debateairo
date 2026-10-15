@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 // UNION of both lanes: S06 needs the served-root rule vocabularies and the
 // retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
-import type { ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import type { DebateShapeMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
 import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import {
@@ -160,6 +160,18 @@ export interface ConformanceJudgement {
   readonly segmentId: string;
   readonly state: "JUDGED" | "SAMPLED_PASSED" | "NOT_SAMPLED";
   readonly conforms: boolean;
+}
+
+/**
+ * M8 (controller ruling, P2a final review): the answer read's `cost_envelope.basis` without the receipt's debate-shape
+ * member. Least disclosure: the member names the asker's plan and the plan's sizes and thresholds, and nothing public
+ * needs them. A copy without `shape`, every other member as stored; a basis with no `shape` member is returned as the
+ * same object, so today's answer body is byte for byte what it was.
+ */
+export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  if (!Object.hasOwn(basis, "shape")) return basis;
+  const { shape: _shape, ...shown } = basis;
+  return shown;
 }
 
 export function deriveConformanceOutcome(
@@ -1602,7 +1614,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark;
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1671,7 +1683,16 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   // transport outcome stay NULL — 0021/0025 refuse both on this mark — so the
   // role, seat, routes, cause and key live in the progress stream's switch
   // events and on the ledger rows, not here.
-  "BACKUP-MODEL-USED"
+  "BACKUP-MODEL-USED",
+  // Debate shape: every map fallback/fill and every extension carries its typed record (answer scope for the map, naming the served root's node in affectedNodeIds; node scope for the extensions, naming their node).
+  "MAP_ANGLES_FALLBACK",
+  "MAP_MERGE_FALLBACK",
+  "MAP_CHOOSE_FALLBACK",
+  "MAP_UNAVAILABLE_TODAYS_OPENING",
+  "ANSWERS_FILLED",
+  "CHOOSE_QUOTA_FILLED",
+  "PANEL-CLOSE-CALL-EXTENDED",
+  "SCRUTINY-EXTENDED"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -2599,6 +2620,7 @@ export class ServeRepository {
          ON number.answer_id=answer.answer_id AND number.answer_version=answer.answer_version
        LEFT JOIN core.node AS node
          ON node.run_id=answer.run_id AND node.provenance_ref::text=number.source_ref
+        AND node.generation_status <> 'stale'
        WHERE answer.run_id=$1
        ORDER BY answer.answer_version DESC
        LIMIT 1`,
@@ -2996,7 +3018,7 @@ export class ServeRepository {
       tier_source: row.tier_source,
       tier_provenance_ref: row.tier_provenance_ref,
       cost_envelope: {
-        basis: row.envelope_basis,
+        basis: publicCostEnvelopeBasis(row.envelope_basis),
         state: row.envelope_state,
         consumed_model_attempts: Number(row.envelope_consumed),
         protected_core: "NEVER_SKIPPABLE"
@@ -3224,7 +3246,8 @@ export class ServeRepository {
          AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)
        ORDER BY sequence`, [runId]
     ), this.pool.query<{ node_id: string }>(
-      `SELECT node_id::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq`, [runId]
+      // Reclaim resume (migration 0119): a node a later copy set aside ('stale') is not one of the run's current nodes.
+      `SELECT node_id::text FROM core.node WHERE run_id=$1 AND generation_status <> 'stale' ORDER BY created_at_seq`, [runId]
     ), this.pool.query<{ node_set: unknown; state: string; claim_deadline: Date | null }>(
       `SELECT node_set, state, claim_deadline FROM core.work_item WHERE run_id=$1`, [runId]
     )]);
@@ -3353,6 +3376,7 @@ export class ServeRepository {
       .find((node) => node.node_id === nodeId) ?? null;
   }
 
+  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
   private async readEdgesForRun(runId: string): Promise<Edge[]> {
     const result = await this.pool.query<{
       edge_id: string;
@@ -3372,7 +3396,10 @@ export class ServeRepository {
               edge.provenance_ref::text
        FROM core.edge AS edge
        JOIN core.node AS source ON source.node_id = edge.source_node_id AND source.run_id = edge.run_id
-       WHERE edge.run_id = $1
+       LEFT JOIN core.node AS target
+         ON edge.target_kind = 'NODE' AND target.node_id = edge.target_node_id AND target.run_id = edge.run_id
+       WHERE edge.run_id = $1 AND source.generation_status <> 'stale'
+         AND (edge.target_kind <> 'NODE' OR target.generation_status <> 'stale')
        ORDER BY edge.created_at_seq`,
       [runId]
     );
@@ -3390,6 +3417,7 @@ export class ServeRepository {
     }));
   }
 
+  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
   private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number): Promise<Node[]> {
     return withRunContentLease(this.pool,[runId],async () => {
     const result = await this.pool.query<{
@@ -3460,7 +3488,7 @@ export class ServeRepository {
                 JOIN core.node AS defeater ON defeater.node_id=incoming.source_node_id
                 WHERE incoming.run_id=node.run_id AND incoming.target_kind='NODE'
                   AND incoming.target_node_id=node.node_id AND incoming.polarity='attack'
-                  AND defeater.child_kind='defeater'
+                  AND defeater.child_kind='defeater' AND defeater.generation_status <> 'stale'
                 ORDER BY incoming.created_at_seq
               ) AS defeater_refs
        FROM core.node AS node
@@ -3487,7 +3515,7 @@ export class ServeRepository {
          SELECT check_status FROM core.stranger_restatement
          WHERE subject_kind = 'node' AND subject_id = node.node_id ORDER BY at_seq DESC LIMIT 1
        ) AS restatement ON true
-       WHERE node.run_id = $1 ORDER BY node.created_at_seq`,
+       WHERE node.run_id = $1 AND node.generation_status <> 'stale' ORDER BY node.created_at_seq`,
       [runId]
     );
     const markLinks = answerId === undefined || answerVersion === undefined

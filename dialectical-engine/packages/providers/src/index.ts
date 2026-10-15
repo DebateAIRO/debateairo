@@ -187,6 +187,14 @@ export interface ProviderCallRequest {
    */
   readonly costEnvelope?: ProviderCostEnvelopeSeam;
   /**
+   * Debate shape (controller ruling T12-R0, the owner's "always an answer" rule): money, in micro-units, this call
+   * must leave unspent under its phase's ceiling — root 0's worst-case call, named by every map call, so the map can
+   * never take the room a started debate needs for its first position. Handed to the money seam with the projection
+   * (`assertCallAllowed`), which refuses the call that would cut into it before it is sent. Absent: today's decision,
+   * byte for byte. Never sent.
+   */
+  readonly keepRoomMicros?: number;
+  /**
    * Model scorecard §2.2 (rulings R1, R7): the candidate's thinking level, in
    * the connection's own vocabulary. Absent or DEFAULT_ONLY puts nothing on the
    * wire. A level this connection did not declare is refused before the call is
@@ -1183,6 +1191,8 @@ export interface ProviderCostEnvelopeSeam {
     requestBytes: number;
     /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
     completionTokenCeiling: number;
+    /** T12-R0: the request's `keepRoomMicros`, only when it names one: money the call must leave unspent. */
+    keepRoomMicros?: number;
   }>) => void | ProviderCallAdmission | Promise<void | ProviderCallAdmission>;
   /**
    * CHARGE what the vendor billed. Called for every attempt that produced a
@@ -1520,6 +1530,61 @@ export function recordableFinishReason(observed: string | null): string | null {
 function observedFinishReason(decoded: unknown): string | null {
   const parsed = observedFinishReasonSchema.safeParse(decoded);
   return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
+}
+
+/** Reclaim resume: one recorded reply as the gateway read it — its message content (null: none) and how it ended. */
+export type RecordedProviderReply = Readonly<{ content: string | null; reply: ModelReplyFacts }>;
+
+/**
+ * Reclaim resume (docs/superpowers/specs/2026-10-14-reclaim-resume-design.md): a RECORDED vendor reply — an attempt's
+ * `raw_artifact.raw_text`, the vendor's own bytes, and its `raw_artifact.provider` — read back exactly as this gateway
+ * read it when it arrived: an Anthropic reply normalised, the strict body's message content, and its finish reason.
+ */
+export function readRecordedProviderReply(rawText: string, provider: string): RecordedProviderReply {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(rawText);
+  } catch {
+    decoded = null;
+  }
+  if (provider === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+    const native = readAnthropicMessagesReply(decoded);
+    if (native.failure) return Object.freeze({ content: null, reply: Object.freeze({ finishReason: null }) });
+    decoded = native.normalized;
+  }
+  const strict = responseSchema.safeParse(decoded);
+  return Object.freeze({
+    content: strict.success ? strict.data.choices[0]!.message.content : null,
+    reply: Object.freeze({ finishReason: observedFinishReason(decoded) })
+  });
+}
+
+/**
+ * Reclaim resume: the content a RECORDED call handed back, rebuilt from its recorded replies, as the gateway decided
+ * it. `accepted` is the reply of the call's OK attempt; `answered` is the reply of the attempt right before it when
+ * the OK attempt was a repair and that one answered the call's original packet (null otherwise). When `answered` could
+ * be patched (`planPatchFollowUp`) and the OK reply merges into it as an accepted answer, the OK attempt was the patch
+ * and the merge is the content (`mergePatchReply`); otherwise the OK reply itself, when the step's classifier accepts
+ * it. Null when neither holds: the call cannot be replayed and is made again. The classifier runs on the returned
+ * content last, as the gateway runs it, so a step that remembers its reading (`rememberingAcceptedReply`) has it.
+ */
+export function rebuildRecordedCallContent(input: Readonly<{
+  accepted: RecordedProviderReply;
+  answered: RecordedProviderReply | null;
+  classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
+}>): string | null {
+  const { accepted, answered, classifyContent } = input;
+  if (accepted.content === null) return null;
+  if (classifyContent === undefined) return accepted.content;
+  if (answered !== null && answered.content !== null && answered.reply.finishReason !== PROVIDER_FINISH_REASON_LENGTH) {
+    const first = classifyContent(answered.content, answered.reply);
+    const plan = first.parseStatus === "SCHEMA_FAILED"
+      ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
+      : null;
+    const merged = plan === null ? null : mergePatchReply(plan, accepted.content, accepted.reply);
+    if (merged !== null && merged.ok && classifyContent(merged.content, accepted.reply).parseStatus === "PARSED") return merged.content;
+  }
+  return classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED" ? accepted.content : null;
 }
 
 /**
@@ -1867,7 +1932,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        */
       const costAdmission = await request.costEnvelope?.assertCallAllowed({
         requestBytes: Buffer.byteLength(body, "utf8"),
-        completionTokenCeiling: attemptTokenCeiling
+        completionTokenCeiling: attemptTokenCeiling,
+        // T12-R0: only a map call names a room; every other call's projection is today's two members.
+        ...(request.keepRoomMicros === undefined ? {} : { keepRoomMicros: request.keepRoomMicros })
       });
       attemptsMade = attempt;
       const inputHash = digest(JSON.stringify(responseFormat===undefined?attemptPacket:{...attemptPacket,response_format:responseFormat}));
@@ -2539,6 +2606,7 @@ export {
   buildFramedPrompt,
   buildFramedRepairPrompt,
   promptContractFingerprintText,
+  promptTextHasReservedToken,
   readPromptFrame,
   schemaFailureLimits,
   schemaFailureLocator,
@@ -2590,6 +2658,7 @@ export {
   rememberingAcceptedReply,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
+  type MapReplySalvageRepair,
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";

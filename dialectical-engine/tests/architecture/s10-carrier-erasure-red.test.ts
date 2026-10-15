@@ -196,6 +196,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
       "apps/evaluator-worker/src/index.ts",
+      // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
+      // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
+      "apps/runner/src/run-replay.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
@@ -203,6 +206,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/judgement/src/index.ts",
       "packages/ledger/src/index.ts",
       "packages/liveness/src/index.ts",
+      // Debate shape (0117): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
+      "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
       "packages/settlement/src/index.ts",
@@ -234,6 +239,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // It opens no lease and reads no content.
       "apps/runner/src/call-lane-gateway.ts",
       "apps/runner/src/index.ts",
+      // Debate shape (0117, c5e0b2862): the map stage's caller sends each map call through the member gateway the
+      // runner hands it (lane, sit-out book, keep-alive, the run-required leased gateway), naming the run. It opens
+      // no lease and reads no content of its own; the map's storage goes through packages/map/src/repository.ts above.
+      "apps/runner/src/map-stage.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the
       // gateway it wraps (the run-required, leased gateway), or refuses it before
       // anything is sent. It opens no lease and reads no content of its own.
@@ -253,6 +262,12 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     ]);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/withRunContentLease/);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/PROVIDER_RUN_REQUIRED/);
+    // The map stage: every call names the run, it touches no cipher or lease itself, and only the leased runner uses it.
+    expect(contents.get("apps/runner/src/map-stage.ts")).toMatch(/member\.provider\.call\(\{\s*runId: deps\.runId,/);
+    expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(privatePrimitive);
+    expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(/withRunContentLease|ContentCipher|@debateai\/db/);
+    expect([...contents].filter(([,body]) => /from "\.\/map-stage\.js"/.test(body)).map(([path]) => path))
+      .toEqual(["apps/runner/src/index.ts"]);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/lane: "story",/);
     expect(contents.get("packages/providers/src/preview-test.ts")).toMatch(/gateway\.call\(\{\s*\.\.\.request,/);
@@ -271,7 +286,14 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     // Paid plans S1a: the seat's judge is built over the stamped provider, or over the
     // gateway the runner's cheaper-model-while-arguing factory wraps around it.
     expect(contents.get("apps/runner/src/run-seats.ts")).toMatch(/new Judge\(judgeGateway\)/);
-    expect([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path))
+    // Only the leased runner imports run-seats' CODE. A type-only import (debate shape, 8b6bc71be: shape-select.ts
+    // takes the SeatMember type) is erased at build and reaches no seat book, Judge or gateway. Every reference to the
+    // module must be one of the import/export statements read here, so none escapes the classification.
+    const seatStatements = [...contents].flatMap(([path, body]) =>
+      [...body.matchAll(/^(?:import|export)\s[^;]*?from "\.\/run-seats\.js"/gmu)].map((match) => [path, match[0]] as const));
+    expect([...new Set(seatStatements.map(([path]) => path))].sort())
+      .toEqual([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path).sort());
+    expect([...new Set(seatStatements.filter(([, statement]) => !/^(?:import|export)\s+type\s/u.test(statement)).map(([path]) => path))])
       .toEqual(["apps/runner/src/index.ts"]);
   });
 

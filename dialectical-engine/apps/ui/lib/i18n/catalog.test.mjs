@@ -74,7 +74,14 @@ test("all 35 locales have exact CLDR plural categories, non-plural keys, and pla
   }
 });
 
-test("the Finnish model budget names LLM tokens rather than identifiers", () => {
-  const finnish = readCatalog("fi", "newDebate");
-  assert.equal(finnish["newDebate.maxTokens"], "Tokenien enimmäismäärä");
+test("no locale keeps the /new keys retired by debate shape P2c", () => {
+  const retired = [
+    "newDebate.legacyNotice", "newDebate.selectionStrategy", "newDebate.manual", "newDebate.recommended",
+    "newDebate.maxTokens", "newDebate.maxTokensHint", "newDebate.scrutinyStandardHint",
+    "newDebate.scrutinyDeepHint", "newDebate.scrutinyExhaustiveHint"
+  ];
+  for (const { code } of LOCALES) {
+    const catalog = readCatalog(code, "newDebate");
+    for (const key of retired) assert.equal(Object.hasOwn(catalog, key), false, `${code}/newDebate still has ${key}`);
+  }
 });

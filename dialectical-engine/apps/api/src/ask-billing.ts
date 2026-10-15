@@ -2,7 +2,8 @@ import { PLAN_TIER_ROSTERS, type AskApplied, type AskRequest, type PlanTier } fr
 import { previewPlanTierRosters, validatePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { CostEstimator, PersonAllowanceSource } from "@debateai/budget";
 import { TypedDomainError, type FundingBasis } from "@debateai/kernel";
-import { planById, type BillingPlan, type BillingPlans, type PlanId } from "@debateai/register";
+import { planById, type BillingPlan, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
+import { runShapeClassOf } from "./debate-shape-ask.js";
 
 /**
  * PAID PLANS (spec 2026-09-29 §2.3.4, §2.6 item 7; amendment R1 A5; ruling
@@ -84,7 +85,8 @@ export function decideSettingsForPlan<T extends AskSettings>(settings: T, plan: 
     ...settings,
     plan_tier: "free" as const,
     composition_budget_tier: gauges.compositionBudgetTier,
-    depth_params: Object.freeze({ depth: gauges.depth })
+    // Debate shape (spec 2026-10-12 §3.2): only the depth is Free's gauge; the shape settings pass on to the shape's own normalisation.
+    depth_params: Object.freeze({ ...settings.depth_params, depth: gauges.depth })
   });
 }
 
@@ -115,7 +117,8 @@ export function normaliseAskForPlan(ask: AskRequest, plan: BillingPlan): Readonl
       tier_source: FREE_GAUGE_SOURCE.tierSource,
       tier_provenance_ref: FREE_GAUGE_SOURCE.provenanceRef,
       composition_budget_tier: gauges.compositionBudgetTier,
-      depth_params: Object.freeze({ depth: gauges.depth })
+      // Debate shape (spec 2026-10-12 §3.2): only the depth is Free's gauge; the shape settings pass on to the shape's own normalisation.
+      depth_params: Object.freeze({ ...ask.depth_params, depth: gauges.depth })
     }),
     normalised: true
   });
@@ -156,11 +159,32 @@ export async function decideRoomSettings<T extends AskSettings>(
   ownerRef: string | null,
   billing: AskBilling | undefined
 ): Promise<T> {
-  if (billing === undefined || ownerRef === null) return settings;
+  return (await decideRoomSettingsAndPlan(settings, ownerRef, billing)).settings;
+}
+
+/**
+ * `decideRoomSettings` with the plan id `submit` would resolve (`resolveBillingAsk`'s `planId`): the entitlement's
+ * plan with billing on, null without billing, without an owner, or for internal funding. Debate shape (spec
+ * 2026-10-12 §3.1): the room read normalises and samples under the same plan key as the ask it advises on.
+ */
+export async function decideRoomSettingsAndPlan<T extends AskSettings>(
+  settings: T,
+  ownerRef: string | null,
+  billing: AskBilling | undefined
+): Promise<Readonly<{ settings: T; planId: PlanId | null }>> {
+  if (billing === undefined || ownerRef === null) return Object.freeze({ settings, planId: null });
   const basis = await billing.funding?.resolveAskFunding(ownerRef,billing.clock());
-  if (basis?.kind === "INTERNAL") return settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const});
+  if (basis?.kind === "INTERNAL") {
+    return Object.freeze({
+      settings: settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const}),
+      planId: null
+    });
+  }
   const entitlement = await billing.entitlements.current(ownerRef, billing.clock());
-  return decideSettingsForPlan(settings, planById(billing.plans, entitlement.planId));
+  return Object.freeze({
+    settings: decideSettingsForPlan(settings, planById(billing.plans, entitlement.planId)),
+    planId: entitlement.planId
+  });
 }
 
 export type CoarseFit = "AS_ASKED" | "FREE_ROSTER";
@@ -201,11 +225,15 @@ export function decideCoarseFit(input: Readonly<{
  * whatever this chose (`#submitWithRoom`).
  */
 export async function coarseFitFor(
-  ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig
+  ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig,
+  shapePlan?: DebateShapePlanKey
 ): Promise<CoarseFit> {
   if (ask.plan_tier !== "premium") return "AS_ASKED";
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
   if (windows.length === 0) return "AS_ASKED";
+  // Debate shape: the class's optional shape member, built before the class so no conditional sits beside the roster pick.
+  const coarseShape = runShapeClassOf(ask.depth_params, shapePlan ?? "premium");
+  const coarseShapeMember = coarseShape === null ? {} : { shape: coarseShape };
   const [holdsMicros, estimateMicros, spent] = await Promise.all([
     billing.coarseFit.spend.readOwnerCountedHoldsMicros(ownerRef,windows[0]?.funding),
     billing.coarseFit.estimator.estimateMicros({
@@ -213,7 +241,8 @@ export async function coarseFitFor(
       compositionBudgetTier: ask.composition_budget_tier,
       // Step 1: the roster this deployment really runs (one GLM on the private preview).
       makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig), PLAN_TIER_ROSTERS).premium.length,
-      depth: ask.depth_params.depth
+      depth: ask.depth_params.depth,
+      ...coarseShapeMember
     }),
     Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)))
   ]);

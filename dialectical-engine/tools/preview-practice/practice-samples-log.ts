@@ -36,6 +36,25 @@ export type PracticeRemainingLine = Readonly<{
   enabledModels: readonly string[];
 }>;
 
+/**
+ * The line kinds every practice log keeps the same way (the gates' watch and stops, a model marked busy for good, the
+ * end, the abort). The formats log and the openings log read them with the same code (`practiceLogEnding`).
+ */
+export type PracticeLogCommonLine =
+  | Readonly<{ kind: "wire"; event: PracticeWireEvent }>
+  | Readonly<{ kind: "stop"; stop: PracticeGateStop }>
+  /** A model marked busy for good: its wait budget spent, its remaining jobs skipped. */
+  | Readonly<{ kind: "busy"; model: string }>
+  | Readonly<{ kind: "end"; finishedAt: string; interrupted: boolean;
+    remainingAfter: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
+  | Readonly<{ kind: "abort"; at: string; code: string }>;
+
+const PRACTICE_LOG_COMMON_KINDS: readonly string[] = ["wire", "stop", "busy", "end", "abort"];
+
+export function isPracticeLogCommonLine(line: Readonly<{ kind: string }>): line is PracticeLogCommonLine {
+  return PRACTICE_LOG_COMMON_KINDS.includes(line.kind);
+}
+
 export type PracticeLogLine =
   | Readonly<{ kind: "start"; schema: typeof PRACTICE_SAMPLES_SCHEMA; mode: "formats"; startedAt: string;
     models: readonly string[]; lanes: readonly PracticeLane[]; samples: number; parallel: boolean;
@@ -45,18 +64,14 @@ export type PracticeLogLine =
     remainingBefore: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>>;
     /** Spec 2026-10-12 §4.8: each `--levels` model's runs ("high#1", …); only in a `--levels` run's log. */
     levels?: Readonly<Record<string, readonly string[]>> }>
-  | Readonly<{ kind: "wire"; event: PracticeWireEvent }>
-  | Readonly<{ kind: "stop"; stop: PracticeGateStop }>
+  | PracticeLogCommonLine
   | Readonly<{ kind: "sample"; sample: PracticeSample }>
-  /** A model marked busy for good: its wait budget spent, its remaining jobs skipped. */
-  | Readonly<{ kind: "busy"; model: string }>
   /** A busy model parked: it waits, then the same job is tried again. */
   | (Readonly<{ kind: "busy-wait" }> & PracticeBusyWait)
   /** A parked model's wait ended. */
-  | (Readonly<{ kind: "resume" }> & PracticeBusyResume)
-  | Readonly<{ kind: "end"; finishedAt: string; interrupted: boolean;
-    remainingAfter: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> }>
-  | Readonly<{ kind: "abort"; at: string; code: string }>;
+  | (Readonly<{ kind: "resume" }> & PracticeBusyResume);
+
+const PRACTICE_SAMPLES_KINDS: readonly string[] = ["start", "wire", "stop", "sample", "busy", "busy-wait", "resume", "end", "abort"];
 
 export function remainingLine(value: PreviewGateRemaining | null): PracticeRemainingLine | null {
   return value === null ? null : Object.freeze({ state: value.state, windowOpen: value.windowOpen,
@@ -72,8 +87,11 @@ function remainingValue(line: PracticeRemainingLine | null | undefined): Preview
     enabledModels: Object.freeze([...line.enabledModels]) });
 }
 
-/** Appends one line at a time and pushes each to the disk before returning. One writer per log. */
-export class PracticeSampleLog {
+/**
+ * Appends one JSON line at a time to a NEW file in a folder (private) and pushes each to the disk before returning. One
+ * writer per file. The formats log and the openings log both write this way.
+ */
+export class PracticeJsonlWriter {
   readonly path: string;
   #fd: number | null;
 
@@ -82,21 +100,21 @@ export class PracticeSampleLog {
     this.#fd = fd;
   }
 
-  /** Opens a NEW log in the folder (made private if missing); a folder that already holds one is refused. */
-  static create(directory: string): PracticeSampleLog {
+  /** Opens a NEW file in the folder (made private if missing); a folder that already holds it is refused with `holdsCode`. */
+  static create(directory: string, file: string, holdsCode: string): PracticeJsonlWriter {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const path = join(directory, PRACTICE_SAMPLES_FILE);
+    const path = join(directory, file);
     let fd: number;
     try { fd = openSync(path, "ax", 0o600); } catch (error) {
-      if ((error as { code?: unknown }).code === "EEXIST") throw new Error("PRACTICE_OUT_ALREADY_HOLDS_SAMPLES");
+      if ((error as { code?: unknown }).code === "EEXIST") throw new Error(holdsCode);
       throw error;
     }
-    return new PracticeSampleLog(path, fd);
+    return new PracticeJsonlWriter(path, fd);
   }
 
   get open(): boolean { return this.#fd !== null; }
 
-  append(line: PracticeLogLine): void {
+  append(line: unknown): void {
     if (this.#fd === null) return;
     const text = `${JSON.stringify(line)}\n`;
     writeSync(this.#fd, text);
@@ -112,23 +130,54 @@ export class PracticeSampleLog {
 }
 
 /**
- * The log's lines. A last line cut short (the process killed while writing it) is left out; any other line that cannot
- * be read refuses the whole log.
+ * The JSON lines of a log's text, in order. A last line cut short (the process killed while writing it) is left out; any
+ * other line that cannot be read, or whose kind is not one of `kinds`, refuses the whole text with `invalidCode`.
  */
-export function parsePracticeSampleLog(text: string): readonly PracticeLogLine[] {
+export function parseJsonlLines<T>(text: string, kinds: readonly string[], invalidCode: string): T[] {
   const raw = text.split("\n");
   if (raw.at(-1) === "") raw.pop();
-  const lines: PracticeLogLine[] = [];
+  const lines: T[] = [];
   for (const [index, entry] of raw.entries()) {
     let parsed: unknown;
     try { parsed = JSON.parse(entry); } catch {
       if (index === raw.length - 1) break;
-      throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
+      throw new Error(invalidCode);
     }
     const kind = typeof parsed === "object" && parsed !== null ? (parsed as { kind?: unknown }).kind : undefined;
-    if (!["start", "wire", "stop", "sample", "busy", "busy-wait", "resume", "end", "abort"].includes(String(kind))) throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
-    lines.push(parsed as PracticeLogLine);
+    if (!kinds.includes(String(kind))) throw new Error(invalidCode);
+    lines.push(parsed as T);
   }
+  return lines;
+}
+
+/** Appends one line at a time and pushes each to the disk before returning. One writer per log. */
+export class PracticeSampleLog {
+  readonly path: string;
+  readonly #writer: PracticeJsonlWriter;
+
+  private constructor(writer: PracticeJsonlWriter) {
+    this.path = writer.path;
+    this.#writer = writer;
+  }
+
+  /** Opens a NEW log in the folder (made private if missing); a folder that already holds one is refused. */
+  static create(directory: string): PracticeSampleLog {
+    return new PracticeSampleLog(PracticeJsonlWriter.create(directory, PRACTICE_SAMPLES_FILE, "PRACTICE_OUT_ALREADY_HOLDS_SAMPLES"));
+  }
+
+  get open(): boolean { return this.#writer.open; }
+
+  append(line: PracticeLogLine): void { this.#writer.append(line); }
+
+  close(): void { this.#writer.close(); }
+}
+
+/**
+ * The log's lines. A last line cut short (the process killed while writing it) is left out; any other line that cannot
+ * be read refuses the whole log.
+ */
+export function parsePracticeSampleLog(text: string): readonly PracticeLogLine[] {
+  const lines = parseJsonlLines<PracticeLogLine>(text, PRACTICE_SAMPLES_KINDS, "PRACTICE_SAMPLES_LOG_INVALID");
   const start = lines.find((line) => line.kind === "start");
   if (start === undefined || start.schema !== PRACTICE_SAMPLES_SCHEMA) throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
   return Object.freeze(lines);
@@ -141,6 +190,32 @@ export function readPracticeSampleLog(directory: string): readonly PracticeLogLi
 }
 
 /**
+ * What a log's end and abort lines say, read the same way by every log's report: the gates' watch replayed from the wire
+ * and stop lines, the models marked busy, the abort code (the one the caller names, else the log's own abort line, else
+ * PRACTICE_LOG_HAS_NO_END when there is no end line), when the run finished, whether the operator interrupted it, and
+ * the gates' counts after it (null without an end line).
+ */
+export function practiceLogEnding(lines: readonly PracticeLogCommonLine[], unsentStreakAtStart: Readonly<Record<PracticeGateName, number>>,
+  abort: Readonly<{ code: string; at: Date }> | null): Readonly<{
+    observer: PracticeGateObserver; busy: readonly string[]; abortCode: string | null; finishedAt: Date; interrupted: boolean;
+    after: Readonly<Record<PracticeGateName, PracticeRemainingLine | null>> | null;
+  }> {
+  const end = lines.find((line) => line.kind === "end");
+  const abortLine = lines.find((line) => line.kind === "abort");
+  const played = lines.flatMap((line): ({ event: PracticeWireEvent } | { stop: PracticeGateStop })[] =>
+    line.kind === "wire" ? [{ event: line.event }] : line.kind === "stop" ? [{ stop: line.stop }] : []);
+  return Object.freeze({
+    observer: PracticeGateObserver.replay(played, { unsentStreakAtStart }),
+    busy: Object.freeze([...new Set(lines.flatMap((line) => line.kind === "busy" ? [line.model] : []))]),
+    abortCode: abort?.code ?? (abortLine?.kind === "abort" ? abortLine.code : end === undefined ? PRACTICE_LOG_HAS_NO_END : null),
+    finishedAt: end?.kind === "end" ? new Date(end.finishedAt)
+      : abort !== null ? abort.at : abortLine?.kind === "abort" ? new Date(abortLine.at) : new Date(),
+    interrupted: end?.kind === "end" ? end.interrupted : false,
+    after: end?.kind === "end" ? end.remainingAfter : null
+  });
+}
+
+/**
  * The report, built from the log's lines alone. A log with an end line gives the run's own verdict; one with an abort
  * line, or with neither (killed outright), gives ABORTED (exit 50) with every other rule that applied listed after it.
  * `abort` names the abort when the caller is writing it now (its line may not be on the disk).
@@ -148,21 +223,13 @@ export function readPracticeSampleLog(directory: string): readonly PracticeLogLi
 export function practiceReportFromLog(lines: readonly PracticeLogLine[], abort: Readonly<{ code: string; at: Date }> | null = null): PracticeReport {
   const start = lines.find((line) => line.kind === "start");
   if (start === undefined || start.kind !== "start") throw new Error("PRACTICE_SAMPLES_LOG_INVALID");
-  const end = lines.find((line) => line.kind === "end");
-  const abortLine = lines.find((line) => line.kind === "abort");
-  const played = lines.flatMap((line): ({ event: PracticeWireEvent } | { stop: PracticeGateStop })[] =>
-    line.kind === "wire" ? [{ event: line.event }] : line.kind === "stop" ? [{ stop: line.stop }] : []);
-  const observer = PracticeGateObserver.replay(played, { unsentStreakAtStart: start.unsentStreakAtStart });
+  const ending = practiceLogEnding(lines.filter(isPracticeLogCommonLine), start.unsentStreakAtStart, abort);
   const samples = lines.flatMap((line) => line.kind === "sample" ? [line.sample] : []);
-  const busy = [...new Set(lines.flatMap((line) => line.kind === "busy" ? [line.model] : []))];
   const result: PracticeFormatsResult = Object.freeze({ samples: Object.freeze(samples), models: start.models, lanes: start.lanes,
-    busyModels: Object.freeze(busy) });
-  const abortCode = abort?.code ?? (abortLine?.kind === "abort" ? abortLine.code : end === undefined ? PRACTICE_LOG_HAS_NO_END : null);
-  const finishedAt = end?.kind === "end" ? new Date(end.finishedAt)
-    : abort !== null ? abort.at : abortLine?.kind === "abort" ? new Date(abortLine.at) : new Date();
-  const after = end?.kind === "end" ? end.remainingAfter : null;
-  const report = formatsReport({ result, observer, startedAt: new Date(start.startedAt), finishedAt,
-    interrupted: end?.kind === "end" ? end.interrupted : false, aborted: abortCode,
+    busyModels: ending.busy });
+  const after = ending.after;
+  const report = formatsReport({ result, observer: ending.observer, startedAt: new Date(start.startedAt), finishedAt: ending.finishedAt,
+    interrupted: ending.interrupted, aborted: ending.abortCode,
     remaining: {
       deepinfra: { before: remainingValue(start.remainingBefore.deepinfra), after: remainingValue(after?.deepinfra) },
       anthropic: { before: remainingValue(start.remainingBefore.anthropic), after: remainingValue(after?.anthropic) }

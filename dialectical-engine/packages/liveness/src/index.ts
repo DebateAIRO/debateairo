@@ -367,7 +367,8 @@ export class LivenessRepository {
            SELECT node.run_id, 'NODE'::text AS subject_kind, node.node_id::text AS subject_ref, node.relevant_as_of
            FROM core.node AS node
            JOIN core.run AS owner ON owner.run_id=node.run_id
-           WHERE owner.register_version=$4
+           -- A node a later copy set aside (migration 0119, 'stale') is no part of the answer: no review clock.
+           WHERE owner.register_version=$4 AND node.generation_status <> 'stale'
            UNION ALL
            SELECT answer.run_id, 'ANSWER'::text, answer.answer_id::text, answer.relevant_as_of
            FROM serve.answer AS answer

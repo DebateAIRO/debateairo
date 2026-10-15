@@ -770,6 +770,7 @@ export class PostgresEvaluatorAddonRepository implements EvaluatorAddonRepositor
       FROM core.run AS run
       JOIN ledger.reduced_judgement AS judgement ON judgement.run_id=run.run_id
       JOIN core.node AS node ON node.node_id=judgement.node_id AND node.run_id=run.run_id
+       AND node.generation_status <> 'stale'
       JOIN ledger.raw_artifact AS artifact
         ON artifact.raw_artifact_id=judgement.raw_artifact_ref AND artifact.run_id=run.run_id
       LEFT JOIN evaluator.question_domain AS domain ON domain.run_id=run.run_id
@@ -2159,21 +2160,27 @@ export class EvaluatorHarvestRepository {
           ORDER BY entry.raw_artifact_ref,entry.attempt_id,entry.call_site_key,
             authenticated_evaluator_scope
         `, [runId,artifactRefs]);
+    // Reclaim resume (migration 0119): a copy that took the run over set the dead copy's nodes aside ('stale') and
+    // wrote its own from the same recorded answers, so a stale node, its review, its judgement and its strength are
+    // a duplicate of the live copy's and are not read. The raw artifacts above stay: UNION already folds a stale node
+    // and its live copy (same provenance) into one artifact, and each artifact is a call that was made.
     const nodes = await client.query<{
       node_id: string; raw_artifact_ref: string; generation_status: string;
       path_status: string; claim_type: string;
     }>(`
       SELECT node_id, provenance_ref AS raw_artifact_ref, generation_status, path_status, claim_type
-      FROM core.node WHERE run_id=$1 AND provenance_ref IS NOT NULL ORDER BY node_id
+      FROM core.node WHERE run_id=$1 AND provenance_ref IS NOT NULL AND generation_status <> 'stale' ORDER BY node_id
     `, [runId]);
     const reviews = await client.query<{
       node_review_id: string; author_raw_artifact_ref: string; review_raw_artifact_ref: string;
       outcome: string; reasons: unknown;
       content_ciphertext: CryptoEnvelope | null;
     }>(`
-      SELECT node_review_id,author_raw_artifact_ref,review_raw_artifact_ref,outcome,reasons,
-             content_ciphertext
-      FROM ledger.node_review WHERE run_id=$1 ORDER BY node_review_id
+      SELECT review.node_review_id,review.author_raw_artifact_ref,review.review_raw_artifact_ref,review.outcome,
+             review.reasons,review.content_ciphertext
+      FROM ledger.node_review AS review
+      JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+      WHERE review.run_id=$1 ORDER BY review.node_review_id
     `, [runId]);
     const decryptedReviews = reviews.rows.map((row) => {
       const content = decryptLeasedContentForRun<{ reasons: unknown }>(
@@ -2186,8 +2193,11 @@ export class EvaluatorHarvestRepository {
       reduced_judgement_id: string; raw_artifact_ref: string; tau: number;
       number_kind: string; producer: string;
     }>(`
-      SELECT reduced_judgement_id, raw_artifact_ref, tau, number_kind, producer
-      FROM ledger.reduced_judgement WHERE run_id=$1 ORDER BY reduced_judgement_id
+      SELECT judgement.reduced_judgement_id, judgement.raw_artifact_ref, judgement.tau, judgement.number_kind,
+             judgement.producer
+      FROM ledger.reduced_judgement AS judgement
+      JOIN core.node AS node ON node.node_id=judgement.node_id AND node.generation_status <> 'stale'
+      WHERE judgement.run_id=$1 ORDER BY judgement.reduced_judgement_id
     `, [runId]);
     const strengths = await client.query<{
       propagation_run_id: string; node_id: string; strength: number;
@@ -2197,6 +2207,7 @@ export class EvaluatorHarvestRepository {
              strength.number_kind, strength.producer
       FROM ledger.node_strength_record AS strength
       JOIN ledger.propagation_run AS propagation USING (propagation_run_id)
+      JOIN core.node AS node ON node.node_id=strength.node_id AND node.generation_status <> 'stale'
       WHERE propagation.run_id=$1 ORDER BY strength.propagation_run_id, strength.node_id
     `, [runId]);
     const settlements = await client.query<{

@@ -21,6 +21,8 @@ const paths = [
     "final_strength.kind", "final_strength.source", "final_strength.producer", "final_strength.replay_handle",
     "locator", "abstention.question_class", "abstention.register_row_key", "abstention.unlock_condition"]
     .map(p => [`answer.nodes[].${p}`, "ARGUMENTS"]),
+  // Debate shape P2c: the map view's public text, judged with the arguments.
+  ["map_view.positions[].answer", "ARGUMENTS"], ["map_view.also_raised[]", "ARGUMENTS"],
   ["answer.nodes[].review.reasons[]", "REVIEWS"],
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(p => [`story_short.${p}`, "STORY"])
@@ -54,7 +56,8 @@ function snapshot(markers = false): PublicDebate {
     for (const t of tuples(path, 2)) setIndexed(root, path, t, markerOf(path, t));
   }
   for (const path of ["public_ref", "author_pseudonym", "answer.nodes[].node_id", "answer.nodes[].provenance_ref",
-    "answer.edges[].strength.number.source", "answer.nodes[].maker_lineage.model_id", "story_short.paths[].position_ref"])
+    "answer.edges[].strength.number.source", "answer.nodes[].maker_lineage.model_id", "story_short.paths[].position_ref",
+    "map_view.positions[].node_id"])
     setPath(root, path, `EXCLUDED-${path}`);
   return root as PublicDebate;
 }
@@ -99,12 +102,14 @@ describe("R2", () => {
   // Property: every schema string is explicitly checked or explicitly excluded, exclusively.
   // INTEG-HS-dev: origin/dev's public-lineage trim (C17/B11, PublicMakerLineageSchema = { maker, model_id }) drops
   // transport + provider_ref from the two public lineages — 4 string leaves, both subtrees R2-excluded: 62 → 58, 36 → 32.
-  it("covers the schema with 26 checked paths and 32 excluded strings", async () => {
+  // Debate shape P2c: map_view adds 3 string leaves — positions[].answer and also_raised[] checked,
+  // positions[].node_id excluded: 58 → 61, 32 → 33, 26 → 28 checked paths.
+  it("covers the schema with 28 checked paths and 33 excluded strings", async () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     expect(m.CHECKED_TEXT_PATHS).toEqual(paths.map(([path, kind]) => ({ path, kind })));
     const leaves = walk(PublicDebateSchema).filter(l => l.type === "string");
-    expect(leaves).toHaveLength(58);
-    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(32);
+    expect(leaves).toHaveLength(61);
+    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(33);
     for (const leaf of walk(PublicDebateSchema)) {
       const checked = m.CHECKED_TEXT_PATHS.some(p => p.path === leaf.path);
       expect(Number(checked) + Number(m.isExcludedTextPath(leaf.path, leaf.type)), leaf.path).toBe(1);
@@ -117,8 +122,8 @@ describe("R2", () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     const leaves = m.extractCheckedText(snapshot(true));
     const expected = paths.flatMap(([path, kind]) => tuples(path, 2).map(t => ({ kind, text: markerOf(path, t) })));
-    // 26 paths: 8 without an array, 17 with one array (2 members each), 1 with two nested arrays (4 members).
-    expect(expected).toHaveLength(8 + 17 * 2 + 1 * 4);
+    // 28 paths: 8 without an array, 19 with one array (2 members each), 1 with two nested arrays (4 members).
+    expect(expected).toHaveLength(8 + 19 * 2 + 1 * 4);
     expect(leaves).toEqual(expected);
     const calls = m.packJudgeCalls(leaves);
     // FIX-HS2-t: one part kind per call — five kinds, five calls, one field each.

@@ -1,5 +1,7 @@
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
-import { readModelScorecard, readEngineVersion } from "@debateai/register";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket } from "@debateai/providers";
+import { readModelScorecard, readEngineVersion, questionLanguagePolicyStartValues, readQuestionLanguagePolicy } from "@debateai/register";
+import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
+import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -90,6 +92,8 @@ import {
   readProductRolePolicy,
   readPublicationCheckPolicy,
   readAnswerRoleRotationPolicy,
+  readDebateShapePolicy,
+  debateShapeInForce,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -106,7 +110,9 @@ import {
   RecentRunsCostEstimator,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
-  mostOneRunMaySpendMicros
+  languageCheckSpendWriterPresent,
+  mostOneRunMaySpendMicros,
+  recordLanguageCheckSpend
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
@@ -156,6 +162,8 @@ import { createPublicationContentCheck } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
+import { MapChoiceRepository } from "@debateai/map";
+import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -185,7 +193,7 @@ import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
 import {
-  createSupportModelAdapter,parseSupportModelTargetJson,type SupportModelPort
+  createSupportModelAdapter,parseSupportModelTargetJson,supportAnthropicMessagesKey,type SupportModelPort
 } from "./support/model.js";
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
@@ -624,6 +632,78 @@ const askRoom = askRoomComposition?.room;
  */
 const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;
 const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
+// Debate shape (spec 2026-10-12 §3.1): the optional row; absent = today's shape byte for byte, a malformed row refuses the boot.
+const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
+// The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
+const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+// V-30(1): the support chat's model is configuration, on the SAME mode decision
+// the debate targets take above. Hosted refuses a relay target here exactly as
+// it refuses one there; local keeps today's relay path. Parsed HERE, above the
+// question-language step, whose hosted fast check borrows this target's key
+// (P2L Task 19, pre-flight PF-L36); the support chat below receives this same target.
+const supportModelTarget = boot.runSync("support-model-target", () =>
+  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
+    ? undefined
+    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
+      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
+    })));
+// Task 19 fix round 2 (Minor 6): the support target's key file is read ONCE at boot, through the same custody loader,
+// by whichever reader comes first (the hosted question-language route, else the support adapter); the other gets the
+// same value. Both readers are at boot, so the adapter sees exactly what it read before. Cleared once the support
+// adapter is built, so this process keeps no copy beyond the adapter's own.
+const supportCredentialReads = new Map<string,string>();
+const readSupportCredentialOnce = (path: string): string => {
+  const known = supportCredentialReads.get(path);
+  if (known !== undefined) return known;
+  const value = readCustodyAuthorizationHeader(path);
+  supportCredentialReads.set(path, value);
+  return value;
+};
+// Question language (spec 2026-10-13): only with the debate shape row in force (row absent, or `enabled: false`: no
+// row read, no eld load, today's boot). The row is optional (absent = start values); a malformed row, an owner text
+// carrying a frame token, or an unreviewed preview model refuses the boot. The fast check is a site cost: nothing
+// charges the person for it.
+const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run("question-language", async () => {
+  const policy = await readQuestionLanguagePolicy(pool, environment.REGISTER_VERSION);
+  // Task 19: with no preview configured the hosted side decides, awaited before the composition. It probes for 0118's
+  // one writer (absent = the fast check stays off, HOSTED_BEFORE_SPEND_RECORD: never spend unrecorded) and reads the
+  // support target's Anthropic key once, through the same custody loader the support chat uses. Each check is then one
+  // run-less site cost in the day's pot, never the person's; a failed record is one code-only line.
+  const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({
+    mode: environment.DEPLOYMENT_MODE,
+    fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
+    spend: {
+      writerPresent: () => languageCheckSpendWriterPresent(pool),
+      record: (entry) => recordLanguageCheckSpend(pool, entry)
+    },
+    // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
+    dayPot: costEnvelopeRows === undefined ? null : {
+      ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+      spentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
+    },
+    clock: () => new Date(),
+    report: (line) => console.error(JSON.stringify(line))
+  });
+  return composeQuestionLanguage({
+    policy,
+    // Ruling L-ROUTE: a configured preview is PREVIEW (the guarded fetch with the Anthropic gate socket) or NONE, never
+    // HOSTED (no onUsage there: the gate settles preview money); without a preview the hosted route above stands.
+    route: questionLanguageRouteFor({
+      previewConfigured: previewConfig !== undefined,
+      previewFetch,
+      anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, "anthropic"),
+      hosted: () => {
+        if (hostedRoute === undefined) throw new TypeError("QUESTION_LANGUAGE_HOSTED_ROUTE_ON_PREVIEW");
+        return hostedRoute;
+      }
+    }),
+    clock: () => new Date(),
+    maxQuestionBytes: askQuestionMaxBytes(),
+    // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
+    referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
+  });
+});
 const modelPicker = await composeAskModelPicker({
   boot,
   pool,
@@ -634,6 +714,8 @@ const modelPicker = await composeAskModelPicker({
   callTokenCeilings,
   moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
   billingEnabled,
+  // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).
+  debateShapePolicy: debateShapeInForcePolicy,
   log: (line) => console.error(line)
 });
 /**
@@ -653,7 +735,10 @@ await boot.run("run-ceiling-covers-one-call", async () => {
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
     judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
-    questionMaxBytes: askQuestionMaxBytes()
+    questionMaxBytes: askQuestionMaxBytes(),
+    // Pre-flight PF-L38: with the debate-shape row in force a run may be shaped, and its first call carries the locked
+    // language (the named sentence and the question_language field): priced at the longest lock too. Row absent: today's.
+    questionLanguageLocked: debateShapeInForcePolicy !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
@@ -978,6 +1063,10 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   modelPicker,
   // Role rotation (spec 2026-10-11 Part 4): admission reads the counts only with the row ON.
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+  // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
+  ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Question language (spec 2026-10-13): the decider, composed above only with the shape row in force.
+  ...(questionLanguage === undefined ? {} : { questionLanguage }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -991,7 +1080,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
     maxDepth: envelopeFormulaInputs.maxDepth,
     // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
-    backupSequencesProvisioned: input.backupSequencesProvisioned
+    backupSequencesProvisioned: input.backupSequencesProvisioned,
+    // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
+    ...(input.shape === null ? {} : { shape: input.shape })
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -1016,6 +1107,13 @@ const publicationCipher = environment.PUBLICATION_ENABLED === "true"
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
     )))
   : undefined;
+// Debate shape P2c (spec 2026-10-12 §3.3 step 8): the debate page's map view, for the
+// owner's route and for the snapshot a publication takes, on the same runtime pool. P2b's
+// reader checks no owner, so the view asks core.run_is_owned_by first (pre-flight PF-C16).
+const mapViews = new RepositoryAnswerMapViewApplication(
+  new MapChoiceRepository(pool),
+  runOwnerCheckFrom((text, values) => pool.query<{ owned?: boolean; run_id?: string }>(text, values))
+);
 const publications = publicationCipher === undefined
   ? undefined
   : new PostgresPublicationApplication(
@@ -1023,7 +1121,8 @@ const publications = publicationCipher === undefined
       publicationCipher,
       undefined,
       new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
-      new RepositoryPublicationStoryReader(storyRepository)
+      new RepositoryPublicationStoryReader(storyRepository),
+      mapViews
     );
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
@@ -1172,25 +1271,20 @@ const supportRelayQueue = new SupportRelayQueue({
   reportCleanupFailure: reportSupportDiagnostic
 });
 const supportDegraded = new SupportDegradedState();
-// V-30(1): the support chat's model is configuration, on the SAME mode decision
-// the debate targets take above. Hosted refuses a relay target here exactly as
-// it refuses one there; local keeps today's relay path.
-const supportModelTarget = boot.runSync("support-model-target", () =>
-  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
-    ? undefined
-    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
-      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
-    })));
+// V-30(1): the support chat's model target is parsed above, before the question-language step (P2L Task 19,
+// pre-flight PF-L36); the support chat receives that same target here.
 const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
   supportModelTarget.providerRef,
   // V-9(2): a declared credential FILE is resolved here, through the same
   // custody-checked loader the debate targets use — one seam, one contract.
   createSupportModelAdapter(supportModelTarget,{
-    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    readAuthorizationHeader: readSupportCredentialOnce,
     timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
     reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
+// Fix round 2 (Minor 6): the adapter holds its key now; the boot's one-read memo keeps no copy past this line.
+supportCredentialReads.clear();
 // hate-speech S02 (D-S02-12, D-S02-21): the publish check's judge is the support
 // chat's configured target, called through its own per-call adapter; absent,
 // every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. SIGUSR2 toggles the
@@ -1482,6 +1576,7 @@ const api = buildApi({
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
+  mapViews,
   ...(dataExport === undefined ? {} : { dataExport }),
   // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
   // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
@@ -1518,6 +1613,8 @@ const api = buildApi({
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
+  // Debate shape: the room read normalises its query under the same row as submit.
+  ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

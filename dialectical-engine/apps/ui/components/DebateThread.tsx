@@ -5,6 +5,7 @@ import type { ContractNode } from "@/lib/v3/adapter";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
+import { PositionTitle } from "@/components/PositionTitle";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
@@ -225,6 +226,7 @@ function ThreadRowCard({
             <span style={{ flex: 1 }} />
             <ReferenceAuthorPill node={node} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
           </div>
+          <PositionTitle nodeId={node.id} />
           <ReferenceReviewLine review={v3Node?.review} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
 
           {empty ? (

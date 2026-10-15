@@ -22,6 +22,14 @@
 // recomposed snapshot. On top, v3 asks of the composed rows the questions a hosted API asks at boot that need no
 // database (cost envelope and band, the room read's and the support budgets, the country gate's scope, billing
 // readiness and its four admission scopes, the story family and one day holding one run plus its story).
+// Debate shape (ruling L-KIT): the operator's optional debateShapePolicy row passes through to v2's builder (v2's
+// optional key, so v3's closure admits it); the sealed mapContractHash (a required v2 key) is parsed; a carried
+// debateShapePolicy row is parsed like v2 does; and when the composed rows hold the shape, the hosted runner's own
+// boot refusals (MAP_CONTRACT_HASH_MISMATCH, DEBATE_SHAPE_MAP_HASH_UNSEALED) are asked before anything is sealed.
+// Question language (ruling L-KIT, P2L Task 12): the operator's optional questionLanguagePolicy row passes through to
+// v2's builder the same way (v2's seventh argument); a carried questionLanguagePolicy row is parsed; and when the
+// composed rows hold the debate shape in force, the hosted API's own question-language boot refusals (an owner text
+// carrying a frame token, a fast-check model the preview's Anthropic gate does not review) are asked before sealing.
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
@@ -32,9 +40,14 @@ import {
   billingPolicyFromValue, billingPlansFromValue, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue, COUNTRY_POLICY_ROW_KEY, readStoryPolicy,
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
-  type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
+  DEBATE_SHAPE_POLICY_ROW_KEY, parseDebateShapePolicy, MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, debateShapeInForce,
+  QUESTION_LANGUAGE_POLICY_ROW_KEY, parseQuestionLanguagePolicy,
+  type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type QuestionLanguagePolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { costEnvelopeGuardPolicy } from '@debateai/budget';
+import { mapPromptContractHash } from '@debateai/map';
+import { resolveDebateShapeRunnerSettings } from '../../../apps/runner/src/debate-shape-boot.js';
+import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
 import { buildDevelopmentStoryRegisterRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet } from '../../../packages/providers/src/preview-models.js';
@@ -108,11 +121,13 @@ const withSuffix = (sourceRef:string,suffix:string) => {
 
 /**
  * v2's source build with the hosted story row and the owner's three rows. `hosted` is checked first (the owner's
- * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy).
+ * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy, debate shape,
+ * question language). `debateShape` is v2's sixth argument, passed through (default null: no row; 'off': the start
+ * values disabled); `questionLanguage` is v2's seventh (default null: no row, the code's start values).
  */
-export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
   const choice=previewHostedBillingChoice(hosted);
-  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency);
+  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage);
   const byKey=new Map(local.map(row=>[row.rowKey,row]));
   // The hosted builder's story rows: every one but the money row must be v2's, so the hosted build differs by that row alone.
   const story=buildDevelopmentStoryRegisterRows({synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:previewCheckerRoleRef(checker)},'hosted')
@@ -217,7 +232,9 @@ function assertBillingRows(source:ReadonlyMap<string,RegisterPublicationRow>, ba
 
 /**
  * The questions a hosted API asks of the version in force at boot that need no database, in main.ts's order
- * (verifyHostedRegisterBootReadiness asks them of a sealed version; here they are asked before anything is sealed).
+ * (verifyHostedRegisterBootReadiness asks them of a sealed version; here they are asked before anything is sealed),
+ * then, with a debate shape row, the hosted RUNNER's own boot refusals (apps/runner/src/debate-shape-boot.ts), and,
+ * with the shape in force, the API's question-language boot refusals (apps/api/src/question-language/boot.ts).
  */
 export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow[]):void {
   const map=new Map(rows.map(row=>[row.rowKey,row]));
@@ -241,6 +258,25 @@ export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow
   if(admission.billingNotify===null)fail('BILLING_ADMISSION_UNSEALED');
   if(policy.enabled&&country===null)fail('BILLING_CONFIGURATION_INCOMPLETE');
   if(policy.enabled&&(admission.billingQuote===null||admission.billingCheckout===null||admission.billingCancelLink===null))fail('BILLING_ADMISSION_UNSEALED');
+  // The hosted runner's own boot read (apps/runner/src/debate-shape-boot.ts): with a debateShapePolicy row (enabled or
+  // not), the sealed mapContractHash must be present and the code's, or it throws the runner's typed refusal. No shape
+  // row = today's boot: the map hash row is never read.
+  const shape=map.get(DEBATE_SHAPE_POLICY_ROW_KEY);
+  if(shape!==undefined){
+    const hash=map.get(MAP_CONTRACT_HASH_ROW_KEY);
+    resolveDebateShapeRunnerSettings({policy:parseDebateShapePolicy(JSON.parse(shape.valueJsonText)),
+      mapContractHash:hash===undefined?null:parseMapContractHash(JSON.parse(hash.valueJsonText)),codeMapContractHash:mapPromptContractHash()});
+  }
+  // The API's question-language boot step (main.ts "question-language"): only with the shape row in force. The preview
+  // route is the strictest one the API can take (L-ROUTE: never hosted): the fast-check model must be a reviewed row of
+  // the preview's Anthropic gate, and the owner text must frame. No shape in force = the row is never read at boot.
+  const language=map.get(QUESTION_LANGUAGE_POLICY_ROW_KEY);
+  if(language!==undefined){
+    const policy=parseQuestionLanguagePolicy(JSON.parse(language.valueJsonText));
+    if(shape!==undefined&&debateShapeInForce(parseDebateShapePolicy(JSON.parse(shape.valueJsonText)))!==null){
+      assertQuestionLanguagePolicyBootable(policy,{kind:'PREVIEW',fetch:(async()=>fail('question-language-boot-check-never-calls')) as typeof fetch});
+    }
+  }
 }
 
 export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
@@ -256,7 +292,13 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
   if(!sourceKeysReviewedV3(source.map(row=>row.rowKey)))fail('source-key-list');
   const optional=PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 as readonly string[];
   const carried=base.filter(row=>optional.includes(row.rowKey)&&!sourceMap.has(row.rowKey));
-  for(const row of carried)if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+  for(const row of carried){
+    if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
+    if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
+  }
+  // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
+  parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
   assertProviderRows(baseMap,'base');

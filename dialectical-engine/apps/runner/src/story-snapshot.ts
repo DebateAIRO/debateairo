@@ -1,6 +1,8 @@
-import type { CompositionBudgetTier, WayOfKnowing } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
+import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import {
   withoutStoryNodeIds,
+  type StoryAnswersNoteKind,
   type StoryCostFallback,
   type StoryRoleMaker,
   type StoryRoleResolver,
@@ -41,6 +43,12 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
   "Adaptive stopping froze this branch: its leverage on the positions was below the sealed branch-freeze "
     + "threshold, so nothing was expanded beneath it"
 ]]);
+/**
+ * Debate shape (Task 14; Task 12 note): the eight shape marks say how the debate was run (the map's fallbacks and fills,
+ * a close call that gained graders, a point that got scrutiny), and their records carry codes only. The story is never
+ * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
+ */
+const STORY_OMITTED_MARKS: ReadonlySet<string> = new Set(DEBATE_SHAPE_MARKS);
 /** Free text with every node-id-shaped run replaced: the safety net under every field below. */
 const withoutNodeIds = withoutStoryNodeIds;
 
@@ -56,6 +64,11 @@ export interface StorySnapshotSource {
   readonly questionLine: string;
   /** The question's language the run recorded (its frozen head's tag and English name), or null. */
   readonly argumentLanguage: { readonly tag: string; readonly name: string } | null;
+  /**
+   * Question-language spec 2026-10-13: true only when the run's shape receipt says the language was locked, so the
+   * story writes in that lock; the caller decides by the receipt, never by the stored tag. Absent: today's story.
+   */
+  readonly languageLocked?: boolean;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
@@ -125,6 +138,17 @@ export interface StorySnapshotSource {
    * register's refs.
    */
   readonly roleMakers?: StoryRunRoleMakers | undefined;
+  /**
+   * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's points that were raised but
+   * not debated (`storyAlsoRaisedFrom`). Undefined when the run had no map choice, so the
+   * story's material stays exactly today's.
+   */
+  readonly alsoRaised?: readonly { readonly claim: string; readonly raisedBy: number }[] | undefined;
+  /**
+   * Debate shape P2c, owner ruling C-STORY: why not every answer argued was picked the usual way
+   * (`storyAnswersNoteFrom`). Undefined on today's run and on a map that chose everything itself.
+   */
+  readonly answersNote?: StoryAnswersNoteKind | undefined;
 }
 
 /**
@@ -201,10 +225,51 @@ function inArrowOrder<T extends { readonly arrowId: string }>(arrows: readonly T
     .map(({ arrow }) => arrow);
 }
 
+/** The members of P2b's `MapResult` (@debateai/map) this module reads. */
+export type StoryMapSource = Pick<MapResult, "keyPoints" | "mergedAnswers" | "choice">;
+
+/**
+ * Debate shape P2c: the map choice's "also raised, not debated" points, most-raised first, each with how many
+ * different makers raised it. A claim is cleared of node ids like every free text here. No map, or a map that chose
+ * nothing: undefined. Whole-branch review m-3/m-4 (ruling W-CUT): the list is @debateai/map's `mapAlsoRaisedOf`, the
+ * one the debate page's stored list is built with: a chosen answer past the `arguedAnswers` the run argued is listed
+ * too, with the points only it took, and claims that say the same are one entry.
+ */
+export function storyAlsoRaisedFrom(
+  map: StoryMapSource | null,
+  arguedAnswers: number
+): readonly { readonly claim: string; readonly raisedBy: number }[] | undefined {
+  if (map === null || map.choice === null) return undefined;
+  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers })
+    .map((entry) => Object.freeze({ claim: withoutNodeIds(entry.claim), raisedBy: Math.max(1, new Set(entry.makers).size) })));
+}
+
+/** The members of P2b's `MapResult` the answers note reads; structural, like `StoryMapSource`. */
+export type StoryMapOutcome = Readonly<{
+  kind: "MAP" | "UNAVAILABLE";
+  marks: readonly Readonly<{ mark: string }>[];
+}>;
+
+/**
+ * Debate shape P2c, owner ruling C-STORY: the plain sentence, if any, the story owes the person about how the answers
+ * argued came about. Read from the map's whole result and its marks (the runner's `shapeMapResult`, never
+ * `debateShapeMap`, which is null exactly when the map fell back). The map unavailable, or today's opening argued
+ * because the map gave fewer than two positions (`arguedTodaysOpening`; no mark records that case), is MAP_UNAVAILABLE;
+ * an answer or a point the code filled in is ANSWERS_FILLED. The map's other fallbacks change how the map was made, not
+ * which answers were argued: no note. No map (today's run): undefined, so the story's material stays today's.
+ */
+export function storyAnswersNoteFrom(map: StoryMapOutcome | null, arguedTodaysOpening: boolean): StoryAnswersNoteKind | undefined {
+  if (map === null) return undefined;
+  const marked = (mark: DebateShapeMark): boolean => map.marks.some((record) => record.mark === mark);
+  if (arguedTodaysOpening || map.kind === "UNAVAILABLE" || marked("MAP_UNAVAILABLE_TODAYS_OPENING")) return "MAP_UNAVAILABLE";
+  if (marked("ANSWERS_FILLED") || marked("CHOOSE_QUOTA_FILLED")) return "ANSWERS_FILLED";
+  return undefined;
+}
+
 export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteInput {
   const baseById = new Map(source.baseStrengths.map((row) => [row.nodeId, row.baseStrength] as const));
   const finalById = new Map(source.finalStrengths.map((row) => [row.nodeId, row.strength] as const));
-  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node");
+  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark));
   const excludedReasonOf = (nodeId: string): string | null => {
     const record = nodeScoped.find((candidate) =>
       (EXCLUDING_MARKS.has(candidate.mark) || SET_ASIDE_MARKS.has(candidate.mark))
@@ -238,7 +303,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
         disagreement: source.thresholds.disagreementThreshold
       },
       confidence_band: source.confidenceBand,
-      marks: source.answerMarks.map(withoutNodeIds)
+      marks: source.answerMarks.filter((mark) => !STORY_OMITTED_MARKS.has(mark)).map(withoutNodeIds)
     },
     servedStatement: Object.freeze(source.servedSegments.map((segment) => segment.text)),
     nodes: Object.freeze(source.authored.map((node) => Object.freeze({
@@ -269,6 +334,11 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     resolveProvider: source.resolveProvider,
     stepLease: source.stepLease,
     costFallback: source.costFallback,
-    ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers })
+    ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers }),
+    ...(source.alsoRaised === undefined
+      ? {}
+      : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),
+    ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
+    ...(source.languageLocked === true ? { languageLocked: true as const } : {})
   });
 }

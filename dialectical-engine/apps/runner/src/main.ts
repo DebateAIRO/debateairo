@@ -53,6 +53,7 @@ import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgr
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
+import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -126,6 +127,12 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
     return null;
   });
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
+/**
+ * Debate shape (spec 2026-10-12 §3.1, §4): the optional row (absent = today's shape, byte for byte; malformed = boot
+ * refused, DEBATE_SHAPE_POLICY_INVALID) and, only with it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED /
+ * MAP_CONTRACT_HASH_MISMATCH). A run's sizes are read from its own receipt, never from this row.
+ */
+const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.
@@ -317,7 +324,11 @@ if (costEnvelopePolicy !== null && envelopeBand !== null) {
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
     judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
-    questionMaxBytes: askQuestionMaxBytes()
+    questionMaxBytes: askQuestionMaxBytes(),
+    // Ruling L-B9R (P2L Task 17): with ANY debateShapePolicy row (read raw above, enabled false too: this runner still
+    // finishes the shaped runs admitted before the switch), a run's first call may carry the locked language, so it is
+    // priced at the longest lock too. No row: today's price.
+    questionLanguageLocked: debateShape !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
@@ -544,6 +555,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // Parallel AI calls (spec 2026-10-12 §3.2, §3.6): every debate's calls through its lane of the one scheduler above,
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
+  // Debate shape (spec 2026-10-12 §3): resolved at boot above; null without the row (today's runner).
+  debateShape,
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),

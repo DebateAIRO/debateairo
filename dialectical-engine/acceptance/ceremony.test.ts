@@ -23,7 +23,7 @@ import {
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
-import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { SYNTHESIZER_LENGTH_PROMPT_CONTRACT, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 
 let database: StandingDatabase;
@@ -941,6 +941,8 @@ describe("S-LANG — the ceremony's provider double classifies a packet the same
     ["REVIEW", reviewPromptContract(1)],
     ["JUDGE", judgePromptContract("primary-root", "unknown")],
     ["COMPOSE", SYNTHESIZER_PROMPT_CONTRACT],
+    // Debate shape (Task 14): a shaped run's writer is asked with the answer-length variant — still a writer call.
+    ["COMPOSE", SYNTHESIZER_LENGTH_PROMPT_CONTRACT],
     ["EVALUATOR", EVALUATOR_PROMPT_CONTRACT]
   ];
   const LANGUAGES = ["English", "Romanian", "română", "the same language as the question"] as const;

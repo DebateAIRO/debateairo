@@ -7,6 +7,7 @@ export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
+import { CatalogLocaleCodeSchema } from "./locale.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -16,6 +17,7 @@ import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
 export * from "./billing-address.js";
@@ -169,9 +171,58 @@ export const EXPANSION_DEPTH_VALUES: readonly number[] = Object.freeze(
   )
 );
 
-/** Closed at the contract door: exactly one key, an integer inside the range. */
-export const DepthParamsSchema = z.object({ depth: ExpansionDepthSchema }).strict();
+/** Debate shape (spec 2026-10-12 §3.2): how the deeper rounds are chosen. Missing reads as "adaptive". */
+export const DepthModeSchema = z.enum(["fixed", "adaptive"]);
+export type DepthMode = z.infer<typeof DepthModeSchema>;
+/** Debate shape (spec §3.2, ruling S7): the scrutiny budget asked for. Missing reads as "standard". */
+export const ScrutinySchema = z.enum(["standard", "deep", "exhaustive"]);
+export type Scrutiny = z.infer<typeof ScrutinySchema>;
+/** Debate shape (spec §3.2, ruling S8): the answer's target length. Missing reads as "standard". */
+export const AnswerLengthSchema = z.enum(["short", "standard", "detailed"]);
+export type AnswerLength = z.infer<typeof AnswerLengthSchema>;
+
+/** Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2). */
+export const DepthParamsSchema = z.object({
+  depth: ExpansionDepthSchema,
+  depthMode: DepthModeSchema.optional(),
+  scrutiny: ScrutinySchema.optional(),
+  answerLength: AnswerLengthSchema.optional()
+}).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;
+
+/** The three shape settings of an asked or stored depth_params. */
+export type DebateShapeSettings = Readonly<{ depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength }>;
+
+function shapeSettingOf<T extends string>(
+  depthParams: Readonly<Record<string, unknown>>, key: keyof DebateShapeSettings, schema: z.ZodType<T>, fallback: T
+): T {
+  // M5: an own key holding `undefined` (an internally built object; JSON cannot carry one) reads as missing too.
+  if (!Object.hasOwn(depthParams, key) || depthParams[key] === undefined) return fallback;
+  const parsed = schema.safeParse(depthParams[key]);
+  if (!parsed.success) throw new TypeError(`DEPTH_PARAMS_SHAPE_INVALID:${key}`);
+  return parsed.data;
+}
+
+/** A missing key reads as its default (every run stored before the shape); a present value outside its enum is refused. */
+export function debateShapeSettingsOf(depthParams: Readonly<Record<string, unknown>>): DebateShapeSettings {
+  return Object.freeze({
+    depthMode: shapeSettingOf(depthParams, "depthMode", DepthModeSchema, "adaptive"),
+    scrutiny: shapeSettingOf(depthParams, "scrutiny", ScrutinySchema, "standard"),
+    answerLength: shapeSettingOf(depthParams, "answerLength", AnswerLengthSchema, "standard")
+  });
+}
+
+/** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
+export const SiteLanguageSchema = CatalogLocaleCodeSchema;
+export const SITE_LANGUAGE_CODES = CatalogLocaleCodeSchema.options;
+export type SiteLanguage = z.infer<typeof SiteLanguageSchema>;
+/** The person's answer to a real-mix offer: a reference the server signed and a choice; never a language or text of its own. */
+export const QuestionLanguageChoiceSchema = z.object({
+  check_ref: z.string().min(3).max(4096).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u),
+  choice: z.enum(["USE_REWRITE", "KEEP_MINE"]),
+  original_question_line: z.string().trim().min(1).max(8192).optional()
+}).strict();
+export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
 
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
@@ -185,7 +236,10 @@ export const AskRequestSchema = z.object({
   steering_presets: z.array(z.string().trim().min(1)),
   plan_tier: PlanTierSchema,
   model_strength: ModelStrengthSchema.optional(),
-  steering_annotations: z.array(z.string().min(1))
+  steering_annotations: z.array(z.string().min(1)),
+  // Question language (spec 2026-10-13): read only when the debate shape row is present; ignored otherwise.
+  site_language: SiteLanguageSchema.optional(),
+  question_language_choice: QuestionLanguageChoiceSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -275,6 +329,38 @@ export const AskAlreadyWaitingSchema = z.object({
 }).strict();
 export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
+/**
+ * Question language (spec 2026-10-13, D1): the 409 body of a real-mix offer. The server signed `check_ref`; the
+ * page shows the languages and the proposed rewrite and answers with `question_language_choice` on the same ask.
+ * Pre-flight PF-L19 and ruling L-B64: two to six languages, each primary code once, each name at most 64 UTF-8
+ * bytes — the decider safeParses its offer with this schema and locks instead, so the 409 never becomes a 500.
+ */
+export const QUESTION_LANGUAGE_CHOICE_NEEDED = "QUESTION_LANGUAGE_CHOICE_NEEDED" as const;
+const LANGUAGE_NAME_BYTES = Object.freeze({ max: 64 });
+const NamedLanguageSchema = z.object({
+  code: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/u),
+  name: z.string().min(1).max(LANGUAGE_NAME_BYTES.max)
+    .refine((name) => new TextEncoder().encode(name).length <= LANGUAGE_NAME_BYTES.max, "a language name is at most 64 bytes")
+}).strict();
+export const QuestionLanguageOfferSchema = z.object({
+  check_ref: z.string().min(3).max(4096),
+  main_language: NamedLanguageSchema,
+  languages_seen: z.array(NamedLanguageSchema).min(2).max(6)
+    .refine((seen) => new Set(seen.map((language) => language.code.split("-")[0])).size === seen.length,
+      "each language is named once"),
+  proposed_question: z.string().min(1)
+}).strict();
+export type QuestionLanguageOffer = z.infer<typeof QuestionLanguageOfferSchema>;
+export const QuestionLanguageChoiceNeededSchema = z.object({
+  error: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
+  message: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
+  offer: QuestionLanguageOfferSchema
+}).strict();
+export type QuestionLanguageChoiceNeeded = z.infer<typeof QuestionLanguageChoiceNeededSchema>;
+export type AskSubmitOutcome =
+  | Readonly<{ kind: "ACCEPTED"; accepted: AskAccepted }>
+  | Readonly<{ kind: "LANGUAGE_CHOICE_NEEDED"; offer: QuestionLanguageOffer }>;
+
 /** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
 export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
 export const FundingBasisSchema = z.discriminatedUnion("kind", [
@@ -286,7 +372,11 @@ export const FundingBasisSchema = z.discriminatedUnion("kind", [
 export const AskRoomQuerySchema = z.object({
   plan_tier: PlanTierSchema,
   composition_budget_tier: CompositionBudgetTierSchema,
-  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema)
+  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema),
+  // Debate shape (spec 2026-10-12 §3.2): the /new page reads the room for the settings it will send.
+  depth_mode: DepthModeSchema.optional(),
+  scrutiny: ScrutinySchema.optional(),
+  answer_length: AnswerLengthSchema.optional()
 }).strict();
 
 /**
@@ -303,7 +393,11 @@ const CustomerAskRoomResponseSchema = z.object({
   // Final review Part 1b, Important 1: a question that would wait (or the one
   // waiting) waits only for the person's own running debates; `resets_at` is
   // then the waker's next tick, not a reset.
-  waits_for: WaitsForSchema.optional()
+  waits_for: WaitsForSchema.optional(),
+  // Debate shape P2c (Contract deviation 7): present, and only ever `true`, when the deployment's
+  // debateShapePolicy row is in force, so the /new page may offer depth mode, scrutiny and answer
+  // length. Absent otherwise: the API would drop them, so the page offers none of them.
+  shape_settings: z.literal(true).optional()
 }).strict().superRefine((answer, context) => {
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
@@ -323,7 +417,7 @@ const CustomerAskRoomResponseSchema = z.object({
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
   room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
-  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional()
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional()
 }).strict().superRefine((answer,context)=>{
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
@@ -1269,7 +1363,11 @@ export const PublicDebateSchema = z.object({
   // engine derived and the published position it rests on, whose own
   // statement the public page shows. No reason code, no model: optional, so
   // every snapshot published before it still parses.
-  floor: AnswerFloorSchema.optional()
+  floor: AnswerFloorSchema.optional(),
+  // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map view copied at publish time,
+  // so the public page can list what was raised but not debated and title each position.
+  // Optional: every snapshot published before it still parses.
+  map_view: DebateMapViewSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1538,6 +1636,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/ledger-digest",
     "GET /v1/answers/{id}/story",
     "GET /v1/answers/{id}/disclosure",
+    "GET /v1/answers/{id}/map",
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
@@ -1573,7 +1672,7 @@ export const contractInventory = Object.freeze({
     ...staffContractInventory.resources,
     ...fundedStaffContractInventory.resources,
     FundingBasisSchema,
-    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, QuestionLanguageChoiceNeededSchema, AskRoomQuerySchema, AskRoomResponseSchema,
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
@@ -1596,7 +1695,7 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
+    AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

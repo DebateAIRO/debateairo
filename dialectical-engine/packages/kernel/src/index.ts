@@ -2,6 +2,7 @@ import { analyzeSupportCredentialText } from "./support-credentials.js";
 
 export * from "./argument-language.js";
 export * from "./reply-language.js";
+export * from "./question-language.js";
 export * from "./date-of-birth.js";
 export type * from "./staff-access.js";
 export type * from "./provider-funding.js";
@@ -154,6 +155,16 @@ export const CONDITION_MARKS = [
   // of this vocabulary is read positionally by `CONDITION_MARKS.slice(-4)`.
   "PANEL-PARTIAL",
   "PANEL-DEGRADED-SINGLE-VOICE",
+  // Debate shape (spec 2026-10-12 §3.3): the map's fallbacks and fills (answer scope) and the two extensions (node
+  // scope: a close call that gained graders, a point that got scrutiny). Placed HERE, mid-list, never at the DR-176 tail.
+  "MAP_ANGLES_FALLBACK",
+  "MAP_MERGE_FALLBACK",
+  "MAP_CHOOSE_FALLBACK",
+  "MAP_UNAVAILABLE_TODAYS_OPENING",
+  "ANSWERS_FILLED",
+  "CHOOSE_QUOTA_FILLED",
+  "PANEL-CLOSE-CALL-EXTENDED",
+  "SCRUTINY-EXTENDED",
   "AMBIGUOUS_ATTRIBUTION",
   "STALE",
   "UNDER-REVIEW",
@@ -227,6 +238,11 @@ export const CONDITION_MARKS = [
   "UNAUTHORED-BRANCH-HALTED"
 ] as const;
 export type ConditionMark = typeof CONDITION_MARKS[number];
+
+/** The debate shape's marks, in their CONDITION_MARKS order. */
+export const DEBATE_SHAPE_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
+  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
+export type DebateShapeMark = typeof DEBATE_SHAPE_MARKS[number];
 
 export const RISK_TIERS = ["casual", "standard", "high-stakes"] as const;
 export type RiskTier = typeof RISK_TIERS[number];

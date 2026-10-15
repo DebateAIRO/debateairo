@@ -49,6 +49,7 @@ const LANGUAGE_NAMES = Object.freeze({
   vi: "Vietnamese",
   zh: "Chinese"
 } as const);
+export const ARGUMENT_LANGUAGE_NAMES: Readonly<Record<string, string>> = LANGUAGE_NAMES;
 
 type KnownArgumentLanguageTag = keyof typeof LANGUAGE_NAMES;
 

@@ -1,8 +1,14 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { PROMPT_FRAME_VERSION, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
-import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "../../packages/judgement/src/prompts.js";
-import { SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT } from "@debateai/serve";
+import {
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1
+} from "../../packages/judgement/src/prompts.js";
+import {
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT,
+  SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_V3_PROMPT_CONTRACT
+} from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
@@ -47,10 +53,31 @@ describe("S01 seals the content rule", () => {
   // contract version is needed for a pack edit; each story records the hash it was written with), and no register row
   // carries a story hash. Before this edit: v1 storyteller 9c4d5255..., v1 checker 31038759..., v2 storyteller
   // b138db9d..., v3 storyteller 1419737c..., v2 checker e92de07b....
+  // Debate shape P2c (2026-10-14): the owners' pack (story-shapes/common.md and checker.md, version 2026-10-14.1)
+  // now explains also_raised and answers_note, so every story row below moves again, as on 2026-10-12. The answer
+  // forms and contract ids are unchanged, and no register row carries a story hash. Before this edit: v1 storyteller
+  // 4803cf19..., v1 checker 403a837a..., v2 storyteller 68dd9b31..., v3 storyteller 73b2caba..., v2 checker
+  // c5d7860d..., v3 checker 37df1d19....
+  // Whole-branch review I-1, ruling W-STORY (2026-10-14): that edit is moved out of common.md and checker.md into
+  // common-map.md and checker-map.md (pack 2026-10-14.2), which ride ONLY with a material carrying also_raised or
+  // answers_note. The contracts below are built without them, as every story without a map is, so every story row is
+  // back at its origin/dev seal above (4803cf19..., 403a837a..., 68dd9b31..., 73b2caba..., c5d7860d..., 37df1d19...).
+  // The 2026-10-14.1 values, never shipped: v1 storyteller 5e52c7fd..., v1 checker f4950231..., v2 storyteller
+  // 38d21dd9..., v3 storyteller d8bdfb5c..., v2 checker c6638e2c..., v3 checker 7ad6684c.... A map story's contracts
+  // are checked in debate-shape-story-request-bytes.test.ts.
   // Property: all eight sealed families move from their independently measured base
   // hashes to the PLAN's exact post-change hashes, with no unsealed family left behind.
   it.each([
-    ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
+    // Debate shape (Phase 2b Task 4): the judge text R7-a sealed is now frozen as V1; the current text appends the
+    // shape's six contracts to it, so the judge family moves once more, from e7f7e4b0... to its debate-shape seal.
+    ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
+    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    // Debate shape (Phase 2b Task 5): the composer row now seals v3 then its answer-length variant; v3's own seal
+    // (the base here, register 12's value) stays pinned below as history.
+    // Answer writer v4 (owner-approved wording, 2026-10-15): v4 + length.v2 supersede v3 + length.v1, so this row now
+    // reads the exported HISTORY text (SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT); its seal is unchanged (9a46af29...).
+    ["composerContractHash serve.synthesizer.v3 + length.v1", () => sha256(SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT), "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f", "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662"],
+    ["composerContractHash serve.synthesizer.v4 + length.v2", () => sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT), "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662", "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47"],
     // Practice debate 3 (2026-10-12): the v1 and evaluator-v1 rows now read the exported HISTORY contracts
     // (`SYNTHESIZER_V1_PROMPT_CONTRACT`, `EVALUATOR_V1_PROMPT_CONTRACT`): the current contracts carry the v3/v2
     // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.
@@ -76,12 +103,15 @@ describe("S01 seals the content rule", () => {
     expect(v2).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
   });
   // Practice debate 3 (2026-10-12, owner-approved wording): serve.synthesizer.v3 supersedes v2 and
-  // serve.evaluator.v2 supersedes v1. The composer and conformance rows of every register version
-  // published from this code (the preview's version 12 first) carry the two seals below.
-  it("seals the current serve.synthesizer.v3 and serve.evaluator.v2, each distinct from the version it supersedes", () => {
-    const composer = sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT));
+  // serve.evaluator.v2 supersedes v1. The conformance row of every register version published from this
+  // code carries evaluator v2's seal below. v3 ALONE is the composer seal of the preview's version 12
+  // (history, checked here); from the debate shape (2026-10-13) the published composer row is v3 + its
+  // answer-length variant (the R7-a row above). Answer writer v4 (2026-10-15) superseded v3, so v3 is now read from
+  // its exported HISTORY contract (SYNTHESIZER_V3_PROMPT_CONTRACT); its seal is unchanged.
+  it("seals serve.synthesizer.v3 (now history) and the current serve.evaluator.v2, each distinct from the version it supersedes", () => {
+    const composer = sha256(promptContractFingerprintText(SYNTHESIZER_V3_PROMPT_CONTRACT));
     const conformance = sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT));
-    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
+    expect(SYNTHESIZER_V3_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
     expect(EVALUATOR_PROMPT_CONTRACT.contractId).toBe("serve.evaluator.v2");
     expect(composer).not.toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
     expect(conformance).not.toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
@@ -89,6 +119,14 @@ describe("S01 seals the content rule", () => {
       "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f",
       "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f"
     ]);
+  });
+  // Answer writer v4 (owner-approved wording, 2026-10-15): the current writer contract alone, distinct from v3. The
+  // composer row seals it with its length variant (the R7-a row above, 879d2c5d...).
+  it("seals the current serve.synthesizer.v4 alone, distinct from the v3 it supersedes", () => {
+    const composer = sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT));
+    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v4");
+    expect(composer).not.toBe("4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f");
+    expect(composer).toBe("8f8758a91f14c39e2571538bcf8401f6ac01d3821e7901ac0a1da1cda07db14a");
   });
   it("keeps the reviewed compact storyteller v2 distinct from the preserved V1 seal", () => {
     expect(storyContractHash({ ...buildStorytellerContract(pack), contractId: STORYTELLER_V2_CONTRACT_ID, answerForm: STORYTELLER_V2_ANSWER_FORM }))

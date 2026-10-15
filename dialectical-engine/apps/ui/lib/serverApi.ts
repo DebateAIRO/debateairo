@@ -5,12 +5,14 @@ import {
   type AnswerFloor,
   type ArgumentLanguage,
   type ContractClient,
+  type DebateMapView,
   type RunProjection
 } from "@debateai/contract";
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
 import { readAnswerFloor } from "./v3/floorAnswer.js";
+import { readAnswerMapView } from "./v3/mapView.js";
 import composeEnglish from "../messages/en/compose.json" with { type: "json" };
 import type { MessageCatalog } from "./i18n/translate.js";
 
@@ -138,7 +140,7 @@ async function withWaitingStarts(summaries: DebateSummary[], client: ContractCli
 }
 
 export type GetDebateServerResult =
-  | { ok: true; debate: DebateDetail; answer: Answer; questionLanguage: ArgumentLanguage | null; floor: AnswerFloor | null }
+  | { ok: true; debate: DebateDetail; answer: Answer; questionLanguage: ArgumentLanguage | null; floor: AnswerFloor | null; mapView: DebateMapView | null }
   | { ok: false; kind: "loading"; run: RunProjection }
   | { ok: false; kind: "failed"; run: RunProjection; reason: string }
   | { ok: false; kind: "not_found" }
@@ -190,20 +192,21 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: runFailure instanceof Error ? runFailure.message : "Unable to load run" };
     }
   }
-  // The question's language and, for a components-only answer, its floor
-  // (spec 2026-09-26 §14.4.4) are read side by side: both need only the
-  // answer, so the page waits for one round trip, not two. Neither read can
-  // fail the page: no language keeps the reader's, no floor reads as today.
-  const [questionLanguage, floorRead] = await Promise.all([
+  // The question's language, a components-only answer's floor (spec 2026-09-26 §14.4.4) and
+  // the map view (debate shape P2c) are read side by side: all need only the answer. None of
+  // them can fail the page.
+  const [questionLanguage, floorRead, mapViewRead] = await Promise.all([
     readQuestionLanguage(resolvedClient, answer.run_ref),
-    readAnswerFloor(resolvedClient, answer)
+    readAnswerFloor(resolvedClient, answer),
+    readAnswerMapView(resolvedClient, answer)
   ]);
   return {
     ok: true,
     debate: debateDetailFromAnswer(answer, catalog),
     answer,
     questionLanguage,
-    floor: floorRead.floor
+    floor: floorRead.floor,
+    mapView: mapViewRead.mapView
   };
 }
 

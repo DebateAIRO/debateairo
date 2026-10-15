@@ -1,0 +1,204 @@
+import { describe, expect, it } from "vitest";
+import {
+  ARGUMENT_LANGUAGE_NAMES, QUESTION_LANGUAGE_FIELD, argumentLanguageDirective, detectArgumentLanguage, languageDirectiveFor,
+  lockedReplyLanguageExpectation, questionLanguageField, questionLanguageForBounds, questionLanguageFromRun, questionLanguageOf,
+  questionLanguageSentence, replyLanguageCheck, replyLanguageCheckFor, replyScriptOfTag, withQuestionLanguageField
+} from "@debateai/kernel";
+import { readdirSync } from "node:fs";
+
+const SITE_LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.url), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+const RO = Object.freeze({ code: "ro", name: "Romanian" });
+const FRENCH_REPLY = { statement: "Le gouvernement doit maintenir la monnaie nationale pour les citoyens et les entreprises du pays." };
+const LATIN_QUESTION = "Should Thailand and Iran keep their national currencies instead of adopting the euro?";
+const THAI_STATEMENT = "รัฐบาลควรรักษาสกุลเงินบาทไว้เพื่อประโยชน์ของประชาชนและธุรกิจทั้งหมดในประเทศไทย";
+const PERSIAN_STATEMENT = "دولت باید پول ملی را برای شهروندان و کسب و کارهای کشور حفظ کند و از آن محافظت کند.";
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const SCRIPT_LINES = [undefined, "Da li bi Srbija trebalo da uvede evro umesto dinara?", "Да ли би Србија требало да уведе евро уместо динара?"];
+const framed = (language: { code: string; name: string }): number =>
+  new TextEncoder().encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
+
+describe("the locked question language (question-language spec 2026-10-13, ruling L6)", () => {
+  it("names our 35 site languages exactly as the runs already store them, and other ISO 639-1 codes in English", () => {
+    expect(Object.keys(ARGUMENT_LANGUAGE_NAMES).sort()).toEqual(SITE_LOCALES);
+    for (const code of SITE_LOCALES) expect(questionLanguageOf(code)).toEqual({ code, name: ARGUMENT_LANGUAGE_NAMES[code] });
+    expect(questionLanguageOf("EN")).toEqual({ code: "en", name: "English" });
+    expect(questionLanguageOf("ca")).toEqual({ code: "ca", name: "Catalan" });
+    expect(questionLanguageOf("ms")).toEqual({ code: "ms", name: "Malay" });
+    for (const refused of ["xx", "unknown", "und", "", "en-US", "e", "eng"]) expect(questionLanguageOf(refused)).toBeNull();
+  });
+
+  it("adds the script for a two-script language from the question's own letters", () => {
+    expect(questionLanguageOf("sr", "Da li bi Srbija trebalo da uvede evro umesto dinara?"))
+      .toEqual({ code: "sr-Latn", name: "Serbian (Latin script)" });
+    expect(questionLanguageOf("sr", "Да ли би Србија требало да уведе евро уместо динара?"))
+      .toEqual({ code: "sr-Cyrl", name: "Serbian (Cyrillic script)" });
+    expect(questionLanguageOf("sr")).toEqual({ code: "sr", name: "Serbian" });
+    expect(questionLanguageOf("ro", "Да ли би Србија требало да уведе евро?")).toEqual(RO);
+  });
+
+  it("reads a run's stored language; und and the fallback name are no lock", () => {
+    expect(questionLanguageFromRun("ro", "Romanian")).toEqual(RO);
+    expect(questionLanguageFromRun("sr-Latn", "Serbian (Latin script)")).toEqual({ code: "sr-Latn", name: "Serbian (Latin script)" });
+    expect(questionLanguageFromRun("und", "the same language as the question")).toBeNull();
+    expect(questionLanguageFromRun("ro", "")).toBeNull();
+    expect(questionLanguageFromRun("ro", "the same language as the question")).toBeNull();
+  });
+
+  it("reads back only what questionLanguageOf can emit, with a short single-line name (fix round 1)", () => {
+    for (const [tag, name] of [
+      ["ro-Latn", "Romanian"], ["sr-latn", "Serbian"], ["sr-Grek", "Serbian"], ["en-US", "English"], ["eng", "English"],
+      ["RO", "Romanian"], ["xx", "Xx"], ["", "Romanian"], ["ro", "Roma\nnian"], ["ro", "Rom\u0000anian"], ["ro", "Roma\u2028nian"],
+      ["ro", "x".repeat(65)], ["ro", "ă".repeat(33)], ["ro", "Roma\"nian"], ["ro", "Roma\\nian"], ["ro", "Roma\ud800nian"]
+    ] as const) expect(questionLanguageFromRun(tag, name), JSON.stringify([tag, name])).toBeNull();
+    // Every lock the kernel can make reads back unchanged (a real stored lock is never refused).
+    for (const first of LETTERS) for (const second of LETTERS) for (const line of SCRIPT_LINES) {
+      const language = questionLanguageOf(`${first}${second}`, line);
+      if (language !== null) expect(questionLanguageFromRun(language.code, language.name), language.code).toEqual(language);
+    }
+  });
+
+  it("the bound covers every lock questionLanguageFromRun can return (pre-flight PF-L38, fix round 1)", () => {
+    const bound = framed(questionLanguageForBounds());
+    expect(questionLanguageForBounds()).toBe(questionLanguageForBounds());
+    const names = ["Romanian", "x".repeat(64), "ă".repeat(32), "語".repeat(21), "\"".repeat(64), "\\".repeat(64),
+      ...Array.from({ length: 64 }, (_, index) => "n".repeat(index + 1))];
+    let accepted = 0;
+    for (const first of LETTERS) for (const second of LETTERS) for (const suffix of ["", "-Latn", "-Cyrl"]) for (const name of names) {
+      const language = questionLanguageFromRun(`${first}${second}${suffix}`, name);
+      if (language === null) continue;
+      accepted += 1;
+      expect(framed(language), JSON.stringify(language)).toBeLessThanOrEqual(bound);
+    }
+    expect(accepted).toBeGreaterThan(0);
+  });
+
+  it("the bound is a 64-byte name on the longest tag, whatever today's names are (ruling L-B64, fix round 2)", () => {
+    const bytes = (text: string): number => new TextEncoder().encode(text).length;
+    const bound = questionLanguageForBounds();
+    expect(bytes(bound.name)).toBe(64);
+    expect(bytes(bound.code)).toBe(7);
+    // A stored lock with any accepted name reads back, even one no Node build names today, and frames within the bound.
+    for (const name of ["x".repeat(64), "ă".repeat(32), "語".repeat(21) + "x", "Azerbaijani (Cyrillic script), renamed by a later CLDR"]) {
+      const stored = questionLanguageFromRun("az-Cyrl", name);
+      expect(stored, name).toEqual({ code: "az-Cyrl", name });
+      expect(framed(stored!), name).toBeLessThanOrEqual(framed(bound));
+    }
+    expect(framed(questionLanguageFromRun("az-Cyrl", "x".repeat(64))!)).toBe(framed(bound));
+    expect(questionLanguageFromRun("az-Cyrl", "x".repeat(65))).toBeNull();
+    expect(questionLanguageForBounds()).toBe(bound);
+  });
+
+  it("is ONE named sentence: never the fallback form, never today's question-language wording", () => {
+    const sentence = questionLanguageSentence(RO);
+    expect(sentence.startsWith("Write every natural-language field in Romanian, the language this debate was set to and named in question_language, even where the material quotes another language.")).toBe(true);
+    expect(sentence).toContain("never translate an identifier or literal.");
+    expect(sentence).not.toContain("the same language as the question");
+    expect(sentence).not.toContain("the language of the question");
+    expect(() => questionLanguageSentence({ code: "ro", name: " " })).toThrow(/QUESTION_LANGUAGE_NAME_REQUIRED/u);
+    // P2L Task 13 review, Minor 2 (defence in depth): only a lock `questionLanguageFromRun` accepts is ever framed.
+    for (const refused of [{ code: "und", name: "Romanian" }, { code: "ro-Latn", name: "Romanian" }, { code: "xx", name: "Xish" },
+      { code: "ro", name: "Ro\"manian" }, { code: "ro", name: "Ro\\manian" }, { code: "ro", name: "Roma\nnian" },
+      { code: "ro", name: "x".repeat(65) }, { code: "ro", name: "\u00e4".repeat(33) }]) {
+      expect(questionLanguageFromRun(refused.code, refused.name), JSON.stringify(refused)).toBeNull();
+      expect(() => questionLanguageSentence(refused), JSON.stringify(refused)).toThrow(/QUESTION_LANGUAGE_INVALID/u);
+    }
+    expect(() => questionLanguageSentence(questionLanguageForBounds())).not.toThrow();
+    expect(questionLanguageSentence({ code: "sr-Cyrl", name: "x".repeat(64) })).toContain(`in ${"x".repeat(64)},`);
+    expect(languageDirectiveFor("Romanian", null)).toBe(argumentLanguageDirective("Romanian"));
+    expect(languageDirectiveFor(undefined, undefined)).toBe(argumentLanguageDirective(""));
+    expect(languageDirectiveFor("French", RO)).toBe(sentence);
+  });
+
+  it("puts the field last in the material, only when a language is locked", () => {
+    const material = [{ name: "question_line", content: "Q?" }];
+    expect(withQuestionLanguageField(material, null)).toBe(material);
+    expect(withQuestionLanguageField(material, undefined)).toBe(material);
+    expect(withQuestionLanguageField(material, RO)).toEqual([
+      { name: "question_line", content: "Q?" }, { name: QUESTION_LANGUAGE_FIELD, content: '{"code":"ro","name":"Romanian"}' }]);
+    expect(questionLanguageField(RO)).toEqual({ name: "question_language", content: '{"code":"ro","name":"Romanian"}' });
+  });
+
+  it("the locked expectation reads the code (and its script), never the question's guess", () => {
+    expect(replyScriptOfTag("ru")).toBe("Cyrillic");
+    expect(replyScriptOfTag("ro")).toBeUndefined();
+    expect(lockedReplyLanguageExpectation(RO, "Ar trebui sa renuntam la leu?")).toEqual({ tag: "ro", script: "Latin" });
+    expect(lockedReplyLanguageExpectation({ code: "sr-Cyrl", name: "Serbian (Cyrillic script)" }, "x")).toEqual({ tag: "sr", script: "Cyrillic" });
+    expect(lockedReplyLanguageExpectation({ code: "ja", name: "Japanese" }, "x")).toEqual({ tag: "ja", script: "CJK" });
+    expect(lockedReplyLanguageExpectation({ code: "ca", name: "Catalan" }, "Hauria Barcelona de limitar els pisos turístics?"))
+      .toEqual({ tag: "ca", script: "Latin" });
+    // Fix round 1: the script comes from the CODE (Catalan is written in Latin letters), not from a one-mark question.
+    expect(lockedReplyLanguageExpectation({ code: "ca", name: "Catalan" }, "?")).toEqual({ tag: "ca", script: "Latin" });
+    expect(lockedReplyLanguageExpectation({ code: "th", name: "Thai" }, LATIN_QUESTION)).toEqual({ tag: "th", script: "Other" });
+    expect(lockedReplyLanguageExpectation({ code: "fa", name: "Persian" }, LATIN_QUESTION)).toEqual({ tag: "fa", script: "Arabic" });
+    expect(replyScriptOfTag("constructor")).toBeUndefined();
+  });
+
+  it("a kept-wording question in Latin letters never makes a Thai or Persian lock refuse a correct reply (fix round 1)", () => {
+    const thai = { code: "th", name: "Thai" };
+    const persian = { code: "fa", name: "Persian" };
+    expect(replyLanguageCheckFor(LATIN_QUESTION, thai, ["statement"])({ statement: THAI_STATEMENT })).toEqual([]);
+    expect(replyLanguageCheckFor(LATIN_QUESTION, persian, ["statement"])({ statement: PERSIAN_STATEMENT })).toEqual([]);
+    expect(replyLanguageCheckFor(LATIN_QUESTION, thai, ["statement"])(FRENCH_REPLY)).toEqual([
+      { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
+  });
+
+  it("a code whose script comes only from CLDR takes the question's non-Latin script (final review I1)", () => {
+    // Sorani Kurdish is written in Arabic letters; CLDR says ku → Latn. The question's own script wins.
+    const kurdish = { code: "ku", name: "Kurdish" };
+    const soraniQuestion = "ئایا حکومەت دەبێت دراوی نیشتمانی بپارێزێت لە جیاتی یۆرۆ؟";
+    const soraniReply = { statement: "حکومەت دەبێت دراوی نیشتمانی بپارێزێت بۆ هاوڵاتیان و کۆمپانیاکانی وڵات و ئابووری." };
+    expect(lockedReplyLanguageExpectation(kurdish, soraniQuestion)).toEqual({ tag: "ku", script: "Arabic" });
+    expect(replyLanguageCheckFor(soraniQuestion, kurdish, ["statement"])(soraniReply)).toEqual([]);
+    expect(replyLanguageCheckFor(soraniQuestion, kurdish, ["statement"])(FRENCH_REPLY)).toEqual([
+      { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
+    // Punjabi in Shahmukhi: CLDR says pa → Guru (read as Other).
+    expect(lockedReplyLanguageExpectation({ code: "pa", name: "Punjabi" }, "کیہ پنجاب نوں یورو دی تھاں اپنی کرنسی رکھنی چاہیدی اے؟"))
+      .toEqual({ tag: "pa", script: "Arabic" });
+    // A Latin question (romanized Thai) never moves the script: it is a script reading, not a language guess.
+    expect(lockedReplyLanguageExpectation({ code: "th", name: "Thai" }, "Ratthaban khuan raksa sakun ngoen baht wai mai?"))
+      .toEqual({ tag: "th", script: "Other" });
+    // Fewer than 12 letters: CLDR's script stands.
+    expect(lockedReplyLanguageExpectation(kurdish, "ئایا یۆرۆ؟")).toEqual({ tag: "ku", script: "Latin" });
+  });
+
+  it("a plain two-script code reads the question's script, never CLDR's (final review I1)", () => {
+    const serbian = { code: "sr", name: "Serbian" };
+    expect(lockedReplyLanguageExpectation(serbian, "Да ли евро?")).toEqual({ tag: "sr", script: null });
+    expect(lockedReplyLanguageExpectation(serbian, SCRIPT_LINES[2]!)).toEqual({ tag: "sr", script: "Cyrillic" });
+    expect(lockedReplyLanguageExpectation(serbian, SCRIPT_LINES[1]!)).toEqual({ tag: "sr", script: "Latin" });
+    // Iranian Azerbaijani in Arabic letters (CLDR says az → Latn).
+    expect(lockedReplyLanguageExpectation({ code: "az", name: "Azerbaijani" }, "آیا ایران اؤز پول واحدینی ساخلاماليدیر؟"))
+      .toEqual({ tag: "az", script: "Arabic" });
+    // A script subtag still names the script outright.
+    expect(lockedReplyLanguageExpectation({ code: "sr-Latn", name: "Serbian (Latin script)" }, "Да ли евро?"))
+      .toEqual({ tag: "sr", script: "Latin" });
+    // None of the five is in our 35, so no branch above the two-script rule can name a script for them.
+    for (const code of ["sr", "uz", "az", "kk", "mn"]) expect(Object.hasOwn(ARGUMENT_LANGUAGE_NAMES, code), code).toBe(false);
+  });
+
+  it("replyLanguageCheckFor: today's check without a lock, the locked check with one", () => {
+    const question = "Ar trebui sa renuntam la leu si sa trecem la euro cat mai repede?";
+    expect(replyLanguageCheckFor(question, null, ["statement"])(FRENCH_REPLY))
+      .toEqual(replyLanguageCheck(question, ["statement"])(FRENCH_REPLY));
+    expect(replyLanguageCheckFor(question, RO, ["statement"])(FRENCH_REPLY)).toEqual([
+      { code: "TEXT_NOT_IN_QUESTION_LANGUAGE", path: ["statement"], message: "TEXT_NOT_IN_QUESTION_LANGUAGE" }]);
+    expect(replyLanguageCheckFor(question, RO, ["statement"])({ statement: "Guvernul trebuie să păstreze moneda națională pentru cetățeni și firme." })).toEqual([]);
+    // Review Focus 5 (pre-flight PF-L5): today's guesser cannot name this question, so today's check lets French through;
+    // only the locked check refuses it.
+    expect(detectArgumentLanguage(question).tag).toBe("und");
+    expect(replyLanguageCheck(question, ["statement"])(FRENCH_REPLY)).toEqual([]);
+  });
+
+  it("questionLanguageForBounds: no lock the kernel can make frames longer (pre-flight PF-L38: B9 prices with it)", () => {
+    const size = (language: { code: string; name: string }) =>
+      new TextEncoder().encode(questionLanguageSentence(language) + questionLanguageField(language).content).length;
+    const bound = size(questionLanguageForBounds());
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    const lines = [undefined, "Da li bi Srbija trebalo da uvede evro umesto dinara?", "Да ли би Србија требало да уведе евро уместо динара?"];
+    for (const first of letters) for (const second of letters) for (const line of lines) {
+      const language = questionLanguageOf(`${first}${second}`, line);
+      if (language !== null) expect(size(language), language.code).toBeLessThanOrEqual(bound);
+    }
+  });
+});

@@ -58,11 +58,14 @@ describe("a call refused by the stopped lane leaves as it arrived", () => {
     const source = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     expect(source).toMatch(/bodyFailed = true;\s*bodyFailures\.push\(Object\.freeze\(\{ rank: stage\.rank, error \}\)\);\s*callLane\?\.stop\(\);/u);
     // Two stops: `runChain`'s, and (ruling R30, Task 12 fix round 1) the keep-alive hook's on the parallel path — each
-    // right after marking the body failed.
-    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(2);
+    // right after marking the body failed. Debate shape (P2b Task 12): plus the map stage's own, when an abandon
+    // leaves the map before root 0 (no arguing has started, so there is no body to mark failed).
+    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(3);
+    expect(source).toMatch(/\} catch \(error\) \{\s*callLane\?\.stop\(\);\s*\/\/ Controller ruling T12-W/u);
     expect(source).toMatch(/if \(keepAliveStop\(error\)\) \{\s*bodyFailed = true;\s*callLane\?\.stop\(\);\s*keepAliveStopped\.resolve\(error\);/u);
-    expect(source).toContain("nodeRecorder.commit(0, async () => bodyFailed ? null : saveAuthored(");
-    expect(source).toContain("nodeRecorder.commit(rootIndex, async () => bodyFailed ? null : saveAuthored(");
+    // Debate shape (plan Task 13): a root's turn also writes which answer it argued, after its node — never after a failure.
+    expect(source).toMatch(/nodeRecorder\.commit\(0, async \(\) => \{\s*if \(bodyFailed\) return null;\s*const saved = await saveAuthored\(0,/u);
+    expect(source).toMatch(/nodeRecorder\.commit\(rootIndex, async \(\) => \{\s*if \(bodyFailed\) return null;\s*const node = await saveAuthored\(rootIndex,/u);
     expect(source).toContain("if (outcome.kind === \"STOPPED\" || bodyFailed) return;");
     expect(source).toContain("!(error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED)");
   });
@@ -96,13 +99,20 @@ describe("a call the lane held back leaves as it arrived, and ends its chain wit
   it("the runner: runChain drops it before marking the body failed; the guard lives only while the arguing runs together", () => {
     const source = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     expect(source).toMatch(/\.catch\(\(error: unknown\) => \{\s*if \(callHeldBack\(error\)\) return;\s*bodyFailed = true;/u);
-    // Installed and removed in one place, inside `if (callsRunTogether)`, never on the serial engine's branch.
-    const together = source.indexOf("    if (callsRunTogether) {\n");
+    // Installed and removed in one place, inside `if (chainsRun)` (calls run together, or a shaped run, whose chains
+    // always run through the lane — plan Task 13), never on the serial engine's branch.
+    const together = source.indexOf("    if (chainsRun) {\n");
     const serial = source.indexOf("    } else {\n", together);
     expect(together).toBeGreaterThan(0);
-    const installs = [...source.matchAll(/callLane\?\.guardStarts\(/gu)].map((match) => match.index);
-    expect(installs).toHaveLength(2);
-    for (const at of installs) expect(at > together && at < serial).toBe(true);
+    const installs = [...source.matchAll(/callLane\?\.guardStarts\(/gu)].map((match) => match.index!);
+    // Debate shape (P2b Task 12): the map stage installs its own guard while the map runs and removes it after, before
+    // root 0 — so before the arguing's block; the arguing's two are inside it.
+    const mapStage = source.indexOf("const runMap = async (): Promise<");
+    expect(mapStage).toBeGreaterThan(0);
+    expect(installs.filter((at) => at > mapStage && at < together)).toHaveLength(2);
+    const arguing = installs.filter((at) => at > together);
+    expect(arguing).toHaveLength(2);
+    for (const at of arguing) expect(at > together && at < serial).toBe(true);
     const failedHooks = [...source.matchAll(/laneCallFailed = /gu)].map((match) => match.index);
     expect(failedHooks).toHaveLength(2);
     for (const at of failedHooks) expect(at > together && at < serial).toBe(true);

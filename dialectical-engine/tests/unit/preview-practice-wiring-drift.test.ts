@@ -248,6 +248,29 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {").has("billing")).toBe(false);
   });
 
+  it("hosted and local alike: the debate shape and the question language are wired as the two main.ts files wire them", () => {
+    // The merge of #165 into the debate-shape branch: the hosted compositions read the shape row (and its map hash) and
+    // price the first call with the locked language exactly as main.ts does, in both modes.
+    const runnerMain = flat(RUNNER_MAIN);
+    const practiceRunner = flat(PRACTICE_RUNNER);
+    const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
+    expect(runnerMain).toContain(shapeRead);
+    expect(practiceRunner).toContain(shapeRead);
+    expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
+    expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
+    expect(practiceRunner).toContain("storyPolicy, debateShape, log:");
+    // Read before the money wiring, never only in one mode.
+    expect(practiceRunner.indexOf(shapeRead)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
+    const apiMain = flat(API_MAIN);
+    const practiceAsk = flat(PRACTICE_ASK);
+    for (const source of [apiMain, practiceAsk]) {
+      expect(source).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+      expect(source).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
+      expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
+      expect(source).toContain("route: questionLanguageRouteFor({");
+    }
+  });
+
   it("control: the reader sees a key that is missing", () => {
     const shipped = objectKeys("{ a: 1, ...(x ? {} : { b: 2, c: { d: 3 } }), e: f(g, { h: 1 }), m(n: string) { return { o: n }; }, i }");
     expect([...shipped].sort()).toEqual(["a", "b", "c", "e", "i", "m"]);
@@ -375,11 +398,13 @@ describe("preview practice lanes: the jobs see the runner's context", () => {
     expect(RUNNER).toMatch(/const writerReading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     expect(LANES).toMatch(/const reading = rememberingAcceptedReply\(\(content, reply\) => classifyComposedContent\(content, \{/u);
     // Reply language (2026-10-12): both check the objection against the question's language.
-    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));");
+    // Question language (P2L Task 17): the runner's reading also carries a shaped run's lock (null on today's run).
+    expect(RUNNER).toContain("const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage));");
     expect(LANES).toContain("const reading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, q.questionLine));");
     // R15 into dev (2026-10-13): the writer's classifier also carries Problem 7's wording index (no scores or engine
     // codes in the prose), so both pins now hold the wording member before the question line.
-    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine\s*\}, reply\)\);/u);
+    // Question language (P2L Task 17): and, after the question line, a shaped run's lock (absent on today's run).
+    expect(RUNNER).toMatch(/exemptTokens: personIdTokens,\s*wording: writerWording,\s*questionLine: run\.questionLine,\s*\.\.\.shapeLanguageInput\s*\}, reply\)\);/u);
     expect(LANES).toMatch(/wording: synthesisWordingIndex\(\{ request, personTexts \}\),\s*questionLine: q\.questionLine\s*\}, reply\)\);/u);
   });
 

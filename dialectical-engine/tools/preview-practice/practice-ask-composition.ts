@@ -76,18 +76,21 @@ import {
   computeStructuralCeilingBasis,
   costEnvelopeBand,
   costEnvelopeCeilings,
+  debateShapeInForce,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readBillingPlans,
   readBillingPolicy,
   readCallTokenCeilings,
   readCostEnvelopePolicy,
+  readDebateShapePolicy,
   readDeploymentRiskTier,
   readEngineVersion,
   readEnvelopeFormulaInputs,
   readJudgeTokenCeiling,
   readModelScorecard,
   readPanelDiscoveryPolicy,
+  readQuestionLanguagePolicy,
   readStoryPolicyFromRegister,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
@@ -97,6 +100,9 @@ import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
+import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
+import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
+import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
 /** The read-only "what is left today" answer of each gate, over the forwarded sockets. */
@@ -209,6 +215,8 @@ async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
   money: NonNullable<Awaited<ReturnType<typeof composePracticeAskMoney>>>;
   declaredProviderTargets: Parameters<typeof firstPositionCallProjections>[0]["targets"];
   scorecardState: string;
+  /** main.ts's `debateShapeInForcePolicy !== null`: a shaped run's first call carries the locked language. */
+  questionLanguageLocked: boolean;
 }>): Promise<void> {
   const { pool, money: { costEnvelopeRows }, declaredProviderTargets } = input;
   const billingEnabled = input.money.registerBillingEnabled;
@@ -216,7 +224,10 @@ async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
     judgeTokenCeiling: await readJudgeTokenCeiling(pool, input.registerVersion),
-    questionMaxBytes: askQuestionMaxBytes()
+    questionMaxBytes: askQuestionMaxBytes(),
+    // Pre-flight PF-L38, as main.ts: with the debate-shape row in force a run may be shaped, and its first call carries
+    // the locked language: priced at the longest lock too. Row absent (or switched off): today's price.
+    questionLanguageLocked: input.questionLanguageLocked
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
@@ -252,6 +263,8 @@ export async function composePracticeAsk(input: Readonly<{
   /** Hosted only: the room's own decision pool (distinct from the others). Absent in local mode, where no room exists. */
   roomDecisionPool?: Pool;
   log?: (line: string) => void;
+  /** Question language (P2d's report): each lock or offer the decider makes. Never wired to a logger. */
+  onQuestionLanguage?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
 }>) {
   const { pool, settings } = input;
   const version = settings.runner.REGISTER_VERSION;
@@ -296,6 +309,28 @@ export async function composePracticeAsk(input: Readonly<{
   const costEnvelopeGuard = money?.costEnvelopeGuard;
   const askRoom = money?.askRoom;
   const callTokenCeilings = await readCallTokenCeilings(pool, version);
+  // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition resolves the shape.
+  const debateShapePolicy = await readDebateShapePolicy(pool, version);
+  // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
+  const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+  // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
+  // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
+  // blind-index key here, so the check reference key is per process. The same in hosted mode: the hosted preview still
+  // has its preview configuration, so main.ts takes this preview route there too (never its hosted route, L-ROUTE).
+  const questionLanguage = debateShapeInForcePolicy === null ? undefined : await composeQuestionLanguage({
+    policy: await readQuestionLanguagePolicy(pool, version),
+    route: questionLanguageRouteFor({
+      previewConfigured: true,
+      previewFetch,
+      // The forwarded Anthropic gate socket, when the practice has a port on it (the seam main.ts reads from the config).
+      anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,
+      hosted: () => { throw new TypeError("PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE"); }
+    }),
+    clock: () => new Date(),
+    maxQuestionBytes: askQuestionMaxBytes(),
+    referenceKey: newQuestionLanguageReferenceKey(),
+    ...(input.onQuestionLanguage === undefined ? {} : { onDecided: input.onQuestionLanguage })
+  });
   const modelPicker = await composeAskModelPicker({
     boot: BOOT,
     pool,
@@ -308,11 +343,12 @@ export async function composePracticeAsk(input: Readonly<{
     // Billing kept off in the practice (the file's head says why); on the preview it changes nothing here, because the
     // picker's billing rules apply only under a VALID scorecard, which the preview refuses (PREVIEW_SCORECARD_CONFLICT).
     billingEnabled: false,
+    debateShapePolicy: debateShapeInForcePolicy,
     log: (line) => input.log?.(line)
   });
   if (money !== null) {
     await assertPracticeRunCeilingCoversOneCall({ pool, registerVersion: version, money, declaredProviderTargets,
-      scorecardState: modelPicker.scorecard.state });
+      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null });
   }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
@@ -332,6 +368,8 @@ export async function composePracticeAsk(input: Readonly<{
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+    ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+    ...(questionLanguage === undefined ? {} : { questionLanguage }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
       panelSize: basis.panelSize,
@@ -344,7 +382,8 @@ export async function composePracticeAsk(input: Readonly<{
       synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
       evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
       maxDepth: envelopeFormulaInputs.maxDepth,
-      backupSequencesProvisioned: basis.backupSequencesProvisioned
+      backupSequencesProvisioned: basis.backupSequencesProvisioned,
+      ...(basis.shape === null ? {} : { shape: basis.shape })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

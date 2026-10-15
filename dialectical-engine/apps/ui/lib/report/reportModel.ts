@@ -422,6 +422,17 @@ function pointNote(mark: ConditionMark): PointNote | null {
     // could not be used and a backup that answered instead is said once for the
     // whole answer (its record names the served root), not about one point.
     case "BACKUP-MODEL-USED":
+    // Debate shape (Phase 2b): the six map marks are said once for the whole
+    // answer (their record names the served root's node), not about one point;
+    // the two extensions are engine detail the page shows through the label only.
+    case "MAP_ANGLES_FALLBACK":
+    case "MAP_MERGE_FALLBACK":
+    case "MAP_CHOOSE_FALLBACK":
+    case "MAP_UNAVAILABLE_TODAYS_OPENING":
+    case "ANSWERS_FILLED":
+    case "CHOOSE_QUOTA_FILLED":
+    case "PANEL-CLOSE-CALL-EXTENDED":
+    case "SCRUTINY-EXTENDED":
       return null;
   }
 }

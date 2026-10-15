@@ -70,7 +70,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] [--debate-shape off\|'<JSON object>'] [--question-language '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs. `--debate-shape` sets the debate shape row. `off` publishes it disabled: the start values with `enabled: false`, so the API asks today's shape, and a runner on that version still finishes the debates admitted with the shape. A JSON object (the whole policy, with its kind) publishes that policy; the register's own parser checks it on the server before any row is built. Without the option the current row is kept, or there is none. `--question-language` sets the optional `questionLanguagePolicy` row (the policy without its `kind`; `deploy/vps/register/README.md`); `"fastCheck": null` in it switches the fast language check off. Before anything is sealed the kit asks the API's own question-language boot refusals while the debate shape is in force (a reserved prompt-frame token in the instruction, a fast-check model the preview gate does not list). Without the option the base's row is kept, or there is none (the code's start values). |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -209,6 +209,53 @@ below; when the release changes the register, do it instead of this step 7.
 Then pin and restart exactly as `deploy/preview-lifecycle/v1/README.md` "Pinning a NEW release"
 says (`prestart.mjs pin --from "$ART/api-launch.json"`, the same for ui, regenerate both release
 drop-ins, `daemon-reload`, restart api then ui).
+
+## Releasing the debate-shape code (a new register version, even with the shape off)
+
+**In plain words.** The debate-shape release changes two of the instructions the AIs are sent, so their
+fingerprints in the settings (the register) change too. The new runner checks those fingerprints when it starts
+and refuses a settings version that does not carry them (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`). So this
+release needs a **new register version** before it can run at all, **even with the debate shape switched off**.
+With register 12 still pinned, the API would start and accept debates, but the runner would refuse to start, and
+those debates would wait with nobody to run them.
+
+**What the new version changes** (and nothing else):
+
+- `judgeContractHash`: `e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365` becomes
+  `aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612`;
+- `composerContractHash`: `4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f` becomes
+  `879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47` (the answer writer `serve.synthesizer.v4`
+  with its answer-length variant `serve.synthesizer.length.v2`: since 2026-10-15 the writer says in natural words
+  of the question's language that a provisional answer may still change, instead of translating "not yet settled"
+  word for word. This branch's earlier value, `9a46af29…` (v3 with `serve.synthesizer.length.v1`), is history: a
+  plan or progress line that names it was made from older code);
+- `mapContractHash` is new: `25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392` (read only
+  beside a debate-shape row);
+- `nodeRuntimeVersion` keeps its value with a new source reference, as at every publication.
+
+There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
+changed row: stop and ask.
+
+**The order.**
+
+1. **Practice first, with `--register-next`** (`tools/preview-practice/README.md`). Without it the practice
+   debate stops at `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`. Its progress line must name exactly the rows above.
+2. **Apply migrations 0117 and 0118** (after the mail language's 0116 if the preview does not have it yet) with the
+   release's database step (step 6 above, `apply-and-plan`, then the native operator once). Without 0117 every debate page fails: the page asks for the debate's map, and
+   the table it reads does not exist yet.
+3. **Publish the new version from this code, without `--debate-shape`**: the plan, the owner's review of the
+   delta, then the publish, as "Publishing a new register version on the preview" below describes. The plan
+   keeps the checker and rotation choices of version 12.
+4. **Wait until no debate is queued or running.** A debate in flight was started under the old fingerprints;
+   the runner finds its earlier attempts by them, so a debate crossing the switch would ask the AIs again and
+   pay twice.
+5. **Restart the API and the runner together** on the new version: `REGISTER_VERSION` moves in both `api.env`
+   and `runner.env`, and the launch plans carry the new publication. Start the website with the API or after
+   it, never before. Never restart the API alone on version 12: it does not check the fingerprints, so it
+   would accept debates the runner cannot start.
+
+Rollback: the new version stays sealed and unused; the old release goes back on version 12 in both env files.
+Switching the shape on later is a separate publication (`--debate-shape`), after these steps.
 
 ## Publishing a new register version on the preview (publish kit v2)
 

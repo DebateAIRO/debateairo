@@ -2404,7 +2404,10 @@ export const CONTENT_CARRIERS = Object.freeze([
   // Verdict story (migration 0074): the story, its reservation and its verdict basis.
   "serve.answer_story",
   // Model scorecard (migration 0090): the exact prompt of one model-call attempt.
-  "ledger.call_prompt"
+  "ledger.call_prompt",
+  // Debate shape (migration 0117): the map's points and candidate answers, and the chosen answers with their notes.
+  "core.map_item",
+  "core.map_choice"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

@@ -16,13 +16,17 @@ import {
   type SynthesizerRequest
 } from "@debateai/serve";
 
-// serve.synthesizer.v3 (owner-approved content, practice debate 3, 2026-10-12): the answer form the writer is sent.
+// serve.synthesizer.v4 (owner-approved wording, 2026-10-15): the answer form the writer is sent. It supersedes
+// serve.synthesizer.v3 (practice debate 3, 2026-10-12), whose "not yet settled" / "would settle it" clause the
+// writer translated word for word into Romanian; v3 is pinned as history in prompt-text-pins.test.ts.
 const SYNTHESIZER_CONTRACT_TEXT =
   "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
   + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
   + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
-  + "return two segments in order: the first gives the provisional answer and says plainly that it is not yet "
-  + "settled; the second says what evidence would settle it. Never start a segment with a heading or a label. "
+  + "return two segments in order: the first gives the provisional answer and says plainly, in natural words of the "
+  + "question's language, that it may still change; the second says what evidence would decide it. Write both as "
+  + "ordinary sentences in that language, never as a translation of these instructions. Never start a segment with "
+  + "a heading or a label. "
   + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
   + "copy ids exactly and never translate identifiers. served_number_refs is always [].";
 
@@ -48,7 +52,7 @@ const evaluatorRequest = {
 
 describe("runner argument-language packets", () => {
   it.each([
-    ["synthesizer", () => buildSynthesizerPromptPacket(synthesizerRequest, "Romanian"), SYNTHESIZER_CONTRACT_TEXT, "serve.synthesizer.v3"],
+    ["synthesizer", () => buildSynthesizerPromptPacket(synthesizerRequest, "Romanian"), SYNTHESIZER_CONTRACT_TEXT, "serve.synthesizer.v4"],
     ["evaluator", () => buildEvaluatorPromptPacket(evaluatorRequest, "Romanian"), EVALUATOR_CONTRACT_TEXT, "serve.evaluator.v2"]
   ] as const)("keeps the %s contract and language directive inside the secure frame", (
     _name,build,contract,contractId
