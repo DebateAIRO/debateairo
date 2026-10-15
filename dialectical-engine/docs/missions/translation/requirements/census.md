@@ -2,6 +2,8 @@
 
 Measured 2026-09-02 at `dev` @ `4f764037`. Raw rows: `census.json` beside this file.
 
+**Deleted since measured** (rows and totals below are kept as measured): `apps/ui/lib/scrutinyDepth.ts` (6 rows) was removed by debate shape P2c (2026-10); the Scrutiny control's words now live in the `newDebate` catalogue.
+
 ## Method, and what it cannot see
 
 **Tool.** A Node script walking the TypeScript AST — `ts.createSourceFile` from **TypeScript 5.9.3**, resolved by absolute path from `apps/ui/node_modules`. It is not `tsc`: no type checker, no program, purely syntactic. The repo root pins `typescript@7.0.2`, whose package ships **no `lib/typescript.js`** and therefore no JavaScript compiler API at all, so `pnpm exec tsx` at the root cannot load one; that is recorded in `.hermes/TOOLING-TRAPS.md`.
@@ -141,7 +143,7 @@ Every file below is owned by exactly one extraction slice; the map is exhaustive
 | `components/CanvasViewport.tsx` | I05 | 6 | 1 | 5 | 0 | 0 | 0 |
 | `components/DebatesBuffer.tsx` | I04 | 6 | 3 | 0 | 1 | 2 | 0 |
 | `components/PublicAnswerDisclosure.tsx` | I10 | 6 | 5 | 1 | 0 | 0 | 0 |
-| `lib/scrutinyDepth.ts` | I09 | 6 | 0 | 0 | 6 | 0 | 0 |
+| `lib/scrutinyDepth.ts` (deleted, debate shape P2c) | I09 | 6 | 0 | 0 | 6 | 0 | 0 |
 | `lib/v3/answerExport.ts` | I09 | 6 | 0 | 0 | 5 | 1 | 0 |
 | `components/landing/LandingChrome.tsx` | I01 | 5 | 4 | 1 | 0 | 0 | 0 |
 | `components/LibraryComposer.tsx` | I04 | 5 | 3 | 2 | 0 | 0 | 0 |

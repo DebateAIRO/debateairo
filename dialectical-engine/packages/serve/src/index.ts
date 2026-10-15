@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 // UNION of both lanes: S06 needs the served-root rule vocabularies and the
 // retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
-import type { ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import type { DebateShapeMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
 import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import {
@@ -160,6 +160,18 @@ export interface ConformanceJudgement {
   readonly segmentId: string;
   readonly state: "JUDGED" | "SAMPLED_PASSED" | "NOT_SAMPLED";
   readonly conforms: boolean;
+}
+
+/**
+ * M8 (controller ruling, P2a final review): the answer read's `cost_envelope.basis` without the receipt's debate-shape
+ * member. Least disclosure: the member names the asker's plan and the plan's sizes and thresholds, and nothing public
+ * needs them. A copy without `shape`, every other member as stored; a basis with no `shape` member is returned as the
+ * same object, so today's answer body is byte for byte what it was.
+ */
+export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  if (!Object.hasOwn(basis, "shape")) return basis;
+  const { shape: _shape, ...shown } = basis;
+  return shown;
 }
 
 export function deriveConformanceOutcome(
@@ -1602,7 +1614,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark;
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1671,7 +1683,16 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   // transport outcome stay NULL — 0021/0025 refuse both on this mark — so the
   // role, seat, routes, cause and key live in the progress stream's switch
   // events and on the ledger rows, not here.
-  "BACKUP-MODEL-USED"
+  "BACKUP-MODEL-USED",
+  // Debate shape: every map fallback/fill and every extension carries its typed record (answer scope for the map, naming the served root's node in affectedNodeIds; node scope for the extensions, naming their node).
+  "MAP_ANGLES_FALLBACK",
+  "MAP_MERGE_FALLBACK",
+  "MAP_CHOOSE_FALLBACK",
+  "MAP_UNAVAILABLE_TODAYS_OPENING",
+  "ANSWERS_FILLED",
+  "CHOOSE_QUOTA_FILLED",
+  "PANEL-CLOSE-CALL-EXTENDED",
+  "SCRUTINY-EXTENDED"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -2996,7 +3017,7 @@ export class ServeRepository {
       tier_source: row.tier_source,
       tier_provenance_ref: row.tier_provenance_ref,
       cost_envelope: {
-        basis: row.envelope_basis,
+        basis: publicCostEnvelopeBasis(row.envelope_basis),
         state: row.envelope_state,
         consumed_model_attempts: Number(row.envelope_consumed),
         protected_core: "NEVER_SKIPPABLE"

@@ -6,6 +6,7 @@ import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSch
 import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,MfaRecoveryPendingResponseSchema,MfaRecoveryPendingCancelledSchema,type AuthMethodsResponse,type MfaRecoveryPendingResponse} from "./index.js";
 import type {ConsumerAuthenticationCredential} from "./consumer-auth.js";
 import type { StepUpAuthorizationRequest, StepUpResponse } from "./index.js";
+import type { AnswerLength, DepthMode, Scrutiny } from "./index.js";
 import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
  type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
  type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
@@ -50,8 +51,11 @@ import {
   AnswerIndexSchema,
   AnswerStorySchema,
   AnswerDisclosureSchema,
+  DebateMapViewSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
+  QuestionLanguageChoiceNeededSchema,
+  type AskSubmitOutcome,
   AskRoomResponseSchema,
   BillingCancelLinkAcceptedSchema,
   BillingCardChangeResponseSchema,
@@ -99,6 +103,7 @@ import {
   type AnswerStory,
   type AccountEmail,
   type AnswerDisclosure,
+  type DebateMapView,
   type AskAccepted,
   type AskRequest,
   type AskRoomResponse,
@@ -444,11 +449,19 @@ export interface ContractClient {
   confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
-  /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
+  /** Question language (spec 2026-10-13, D1): the same POST /v1/asks, with a valid real-mix offer (409) read as data. */
+  submitAskOrLanguageChoice(input: AskRequest): Promise<AskSubmitOutcome>;
+  /**
+   * Budget spec §2.7: the room this ask would find — a word, never a figure. Debate shape (M4): the three shape
+   * fields go on the query only when given, so today's query is unchanged.
+   */
   getAskRoom(input: Readonly<{
     plan_tier: PlanTier;
     composition_budget_tier: "low" | "medium" | "high";
     depth: number;
+    depth_mode?: DepthMode;
+    scrutiny?: Scrutiny;
+    answer_length?: AnswerLength;
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
@@ -493,6 +506,8 @@ export interface ContractClient {
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
   readAnswerStory(answerId: string): Promise<AnswerStory>;
   readAnswerDisclosure(answerId: string): Promise<AnswerDisclosure>;
+  /** Debate shape P2c: the owner's map view of an answer (404 when the run had no map choice). */
+  readAnswerMapView(answerId: string): Promise<DebateMapView>;
   readNode(answerId: string, nodeId: string): Promise<Node>;
   recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest): Promise<InvestigationAccepted>;
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
@@ -789,14 +804,30 @@ export function createContractClient(
     ),
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    submitAskOrLanguageChoice: (input: AskRequest) => requestJson<AskSubmitOutcome>(
+      root.href, fetchImplementation, "/v1/asks",
+      AskAcceptedSchema.transform((accepted): AskSubmitOutcome => Object.freeze({ kind: "ACCEPTED" as const, accepted })),
+      { method: "POST", body: JSON.stringify(input) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const parsed = QuestionLanguageChoiceNeededSchema.safeParse(body);
+        return parsed.success ? Object.freeze({ kind: "LANGUAGE_CHOICE_NEEDED" as const, offer: parsed.data.offer }) : null;
+      }
+    ),
     getAskRoom: (input: Readonly<{
       plan_tier: PlanTier;
       composition_budget_tier: "low" | "medium" | "high";
       depth: number;
+      depth_mode?: DepthMode;
+      scrutiny?: Scrutiny;
+      answer_length?: AnswerLength;
     }>) => request(`/v1/asks/room?${new URLSearchParams({
       plan_tier: input.plan_tier,
       composition_budget_tier: input.composition_budget_tier,
-      depth: String(input.depth)
+      depth: String(input.depth),
+      ...(input.depth_mode === undefined ? {} : { depth_mode: input.depth_mode }),
+      ...(input.scrutiny === undefined ? {} : { scrutiny: input.scrutiny }),
+      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
@@ -877,6 +908,7 @@ export function createContractClient(
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),
     readAnswerStory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/story`, AnswerStorySchema),
     readAnswerDisclosure: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/disclosure`, AnswerDisclosureSchema),
+    readAnswerMapView: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/map`, DebateMapViewSchema),
     readNode: (answerId: string, nodeId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, NodeSchema),
     recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     unlinkMemory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, UnlinkSchema, { method: "POST" }),

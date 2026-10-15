@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
 import { assertRunCeilingCoversOneCall, projectedCallCeilingMicros } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
-import { Judge, firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { TypedDomainError } from "@debateai/kernel";
+import { Judge, firstCallsByPlanRoster, firstPositionCallProjections, framedJudgePromptForTest } from "@debateai/judgement";
+import { TypedDomainError, questionLanguageForBounds } from "@debateai/kernel";
 import {
   OpenAICompatibleProviderGateway,
   lengthRetryTokenCeiling,
@@ -101,6 +101,29 @@ describe("B9d · the first position's own call, priced at its largest", () => {
       questionMaxBytes: askQuestionMaxBytes()
     });
     expect(projections.map((entry) => [entry.providerRef, entry.model])).toEqual([["provider:a", "a"]]);
+  });
+
+  it("PF-L38: with the shape row in force it also frames the longest lock and keeps the larger; without, today's number", () => {
+    const input = {
+      targets: [target("provider:a", "vendor/model-a", 3_000_000, 15_000_000), target("provider:b", "vendor/model-b", 1_000_000, 5_000_000)],
+      judgeTokenCeiling: TOKEN_CEILING,
+      questionMaxBytes: askQuestionMaxBytes()
+    };
+    const today = firstPositionCallProjections(input);
+    expect(firstPositionCallProjections({ ...input, questionLanguageLocked: false })).toEqual(today);
+    const locked = firstPositionCallProjections({ ...input, questionLanguageLocked: true });
+    expect(locked).toHaveLength(today.length);
+    const question = "\u0001".repeat(askQuestionMaxBytes());
+    for (const [index, projection] of locked.entries()) {
+      expect(projection.requestBytes).toBeGreaterThan(today[index]!.requestBytes);
+      expect(projection.completionTokenCeiling).toBe(today[index]!.completionTokenCeiling);
+      for (const claim of ["unknown", "resolved"] as const) {
+        const packet = framedJudgePromptForTest({ kind: "primary-root" }, question, undefined, claim, questionLanguageForBounds()).packet;
+        expect(projection.requestBytes).toBeGreaterThanOrEqual(Buffer.byteLength(JSON.stringify({
+          model: projection.model, max_tokens: projection.completionTokenCeiling, messages: packet.messages
+        }), "utf8"));
+      }
+    }
   });
 
   it("uses the API's own question bound, from one source", () => {
@@ -213,6 +236,10 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(main).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");
     expect(main).toContain("questionMaxBytes: askQuestionMaxBytes()");
     expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
+    // Ruling L-B9R (P2L Task 17): the runner prices the longest lock whenever ANY debateShapePolicy row is present
+    // (`debateShape`, read raw before this check: enabled false too); no row, today's price.
+    expect(main).toContain("questionLanguageLocked: debateShape !== null");
+    expect(main.indexOf("questionLanguageLocked: debateShape !== null")).toBeGreaterThan(main.indexOf("const debateShape = await readDebateShapeRunnerSettings("));
   });
 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {
@@ -225,5 +252,8 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(main).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
     expect(main).toContain("judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),");
     expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
+    // PF-L38: the lock is priced only with the debate-shape row in force (read before this stage).
+    expect(main).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+    expect(stage).toBeGreaterThan(main.indexOf("const debateShapeInForcePolicy ="));
   });
 });

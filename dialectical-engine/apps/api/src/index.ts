@@ -30,6 +30,7 @@ import {
   DataExportRequestSchema,
   DataExportStatusSchema,
   DataExportDownloadRequestSchema,
+  DebateMapViewSchema,
   EmailChangeCancelledSchema,
   EmailChangeConfirmedSchema,
   EmailChangeLinkRequestSchema,
@@ -96,7 +97,9 @@ import {
   LegalStatusResponseSchema,
   GeoAvailabilityResponseSchema,
   AskRoomQuerySchema,
-  AskRoomResponseSchema
+  AskRoomResponseSchema,
+  QUESTION_LANGUAGE_CHOICE_NEEDED,
+  QuestionLanguageChoiceNeededSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -158,6 +161,15 @@ import {
   type PersonRoomPick
 } from "./person-room-picker.js";
 import {
+  QuestionLanguageChoiceNeeded,
+  ownerScopeOf,
+  questionLanguageAskContractMember,
+  runLanguageOf,
+  type QuestionLanguageLock,
+  type QuestionLanguagePort
+} from "./question-language/decider.js";
+export { QuestionLanguageChoiceNeeded, type QuestionLanguagePort } from "./question-language/decider.js";
+import {
   RoleAssignmentSchema,
   pickRotatedRoles,
   rotationPinFields,
@@ -170,6 +182,7 @@ import {
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
+  answerTokenCeilingsForBasis,
   debaterSeatCount,
   expectedCallsByRoleFromBasis,
   isUsablePerRunCeiling,
@@ -182,7 +195,6 @@ import {
 import {
   AGE_RULE_VERSION,
   checkDob,
-  detectArgumentLanguage,
   dobFromIso,
   isMailAddress,
   meetsMinimumAge,
@@ -220,10 +232,18 @@ import {
   ASK_SIGN_IN_REQUIRED,
   appliedAskOf,
   coarseFitFor,
-  decideRoomSettings,
+  decideRoomSettingsAndPlan,
   resolveBillingAsk,
   type AskBilling
 } from "./ask-billing.js";
+import {
+  debateShapePlanKeyOf,
+  structuralBasisProvisionsBackup,
+  type DebateShapeCeilingInput,
+  type DebateShapePlanKey,
+  type DebateShapePolicy
+} from "@debateai/register";
+import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
@@ -235,6 +255,7 @@ import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
+import { answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { DataExportApplication } from "./data-export/service.js";
 import {
@@ -461,6 +482,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
   "COST_ENVELOPE_DAY_INVALID",
   "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_KEEP_ROOM_INVALID",
   "COST_ENVELOPE_PRICE_INVALID",
   "COST_ENVELOPE_PRICE_UNPRICED",
   "COST_ENVELOPE_PROJECTION_INVALID",
@@ -478,6 +500,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
   "DEBATE_ROOT_MISSING",
+  "DEBATE_SHAPE_RUNNER_UNCONFIGURED",
   "DECISION_IDEMPOTENCY_CONFLICT",
   "DECISION_IDENTITY_UNSERIALIZABLE",
   "DECISION_SPAWN_COUNT_INVALID",
@@ -593,6 +616,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
+  "MAP_GAP_ITEM_UNKNOWN",
+  "MAP_RECORD_INVALID",
+  "MAP_REPLY_UNREADABLE",
+  "MAP_ROW_INVALID",
   "MEMORY_ASKER_SCOPE_MISMATCH",
   "MEMORY_DIFFERENCE_REQUIRED",
   "MEMORY_DISCLOSURE_GATE_FAILED",
@@ -713,6 +740,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
   "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "RUN_COST_ENVELOPE_ROOM_KEPT",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
@@ -1392,6 +1420,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
   { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
   { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
+  { route: "GET /v1/answers/{id}/map", auth: "user", resource: "run-owner", action: "read-map-view" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -1689,6 +1718,11 @@ export interface ApiOptions {
    * closed 404 when it is absent, and the story route then knows no floor.
    */
   readonly disclosures?: AnswerDisclosureApplication;
+  /**
+   * Debate shape P2c (spec 2026-10-12 §3.3 step 8): the owner's read of the debate's map
+   * view. Optional like `disclosures`; without it the route answers its closed 404.
+   */
+  readonly mapViews?: AnswerMapViewApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -1718,6 +1752,8 @@ export interface ApiOptions {
    * Absent, the room is read for the settings as sent.
    */
   readonly askBilling?: AskBilling;
+  /** Debate shape (spec 2026-10-12 §3.1): the register's optional row, for the room read's normalisation. Absent: today's. */
+  readonly debateShapePolicy?: DebateShapePolicy;
   /**
    * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
    * supplied by main only when hosted with billing on; each route whose member is
@@ -1805,12 +1841,19 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 403 | 409 | 422 | 429 {
   if (code === ASK_SIGN_IN_REQUIRED) return 401;
   // Step 1: the same 403 the route answers when it refuses a person outside the preview's team.
   if (code === PREVIEW_TEAM_ONLY) return 403;
+  // Question language (spec 2026-10-13): a stale, forged or mismatched choice; the page checks the question again.
+  if (QUESTION_LANGUAGE_CHOICE_REFUSALS.has(code)) return 409;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
+
+/** Question language (spec 2026-10-13): the refusals of the person's answer to an offer (reference.ts, decider.ts). */
+const QUESTION_LANGUAGE_CHOICE_REFUSALS: ReadonlySet<string> = new Set([
+  "QUESTION_LANGUAGE_CHECK_INVALID", "QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHOICE_MISMATCH"
+]);
 
 /**
  * I6 (re-review) — WHAT THE CALLER IS TOLD.
@@ -1821,14 +1864,29 @@ export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
  * to exhaust the day — ask once, read the ceiling, ask again and watch the
  * number climb. Same class as the support status-page leak DL1-F4.
  *
- * So the public body for this one refusal is the CODE. Every other ask refusal
- * keeps its message, because those describe the ASK the caller sent and
- * withholding them would only make a lawful refusal unactionable. The figures
- * stay on the error, and the boundary logs them for the operator.
+ * So the public body is the CODE alone for the refusals in the set below
+ * (ASK_REFUSALS_WITH_OPERATOR_FIGURES), whose messages carry operator-only
+ * figures. Every other ask refusal keeps its message, because those describe
+ * the ASK the caller sent and withholding them would only make a lawful refusal
+ * unactionable. The figures stay on the error, and the boundary logs them for
+ * the operator.
  */
 export function askRefusalPublicMessage(code: string, message: string): string {
-  return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
+  return ASK_REFUSALS_WITH_OPERATOR_FIGURES.has(code) ? code : message;
 }
+
+/**
+ * The refusals whose message carries the OPERATOR's figures (I6): the day's ceiling and spend, and — debate shape,
+ * spec 2026-10-12 — the attempt ceiling's own terms that the receipt readers name when a receipt does not add up
+ * (the serve reserve, the serve leg's attempts, a size against the panel). They describe the engine's receipt, not
+ * the ask the caller sent, so the caller is told the code and the operator's log keeps the message.
+ */
+const ASK_REFUSALS_WITH_OPERATOR_FIGURES: ReadonlySet<string> = new Set([
+  "DAILY_COST_ENVELOPE_REACHED",
+  "RUN_COST_ENVELOPE_UNRESOLVED",
+  "STRUCTURAL_CEILING_SHAPE_INVALID",
+  ASK_MODEL_ASSIGNMENT_INVALID
+]);
 
 /**
  * The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. A refusal that
@@ -2511,6 +2569,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // Budget spec §2.7 (B6b): 422 with the waiting run and its expected start,
     // and nothing else. Every other refusal keeps the envelope below.
+    // Question language (spec 2026-10-13): a real mix ends the request with the offer; no run exists. The decider
+    // sends only an offer the contract accepts (PF-L19: one it refuses becomes the lock), so this parse holds.
+    if (knownError instanceof QuestionLanguageChoiceNeeded) {
+      return reply.status(409).send(QuestionLanguageChoiceNeededSchema.parse({
+        error: QUESTION_LANGUAGE_CHOICE_NEEDED, message: QUESTION_LANGUAGE_CHOICE_NEEDED, offer: knownError.offer
+      }));
+    }
     if (knownError instanceof AskAlreadyWaitingRefusal) {
       return reply.status(422).send(AskAlreadyWaitingSchema.parse({
         error: "ASK_ALREADY_WAITING",
@@ -3504,12 +3569,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
           access,
-          // B8 (R-28): with billing on, the room is read for the ask the server would run.
-          settingsClass: runSettingsClassOfAsk(await decideRoomSettings({
-            plan_tier: query.data.plan_tier,
-            composition_budget_tier: query.data.composition_budget_tier,
-            depth_params: { depth: query.data.depth }
-          }, access.ownerRef, options.askBilling),previewConfig)
+          settingsClass: await (async () => {
+            // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
+            // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
+            const decided = await decideRoomSettingsAndPlan({
+              plan_tier: query.data.plan_tier,
+              composition_budget_tier: query.data.composition_budget_tier,
+              depth_params: roomDepthParams(query.data)
+            }, access.ownerRef, options.askBilling);
+            const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
+            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan),
+              previewConfig, roomPlan);
+          })()
         });
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -3518,7 +3589,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       waiting_run_ref: answer.waitingRunRef,
       plan_id: answer.planId,
       ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
-      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
+      // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
+      // today's byte for byte, and the page offers none of the three settings it would drop.
+      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const })
     }));
   });
 
@@ -3610,6 +3685,36 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return disclosure === null
       ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
       : reply.send(disclosure);
+  });
+
+  // Debate shape P2c (spec 2026-10-12 §3.3 step 8, §3.4): the debate page's map view.
+  // Ruling C-MAPREAD: the page asks on every load and most debates have no map, so the first
+  // gate is `findMapRun` — one owner query that names the answer's run, then one lookup of the
+  // map choice — and a debate with no map answers 404 before the full answer read or any
+  // content lease. A caller who does not own the answer gets the same 404 after the owner
+  // query alone. Only then is the answer read (owner-scoped, for its nodes), and the
+  // application checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
+  // "Not yours", "malformed", "no reader" and "no map choice" (incl. an erased run) are one
+  // closed 404. Titles land on the nodes the map recorded (C-ROOTS), kept only when the
+  // answer holds them, so a title never names a node the page cannot show. A corrupt map
+  // row stays the closed 500 (PF-C19).
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/map", routePolicy("GET /v1/answers/{id}/map"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const mapViews = options.mapViews;
+    if (!answerId.success || mapViews === undefined) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    const ownership = ownershipFor(request);
+    const mapRunId = await mapViews.findMapRun({ answerId: answerId.data, ownership });
+    if (mapRunId === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null || answer.run_ref !== mapRunId) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    const view = await mapViews.readMapView({
+      runId: answer.run_ref,
+      nodeIds: answerNodeIds(answer),
+      ownership
+    });
+    return view === null
+      ? reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" })
+      : reply.send(DebateMapViewSchema.parse(view));
   });
 
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {
@@ -3955,6 +4060,8 @@ export interface RunCreationSettings {
      * it; the composition passes it to `computeStructuralCeilingBasis`.
      */
     readonly backupSequencesProvisioned: 0 | 1;
+    /** Debate shape (spec 2026-10-12 §3.6): the sizes this panel runs (`resolveDebateShape`), or null for today's shape. */
+    readonly shape: DebateShapeCeilingInput | null;
   }) => Promise<Readonly<Record<string, unknown>>>;
   readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
@@ -3974,6 +4081,13 @@ export interface RunCreationSettings {
    * admits through `admitWithScorecard`, which never reads it). Absent: today's fixed roles, byte for byte.
    */
   readonly roleRotation?: Readonly<{ readCounts: () => Promise<RoleRotationCounts> }>;
+  /**
+   * Debate shape (spec 2026-10-12 §3.1): present only when the register's optional debateShapePolicy row is in force.
+   * Absent: every ask's depth_params is today's `{ depth }` and every basis today's, byte for byte.
+   */
+  readonly debateShapePolicy?: DebateShapePolicy;
+  /** Question language (spec 2026-10-13): read only with `debateShapePolicy`; the first step of submit. */
+  readonly questionLanguage?: QuestionLanguagePort;
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
@@ -4067,6 +4181,8 @@ async function admitWithScorecard(input: Readonly<{
   scorecard: Scorecard;
   /** S2: the person the room's preview measured; null for no person scope (local, billing off, legacy asker). */
   personRoom: PersonRoomInput | null;
+  /** Debate shape (spec 2026-10-12 §3.1): the plan key the ask was normalised for. */
+  shapePlan: DebateShapePlanKey;
 }>): Promise<AskAdmission> {
   const { settings, ask, risk, discoveredPanel, picker } = input;
   // Carry 15 (A20.2 review m1): first, as an engine fault. `evaluateAskAdmission`
@@ -4099,14 +4215,17 @@ async function admitWithScorecard(input: Readonly<{
   }
   const resolveBasis = async (
     panelSize: number,
-    backupSequencesProvisioned: 0 | 1
+    backupSequencesProvisioned: 0 | 1,
+    makers: number
   ): Promise<Readonly<Record<string, unknown>>> => {
     try {
       return await settings.resolveEnvelopeBasis({
         depthParams: ask.depth_params,
         riskTier: risk.effectiveRiskTier,
         panelSize,
-        backupSequencesProvisioned
+        backupSequencesProvisioned,
+        // Debate shape (spec 2026-10-12 §3.6): on this path each debater is a distinct maker (debaterSeatCount).
+        shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers)
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -4114,7 +4233,7 @@ async function admitWithScorecard(input: Readonly<{
   };
   // The planned basis sizes the picker's expected calls only. Its call-site
   // counts do not depend on the backup provision, so it is asked without one.
-  const plannedBasis = await resolveBasis(plannedDebaters, 0);
+  const plannedBasis = await resolveBasis(plannedDebaters, 0, plannedDebaters);
   // S2: a hosted plan cap is read by the plan's TIER. With billing on, B8 already
   // rewrote `ask.plan_tier` to the person's plan's tier (R-28).
   const hostedPlanTier = picker.mode === "HOSTED" ? ask.plan_tier : null;
@@ -4130,8 +4249,9 @@ async function admitWithScorecard(input: Readonly<{
     perRunCeilingMicros: picker.perRunCeilingMicros,
     plansSold,
     prices: targetPricesOf(picker.targetFacts),
-    // Final review I3: the gateway's window wall adds each call's sealed answer bound.
-    answerTokenCeilingByRole: picker.answerTokenCeilings
+    // Final review I3: the gateway's window wall adds each call's sealed answer bound. Debate shape (spec
+    // 2026-10-12 §3.3): a shaped run's answer writer and map steps use its receipt's longer bounds.
+    answerTokenCeilingByRole: answerTokenCeilingsForBasis(picker.answerTokenCeilings, plannedBasis)
   });
   /** S2: the pick for the person's room at `at` (null: no person scope). */
   const pickAt = (at: Date | null): PersonRoomPick => pickWithinPersonRoom({
@@ -4207,14 +4327,16 @@ async function admitWithScorecard(input: Readonly<{
     // has a runner-up; any other run keeps DR-184-v4 exactly (no padding, V's
     // 2026-09-05 ruling). The receipt names the formula it was minted with.
     const backupSequencesProvisioned = backupSequencesFor(outcome.assignment);
-    const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0
+    // Debate shape: the seated debaters' own makers size the shape, so a shaped basis is always minted for them.
+    const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0 && settings.debateShapePolicy === undefined
       ? plannedBasis
-      : await resolveBasis(debaters.length, backupSequencesProvisioned);
+      : await resolveBasis(debaters.length, backupSequencesProvisioned, new Set(debaters.map((seat) => seat.maker)).size);
     // Carry 15 (A20.2 review m3): a required input field does not force a
     // composition to read it. One that drops the provision would mint DR-184-v4
     // for a run whose runner-ups need v5's backup allowance, and that run could
     // exhaust its ceiling part-way. The receipt names its formula, so it is checked.
-    if (backupSequencesProvisioned === 1 && envelopeBasis.formula_version !== "DR-184-v5") {
+    // Debate shape: a shape receipt says so itself (`shape.backup_sequences`), so the check reads the receipt, not a name.
+    if (backupSequencesProvisioned === 1 && !structuralBasisProvisionsBackup(envelopeBasis)) {
       throw new TypedDomainError(
         ASK_MODEL_ASSIGNMENT_INVALID,
         "The attempt ceiling was minted without the backup sequence a runner-up needs"
@@ -4291,7 +4413,8 @@ export async function evaluateAskAdmission(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,
-  previewAdmissionLock?: PreviewAdmissionLock
+  previewAdmissionLock?: PreviewAdmissionLock,
+  shapePlanKey: DebateShapePlanKey | null = null
 ): Promise<AskAdmission> {
   const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
   if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
@@ -4323,6 +4446,8 @@ export async function evaluateAskAdmission(
       "The plan tier must be free or premium"
     ));
   }
+  // Debate shape (spec 2026-10-12 §3.1): the plan id submit resolved with billing on, else the tier's key.
+  const shapePlan = shapePlanKey ?? debateShapePlanKeyOf(null, ask.plan_tier);
   // A20: a VALID scorecard replaces the roster filter below; anything else
   // (no picker, ABSENT, REFUSED) keeps it byte for byte.
   const modelPicker = settings.modelPicker;
@@ -4337,7 +4462,7 @@ export async function evaluateAskAdmission(
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     return admitWithScorecard({
       settings, ask, risk, discoveredPanel, rosterModelIds: roster,
-      picker: modelPicker, scorecard: modelPicker.scorecard.scorecard, personRoom
+      picker: modelPicker, scorecard: modelPicker.scorecard.scorecard, personRoom, shapePlan
     });
   }
   const filteredPanel = roster
@@ -4389,7 +4514,9 @@ export async function evaluateAskAdmission(
       riskTier: risk.effectiveRiskTier,
       panelSize: filteredPanel.length,
       // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
-      backupSequencesProvisioned: 0
+      backupSequencesProvisioned: 0,
+      shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan,
+        new Set(filteredPanel.map((entry) => entry.maker)).size)
     });
   } catch (error) {
     markAskRefusal(error);
@@ -4462,10 +4589,11 @@ type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 async function evaluationOrRefusal(
   settings: RunCreationSettings,
   ask: AskRequest,
-  personRoom: PersonRoomInput | null = null
+  personRoom: PersonRoomInput | null = null,
+  shapePlan: DebateShapePlanKey | null = null
 ): Promise<AskEvaluation | AskRefusal> {
   try {
-    return await evaluateAskAdmission(settings, ask, personRoom);
+    return await evaluateAskAdmission(settings, ask, personRoom, undefined, shapePlan);
   } catch (error) {
     if (error instanceof AskRefusal) return error;
     throw error;
@@ -4585,8 +4713,36 @@ export class PostgresAskApplication implements AskApplication {
     // sees the decided one. `plannedAsk` is the plan-decided ask before the
     // interim swap: B6b's room creates a question that WAITs from it, so only a
     // START runs on the Free roster (A5). Without a swap the two are the same.
-    let ask: AskRequest = requestedAsk;
-    let plannedAsk: AskRequest = requestedAsk;
+    // Debate shape (spec 2026-10-12 §3.2): every ask is normalised for its plan key before anything reads it, so the
+    // stored depth_params is `{ depth }` exactly (no row) or all four settings (the row), never anything in between.
+    const shapePolicy = this.settings.debateShapePolicy ?? null;
+    // Question language (spec 2026-10-13, ruling L8): with the shape row, the language is decided first — after the
+    // route's crisis, consent, team, admission and country checks, before billing, admission and any lock. A refusal
+    // of the person's choice is a 409 the page answers by checking again; an offer ends the request with a 409.
+    // Ruling L-NOCONSENT (pre-flight PF-L30): the route records consent only for signed-in people, so a legacy
+    // principal never reaches the fast AI (eld + site language, no offer). The step stays before billing (CR-1).
+    // An unknown tier with billing off (a direct caller; the route's schema admits only free and premium) can never
+    // start: today's typed check refuses it further on (`#submitWithRoom`'s first line, or `evaluateAskAdmission`
+    // after the daily guard), in today's order. So the decider is not asked for it (no fast call, no offer). With
+    // billing on the server decides the tier from the person's plan, so the decider is asked as for any ask.
+    const tierRefusedLater = this.settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
+    const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || this.settings.questionLanguage === undefined
+      || tierRefusedLater
+      ? null
+      : await this.settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
+        fastCheckAllowed: principal.kind === "server" })
+        .catch((error: unknown) => {
+          if (error instanceof TypedDomainError) markAskRefusal(error);
+          throw error;
+        });
+    // An unknown tier (a direct caller; the route's schema admits only free and premium) is refused by today's typed
+    // check further on — `#submitWithRoom`'s first line, or `evaluateAskAdmission` after the daily guard — so until
+    // then it is keyed as Free, the narrowest plan, instead of `debateShapePlanKeyOf` throwing a raw TypeError first.
+    // With billing on, the key is re-derived below from the plan the server resolved.
+    let shapePlan: DebateShapePlanKey = Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string)
+      ? debateShapePlanKeyOf(null, requestedAsk.plan_tier) : "free";
+    let ask: AskRequest = normaliseAskForDebateShape(requestedAsk, shapePolicy, shapePlan);
+    let plannedAsk: AskRequest = ask;
     let applied: AskApplied | null = null;
     let substitutedAt: Date | null = null;
     let fundingBasis: FundingBasis | undefined;
@@ -4598,15 +4754,17 @@ export class PostgresAskApplication implements AskApplication {
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
       fundingBasis = resolved.fundingBasis;
-      ask = resolved.ask;
-      plannedAsk = resolved.ask;
-      applied = appliedAskOf(resolved.ask);
+      // Debate shape: with billing on the plan id decides the key (PLUS, PRO and MAX each their own), not the tier.
+      shapePlan = debateShapePlanKeyOf(resolved.planId, resolved.ask.plan_tier);
+      ask = normaliseAskForDebateShape(resolved.ask, shapePolicy, shapePlan);
+      plannedAsk = ask;
+      applied = appliedAskOf(ask);
       // Paid plans S2 (spec §2.6 item 7, "until the picker is live"): with a VALID
       // model scorecard the picker plans inside the person's room (the third argument
       // of `evaluateAskAdmission`), so the interim roster swap — which would also put a
       // paid person under the Free cap — never runs on the picker path.
       const pickerPlans = this.settings.modelPicker?.scorecard.state === "VALID";
-      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, this.settings.previewProviderTestConfig) === "FREE_ROSTER") {
+      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, this.settings.previewProviderTestConfig, shapePlan) === "FREE_ROSTER") {
         ask = Object.freeze({ ...ask, plan_tier: "free" as const });
         substitutedAt = now;
       }
@@ -4621,7 +4779,7 @@ export class PostgresAskApplication implements AskApplication {
     // the reply carries what the server applied (QUEUED or WAITING).
     if (this.settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, fundingBasis
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, shapePlan, questionLanguageLock, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -4631,8 +4789,11 @@ export class PostgresAskApplication implements AskApplication {
     const previewAdmissionLock = validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined
       ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
     try {
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock);
-    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock, shapePlan);
+    // Ruling L-SHAPED-ONLY (final review I2): the lock is the run's only when admission minted a shape receipt, the
+    // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
+    const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
+    const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
     // after that, and the run then exists with nothing to start it.
@@ -4668,7 +4829,8 @@ export class PostgresAskApplication implements AskApplication {
             decision_scope: ask.decision_scope,
             steering_presets: ask.steering_presets,
             steering_annotations: ask.steering_annotations,
-            critic_unavailable_cap: criticUnavailableCap
+            critic_unavailable_cap: criticUnavailableCap,
+            ...questionLanguageAskContractMember(storedLanguageLock)
           },
           batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
         },lease.client);
@@ -4849,13 +5011,14 @@ export class PostgresAskApplication implements AskApplication {
     ownership: RunOwnershipAccess,
     room: AskRoomPort,
     substitutedAt: Date | null,
+    shapePlan: DebateShapePlanKey,
+    questionLanguageLock: QuestionLanguageLock | null,
     fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
-    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -4883,16 +5046,16 @@ export class PostgresAskApplication implements AskApplication {
         let startAsk = ask;
         let swappedAt = substitutedAt;
         let decisionQuestion = question;
-        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask, personRoomOf(preview));
+        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask, personRoomOf(preview), shapePlan);
         const plannedEvaluation = substitutedAt === null
           ? swappedEvaluation
-          : await evaluationOrRefusal(this.settings, plannedAsk);
+          : await evaluationOrRefusal(this.settings, plannedAsk, null, shapePlan);
         if (swappedAt !== null && swappedEvaluation instanceof AskRefusal && !(plannedEvaluation instanceof AskRefusal)) {
           // Important 2: the cheaper roster cannot run, the plan's own can. Drop the swap.
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -4911,6 +5074,10 @@ export class PostgresAskApplication implements AskApplication {
             : startEvaluation;
           const evaluated: PlannedAskAdmission | AskRefusal = keepsPlan ? plannedEvaluation : chosen;
           if (evaluated instanceof AskRefusal) throw evaluated;
+          // Ruling L-SHAPED-ONLY (final review I2): the lock is stored only when the admission this run is created
+          // from minted a shape receipt; a run with no shape stores today's guess and today's ask contract.
+          const storedLanguageLock = (evaluated.envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
+          const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
           await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
           const runId = await this.#runs.startRun({
             questionLine: runAsk.question_line,
@@ -4936,7 +5103,8 @@ export class PostgresAskApplication implements AskApplication {
               decision_scope: runAsk.decision_scope,
               steering_presets: runAsk.steering_presets,
               steering_annotations: runAsk.steering_annotations,
-              critic_unavailable_cap: evaluated.criticUnavailableCap
+              critic_unavailable_cap: evaluated.criticUnavailableCap,
+              ...questionLanguageAskContractMember(storedLanguageLock)
             },
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
           }, lease.client);

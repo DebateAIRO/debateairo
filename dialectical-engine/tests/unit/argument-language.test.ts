@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { argumentLanguageDirective, detectArgumentLanguage, foreignLatinLetterCount } from "@debateai/kernel";
+import { LEGAL_LOCALES, legalSentences } from "../../tools/question-language-tune/legal-sentences.js";
 
 const CASES = [
   ["ro", "Romanian", "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat."],
@@ -319,21 +319,8 @@ describe("detectArgumentLanguage", () => {
  * Romanian sentences read as French with high confidence (they share î and â, "de", "la" and "au"). A language whose
  * alphabet lacks letters the claim writes in its lowercase words now loses its marker at one such letter and is out at
  * two; Romanian and Spanish also know a few more of their own small words. Measured on every sentence of six to thirty
- * words of the site's translated Terms and Privacy pages (35 languages).
+ * words of the site's translated Terms and Privacy pages (35 languages; tools/question-language-tune/legal-sentences.ts).
  */
-function legalSentences(locale: string): string[] {
-  const files = locale === "en"
-    ? ["../../apps/ui/lib/termsOfService.ts", "../../apps/ui/lib/privacyPolicy.ts"]
-    : [`../../apps/ui/lib/legal/${locale}/termsOfService.ts`, `../../apps/ui/lib/legal/${locale}/privacyPolicy.ts`];
-  return files.flatMap((file) => [...readFileSync(new URL(file, import.meta.url), "utf8").matchAll(/text: "((?:[^"\\]|\\.)*)"/gu)]
-    .map((match) => JSON.parse(`"${match[1]!}"`) as string)
-    .filter((text) => !text.startsWith("[")))
-    .flatMap((paragraph) => paragraph.split(/(?<=[.!?;:])\s+/u))
-    .filter((sentence) => { const words = sentence.split(/\s+/u).length; return words >= 6 && words <= 30; });
-}
-const LEGAL_LOCALES = ["en", ...readdirSync(new URL("../../apps/ui/lib/legal/", import.meta.url), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory()).map((entry) => entry.name)].sort();
-
 describe("Romanian is not French, and neighbours stay apart (2026-10-13)", () => {
   it.each([
     "Renunțarea la leu înseamnă pierderea politicii monetare proprii și a cursului de schimb, instrumente care au amortizat șocurile asimetrice în ultimii douăzeci de ani.",

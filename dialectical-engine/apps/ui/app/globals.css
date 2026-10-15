@@ -6827,20 +6827,12 @@ a:focus-visible {
 .ndOptionsCaret { font-size: 8px; }
 .ndOptionsRule { flex: 1; height: 1px; background: var(--line); }
 
-/* The V2 knobs the V3 contract has no slot for are drawn as a dashed aside. */
+/* The OPTIONS panel is drawn as a dashed aside (M12 pins this frame). */
 .ndLegacy {
   margin-top: 14px;
   border-style: dashed;
   border-color: var(--line-strong);
   opacity: 0.88;
-}
-.ndLegacyNotice {
-  margin: 0;
-  padding: 14px 0;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-2);
-  border-bottom: 1px solid var(--line);
 }
 /* The document draws these as a box holding just the chosen label. A native
    select would instead size to its widest option, so the real control lies
@@ -8045,6 +8037,13 @@ a:focus-visible {
   color: var(--gold-text);
   background: var(--gold-bg);
   border-color: var(--gold-border);
+}
+
+/* Debate shape P2c (ruling C-TONE): the shape marks are information, not a dispute. */
+.drawerConditionPill.neutral {
+  color: var(--text-2);
+  background: var(--surface-sunken);
+  border-color: var(--line-2);
 }
 
 .drawer[data-drawer-panel] .drawerActions {
@@ -10068,6 +10067,43 @@ a:focus-visible {
   .lpNav { max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; gap: 12px; padding: 10px; }
   .lpNavLinks { display: none; }
   .lpNav > div { flex-wrap: wrap; justify-content: center; }
+}
+
+/* Debate shape P2c (spec 2026-10-12 §3.3 step 8): "Also raised, not debated" and the position titles. */
+.alsoRaised {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+.alsoRaisedTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.alsoRaisedList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.alsoRaisedEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.positionTitle {
+  margin: 6px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
 }
 
 /* === consent-ui S01 === */

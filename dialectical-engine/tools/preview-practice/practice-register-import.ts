@@ -39,15 +39,20 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import {
+  canonicalRegisterJson,
   computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort,
+  DEBATE_SHAPE_POLICY_ROW_KEY,
+  debateShapePolicyRow,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   type BootstrapRegister,
   type CallConcurrencyPolicy,
+  type DebateShapePolicy,
   type RegisterPublicationRow
 } from "@debateai/register";
+import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import {
   buildPreviewSourceRowsV2,
   composePreviewSnapshotV2,
@@ -210,10 +215,24 @@ export type PracticeNextRegisterChoices = Readonly<{
   checker?: PreviewCheckerChoice;
   roleRotation?: PreviewRoleRotationChoice;
   callConcurrency?: CallConcurrencyPolicy;
+  /**
+   * `--shape-policy` with `--register-next` (controller ruling D-REGNEXT): handed to the kit's own source build as its
+   * `debateShape` (kit v2 directly, kit v3 through kit v2, as the plan's `--debate-shape`), so the code's next version
+   * carries the row exactly as the server's publish would. Absent: no row from the code (a base's own row is carried
+   * unchanged, R19).
+   */
+  debateShape?: DebateShapePolicy;
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
+  /**
+   * The version the debate ran on. As the import returns it: the export's newest version, or the code's next one
+   * (`--register-next`). In a debate's report, after `--shape-policy` published the practice's own version on top, that
+   * version (final review M-2), and the imported newest version moves to `importedRegisterVersion`.
+   */
   registerVersion: string;
+  /** Only when the practice's own debate-shape version was published on top: the newest version the import brought in. */
+  importedRegisterVersion?: string;
   steps: readonly PracticeRegisterImportStep[];
   /** Present when the practice runs on the code's next version (`--register-next`): what that version changed. */
   codeNext?: Readonly<{ baseRegisterVersion: string; addedKeys: readonly string[]; changedKeys: readonly string[]; deltaSha256: string;
@@ -241,6 +260,12 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
   deepseekEnabledOnGate?: string | undefined;
   roleRotation?: string | undefined;
   callConcurrency?: string | undefined;
+  /**
+   * `--shape-policy`'s policy, already checked by the register's own parser (practice-shape.ts); with `--register-next`
+   * it goes into the next version (controller ruling D-REGNEXT), as the plan's `--debate-shape '<JSON>'`. It does not
+   * choose the kit.
+   */
+  debateShape?: DebateShapePolicy | null | undefined;
 }>, load: () => Promise<NativeOperatorChecks> = async () => await import(NATIVE_OPERATOR_MODULE) as NativeOperatorChecks):
   Promise<Readonly<{ kit: "v2" | "v3"; hostedBilling: PreviewHostedBillingChoice | null; choices: PracticeNextRegisterChoices }>> {
   const invalid = (flag: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_INPUT_INVALID", flag); };
@@ -267,7 +292,8 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
     ...(flags.checker === undefined ? {} : { checker: flags.checker === "deepseek"
       ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const }) : Object.freeze({ checker: "glm" as const }) }),
     ...(flags.roleRotation === undefined ? {} : { roleRotation: flags.roleRotation as PreviewRoleRotationChoice }),
-    ...(callConcurrency === undefined ? {} : { callConcurrency })
+    ...(callConcurrency === undefined ? {} : { callConcurrency }),
+    ...(flags.debateShape === undefined || flags.debateShape === null ? {} : { debateShape: flags.debateShape })
   });
   return Object.freeze({ kit: hostedBilling === null ? "v2" as const : "v3" as const, hostedBilling, choices });
 }
@@ -304,7 +330,8 @@ function practiceBaseRuntime(baseRows: readonly RegisterPublicationRow[], unsupp
  *  - the runtime observation: the base's `nodeRuntimeVersion` row and its source reference, and its `pnpmVersion` row.
  * Anything else in the base that cannot be read that way refuses (PRACTICE_REGISTER_NEXT_UNSUPPORTED), and so does a
  * code that changes no row (there is then no next version to practise). `choices` (the plan's `--checker`,
- * `--role-rotation`, `--call-concurrency`) replace the base's reading when given. A hosted base (one kit v3 sealed)
+ * `--role-rotation`, `--call-concurrency`) replace the base's reading when given; `choices.debateShape` (the plan's
+ * `--debate-shape`, the practice's `--shape-policy`) adds the debate-shape row. A hosted base (one kit v3 sealed)
  * refuses: the server's plan needs the hosted inputs there too (PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED).
  */
 export async function composePracticeNextRegisterVersion(
@@ -334,8 +361,9 @@ export async function composePracticeNextRegisterVersion(
     return rotationEnabled === true ? "on" as const : "off" as const;
   })();
   const runtime = practiceBaseRuntime(baseRows, unsupported);
+  // `choices.debateShape` (controller ruling D-REGNEXT): the kit's own source build's `debateShape`.
   const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), runtime, checker, roleRotation,
-    choices.callConcurrency ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV2({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -387,8 +415,10 @@ export async function composePracticeHostedNextRegisterVersion(
     notes.push("the newest version has role rotation off; without --role-rotation off the next version switches it on "
       + "(so does the server's plan without the same flag)");
   }
+  // `choices.debateShape` (controller ruling D-REGNEXT): kit v3 hands it to kit v2's source build, as the plan's own
+  // `--debate-shape` does (publish-register-v3.ts), and asks the runner's debate-shape boot refusals before sealing.
   const sourceRows = await buildPreviewSourceRowsV3(bootstrap ?? await loadBootstrapRegister(), runtime, hostedBilling, checker, roleRotation,
-    choices.callConcurrency ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV3({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -484,4 +514,87 @@ export async function importPracticeRegister(pool: Pool, document: PracticeRegis
       changedKeys: next.changedKeys, deltaSha256: next.deltaSha256,
       ...(next.composer === undefined ? {} : { composer: next.composer, hostedBilling: next.hostedBilling!, notes: next.notes ?? [] }) })
   });
+}
+
+/**
+ * Debate shape (plan 2026-10-12-debate-shape-phase2d, `--shape-policy`): the source ref of the one row the practice adds.
+ * It says where the row came from, so no reader can mistake the practice's version for a live one.
+ */
+export const PRACTICE_SHAPE_SOURCE_REF = "preview practice: --shape-policy, this throwaway register only" as const;
+
+export type PracticeShapeVersion = Readonly<{
+  baseRegisterVersion: string;
+  registerVersion: string;
+  /** ADDED: the export had no debate-shape row. REPLACED: its own row was superseded in this throwaway copy. */
+  row: "ADDED" | "REPLACED";
+  snapshotSha256: string;
+}>;
+
+/**
+ * The contract-hash rows the practice version takes from THIS code (P2b ruling X3, plan 2026-10-12-debate-shape-phase2d
+ * Contract deviation 7). The runner refuses a debate-shape row whose map hash is not its own map contracts, and its
+ * boot (assertRegisterPromptContractHashes) refuses a register whose judge, composer or conformance hash is not what
+ * this candidate code sends (pre-flight PF-D7).
+ */
+export const PRACTICE_CODE_HASH_ROW_KEYS = Object.freeze(["composerContractHash", "conformanceContractHash", "judgeContractHash",
+  "mapContractHash"] as const);
+
+/**
+ * The code's own values of those four rows, exactly as the development register builder seals them
+ * (apps/runner/src/dev-deployment-register.ts), its source ref included: the runner's policy reader
+ * (apps/runner/src/dev-runner-policy.ts) refuses a judge, composer or conformance hash row sealed by anyone else
+ * (DEV_RUNNER_POLICY_PROVENANCE_INVALID; found by P2d Task 6's whole shape debate). The version itself is still
+ * published under PRACTICE_SHAPE_SOURCE_REF, and so is the debate-shape row. Throwaway database only.
+ */
+export async function practiceCodeContractHashRows(): Promise<readonly RegisterPublicationRow[]> {
+  const rows = await buildDevelopmentRunnerRegisterRows();
+  return Object.freeze(PRACTICE_CODE_HASH_ROW_KEYS.map((rowKey) => {
+    const row = rows.find((entry) => entry.rowKey === rowKey);
+    if (row === undefined || typeof row.value !== "string") throw new PracticeRegisterError("PRACTICE_CODE_HASH_MISSING", rowKey);
+    return Object.freeze({ rowKey, valueJsonText: canonicalRegisterJson(row.value), sourceRef: row.sourceRef });
+  }));
+}
+
+/**
+ * The practice version's rows: the export's LAST version's rows exactly as imported, with the debate-shape row added
+ * (or the export's own replaced) and the code's four contract-hash rows put in place of the export's, in key order.
+ * Pure.
+ */
+export function practiceShapeVersionRows(document: PracticeRegisterExport, policy: DebateShapePolicy,
+  codeHashRows: readonly RegisterPublicationRow[]): Readonly<{ rows: readonly RegisterPublicationRow[]; row: "ADDED" | "REPLACED" }> {
+  const last = document.versions[document.versions.length - 1]!;
+  const base = practiceVersionRows(document, last.register_version);
+  const shaped = debateShapePolicyRow(policy, PRACTICE_SHAPE_SOURCE_REF);
+  const replaced = base.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY);
+  const own = new Set<string>([DEBATE_SHAPE_POLICY_ROW_KEY, ...codeHashRows.map((row) => row.rowKey)]);
+  const rows = [...base.filter((row) => !own.has(row.rowKey)),
+    Object.freeze({ rowKey: shaped.rowKey, valueJsonText: shaped.valueJsonText, sourceRef: shaped.sourceRef }), ...codeHashRows]
+    .sort((a, b) => (a.rowKey < b.rowKey ? -1 : a.rowKey > b.rowKey ? 1 : 0));
+  return Object.freeze({ rows: Object.freeze(rows), row: replaced ? "REPLACED" : "ADDED" });
+}
+
+/**
+ * Publishes the practice version in the THROWAWAY database only, through the register's own general publication on
+ * the export's last version, and proves it: the number allocated is exactly one above, and its rows hash as built.
+ * The export document is only read.
+ */
+export async function publishPracticeShapeVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
+  policy: DebateShapePolicy): Promise<PracticeShapeVersion> {
+  const { rows, row } = practiceShapeVersionRows(document, policy, await practiceCodeContractHashRows());
+  const expected = String(BigInt(receipt.registerVersion) + 1n);
+  const published = await createPostgresRegisterPublicationPort(pool).publishGeneral({
+    publicationId: randomUUID(),
+    baseRegisterVersion: parseRegisterVersionText(receipt.registerVersion),
+    rows,
+    sourceRef: PRACTICE_SHAPE_SOURCE_REF,
+    deployment: "local"
+  });
+  if (published.registerVersion !== expected) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_VERSION_DRIFT", `expected ${expected}, the publication allocated ${published.registerVersion}`);
+  }
+  const snapshotSha256 = computeRegisterSnapshotSha256(rows);
+  if (await databaseVersionSnapshotSha256(pool, expected) !== snapshotSha256) {
+    throw new PracticeRegisterError("PRACTICE_REGISTER_HASH_MISMATCH", `version ${expected} (the practice's debate-shape version)`);
+  }
+  return Object.freeze({ baseRegisterVersion: receipt.registerVersion, registerVersion: expected, row, snapshotSha256 });
 }

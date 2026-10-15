@@ -5,7 +5,7 @@ import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
-import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const sourceOf = (relative: string): Promise<string> =>
@@ -98,14 +98,18 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   it("pins the judge and composer fingerprints as sealed VALUES, not derivations", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
+    // Debate shape (Phase 2b Task 4): the judge seal grew from e7f7e4b0…1365 (frozen V1, history) by six contracts.
     expect(acceptance.judgeContractHash)
-      .toBe("e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365");
+      .toBe("aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612");
     // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
     // d96e7cc9…c866, and serve.synthesizer.v3 (2026-10-12, practice debate 3)
     // superseded v2's 340e11a6…8b70 (register versions sealed before each keep
-    // the value they carry).
+    // the value they carry). The debate shape's length variant (2026-10-13)
+    // joined v3 in this seal; v3's 4b141d3a…f90f is history. Answer writer v4
+    // (owner-approved wording, 2026-10-15) with its length variant length.v2
+    // superseded v3 + length.v1's 9a46af29…5662, which is history too.
     expect(acceptance.composerContractHash)
-      .toBe("4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f");
+      .toBe("879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);
@@ -118,7 +122,7 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // runner's source, so the slot separation is asserted against the objects.
     expect(acceptance.conformanceContractHash).not.toBe(acceptance.composerContractHash);
     expect(acceptance.composerContractHash)
-      .toBe(sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)));
+      .toBe(sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT));
     expect(acceptance.conformanceContractHash).not.toBe(
       sha256([
         promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),

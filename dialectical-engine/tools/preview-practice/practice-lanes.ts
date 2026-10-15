@@ -26,6 +26,20 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
+  mapAnglesReplySchema,
+  mapAnglesSalvage,
+  mapChooseReplySchema,
+  mapChooseSalvage,
+  mapClassifyReply,
+  mapGapReplySchema,
+  mapGapSalvage,
+  mapListReplySchema,
+  mapListSalvage,
+  mapMergeReplySchema,
+  mapSnowballReplySchema,
+  type MapReplySalvage
+} from "@debateai/map";
+import {
   decodeModelJson,
   promptContractFingerprintText,
   rememberingAcceptedReply,
@@ -50,7 +64,7 @@ import {
   parseEvaluatorOutput
 } from "@debateai/runner";
 import {
-  SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   assertEvaluatorVerdict,
   buildEvaluatorRequest,
   buildSynthesisDigest,
@@ -129,10 +143,11 @@ export function replyContentOf(rawText: string): string {
   return rawText;
 }
 
-export type PracticeCallFamily = "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER" | "UNMAPPED";
+export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER" | "UNMAPPED";
 
 /** Which job a debate call was, from its call-site key (apps/runner/src/index.ts and packages/story naming). */
 export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
+  if (callSiteKey.startsWith("MAP:")) return "MAP";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
   if (callSiteKey.startsWith("COMPOSER:SYNTHESIZER:")) return "SYNTHESIZER";
@@ -143,14 +158,89 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   return "UNMAPPED";
 }
 
+/** The map's steps as their call-site keys name them (spec 2026-10-12 §3.4). */
+export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap", "choose"] as const);
+export type PracticeMapStep = typeof PRACTICE_MAP_STEPS[number];
+
+/**
+ * `MAP:angles` → angles, `MAP:list:<i>` → list, `MAP:gap:<k>` → gap, …; null for any other key. Only the second
+ * segment is read, so a reassigned list (`MAP:list:<i>:2`, P2b Task 1) is a list too.
+ */
+export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
+  const [family, step] = callSiteKey.split(":");
+  if (family !== "MAP" || step === undefined) return null;
+  return (PRACTICE_MAP_STEPS as readonly string[]).includes(step) ? step as PracticeMapStep : null;
+}
+
+/** One way a map step's reply is read: its schema and the code salvage its step makes (ruling MAP-SALVAGE). */
+type PracticeMapReading = Readonly<{ schema: Parameters<typeof mapClassifyReply>[2]; salvage: (keyPointIds: ReadonlySet<string> | null) => MapReplySalvage<unknown> }>;
+const noSalvage = (): MapReplySalvage<unknown> => ({});
+
+/**
+ * The readings a map step's reply may have. The list key carries both the list and (in a snowball opening) the
+ * snowball reply, so either is accepted. Each makes the step's own code salvage (`@debateai/map` salvage.ts), so a reply
+ * the step salvaged is never flagged here. The steps' own content checks need the run's ids and are not re-run here: the
+ * schema re-check is the diagnosis, the call-time check is the verdict. Choose's salvage drops an id the run does not
+ * hold only when the caller knows the call's key point ids (`practiceMapKeyPointIdsOf`); without them it drops repeats.
+ */
+const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMapReading[]>> = Object.freeze({
+  angles: [{ schema: mapAnglesReplySchema, salvage: () => mapAnglesSalvage }],
+  list: [{ schema: mapListReplySchema, salvage: () => mapListSalvage }, { schema: mapSnowballReplySchema, salvage: () => mapListSalvage }],
+  merge: [{ schema: mapMergeReplySchema, salvage: noSalvage }],
+  gap: [{ schema: mapGapReplySchema, salvage: () => mapGapSalvage }],
+  choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
+});
+
+/** The step's readings in order: the first that accepts the reply, else the first refusal. Null for a key that is no map step. */
+function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFacts | undefined,
+  keyPointIds: ReadonlySet<string> | null): ReturnType<typeof mapClassifyReply<unknown>> | null {
+  const step = practiceMapStepOf(callSiteKey);
+  if (step === null) return null;
+  let first: ReturnType<typeof mapClassifyReply<unknown>> | null = null;
+  for (const reading of MAP_RECHECK_READINGS[step]) {
+    const read = mapClassifyReply(content, ending, reading.schema, () => [], reading.salvage(keyPointIds));
+    if (read.classification.parseStatus === "PARSED") return read;
+    first ??= read;
+  }
+  return first;
+}
+
+function recheckMapReply(callSiteKey: string, content: string): readonly string[] {
+  const read = readMapReply(callSiteKey, content, undefined, null);
+  return read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification);
+}
+
+/**
+ * The key point ids a choose call was shown, from its own recorded prompt (the `key_points` material field, a JSON list
+ * of `{ key_point_id, … }`). Null when the prompt holds no such field or it cannot be read.
+ */
+export function practiceMapKeyPointIdsOf(messages: PromptPacket["messages"]): ReadonlySet<string> | null {
+  try {
+    const field = readPromptFrame({ messages }).fields.find((candidate) => candidate.name === "key_points");
+    if (field === undefined) return null;
+    const keyPoints = JSON.parse(field.content) as unknown;
+    if (!Array.isArray(keyPoints)) return null;
+    const ids = keyPoints.map((entry) => (typeof entry === "object" && entry !== null ? (entry as { key_point_id?: unknown }).key_point_id : undefined));
+    return ids.every((id): id is string => typeof id === "string") ? Object.freeze(new Set(ids)) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Information only (all-steps format robustness, 2026-10-12): which tolerant repair an ACCEPTED reply needed, read by
  * the shared decode (`decodeModelJson`) with how the reply ended (`finish_reason` as the gateway recorded it). Null for
  * strict JSON. The judge's own reading takes the FIRST of several objects where this takes the last, so for such a reply
  * the code may differ; the counts are shown in the report, never a reason for a verdict.
  */
-export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string): string | null {
+export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string,
+  mapKeyPointIds?: ReadonlySet<string> | null): string | null {
   const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
+  // Ruling MAP-SALVAGE (2026-10-14): a map reply is read by its step's own reading, salvage included, and every repair
+  // it needed is named, joined by "+" ("INNER_QUOTE+MAP_TEXT_TRIMMED"). A reply that reading refuses (a patch reply holds
+  // only the patched members) is read by the shared decode, as before.
+  const map = callSiteKey === undefined ? null : readMapReply(callSiteKey, content, ending, mapKeyPointIds ?? null);
+  if (map !== null && map.classification.parseStatus === "PARSED") return map.repairs.length === 0 ? null : map.repairs.join("+");
   // MiMo salvage (2026-10-12): the judge-family steps also make SHAPE repairs (NESTED_FIELDS, RENAMED_MEMBER,
   // UNASKED_KEYS, EMPTY_LIST) that the schema-blind decode cannot see, so with its call-site key a judge, panel or
   // review reply is read by the step's own reader and counted under the repair that reader needed.
@@ -280,6 +370,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       }
       return { family, issues: fromZod(StoryBodySchema.safeParse(parsed)) };
     }
+    case "MAP": return { family, issues: recheckMapReply(callSiteKey, content) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }
@@ -291,7 +382,7 @@ const digestHex = (text: string): string => createHash("sha256").update(text).di
 /** The sealed contract hashes, derived exactly as the register's builder derives them (dev-deployment-register.ts). */
 export const PRACTICE_CONTRACT_HASHES = Object.freeze({
   judge: digestHex(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-  composer: digestHex(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+  composer: digestHex(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
   conformance: digestHex(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
 });
 

@@ -10,9 +10,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { migrate } from "@debateai/db";
 import {
+  DEBATE_SHAPE_POLICY_ROW_KEY,
   canonicalRegisterJson,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
@@ -25,8 +26,9 @@ import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegis
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
-import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
-import { startPreviewGateStubs, stubChatBody, type GateOverride, type GateRequest } from "../support/preview-gate-stubs.js";
+import { PRACTICE_LANGUAGE_DRY_REWRITES, practiceLanguageDryReading } from "../../tools/preview-practice/practice-language.js";
+import { PRACTICE_LANGUAGE_CASES, PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
+import { startPreviewGateStubs, stubChatBody, stubMapContent, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
@@ -835,4 +837,284 @@ describe("preview practice: debate mode", () => {
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_ACK_REQUIRED"]);
     expect(stubs.requests).toEqual([]);
   }, 60_000);
+
+  it("debate shape (P2d Task 2): the command hands the ask settings to the debate, which refuses them on a register without a debate-shape row before any AI is asked (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--answer-length", "short"], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
+    expect(stubs.requests).toEqual([]);
+  }, 300_000);
+});
+
+describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 §5)", () => {
+  const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
+  type ShapeReport = {
+    verdict: string; reasons: string[]; ask: unknown;
+    register: { registerVersion: string; importedRegisterVersion?: string; steps: { path: string }[];
+      codeNext?: { baseRegisterVersion: string; addedKeys: string[]; changedKeys: string[] } };
+    run: { runId: string; workItemOutcome: string; answer: { served: boolean }; story: { outcome: string } };
+    byModelAndSite: { model: string; site: string }[];
+    shape?: { source: string; registerVersion: string; row: string | null; storedDepthParams: unknown; sizes: Record<string, unknown> | null;
+      opening: string | null; mapMarks: Record<string, number>; chosenAnswers: number | null; alsoRaised: number | null;
+      panelCloseCallExtensions: number; scrutinyExtensions: number; mapCallsByStep: Record<string, number>; notExercised: string | null };
+    language?: { siteLanguage: string; offered: boolean; choice: string | null;
+      lock: { code: string; source: string; recordCode: string; localReason: string | null;
+        fast: { outcome: string; reason: string | null; main: string | null } | null } | null;
+      rewriteUsed: boolean; storedLanguage: string | null; plannerLanguage: string | null; plannerDisagrees: boolean | null };
+  };
+  const exportDigest = () => createHash("sha256").update(readFileSync(registerExportPath)).digest("hex");
+  /** How many also-raised points the storyteller was handed (its `also_raised` field, P2c), over all its answered calls. */
+  const storytellerAlsoRaised = (requests: readonly GateRecord[]): number => requests
+    .filter((request) => request.kind === "STORYTELLER" && request.answer === "OK")
+    .map((request) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields
+      .find((field) => field.name === "also_raised")?.content)
+    .reduce((sum, content) => sum + (content === undefined ? 0 : (JSON.parse(content) as unknown[]).length), 0);
+
+  it("--shape-policy (the owners' start values): the map, the chosen answers argued, a served answer and a READY story handed what was also raised: PASS (exit 0)", async () => {
+    const before = exportDigest();
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, quiet);
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    // The export is only read; the import itself is today's; the practice's own version is one above it.
+    expect(exportDigest()).toBe(before);
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION"]);
+    // Final review M-2: the register block names the version the debate ran on, the imported newest under its own name.
+    expect(report.register).toMatchObject({ registerVersion: "6", importedRegisterVersion: "5" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    // Both compositions read the row: the ask path stored the four settings, admission froze the sizes, the runner ran the map.
+    expect(report.shape).toMatchObject({
+      source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", chosenAnswers: 2, notExercised: null,
+      storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+      sizes: { plan: "premium", depthMode: "adaptive", scrutiny: "standard", answerLength: "standard", mapAIs: 5, graders: 3, opening: "ANGLE_MAP" }
+    });
+    expect(report.shape!.alsoRaised).toBeGreaterThan(0);
+    expect(report.shape!.mapCallsByStep).toMatchObject({ angles: 1, merge: 1, choose: 1 });
+    expect(report.shape!.mapCallsByStep.list).toBeGreaterThanOrEqual(2);
+    expect(report.shape!.mapCallsByStep.gap).toBeGreaterThanOrEqual(1);
+    expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(true);
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The ask's one fast language check ran (the row-absent case below sends none; pre-flight PF-D15).
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(stubs.requests.filter((request) => request.kind === "MAP" && request.answer === "OK").length).toBeGreaterThanOrEqual(5);
+    expect(storytellerAlsoRaised(stubs.requests)).toBeGreaterThan(0);
+    // The question language (Task 7b): the Romanian question on the Romanian site. Romanian is an always-ask site (ruling
+    // L-KEEP), so the fast check read it (the stub's one language: FAST, never ELD_SITE), and the run stored that lock
+    // (admission froze a shape: ruling L-SHAPED-ONLY; pre-flight PF-D27). The planner named the same language. Its
+    // naming is recorded for the operator only (CR-3): no condition mark is expected for it.
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, choice: null,
+      lock: { code: "ro", source: "FAST", recordCode: "FAST", localReason: null, fast: { outcome: "ONE", main: "ro" } },
+      rewriteUsed: false, storedLanguage: "ro", plannerLanguage: "ro", plannerDisagrees: false });
+    // The transcript holds the map and ran on the practice's version.
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as {
+      run: { registerVersion: string }; attempts: { family: string }[];
+      structure: { map?: { choice: { alsoRaised: unknown[] } | null; items: unknown[] } };
+    };
+    expect(transcript.run.registerVersion).toBe("6");
+    expect(transcript.attempts.some((attempt) => attempt.family === "MAP")).toBe(true);
+    expect(transcript.structure.map?.choice?.alsoRaised.length ?? 0).toBeGreaterThan(0);
+    expect(transcript.structure.map?.items.length ?? 0).toBeGreaterThan(0);
+  }, 900_000);
+
+  it("--register-next --shape-policy (the path every branch debate takes, ruling D-BOTHNEXT): the code's next version carries the row, nothing more is published: PASS (exit 0)", async () => {
+    // Final review M-1: the export is one the publish kit itself would publish from this code, so the code's next
+    // version is the live one plus the debate-shape row the kit's own source build adds (controller ruling D-REGNEXT).
+    const before = exportDigest();
+    const logs: string[] = [];
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, { ...quiet, log: (line: string) => { logs.push(line); } });
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    // The import brought in 4 and 5, then the code's next version (6) with the row ADDED; nothing was published on top.
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { baseRegisterVersion: "5", addedKeys: [DEBATE_SHAPE_POLICY_ROW_KEY] } });
+    expect(report.register.codeNext!.changedKeys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect("importedRegisterVersion" in report.register).toBe(false);
+    expect(logs.some((line) => line.includes("practising on this code's next version 6"))).toBe(true);
+    expect(logs.some((line) => line.includes("in this throwaway copy as version"))).toBe(false);
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    // A real shape block, read from the database: both compositions read the row in the code's next version.
+    expect(report.shape).toMatchObject({
+      source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", chosenAnswers: 2, notExercised: null,
+      storedDepthParams: { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" },
+      sizes: { plan: "premium", mapAIs: 5, graders: 3, opening: "ANGLE_MAP" }
+    });
+    expect(report.shape!.mapCallsByStep).toMatchObject({ angles: 1, merge: 1, choose: 1 });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string } };
+    expect(transcript.run.registerVersion).toBe("6");
+  }, 900_000);
+
+  it("hosted: --register-next --hosted-billing --shape-policy (the merge of #165): kit v3's next version carries the row, the hosted runner and ask run the new shape and lock the language: PASS (exit 0)", async () => {
+    // Controller ruling D-REGNEXT in hosted mode: the policy reaches kit v3's own source build (as the plan's
+    // --debate-shape), and both hosted compositions read the row, its map hash and the question-language decider as the
+    // two main.ts files do.
+    const before = exportDigest();
+    const { stubs, env, common, quiet } = await scenario();
+    const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
+    await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
+    const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
+    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
+      hostedBilling, "--depth", "1", "--shape-policy", SHAPE_POLICY_START], env, quiet);
+    const report = outcome.report as unknown as ShapeReport & {
+      register: { codeNext: { composer?: string } }; deployment?: { mode: string; room: boolean; billingInPractice: string } };
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(exportDigest()).toBe(before);
+    expect(report.register.steps.map((step) => step.path)).toEqual(["HISTORICAL_IMPORT", "GENERAL_PUBLICATION", "CODE_NEXT_VERSION"]);
+    expect(report.register).toMatchObject({ registerVersion: "6", codeNext: { composer: "preview-register-composer-v3" } });
+    expect(report.register.codeNext!.addedKeys).toEqual(expect.arrayContaining([DEBATE_SHAPE_POLICY_ROW_KEY, "storyCostEnvelopePolicy"]));
+    expect(report.deployment).toMatchObject({ mode: "hosted", room: true, billingInPractice: "off" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    expect(report.shape).toMatchObject({ source: "FLAG", registerVersion: "6", row: "ADDED", opening: "ANGLE_MAP", notExercised: null,
+      sizes: { plan: "premium", mapAIs: 5, opening: "ANGLE_MAP" } });
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: false, lock: { code: "ro", source: "FAST" }, storedLanguage: "ro" });
+  }, 900_000);
+
+  // Final review M-5: the one-language offer and its answer, through the real decider and the ask's own resubmission
+  // (the signed check reference, the owner's scope). The fast check reads lang-ro-en-mix as a real mix with a usable
+  // rewrite (the dry script's reading); every other request is the doubles' own.
+  const MIX_CASE = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-ro-en-mix")!;
+  const MIX_REWRITE = PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!;
+  const questionLineOf = (request: GateRequest): string | undefined =>
+    readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields.find((field) => field.name === "question_line")?.content;
+  const mixScript = (request: GateRequest): GateOverride | null =>
+    request.kind === "QUESTION_LANGUAGE" ? { content: practiceLanguageDryReading(questionLineOf(request) ?? "") } : null;
+  const offerDebate = async (choice: readonly string[]) => {
+    const { stubs, env, common, quiet, out } = await scenario(mixScript);
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--question", "lang-ro-en-mix", ...choice, "--shape-policy", SHAPE_POLICY_START, "--transcript"], env, quiet);
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { question: { id: string; text: string } } };
+    const angles = stubs.requests.filter((request) => request.kind === "MAP" && questionLineOf(request) !== undefined);
+    return { outcome, report: outcome.report as unknown as ShapeReport, stubs, transcript, mapQuestions: new Set(angles.map(questionLineOf)) };
+  };
+
+  it("lang-ro-en-mix with --language-choice use: the offer is made, the ask is sent again with the server's rewrite, and the debate argues it: PASS (exit 0)", async () => {
+    const { outcome, report, stubs, transcript, mapQuestions } = await offerDebate(["--site-language", "ro", "--language-choice", "use"]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE").map((request) => request.answer)).toEqual(["OK"]);
+    // The lock came from the person's choice on the server's signed offer; the rewrite was used and stored as Romanian.
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "USE_REWRITE", rewriteUsed: true,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE", fast: { outcome: "MIX", main: "ro" } }, storedLanguage: "ro" });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true } });
+    // The map planned the rewrite, never the mixed wording; the transcript still names the case's own question.
+    expect([...mapQuestions]).toEqual([MIX_REWRITE]);
+    expect(transcript.run.question).toEqual({ id: "lang-ro-en-mix", text: MIX_CASE.questionLine });
+  }, 900_000);
+
+  it("lang-ro-en-mix with the default answer (keep), asked on the case's own site: the offer is made and the person's wording is kept: PASS (exit 0)", async () => {
+    const { outcome, report, mapQuestions } = await offerDebate([]);
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.language).toMatchObject({ siteLanguage: "ro", offered: true, choice: "KEEP_MINE", rewriteUsed: false,
+      lock: { code: "ro", source: "CHOICE", recordCode: "CHOICE" }, storedLanguage: "ro" });
+    expect([...mapQuestions]).toEqual([MIX_CASE.questionLine]);
+  }, 900_000);
+
+  it("no --shape-policy and a register without the row: today's shape, nothing new in the report, no map call", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--transcript"], env, quiet);
+    const report = outcome.report as unknown as ShapeReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect("shape" in report).toBe(false);
+    expect("language" in report).toBe(false);
+    expect(report.ask).toEqual({ questionId: "ro", depth: 1, planTier: "premium" });
+    expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(false);
+    expect(stubs.requests.some((request) => request.kind === "MAP")).toBe(false);
+    // Without the row the ask builds, calls and reads nothing new (P2L): no fast language check either.
+    expect(stubs.requests.some((request) => request.kind === "QUESTION_LANGUAGE")).toBe(false);
+    expect(storytellerAlsoRaised(stubs.requests)).toBe(0);
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string }; structure: object };
+    expect(transcript.run.registerVersion).toBe("5");
+    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story"]);
+  }, 600_000);
+
+  it("refuses a malformed --shape-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched", async () => {
+    const bad = join(folder, `shape-bad-${randomUUID()}.json`);
+    await writeFile(bad, JSON.stringify({ ...(JSON.parse(readFileSync(SHAPE_POLICY_START, "utf8")) as object), version: 2 }));
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--shape-policy", bad], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_POLICY_INVALID"]);
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 60_000);
+
+  it("--depth-mode without a debate-shape row: refused before any model call (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth-mode", "fixed"], env, quiet);
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
+    expect(stubs.requests).toEqual([]);
+  }, 300_000);
+});
+
+describe("preview practice: language mode, the question language (P2L)", () => {
+  type LanguageReport = { verdict: string; exitCode: number; reasons: string[]; mode: string;
+    cases: { id: string; lock: string; lockSource: string; offered: boolean; fastNeeded: boolean;
+      fastCheck: { outcome: string; proposedQuestion: string | null };
+      planner: { status: string; questionLanguage: string | null; disagrees: boolean | null } }[];
+    notRun: unknown[] };
+  const EN_ON_RO = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-en-on-ro")!;
+  const MIX = PRACTICE_LANGUAGE_CASES.find((entry) => entry.id === "lang-ro-en-mix")!;
+  /** The fast check answers each case as it expects (the dry script's reading); the planner of lang-en-on-ro names Romanian. */
+  const languageScript = (request: GateRequest): GateOverride | null => {
+    const chat = stubChatBody(request.provider, request.body);
+    const question = readFramedMaterial(wirePacket(chat)).fields.find((field) => field.name === "question_line")?.content ?? "";
+    if (request.kind === "QUESTION_LANGUAGE") return { content: practiceLanguageDryReading(question) };
+    if (request.kind === "MAP" && question === EN_ON_RO.questionLine) {
+      return { content: JSON.stringify({ ...(JSON.parse(stubMapContent(chat, 1)) as object), question_language: "ro" }) };
+    }
+    return null;
+  };
+
+  it("language mode: every case locked as expected, the mix offered, the fast check asked for every case, the planner recorded only: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario(languageScript);
+    const outcome = await runPractice(["language", ...common], env, quiet);
+    const report = outcome.report as unknown as LanguageReport;
+    // No case is settled by eld alone (ro, en and id are always-ask, ruling L-KEEP; lang-ku-arab is under eld's floor),
+    // so a LANGUAGE_MIX_NOT_OFFERED:lang-ro-en-mix:<record code> can only come from the fast check's side: the rewrite
+    // refused (FAST_MIX_NO_OFFER:REWRITE_UNUSABLE:…, ruling L-REWRITE) or an offer body the contract refuses
+    // (FAST_MIX_NO_OFFER:OFFER_BODY_REFUSED). STOP and report it; never weaken this (pre-flight PF-D20, PF-D22).
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.mode).toBe("language");
+    expect(report.cases.map((entry) => [entry.id, entry.lock]))
+      .toEqual(PRACTICE_LANGUAGE_CASES.map((entry) => [entry.id, entry.expectedLock]));
+    // Every lock's source (controller ruling D-SETTLE): eld settles none of them (lang-ro-plain on ro is FAST, never
+    // ELD_SITE); lang-zh-short is worked out with the fast check off, so its script decides (LOCAL_ELD).
+    expect(report.cases.map((entry) => [entry.id, entry.lockSource])).toEqual([["lang-ro-plain", "FAST"], ["lang-ro-en-mix", "OFFER"],
+      ["lang-en-on-ro", "FAST"], ["lang-short-code", "FAST"], ["lang-sr-latn", "FAST"], ["lang-id", "FAST"], ["lang-ro-borrowed", "FAST"],
+      ["lang-zh-short", "LOCAL_ELD"], ["lang-ku-arab", "FAST"]]);
+    // The fast check is asked for EVERY case, whatever eld said; one planner call (with any repair) per case; nothing else.
+    expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE" && request.answer === "OK")).toHaveLength(PRACTICE_LANGUAGE_CASES.length);
+    expect(report.cases.every((entry) => entry.fastCheck.outcome !== "DOWN")).toBe(true);
+    expect(stubs.requests.filter((request) => request.kind === "MAP").length).toBeGreaterThanOrEqual(PRACTICE_LANGUAGE_CASES.length);
+    expect(stubs.requests.every((request) => request.kind === "QUESTION_LANGUAGE" || request.kind === "MAP")).toBe(true);
+    expect(report.cases.find((entry) => entry.id === "lang-ro-en-mix")).toMatchObject({ offered: true, lockSource: "OFFER",
+      fastCheck: { outcome: "MIX", proposedQuestion: PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"] } });
+    // CR-3: the planner of lang-en-on-ro named Romanian; it is recorded, and the verdict above is still PASS.
+    expect(report.cases.find((entry) => entry.id === "lang-en-on-ro")!.planner).toMatchObject({ status: "ANSWERED", questionLanguage: "ro", disagrees: true });
+    // language.jsonl: a start line, one line per case, an end line; never a case's question text.
+    const log = readFileSync(join(out, "language.jsonl"), "utf8");
+    expect(log.trim().split("\n").map((line) => (JSON.parse(line) as { kind: string }).kind))
+      .toEqual(["start", ...PRACTICE_LANGUAGE_CASES.map(() => "case"), "end"]);
+    for (const entry of PRACTICE_LANGUAGE_CASES) expect(log).not.toContain(entry.questionLine);
+    // report.md: the mixed question beside its rewrite, for the owners' read.
+    const markdown = readFileSync(join(out, "report.md"), "utf8");
+    expect(markdown).toContain(`original «${MIX.questionLine}»; rewrite «${PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!}»`);
+  }, 300_000);
 });

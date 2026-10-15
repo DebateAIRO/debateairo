@@ -21,6 +21,24 @@ describe("B7a contract client: the room read and the usage read", () => {
     ]);
   });
 
+  it("M4: sends the three debate-shape room fields only when given, after today's three (today's query unchanged)", async () => {
+    const searches: string[] = [];
+    const fetchImplementation = (async (input: string | URL | Request) => {
+      searches.push(new URL(input instanceof Request ? input.url : String(input)).search);
+      return Response.json({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null });
+    }) as typeof fetch;
+    const client = createContractClient("https://api.debateai.test", fetchImplementation);
+    await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "low", depth: 2 });
+    await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "low", depth: 2,
+      depth_mode: "fixed", scrutiny: "deep", answer_length: "detailed" });
+    await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "low", depth: 2, answer_length: "short" });
+    expect(searches).toEqual([
+      "?plan_tier=free&composition_budget_tier=low&depth=2",
+      "?plan_tier=free&composition_budget_tier=low&depth=2&depth_mode=fixed&scrutiny=deep&answer_length=detailed",
+      "?plan_tier=free&composition_budget_tier=low&depth=2&answer_length=short"
+    ]);
+  });
+
   it("refuses an answer that carries a figure", async () => {
     const fetchImplementation = (async () => Response.json({
       room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, estimate_micros: 123

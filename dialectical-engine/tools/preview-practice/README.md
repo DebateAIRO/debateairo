@@ -17,7 +17,7 @@ server, because only they hold the keys. The Mac never sees a key:
 
 It spends real money from the same daily pots as the site, a little (see "Money and time").
 
-Two modes:
+Four modes:
 
 - **formats**: every model is asked to do every job a few times (write a position, attack one, answer a cross
   exchange, sit on a panel, review a node, write the answer, check the answer, tell the story, check the story). The
@@ -33,9 +33,21 @@ Two modes:
 - **debate**: one whole practice debate (depth 1 by default, 2 allowed). It goes through the real ask path (health
   check of each model, start-of-debate estimate against what each gate says is left, role rotation, admission) and
   then the real runner, on the live register's exact settings. At the end: served answer, story, and every call's
-  format check, time and tokens.
+  format check, time and tokens. With `--shape-policy` it runs the new debate shape instead (see "The new debate
+  shape").
+- **openings** (the debate-shape comparison, spec 2026-10-12 §2): on 12 fixed questions (6 Romanian, 6 English), the
+  same AIs open each question four ways: **T** today's opening (every AI writes a full position, blind), **A** a
+  snowball (the first AI lists points, each next AI sees them and adds only new ones), **B** blind lists (every AI
+  lists points with no angle, then merge, one "what is missing?" round and choose) and **C** the angle map (one AI
+  picks the angles, each AI lists points from its own angle, then merge, up to two "what is missing?" rounds and
+  choose). The first AI changes from question to question. It is not a pass/fail test of the release: it collects the
+  data the owners compare with their own method.
+- **language**: the question-language practice (no debate, under $0.05). Nine fixed questions are each read the way the
+  site will read them before a debate, and the report says which language each would be locked to. See "The question
+  language".
 
-Run **formats** first, then **debate**. Both must PASS.
+Run **formats** first, then **debate**. Both must PASS. **openings** is separate: run it when the owners want the
+comparison, never as a release check.
 
 The practice works for both kinds of preview: the local-mode preview of today and the hosted preview with
 NETOPIA's sandbox (`deploy/preview-release/v1/README.md`, "Hosted preview with NETOPIA sandbox billing"). The
@@ -111,6 +123,10 @@ own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
   `--register-call-concurrency '<JSON>'`: the plan's `--checker`/`--deepseek-enabled-on-gate`, `--role-rotation` and
   `--call-concurrency`, same values. The practice's own `--call-concurrency A/B/...` is something else: it sets this
   practice's calls at once and is never written to a register.
+- `--shape-policy FILE` with `--register-next --hosted-billing '<JSON>'`: the debate-shape row goes into kit v3's next
+  version, as the plan's `--debate-shape '<the same policy as JSON>'` puts it there; give the plan the same policy. The
+  new debate shape and the question language then run in hosted mode exactly as in local mode (the runner reads the
+  row and its map fingerprint, the ask locks the question's language).
 - With kit v3 the choices follow the PLAN's defaults, not the newest version's: the answer checker GLM, rotation on,
   the call-concurrency row carried unchanged. Give the practice exactly the flags you will give the plan; where a
   default moves a row away from what the preview runs now, the practice says so (`register-next: the newest version's
@@ -133,9 +149,9 @@ echo "exit: $?"
 
 Each run writes `report.json` (everything, including the text of every reply that failed its format check, with
 anything key-shaped blanked, at most 64 KiB each) and `report.md` (a short summary with no reply text) into the folder
-given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it, and (formats) a folder
-that already holds another run's `samples.jsonl`. Without `--out` it makes a fresh folder under the system temp folder
-and prints its path.
+given by `--out`. The folder must be outside the repository; the tool refuses a folder inside it, and a folder that
+already holds another run's `samples.jsonl` (formats) or `openings.jsonl` (openings). Without `--out` it makes a fresh
+folder under the system temp folder and prints its path.
 
 Formats mode never loses a finished job: each one is written to `samples.jsonl` in the same folder the moment it
 finishes (with the same content the report holds), and the report is built from that file at the end, and on every
@@ -144,6 +160,48 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 
 ```sh
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
+```
+
+### The openings record (openings mode)
+
+Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
+
+- the arm, the question and the step;
+- the AI and its maker;
+- exactly what the AI could see (blind, or the ids of the points it was shown) and its place in the plan;
+- its times, its tokens (in, out, reasoning) and its cost;
+- its format check, and how a slip was fixed (by the short patch follow-up or by a full re-ask);
+- the reply itself, with anything key-shaped blanked, at most 64 KiB.
+
+The first line names the AIs, the arms and the questions asked, each question with a short fingerprint of its exact
+wording, so two runs can be compared question by question. After each arm of each question, one line holds what came
+out: the angles, the points with who raised them, the merged answers, the chosen answers with their points for and
+against and their strongest rival, the points raised but not chosen, and every fallback that was used.
+
+`report.json` and `report.md` are built from `openings.jsonl` at the end, and on every other way out too (Ctrl-C,
+Ctrl-C again, the tool breaking midway), as formats builds its report from `samples.jsonl`. They hold counts, cost,
+time, slips and fallbacks per arm. They never hold a quality score: the comparison is the owners' own method, outside
+this repository. When a gate stops or halts (or Ctrl-C is pressed once), the arm in progress finishes, it gets a
+`STOPPED` note (its unsent calls are the stop, not the AIs' own fallbacks), and no new arm or question starts.
+To build `report.json` and `report.md` again from a folder's `openings.jsonl` (nothing is sent; no socket or
+acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
+folder holds one.
+
+The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
+openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
+(angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
+the owner set it.
+
+Before the real run, run it dry. `--dry` answers from a script: no socket, no settings, no acknowledgement, no
+connection to a gate at all, and nothing is spent. It goes through every arm of all 12 questions in a few seconds,
+with one repaired slip, one busy AI and the fallbacks, and ends PASS_WITH_WARNINGS (exit 10). Its report says "dry" in
+its title; the costs in it are the price list's estimate for the script's made-up token counts, not money spent. The
+block below makes its own fresh folder outside the repository:
+
+```sh
+O=$(mktemp -d /tmp/openings-dry.XXXXXX)
+node_modules/.bin/tsx tools/preview-practice/practice.ts openings --dry --out "$O/report"
+echo "exit: $?"
 ```
 
 ### The whole debate, word for word (debate mode, `--transcript`)
@@ -188,8 +246,7 @@ The last line on the screen and the exit code say:
 | 0 | PASS | Everything worked. The upload may go ahead. |
 | 10 | PASS_WITH_WARNINGS | It worked, but some calls were refused as "too busy" and then recovered, or a model's 90th-percentile call took more than 2 minutes, or an AI's reply had the wrong format and a later try of the same call fixed it, by the short follow-up or the full re-ask (`FORMAT_REPAIRED:<model>:<how many>`, owner ruling 2026-10-12 "Fixed slips = warning"), or an AI was busy and sat out the rest after giving at least one accepted answer (`MODEL_BUSY_PARTLY:<model>:answered=<n>:skipped=<m>`, owner ruling 2026-10-12 "Keep GLM, it sits out"), or the story was served with the story checker's reservation after its rounds ran out (`STORY_RESERVED`, owner ruling 2026-10-12). Owner decides. |
 | 20 | FAIL | A call ended without an accepted reply after its tries because of its format (`FORMAT_FAILED`), or one AI's first tries had the wrong format too often (`SLIP_RATE:<model>:<slips>/<answered calls>`: more than 1 in 10 of its answered calls, one slip always allowed), a call failed, the debate did not finish, no answer or no story (anything but READY or READY_WITH_RESERVATION), or a gate refused or halted. Do not upload. `failures` in report.json is the diagnosis. |
-| 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end. Run again later, or owner decides. |
-
+| 30 | NOT_PROVEN | It worked, but a model stayed busy (the AI company kept refusing its call as "too busy", not billed, or the model kept cooling off) and sat out before it gave a single accepted answer, or the practice paused a gate itself after four "could not reach the AI company" answers in a row, or the operator pressed Ctrl-C once, so some model was not tested to the end, or a debate asked for the new shape did not run it (`SHAPE_NOT_EXERCISED:<why>`, see "The new debate shape"). Run again later, or owner decides. |
 | 40 | HARNESS_ERROR | The practice could not run (a start check refused, or the tool broke). Nothing about the release is known. |
 | 50 | ABORTED | The practice started but did not reach its end (Ctrl-C a second time, or the tool broke midway). The report holds every job that finished, and lists whatever else it found. Run again. |
 
@@ -241,6 +298,204 @@ calls that really went at once in the debate (`peakInFlight`), per model (`peakB
 how long each model's calls waited for a free slot in all (`waitedMsByModel`, milliseconds), the calls (`calls`), and
 how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
 it (`busyProbesByModel`).
+
+### The new debate shape (debate mode, `--shape-policy`)
+
+The new debate shape (spec 2026-10-12, Phase 2) is switched on by one register row, `debateShapePolicy`. The live
+preview has no such row, so a practice debate runs today's shape unless you ask for the new one.
+
+- `--shape-policy FILE` puts the row from FILE into the practice's own throwaway database, and only there:
+  - The register is copied as always: every exported version, each proved by its hash.
+  - With `--register-next` (see "Optional flags"): the row goes into this code's next version, which the preview
+    publish kit composes in the throwaway database anyway. No other version is made. That version already holds this
+    code's own contract hashes.
+  - Without `--register-next`: ONE more version is published in the throwaway database. It holds the last exported
+    version's rows with the debate-shape row added. If the export already holds a debate-shape row, the copy's row is
+    replaced instead. That version also holds this code's own judge, composer, conformance and map contract hashes, in
+    place of the live ones: the runner refuses the new shape unless the map hash is its own, and the hashes must
+    describe what this code sends.
+  - The practice asks and argues on that version: both the ask path and the runner read the row from it.
+  - The export file is only read. The live register is never reached; the practice has no connection to the live
+    database at all.
+- Until the owners publish a register version that carries this code's prompt fingerprints (map `25b4c106…`, judge
+  `aac53407…`, composer `879d2c5d…`; it was `9a46af29…` until answer writer v4, 2026-10-15), every practice debate of this branch runs with `--register-next`, in either
+  shape. Without it, a debate in today's shape is refused before it starts (HARNESS_ERROR
+  `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`: the live register holds the older fingerprints), and the two shapes would
+  not run on the same register rows.
+- `tools/preview-practice/shape-policy-start.json` holds the owners' start values: rulings S5 to S8, with the angle map
+  as the opening. A unit test keeps it equal to the start values in the code.
+  - A file that does not pass the register's own check is refused before anything starts, with
+    `PRACTICE_SHAPE_POLICY_INVALID`.
+  - The refusal names only the place in the file that is wrong.
+  - A file that switches the row off (`"enabled": false`, the preview's way back) is refused too: it could never run
+    the new shape. The start-values file never holds `enabled` (absent means on).
+- `--depth-mode fixed|adaptive`, `--scrutiny standard|deep|exhaustive` and `--answer-length short|standard|detailed`
+  ask the practice debate with these settings, as the /new page sends them.
+  - The ask path adjusts them for the plan exactly as the site does. The practice asks as a premium person with no plan
+    id, so the `premium` sizes apply.
+  - Each one left out is the site's default: adaptive, standard, standard.
+  - Without a debate-shape row they would be ignored, so they are refused before any AI is asked, with
+    `PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW`.
+- Only debate reads these four flags. Every other mode refuses them, and a mistyped flag is refused before anything
+  starts (`PRACTICE_FLAG_UNKNOWN`).
+
+With the row, `report.json` gains a `shape` block, and `report.md` a "Debate shape" paragraph with no reply text. The
+block holds:
+
+- `source`: FLAG for `--shape-policy`, REGISTER for a register that already holds the row;
+- `registerVersion`: the throwaway version the debate ran on. `report.json`'s `register` block names the same version;
+  when the practice published its own version on top (`--shape-policy` without `--register-next`), that block keeps the
+  export's newest version as `importedRegisterVersion`;
+- `row`: ADDED or REPLACED; with `--register-next`, UNCHANGED when the export already held this very row (same value,
+  same source);
+- `asked`: the three settings as given;
+- `storedDepthParams`: what the ask path stored for the run;
+- `sizes`: the sizes frozen on the run's money receipt (plan, map AIs, answers, graders, close-call extra graders,
+  points per answer, deeper points, gap rounds, the three settings, the opening);
+- `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
+  answers to argue, and each AI argued its own position, as today;
+- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose), every try as the ledger recorded it;
+- `chosenAnswers` and `alsoRaised`: how many different answers the map chose to argue, and how many points came up but
+  were not debated. When fewer than two answers were chosen, the points are still counted here, but the story and the
+  debate page show none of them (today's opening was argued instead);
+- `mapMarks`: the map's fallback marks, with how often each came up (for example `ANSWERS_FILLED`);
+- `panelCloseCallExtensions` and `scrutinyExtensions`: how many points had a close call that called for extra graders
+  (counted even when an extra grader then failed), and how many points scrutiny examined further (one count per point,
+  not per exchange);
+- `notExercised`: why the new shape did not run, else null.
+
+Map calls also count everywhere else, like any other call:
+
+- in `byModelAndSite`, as the site `MAP`;
+- for the format rule.
+
+With `--transcript`, `transcript.json` gains `structure.map`:
+
+- the map's items: every point and candidate answer, with the AI that wrote it;
+- the choice: the answers argued and the points also raised.
+
+A debate asked for the new shape that did not run it is NOT_PROVEN (exit 30), with the reason
+`SHAPE_NOT_EXERCISED:<why>`:
+
+- `MAP_UNAVAILABLE_TODAYS_OPENING`: fewer than two map lists came back, so the opening fell back to today's (the map's
+  stored choice says so even when no answer was served);
+- `MAP_ANSWERS_NOT_ARGUED`: the map gave fewer than two answers to argue, so each AI argued its own opening, as today;
+- `NO_MAP_STORED`: the run kept no map at all (it stopped before the map);
+- `NO_SHAPE_ON_RECEIPT`: the run was admitted without the shape;
+- `FACTS_UNREADABLE:<code>`: what the run did could not be read.
+
+Without `--shape-policy`, on a register without the row, nothing changes: today's shape, and no `shape` block.
+
+Switching the new shape on for the site is a separate set of owner steps, listed in the plans and not done by this
+tool: publish a register version with this code's prompt fingerprints; run migration 0118 before the hosted mode;
+keep the row out of force until the /new page's language pop-up (P2L Task 18) is deployed (L-POPUP-FIRST); fix the
+re-claim bug first (task_205182c8); publish the support article (C-ARTICLE); and let running debates finish first.
+
+To run the new shape, add the start values to S-6's debate command, which already runs with `--register-next` (see
+above; S-3 first, as always):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --shape-policy tools/preview-practice/shape-policy-start.json --out "$P/debate-shape-report"
+echo "exit: $?"
+```
+
+### The question language (language mode, and debate's `--site-language`)
+
+With the new shape on, the site fixes the language of each question before the debate starts (P2L):
+
+- First eld, a small language reader on the server, reads the question. When it is sure the question is in the
+  site's language, that is the language. On some sites eld is never trusted alone, because there it mixes up near
+  neighbours (Romanian, English and Indonesian are among them): there the fast AI below always reads the question.
+- Otherwise one short call to a fast AI (Haiku) reads it. If the question really mixes two languages, the person is
+  offered the question written in one language (the pop-up), and can keep their own wording instead.
+- With no fast AI (a signed-out person, or no paid AI), eld and the question's alphabet decide, else the site's
+  language.
+
+`language` mode checks this on nine fixed questions, with no debate and no database:
+
+- For each question: eld's reading, the fast AI's reading (always asked here, so its reading is written down even when
+  eld was sure), and one call to the AI that plans a debate's angles (the AIs take turns).
+- The language is worked out exactly as the site does it. One question, `lang-zh-short`, is worked out as if there
+  were no fast AI: its language must come from its alphabet. The fast AI is still asked, so its reading is written
+  down.
+- It writes `language.jsonl` (one line per question, never the question's text), `report.json` and `report.md`.
+- It costs under $0.05 and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
+  170 seconds to plan a question's angles.
+
+| Id | Site | Must lock | Offer the rewrite |
+|---|---|---|---|
+| `lang-ro-plain` | ro | ro | no |
+| `lang-ro-en-mix` | ro | ro | yes |
+| `lang-en-on-ro` | ro | en | no |
+| `lang-short-code` | en | en | no |
+| `lang-sr-latn` | ro | sr-Latn | no |
+| `lang-id` | id | id | no |
+| `lang-ro-borrowed` | ro | ro | no |
+| `lang-zh-short` | en | zh | no |
+| `lang-ku-arab` | ar | ku | no |
+
+`lang-zh-short` is a short Chinese question, worked out as if there were no fast AI. `lang-ku-arab` is Kurdish
+(Sorani) written in Arabic letters, asked on the Arabic site: it must lock Kurdish (`ku`).
+
+The verdict:
+
+- FAIL: a question locked to the wrong language, or the mixed question not offered a rewrite.
+- FAIL: a rewrite offered on a question whose "Offer the rewrite" is "no" (`LANGUAGE_UNEXPECTED_OFFER`), even when
+  the language is right. For example `lang-ro-borrowed`: borrowed words such as "startup" or "AI" never make a
+  question mixed, so the site must not show the pop-up for it.
+- NOT_PROVEN: the fast AI did not answer, so the language came from a fallback. Run it again later.
+- PASS otherwise. Then the owners read each rewrite in `report.md`, where it stands beside the question, and decide
+  whether it keeps the meaning.
+- The planner's naming is recorded for the operator only: it never changes the verdict and never shows up as a mark
+  on an answer.
+
+The fast AI's settings come from the export's `questionLanguagePolicy` row when it has one (`--register-export`), else
+from the code's start values. A row the site itself would refuse at start-up is refused here too, before anything is
+sent: for example a reserved word in the owners' text, or a model or thinking level the Anthropic gate does not allow.
+
+If you interrupt a language run (Ctrl-C), its report is still written. But `report --out` cannot rebuild a language
+folder (it refuses with `PRACTICE_SAMPLES_LOG_MISSING`): run the mode again into a new folder instead.
+
+A dry run first (scripted answers, nothing spent, no socket):
+
+```sh
+node_modules/.bin/tsx tools/preview-practice/practice.ts language --dry --out "$P/language-dry"
+echo "exit: $?"
+```
+
+The real run (S-3 first, as always):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts language --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/language-report"
+echo "exit: $?"
+```
+
+Debate mode, with a debate-shape row, also asks with a site language:
+
+- `--site-language <code>`: one of the site's 35 languages. Left out, a language case asked by its id (for example
+  `--question lang-sr-latn`) is asked on its own site from the table above, as the language mode asks it. Any other
+  question is asked on its own language as the old guesser reads it, if the site has that language; else English.
+- `--language-choice use|keep`: how the pop-up is answered when the ask offers a rewrite. The default is `keep`: the
+  person keeps their own wording. With `use`, the debate argues the rewritten question, while `transcript.json` still
+  names the case's own question.
+- Both need a debate-shape row; without one they are refused before any AI is asked
+  (`PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW`).
+- `report.json` gains a `language` block, and `report.md` a "Question language" paragraph: the site language; the
+  language locked, how and why; the language the debate was stored with; whether a rewrite was offered and used; and
+  what the planner named (for the operator only).
+
+The full practice debate on the mixed question, before the preview upload (S-8). It answers the pop-up with `use`, so
+the rewrite is tried once. Like every practice debate of this release, it runs with `--register-next`: the release
+needs a new register version (new prompts), and until the owners publish it the practice runs on this code's next
+version (see `--register-next` under "Optional flags").
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --register-next --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question lang-ro-en-mix --site-language ro --language-choice use --shape-policy tools/preview-practice/shape-policy-start.json --transcript --out "$P/language-debate"
+echo "exit: $?"
+```
 
 ## Safety rules built in
 
@@ -315,10 +570,24 @@ it (`busyProbesByModel`).
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
+- openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
+  estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
+  budget is $5 a day for DeepInfra but only $1 a day for Haiku, so check Haiku's share in the first run's report before
+  running again the same day. `report.md` shows each gate's spend by the gate's own count ("spent by the gate's count"
+  on its line under "Gates"), and Haiku is the only AI on the Anthropic gate, so the `anthropic` line is Haiku's share. The steps of one arm go one after another, so it takes several hours (the slow models
+  take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
 - debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours one call at a time. Depth 2: about
   350 calls, up to about 3 hours. Calls at the same time (`--call-concurrency`, or the register's setting) cost the
   same and should take less time; the report's "Calls at once" part shows how much the calls overlapped. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
   $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
+- debate in the new shape (`--shape-policy`), depth 1: about $0.30 (spec 2026-10-12), with fewer calls than today's
+  shape, plus one fast language check by Haiku on the Anthropic gate (about $0.00013). Its start-of-debate estimate may
+  need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
+  the first new-shape run's admission figures (S-8, "Room the estimate needs").
+- language: under $0.05, about 5 to 20 minutes.
+- the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
+  `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
+  day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
 - hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
   value, suggested $3) and its story to the story ceiling ($0.05), as on the server.
 
@@ -415,7 +684,7 @@ scp "$PREVIEW_SSH:/home/ubuntu/practice/*" "$P/"
 ssh -N -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o StreamLocalBindMask=0177 -L "$D/deepinfra.sock:/run/debateai-practice/deepinfra.sock" -L "$D/anthropic.sock:/run/debateai-practice/anthropic.sock" "$PREVIEW_SSH"
 ```
 
-### S-6, Mac: run formats, then debate
+### S-6, Mac: run formats, then debate (and openings, when the owners ask for it)
 
 In a second terminal, from the worktree's `dialectical-engine` folder (set `D` and `P` to the same folders as in
 S-5):
@@ -425,11 +694,38 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-Only after formats passes: repeat S-3 (fresh gate status) and copy the two status files down again, then:
+Only after formats passes: repeat S-3 (fresh gate status) and copy the two status files down again, then run the
+debate. Until the owners publish a register version that carries this code's prompt fingerprints, it runs with
+`--register-next` (see "The new debate shape"): without it, the debate is refused before it starts.
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --out "$P/debate-report"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --out "$P/debate-report"
+echo "exit: $?"
+```
+
+The openings comparison (it spends real money from the test budget; see "Money and time"), all five AIs, in two
+runs: first the 6 Romanian questions, then the 6 English ones, each into its own `--out` folder. Why two: the whole
+comparison takes several hours and may outlast the relay, which S-4 starts with an 8-hour lifetime. Each half seats the
+AIs exactly as one full run would (by each question's fixed place). Run it dry first (see "The openings record").
+
+Before each half: repeat S-3 (fresh gate status) and copy the two status files down again. The Romanian half:
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --questions ro-euro,ro-autobuze,ro-final-viata,ro-ciuperci,ro-strainatate,ro-hpv --out "$P/openings-report-ro"
+echo "exit: $?"
+```
+
+Then the English half, after S-3 again. If the relay has ended meanwhile: on the server, as root, run S-4's
+`systemd-run` line again, then its three check lines (the install and the sha256 check of S-4 are skipped: the
+installed file is still there). Then on the Mac, first stop the earlier `ssh -N` (Ctrl-C in its terminal) and run S-5's
+`ssh -N` line again in that same terminal (it puts the two sockets back in the same `D`; leave `D` and `P` as they
+are):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --questions en-nuclear,en-four-day-week,en-phones-school,en-retirement-age,en-social-media-age,en-rent-caps --out "$P/openings-report-en"
 echo "exit: $?"
 ```
 
@@ -442,13 +738,26 @@ Optional flags:
   `--models a,b` (model ids from the preview's roster), `--lanes JUDGE_POSITION,PANEL,...` (default all nine:
   JUDGE_POSITION, JUDGE_ATTACK, JUDGE_CROSS, PANEL, REVIEW, SYNTHESIZER, EVALUATOR, STORYTELLER, STORY_CHECKER).
   `--levels "<model>=<level>,...;..."` (the same jobs at several thinking levels, see S-6b).
-- report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/samples.jsonl.
-- debate: `--depth 1|2`, `--question ro|en`, `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
+- openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
+  ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
+  en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
+  (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
+  are fixed in the code and never read from the command line; a refused value is never repeated in the output.
+  Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
+  the two `--gate-status-*` flags are refused with `--dry`, so a mistyped flag can never start the paid run.
+- report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/openings.jsonl when DIR holds one
+  (an openings run), else from DIR/samples.jsonl. `report --side-by-side FILE --out DIR` writes only
+  DIR/side-by-side.html from a formats samples log (see S-6b).
+- debate: `--depth 1|2`, `--question ro|en` or one of the comparison's ids (`ro-euro`, `ro-strainatate`, `en-nuclear`,
+  `en-social-media-age`, see S-8), `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
   once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
   across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
-  formats mode refuses it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
-  debate, word for word" above). The register is copied only through the register's own publication
-  paths; an export holding a support-configuration version refuses (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
+  formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
+  debate, word for word" above), `--shape-policy FILE`, `--depth-mode fixed|adaptive`, `--scrutiny standard|deep|exhaustive`
+  and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only). The register is copied only
+  through the register's own publication paths; an export holding a support-configuration version refuses
+  (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
   `--register-next` practises a release that needs a NEW register version (new sealed prompts) before it is uploaded:
   the export is imported as always, then this checkout's next version is composed on its newest version by the
   preview publish kit itself (`buildPreviewSourceRowsV2` and `composePreviewSnapshotV2`, with the newest version's own
@@ -460,6 +769,13 @@ Optional flags:
   preview, or to practise the switch to it, add `--hosted-billing '<JSON>'` (publish kit v3; see "`--register-next` on
   the hosted preview" above); `--checker`, `--deepseek-enabled-on-gate`, `--role-rotation` and
   `--register-call-concurrency` give the plan's other choices (with kit v2 they replace the newest version's).
+  With `--shape-policy`, the debate-shape row goes into that next version too, with kit v2 or kit v3 alike (no other
+  version is made), so `register.codeNext` also names `debateShapePolicy`, which the release's own publish leaves out
+  unless the plan is given the same policy (`--debate-shape '<JSON>'`).
+  `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with
+  a debate-shape row).
+- language: `--dry` (scripted answers, nothing spent); `--register-export` (the fast AI's settings from its
+  `questionLanguagePolicy` row, if any). Nothing else.
 
 ### S-6b, Mac: thinking levels side by side (formats, `--levels`)
 
@@ -519,6 +835,148 @@ together (a slip fixed by the second try is a warning; a step failed for good, o
 model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
 bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
+### S-8, Mac: the whole-debate comparison (today's shape and the new shape)
+
+What it is, in plain words:
+
+- The same four fixed questions are argued twice each, at depth 1 with all five AIs: once in today's shape and once in
+  the new shape (the owners' start values). Both run with `--register-next`, so the two differ only by the
+  debate-shape row (see "The new debate shape").
+- Each run gets its own `--out` folder: `$P/compare/<question>/today` and `$P/compare/<question>/shape`.
+- Each folder holds `report.json`, `report.md` and `transcript.json`.
+- The tool only runs and records the debates.
+  The results are judged by the owners' private method, outside this repository. Nothing in this README or in the
+  tool is part of that method.
+
+The four questions are fixed in the code (`practice-questions.ts`). Each one is word for word the openings question of
+the same id, so the Phase 1 data lines up:
+
+| Id | Language | Kind |
+|---|---|---|
+| `ro-euro` | Romanian | public policy |
+| `ro-strainatate` | Romanian | personal decision |
+| `en-nuclear` | English | contested fact |
+| `en-social-media-age` | English | ethics |
+
+**The working folder.** S-8 runs over several days. S-5's folder (`P=$(mktemp -d /tmp/dpr.XXXXXX)`) is a new one each
+time and may be emptied when the Mac restarts, so S-8 keeps one folder of its own, in your home folder, outside the
+repository. On day 1 only, run these two lines in place of S-5's `P=` line (if `mkdir` says the folder exists, an
+earlier comparison is in it: choose another name and use it on every day):
+
+```sh
+P="$HOME/debate-shape-s8"
+mkdir -m 700 "$P"
+```
+
+Every later day, in each terminal, run only the first of those two lines in place of S-5's `P=` line, then the rest of
+S-5 as written: its `scp` copies the day's fresh settings and register export into the same folder (the settings hold
+no key, see S-2). At the end of each day, keep a dated copy of the results somewhere else too:
+
+```sh
+cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
+```
+
+**The pass bar comes first** (the owner's rule: before any upload, a practice with all real AIs must pass):
+
+1. Day 1: run S-3, then S-6's formats. It must PASS. For exit 10 the owner decides, as in the table above.
+2. Then the language mode (above): first `--dry`, then the real run. It must PASS. A FAIL stops everything: nothing is
+   uploaded. NOT_PROVEN: run it again later the same day, into a NEW `--out` folder. The first run's folder already
+   holds its `language.jsonl`, so the mode refuses it (`PRACTICE_OUT_ALREADY_HOLDS_LANGUAGE`, nothing spent). For the
+   second try, for example:
+
+   ```sh
+   scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+   PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts language --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/language-report-2"
+   echo "exit: $?"
+   ```
+
+   A third try goes into `"$P/language-report-3"`, and so on.
+3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
+   question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
+   rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
+4. Day 2: run the first pair on `ro-euro`, today's shape first. Both debates must PASS:
+   - today's shape is the release's practice debate, because the upload ships with the row absent, so the site keeps
+     today's shape, and with a new register version carrying this code's three prompt fingerprints (P2b OWNER STEP
+     PF-B13). That is why this debate runs with `--register-next` too: it practises that very version;
+   - the new shape proves the shape.
+
+   If either is FAIL, stop: nothing is uploaded and the comparison waits for a fix. These two runs are also the
+   comparison's first pair.
+
+**One pair a day after that:**
+
+| Day | Pair | Order |
+|---|---|---|
+| 3 | `ro-strainatate` | new shape first |
+| 4 | `en-nuclear` | today's shape first |
+| 5 | `en-social-media-age` | new shape first |
+
+Money and time, within the owners' daily test budget:
+
+- **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
+  plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
+  $0.10 to $0.30. The whole comparison is about $1.9 to $4.3 (four debates in each shape and day 1's formats),
+  spread over at least five days. The language mode costs under $0.05 and the `lang-ro-en-mix` debate about $0.30, on
+  day 1 after formats. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in all).
+- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends: about $4
+  DeepInfra and $0.90 Anthropic for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
+  Then the report's first reason starts with `ADMISSION_REFUSED:`, and nothing but the AIs' health checks was spent.
+  - The new shape's estimate may need more room (the map's merge and choose steps are each counted in full on both
+    gates). Read the first new-shape run's admission figures before you plan the next day: whether it was admitted,
+    and each gate's `remainingBefore` in `report.json`.
+  - Run that debate first thing the next Bucharest day, into the same folder.
+  - Note in your own log that the pair was split over two days.
+- **Daily stop.** After every run, read the "spent by the gate's count" on each gate's line in `report.md`. Stop for
+  the day once the day's runs add up to $4.50 DeepInfra or $0.90 Anthropic. Haiku is the only AI on the Anthropic gate,
+  so its line is Haiku's share.
+- **Time.** Both debates of a pair run with the same call setting: the same `--call-concurrency` value on both
+  commands, or none on either. The commands below give none, so they use the register's own setting, which on today's
+  preview is one call at a time: a debate then takes about 1 to 2 hours, so a pair fits in one relay lifetime (S-4: 8
+  hours). With calls at the same time (for example `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
+  added to both commands, only after the gate check under "Safety rules built in"), a whole debate in today's shape
+  took 53 minutes when it was measured (2026-10-13). If the relay has ended, restart it as described under S-6.
+
+Each run: set the question, repeat S-3 and copy the status files down, then run the two commands in the day's order.
+Repeat S-3 and the `scp` line before the second command too.
+
+```sh
+Q=ro-euro
+```
+
+Today's shape:
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question "$Q" --register-next --transcript --out "$P/compare/$Q/today"
+echo "exit: $?"
+```
+
+The new shape:
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question "$Q" --register-next --shape-policy tools/preview-practice/shape-policy-start.json --transcript --out "$P/compare/$Q/shape"
+echo "exit: $?"
+```
+
+What to check after each run:
+
+- **The verdict.** A FAIL or HARNESS_ERROR stops the comparison until it is understood. NOT_PROVEN means some AI sat
+  out, or, for the new shape, the shape did not run (`SHAPE_NOT_EXERCISED`). Run that question's pair again on another
+  day.
+- **The new shape's report.md.** Its "Debate shape" paragraph must say the opening used was `ANGLE_MAP` and must list
+  the chosen answers.
+- **The story's note on the answers.** When the "Debate shape" paragraph says the new shape was not exercised because
+  of `MAP_UNAVAILABLE_TODAYS_OPENING` or `MAP_ANSWERS_NOT_ARGUED`, or its map marks list `ANSWERS_FILLED` or
+  `CHOOSE_QUOTA_FILLED`, the story owes the person one plain sentence on how the argued answers came about. Read the
+  story in `transcript.json` (`structure.story`). It must say, in the question's language, either "We could not first
+  gather every possible answer, so each AI argued the answer it found best." (for the first two codes) or "Some of the
+  answers or points argued here were added to make sure enough options were tested." (for the last two). If the story
+  leaves it out, note it for the owners with the question's id: it is a finding, not a verdict.
+
+Keep `$P/compare` with the other reports (S-7 deletes only `$D`; `$P` here is the folder in your home folder, made on
+day 1). It holds only our own practice questions and the AIs' text about them.
+
 ### S-7, stop and clean up
 
 Mac: stop the `ssh -N` (Ctrl-C in its terminal), then:
@@ -542,7 +1000,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (both modes, the start checks, the report).
+- `practice.ts`: the command (the four modes, the start checks, the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview, in local or hosted mode (hosted: the money wiring, with billing kept off
   in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
@@ -550,11 +1008,19 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
   `--transcript` file.
+- `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
+  the shape run did (the report's `shape` block, the transcript's `structure.map`).
+- `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
+  out, `language.jsonl`, the report) and debate mode's `--site-language` and `--language-choice`.
+- `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
   "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
+- `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
+  `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).
+  The map itself is the package `packages/map`. Tests: `tests/unit/map-*.test.ts`, `tests/unit/practice-openings*.test.ts`.
 - `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
   (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
   `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
@@ -562,6 +1028,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-hosted.test.ts` (hosted settings and the
   kit-v3 `--register-next`), `tests/unit/preview-practice-levels.test.ts`,
   `tests/unit/preview-thinking-levels-check.test.ts`,
+  `tests/unit/preview-practice-shape.test.ts`,
+  `tests/unit/preview-practice-language.test.ts`,
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,

@@ -8,6 +8,10 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
     "final_strength.kind", "final_strength.source", "final_strength.producer", "final_strength.replay_handle",
     "locator", "abstention.question_class", "abstention.register_row_key", "abstention.unlock_condition"]
     .map(path => ({ path: `answer.nodes[].${path}`, kind: "ARGUMENTS" as const })),
+  // Debate shape P2c: the map view's answers and also-raised claims are model text the
+  // public page shows, judged with the arguments (kept beside them, so one call per kind holds).
+  { path: "map_view.positions[].answer", kind: "ARGUMENTS" },
+  { path: "map_view.also_raised[]", kind: "ARGUMENTS" },
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const }))

@@ -1,15 +1,21 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { mostOneRunMaySpendMicros } from "@debateai/budget";
+import { mostOneRunMaySpendMicros, parseCostEnvelopeBasis, type CostEnvelopeBasis } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  DEBATE_SHAPE_FORMULA_VERSION,
+  debateShapeWriterCeiling,
+  debateShapeSiteCounts,
   readBundledModelScorecard,
   readEngineVersion,
   readModelScorecard,
+  type DebateShapeCeilingInput,
+  type DebateShapePolicy,
+  type DebateShapeSiteCounts,
   type ModelScorecardReadResult
 } from "@debateai/register";
 import {
@@ -124,6 +130,28 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
   });
 }
 
+/**
+ * Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's call bound becomes max(sealed bound, the run's
+ * answer length's writer bound), so the picker seats only writers whose window holds the longer answer. The map's
+ * merge and choose calls are made by debaters (counted under POSITION, `expectedCallsByRoleFromBasis`) at the
+ * receipt's map step bounds (ruling X1), so POSITION's bound becomes max(sealed bound, merge bound, choose bound):
+ * a debater whose window cannot hold a merge would be refused by the gateway's window wall part-way through the
+ * debate. A receipt without a shape keeps the sealed table (the same object).
+ */
+export function answerTokenCeilingsForBasis(
+  ceilings: Readonly<Record<DebateRole, number>>,
+  basis: Readonly<Record<string, unknown>>
+): Readonly<Record<DebateRole, number>> {
+  const shaped = admittedShapeOf(basis);
+  if (shaped === null) return ceilings;
+  const { writerBound, mapMergeBound, mapChooseBound } = shaped.shape;
+  return Object.freeze({
+    ...ceilings,
+    POSITION: Math.max(ceilings.POSITION, mapMergeBound, mapChooseBound),
+    ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, writerBound)
+  });
+}
+
 /** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */
 export type AskMoneyPolicy = Readonly<{
   perRunCeilingMicros: number;
@@ -203,6 +231,11 @@ export function askModelPickerSettings(input: Readonly<{
   moneyPolicy?: AskMoneyPolicy | null;
   /** S2 (hosted): billing is on — the site sells plans, so the scorecard must follow the owners' plan-cap rule. */
   billingEnabled?: boolean;
+  /**
+   * Debate shape (P2b Task 6, pre-flight PF-B22): the row IN FORCE (`debateShapeInForce`; absent or disabled = none).
+   * Only the Free answer-job check reads it.
+   */
+  debateShapePolicy?: DebateShapePolicy | null;
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
@@ -232,6 +265,13 @@ export function askModelPickerSettings(input: Readonly<{
     throw new TypeError("ASK_MODEL_PICKER_MONEY_POLICY_MISMATCH");
   }
   const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
+  // Debate shape (P2b Task 6, pre-flight PF-B22): with a row in force a Free `detailed` answer asks the writer for up to
+  // the row's largest writer bound, and Free's writer has no fallback. Only this check reads it: `answerTokenCeilings`
+  // (the settings the picker seats with) keep the sealed bounds; a run's own writer bound comes from its receipt.
+  const freeAnswerCeilings = Object.freeze({
+    ANSWER_WRITER: debateShapeWriterCeiling(answerTokenCeilings.ANSWER_WRITER, input.debateShapePolicy ?? null),
+    ANSWER_CHECKER: answerTokenCeilings.ANSWER_CHECKER
+  });
   // Paid plans P4-E (Part 3b re-review M-4; ruling C4): the backstop of the publish-time
   // check. With billing on a Free ask's answer writer and checker take a scored Free-roster
   // model or none, so a scorecard under which no declared Free-roster model can take one of
@@ -242,7 +282,7 @@ export function askModelPickerSettings(input: Readonly<{
       scorecard: input.scorecard.scorecard,
       targets: input.targets,
       freeRosterModelIds: PLAN_TIER_ROSTERS.free,
-      answerTokenCeilingByRole: answerTokenCeilings
+      answerTokenCeilingByRole: freeAnswerCeilings
     })) {
     throw new TypeError(SCORECARD_FREE_ANSWER_UNSCORED);
   }
@@ -295,6 +335,8 @@ export async function composeAskModelPicker(input: Readonly<{
   moneyPolicy?: AskMoneyPolicy | null;
   /** S2 (hosted): billing is on — the plan-cap rule is checked at this stage. */
   billingEnabled?: boolean;
+  /** Debate shape (P2b Task 6): the row in force, handed to `askModelPickerSettings`'s Free answer-job check. */
+  debateShapePolicy?: DebateShapePolicy | null;
   log: (line: string) => void;
   engineManifest?: URL;
   bundledScorecard?: URL;
@@ -313,6 +355,7 @@ export async function composeAskModelPicker(input: Readonly<{
     perRunCeilingMicros: input.perRunCeilingMicros,
     ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
     ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),
+    ...(input.debateShapePolicy === undefined ? {} : { debateShapePolicy: input.debateShapePolicy }),
     callTokenCeilings: input.callTokenCeilings,
     log: input.log
   }));
@@ -414,6 +457,37 @@ const admittedStructureSchema = z.object({
 
 const SYNTHESIS_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER"] as const);
 
+/** The strict reader's own refusal code (`parseCostEnvelopeBasis`); any other error is not a receipt refusal. */
+const COST_ENVELOPE_UNRESOLVED = "RUN_COST_ENVELOPE_UNRESOLVED" as const;
+
+function malformedDebateShape(reason: string): TypedDomainError {
+  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, `The admitted structural basis carries a malformed debate shape: ${reason}`);
+}
+
+/**
+ * Debate shape (spec 2026-10-12 §3.6, PF7): the run's shaped receipt, read ONLY through the strict receipt parser
+ * (`parseCostEnvelopeBasis`), never through a loose reader of this module's own. A receipt is shaped when it carries
+ * a shape member OR names the shape formula, so a shape-formula receipt with its member missing is refused by the
+ * parser, never priced as today's. A basis with neither is today's receipt (null). The parser's reason is kept.
+ * The ONE shared reader (PF7): the picker and the preview estimate (`preview-budget-estimate.ts`) both read through it.
+ */
+export function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
+  shape: DebateShapeCeilingInput;
+  counts: DebateShapeSiteCounts;
+}> | null {
+  if (basis.shape === undefined && basis.formula_version !== DEBATE_SHAPE_FORMULA_VERSION) return null;
+  let parsed: CostEnvelopeBasis;
+  try {
+    parsed = parseCostEnvelopeBasis(basis);
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === COST_ENVELOPE_UNRESOLVED) throw malformedDebateShape(error.message);
+    throw error;
+  }
+  const shape = parsed.shape;
+  if (shape === undefined) throw malformedDebateShape("the receipt carries no shape member");
+  return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
+}
+
 /**
  * Expected calls per role, one per call site, from the basis admission pinned.
  * Mapping (panelSize = debaters):
@@ -424,6 +498,8 @@ const SYNTHESIS_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER"] as con
  *   REVIEWER       = call_sites.reviewer
  *   ANSWER_WRITER  = ANSWER_CHECKER = serve_leg.synthesis_loop_sites ÷ 2
  *                    (SERVE_LEG requires the two round bounds to be equal)
+ * With a shape receipt (debate shape): POSITION = answers + map sites (the debaters also write the map),
+ * CROSS_EXCHANGE = cross_nodes; SUPPORT_ATTACK is the rest of the author sites, as before.
  */
 export function expectedCallsByRoleFromBasis(
   basis: Readonly<Record<string, unknown>>
@@ -433,14 +509,16 @@ export function expectedCallsByRoleFromBasis(
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis carries no call-site split");
   }
   const { panel_size: panelSize, call_sites: sites, serve_leg: serveLeg } = parsed.data;
-  const crossExchange = panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
-  const supportAttack = sites.author - panelSize - crossExchange;
+  const shaped = admittedShapeOf(basis);
+  const positions = shaped === null ? panelSize : shaped.shape.answers + shaped.counts.mapSites;
+  const crossExchange = shaped !== null ? shaped.counts.crossNodes : panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
+  const supportAttack = sites.author - positions - crossExchange;
   const perSynthesisRole = serveLeg.synthesis_loop_sites / SYNTHESIS_ROLES.length;
   if (supportAttack < 0 || !Number.isInteger(perSynthesisRole)) {
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis does not split into roles");
   }
   return Object.freeze({
-    POSITION: panelSize,
+    POSITION: positions,
     SUPPORT_ATTACK: supportAttack,
     CROSS_EXCHANGE: crossExchange,
     JUDGE: sites.panel,

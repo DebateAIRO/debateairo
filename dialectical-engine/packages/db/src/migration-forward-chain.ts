@@ -7,6 +7,8 @@ import { loadForward0113 } from './migration-forward0113.js';
 import { loadForward0114 } from './migration-forward0114.js';
 import { loadForward115 } from './migration-forward115.js';
 import { loadForward0116 } from './migration-forward0116.js';
+import { loadForward0117 } from './migration-forward0117.js';
+import { loadForward0118 } from './migration-forward0118.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -34,9 +36,10 @@ type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 /**
  * The chain, in order: 0111 (NETOPIA), then the auth DB batch (0112), then Part C's prices (0113, spec 2026-10-05
  * §2.16.6), then role rotation (0114, spec 2026-10-11 Part 3), then the data export (0115, V-41), then the mail locale carrier
- * (0116, mission email-locale S01-C05). A new step appends its loader here (README).
+ * (0116, mission email-locale S01-C05), then the debate shape's map (0117, spec 2026-10-12 §3.4), then the language
+ * check's site cost (0118, spec 2026-10-13). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118]);
 
 const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};

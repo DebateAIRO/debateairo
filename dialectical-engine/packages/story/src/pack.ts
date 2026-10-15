@@ -34,6 +34,13 @@ export interface StoryPack {
   readonly defaultShape: string;
   readonly common: string;
   readonly checker: string;
+  /**
+   * Debate shape (whole-branch review I-1, ruling W-STORY): what the storyteller and the checker are told about the
+   * two map fields (`also_raised`, `answers_note`). Sent ONLY when the material carries one of them, so a story
+   * without a map gets exactly the instructions it got before the debate shape, byte for byte.
+   */
+  readonly commonMap: string;
+  readonly checkerMap: string;
   readonly shapes: readonly StoryShape[];
   readonly fingerprint: string;
 }
@@ -257,8 +264,12 @@ function assertStoryTextFrameable(path: string, text: string): void {
 /**
  * The storyteller's instruction: `common.md`, then a menu of every shape with
  * its id, title, when-to-use line, ordered sections and guidance.
+ *
+ * Debate shape (ruling W-STORY): with `mapFields` true (the material carries `also_raised` or `answers_note`),
+ * `common-map.md` follows `common.md`, before the menu. Without it the instruction is the one every story got before
+ * the debate shape, byte for byte.
  */
-export function assembleStorytellerInstruction(pack: StoryPack): string {
+export function assembleStorytellerInstruction(pack: StoryPack, mapFields = false): string {
   const menu = pack.shapes.map((shape) => [
     `### Shape ${shape.id}: ${shape.title}`,
     `When to use: ${shape.whenToUse}`,
@@ -269,10 +280,19 @@ export function assembleStorytellerInstruction(pack: StoryPack): string {
   ].join("\n"));
   return [
     pack.common,
+    ...(mapFields ? [pack.commonMap] : []),
     "## The shapes",
     `Choose the one shape below that best fits the question, and put its id in shape_id. When none fits clearly, choose ${pack.defaultShape}. Use the chosen shape's sections, in order, as the titles of long.sections, written in the language of the question, and follow its guidance.`,
     ...menu
   ].join("\n\n");
+}
+
+/**
+ * The checker's instruction: `checker.md`, then, only when the material carries a map field (ruling W-STORY),
+ * `checker-map.md` after a blank line. Without it, the checker's instruction of every story before the debate shape.
+ */
+export function assembleStoryCheckerInstruction(pack: StoryPack, mapFields = false): string {
+  return mapFields ? `${pack.checker}\n\n${pack.checkerMap}` : pack.checker;
 }
 
 /**
@@ -325,7 +345,9 @@ export function loadStoryPack(dir: string): StoryPack {
 
   const commonFile = readStoryPackFile(dir, "common.md");
   const checkerFile = readStoryPackFile(dir, "checker.md");
-  for (const file of [commonFile, checkerFile]) {
+  const commonMapFile = readStoryPackFile(dir, "common-map.md");
+  const checkerMapFile = readStoryPackFile(dir, "checker-map.md");
+  for (const file of [commonFile, checkerFile, commonMapFile, checkerMapFile]) {
     if (file.text.trim() === "") throw storyPackFailure("TEXT_EMPTY", `${file.path} is empty`);
   }
 
@@ -362,18 +384,24 @@ export function loadStoryPack(dir: string): StoryPack {
     defaultShape,
     common: commonFile.text.trim(),
     checker: checkerFile.text.trim(),
+    commonMap: commonMapFile.text.trim(),
+    checkerMap: checkerMapFile.text.trim(),
     shapes: Object.freeze(shapes),
-    fingerprint: storyPackFingerprint([manifestFile, commonFile, checkerFile, ...shapeFiles])
+    fingerprint: storyPackFingerprint([manifestFile, commonFile, checkerFile, commonMapFile, checkerMapFile, ...shapeFiles])
   });
-  const instruction = assembleStorytellerInstruction(pack);
-  const instructionBytes = Buffer.byteLength(instruction, "utf8");
-  if (instructionBytes > STORY_PACK_LIMITS.maxInstructionBytes) {
-    throw storyPackFailure(
-      "INSTRUCTION_TOO_LARGE",
-      `the assembled storyteller instruction is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
-    );
+  // Both forms of each instruction are checked: the larger one (with the map fields) bounds the size.
+  for (const mapFields of [false, true]) {
+    const instruction = assembleStorytellerInstruction(pack, mapFields);
+    const instructionBytes = Buffer.byteLength(instruction, "utf8");
+    if (instructionBytes > STORY_PACK_LIMITS.maxInstructionBytes) {
+      throw storyPackFailure(
+        "INSTRUCTION_TOO_LARGE",
+        `the assembled storyteller instruction is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
+      );
+    }
+    assertStoryTextFrameable("the assembled storyteller instruction", instruction);
   }
-  assertStoryTextFrameable("the assembled storyteller instruction", instruction);
   assertStoryTextFrameable(checkerFile.path, pack.checker);
+  assertStoryTextFrameable(checkerMapFile.path, pack.checkerMap);
   return pack;
 }

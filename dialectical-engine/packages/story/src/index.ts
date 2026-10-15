@@ -1,6 +1,7 @@
 export {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
+  assembleStoryCheckerInstruction,
   assembleStorytellerInstruction,
   loadStoryPack,
   resolveStoryPackDir,
@@ -33,13 +34,18 @@ export {
   type StoryMaterialIndex
 } from "./validate.js";
 export {
+  STORY_ANSWERS_NOTE_ANSWERS_FILLED,
+  STORY_ANSWERS_NOTE_MAP_UNAVAILABLE,
   STORY_ENGINE_TOKENS,
   buildStoryMaterial,
   pointNumbersFrom,
   restoreStoryRefs,
+  storyMaterialHasMapFields,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
+  type StoryAnswersNoteKind,
   type StoryMaterial,
+  type StoryMaterialAlsoRaised,
   type StoryMaterialOmitted,
   type StoryMaterialPoint,
   type StoryMaterialPosition,
@@ -48,6 +54,7 @@ export {
   type StoryNodeEnrichment,
   type StoryRunSnapshot,
   type StorySnapshotArrow,
+  type StorySnapshotAlsoRaised,
   type StorySnapshotNode
 } from "./material.js";
 export {

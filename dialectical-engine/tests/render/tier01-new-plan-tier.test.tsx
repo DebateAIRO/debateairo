@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(),
   push: vi.fn(),
   readSession: vi.fn(),
+  getAskRoom: vi.fn(),
   // A21-O4c: the session token the page receives; a new one re-reads the session.
   token: "test-token"
 }));
@@ -26,7 +27,7 @@ vi.mock("@/components/AuthGate", () => ({
 vi.mock("@/lib/api", () => ({
   createDebate: mocks.createDebate,
   // This account already gave its one-time sensitive-data consent (V, 2026-09-29).
-  contractClient: { readSession: mocks.readSession, readSensitiveDataConsent: async () => ({ status: "given" as const }) }
+  contractClient: { readSession: mocks.readSession, getAskRoom: mocks.getAskRoom, readSensitiveDataConsent: async () => ({ status: "given" as const }) }
 }));
 
 import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
@@ -113,6 +114,10 @@ describe("S01 /new plan tier", () => {
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
     mocks.push.mockReset();
     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
+    // Debate shape P2c (Contract deviation 7): a deployment whose shape row is in force, so the three settings show.
+    mocks.getAskRoom.mockReset().mockResolvedValue({
+      room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, shape_settings: true
+    });
     mocks.token = "test-token";
     const container = document.createElement("div");
     document.body.append(container);
@@ -130,6 +135,7 @@ describe("S01 /new plan tier", () => {
     await act(async () => root!.render(
       <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
     ));
+    await settle();
     await settle();
   }
 
@@ -352,7 +358,7 @@ describe("S01 /new plan tier", () => {
     }
   );
 
-  it.each(SESSION_STATES)("S01-27 R4 locks all thirteen controls while Free is chosen, when %s", async (_state, session, hint) => {
+  it.each(SESSION_STATES)("S01-27 R4 locks all twelve controls while Free is chosen, when %s", async (_state, session, hint) => {
     mocks.readSession.mockResolvedValue(session);
     await renderPage();
     await click('.ndOptionsToggle');
@@ -370,16 +376,17 @@ describe("S01 /new plan tier", () => {
       "modelStrength-BALANCED",
       "modelStrength-BEST",
       "depthMode",
-      "scrutinyDepth",
-      "maxTokens"
+      "scrutinyDepth"
     ];
     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(13);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(12);
     expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
     expect(locked.map((control) => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
-    })).toEqual(Array.from({ length: 13 }, () => ["", ""]));
+    })).toEqual(Array.from({ length: 12 }, () => ["", ""]));
+    // Debate shape P2c, S8: Answer length is every plan's choice, so Free leaves it open.
+    expect([...document.querySelectorAll<HTMLButtonElement>('[data-field="answerLength"]')].every((pill) => !pill.disabled)).toBe(true);
     expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(hint);
   });
 
@@ -398,7 +405,8 @@ describe("S01 /new plan tier", () => {
       document.querySelectorAll('.ndSelect select:disabled').length
     // A21: the three model-strength pills are segmented items too (6 -> 9).
     // Parallel calls task 13: Branching width and Concurrency are gone (sliders 4 -> 2).
-    ]).toEqual([9, 2, 0, 2]);
+    // Debate shape P2c: Max tokens is gone (sliders 2 -> 1); Answer length's pills are open on Free.
+    ]).toEqual([9, 1, 0, 2]);
     expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
@@ -416,7 +424,7 @@ describe("S01 /new plan tier", () => {
       "budgetTier-low", "budgetTier-medium", "budgetTier-high",
       "treeDepth",
       "modelStrength-ECONOMY", "modelStrength-BALANCED", "modelStrength-BEST",
-      "depthMode", "scrutinyDepth", "maxTokens"
+      "depthMode", "scrutinyDepth"
     ];
     const focusAccepted = lockedIds.filter((id) => {
       const control = document.querySelector<HTMLElement>(`#${id}`)!;
@@ -427,7 +435,7 @@ describe("S01 /new plan tier", () => {
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
-  it("S01-30 R5 / M12 keeps the OPTIONS toggle and notice operable in Free", async () => {
+  it("S01-30 R5 / M12 keeps the OPTIONS toggle operable in Free, with no 'not sent' notice", async () => {
     await renderPage();
 
     const toggle = document.querySelector<HTMLButtonElement>('.ndOptionsToggle')!;
@@ -436,9 +444,9 @@ describe("S01 /new plan tier", () => {
     await click('.ndOptionsToggle');
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(document.querySelector('#additionalRunOptions')).not.toBeNull();
-    expect(document.querySelector('.ndLegacyNotice')?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-      "Depth mode, depth of scrutiny and max tokens are not sent yet: the new engine does not use them."
-    );
+    // Debate shape P2c: the three controls are sent, so the "not sent" notice is gone.
+    expect(document.querySelector('.ndLegacyNotice')).toBeNull();
+    expect(document.querySelector('#additionalRunOptions')?.textContent).not.toMatch(/not sent/i);
   });
 
   /* Parallel calls task 13 (owner ruling 2026-10-12): Concurrency is an owner-only
@@ -453,7 +461,9 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#branchingWidth')).toBeNull();
     expect(document.querySelector('#concurrency')).toBeNull();
     expect(panel.textContent).not.toMatch(/Branching width|Concurrency|Pro \+ con children per claim|Models running in parallel/);
-    expect([...panel.querySelectorAll('.ndSlider')].map((slider) => slider.id)).toEqual(["maxTokens"]);
+    // Debate shape P2c: Max tokens became the Answer length pills.
+    expect([...panel.querySelectorAll('.ndSlider')].map((slider) => slider.id)).toEqual([]);
+    expect(document.querySelector('#answerLength-standard')).not.toBeNull();
     expect(document.querySelector('#depthMode')).not.toBeNull();
     expect(document.querySelector('#scrutinyDepth')).not.toBeNull();
   });
@@ -504,9 +514,9 @@ describe("S01 /new plan tier", () => {
     // A21 O4: the choice really landed, so the reset below is proven, not vacuous.
     expect(document.querySelector('#modelStrength-BEST')?.getAttribute("aria-checked")).toBe("true");
     await click('.ndOptionsToggle');
-    await selectValue('#depthMode', "adaptive");
+    await selectValue('#depthMode', "fixed");
     await selectValue('#scrutinyDepth', "deep");
-    await inputValue('#maxTokens', "4000");
+    await click('#answerLength-detailed');
 
     await click('#planTier-free');
 
@@ -525,22 +535,23 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#budgetTier-label')?.parentElement?.querySelector('.ndHint')?.textContent).toBe(
       "How much work the composition may spend · fixed by the Free plan"
     );
-    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("fixed");
+    expect(document.querySelector<HTMLSelectElement>('#depthMode')?.value).toBe("adaptive");
     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("standard");
-    const sliderGrid = ["treeDepth", "maxTokens"].map((id) => {
+    const sliderGrid = ["treeDepth"].map((id) => {
       const slider = document.querySelector<HTMLInputElement>(`#${id}`)!;
       return { id, min: slider.min, max: slider.max, step: slider.step, value: slider.value };
     });
     expect(sliderGrid).toEqual([
-      { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" },
-      { id: "maxTokens", min: "128", max: "4000", step: "32", value: "800" }
+      { id: "treeDepth", min: "1", max: "5", step: "1", value: "2" }
     ]);
+    // S8: the answer length the asker chose survives the switch to Free.
+    expect(document.querySelector('#answerLength-detailed')?.getAttribute("aria-checked")).toBe("true");
     expect(sliderGrid.every(({ min, max, step, value }) =>
       (Number(value) - Number(min)) % Number(step) === 0 &&
       (Number(max) - Number(min)) % Number(step) === 0
     )).toBe(true);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(13);
+    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(12);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
@@ -586,7 +597,9 @@ describe("S01 /new plan tier", () => {
       "modelStrength-BEST",
       "depthMode",
       "scrutinyDepth",
-      "maxTokens"
+      "answerLength-short",
+      "answerLength-standard",
+      "answerLength-detailed"
     ];
     expect(gaugeIds.filter((id) => {
       const control = document.querySelector(`#${id}`);

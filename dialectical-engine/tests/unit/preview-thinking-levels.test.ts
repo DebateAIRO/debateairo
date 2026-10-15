@@ -52,7 +52,9 @@ describe("the step of a call", () => {
     ["JUDGE:review:node-1", "served", "reviewer"], ["JUDGE:review:catch-up:node-1", "served", "reviewer"],
     ["COMPOSER:SYNTHESIZER:INITIAL:1", "served", "answer_writer"], ["COMPOSER:SYNTHESIZER:RETRY:2:seat:main", "served", "answer_writer"],
     ["POST_COMPOSE_R9:EVALUATOR:1", "served", "answer_checker"], ["STORY:STORYTELLER:1", "story", "story_writer"],
-    ["STORY:CHECKER:2", "story", "story_checker"], ["STORY:STORYTELLER:1", "served", null], ["evaluator.grade-judge-output.v1", "served", null]
+    ["STORY:CHECKER:2", "story", "story_checker"], ["STORY:STORYTELLER:1", "served", null], ["evaluator.grade-judge-output.v1", "served", null],
+    ["MAP:angles", "served", "opening"], ["MAP:list:0", "served", "opening"], ["MAP:merge", "served", "opening"],
+    ["MAP:gap:1", "served", "opening"], ["MAP:choose", "served", "opening"]
   ])("%s on %s -> %s", (callSiteKey, lane, step) => {
     expect(previewThinkingStepOf({ callSiteKey, lane })).toBe(step);
   });

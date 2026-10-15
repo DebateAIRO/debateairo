@@ -1,0 +1,17 @@
+{
+  "version": "debate-shape-map-forward0117-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0116_mail_locale.sql",
+    "manifestSha256": "e088749386b47e10fbc40d420b11ffebc5f1736b194ddeb6e549bffa71815937",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0117_debate_shape_map.sql",
+    "sha256": "7cbd0f9ab826a89e71695257b498c71a6ac2f0e954d0ef4209e55e41fe8bfee7"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

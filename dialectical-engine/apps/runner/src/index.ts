@@ -65,6 +65,7 @@ import {
   attemptCeilingForPhase,
   parseCostEnvelopeBasis,
   projectedCallCeilingMicros,
+  RUN_COST_ENVELOPE_ROOM_KEPT,
   sharedWallReached,
   type BudgetPressureDecision,
   type CostEnvelopePhase,
@@ -77,6 +78,7 @@ import {
   decideBranchFreezes,
   decideRoundBoundary,
   evaluate,
+  resolveLeverage,
   type BranchFreezeDecision,
   type EvaluationSnapshot,
   type NodeStrengthRecord,
@@ -143,6 +145,9 @@ import {
   ServeRepository,
   toSynthesisPromptMaterial,
   SYNTHESIZER_PROMPT_CONTRACT,
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+  SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+  synthesizerAnswerLengthField,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -165,10 +170,15 @@ import {
   type VerdictLabelBasis,
   type VerdictLabelDerivation
 } from "@debateai/serve";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
+import { MapChoiceRepository, mapAnswersArgued, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
-  replyLanguageCheck,
+  questionLanguageFromRun,
+  questionLanguageSentence,
+  replyLanguageCheckFor,
+  withQuestionLanguageField,
+  type QuestionLanguage,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -207,9 +217,25 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import {
+  shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
+  type ScrutinyCandidate
+} from "./shape-select.js";
+import {
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRoomAttempts,
+  rootZeroRoomRefs, runMapStage, shapeRootMaterial
+} from "./map-stage.js";
+import {
+  buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
+  type ShapeLeg, type ShapePlan, type ShapePositionPlan
+} from "./shape-plan.js";
+import {
+  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
+} from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
@@ -645,7 +671,7 @@ export const EVALUATOR_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
  * PRACTICE DEBATE 3 (2026-10-12): `serve.evaluator.v2`, what the runner sends.
  * Only the owners' instruction slot changed (owner approved 2026-10-12,
  * `EVALUATOR_INSTRUCTIONS`): the checker now also grades the reader's rule the
- * writer's `serve.synthesizer.v3` instruction states. The answer form is the
+ * writer's `serve.synthesizer.v3` instruction states (v4 keeps that instruction). The answer form is the
  * same sealed `EVALUATOR_CONTRACT_TEXT`, so the verdict schema below is
  * unchanged. A new instruction is a new contract id, never an edit, and a new
  * `conformanceContractHash` the register must carry before the runner starts
@@ -669,7 +695,7 @@ export function codePromptContractHashes(): Readonly<{ judge: string; composer: 
   const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
   return Object.freeze({
     judge: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-    composer: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    composer: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
     conformance: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
   });
 }
@@ -712,13 +738,21 @@ export function assertRegisterPromptContractHashes(
   );
 }
 
+/**
+ * The contract with its language sentence, added at call time (never sealed: the synthesizer and evaluator fingerprints
+ * exclude it). Without a lock, today's directive byte for byte; with a shaped run's lock (question-language spec
+ * 2026-10-13 L6), THE one named sentence.
+ */
 function promptContractInArgumentLanguage(
   contract: PromptContract,
-  argumentLanguageName: string
+  argumentLanguageName: string,
+  questionLanguage: QuestionLanguage | null = null
 ): PromptContract {
   return Object.freeze({
     ...contract,
-    instruction: `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName)}`
+    instruction: questionLanguage === null
+      ? `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName)}`
+      : `${contract.instruction} ${questionLanguageSentence(questionLanguage)}`
   });
 }
 
@@ -766,20 +800,46 @@ export const evaluatorVerdictSchema = z.object({
  * export). `randomBytes` exists for the byte-equality test; production never
  * passes it. Paid plans S1a: it writes in the question's language (dev's
  * argument-language rule, D2), so the replayed prompt is the live one.
+ * Question language (spec 2026-10-13 L6): with a shaped run's lock, the named
+ * sentence replaces the directive and the `question_language` field rides LAST
+ * (after `answer_length`); without one (null), the packet is today's, byte for byte.
  */
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
-  randomBytes?: (size: number) => Buffer
+  randomBytes?: (size: number) => Buffer,
+  answerWords: number | null = null,
+  questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
+  // Debate shape (spec §3.3 step 8): only a writer call with an answer length takes the length variant; without one
+  // (every run without a shape, and every checker call) the packet is today's, byte for byte.
+  const lengthed = request.role === "SYNTHESIZER" && answerWords !== null;
+  // V-MINIMUM-PAYLOAD: the one projection, applied once; the length variant only appends its own field after it.
+  const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
-      request.role === "SYNTHESIZER" ? SYNTHESIZER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT,
-      argumentLanguageName
+      request.role === "SYNTHESIZER"
+        ? (lengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
+        : EVALUATOR_PROMPT_CONTRACT,
+      argumentLanguageName,
+      questionLanguage
     ),
-    material: toSynthesisPromptMaterial(request),
+    // The language field wraps the ONE projection (and the length field after it): it rides LAST; with no lock
+    // `withQuestionLanguageField` returns the same array, today's bytes.
+    material: withQuestionLanguageField(lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material, questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
+}
+
+/**
+ * Spec §3.3 step 8: the writer's call bound is max(sealed bound, the answer length's writerBound) — never under the
+ * sealed bound, never under the row's writer bound. Null (no shape): the sealed bound itself, the same object.
+ */
+export function shapeWriterBound(bound: CallBound, writerBound: number | null): CallBound {
+  if (writerBound === null) return bound;
+  if (!Number.isSafeInteger(writerBound) || writerBound < 1) throw new TypeError("SHAPE_WRITER_BOUND_INVALID");
+  if (writerBound <= bound.tokenCeiling) return bound;
+  return Object.freeze({ ...bound, tokenCeiling: writerBound });
 }
 
 /** A17: the classification a live synthesis call applies, exported for replay. */
@@ -1551,6 +1611,8 @@ export interface ReviewCatchUpReviewer {
     readonly callSiteKey: string;
     readonly questionLine: string;
     readonly argumentLanguageName?: string;
+    /** P2d Task 7c: the run's lock, exactly as the runner's own review sends it (`JudgeSubjectInput.questionLanguage`). */
+    readonly questionLanguage?: QuestionLanguage;
     readonly statement: string;
     readonly authorMaker: string;
     readonly providerRef: string;
@@ -1718,6 +1780,14 @@ export async function runReviewCatchUp(input: {
   readonly workItemId: string;
   readonly questionLine: string;
   readonly argumentLanguageName?: string;
+  /**
+   * P2d Task 7c (controller ruling D-CATCHUP; ruling L-SHAPED-ONLY): the run's stored tag and its frozen receipt
+   * (`core.run.envelope_basis`), both as `RunRepository.readFrozenHead` returns them. The receipt decides the lock
+   * exactly as the runner decides it for its own reviews (`runQuestionLanguageLock`): a receipt with a shape locks every
+   * catch-up review to the stored pair; a receipt with no shape, or none given, keeps today's review.
+   */
+  readonly argumentLanguageTag?: string;
+  readonly envelopeBasis?: unknown;
   readonly invocationId: string;
   readonly pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[];
   readonly judgeBound: CallBound;
@@ -1729,6 +1799,14 @@ export async function runReviewCatchUp(input: {
   return input.dependencies.withContentLease(input.runId,async () => {
   const beforeAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
+  // P2d Task 7c (controller ruling D-CATCHUP): THE RUN'S LOCK, read off its receipt as the runner reads it. The Postgres
+  // reader above has already parsed this same receipt, so one that does not parse is refused there, as today.
+  const catchUpLanguage: QuestionLanguage | null = input.envelopeBasis === undefined ? null
+    : runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {
+      argumentLanguageTag: input.argumentLanguageTag ?? "und",
+      argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
+    });
+  const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -1782,6 +1860,7 @@ export async function runReviewCatchUp(input: {
         callSiteKey,
         questionLine: input.questionLine,
         argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
+        ...catchUpLanguageInput,
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
@@ -2308,6 +2387,13 @@ export interface WalkingSkeletonSettings {
     store?: Pick<RunCostSubstitutionRepository, "record">;
     log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
   }>;
+  /**
+   * Debate shape (spec 2026-10-12 §3.3 step 1): where a shaped run's map is stored and read back (a re-claimed run
+   * reuses its stored map and asks nothing again). Absent: the runner's pool. Never read by a run without a shape.
+   */
+  readonly mapChoices?: Readonly<{
+    store: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
+  }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -2355,6 +2441,13 @@ export interface WalkingSkeletonSettings {
    * nothing is wrapped, today's runner (and, like an absent row, today's one-call-after-another debate: Task 10).
    */
   readonly callScheduler?: CallScheduler;
+  /**
+   * Debate shape (spec 2026-10-12 §3): set at boot when the register seals debateShapePolicy (with its map hash).
+   * A run whose receipt carries a shape needs it (DEBATE_SHAPE_RUNNER_UNCONFIGURED otherwise, Task 12); a run without
+   * one never reads it. Absent: today's runner. A shaped run reads its map hash (the map's calls are checked against
+   * it) and argues the shape (Task 13: the Phase 2a per-run refusal is gone).
+   */
+  readonly debateShape?: DebateShapeRunnerSettings | null;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
@@ -2586,6 +2679,25 @@ interface ComposedCitationContext {
    * language is not checked.
    */
   readonly questionLine?: string;
+  /**
+   * Question language (spec 2026-10-13 L6): a shaped run's lock. With it, the prose is checked against the lock
+   * (`replyLanguageCheckFor`), never a re-guess of the question; absent, today's check.
+   */
+  readonly questionLanguage?: QuestionLanguage;
+}
+
+/**
+ * Question language (spec 2026-10-13 L6; ruling L-SHAPED-ONLY, final review I2): THE RUN'S LOCK, decided by its
+ * RECEIPT. A receipt with a shape (`envelope_basis.shape`) reads the stored tag and name back as the lock
+ * (`questionLanguageFromRun`: null for "und" or a stored fallback name) — also when the run is left with one maker at
+ * claim, so it is told and checked in the one language the API stored for it. A receipt with no shape is never locked,
+ * whatever pair it stored: today's directive, fields and reply check, byte for byte.
+ */
+export function runQuestionLanguageLock(
+  receiptShape: unknown, run: Readonly<{ argumentLanguageTag: string; argumentLanguageName: string }>
+): QuestionLanguage | null {
+  return receiptShape === null || receiptShape === undefined ? null
+    : questionLanguageFromRun(run.argumentLanguageTag, run.argumentLanguageName);
 }
 
 /** Reply language (2026-10-12): the answer's prose, and the checker's objection (the next round's material). */
@@ -2620,7 +2732,7 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
   }
   if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
   // Reply language (2026-10-12): checked once the citations hold, so a refusal names one kind of fix.
-  const language = citation.questionLine === undefined ? [] : replyLanguageCheck(citation.questionLine, COMPOSED_PROSE)(composed);
+  const language = citation.questionLine === undefined ? [] : replyLanguageCheckFor(citation.questionLine, citation.questionLanguage, COMPOSED_PROSE)(composed);
   return language.length === 0
     ? structured
     : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
@@ -3537,12 +3649,15 @@ export function parseEvaluatorOutput(content: string, reply?: ModelReplyFacts): 
 
 /**
  * The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. Reply language (2026-10-12):
- * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`).
+ * with the person's question, an objection must be in its language (`EVALUATOR_PROSE`); with a shaped run's lock
+ * (question-language spec 2026-10-13 L6), in the locked language.
  */
-export function classifyEvaluatorContent(content: string, reply?: ModelReplyFacts, questionLine?: string): ContentClassification {
+export function classifyEvaluatorContent(
+  content: string, reply?: ModelReplyFacts, questionLine?: string, questionLanguage: QuestionLanguage | null = null
+): ContentClassification {
   const structured = classifyStructuredContent(content, evaluatorVerdictSchema, reply);
   if (structured.parseStatus !== "PARSED" || questionLine === undefined) return structured;
-  const language = replyLanguageCheck(questionLine, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
+  const language = replyLanguageCheckFor(questionLine, questionLanguage, EVALUATOR_PROSE)(parseEvaluatorOutput(content, reply));
   return language.length === 0 ? structured : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(language) };
 }
 
@@ -4461,6 +4576,7 @@ export class WalkingSkeletonRunner {
   readonly #providerProbes: ProviderProbeRepository;
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
+  readonly #mapChoices: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -4489,6 +4605,7 @@ export class WalkingSkeletonRunner {
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
+    this.#mapChoices = settings.mapChoices?.store ?? new MapChoiceRepository(pool);
     const critique = settings.critique === undefined ? undefined
       : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
@@ -5061,6 +5178,17 @@ export class WalkingSkeletonRunner {
         "The frozen run cost envelope does not satisfy the sealed runner contract"
       );
     }
+    /**
+     * Debate shape (spec 2026-10-12 §3): the sizes this run was admitted with (P2a: its receipt's `shape`), or null —
+     * today's run, byte for byte. A shaped run needs the runner's shape settings (the sealed map hash) and a call
+     * scheduler (its chains run through the lane; with no concurrency row the lane holds one call at a time).
+     */
+    const shapeShape = envelopeBasis.shape ?? null;
+    if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
+      throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
+        "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
+    }
+    const shapeSettings = shapeShape === null ? null : debateShapeSettingsOf(run.depthParams);
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     /**
      * Model scorecard A15 (spec §2.7) — the role assignment the picker pinned at
@@ -5245,6 +5373,11 @@ export class WalkingSkeletonRunner {
      */
     const bodyServedBy = new Map<string, string>();
     const reviewAuthorMakers = new Map<string, string>();
+    /**
+     * Debate shape (Task 13 fix round 1): a shaped leg's maker bar (`shapeMakerBar`), by call site, so a call moved to
+     * a cheaper maker never lands on the maker the leg must avoid. Empty on today's run.
+     */
+    const movedCallBars = new Map<string, (member: Readonly<{ maker: string }>) => boolean>();
     const bodyMakers = Object.freeze([...configuredMakers]);
     const bodyPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
     const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>
@@ -5253,7 +5386,9 @@ export class WalkingSkeletonRunner {
         prices: bodyPrices,
         eligibleFor: (request) => {
           const author = reviewAuthorMakers.get(seatBaseCallSiteKey(request.callSiteKey));
-          return author === undefined ? bodyMakers : bodyMakers.filter((candidate) => candidate.maker !== author);
+          const bar = movedCallBars.get(seatBaseCallSiteKey(request.callSiteKey));
+          return author === undefined && bar === undefined ? bodyMakers
+            : bodyMakers.filter((candidate) => candidate.maker !== author && (bar === undefined || bar(candidate)));
         },
         onServed: (callSiteKey, servedBy) => { bodyServedBy.set(seatBaseCallSiteKey(callSiteKey), servedBy.providerRef); },
         onMoved: (moved) => this.#recordCostSubstitution(run.runId, moved)
@@ -5602,6 +5737,25 @@ export class WalkingSkeletonRunner {
     }
     const effectiveMakerCount = seatBook.position.length;
     /**
+     * Debate shape (spec §3.3 step 1): the run's shape context — its frozen sizes, its settings and the sealed map
+     * hash — or null. A shaped run left with one maker at claim keeps today's single-position path (null).
+     */
+    const shapeRun = shapeShape !== null && shapeSettings !== null && this.settings.debateShape != null && effectiveMakerCount >= 2
+      ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
+      : null;
+    /**
+     * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
+     * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a
+     * shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive, fields and
+     * reply check byte for byte. Ruling L-SHAPED-ONLY (final review I2): the RECEIPT decides, not `shapeRun`, so a
+     * shaped run left with one maker at claim (today's single-position path) keeps the lock the API stored for it.
+     * Computed before the map stage, whose root-0 room frames it (PF-L38). Every call of a locked run carries it: the
+     * judge legs, root 0's room, the review, the panel, the writer and its reading, the checker and its reading, the
+     * map (which reads the same stored pair itself) and the story.
+     */
+    const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);
+    const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
+    /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
      * POSITION seat holds its maker — read off the CLAIMED book, never off who
@@ -5823,6 +5977,9 @@ export class WalkingSkeletonRunner {
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
     // keeps its backup; the ledger read still seeds `positionAnswerers`.
     const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /** Final review M-1: a shaped root's maker bar narrows its POSITION rule (main and backup); none is today's rule. */
+    const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined
+      ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);
     /**
      * Model scorecard A16c (controller carries 12 and 16) — THE SYNTHESIS SEATS
      * TAKE PART IN R3's 80-20 SPLIT, through the same site-pure ordinal every
@@ -5869,6 +6026,10 @@ export class WalkingSkeletonRunner {
     // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
     // here because BOTH judgement producers (root and child) append to it.
     const panelDegradations: PanelDegradationRecord[] = [];
+    // Debate shape (spec §3.3 step 6): one entry per node whose panel the close-call extension widened, bound to the
+    // node it extended (root 0's included: `saveAuthored` saves it too). Task 14 turns them into
+    // PANEL-CLOSE-CALL-EXTENDED records; always empty on today's run.
+    const closeCallExtensions: { readonly nodeId: string; readonly added: number }[] = [];
 
     /**
      * S2-2 / T3 — the judge panel for ONE authored node.
@@ -5928,6 +6089,8 @@ export class WalkingSkeletonRunner {
        * can return one.
        */
       readonly spendStop: EnvelopeStopKind | null;
+      /** Debate shape (spec §3.3 step 6): the members the close-call extension called and heard (0: none; always 0 today). */
+      readonly closeCallAdded: number;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
       const authorOnlySelection = (): {
@@ -5961,7 +6124,8 @@ export class WalkingSkeletonRunner {
           disagreement: createUnmeasuredDisagreement(),
           marks: Object.freeze([]),
           panelFailureReason: null,
-          spendStop: null
+          spendStop: null,
+          closeCallAdded: 0
         });
       }
       if (panelPolicy === undefined) {
@@ -5987,7 +6151,11 @@ export class WalkingSkeletonRunner {
       // pays for a call the panel would refuse, and a seat whose main shares the
       // author's maker is answered by its runner-up instead of being lost.
       const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
-      const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
+      // Debate shape (spec §3.3 step 6): a shaped run asks J graders per node (never more than the makers who are not
+      // the author); today's run keeps today's cap.
+      const panelCallCap = shapeRun === null
+        ? Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1
+        : Math.min(shapeRun.shape.graders, effectiveMakerCount - 1);
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
       // Run resilience (spec 2026-10-12, fix (d)): a member that sits out the rest of the run has no panel seat; it
       // is disclosed once, on the answer (RUN_PANEL_REVISED), not as a failed seat on every node.
@@ -6021,6 +6189,50 @@ export class WalkingSkeletonRunner {
         panelCallCap,
         seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: input.callSiteKey })
       );
+      type PlannedPanelSeat = (typeof plannedSeats)[number];
+      // One called seat's panel member — the base panel's and, on a shaped run, the close-call extension's.
+      const memberFor = (
+        seat: PlannedPanelSeat["seat"],
+        panelOptions: PlannedPanelSeat["panelOptions"],
+        planned: NonNullable<PlannedPanelSeat["planned"]>
+      ) => ({
+        memberRole: planned.maker,
+        actorRef: planned.providerRef,
+        contractHash: judgeContractHash,
+        judge: async () => {
+          const answered = await seatCaller.callSeat({
+            seat,
+            callSiteKey: input.callSiteKey,
+            ...panelOptions,
+            keyFor: panelKeyFor,
+            call: (member, callSiteKey) => member.judge.assess({
+              runId: run.runId,
+              subjectItemId: claimed.workItemId,
+              callSiteKey,
+              questionLine: input.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
+              ...shapeLanguageInput,
+              statement: input.statement,
+              authorMaker: input.authorMaker,
+              providerRef: member.providerRef,
+              contractHash: judgeContractHash,
+              bound: this.settings.judgeBound
+            })
+          });
+          // A15c (controller carry 7): the member that ANSWERED, route and
+          // maker together — never one without the other.
+          return {
+            judgementRef: answered.value.judgementRef,
+            assessment: answered.value.assessment,
+            actorRef: answered.member.providerRef,
+            memberRole: answered.member.maker
+          };
+        }
+      });
+      // Task 11 fix round 1 (controller ruling T11-M): on a shaped run, the makers seated on this node's called seats —
+      // a seat's backup never repeats one of them, nor the author's (`shapeDistinctMakerOptions`). Unused today.
+      const calledMakers = plannedSeats.flatMap((entry, index) =>
+        calledSeats[index] === true && entry.planned !== null ? [entry.planned.maker] : []);
       const panelMembers = plannedSeats.flatMap(({ seat, panelOptions, planned }, seatPosition) => {
         if (planned === null) {
           return [{
@@ -6036,39 +6248,9 @@ export class WalkingSkeletonRunner {
           }];
         }
         if (calledSeats[seatPosition] !== true) return [];
-        return [{
-          memberRole: planned.maker,
-          actorRef: planned.providerRef,
-          contractHash: judgeContractHash,
-          judge: async () => {
-            const answered = await seatCaller.callSeat({
-              seat,
-              callSiteKey: input.callSiteKey,
-              ...panelOptions,
-              keyFor: panelKeyFor,
-              call: (member, callSiteKey) => member.judge.assess({
-                runId: run.runId,
-                subjectItemId: claimed.workItemId,
-                callSiteKey,
-                questionLine: input.questionLine,
-                argumentLanguageName: run.argumentLanguageName,
-                statement: input.statement,
-                authorMaker: input.authorMaker,
-                providerRef: member.providerRef,
-                contractHash: judgeContractHash,
-                bound: this.settings.judgeBound
-              })
-            });
-            // A15c (controller carry 7): the member that ANSWERED, route and
-            // maker together — never one without the other.
-            return {
-              judgementRef: answered.value.judgementRef,
-              assessment: answered.value.assessment,
-              actorRef: answered.member.providerRef,
-              memberRole: answered.member.maker
-            };
-          }
-        }];
+        return [memberFor(seat, shapeDistinctMakerOptions(panelOptions, shapeRun === null
+          ? null
+          : { ownMaker: planned.maker, taken: new Set([input.authorMaker, ...calledMakers]) }), planned)];
       });
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
@@ -6115,74 +6297,144 @@ export class WalkingSkeletonRunner {
         : null;
       if (Object.hasOwn(panel, "stoppedBy") && spendStop === null) throw panel.stoppedBy;
 
-      // Each member's assessment is reduced through the SAME ratified
-      // composition as the author's, so the taus are commensurable.
-      const reducedMembers = panel.judgements.flatMap((entry) => {
-        const reducedMember = reduceAssessment({
-          claimType: input.claimType,
-          assessment: entry.assessment,
-          compositionRow,
-          reducerVersion: judgementPolicy.reducerVersion
+      // Task 11: today's reduction, statement for statement, as one local function — the close-call extension
+      // re-reduces every voice heard through it.
+      const reduceHeard = (voices: typeof panel.judgements) => {
+        // Each member's assessment is reduced through the SAME ratified
+        // composition as the author's, so the taus are commensurable.
+        const reducedMembers = voices.flatMap((entry) => {
+          const reducedMember = reduceAssessment({
+            claimType: input.claimType,
+            assessment: entry.assessment,
+            compositionRow,
+            reducerVersion: judgementPolicy.reducerVersion
+          });
+          return reducedMember.kind === "REDUCED"
+            ? [{ ...entry, tau: reducedMember.tau }]
+            : [];
         });
-        return reducedMember.kind === "REDUCED"
-          ? [{ ...entry, tau: reducedMember.tau }]
-          : [];
-      });
-      if (reducedMembers.length === 0) {
-        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
-      }
-
-      const dispersion = measureDispersion(
-        reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
-        {
-          scale: panelPolicy.dispersionScale,
-          rowKey: "dispersionScale",
-          registerVersion: panelPolicy.registerVersion,
-          sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+        if (reducedMembers.length === 0) {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
         }
-      );
 
-      // A15 (R5; controller carry 7 — lands with E8): the discount keys on the
-      // ROUTE THAT ANSWERED — `actorRef` on each panel entry — never on a maker
-      // name looked up in a list, which could not tell two seats of one maker,
-      // or a backup from another family, apart.
-      const familyOf = (actorRef: string): JudgeFamily => {
-        const entry = panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(actorRef));
-        return entry === undefined
-          ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
-          : { kind: "KNOWN", familyRef: entry.familyRef };
+        const dispersion = measureDispersion(
+          reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
+          {
+            scale: panelPolicy.dispersionScale,
+            rowKey: "dispersionScale",
+            registerVersion: panelPolicy.registerVersion,
+            sourceRef: panelPolicy.sourceRefs.dispersionScale ?? panelPolicy.unmappedReason
+          }
+        );
+
+        // A15 (R5; controller carry 7 — lands with E8): the discount keys on the
+        // ROUTE THAT ANSWERED — `actorRef` on each panel entry — never on a maker
+        // name looked up in a list, which could not tell two seats of one maker,
+        // or a backup from another family, apart.
+        const familyOf = (actorRef: string): JudgeFamily => {
+          const entry = panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(actorRef));
+          return entry === undefined
+            ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
+            : { kind: "KNOWN", familyRef: entry.familyRef };
+        };
+        const weighted = applyCorrelatedErrorDiscount(
+          reducedMembers.map((entry) => ({
+            memberRole: entry.memberRole,
+            earnedWeight: judgementPolicy.earnedWeight,
+            family: familyOf(entry.actorRef)
+          })),
+          {
+            repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
+            rowKey: "repeatedFamilyMultiplier",
+            registerVersion: panelPolicy.registerVersion,
+            sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+          }
+        );
+        const selection = selectReducedJudgement(
+          reducedMembers.map((entry, index) => ({
+            judgementRef: entry.judgementRef,
+            tau: entry.tau,
+            effectiveWeight: weighted[index]!.effectiveWeight
+          })),
+          judgementPolicy.selectionRule
+        );
+        if (selection.kind !== "SELECTED") {
+          throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
+        }
+        return { reducedMembers, dispersion, weighted, selection };
       };
-      const weighted = applyCorrelatedErrorDiscount(
-        reducedMembers.map((entry) => ({
-          memberRole: entry.memberRole,
-          earnedWeight: judgementPolicy.earnedWeight,
-          family: familyOf(entry.actorRef)
-        })),
-        {
-          repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
-          rowKey: "repeatedFamilyMultiplier",
-          registerVersion: panelPolicy.registerVersion,
-          sourceRef: panelPolicy.sourceRefs.repeatedFamilyMultiplier ?? panelPolicy.unmappedReason
+      let reduced = reduceHeard(panel.judgements);
+      /** The base panel's own reduction (J graders), before any close-call extra: what its degradation marks read. */
+      const baseReduced = reduced;
+
+      // Debate shape (spec §3.3 step 6; §6: the highest-voice rule is unchanged) — THE CLOSE-CALL EXTENSION. A
+      // measured spread at or above the disagreement threshold calls up to E more graders, of makers neither the
+      // author's nor already called at this node; their voices come AFTER every voice heard and the node is reduced
+      // again. Never on today's run (`shapeRun === null`).
+      let heard = panel.judgements;
+      let notes = panel.notes;
+      let closeCallAdded = 0;
+      let closeCallStop: EnvelopeStopKind | null = null;
+      const firstDispersion = reduced.dispersion.kind === "MEASURED" ? reduced.dispersion.value : null;
+      if (shapeRun !== null && spendStop === null
+        && shapeCloseCallFires(firstDispersion, panelPolicy.disagreementThreshold, shapeRun.shape.closeCallExtraGraders)) {
+        // Pre-flight PF-B34: every maker already CALLED at this node — the ones heard and the ones that failed — so no
+        // panel key (`PANEL:<node>:<providerRef>`, `panelKeyFor`) is ever asked twice.
+        const onPanelMakers = [...heard.map((entry) => entry.memberRole), ...calledMakers];
+        const extraSeats = shapeCloseCallExtraSeats({
+          seatMakers: plannedSeats.map((entry) => entry.planned?.maker ?? null),
+          called: calledSeats,
+          authorMaker: input.authorMaker,
+          onPanelMakers,
+          extra: shapeRun.shape.closeCallExtraGraders,
+          offset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: `${input.callSiteKey}:close-call` })
+        });
+        if (extraSeats.length > 0) {
+          const extension = await runJudgePanel({
+            artifactProducerRef: input.authorProviderRef,
+            primary: { judgementRef: input.authorJudgementRef, assessment: input.authorAssessment, memberRole: input.authorMaker },
+            // Fix round 1 (owner ruling: graders from other makers): an extra seat's backup never repeats a maker already
+            // on this node — the author's, one heard or called, or another extra seat's.
+            members: extraSeats.map((index) => {
+              const extra = plannedSeats[index]!;
+              const taken = new Set([input.authorMaker, ...onPanelMakers, ...extraSeats.map((other) => plannedSeats[other]!.planned!.maker)]);
+              return memberFor(extra.seat, shapeDistinctMakerOptions(extra.panelOptions, { ownMaker: extra.planned!.maker, taken }), extra.planned!);
+            }),
+            askTogether: callsRunTogether,
+            // Pre-flight PF-B32 (law: always an answer): the SAME rule as the base panel — root 0's panel (AUTHOR_ONLY)
+            // keeps what its extension heard and gets the stop back; every other panel lets it travel. Written "TRAVEL"
+            // first on purpose: tests/architecture/v28-serve-decision-wiring.test.ts pins the base panel's own mapping
+            // text exactly ONCE in this file (PANEL_STOP_MAPPING).
+            onRunLevelSpendStop: input.onSpendStop === "TRAVEL" ? "RETHROW" : "RETURN_HEARD",
+            leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
+          });
+          // The author is judgements[0] of both runs: kept once. The extras come AFTER every voice already heard. A stop
+          // the extension handed back is classified by the base panel's own rule, or rethrown (shapeCloseCallFold).
+          const folded = shapeCloseCallFold({ heard, notes, extension, stopOf: (error) => panelSpendStop(error, input.onSpendStop) });
+          heard = folded.heard;
+          notes = folded.notes;
+          const heardExtras = folded.added;
+          closeCallStop = folded.spendStop;
+          if (heardExtras > 0) reduced = reduceHeard(heard);
+          // Controller ruling T14-P: the extension's count is the extras that REDUCED (a heard extra the reduction
+          // could not use is not a voice on this node), never the extras merely heard.
+          closeCallAdded = reduced.reducedMembers.length - baseReduced.reducedMembers.length;
         }
-      );
-      const selection = selectReducedJudgement(
-        reducedMembers.map((entry, index) => ({
-          judgementRef: entry.judgementRef,
-          tau: entry.tau,
-          effectiveWeight: weighted[index]!.effectiveWeight
-        })),
-        judgementPolicy.selectionRule
-      );
-      if (selection.kind !== "SELECTED") {
-        throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no selectable judgement");
       }
+      // Pre-flight PF-B32: the stop that cut this panel short — the base panel's, else its extension's.
+      const panelStop = spendStop ?? closeCallStop;
+      const { reducedMembers, dispersion, weighted, selection } = reduced;
 
       // confirm-item 5. The author is always judgement[0]; every other entry is
       // a non-author voice that actually parsed.
       const nonAuthorVoices = reducedMembers.length - 1;
       // A15d (controller carry 10): a paid voice the panel refused after the
       // call is lost exactly as a failed member is, and is disclosed with it.
-      const { marks, panelFailureReason } = panelDegradationOf(nonAuthorVoices, panel.notes, spendStop);
+      // Controller ruling T14-P (debate shape): the degradation is the BASE panel's — an optional close-call extra that
+      // failed, or a stop its extension met, never marks a complete J panel PANEL-PARTIAL (the extension is an extra;
+      // what it added shows on its PANEL-CLOSE-CALL-EXTENDED record's count). Without an extension (every unshaped
+      // run) the base panel IS the panel: today's marks, byte for byte.
+      const { marks, panelFailureReason } = panelDegradationOf(baseReduced.reducedMembers.length - 1, panel.notes, spendStop);
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -6229,12 +6481,13 @@ export class WalkingSkeletonRunner {
             }))),
             // A15d (controller carry 15): a refusal after the call keeps the
             // maker that answered; every other note keeps its stored shape.
-            notes: panelNoteRecords(panel.notes),
+            notes: panelNoteRecords(notes),
             // Task M2: present only on a panel a spend stop cut short.
-            ...(spendStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[spendStop] })
+            ...(panelStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[panelStop] })
           })
         }),
-        spendStop
+        spendStop: panelStop,
+        closeCallAdded
       });
     };
 
@@ -6364,8 +6617,10 @@ export class WalkingSkeletonRunner {
      * the site's identity plus this ledger.
      */
     const recordedSlotBySite = new Map<string, SeatSlot>();
+    // Pre-flight PF-B42: hoisted, so a shaped run can restore its roots' answerers in its own root order (below). It
+    // stays empty without an assigned seat book, so nothing is restored, as today.
+    const answeredSlotBySite = new Map<string, SeatSlot>();
     if (seatBook.assigned) {
-      const answeredSlotBySite = new Map<string, SeatSlot>();
       let order = 0;
       for (const contractHash of [
         this.settings.judgeContractHash, this.settings.composerContractHash, this.settings.conformanceContractHash
@@ -6413,8 +6668,11 @@ export class WalkingSkeletonRunner {
        * answered it, or an untried one next to a spent main, answers it again.
        */
       const spentSites: { readonly row: SeatKeyRow }[] = [];
+      // Task 13 fix round 1: a shaped run's root i is the i-th seat in the shape's root order (`shapeSeatOrder`, as
+      // `rootSeats` below), so its roots 0 and 1 are read there; today's run reads the seat book's own order.
+      const claimRootSeats: readonly RunSeat[] = shapeRun === null ? seatBook.position : shapeSeatOrder(seatBook.position);
       for (const [rootIndex, siteKey] of [[0, "JUDGE"], [1, "JUDGE:root:secondary"]] as const) {
-        const seat = seatBook.position[rootIndex];
+        const seat = claimRootSeats[rootIndex];
         const spent = seat === undefined ? null : seatCallPlan(seat, siteKey, positionRule(seat)).spent;
         // A16c (controller carry 14c): the terminal cites the site's latest FAILURE — an OK row
         // would settle a FAILED work item on an answer's attempt. Only a site whose spent keys hold
@@ -6498,6 +6756,103 @@ export class WalkingSkeletonRunner {
      * sits out (`rootSitsOut`). Without the sit-out book nothing ever trades and this is the seat book's own order.
      */
     const rootSeats: RunSeat[] = [...seatBook.position];
+    // Debate shape (spec §3.3 step 2): positions go to different makers first, the opener (seat 0) staying first.
+    if (shapeRun !== null) rootSeats.splice(0, rootSeats.length, ...shapeSeatOrder(rootSeats));
+    if (shapeRun !== null) {
+      // Pre-flight PF-B42: a shaped run's root i is rootSeats[i] (shapeSeatOrder), not position seat i, so who answered
+      // each root is restored in root order, from the same ledger read as today's restore above.
+      positionAnswerers.clear();
+      rootSeats.forEach((seat, rootIndex) => {
+        const siteKey = rootIndex === 0 ? "JUDGE" : rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+        const slot = answeredSlotBySite.get(siteKey);
+        const restored = [seat.main, seat.runnerUp].find((member): member is SeatMember => member !== null
+          && member.pinnedAs === slot && spentSeatSlots.get(siteKey) !== slot);
+        if (restored !== undefined) positionAnswerers.set(rootIndex, restored);
+      });
+    }
+    /**
+     * Debate shape, Stage 1 (spec §1, §3.3 step 1, §3.5): the map, before root 0. A re-claimed run finds its stored map
+     * and asks nothing again; a spend stop that map met is restored (`resolveShapeMap`). A copy of the run that loses the
+     * race to store its map argues the stored one. A stop during the map (money, attempts, lane) ends it with the code's
+     * fallbacks; the arguing then stops after root 0 and the answer is written (O6). Controller ruling T12-R0: every map
+     * call keeps room for root 0's first attempt + one retry (`rootZeroKeepRoomMicros`, ruling T12-R3), so a started
+     * debate can always pay its first position. A keep-alive refusal abandons the run, as today. Never on today's run
+     * (`shapeRun === null`): no map, no call, no storage.
+     */
+    let debateShapeMap: MapResult | null = null;
+    let shapeMapResult: MapResult | null = null;
+    let mapSpendStop: EnvelopeStopKind | null = null;
+    if (shapeRun !== null) {
+      const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
+        /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
+        const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
+        // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
+        // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
+        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`).
+        const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+        const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
+          .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
+        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
+          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
+          tokenCeiling: this.settings.judgeBound.tokenCeiling }) });
+        const mapCaller = createRunnerMapCaller({
+          runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
+          judgeBound: this.settings.judgeBound,
+          longBounds: { merge: shapeRun.shape.mapMergeBound, choose: shapeRun.shape.mapChooseBound },
+          // Pre-flight PF-B40: an assigned (scorecard) seat book is built from `configuredByProviderRef` and can name a
+          // route outside the claim-eligible `configuredMakers`; such a map seat calls through the same wrappers
+          // (`sitOutMaker`: the sit-out book, `throughCallLane`, the failure observer), never as BUSY for good.
+          memberOf: (aiRef) => {
+            const eligible = configuredMakers.find((maker) => maker.providerRef === aiRef);
+            if (eligible !== undefined) return eligible;
+            const configured = configuredByProviderRef.get(aiRef);
+            if (configured === undefined) return null;
+            const wrapped = mapOnlyMembers.get(aiRef) ?? sitOutMaker(configured);
+            mapOnlyMembers.set(aiRef, wrapped);
+            return wrapped;
+          },
+          sitsOut: (aiRef) => sitOut !== null && sitOut.sitsOut(aiRef),
+          satOutBy: (error) => sitOut !== null && sitOut.haltsAtOnce(error),
+          spendStopOf: expansionPhaseStop,
+          laneStopped: (error) => callHeldBack(error) || (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED),
+          abandon: keepAliveStop,
+          serial: !callsRunTogether,
+          keepRoomMicros,
+          // T12-R1: a refusal only because of root 0's room stops the map, never the arguing.
+          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT
+        });
+        // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
+        callLane?.guardStarts(() => !mapCaller.stopped());
+        try {
+          const result = await runMapStage({ opening: shapeRun.shape.opening, map: {
+            questionLine: run.questionLine, languageName: run.argumentLanguageName, languageTag: run.argumentLanguageTag,
+            seats: mapStageSeats(rootSeats, shapeRun.shape.mapAIs), caller: mapCaller, abandon: keepAliveStop, seed: run.runId,
+            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer
+          } });
+          return Object.freeze({ result, spendStop: mapCaller.spendStop() });
+        } catch (error) {
+          callLane?.stop();
+          // Controller ruling T12-W: wait for the map calls already sent before the refusal leaves, so their MODEL_CALL
+          // and spend rows land inside this run's execution and nothing of the map runs on after it is abandoned. The
+          // wait is bounded: each of those calls ends by its own deadline (the gateway's per-attempt timeout), and the
+          // caller sends nothing more once it has seen the refusal.
+          await mapCaller.settled();
+          throw error;
+        } finally {
+          callLane?.guardStarts(null);
+        }
+      };
+      const resolved = await resolveShapeMap({
+        store: this.#mapChoices, runId: run.runId, runMap,
+        // Pre-flight PF-B31: never fewer than two positions (buildShapePlan refuses fewer; the receipt's answers is ≥ 2).
+        // Ruling T-P5: never more than the map stores either (`shapePositionCount` holds MAP_LIMITS.chooseAnswersMax).
+        answerCount: () => shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut)),
+        spendStopOfCode: (code) => expansionPhaseStop(new TypedDomainError(code, code))
+      });
+      shapeMapResult = resolved.result;
+      mapSpendStop = resolved.spendStop;
+      if (shapeMapResult.kind === "MAP" && shapeMapResult.choice !== null) debateShapeMap = shapeMapResult;
+    }
     /** True when every member of root `rootIndex`'s seat sits out the rest of the run (never without the book). */
     const rootSitsOut = (rootIndex: number): boolean => rootSeats[rootIndex] !== undefined && seatSitsOut(rootSeats[rootIndex]!);
     /**
@@ -6511,9 +6866,16 @@ export class WalkingSkeletonRunner {
      * the answer as an envelope record — and the run goes on to its answer with what it has. Set once, never unset.
      */
     let membersSatOutStop = false;
+    /**
+     * The members left to argue. Debate shape (Task 15, binding note 3): a SHARE hand-over puts one seat in two
+     * positions, so a shaped run counts the distinct MAKERS of the seats that do not sit out (`shapeDistinctMakers`,
+     * what P is sized with) — a seat counted twice is still one maker. Row absent: today's count of seats.
+     */
+    const membersLeftToArgue = (): number => shapeRun !== null ? shapeDistinctMakers(rootSeats, seatSitsOut)
+      : rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length;
     const tooFewLeftToArgue = (): boolean => {
       if (sitOut !== null && effectiveMakerCount > 1 && !membersSatOutStop) {
-        membersSatOutStop = rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2;
+        membersSatOutStop = membersLeftToArgue() < 2;
       }
       return membersSatOutStop;
     };
@@ -6526,7 +6888,7 @@ export class WalkingSkeletonRunner {
     const noteTooFew = (rank: readonly number[]): void => { tooFewRank ??= rank; };
     afterFailedCall = () => {
       if (tooFewRank !== null || effectiveMakerCount <= 1) return;
-      if (rootSeats.filter((_seat, rootIndex) => !rootSitsOut(rootIndex)).length < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
+      if (membersLeftToArgue() < 2) noteTooFew(chainStageScope.getStore()?.rank ?? []);
     };
     /**
      * Parallel AI calls (spec 2026-10-12 §2.1) — THE PLAN, KNOWN BEFORE ROOT 0. Both plans are pure functions of the
@@ -6537,11 +6899,43 @@ export class WalkingSkeletonRunner {
      * PRO-01 × PANEL-01: each independently authored root owns its own B3-B breadth-first pro/con tree, with real
      * per-node maker lineage.
      */
-    const expansionPlan = effectiveMakerCount > 1
-      ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount)
-      : [];
-    const crossExchangePlan = buildCrossRootExchangePlan(effectiveMakerCount);
-    const totalPlannedNodes = effectiveMakerCount + expansionPlan.length + crossExchangePlan.length;
+    /**
+     * Debate shape (spec §3.3 steps 2–5; plan Task 13) — THE SHAPE'S PLAN, in place of today's: P roots, each arguing a
+     * DISTINCT chosen answer (assigned-root; without a map, today's opening for the first P seats), K chosen points
+     * each and ONE cross-reply each in round 1, then one exchange per kept chain per deeper round, breadth-first, then
+     * the reserved scrutiny slots. P is the receipt's answers, lowered to the distinct makers left, never below two
+     * (`shapePositionCount`, pre-flight PF-B31); a map that hands back fewer than two answers argues today's opening.
+     * Null on today's run: today's plan, value for value.
+     */
+    const shapeAnswerCount = shapeRun === null ? 0
+      : shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut));
+    const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
+      : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
+        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+    /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
+    const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
+    const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
+      : shapeMapArgued ? shapeMapPositions
+        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+    const shapePlan: ShapePlan | null = shapeRun === null || shapePositions === null ? null : buildShapePlan({
+      positions: shapePositions, depth: expansionDepth,
+      scrutiny: { roundsPerPoint: shapeRun.shape.scrutinyRoundsPerPoint, pointsPerDebate: shapeRun.shape.scrutinyPointsPerDebate }
+    });
+    /** THE NUMBER OF ROOTS: the shape's P, or today's one root per maker. */
+    const rootCount = shapePlan?.rootCount ?? effectiveMakerCount;
+    const expansionPlan: readonly MultiMakerExpansionLeg[] = shapePlan !== null ? shapePlan.legs
+      : effectiveMakerCount > 1 ? buildMultiMakerExpansionPlan(expansionDepth, effectiveMakerCount) : [];
+    const crossExchangePlan = shapePlan !== null ? [] : buildCrossRootExchangePlan(effectiveMakerCount);
+    const totalPlannedNodes = shapePlan?.totalPlannedNodes ?? effectiveMakerCount + expansionPlan.length + crossExchangePlan.length;
+    /** The scrutiny legs, once scrutiny has chosen its nodes (Task 14); empty until then. */
+    const scrutinyLegs = new Map<number, ShapeLeg>();
+    /** A plan position's shape leg (a root has none), or null on today's run. */
+    const shapeLegAt = (position: number): ShapeLeg | null => shapePlan === null ? null
+      : (shapePlan.legs[position - shapePlan.rootCount] ?? scrutinyLegs.get(position) ?? null);
+    /** Adaptive (spec §3.3 step 5): the deeper legs of the chains NOT kept at the round-1 boundary — never sent. */
+    const deselectedIndices = new Set<number>();
+    /** A shaped run always argues through the chains; with no concurrency row its lane holds one call at a time. */
+    const chainsRun = callsRunTogether || shapePlan !== null;
     // T7 / S3-2 + S5-1 · ruling J15(a) — adaptive stopping, evaluated at the
     // DERIVED global round boundary. `leg.round` resets at every root in this
     // root-major plan, so a change in it is not a boundary; round k completes at
@@ -6553,6 +6947,14 @@ export class WalkingSkeletonRunner {
       const promise = new Promise<T>((settle) => { resolve = settle; });
       return Object.freeze({ promise, resolve });
     };
+    /**
+     * Debate shape (spec §3.3 step 7) — THE NODES SCRUTINY CHOSE, each with the plan position it holds: set once by the
+     * scrutiny chain in `argueTogether`, and read after the arguing for their SCRUTINY-EXTENDED records. Nothing (`[]`)
+     * when no scrutiny slot is planned (today's run; a zero scrutiny budget), when scrutiny never ran (a stop, too few
+     * members, a failure), or once the arguing is over without it (first settle wins).
+     */
+    const scrutinyChosen = settable<readonly { readonly position: number; readonly nodeId: string }[]>();
+    if (shapePlan === null || shapePlan.scrutiny.count === 0) scrutinyChosen.resolve([]);
     /**
      * An ordered recorder (ordered-recorder.ts) whose positions are each claimed once: committed, or given up by a
      * chain that has nothing (more) to write there (`skip`, harmless for a position already claimed), so no later
@@ -6626,6 +7028,8 @@ export class WalkingSkeletonRunner {
      */
     const spendStopRanks: ChainRank[] = [];
     const noteSpendStop = (rank: ChainRank): void => { spendStopRanks.push(rank); };
+    // Debate shape (spec §3.3 / O6): a stop during the map is a stop before everything in today's order.
+    if (mapSpendStop !== null) { runBodyBudgetStop ??= mapSpendStop; noteSpendStop([]); }
     /** Spec §2.3 (O6): no chain starts an AUTHOR or a REVIEW call once this is true. */
     const arguingStopped = (): boolean => bodyFailed || runBodyBudgetStop !== null || tooFewLeftToArgue();
     /**
@@ -6655,7 +7059,20 @@ export class WalkingSkeletonRunner {
       const first = [...(causes.length > 0 ? causes : bodyFailures)].sort((left, right) => compareRanks(left.rank, right.rank))[0];
       if (first !== undefined) throw first.error;
     };
-    const openFirstPosition = async (primarySeat: RunSeat) => {
+    /**
+     * Spec §3.3 step 2: root i argues answer i (assigned-root); without a map, today's legs. Binding note 2 (Task 13):
+     * the material is held within root 0's limits (`shapeRootMaterial`), so the room the map kept for root 0 is a
+     * ceiling; every root is framed by the same rule.
+     */
+    const rootLegOf = (rootIndex: number): JudgeLeg => {
+      const position = shapePositions?.[rootIndex];
+      if (position === undefined || position.statement === null || position.mapPoints === null) {
+        return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
+      }
+      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints });
+      return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
+    };
+    const openFirstPosition = async (primarySeat: RunSeat, leg: JudgeLeg = { kind: "primary-root" }) => {
       const primaryPlan = seatCallPlan(primarySeat, "JUDGE", positionRule(primarySeat));
       const primaryAttempt = await cooldownAttempt({
         callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
@@ -6676,7 +7093,8 @@ export class WalkingSkeletonRunner {
             // field; the leg's directive is code's and rides the system message.
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
-            leg: { kind: "primary-root" },
+            ...shapeLanguageInput,
+            leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
             bound: { ...this.settings.judgeBound, maxAttempts }
@@ -6691,13 +7109,13 @@ export class WalkingSkeletonRunner {
       });
       return primaryAttempt;
     };
-    let primaryAttempt = await openFirstPosition(rootSeats[0]!);
+    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
     // Fix (d): root 0 cannot be dropped — nothing would exist to answer from — so when its member sat out, the next
     // member that does not sit out opens instead (the two seats trade roots, above).
     for (let next = 1; primaryAttempt.kind === "HALTED" && rootSitsOut(0) && next < rootSeats.length; next += 1) {
       if (rootSitsOut(next)) continue;
       [rootSeats[0], rootSeats[next]] = [rootSeats[next]!, rootSeats[0]!];
-      primaryAttempt = await openFirstPosition(rootSeats[0]!);
+      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
     }
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -6713,6 +7131,12 @@ export class WalkingSkeletonRunner {
     // B9: the node's author is the model that actually wrote it — the member
     // that answered root 0, or the cheaper maker its refused first call moved to.
     const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
+    /**
+     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
+     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
+     */
+    const answeredMakers: (string | undefined)[] = [];
+    answeredMakers[0] = rootAuthor.maker;
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
       assessment: judged.assessment,
@@ -6744,6 +7168,11 @@ export class WalkingSkeletonRunner {
        * runtime value the label ladder reads, never a zero it can compare.
        */
       readonly panelDispersion: number | null;
+      /**
+       * Debate shape (spec §3.3 step 7): the node's panel-selected base score (its reduced judgement's tau), read by
+       * scrutiny's "weak" need. Carried on every run; only a shaped run reads it.
+       */
+      readonly baseTau: number;
       /**
        * T5 / S3-1: every edge this node sources, carried to the node's ONE
        * review call so the reviewer measures them all on the visit it was
@@ -6798,6 +7227,11 @@ export class WalkingSkeletonRunner {
        */
       readonly leg: JudgeLeg;
       readonly callSiteKey: string;
+      /**
+       * Debate shape (Task 13 fix round 1): the makers this leg must not be written by, as a rule on every member of
+       * its seat (main and backup) and on a call moved to a cheaper maker. Absent on today's legs.
+       */
+      readonly makerBar?: (member: Readonly<{ maker: string }>) => boolean;
       readonly role: string;
       readonly parentNodeId: string | null;
       readonly childKind: "support" | "defeater" | null;
@@ -6841,8 +7275,11 @@ export class WalkingSkeletonRunner {
      */
     const authorAndPanel = async (
       input: AuthorCallInput,
-      /** Spec §2.1: told the node's statement once its author call returned, before its panel — replies start from it. */
-      authoredStatement?: (statement: string) => void
+      /**
+       * Spec §2.1: told the node's statement once its author call returned, before its panel — replies start from it —
+       * with the maker that actually wrote it (pre-flight PF-B45).
+       */
+      authoredStatement?: (statement: string, maker: string) => void
     ): Promise<
       | { readonly kind: "AUTHORED"; readonly value: AuthoredPosition }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -6867,8 +7304,9 @@ export class WalkingSkeletonRunner {
       const childPlan = seatCallPlan(
         input.seat,
         input.callSiteKey,
-        input.seat.role === "POSITION" ? positionRule(input.seat) : undefined
+        input.seat.role === "POSITION" ? positionSeatRule(input.seat, input.makerBar) : input.makerBar
       );
+      if (input.makerBar !== undefined) movedCallBars.set(seatBaseCallSiteKey(input.callSiteKey), input.makerBar);
       const childAttempt = await cooldownAttempt({
         callSiteKey: input.callSiteKey,
         parentNodeId: input.parentNodeId,
@@ -6886,6 +7324,7 @@ export class WalkingSkeletonRunner {
             callSiteKey,
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
+            ...shapeLanguageInput,
             leg: input.leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -6904,7 +7343,9 @@ export class WalkingSkeletonRunner {
       // lineage, the panel's author (controller carry 8) and the reviewer rule's
       // author. Cross-exchange chains read `positionAnswerers` for their writer.
       const selectedMaker = childAttempt.value.member;
-      if (input.seat.role === "POSITION") positionAnswerers.set(input.seat.seatIndex, selectedMaker);
+      // Pre-flight PF-B42: keyed by ROOT index on a shaped run (a root's `authorIndex`; its seat index is not its root
+      // index there); by seat index, as today, otherwise.
+      if (input.seat.role === "POSITION") positionAnswerers.set(shapePlan === null ? input.seat.seatIndex : input.authorIndex, selectedMaker);
       // B9: the author is the model that actually wrote this node (a moved call's cheaper maker).
       const author = actualAuthor(input.callSiteKey, selectedMaker);
       const childReduced = reduceAssessment({
@@ -6916,7 +7357,7 @@ export class WalkingSkeletonRunner {
       if (childReduced.kind !== "REDUCED") {
         throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
       }
-      authoredStatement?.(childJudged.statement);
+      authoredStatement?.(childJudged.statement, author.maker);
       // Spec §2.3: once the author call was sent, its panel always runs — it finishes a paid step.
       const childSelection = await runNodePanel({
         authorMaker: author.maker,
@@ -7000,6 +7441,9 @@ export class WalkingSkeletonRunner {
           reason: childSelection.panelFailureReason ?? "Every non-author panel member failed"
         }));
       }
+      if (childSelection.closeCallAdded > 0) {
+        closeCallExtensions.push(Object.freeze({ nodeId: childNodeId, added: childSelection.closeCallAdded }));
+      }
       const childReducedJudgementId = await this.#judgements.recordReduced({
         runId: run.runId,
         nodeId: childNodeId,
@@ -7031,6 +7475,7 @@ export class WalkingSkeletonRunner {
         restatementStatus: childJudged.restatementStatus,
         reversalPoint: childJudged.assessment.critic.summary,
         panelDispersion: childSelection.dispersion,
+        baseTau: childSelection.tau,
         authorIndex: input.authorIndex,
         maker: author.maker,
         member: authored.member
@@ -7054,9 +7499,25 @@ export class WalkingSkeletonRunner {
       return { kind: "AUTHORED", value: await nodeRecorder.commit(position, () => saveAuthored(position, input, authored.value)) };
     };
 
-    /** Fix (d): root `rootIndex` is dropped (`satOutDuringRun`) when its member sits out; false otherwise. */
-    const dropSatOutRoot = (rootIndex: number): boolean => {
+    /**
+     * Fix (d): root `rootIndex` is dropped (`satOutDuringRun`) when its member sits out; false otherwise. Debate shape
+     * (spec §3.3 step 2, INTERFACE §7; pre-flight PF-B41): before the root's first call (`beforeCall`), a shaped run
+     * hands the root over to a working seat instead (SWAP with a seat no root uses, or SHARE one), and it is not
+     * dropped. After a call was made under the old seat it is never handed over: the root is dropped as today.
+     */
+    const dropSatOutRoot = (rootIndex: number, beforeCall: boolean): boolean => {
       if (!rootSitsOut(rootIndex)) return false;
+      if (shapePlan !== null && beforeCall) {
+        const handOver = shapeHandOverRoot({ makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut });
+        if (handOver.kind === "SWAP") {
+          [rootSeats[rootIndex], rootSeats[handOver.withIndex]] = [rootSeats[handOver.withIndex]!, rootSeats[rootIndex]!];
+          return false;
+        }
+        if (handOver.kind === "SHARE") {
+          rootSeats[rootIndex] = rootSeats[handOver.withIndex]!;
+          return false;
+        }
+      }
       satOutDuringRun.add(rootIndex);
       return true;
     };
@@ -7146,6 +7607,7 @@ export class WalkingSkeletonRunner {
               callSiteKey: memberCallSiteKey,
               questionLine: run.questionLine,
               argumentLanguageName: run.argumentLanguageName,
+              ...shapeLanguageInput,
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
@@ -7271,16 +7733,26 @@ export class WalkingSkeletonRunner {
      * from the ledger.
      */
     const reviewBatchEnds: readonly number[] = (() => {
-      const ends = [effectiveMakerCount];
+      const ends = [rootCount];
       let round = expansionPlan[0]?.round ?? null;
       expansionPlan.forEach((leg, legIndex) => {
         if (round !== null && leg.round !== round) {
-          ends.push(effectiveMakerCount + legIndex);
+          ends.push(rootCount + legIndex);
           round = leg.round;
         }
-        if (globalRoundCompletions.has(legIndex)) ends.push(effectiveMakerCount + legIndex + 1);
+        if (globalRoundCompletions.has(legIndex)) ends.push(rootCount + legIndex + 1);
       });
-      ends.push(effectiveMakerCount + expansionPlan.length, totalPlannedNodes);
+      // 1. the end of the planned legs;
+      ends.push(rootCount + expansionPlan.length);
+      // 2. Debate shape, spec §3.3 step 7 (pre-flight PF-B44): one batch per scrutiny round (each 2·Q reserved slots),
+      // in slot order, so the ends never decrease and no planned position lands in a scrutiny batch;
+      if (shapePlan !== null) {
+        for (let scrutinyRound = 1; scrutinyRound <= shapePlan.scrutiny.roundsPerNode; scrutinyRound += 1) {
+          ends.push(shapePlan.scrutiny.start + scrutinyRound * 2 * shapePlan.scrutiny.nodesPerDebate);
+        }
+      }
+      // 3. the end of the plan.
+      ends.push(totalPlannedNodes);
       // Never decreasing, so the distinct ends are in order (an empty batch has no positions to place).
       return Object.freeze([...new Set(ends)]);
     })();
@@ -7417,6 +7889,18 @@ export class WalkingSkeletonRunner {
       rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
     /** Root 0's panel result: its selection rule is recorded on the propagation receipt (below). */
     const rootZeroPanel: { selection: Awaited<ReturnType<typeof runNodePanel>> | null } = { selection: null };
+    /**
+     * Debate shape (spec §3.3 step 2): which root argued each chosen answer, written once the root is saved (inside its
+     * node's turn). Binding note 4 (Task 13): an erased run stops the run as the graph's own write does
+     * (PRIVATE_CONTENT_ERASED, the content lease's `assertLive`); the root's own write already refuses it first, so this
+     * is the same stop. Nothing on today's run, or on a root that argues no map answer.
+     */
+    const writeMapPosition = async (rootIndex: number, node: AuthoredDebateNode): Promise<void> => {
+      const answerId = shapePositions?.[rootIndex]?.answerId;
+      if (typeof answerId !== "string") return;
+      const written = await this.#mapChoices.writeMapPosition({ runId: run.runId, answerId, rootIndex, rootNodeId: node.nodeId, maker: node.maker });
+      if (written === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+    };
     const rootZeroChain = async (stage: { rank: ChainRank }): Promise<void> => {
       const selection = await runNodePanel({
         authorMaker: rootAuthor.maker,
@@ -7439,11 +7923,16 @@ export class WalkingSkeletonRunner {
       if (selection.spendStop !== null) noteSpendStop(stage.rank);
       rootZeroPanel.selection = selection;
       // Spec §2.3: once a failure ends the debate, nothing more is saved (its turn still passes, so no later save waits).
-      const authoredRoot = await nodeRecorder.commit(0, async () => bodyFailed ? null : saveAuthored(0, { ...ROOT_SAVE, authorIndex: 0 }, {
-        judged, reduced, selection, author: rootAuthor, member: primaryMaker
-      }));
+      const authoredRoot = await nodeRecorder.commit(0, async () => {
+        if (bodyFailed) return null;
+        const saved = await saveAuthored(0, { ...ROOT_SAVE, authorIndex: 0 }, {
+          judged, reduced, selection, author: rootAuthor, member: primaryMaker
+        });
+        await writeMapPosition(0, saved);
+        return saved;
+      });
       savedNodes[0]!.resolve(authoredRoot);
-      if (authoredRoot === null || !callsRunTogether) return;
+      if (authoredRoot === null || !chainsRun) return;
       stage.rank = reviewRank(0);
       await reviewInChain(reviewSlot(0), authoredRoot);
     };
@@ -7451,20 +7940,26 @@ export class WalkingSkeletonRunner {
       // Spec §2.3 (O6): right before the author call. Fix (d): too few members left ends the arguing, and a root
       // whose member sits out is dropped without a call.
       if (arguingStopped()) return;
-      if (dropSatOutRoot(rootIndex)) return;
+      if (dropSatOutRoot(rootIndex, true)) return;
       const input: AuthorPositionInput = {
         authorIndex: rootIndex,
         seat: rootSeats[rootIndex]!,
-        leg: { kind: "independent-root" },
+        leg: rootLegOf(rootIndex),
         callSiteKey: rootCallSiteKey(rootIndex),
         role: rootIndex === 1 ? "secondary root author" : "additional maker root author",
+        // Final review M-1 (shaped only): this root's backup or moved call never lands on a maker arguing another root.
+        ...(shapePlan === null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+          () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)) }),
         ...ROOT_SAVE,
         plannedLegCount: 1
       };
       let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;
       try {
         // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
-        authoredRoot = await authorAndPanel(input, (statement) => statements[rootIndex]!.resolve(statement));
+        authoredRoot = await authorAndPanel(input, (statement, maker) => {
+          answeredMakers[rootIndex] = maker;
+          statements[rootIndex]!.resolve(statement);
+        });
       } catch (error) {
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
@@ -7475,8 +7970,9 @@ export class WalkingSkeletonRunner {
         return;
       }
       if (authoredRoot.kind === "HALTED") {
-        // Fix (d): halted because its member now sits out (busy, or its gate unavailable): dropped, not fatal.
-        if (dropSatOutRoot(rootIndex)) return;
+        // Fix (d): halted because its member now sits out (busy, or its gate unavailable): dropped, not fatal. A call
+        // was made under this seat, so a shaped root is never handed over here (pre-flight PF-B41).
+        if (dropSatOutRoot(rootIndex, false)) return;
         throw new TypedDomainError(
           "MAKER_POSITION_UNAVAILABLE",
           rootIndex === 1
@@ -7485,16 +7981,21 @@ export class WalkingSkeletonRunner {
         );
       }
       const authoredValue = authoredRoot.value;
-      const saved = await nodeRecorder.commit(rootIndex, async () => bodyFailed ? null : saveAuthored(rootIndex, input, authoredValue));
+      const saved = await nodeRecorder.commit(rootIndex, async () => {
+        if (bodyFailed) return null;
+        const node = await saveAuthored(rootIndex, input, authoredValue);
+        await writeMapPosition(rootIndex, node);
+        return node;
+      });
       savedNodes[rootIndex]!.resolve(saved);
-      if (saved === null || !callsRunTogether) return;
+      if (saved === null || !chainsRun) return;
       stage.rank = reviewRank(rootIndex);
       await reviewInChain(reviewSlot(rootIndex), saved);
     };
-    if (!callsRunTogether) {
+    if (!chainsRun) {
       // Today's engine, call for call: root 0's panel and save, each further root in order (the same chain, run
       // alone), then today's review pass over the roots.
-      for (let rootIndex = 0; rootIndex < effectiveMakerCount; rootIndex += 1) {
+      for (let rootIndex = 0; rootIndex < rootCount; rootIndex += 1) {
         await runChain(rootIndex === 0 ? rootZeroChain : (stage) => rootChain(rootIndex, stage), [0, 0, rootIndex], releaseAt(rootIndex));
         throwBodyFailure();
       }
@@ -7502,9 +8003,12 @@ export class WalkingSkeletonRunner {
     }
 
     const haltedIndices = new Set<number>();
+    // Task 15 (Task 14 minor): the walk reaches the scrutiny legs too, once scrutiny has planned them (`scrutinyLegs`,
+    // parents before children, after every leg of the plan), so a halted scrutiny reply counts the legs beneath it.
+    // Empty on today's run and before scrutiny chose: today's walk.
     const subtreeIndices = (rootIndex: number): readonly number[] => {
       const indices = new Set([rootIndex]);
-      for (const candidate of expansionPlan) {
+      for (const candidate of [...expansionPlan, ...scrutinyLegs.values()]) {
         if (indices.has(candidate.parentIndex)) indices.add(candidate.childIndex);
       }
       return Object.freeze([...indices]);
@@ -7520,9 +8024,52 @@ export class WalkingSkeletonRunner {
      * from here), then apply the ε branch freeze and the global δ stop. Returns
      * true when the debate should stop expanding.
      */
+    /**
+     * The last round boundary's propagation, read by scrutiny (spec §3.3 step 7: a node's root leverage); null until a
+     * boundary is decided (and on a run with no stopping policy, which decides none).
+     */
+    let lastBoundary: { completedRounds: number; propagation: PropagationOutcome; rootNodeIds: readonly string[];
+      scoredNodeIds: ReadonlySet<string> } | null = null;
+    /** Adaptive (spec §3.3 step 5): set once the round-1 boundary chose the chains to keep. */
+    let adaptiveChosen = false;
+    /**
+     * True on a shaped run whose deeper rounds are adaptive: a deeper leg runs only under a chain the choice kept. Final
+     * review M-2: read from the RECEIPT (`shape.depthMode`, what the price was made from), never from the run's settings.
+     */
+    const adaptiveShape = shapePlan !== null && shapeRun !== null && shapeRun.shape.depthMode === "adaptive";
+    /**
+     * Spec §3.3 step 5 (adaptive; contract deviation 6) — THE CHAINS PER POSITION KEPT AT THE ROUND-1 BOUNDARY: the
+     * receipt's `deeperTopPoints` per position with the highest root leverage (`shapeSelectChains`; a frozen or unscored
+     * point never). Binding note 1 (the money law): the plan builds all K chains, the price covers only these, so the
+     * deeper legs of every other chain are never sent (`deselectedIndices`).
+     */
+    const keepAdaptiveChains = (leverageOf: (position: number) => number | null): void => {
+      if (adaptiveChosen || shapePlan === null || shapeRun === null) return;
+      adaptiveChosen = true;
+      const chainsByRoot = new Map<number, number[]>();
+      for (const leg of shapePlan.legs) {
+        if (leg.kind === "POINT") chainsByRoot.set(leg.rootIndex, [...(chainsByRoot.get(leg.rootIndex) ?? []), leg.childIndex]);
+      }
+      const kept = shapeSelectChains({ chainsByRoot, leverageOf, frozen: frozenIndices, perRoot: shapeRun.shape.deeperTopPoints });
+      for (const leg of shapePlan.legs) {
+        if (leg.kind !== "REPLY" && leg.kind !== "DEFENCE") continue;
+        if (leg.chain !== null && !kept.has(leg.chain)) deselectedIndices.add(leg.childIndex);
+      }
+    };
+    /** Task 13 fix round 1: whether plan position `index` can still be asked (`shapeLegCanRun`); always on today's run. */
+    const legCanRun = (index: number): boolean => shapeLegCanRun(shapeLegAt(index), {
+      deselected: deselectedIndices.has(index), adaptive: adaptiveShape, chosen: adaptiveChosen, depth: expansionDepth
+    });
+    /** At round 1 of an adaptive shaped run, a boundary that cannot be measured keeps no chain (never more than priced). */
+    const keepNoChainAtRoundOne = (completedRounds: number): void => {
+      if (adaptiveShape && completedRounds === 1) keepAdaptiveChains(() => null);
+    };
     const closeGlobalRound = async (completedRounds: number, boundaryLegIndex: number): Promise<boolean> => {
       const stoppingPolicy = this.settings.stoppingPolicy;
-      if (stoppingPolicy === undefined) return false;
+      if (stoppingPolicy === undefined) {
+        keepNoChainAtRoundOne(completedRounds);
+        return false;
+      }
       const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
       const roundStanding = projectJudgedStanding(
         roundSnapshot,
@@ -7535,13 +8082,16 @@ export class WalkingSkeletonRunner {
       // because of it — dropping it here is what let r2 claim "no root moved"
       // about a root it had never looked at.
       const rootScope = selectAuthoritativeRootScope({
-        effectiveMakerCount,
+        effectiveMakerCount: rootCount,
         authoredRootNodeIdByMakerIndex: new Map(
-          Array.from({ length: effectiveMakerCount }, (_, index) => [index, authoredNodes.get(index)] as const)
+          Array.from({ length: rootCount }, (_, index) => [index, authoredNodes.get(index)] as const)
             .flatMap(([index, root]) => root === undefined ? [] : [[index, root.nodeId] as const])
         )
       });
-      if (rootScope.rootNodeIds.length === 0) return false;
+      if (rootScope.rootNodeIds.length === 0) {
+        keepNoChainAtRoundOne(completedRounds);
+        return false;
+      }
       // The branches that could expand next are the nodes this round authored.
       const branchCarryingNodeIds = expansionPlan
         .filter((candidate) => candidate.round === completedRounds
@@ -7582,6 +8132,17 @@ export class WalkingSkeletonRunner {
         for (const index of subtreeIndices(branch.index)) frozenIndices.add(index);
       }
       for (const record of boundary.conditionMarkRecords) branchFrozenRecords.push(record);
+      lastBoundary = { completedRounds, propagation: boundary.propagation, rootNodeIds: rootScope.rootNodeIds, scoredNodeIds };
+      if (adaptiveShape && completedRounds === 1 && expansionDepth > 1) {
+        const recorded = new Set(boundary.propagation.sensitivityRecords.map((record) => record.removedNodeId));
+        keepAdaptiveChains((position) => {
+          const node = authoredNodes.get(position);
+          // A point with no score, or no sensitivity record (nothing to measure its leverage on), is never kept.
+          if (node === undefined || !scoredNodeIds.has(node.nodeId) || !recorded.has(node.nodeId)) return null;
+          return resolveLeverage({ completedRounds, carryingNodeId: node.nodeId, sensitivityRecords: boundary.propagation.sensitivityRecords,
+            rootNodeIds: rootScope.rootNodeIds }).leverage;
+        });
+      }
       return boundary.continuation.kind === "STOP";
     };
     let stoppedByAdaptiveRule = false;
@@ -7667,7 +8228,7 @@ export class WalkingSkeletonRunner {
       const boundaryDecisions: (readonly [number, Promise<void>])[] = [];
       let earlierDecisions: Promise<void> = Promise.resolve();
       for (const [boundaryLegIndex, completedRound] of globalRoundCompletions) {
-        const boundaryEnd = effectiveMakerCount + boundaryLegIndex + 1;
+        const boundaryEnd = rootCount + boundaryLegIndex + 1;
         const batchIndex = reviewBatchOf(boundaryEnd - 1);
         const after = earlierDecisions;
         earlierDecisions = runChain(async () => {
@@ -7693,37 +8254,76 @@ export class WalkingSkeletonRunner {
       const decisionBefore = (legIndex: number): Promise<void> | undefined =>
         boundaryDecisions.filter(([boundaryLegIndex]) => boundaryLegIndex < legIndex).pop()?.[1];
 
-      const legChain = async (legIndex: number, stage: { rank: ChainRank }): Promise<void> => {
-        const leg = expansionPlan[legIndex]!;
+      /**
+       * One leg of the plan, from its parent's statement to its review. `decision` is the round boundary it waits for
+       * (none for a leg before the first boundary). Debate shape (spec §3.3 steps 3–5): a shape leg's writer is a maker
+       * other than the one it answers (`shapeWriterSeat` over the makers that ANSWERED, pre-flight PF-B45), it carries
+       * its chosen point (`consideration`) and its own key, a cross-reply goes to `argueShapeCross`, and a deeper leg of
+       * a chain the adaptive choice did not keep is never sent (binding note 1). Row absent: `shapeLegAt` is null and
+       * every shape line is skipped — today's leg, byte for byte.
+       */
+      const argueLeg = async (leg: MultiMakerExpansionLeg, decision: Promise<void> | undefined, stage: { rank: ChainRank }): Promise<void> => {
         const position = leg.childIndex;
-        const decision = decisionBefore(legIndex);
         if (decision !== undefined) await decision;
         // Its parent's text: null when the parent never got one (dropped, halted, stopped, or itself never asked).
         const parentStatement = await statements[leg.parentIndex]!.promise;
-        if (parentStatement === null || stoppedByAdaptiveRule) return;
+        // Pre-flight PF-B48: the adaptive (δ) stop ends the PLANNED rounds only; a scrutiny leg (round > depth) still
+        // runs. A leg of today's plan always has round <= depth, so this is today's check.
+        if (parentStatement === null || (stoppedByAdaptiveRule && leg.round <= expansionDepth)) return;
         if (haltedIndices.has(leg.parentIndex) || haltedIndices.has(leg.childIndex)
           || frozenIndices.has(leg.parentIndex) || frozenIndices.has(leg.childIndex)) return;
         // Spec §2.3 (O6): right before the reply's author call.
         if (arguingStopped()) return;
+        const shapeLeg = shapeLegAt(leg.childIndex);
+        // Binding note 1 (the money law): an adaptive run's planned deeper leg runs only under a chain the round-1
+        // choice KEPT — never when that choice was not made (its boundary was never decided), never under another chain.
+        if (deselectedIndices.has(leg.childIndex)) return;
+        if (shapeLeg !== null && adaptiveShape && shapeLeg.round > 1 && shapeLeg.round <= expansionDepth && !adaptiveChosen) return;
+        if (shapeLeg?.kind === "CROSS") return argueShapeCross(shapeLeg, stage);
+        const writerIndex = shapeLeg === null ? null : shapeWriterSeat({
+          seatMakers: seatBook.supportAttack.map((seat) => seat.main.maker),
+          // A point answers its position; a reply answers the node it attacks; a defence prefers the point's own maker.
+          // Pre-flight PF-B45: the makers that ANSWERED (`answeredMakers`), never the planned ones.
+          avoidMakers: [answeredMakers[leg.parentIndex] ?? ""],
+          preferMaker: shapeLeg.kind === "DEFENCE" && shapeLeg.chain !== null ? answeredMakers[shapeLeg.chain] ?? null : null,
+          offset: leg.rootIndex + leg.round + shapeLeg.siblingOrdinal,
+          sitsOut: (index) => seatSitsOut(seatBook.supportAttack[index]!)
+        });
+        if (shapeLeg !== null && writerIndex === null) return;
+        // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as today (a shape leg: the writer rule's seat).
+        const seat = shapeLeg === null
+          ? seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!
+          : seatBook.supportAttack[writerIndex!]!;
         const role = leg.polarity === "support" ? "defender" : "critic";
         const plannedSubtreeIndices = subtreeIndices(leg.childIndex);
+        // Task 13 fix round 1: the planned count holds only the legs that can still be asked (never a dropped chain's).
+        const plannedLegCount = plannedSubtreeIndices.filter(legCanRun).length;
+        // Task 13 fix round 1 (spec §3.3 step 3): the maker this leg answers never writes it — not the seat's backup,
+        // not a call moved to a cheaper maker.
+        const makerBar = shapeLeg === null ? undefined : shapeMakerBar([answeredMakers[leg.parentIndex]]);
         const call = {
-          authorIndex: leg.authorIndex,
-          // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as today.
-          seat: seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!,
-          // DL4-F4: the parent's statement is material, in its own fenced field.
-          leg: { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
-          callSiteKey: `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+          authorIndex: shapeLeg === null ? leg.authorIndex : seat.seatIndex,
+          seat,
+          // DL4-F4: the parent's statement is material, in its own fenced field; a shape point's chosen point too.
+          leg: shapeLeg?.consideration != null
+            ? { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement,
+              consideration: shapeLeg.consideration }
+            : { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
+          callSiteKey: shapeLeg?.callSiteKey ?? `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
+          ...(makerBar === undefined ? {} : { makerBar }),
           role,
           childKind: leg.polarity === "support" ? "support" as const : "defeater" as const,
-          siblingOrdinal: leg.polarity === "support" ? 1 : 2,
-          plannedLegCount: plannedSubtreeIndices.length,
+          siblingOrdinal: shapeLeg?.siblingOrdinal ?? (leg.polarity === "support" ? 1 : 2),
+          plannedLegCount,
           explorationDecision: leg.polarity === "support" ? "deepen" as const : "challenge" as const
         };
         let authored: Awaited<ReturnType<typeof authorAndPanel>>;
         try {
           authored = await authorAndPanel({ ...call, parentNodeId: laterParentAt(leg.parentIndex), edges: [] },
-            (statement) => statements[position]!.resolve(statement));
+            (statement, maker) => {
+              answeredMakers[position] = maker;
+              statements[position]!.resolve(statement);
+            });
         } catch (error) {
           // C1, as today: a spend refusal on the author call or its panel stops the arguing; no node is minted.
           const stop = expansionPhaseStop(error);
@@ -7736,7 +8336,7 @@ export class WalkingSkeletonRunner {
           // As today: nothing beneath a halted reply is asked, and its halt is recorded in plan order.
           plannedSubtreeIndices.forEach((index) => haltedIndices.add(index));
           statements[position]!.resolve(null);
-          const halted = { ...authored.record, plannedLegCount: plannedSubtreeIndices.length };
+          const halted = { ...authored.record, plannedLegCount };
           await nodeRecorder.commit(position, async () => {
             if (!bodyFailed) haltedExpansionRecords.push(halted);
           });
@@ -7752,6 +8352,96 @@ export class WalkingSkeletonRunner {
             ...call,
             parentNodeId: parent.nodeId,
             edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
+          }, authoredValue);
+        });
+        savedNodes[position]!.resolve(saved);
+        if (saved === null) return;
+        stage.rank = reviewRank(position);
+        await reviewInChain(reviewSlot(position), saved);
+      };
+      const legChain = (legIndex: number, stage: { rank: ChainRank }): Promise<void> =>
+        argueLeg(expansionPlan[legIndex]!, decisionBefore(legIndex), stage);
+
+      /**
+       * Spec §3.3 step 4: ONE cross-reply per position, to its strongest rival, by the member that wrote the position.
+       * It sits in round 1, before the round-1 boundary, so it does not await the boundary decisions as today's
+       * cross-exchanges do; it is a child of its own root, so the recorders and `subtreeIndices` treat it as any leg.
+       */
+      const argueShapeCross = async (shapeLeg: ShapeLeg, stage: { rank: ChainRank }): Promise<void> => {
+        const position = shapeLeg.childIndex;
+        const target = shapeLeg.targetRootIndex;
+        if (target === null) return;
+        const [ownPosition, otherMakersPosition] = await Promise.all([statements[shapeLeg.rootIndex]!.promise, statements[target]!.promise]);
+        // As today: a dropped root neither defends nor is attacked, and a root never written has no cross-reply.
+        if (ownPosition === null || otherMakersPosition === null || arguingStopped()) return;
+        // Controller ruling T15-S (owner principle: positions argued by different AIs): after a SHARE hand-over two
+        // positions can have one maker, and a maker never replies to itself — that cross-reply is skipped, never sent
+        // (so it stays within the price). Read from who REALLY wrote each root (`answeredMakers`).
+        if (answeredMakers[shapeLeg.rootIndex] !== undefined && answeredMakers[shapeLeg.rootIndex] === answeredMakers[target]) return;
+        // Pre-flight PF-B42: keyed by root index in a shaped run.
+        const writer = positionAnswerers.get(shapeLeg.rootIndex);
+        if (writer === undefined) {
+          // As `crossExchangeSeatFor`: a written root always has its answerer recorded; none is a defect, never a skip.
+          throw new TypedDomainError("DEBATE_ROOT_MISSING", `Cross-reply ${shapeLeg.callSiteKey} has no written root ${String(shapeLeg.rootIndex)}`);
+        }
+        // Pre-flight PF-B43, as `crossExchangeSeatFor`: a site an earlier pass already recorded keeps its slot (the
+        // attempt ceiling is exact only under that precondition, packages/register/src/index.ts).
+        const recorded = recordedSlotBySite.get(shapeLeg.callSiteKey);
+        // Final review M-1: a backup or a moved call never answers as the maker of the position it replies to.
+        const crossBar = shapeMakerBar([answeredMakers[target]]);
+        const call = {
+          authorIndex: shapeLeg.rootIndex,
+          seat: Object.freeze({
+            role: "CROSS_EXCHANGE" as const,
+            seatIndex: shapeLeg.rootIndex,
+            pinnedSeatIndex: rootSeats[shapeLeg.rootIndex]!.pinnedSeatIndex,
+            main: recorded === undefined || recorded === writer.pinnedAs ? writer : Object.freeze({ ...writer, pinnedAs: recorded }),
+            runnerUp: null,
+            diversityShare: 0,
+            pinned: null
+          }),
+          leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          ...(crossBar === undefined ? {} : { makerBar: crossBar }),
+          callSiteKey: shapeLeg.callSiteKey,
+          role: "cross-root response",
+          childKind: "support" as const,
+          siblingOrdinal: shapeLeg.siblingOrdinal,
+          plannedLegCount: 1,
+          explorationDecision: "challenge" as const
+        };
+        let authored: Awaited<ReturnType<typeof authorAndPanel>>;
+        try {
+          authored = await authorAndPanel({ ...call, parentNodeId: laterParentAt(shapeLeg.rootIndex), edges: [] },
+            (statement, maker) => {
+              answeredMakers[position] = maker;
+              statements[position]!.resolve(statement);
+            });
+        } catch (error) {
+          const stop = expansionPhaseStop(error);
+          if (stop === null) throw error;
+          runBodyBudgetStop = stop;
+          noteSpendStop(stage.rank);
+          return;
+        }
+        if (authored.kind === "HALTED") {
+          const halted = authored.record;
+          await nodeRecorder.commit(position, async () => {
+            if (!bodyFailed) haltedExpansionRecords.push(halted);
+          });
+          return;
+        }
+        const authoredValue = authored.value;
+        const saved = await nodeRecorder.commit(position, async () => {
+          const authorRoot = authoredNodes.get(shapeLeg.rootIndex);
+          const targetRoot = authoredNodes.get(target);
+          if (bodyFailed || authorRoot === undefined || targetRoot === undefined) return null;
+          return saveAuthored(position, {
+            ...call,
+            parentNodeId: authorRoot.nodeId,
+            edges: [
+              { targetNodeId: authorRoot.nodeId, targetStatement: authorRoot.statement, polarity: "support" },
+              { targetNodeId: targetRoot.nodeId, targetStatement: targetRoot.statement, polarity: "attack" }
+            ]
           }, authoredValue);
         });
         savedNodes[position]!.resolve(saved);
@@ -7825,7 +8515,7 @@ export class WalkingSkeletonRunner {
       // Root 0's author call has returned: its replies and exchanges may start from its statement now.
       statements[0]!.resolve(judged.statement);
       const chains = [runChain(rootZeroChain, authorRank(0), releaseAt(0))];
-      for (let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex += 1) {
+      for (let rootIndex = 1; rootIndex < rootCount; rootIndex += 1) {
         chains.push(runChain((stage) => rootChain(rootIndex, stage), authorRank(rootIndex), releaseAt(rootIndex)));
       }
       expansionPlan.forEach((leg, legIndex) => {
@@ -7835,6 +8525,60 @@ export class WalkingSkeletonRunner {
         const position = effectiveMakerCount + expansionPlan.length + exchangeIndex;
         chains.push(runChain((stage) => crossChain(exchangeIndex, stage), authorRank(position), releaseAt(position)));
       });
+      /**
+       * Spec §3.3 step 7 — SCRUTINY (Premium only: a zero budget plans no slot). Once every planned round is decided and
+       * reviewed, the needy nodes are chosen ONCE (`shapeRankScrutiny`) and get `roundsPerPoint` exchanges each, in the
+       * reserved slots, breadth-first (`buildScrutinyLegs`: at most `nodesPerDebate` nodes, 2·R·Q slots — never more
+       * than P2a priced); a slot no chosen node uses is given up. Never after a spend stop, too few members or a
+       * failure (`arguingStopped`); the adaptive (δ) stop judges the PLANNED rounds converged, not the needy nodes, so
+       * scrutiny still runs after it (pre-flight PF-B48, in `argueLeg`).
+       */
+      if (shapePlan !== null && shapeRun !== null && shapePlan.scrutiny.count > 0) {
+        const plannedEnd = shapePlan.scrutiny.start;
+        chains.push(runChain(async () => {
+          await everyBoundaryDecided;
+          await reviewRecorder.through(plannedEnd);
+          await Promise.all(reviewBatches.filter((_batch, index) => reviewBatchEnds[index]! <= plannedEnd).map((batch) => batch.done));
+          if (arguingStopped()) {
+            scrutinyChosen.resolve([]);
+            return;
+          }
+          const disputed = new Set(await this.#judgements.readDisputedNodeIds(run.runId));
+          const boundary = lastBoundary;
+          const recorded = new Set(boundary?.propagation.sensitivityRecords.map((record) => record.removedNodeId) ?? []);
+          const candidates = [...authoredNodes.entries()].flatMap(([position, node]): ScrutinyCandidate[] => {
+            // Pre-flight PF-B48: a node the stopping rule froze is never scrutinised (its legs would be skipped
+            // silently); a cross-reply answers another position and is not a point of its own.
+            if (position >= plannedEnd || shapeLegAt(position)?.kind === "CROSS" || frozenIndices.has(position)) return [];
+            // Root leverage: only for a node the last boundary scored AND measured (`resolveLeverage` refuses a node
+            // with no sensitivity record); none otherwise — the node can still be needy by spread or dispute.
+            const leverage = boundary === null || !boundary.scoredNodeIds.has(node.nodeId) || !recorded.has(node.nodeId) ? null
+              : resolveLeverage({ completedRounds: boundary.completedRounds, carryingNodeId: node.nodeId,
+                sensitivityRecords: boundary.propagation.sensitivityRecords, rootNodeIds: boundary.rootNodeIds }).leverage;
+            return [{ position, rootIndex: position < rootCount ? position : shapeLegAt(position)!.rootIndex,
+              dispersion: node.panelDispersion, disputed: disputed.has(node.nodeId), rootLeverage: leverage, baseTau: node.baseTau }];
+          });
+          const chosen = shapeRankScrutiny({
+            candidates,
+            // No sealed panel policy: a spread never makes a node needy (the panel itself refuses such a run first).
+            disagreementThreshold: panelPolicy?.disagreementThreshold ?? Number.POSITIVE_INFINITY,
+            leverageMin: shapeRun.shape.scrutinyLeverageMin,
+            weakBelow: shapeRun.shape.scrutinyWeakBelow,
+            pointsPerDebate: shapePlan.scrutiny.nodesPerDebate
+          });
+          for (const leg of buildScrutinyLegs({ plan: shapePlan, depth: expansionDepth, selected: chosen })) scrutinyLegs.set(leg.childIndex, leg);
+          scrutinyChosen.resolve(chosen.map((entry) => Object.freeze({ position: entry.position, nodeId: authoredNodes.get(entry.position)!.nodeId })));
+        }, [reviewBatchOf(plannedEnd - 1), 3, 1], () => scrutinyChosen.resolve([])));
+        for (let slot = shapePlan.scrutiny.start; slot < totalPlannedNodes; slot += 1) {
+          chains.push(runChain(async (stage) => {
+            await scrutinyChosen.promise;
+            const leg = scrutinyLegs.get(slot);
+            // A slot no chosen node uses is given up (the chain's release).
+            if (leg === undefined) return;
+            await argueLeg(leg, undefined, stage);
+          }, authorRank(slot), releaseAt(slot)));
+        }
+      }
       const allSettled = (async () => {
         await Promise.allSettled(chains);
         await Promise.allSettled([everyBoundaryDecided, earlierBatches]);
@@ -7853,7 +8597,7 @@ export class WalkingSkeletonRunner {
       }
       throwBodyFailure();
     };
-    if (callsRunTogether) {
+    if (chainsRun) {
       /**
        * Spec §2.3 (O6; Task 10 review carry, ruled) — NO AUTHOR OR REVIEW CALL STARTS ONCE THE ARGUING HAS STOPPED, not
        * even one already waiting in the lane: the lane asks this guard at the moment it would start a call, and holds a
@@ -8019,6 +8763,8 @@ export class WalkingSkeletonRunner {
       }
       await reviewPendingAuthoredNodes();
     }
+    // Debate shape: the arguing is over — a scrutiny it never reached chose nothing (first settle wins).
+    scrutinyChosen.resolve([]);
     // Root 0's chain ran its panel or failed, and a failure was thrown just above.
     const selection = rootZeroPanel.selection;
     if (selection === null) {
@@ -8028,7 +8774,7 @@ export class WalkingSkeletonRunner {
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
       .map(([, authored]) => authored);
-    const authoredMakerPositions = Array.from({ length: effectiveMakerCount }, (_, index) => authoredNodes.get(index))
+    const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
     const { materialised, snapshot: operatorResolvedSnapshot } =
       await this.#resolveOperatorResolvedSnapshot(run.runId);
@@ -8085,7 +8831,8 @@ export class WalkingSkeletonRunner {
      */
     const panelRevisedDuringRun = runPanelRevisedReason(sitOut, configuredMakers.map((maker) => maker.providerRef));
     const makerPositionServe = decideMakerPositionServe({
-      effectiveMakerCount,
+      // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M.
+      effectiveMakerCount: rootCount,
       runBodyBudgetStop,
       authoredMakerPositions,
       snapshot,
@@ -8119,6 +8866,32 @@ export class WalkingSkeletonRunner {
     const servableMakerPositions = makerPositionServe.servableMakerPositions;
     const servedRootSelection = makerPositionServe.servedRootSelection;
     const servedRoot = makerPositionServe.servedRoot;
+    /**
+     * Debate shape (spec §3.3 steps 1, 6, 7) — THE SHAPE'S RECORDS ON THE ANSWER, each with its mark. Pre-flight PF-B47:
+     * `ServeRepository.persist` refuses a record that names no node, so every one names a node: a map record the served
+     * root (answer scope, `mapConditionRecords`), a close-call or scrutiny record the node it extended (node scope).
+     * Reasons are codes only (`<MARK>:<STEP>`, `<CODE>:<count>`), never text a person reads. Nothing on today's run.
+     */
+    const scrutinyRecords: ConditionMarkRecord[] = [];
+    for (const { position, nodeId } of await scrutinyChosen.promise) {
+      // Spec §3.3 step 7: one SCRUTINY-EXTENDED record per scrutinised node, naming the exchanges it got (saved ones).
+      const added = [...scrutinyLegs.values()].filter((leg) => leg.chain === position)
+        .flatMap((leg) => authoredNodes.get(leg.childIndex)?.nodeId ?? []);
+      if (added.length === 0) continue;
+      scrutinyRecords.push(Object.freeze({
+        mark: "SCRUTINY-EXTENDED" as const, scope: "node" as const, subjectRef: nodeId,
+        reason: `SCRUTINY_EXTENDED:${String(added.length)}`, liftPath: null, servedRootRule: null,
+        affectedNodeIds: Object.freeze([nodeId, ...added])
+      }));
+    }
+    // Controller ruling T14-P: the count is the extras that reduced (`runNodePanel`'s `closeCallAdded`).
+    const closeCallRecords: readonly ConditionMarkRecord[] = closeCallExtensions.map((entry) => Object.freeze({
+      mark: "PANEL-CLOSE-CALL-EXTENDED" as const, scope: "node" as const, subjectRef: entry.nodeId,
+      reason: `PANEL_CLOSE_CALL_EXTENDED:${String(entry.added)}`, liftPath: null, servedRootRule: null,
+      affectedNodeIds: Object.freeze([entry.nodeId])
+    }));
+    const mapRecords = shapeMapResult === null ? [] : mapConditionRecords(shapeMapResult, run.runId, servedRoot.nodeId);
+    const shapeRecords: readonly ConditionMarkRecord[] = Object.freeze([...mapRecords, ...closeCallRecords, ...scrutinyRecords]);
     // T11: the three-state label is derived HERE — from the propagated numbers
     // only, before composition and before any synthesis step, so the derivation
     // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
@@ -8313,7 +9086,9 @@ export class WalkingSkeletonRunner {
       ...(wayOfKnowingDowngrades.length > 0 ? ["WAY-OF-KNOWING-DOWNGRADED" as const] : []),
       // S2-2 / J13(b): same rule for the panel degradations — a mark recorded only on
       // the node's receipt is not disclosed to the reader of the answer.
-      ...new Set(panelDegradations.map((record) => record.mark))
+      ...new Set(panelDegradations.map((record) => record.mark)),
+      // Debate shape: the map's fallbacks and fills, and the two extensions — each mark with its record (below).
+      ...new Set(shapeRecords.map((record) => record.mark))
     ]);
     /**
      * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
@@ -8393,6 +9168,8 @@ export class WalkingSkeletonRunner {
       // T7 / S3-2: one typed record per frozen branch, minted at the round
       // boundary that froze it and carried whole to the answer.
       ...branchFrozenRecords,
+      // Debate shape: one record per shape mark (map, close call, scrutiny); none on today's run.
+      ...shapeRecords,
       // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
       // the ONE record; with none, the reason is today's to the byte.
       ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({
@@ -8879,8 +9656,11 @@ export class WalkingSkeletonRunner {
         // `JSON.stringify` of the whole request — the model-authored digest
         // summaries and the prior objection sat in the same compartment as the
         // engine's own `instructions`, with nothing saying which was which.
-        // D2 + A17: ONE builder for the live call and moment:replay, in the question's language.
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName);
+        // D2 + A17: ONE builder for the live call and moment:replay, in the question's language. Debate shape (spec §3.3
+        // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
+        // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords,
+          shapeLanguage);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -8897,7 +9677,9 @@ export class WalkingSkeletonRunner {
           servedNodes,
           exemptTokens: personIdTokens,
           wording: writerWording,
-          questionLine: run.questionLine
+          // P2L Task 17: the question AND the lock — the reading drops the lock when the question is absent.
+          questionLine: run.questionLine,
+          ...shapeLanguageInput
         }, reply));
         const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
           const parsed = parseComposerOutput(content, writerReading.acceptedAs(content).reply);
@@ -8993,7 +9775,9 @@ export class WalkingSkeletonRunner {
             // `composerBound` — an organ T9 retired — which is how the longest
             // generation in the system ended up with a 60-second clock while the
             // judge, answering about ONE node, had 180.
-            bound: this.settings.synthesisRolePolicy.synthesizerBound,
+            // Debate shape (spec §3.3 step 8): max(the sealed bound, the row's writer bound) — never under the sealed one;
+            // the sealed bound itself, the same object, on today's run (`shapeWriterBound`).
+            bound: shapeWriterBound(this.settings.synthesisRolePolicy.synthesizerBound, shapeRun === null ? null : shapeRun.shape.writerBound),
             contractHash: this.settings.composerContractHash,
             providerRef: planned.providerRef,
             packet,
@@ -9055,7 +9839,7 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -9064,7 +9848,7 @@ export class WalkingSkeletonRunner {
          * verdict this reading refuses has left nothing to serve.
          */
         // All-steps format robustness (2026-10-12): remembered as the writer's is.
-        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine));
+        const checkerReading = rememberingAcceptedReply((content, reply) => classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage));
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
           const parsed = parseEvaluatorOutput(content, checkerReading.acceptedAs(content).reply);
           return assertEvaluatorVerdict(Object.freeze({
@@ -9539,6 +10323,8 @@ export class WalkingSkeletonRunner {
               // The same language the debate's own prompts were told to write in
               // (argumentLanguageDirective), and the tag the story is stored with.
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
+              // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
+              languageLocked: shapeLanguage !== null,
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,
@@ -9561,6 +10347,14 @@ export class WalkingSkeletonRunner {
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
               positionNodeIds: makerPositionNodeIds,
+              // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
+              // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
+              // Ruling W-CUT: a chosen answer past the positions argued is listed too (the page's stored list agrees).
+              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0),
+              // Owner ruling C-STORY: one plain sentence when the answers came from a map fallback, read from the map's
+              // whole result (debateShapeMap is null on a fallback); undefined on today's run.
+              answersNote: storyAnswersNoteFrom(shapeMapResult,
+                shapeRun !== null && !shapeMapArgued),
               baseStrengths: materialised.nodes,
               finalStrengths: propagation.strengths,
               // The WHOLE graph's arrows, in the engine's fixed order, so every
@@ -9868,6 +10662,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
   "COST_ENVELOPE_DAY_INVALID",
   "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_KEEP_ROOM_INVALID",
   "COST_ENVELOPE_PRICE_INVALID",
   "COST_ENVELOPE_PRICE_UNPRICED",
   "COST_ENVELOPE_PROJECTION_INVALID",
@@ -9885,6 +10680,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
   "DEBATE_ROOT_MISSING",
+  "DEBATE_SHAPE_RUNNER_UNCONFIGURED",
   "DECISION_IDEMPOTENCY_CONFLICT",
   "DECISION_IDENTITY_UNSERIALIZABLE",
   "DECISION_SPAWN_COUNT_INVALID",
@@ -10000,6 +10796,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
+  "MAP_GAP_ITEM_UNKNOWN",
+  "MAP_RECORD_INVALID",
+  "MAP_REPLY_UNREADABLE",
+  "MAP_ROW_INVALID",
   "MEMORY_ASKER_SCOPE_MISMATCH",
   "MEMORY_DIFFERENCE_REQUIRED",
   "MEMORY_DISCLOSURE_GATE_FAILED",
@@ -10120,6 +10920,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
   "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "RUN_COST_ENVELOPE_ROOM_KEPT",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",

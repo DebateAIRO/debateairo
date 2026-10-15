@@ -146,6 +146,7 @@ export function PublicDebatePageClient({
       storyLocale={storyLocale}
       storyCatalog={storyCatalog}
       publicFloor={publicFloor}
+      publicMapView={debate.map_view ?? null}
       publicNodesById={projection.nodesById}
       publicExport={publicExport}
       publicHeader={publicHeader}

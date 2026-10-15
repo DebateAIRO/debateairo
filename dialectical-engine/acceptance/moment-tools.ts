@@ -6,10 +6,13 @@ import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   Judge,
   PanelMemberFailure,
+  judgeLegFrameSpec,
   judgeLegModelRole,
   type JudgeLeg
 } from "@debateai/judgement";
-import { TypedDomainError, exhaustive, type DebateRole } from "@debateai/kernel";
+import {
+  QUESTION_LANGUAGE_FIELD, TypedDomainError, exhaustive, questionLanguageFromRun, type DebateRole, type QuestionLanguage
+} from "@debateai/kernel";
 import {
   PROVIDER_CONTEXT_WINDOW_EXCEEDED,
   PROVIDER_USAGE_CAP,
@@ -32,6 +35,8 @@ import {
 } from "@debateai/runner";
 import type { MomentBuilder, MomentBuilderFamily, MomentFile, ReplayOutcome } from "@debateai/scorecard";
 import {
+  SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
+  SYNTHESIZER_LENGTH_CONTRACT_ID,
   SYNTHESIZER_PROMPT_CONTRACT,
   buildEvaluatorRequest,
   buildSynthesizerRequest,
@@ -72,12 +77,21 @@ const text = z.string().min(1);
 /** Paid plans S1a: the question's language as the run pinned it; absent = dev's default (a moment written before the merge). */
 const languageName = z.string().refine((value) => value.trim() !== "", "a language name");
 const DEFAULT_ARGUMENT_LANGUAGE_NAME = "the same language as the question";
+/**
+ * Question language (spec 2026-10-13 L6, pre-flight PF-L39): a shaped run's locked language, read back from the trailing
+ * `question_language` field a locked call carries. Absent on every moment recorded without a lock, so their ids are
+ * unchanged. Only a lock the kernel accepts (`questionLanguageFromRun`: an emitted tag, a plain name of at most 64 UTF-8
+ * bytes) is read back, the same rule the named sentence frames by (P2L Task 13 review, Minor 2).
+ */
+const questionLanguageSchema = z.object({ code: z.string(), name: z.string() }).strict()
+  .refine((value) => questionLanguageFromRun(value.code, value.name) !== null, "a lock the kernel accepts");
 const judgeLegSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("primary-root") }).strict(),
   z.object({ kind: z.literal("independent-root") }).strict(),
-  z.object({ kind: z.literal("support"), positionUnderDebate: text }).strict(),
-  z.object({ kind: z.literal("attack"), positionUnderDebate: text }).strict(),
-  z.object({ kind: z.literal("cross-root"), ownPosition: text, otherMakersPosition: text }).strict()
+  z.object({ kind: z.literal("support"), positionUnderDebate: text, consideration: text.optional() }).strict(),
+  z.object({ kind: z.literal("attack"), positionUnderDebate: text, consideration: text.optional() }).strict(),
+  z.object({ kind: z.literal("cross-root"), ownPosition: text, otherMakersPosition: text }).strict(),
+  z.object({ kind: z.literal("assigned-root"), assignedAnswer: text, mapPoints: text }).strict()
 ]);
 /** The code label AS THE MODEL SAW IT: the projection withholds `registerVersion`. */
 const codeLabelSchema = z.object({
@@ -97,30 +111,38 @@ const digestSchema = z.custom<SynthesisDigest>(
 );
 
 export const JudgeJudgeInputsSchema = z.object({
-  questionLine: text, leg: judgeLegSchema, argumentLanguageName: languageName.optional()
+  questionLine: text, leg: judgeLegSchema, argumentLanguageName: languageName.optional(),
+  questionLanguage: questionLanguageSchema.optional()
 }).strict();
 export const JudgeReviewInputsSchema = z.object({
   questionLine: text,
   statement: text,
   edges: z.array(z.object({ targetStatement: text, polarity: z.enum(["support", "attack"]) }).strict()),
-  argumentLanguageName: languageName.optional()
+  argumentLanguageName: languageName.optional(),
+  questionLanguage: questionLanguageSchema.optional()
 }).strict();
 export const JudgeAssessInputsSchema = z.object({
-  questionLine: text, statement: text, argumentLanguageName: languageName.optional()
+  questionLine: text, statement: text, argumentLanguageName: languageName.optional(),
+  questionLanguage: questionLanguageSchema.optional()
 }).strict();
 export const SynthesisWriterInputsSchema = z.object({
   round: z.number().int().positive(),
   digest: digestSchema,
   codeLabel: codeLabelSchema,
   priorObjection: z.string().nullable(),
-  argumentLanguageName: languageName.optional()
+  argumentLanguageName: languageName.optional(),
+  // Debate shape: the answer length a lengthed writer call carried. Absent on every moment recorded before the shape,
+  // so their ids are unchanged.
+  answerWords: z.number().int().positive().optional(),
+  questionLanguage: questionLanguageSchema.optional()
 }).strict();
 export const SynthesisCheckerInputsSchema = z.object({
   round: z.number().int().positive(),
   digest: digestSchema,
   codeLabel: codeLabelSchema,
   candidateStatement: z.string(),
-  argumentLanguageName: languageName.optional()
+  argumentLanguageName: languageName.optional(),
+  questionLanguage: questionLanguageSchema.optional()
 }).strict();
 
 /** A moment's builder with its inputs validated for its family (`MomentBuilder.inputs` is `unknown`). */
@@ -134,6 +156,16 @@ export type TypedMomentBuilder =
 /** Paid plans S1a: the language a moment's live builder writes in — the moment's own, or dev's default. */
 export function momentArgumentLanguageName(builder: TypedMomentBuilder): string {
   return builder.inputs.argumentLanguageName ?? DEFAULT_ARGUMENT_LANGUAGE_NAME;
+}
+
+/** The locked language a recorded call carried (question language L6), or null: today's call, today's packet. */
+function momentQuestionLanguage(builder: TypedMomentBuilder): QuestionLanguage | null {
+  return builder.inputs.questionLanguage ?? null;
+}
+
+/** The answer length a recorded writer call carried (debate shape), or null: a writer call without one, or a checker call. */
+function momentAnswerWords(builder: TypedMomentBuilder): number | null {
+  return builder.family === "SYNTHESIS_WRITER" ? builder.inputs.answerWords ?? null : null;
 }
 
 /**
@@ -208,9 +240,28 @@ export function builderFromRecordedPacket(
     );
   }
   const frame = readPromptFrame(packet);
-  const has = (name: string): boolean => frame.fields.some((entry) => entry.name === name);
+  // Pre-flight PF-L39: a locked call's `question_language` field rides LAST, outside each builder's own fields. It is read
+  // into the inputs and dropped from the list every comparison below reads (the writer's `answer_length` check then reads
+  // the field before it). Anywhere else it is not a lock the builders send: the comparisons refuse it as today.
+  const lockField = frame.fields.at(-1)?.name === QUESTION_LANGUAGE_FIELD ? frame.fields.at(-1)! : null;
+  const fields = lockField === null ? frame.fields : frame.fields.slice(0, -1);
+  const lock = (() => {
+    if (lockField === null) return {};
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(lockField.content) as unknown;
+    } catch {
+      throw new TypedDomainError("MOMENT_RECORDED_PROMPT_UNREADABLE", `${callSiteKey}: ${QUESTION_LANGUAGE_FIELD} is not JSON`);
+    }
+    const parsed = questionLanguageSchema.safeParse(decoded);
+    if (!parsed.success) {
+      throw new TypedDomainError("MOMENT_RECORDED_PROMPT_UNREADABLE", `${callSiteKey}: ${QUESTION_LANGUAGE_FIELD}`);
+    }
+    return { questionLanguage: parsed.data };
+  })();
+  const has = (name: string): boolean => fields.some((entry) => entry.name === name);
   const field = (name: string): string => {
-    const found = frame.fields.find((entry) => entry.name === name);
+    const found = fields.find((entry) => entry.name === name);
     if (found === undefined) throw new TypedDomainError("MOMENT_FIELD_ABSENT", `${callSiteKey}: ${name}`);
     return found.content;
   };
@@ -231,16 +282,28 @@ export function builderFromRecordedPacket(
   const siteKey = seatBaseCallSiteKey(callSiteKey);
   switch (family) {
     case "JUDGE_JUDGE": {
-      const kind = /^judge\.([a-z-]+)\.(?:unknown|resolved)\.v1$/u.exec(frame.contractId)?.[1];
+      const parsed = /^judge\.([a-z-]+)(?:\.consideration)?\.(unknown|resolved)\.v1$/u.exec(frame.contractId);
+      const kind = parsed?.[1];
+      const claim = parsed?.[2] === "unknown" || parsed?.[2] === "resolved" ? parsed[2] : mismatch();
       const leg: JudgeLeg = kind === "support" || kind === "attack"
-        ? { kind, positionUnderDebate: field("position_under_debate") }
-        : kind === "cross-root"
-          ? { kind, ownPosition: field("own_position"), otherMakersPosition: field("other_makers_position") }
-          : kind === "primary-root" || kind === "independent-root"
-            ? { kind }
-            : mismatch();
+        ? {
+            kind, positionUnderDebate: field("position_under_debate"),
+            ...(has("consideration") ? { consideration: field("consideration") } : {})
+          }
+        : kind === "assigned-root"
+          ? { kind, assignedAnswer: field("assigned_answer"), mapPoints: field("map_points") }
+          : kind === "cross-root"
+            ? { kind, ownPosition: field("own_position"), otherMakersPosition: field("other_makers_position") }
+            : kind === "primary-root" || kind === "independent-root"
+              ? { kind }
+              : mismatch();
+      // The framer's own decision (`judgeLegFrameSpec`): the rebuilt leg must name the recorded contract and send
+      // exactly the recorded fields, so a variant id without its consideration (or the reverse) is refused.
+      const spec = judgeLegFrameSpec(leg, claim);
+      if (spec.contract.contractId !== frame.contractId) mismatch();
+      if (fields.map((entry) => entry.name).join("\n") !== spec.materialFields.join("\n")) mismatch();
       if (judgeLegModelRole(leg) !== role) mismatch();
-      return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), leg, ...language } });
+      return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), leg, ...language, ...lock } });
     }
     case "JUDGE_REVIEW": {
       if (frame.contractId !== "judge.review.v1") mismatch();
@@ -258,16 +321,28 @@ export function builderFromRecordedPacket(
           questionLine: field("question_line"),
           statement: field("statement"),
           edges: edges.data.map((edge) => ({ targetStatement: edge.target_statement, polarity: edge.relation })),
-          ...language
+          ...language,
+          ...lock
         }
       });
     }
     case "JUDGE_ASSESS": {
       if (frame.contractId !== "judge.panel.v1") mismatch();
-      return parseMomentBuilder({ family, inputs: { questionLine: field("question_line"), statement: field("statement"), ...language } });
+      return parseMomentBuilder({
+        family, inputs: { questionLine: field("question_line"), statement: field("statement"), ...language, ...lock }
+      });
     }
     case "SYNTHESIS_WRITER": {
-      if (frame.contractId !== SYNTHESIZER_PROMPT_CONTRACT.contractId) mismatch();
+      const lengthed = frame.contractId === SYNTHESIZER_LENGTH_CONTRACT_ID;
+      if (!lengthed && frame.contractId !== SYNTHESIZER_PROMPT_CONTRACT.contractId) mismatch();
+      // The length variant and its `answer_length` field travel together.
+      if (lengthed !== has("answer_length")) {
+        throw new TypedDomainError("MOMENT_FIELD_UNEXPECTED", `${callSiteKey}: answer_length does not match the contract`);
+      }
+      const words = lengthed ? /^about ([1-9][0-9]*) words$/u.exec(field("answer_length"))?.[1] : undefined;
+      if (lengthed && words === undefined) {
+        throw new TypedDomainError("MOMENT_RECORDED_PROMPT_UNREADABLE", `${callSiteKey}: answer_length`);
+      }
       const site = /^COMPOSER:SYNTHESIZER:(INITIAL|RETRY):(\d+)$/u.exec(siteKey);
       if (site === null) return mismatch();
       const retry = site[1] === "RETRY";
@@ -281,7 +356,9 @@ export function builderFromRecordedPacket(
           digest: json("digest"),
           codeLabel: json("code_label"),
           priorObjection: retry ? field("prior_objection") : null,
-          ...language
+          ...(words === undefined ? {} : { answerWords: Number(words) }),
+          ...language,
+          ...lock
         }
       });
     }
@@ -296,7 +373,8 @@ export function builderFromRecordedPacket(
           digest: json("digest"),
           codeLabel: json("code_label"),
           candidateStatement: field("candidate_statement"),
-          ...language
+          ...language,
+          ...lock
         }
       });
     }
@@ -313,6 +391,9 @@ export function graderContextOf(question: string, builder: TypedMomentBuilder): 
       const leg = builder.inputs.leg;
       if (leg.kind === "support" || leg.kind === "attack") {
         excerpts.push({ label: "position_under_debate", text: leg.positionUnderDebate });
+        if (leg.consideration !== undefined) excerpts.push({ label: "consideration", text: leg.consideration });
+      } else if (leg.kind === "assigned-root") {
+        excerpts.push({ label: "assigned_answer", text: leg.assignedAnswer }, { label: "map_points", text: leg.mapPoints });
       } else if (leg.kind === "cross-root") {
         excerpts.push(
           { label: "own_position", text: leg.ownPosition },
@@ -355,7 +436,7 @@ const sha256 = (value: string): string => createHash("sha256").update(value, "ut
 /** The family's contract hash as the seeders seal it (`apps/runner/src/dev-deployment-register.ts:524-526`). */
 export function currentContractHash(family: MomentBuilderFamily): string {
   return family === "SYNTHESIS_WRITER"
-    ? sha256(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT))
+    ? sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT)
     : family === "SYNTHESIS_CHECKER"
       ? sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
       : sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT);
@@ -427,11 +508,13 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
     contractHash: call.contractHash,
     bound: call.bound
   };
+  // The recorded lock, when the moment carries one (PF-L39); absent, today's inputs.
+  const lockInput = builder.inputs.questionLanguage === undefined ? {} : { questionLanguage: builder.inputs.questionLanguage };
   switch (builder.family) {
     case "JUDGE_JUDGE": {
       const judged = await judge.judge({
         ...subject, questionLine: builder.inputs.questionLine,
-        argumentLanguageName: momentArgumentLanguageName(builder), leg: builder.inputs.leg
+        argumentLanguageName: momentArgumentLanguageName(builder), leg: builder.inputs.leg, ...lockInput
       });
       return Object.freeze({
         statement: judged.statement, wayOfKnowing: judged.wayOfKnowing, locator: judged.locator,
@@ -444,6 +527,7 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
         ...subject,
         questionLine: builder.inputs.questionLine,
         argumentLanguageName: momentArgumentLanguageName(builder),
+        ...lockInput,
         statement: builder.inputs.statement,
         authorMaker: WITHHELD_AUTHOR,
         // Edge ids never reach the prompt; the bearings come back in this order.
@@ -459,14 +543,16 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
     case "JUDGE_ASSESS": {
       const assessed = await judge.assess({
         ...subject, questionLine: builder.inputs.questionLine, argumentLanguageName: momentArgumentLanguageName(builder),
-        statement: builder.inputs.statement, authorMaker: WITHHELD_AUTHOR
+        statement: builder.inputs.statement, authorMaker: WITHHELD_AUTHOR, ...lockInput
       });
       return Object.freeze({ assessment: assessed.assessment });
     }
     case "SYNTHESIS_WRITER":
     case "SYNTHESIS_CHECKER": {
       const request = synthesisRequestOf(builder);
-      const framed = buildSynthesisRolePrompt(request, momentArgumentLanguageName(builder));
+      const framed = buildSynthesisRolePrompt(
+        request, momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder), momentQuestionLanguage(builder)
+      );
       const role = request.role;
       const response = await gateway.call({
         runId: null,
@@ -497,7 +583,10 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
 /** The packet the live builder produces for a moment, captured before any byte could leave. */
 export async function captureMomentPacket(builder: TypedMomentBuilder): Promise<PromptPacket> {
   if (builder.family === "SYNTHESIS_WRITER" || builder.family === "SYNTHESIS_CHECKER") {
-    return buildSynthesisRolePrompt(synthesisRequestOf(builder), momentArgumentLanguageName(builder)).packet;
+    return buildSynthesisRolePrompt(
+      synthesisRequestOf(builder), momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder),
+      momentQuestionLanguage(builder)
+    ).packet;
   }
   const captured: { packet: PromptPacket | null } = { packet: null };
   const capture: ProviderGateway = {

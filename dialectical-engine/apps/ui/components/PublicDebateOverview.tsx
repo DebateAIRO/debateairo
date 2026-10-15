@@ -12,6 +12,7 @@ import { v3ScorePercentage } from "@/lib/v3/adapter";
 import { countStoryPositions, storyLabelWords } from "@/lib/v3/storyWords";
 import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
 import { FloorAnswer } from "@/components/FloorAnswer";
+import { AlsoRaisedList } from "@/components/AlsoRaisedList";
 import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -236,6 +237,9 @@ export function PublicDebateOverview({
           <ArgumentCard argument={presentation.strongestPro} catalog={catalog} composeCatalog={composeCatalog} side="pro" onRead={onRead} />
           <ArgumentCard argument={presentation.strongestCon} catalog={catalog} composeCatalog={composeCatalog} side="con" onRead={onRead} />
         </section>
+
+        {/* Debate shape P2c: what came up but was not debated, in the question's language. */}
+        <AlsoRaisedList view={debate.map_view} catalog={storyCatalog} locale={storyLocale} />
 
         <p className="publicUnlockNote">
           <span aria-hidden>🔒</span> {t(catalog, "public.overview.publicViewingNotice")} {" "}

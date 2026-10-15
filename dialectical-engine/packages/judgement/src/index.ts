@@ -7,8 +7,12 @@ import {
   TypedDomainError,
   exhaustive,
   isRunLevelSpendStop,
-  replyLanguageCheck,
+  questionLanguageForBounds,
+  questionLanguageSentence,
+  replyLanguageCheckFor,
+  withQuestionLanguageField,
   type DebateRole,
+  type QuestionLanguage,
   type ReviewOutcome,
   type WayOfKnowing
 } from "@debateai/kernel";
@@ -24,13 +28,17 @@ import {
   type CallBound,
   type FramedPrompt,
   type PromptContract,
+  type PromptPacket,
   type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
 import {
   JUDGE_WAYS_OF_KNOWING,
+  JUDGE_CLAIM_TYPE_INSTRUCTIONS,
+  JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_PROMPT_CONTRACT,
+  judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
   type JudgeClaimedWayOfKnowing,
@@ -232,22 +240,44 @@ function buildContentRepairPacket(framed: FramedPrompt, rejected: {
 export type JudgeLeg =
   | { readonly kind: "primary-root" }
   | { readonly kind: "independent-root" }
-  | { readonly kind: "support" | "attack"; readonly positionUnderDebate: string }
+  /**
+   * Debate shape: a root the map assigns. `assignedAnswer` is the answer the
+   * maker must make the strongest case for; `mapPoints` is the map's points as
+   * one JSON text. Both are material, fenced like every other statement.
+   */
+  | { readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string }
+  /**
+   * `consideration` (debate shape) is the one map point the reply is built on.
+   * Absent = today's leg, byte for byte; present = the consideration variant
+   * contract. `string | undefined` because the repo compiles with
+   * `exactOptionalPropertyTypes` and the moment replay's zod reads it so.
+   */
+  | {
+      readonly kind: "support" | "attack";
+      readonly positionUnderDebate: string;
+      readonly consideration?: string | undefined;
+    }
   | {
       readonly kind: "cross-root";
       readonly ownPosition: string;
       readonly otherMakersPosition: string;
     };
 
+/**
+ * The contract with its language sentence, added at call time (never sealed: the judge fingerprint excludes it). Without
+ * a lock it is today's directive, byte for byte; with one (a shaped run's locked question language, question-language
+ * spec 2026-10-13 L6) it is THE one named sentence, never the vague form.
+ */
 function promptContractInArgumentLanguage(
   contract: PromptContract,
-  argumentLanguageName: string | undefined
+  argumentLanguageName: string | undefined,
+  questionLanguage?: QuestionLanguage | null
 ): PromptContract {
   return Object.freeze({
     ...contract,
-    instruction: `${contract.instruction} ${argumentLanguageDirective(
-      argumentLanguageName ?? "the same language as the question"
-    )}`
+    instruction: questionLanguage === null || questionLanguage === undefined
+      ? `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName ?? "the same language as the question")}`
+      : `${contract.instruction} ${questionLanguageSentence(questionLanguage)}`
   });
 }
 
@@ -258,6 +288,11 @@ export interface JudgeInput {
   /** THE QUESTION ALONE. Never a directive, never another model's statement. */
   readonly questionLine: string;
   readonly argumentLanguageName?: string;
+  /**
+   * The run's locked question language (a shaped run only; the caller decides by the run's shape receipt). Absent: today's
+   * directive, fields and reply check, byte for byte.
+   */
+  readonly questionLanguage?: QuestionLanguage;
   /** Which authoring leg this is. Selects the code-owned directive. */
   readonly leg: JudgeLeg;
   readonly providerRef: string;
@@ -292,6 +327,8 @@ export interface JudgeSubjectInput {
   readonly callSiteKey: string;
   readonly questionLine: string;
   readonly argumentLanguageName?: string;
+  /** As `JudgeInput.questionLanguage`: the run's lock on a shaped run; absent, today's bytes. */
+  readonly questionLanguage?: QuestionLanguage;
   readonly statement: string;
   readonly authorMaker: string;
   readonly providerRef: string;
@@ -348,13 +385,40 @@ export interface ReviewedNode {
 }
 
 /**
- * The closed material table, applied. A leg's fields are fixed by
- * `JUDGE_LEG_MATERIAL_FIELDS`, and this function is the only place that fills
- * them — so a new field cannot reach a model without appearing in that table.
+ * THE ONE DECISION of which sealed contract a leg is framed under and which
+ * closed material table it may send: a support or attack leg WITH a
+ * consideration takes the debate shape's variant (`judgeConsiderationPromptContract`
+ * + `JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS`); every other leg, a support or
+ * attack leg without one included, takes today's contract and table. The framer
+ * and the moment replay both read it, so the two cannot disagree.
+ */
+export function judgeLegFrameSpec(
+  leg: JudgeLeg,
+  claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  if ((leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined) {
+    return Object.freeze({
+      contract: judgeConsiderationPromptContract(leg.kind, claim),
+      materialFields: JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS[leg.kind]
+    });
+  }
+  return Object.freeze({
+    contract: judgePromptContract(leg.kind, claim),
+    materialFields: JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind]
+  });
+}
+
+/**
+ * The closed material table, applied. A leg's fields are fixed by the table
+ * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS`, or the consideration
+ * variant's), and this function is the only place that fills them — so a new
+ * field cannot reach a model without appearing in that table.
  */
 function judgeLegMaterial(
   leg: JudgeLeg,
-  questionLine: string
+  questionLine: string,
+  declared: readonly string[],
+  questionLanguage: QuestionLanguage | null = null
 ): readonly { readonly name: string; readonly content: string }[] {
   const fields = leg.kind === "cross-root"
     ? [
@@ -362,20 +426,28 @@ function judgeLegMaterial(
         { name: "own_position", content: leg.ownPosition },
         { name: "other_makers_position", content: leg.otherMakersPosition }
       ]
-    : leg.kind === "support" || leg.kind === "attack"
+    : leg.kind === "assigned-root"
       ? [
           { name: "question_line", content: questionLine },
-          { name: "position_under_debate", content: leg.positionUnderDebate }
+          { name: "assigned_answer", content: leg.assignedAnswer },
+          { name: "map_points", content: leg.mapPoints }
         ]
-      : [{ name: "question_line", content: questionLine }];
-  const declared = JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind];
+      : leg.kind === "support" || leg.kind === "attack"
+        ? [
+            { name: "question_line", content: questionLine },
+            { name: "position_under_debate", content: leg.positionUnderDebate },
+            ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
+          ]
+        : [{ name: "question_line", content: questionLine }];
   if (fields.length !== declared.length || fields.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
       `Leg ${leg.kind} may send exactly ${declared.join(",")}`
     );
   }
-  return Object.freeze(fields);
+  // The code-owned language field rides LAST, outside the leg's closed table; it is the run's lock, never model or user
+  // text. Without a lock the table's fields alone, as today.
+  return Object.freeze(withQuestionLanguageField(fields, questionLanguage));
 }
 
 /**
@@ -387,13 +459,18 @@ function framedJudgePrompt(
   leg: JudgeLeg,
   questionLine: string,
   argumentLanguageName: string | undefined,
-  claim: "unknown" | "resolved"
+  claim: "unknown" | "resolved",
+  questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
+  const spec = judgeLegFrameSpec(leg, claim);
   return buildFramedPrompt({
-    contract: promptContractInArgumentLanguage(judgePromptContract(leg.kind, claim), argumentLanguageName),
-    material: judgeLegMaterial(leg, questionLine)
+    contract: promptContractInArgumentLanguage(spec.contract, argumentLanguageName, questionLanguage),
+    material: judgeLegMaterial(leg, questionLine, spec.materialFields, questionLanguage)
   });
 }
+
+/** Test seam: the same function `Judge.judge` frames with, so a test reads the exact packet a leg sends. */
+export const framedJudgePromptForTest: typeof framedJudgePrompt = framedJudgePrompt;
 
 /**
  * B9 (budget spec §2.10) — WHAT THE FIRST POSITION'S OWN CALL COSTS AT MOST,
@@ -409,16 +486,23 @@ function framedJudgePrompt(
  * double quote grows 1 → 2 → 4), and nothing at the ask refuses one: the schema
  * only trims `question_line` and the route counts its UTF-8 bytes. It uses the
  * fallback language directive (longer than any language name) and both
- * claim-type variants of the contract, the larger kept. So the figure is never
- * below any first call an admitted ask can make. The completion bound is the
- * judge bound's first-attempt max_tokens. Each projection names its target's
- * `model`, so the boot can group the calls by plan (`firstCallsByPlanRoster`).
- * A target with no price (local mode) is left out.
+ * claim-type variants of the contract, the larger kept. With
+ * `questionLanguageLocked` (the API boot with the debate-shape row in force:
+ * a shaped run's calls carry the locked language), it ALSO frames both variants
+ * under the longest lock the kernel can make (`questionLanguageForBounds`: the
+ * named sentence and the `question_language` field) and keeps the largest of
+ * the four (pre-flight PF-L38); without it, today's two only, today's number.
+ * So the figure is never below any first call an admitted ask can make. The
+ * completion bound is the judge bound's first-attempt max_tokens. Each
+ * projection names its target's `model`, so the boot can group the calls by
+ * plan (`firstCallsByPlanRoster`). A target with no price (local mode) is left
+ * out.
  */
 export function firstPositionCallProjections(input: Readonly<{
   targets: readonly ProviderDiscoveryTarget[];
   judgeTokenCeiling: number;
   questionMaxBytes: number;
+  questionLanguageLocked?: boolean;
 }>): readonly Readonly<{
   providerRef: string;
   model: string;
@@ -432,8 +516,11 @@ export function firstPositionCallProjections(input: Readonly<{
   }
   const question = "\u0001".repeat(input.questionMaxBytes);
   const leg: JudgeLeg = Object.freeze({ kind: "primary-root" });
-  const packets = (["unknown", "resolved"] as const)
-    .map((claim) => framedJudgePrompt(leg, question, undefined, claim).packet);
+  const locks: readonly (QuestionLanguage | null)[] = input.questionLanguageLocked === true
+    ? [null, questionLanguageForBounds()]
+    : [null];
+  const packets = locks.flatMap((lock) => (["unknown", "resolved"] as const)
+    .map((claim) => framedJudgePrompt(leg, question, undefined, claim, lock).packet));
   const completionTokenCeiling = lengthRetryTokenCeiling(input.judgeTokenCeiling, 0);
   return Object.freeze(input.targets.flatMap((target) => {
     const price = providerTargetPrice(target);
@@ -445,6 +532,59 @@ export function firstPositionCallProjections(input: Readonly<{
     }), "utf8")));
     return [Object.freeze({ providerRef: target.providerRef, model: target.model, price, requestBytes, completionTokenCeiling })];
   }));
+}
+
+/**
+ * Debate shape (controller ruling T12-R0) — THE MOST BYTES ROOT 0'S OWN REQUEST CAN CARRY for this question, so the
+ * map can keep room for it. Root 0 is today's primary root (the map's fallback) or a map-assigned root whose answer and
+ * points are at most `assignedMaterialChars` characters each. The assigned material is made of U+0001, the character
+ * whose encoding grows most on the way (1 → 6 → 7 bytes, `firstPositionCallProjections`), so no real material of that
+ * length frames longer. Both claim-type variants of both contracts, the largest kept, measured as the gateway's
+ * `{model, max_tokens, messages}` body with an EMPTY model member: the caller adds its target's model id. With a
+ * `questionLanguage` (pre-flight PF-L38) every packet is framed as the locked call sends it: the named sentence and the
+ * `question_language` field; without one, today's directive and fields, today's number.
+ */
+export function rootPositionRequestBytesBound(input: RootPositionBoundInput): number {
+  return rootPositionBodyBytesBound(input, (framed) => framed.packet);
+}
+
+/**
+ * Debate shape (controller ruling T12-R3) — THE MOST BYTES ROOT 0'S FORMAT REPAIR CAN CARRY: the full re-ask the judge
+ * builds when a reply fails its check (`buildContentRepairPacket`: the first packet, unchanged, then one fenced block with
+ * the rejection's code and machine path). The code and the path are the longest the frame lets a repair carry
+ * (`appendFramedRejection` refuses longer ones), made of characters that do not grow on the way, so no real repair of
+ * the same root frames longer. Measured as `rootPositionRequestBytesBound` measures the first packet.
+ */
+export function rootPositionRepairRequestBytesBound(input: RootPositionBoundInput): number {
+  return rootPositionBodyBytesBound(input, (framed) => buildFramedRepairPrompt(framed, LONGEST_REPAIR_LOCATOR));
+}
+
+type RootPositionBoundInput = Readonly<{
+  questionLine: string;
+  argumentLanguageName: string;
+  completionTokenCeiling: number;
+  assignedMaterialChars: Readonly<{ answer: number; points: number }>;
+  questionLanguage?: QuestionLanguage | null;
+}>;
+
+/** The longest typed code (`[A-Z][A-Z0-9_]{0,63}`) and machine path (200 characters) a repair packet may carry. */
+const LONGEST_REPAIR_LOCATOR = Object.freeze({ code: "A".repeat(64), path: "a".repeat(200) });
+
+function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (framed: FramedPrompt) => PromptPacket): number {
+  const { answer, points } = input.assignedMaterialChars;
+  if (!Number.isSafeInteger(input.completionTokenCeiling) || input.completionTokenCeiling < 1
+    || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
+    throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
+  }
+  const legs: readonly JudgeLeg[] = [
+    Object.freeze({ kind: "primary-root" }),
+    Object.freeze({ kind: "assigned-root", assignedAnswer: "\u0001".repeat(answer), mapPoints: "\u0001".repeat(points) })
+  ];
+  return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
+    model: "",
+    max_tokens: input.completionTokenCeiling,
+    messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim, input.questionLanguage ?? null)).messages
+  }), "utf8"))));
 }
 
 /**
@@ -482,6 +622,7 @@ export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
   switch (leg.kind) {
     case "primary-root":
     case "independent-root":
+    case "assigned-root":
       return "POSITION";
     case "support":
     case "attack":
@@ -513,14 +654,15 @@ export class Judge {
       input.leg,
       input.questionLine,
       input.argumentLanguageName,
-      codeClaim.claimType === "unknown" ? "unknown" : "resolved"
+      codeClaim.claimType === "unknown" ? "unknown" : "resolved",
+      input.questionLanguage ?? null
     );
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended). Judge nested fields
     // (2026-10-12): the author legs alone also nest flattened members (NESTED_FIELDS); the re-read below uses the same
     // options, so the accepted content reads as the repaired object.
-    const inQuestionLanguage = replyLanguageCheck(input.questionLine, JUDGE_ARTIFACT_PROSE);
+    const inQuestionLanguage = replyLanguageCheckFor(input.questionLine, input.questionLanguage, JUDGE_ARTIFACT_PROSE);
     const reading = rememberingAcceptedReply((content, reply) =>
       classifyStructuredArtifact(content, judgeArtifactSchema, reply, JUDGE_ARTIFACT_READING, inQuestionLanguage));
     let response;
@@ -600,9 +742,11 @@ export class Judge {
     const framed = buildFramedPrompt({
       contract: promptContractInArgumentLanguage(
         reviewPromptContract(input.edges.length),
-        input.argumentLanguageName
+        input.argumentLanguageName,
+        input.questionLanguage
       ),
-      material: [
+      // The run's lock rides LAST (code-owned, never model or user text); without one, today's three fields.
+      material: withQuestionLanguageField([
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement },
         {
@@ -613,14 +757,14 @@ export class Judge {
             target_statement: edge.targetStatement
           })))
         }
-      ]
+      ], input.questionLanguage)
     });
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended).
     // MiMo salvage (2026-10-12): the review's shape repairs (REVIEW_ARTIFACT_READING); the re-read below uses the same.
     // Reply language (2026-10-12): the accepted object's prose must be in the question's language.
-    const inQuestionLanguage = replyLanguageCheck(input.questionLine, NODE_REVIEW_PROSE);
+    const inQuestionLanguage = replyLanguageCheckFor(input.questionLine, input.questionLanguage, NODE_REVIEW_PROSE);
     const reading = rememberingAcceptedReply((content, reply) =>
       classifyStructuredArtifact(content, schema, reply, REVIEW_ARTIFACT_READING, inQuestionLanguage));
     let response;
@@ -684,18 +828,19 @@ export class Judge {
    */
   async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
     const framed = buildFramedPrompt({
-      contract: promptContractInArgumentLanguage(PANEL_PROMPT_CONTRACT, input.argumentLanguageName),
-      material: [
+      contract: promptContractInArgumentLanguage(PANEL_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+      // The run's lock rides LAST (code-owned, never model or user text); without one, today's two fields.
+      material: withQuestionLanguageField([
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement }
-      ]
+      ], input.questionLanguage)
     });
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
     // exactly as the classifier read it (the last repair depends on how the reply ended).
     // Judge nested fields (2026-10-12): the panel reads its assessment as the author legs do (NESTED_FIELDS), and the
     // re-read below uses the same options.
-    const inQuestionLanguage = replyLanguageCheck(input.questionLine, JUDGE_ASSESSMENT_PROSE);
+    const inQuestionLanguage = replyLanguageCheckFor(input.questionLine, input.questionLanguage, JUDGE_ASSESSMENT_PROSE);
     const reading = rememberingAcceptedReply((content, reply) =>
       classifyStructuredArtifact(content, judgeAssessmentSchema, reply, JUDGE_ARTIFACT_READING, inQuestionLanguage));
     let response;

@@ -6,7 +6,8 @@
 // model's script; with `debate` scripts a scripted model refuses every other request unbilled and the DeepInfra gate
 // halts at its ceiling of unbilled releases (the run-resilience scenarios, spec
 // docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md T1/T2); every other request is answered by its
-// contract (a valid reply), unless the scenario's `override` answers it first. Gate v4 (2026-10-12,
+// contract (a valid reply), a debate-shape map step (stubMapContent) and the fast language check
+// (stubQuestionLanguageContent) included, unless the scenario's `override` answers it first. Gate v4 (2026-10-12,
 // packages/providers/ops/preview_budget_authority.py): with `debate.coolOffAfter` a model cools off after that many
 // unbilled refusals in a row (409 MODEL_COOLING with retry_after, never contacting the vendor), and with
 // `debate.deepInfraHaltedAnswer: "AUTHORITY_HALTED"` the halted DeepInfra gate says so itself instead of STOPPED.
@@ -16,13 +17,16 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
+import { MAP_CONTRACT_IDS } from "@debateai/map";
 import { STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
+import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
+import { openingsDryContent } from "../../tools/preview-practice/practice-openings-dry.js";
 
 export type GateProvider = "deepinfra" | "anthropic";
-export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
+export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "QUESTION_LANGUAGE" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
 /** A /complete request as the gate saw it (what a scenario's `override` is handed). */
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
@@ -109,9 +113,14 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
  * "the same language as the question").
  */
 export type StubLanguage = "en" | "ro";
-const ROMANIAN_DIRECTIVE = argumentLanguageDirective("Romanian");
+/**
+ * Romanian, in both forms a request can name it: today's directive, and (question-language spec 2026-10-13, P2L Task 17,
+ * pre-flight PF-L52) the locked sentence a shaped run's calls carry instead.
+ */
+const ROMANIAN_DIRECTIVES = Object.freeze([argumentLanguageDirective("Romanian"), questionLanguageSentence({ code: "ro", name: "Romanian" })]);
 export function stubReplyLanguage(chat: string): StubLanguage {
-  return wirePacket(chat).messages.some((message) => typeof message.content === "string" && message.content.includes(ROMANIAN_DIRECTIVE))
+  return wirePacket(chat).messages.some((message) => typeof message.content === "string"
+    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))
     ? "ro" : "en";
 }
 
@@ -212,16 +221,87 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
   });
 }
 
+/**
+ * A valid map reply (debate shape, spec 2026-10-12 §1) for the step the request is: the openings dry script's own
+ * answer (tools/preview-practice/practice-openings-dry.ts), in the question's language. The angle planner's reply
+ * names the locked language first (`question_language`, P2L Task 15; P2L amendment P2b-5): the primary code of the
+ * request's own `question_language` field, so a plain debate records no disagreement. The exception is choose: it names
+ * TWO distinct answers, the first two merged answers. They get an OPPOSITE_CASE point against the first, a PRACTICAL
+ * point for it, an ASKER_WORRY point for the second, and one more point against it (any point not yet used). So a clean
+ * debate needs no answer filling, meets the OPPOSITE_CASE and ASKER_WORRY quotas, and leaves points also raised. The
+ * third quota, SINGLE_AI (a point raised by exactly one AI), is met only when a chosen point has one maker; otherwise
+ * the chooser fills it with a CHOOSE_QUOTA_FILLED map mark, which never changes the verdict (pre-flight PF-D15).
+ */
+export function stubMapContent(chat: string, serial: number): string {
+  const frame = readFramedMaterial(wirePacket(chat));
+  if (frame.contractId === MAP_CONTRACT_IDS.angles) {
+    const locked = frame.fields.find((entry) => entry.name === "question_language")?.content;
+    const code = locked === undefined ? null : (JSON.parse(locked) as { code?: unknown }).code;
+    // No lock in the request: the question's own language, as the kernel's guesser reads it (pre-flight PF-D15).
+    const question = frame.fields.find((entry) => entry.name === "question_line")?.content ?? "";
+    const planner = (typeof code === "string" ? code : detectArgumentLanguage(question).tag).split("-")[0]!.toLowerCase();
+    const angles = JSON.parse(openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial, slip: false })) as object;
+    return JSON.stringify({ question_language: planner, ...angles });
+  }
+  if (frame.contractId === MAP_CONTRACT_IDS.choose) {
+    const field = (name: string): string => frame.fields.find((entry) => entry.name === name)?.content ?? "[]";
+    const keyPoints = JSON.parse(field("key_points")) as { key_point_id: string; angle_kind: string | null }[];
+    const merged = JSON.parse(field("answers")) as { answer_id: string; answer: string }[];
+    if (merged.length >= 2 && keyPoints.length >= 4) {
+      const used = new Set<string>();
+      const take = (kind: string | null): string[] => {
+        const found = keyPoints.find((point) => point.angle_kind === kind && !used.has(point.key_point_id))
+          ?? keyPoints.find((point) => !used.has(point.key_point_id));
+        if (found === undefined) return [];
+        used.add(found.key_point_id);
+        return [found.key_point_id];
+      };
+      const againstFirst = take("OPPOSITE_CASE");
+      const forFirst = take("PRACTICAL");
+      const forSecond = take("ASKER_WORRY");
+      const againstSecond = take(null);
+      return JSON.stringify({ answers: [
+        { answer_id: "a-1", statement: merged[0]!.answer, for: forFirst, against: againstFirst, strongest_rival: "a-2" },
+        { answer_id: "a-2", statement: merged[1]!.answer, for: forSecond, against: againstSecond, strongest_rival: "a-1" }
+      ] });
+    }
+  }
+  return openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial, slip: false });
+}
+
+/**
+ * The fast language check's default answer (P2L Task 5 answer form): one language, no mix, and that language is the
+ * question's own as the kernel's guesser reads it (never the site's: an ask without `site_language` checks against
+ * English, and a Romanian practice question must still lock Romanian). A scenario that needs another reading answers
+ * through its override.
+ */
+export function stubQuestionLanguageContent(chat: string): string {
+  const question = readFramedMaterial(wirePacket(chat)).fields.find((entry) => entry.name === "question_line")?.content ?? "";
+  const code = detectArgumentLanguage(question).tag.split("-")[0]!.toLowerCase();
+  return JSON.stringify({ main_language: code, languages_seen: [code], is_real_mix: false, proposed_question: null });
+}
+
 /* ------------------------------------------------------------------ reading a request */
 
 /**
  * The argument-language directive names the machine keys below, so it is removed before routing (as database.test.ts).
- * Both of its forms (#154): a named language is followed by ", the language of the question," and the fallback (a
- * question the detector cannot name, as the busy-model run's labels are) reads "the same language as the question,".
- * With only the first form the fallback directive stayed in, and its "fatalFlags" sent every review call to PANEL.
+ * Both of its forms (#154): another language is named "<name>, the language of the question,", English only "English,
+ * the language of the question," (an English question, and the fallback for a question the detector cannot name, as
+ * these tests' labels are). With only the first form an English directive stayed in, its "fatalFlags" sent every review
+ * and checker call to PANEL. Question language (spec 2026-10-13, P2L Task 17, pre-flight PF-L51): a shaped run's calls
+ * carry the locked sentence instead, which names "fatalFlags[].type" too — the third alternative removes it WHOLE (both
+ * of its sentences), built from the kernel's own sentence exactly as the first two are, never from a fragment.
  */
-const LANGUAGE_DIRECTIVE = new RegExp([argumentLanguageDirective("\u0000"), argumentLanguageDirective("")]
+// The kernel frames only a lock it would accept (Task 13 review, Minor 2: never "\u0000" as a name), so the sentence is
+// built with a plain placeholder name, then that one name is marked as the first two forms' is.
+const LOCKED_NAME_PLACEHOLDER = "Placeholderish";
+const LANGUAGE_DIRECTIVE = new RegExp([argumentLanguageDirective("\u0000"), argumentLanguageDirective(""),
+  questionLanguageSentence({ code: "en", name: LOCKED_NAME_PLACEHOLDER }).replace(LOCKED_NAME_PLACEHOLDER, "\u0000")]
   .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\u0000", "[^.]+?")).join("|"), "gu");
+/** The one stripping `classifyGateRequest` applies, under a name a test can call (P2L Task 17, PF-L51). */
+export function stripLanguageDirectiveForTest(text: string): string {
+  return text.replace(LANGUAGE_DIRECTIVE, "");
+}
 const PROBE_QUESTION = "Reply exactly: OK";
 
 /**
@@ -245,7 +325,10 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   const contractId = readFramedMaterial(wirePacket(chat)).contractId;
   if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
   if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
-  const instruction = (messages[0]?.content ?? "").replace(LANGUAGE_DIRECTIVE, "");
+  // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
+  if ((Object.values(MAP_CONTRACT_IDS) as string[]).includes(contractId)) return "MAP";
+  if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
+  const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
   if (instruction.includes("edge_bearings")) return "REVIEW";
@@ -356,6 +439,8 @@ export async function startPreviewGateStubs(input: Readonly<{
       case "JUDGE": return stubJudgement(STUB_PROSE[language].point(served), language);
       case "EVALUATOR": return STUB_EVALUATOR_SATISFIED;
       case "COMPOSE": return stubComposition(language);
+      case "MAP": return stubMapContent(chat, served);
+      case "QUESTION_LANGUAGE": return stubQuestionLanguageContent(chat);
       default: return null;
     }
   };

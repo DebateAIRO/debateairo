@@ -1,12 +1,16 @@
 import {
   ContractHttpError,
   createContractClient,
+  DepthParamsSchema,
   PLAN_TIERS,
   type Answer,
   type ArgumentLanguage,
   type AskRequest,
   type ContractClient,
-  type RunProjection
+  type DepthParams,
+  type QuestionLanguageChoice,
+  type RunProjection,
+  type SiteLanguage
 } from "@debateai/contract";
 import type {
   DebateAdaptiveDepthApprovalRequest,
@@ -20,6 +24,8 @@ import type {
   WorkerStatus
 } from "./types.js";
 import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
+import { QuestionLanguageChoiceNeededError } from "./v3/requestFailure.js";
+import { readAnswerMapView, type AnswerMapViewRead } from "./v3/mapView.js";
 import { isModelStrength } from "./modelStrength.js";
 import {
   adaptiveDepthUnavailable,
@@ -138,7 +144,7 @@ export async function validateSession(client: ContractClient = contractClient): 
  * the answer: a components-only answer's record, and nothing for any other.
  */
 export type DebateBundle =
-  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null; floorRead: AnswerFloorRead }
+  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null; floorRead: AnswerFloorRead; mapViewRead?: AnswerMapViewRead }
   | { kind: "loading"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null }
   | { kind: "failed"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null };
 
@@ -157,15 +163,18 @@ async function servedDebateBundle(
   answer: Answer,
   catalog: MessageCatalog,
   run: RunProjection | null,
-  client: Pick<ContractClient, "readAnswerDisclosure">
+  client: Pick<ContractClient, "readAnswerDisclosure" | "readAnswerMapView">
 ): Promise<DebateBundle> {
+  // The floor and the map view (debate shape P2c) both need only the answer: one round trip.
+  const [floorRead, mapViewRead] = await Promise.all([readAnswerFloor(client, answer), readAnswerMapView(client, answer)]);
   return {
     kind: "served",
     answer,
     detail: debateDetailFromAnswer(answer, catalog),
     run: null,
     questionLanguage: run?.argument_language ?? null,
-    floorRead: await readAnswerFloor(client, answer)
+    floorRead,
+    mapViewRead
   };
 }
 
@@ -417,6 +426,34 @@ function optionalModelStrength(config: AskConfig): AskRequest["model_strength"] 
 }
 
 /**
+ * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length ride beside
+ * the depth in `depth_params`, each only when the page chose it. A missing one means the API's
+ * default, so older callers keep working. The contract's own field schema decides what is
+ * valid, so the page never restates the choices.
+ */
+function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength">(
+  config: AskConfig,
+  configKey: "depth_mode" | "scrutiny" | "answer_length",
+  key: K
+): Partial<Pick<DepthParams, K>> {
+  const value = config[configKey];
+  if (value === undefined || value === null) return {};
+  const parsed = DepthParamsSchema.shape[key].safeParse(value);
+  if (!parsed.success || parsed.data === undefined) {
+    throw new Error(`ASK_FIELD_REQUIRED: ${configKey} must be one of the offered choices when supplied.`);
+  }
+  return { [key]: parsed.data } as Partial<Pick<DepthParams, K>>;
+}
+
+/**
+ * Question language (spec 2026-10-13): the server found a real mix and offers a one-language version
+ * (`QuestionLanguageChoiceNeededError`), or refuses a stale answer to an offer with a 409
+ * (`isQuestionLanguageCheckStale`). Both live in `./v3/requestFailure.ts` so a page can read them
+ * without this module; they are re-exported here as the ask's own outcomes.
+ */
+export { isQuestionLanguageCheckStale, QuestionLanguageChoiceNeededError } from "./v3/requestFailure.js";
+
+/**
  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
  * contract value is explicit input — no hidden defaults, no invented
  * numbers). Missing or malformed fields fail loudly before any network call.
@@ -425,7 +462,12 @@ export async function createDebate(
   topic: string,
   config: AskConfig,
   token: string,
-  client: ContractClient = contractClient
+  client: ContractClient = contractClient,
+  /**
+   * Question language (spec 2026-10-13): the page's language, and the person's answer to an offer
+   * when there is one. Absent, the ask is today's ask, sent by today's call.
+   */
+  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>
 ): Promise<{ id: string }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -448,14 +490,26 @@ export async function createDebate(
     tier_source: tierSource,
     tier_provenance_ref: tierProvenanceRef,
     composition_budget_tier: budgetTier as AskRequest["composition_budget_tier"],
-    depth_params: { depth: requiredInteger(config, "depth", 0) },
+    depth_params: {
+      depth: requiredInteger(config, "depth", 0),
+      ...optionalDepthChoice(config, "depth_mode", "depthMode"),
+      ...optionalDepthChoice(config, "scrutiny", "scrutiny"),
+      ...optionalDepthChoice(config, "answer_length", "answerLength")
+    },
     decision_scope: requiredString(config, "decision_scope"),
     as_of: asOf.toISOString(),
     steering_presets: optionalLines(config, "steering_presets"),
     steering_annotations: optionalLines(config, "steering_annotations"),
-    ...(modelStrength === undefined ? {} : { model_strength: modelStrength })
+    ...(modelStrength === undefined ? {} : { model_strength: modelStrength }),
+    ...(language === undefined ? {} : { site_language: language.siteLanguage }),
+    ...(language?.choice === undefined ? {} : { question_language_choice: language.choice })
   };
   requireToken(token);
-  const accepted = await client.submitAsk(ask);
-  return { id: accepted.run_ref };
+  if (language === undefined) {                                   // today's call, unchanged
+    const accepted = await client.submitAsk(ask);
+    return { id: accepted.run_ref };
+  }
+  const outcome = await client.submitAskOrLanguageChoice(ask);
+  if (outcome.kind === "LANGUAGE_CHOICE_NEEDED") throw new QuestionLanguageChoiceNeededError(outcome.offer);
+  return { id: outcome.accepted.run_ref };
 }

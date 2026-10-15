@@ -47,10 +47,22 @@ const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INN
  */
 const MODEL_JSON_SHAPE_REPAIRS = Object.freeze(["NESTED_FIELDS", "RENAMED_MEMBER", "UNASKED_KEYS", "EMPTY_LIST"] as const);
 /**
- * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's six decode repairs and
- * the judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`).
+ * The map's SALVAGE repairs (`packages/map/src/salvage.ts`, ruling MAP-SALVAGE 2026-10-14), each made by the map's own
+ * reader before any follow-up call, on a decoded reply, and accepted only when the salvaged reply then passes the step's
+ * full schema and content check:
+ *  · MAP_TEXT_TRIMMED: a too long INTERNAL text (an angle's label or focus, a point's why_it_matters, a framing
+ *    challenge) cut at its last word boundary within the limit; a text that can reach a reader is never cut;
+ *  · MAP_LEANS_DEFAULTED: a point's missing or unknown `leans` read as "context";
+ *  · MAP_IDS_DROPPED: a choose answer's key point ids that are unknown, repeated, or on both of its sides dropped.
+ * `decodeModelJson` never makes them: it does not know any schema.
  */
-export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | typeof MODEL_JSON_SHAPE_REPAIRS[number];
+const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED"] as const);
+export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
+/**
+ * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's six decode repairs, the
+ * judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`) and the map's salvage repairs (`MAP_REPLY_SALVAGE_REPAIRS`).
+ */
+export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | typeof MODEL_JSON_SHAPE_REPAIRS[number] | MapReplySalvageRepair;
 
 export type ModelJsonDecoded =
   | { readonly ok: true; readonly value: unknown; readonly repair: typeof MODEL_JSON_REPAIRS[number] | null }

@@ -7,6 +7,7 @@ import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/cont
 import { RunRepository } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
+import { debateShapePolicyStartValues } from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
 import {
   AskAlreadyWaitingError,
@@ -81,6 +82,7 @@ function arrange(input: {
   readonly failAt?: Step;
   readonly precheck?: () => Promise<void>;
   readonly withoutRoom?: Partial<RunCreationSettings>;
+  readonly extra?: Partial<RunCreationSettings>;
 } = {}) {
   const order: string[] = [];
   const recorded: unknown[] = [];
@@ -147,7 +149,8 @@ function arrange(input: {
     resolveRisk: (askerRiskTier, tierSource, tierProvenanceRef) => ({
       effectiveRiskTier: askerRiskTier, tierSource: tierSource as never, tierProvenanceRef
     }),
-    ...(input.withoutRoom === undefined ? { room } : input.withoutRoom)
+    ...(input.withoutRoom === undefined ? { room } : input.withoutRoom),
+    ...input.extra
   };
   const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
   const application = new PostgresAskApplication(
@@ -266,6 +269,20 @@ describe("B6b an ask with a room", () => {
 
   it("refuses an unknown plan tier before the room is asked", async () => {
     const { submit, order } = arrange();
+    const refusal = await submit({ ...ask, plan_tier: "gold" } as unknown as AskRequest).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(AskRefusal);
+    expect(refusal).toMatchObject({ code: "ASK_PLAN_TIER_INVALID" });
+    expect(order).toEqual([]);
+  });
+
+  // Debate shape (P2a): the plan key is derived from the tier inside submit; an unknown tier must still meet today's
+  // typed refusal first — with the shape row absent and present, with and without a room — never a raw TypeError.
+  it.each([
+    ["a room, the row present", { extra: { debateShapePolicy: debateShapePolicyStartValues() } }],
+    ["no room, the row absent", { withoutRoom: {} }],
+    ["no room, the row present", { withoutRoom: {}, extra: { debateShapePolicy: debateShapePolicyStartValues() } }]
+  ] as const)("refuses an unknown plan tier with today's typed refusal (%s)", async (_label, options) => {
+    const { submit, order } = arrange(options);
     const refusal = await submit({ ...ask, plan_tier: "gold" } as unknown as AskRequest).then(() => null, (error: unknown) => error);
     expect(refusal).toBeInstanceOf(AskRefusal);
     expect(refusal).toMatchObject({ code: "ASK_PLAN_TIER_INVALID" });

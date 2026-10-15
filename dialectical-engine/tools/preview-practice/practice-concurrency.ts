@@ -97,7 +97,7 @@ export type PracticeJobRetry = Readonly<{ retryAfterMs: number }>;
 export type PracticePreparedJob = (() => Promise<PracticeJobRetry | void>) | null;
 
 /** Waits `milliseconds`, or less when the signal aborts (an interrupt cancels a wait at once). */
-async function abortableWait(sleep: (milliseconds: number) => Promise<void>, milliseconds: number, signal?: AbortSignal): Promise<void> {
+export async function abortableWait(sleep: (milliseconds: number) => Promise<void>, milliseconds: number, signal?: AbortSignal): Promise<void> {
   if (signal === undefined) { await sleep(milliseconds); return; }
   if (signal.aborted) return;
   let onAbort = () => undefined as void;

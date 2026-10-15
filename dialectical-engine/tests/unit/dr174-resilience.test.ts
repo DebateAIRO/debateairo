@@ -63,8 +63,9 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     // with the replies' and cross-exchanges' (`chains`).
     expect(source).toMatch(/const rootCallSiteKey = \(rootIndex: number\): string =>\s*rootIndex === 1 \? "JUDGE:root:secondary" : `JUDGE:root:\$\{String\(rootIndex\)\}`;/);
     expect(source).toMatch(/const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object\.freeze\(\{\s*parentNodeId: null,/);
-    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input, \(statement\) => statements\[rootIndex\]!\.resolve\(statement\)\);/);
-    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < effectiveMakerCount; rootIndex \+= 1\) \{\s*chains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
+    expect(source).toMatch(/const input: AuthorPositionInput = \{[\s\S]*?callSiteKey: rootCallSiteKey\(rootIndex\),[\s\S]*?\.\.\.ROOT_SAVE,[\s\S]*?authoredRoot = await authorAndPanel\(input, \(statement, maker\) => \{\s*answeredMakers\[rootIndex\] = maker;\s*statements\[rootIndex\]!\.resolve\(statement\);\s*\}\);/);
+    // Debate shape (plan Task 13): one chain per ROOT — the shape's P, or today's one per maker (`rootCount`).
+    expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < rootCount; rootIndex \+= 1\) \{\s*chains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
     expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });
@@ -399,7 +400,7 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
     // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
     // Model scorecard A16: 37 -> 38 (BACKUP-MODEL-USED, minted mid-list beside
     // DEGRADED-DIVERSITY); the tail below is still read and still unchanged.
-    expect(CONDITION_MARKS).toHaveLength(38);
+    expect(CONDITION_MARKS).toHaveLength(46);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

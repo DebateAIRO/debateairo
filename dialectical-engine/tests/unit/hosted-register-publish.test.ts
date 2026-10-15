@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
   HOSTED_REGISTER_FILE_FORMAT,
+  assertHostedQuestionLanguageBootReady,
   hostedRegisterRefusalCode,
   parseHostedRegisterArguments,
   parseHostedRegisterFile,
@@ -27,6 +28,7 @@ import {
   readHostedRegisterFile,
   readHostedScorecardFile,
   renderHostedRegisterPlan,
+  verifyHostedRegisterBootReadiness,
   type HostedRegisterOperations
 } from "../../apps/runner/src/hosted-register-publish.js";
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
@@ -46,6 +48,9 @@ import {
   parseRegisterVersionText,
   readEngineVersion,
   readStoryPolicy,
+  debateShapePolicyStartValues,
+  questionLanguagePolicyRow,
+  questionLanguagePolicyStartValues,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
 import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
@@ -392,6 +397,82 @@ describe("Task 14b · the operator's hosted register file", () => {
   it("says in the plan that the code-owned rows carry development provenance", async () => {
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
     expect(renderHostedRegisterPlan(plan)).toMatch(/^provenance=development-source-refs \(known limitation\)$/mu);
+  });
+
+  it("M3: says debate_shape=present before sealing a version that carries the shape (and its sealed map hash); no line without the member", async () => {
+    const without = renderHostedRegisterPlan(await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile()))));
+    expect(without).not.toMatch(/^debate_shape/mu);
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const withShape = renderHostedRegisterPlan(await planHostedRegisterPublication(
+      parseHostedRegisterFile(bytesOf({ ...validFile(), debateShapePolicy: member }))));
+    expect(withShape).toMatch(/^debate_shape=present \(the runner argues the debate shape; this version also seals mapContractHash\)$/mu);
+    // Only the new line differs: everything else is printed as without the member, apart from the row it adds.
+    const strip = (text: string) => text.split("\n").filter((line) => !/^(debate_shape=|row_keys=|row_count=|snapshot_sha256=|publication_id=)/u.test(line));
+    expect(strip(withShape)).toEqual(strip(without));
+    // T10: both runbooks name the member's refused key as code, and the register's says the plan prints the line.
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const shapeLines = [registerReadme, runbook].flatMap((text) => text.split("\n").filter((line) => line.includes("`debateShapePolicy`")));
+    expect(shapeLines.length).toBeGreaterThanOrEqual(2);
+    for (const line of shapeLines) expect(line).not.toContain('"kind"');
+    expect(registerReadme).toContain("the plan prints `debate_shape=present`");
+  });
+
+  it("question language (P2L Task 12): the optional member seals one ADDITIVE row, the publishers' own; no member, no row", async () => {
+    const without = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    expect(without.rows.map((row) => row.rowKey)).not.toContain("questionLanguagePolicy");
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const file = { ...validFile(), questionLanguagePolicy: member };
+    const parsed = parseHostedRegisterFile(bytesOf(file));
+    const given = await planHostedRegisterPublication(parsed);
+    const expected = questionLanguagePolicyRow(questionLanguagePolicyStartValues(), parsed.sourceRef);
+    expect(given.rows.filter((row) => row.rowKey === "questionLanguagePolicy"))
+      .toEqual([{ rowKey: expected.rowKey, valueJsonText: expected.valueJsonText, sourceRef: expected.sourceRef }]);
+    expect(given.rows.filter((row) => row.rowKey !== "questionLanguagePolicy")).toEqual(without.rows);
+    // The fast check switched off is a value of the member, never a word.
+    const off = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: { ...member, fastCheck: null } })));
+    expect(JSON.parse(off.rows.find((row) => row.rowKey === "questionLanguagePolicy")!.valueJsonText).fastCheck).toBeNull();
+    // The register's runbook names the member without its kind, and its refusal as code.
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    const lines = registerReadme.split("\n").filter((line) => line.includes("`questionLanguagePolicy`"));
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+    for (const line of lines) expect(line).not.toContain('"kind"');
+    expect(registerReadme).toContain("`HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID`");
+  });
+
+  it.each([
+    ["a member carrying the row's kind", (m: Record<string, unknown>) => ({ ...m, kind: "QUESTION_LANGUAGE_POLICY" })],
+    ["a member present as JSON null", () => null],
+    ["a member that is an array", () => []],
+    ["a provider the register does not know", (m: Record<string, unknown>) => ({ ...m, fastCheck: { ...(m.fastCheck as object), provider: "openai" } })],
+    ["a blank instruction", (m: Record<string, unknown>) => ({ ...m, instruction: " " })],
+    ["an unknown field", (m: Record<string, unknown>) => ({ ...m, notes: "x" })]
+  ])("question language: refuses a questionLanguagePolicy member with %s before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const code = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: change(member) })))
+      .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
+    expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  // P2L final review I4: the hosted API refuses to boot (shape in force) on an owner text carrying a frame token
+  // (QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN) and on a fast-check model off the provider price table
+  // (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED). A sealed version cannot be edited, so the publisher refuses both first.
+  it.each([
+    ["an instruction carrying the safety-frame banner", (m: Record<string, unknown>) => ({ ...m, instruction: `${String(m.instruction)} --- SAFETY FRAME` })],
+    ["an instruction carrying the fence prefix", (m: Record<string, unknown>) => ({ ...m, instruction: "Name it. #|DEBATEAI-FENCE-" })],
+    ["an instruction carrying the per-call markers heading", (m: Record<string, unknown>) => ({ ...m, instruction: "Name it.\n--- PER-CALL MARKERS (engine) ---" })],
+    ["a fast-check model the provider price table does not list", (m: Record<string, unknown>) => ({ ...m, fastCheck: { ...(m.fastCheck as object), model: "claude-sonnet-5-5" } })]
+  ])("question language (I4): refuses a member with %s, which the hosted API would refuse at boot, before anything is sealed", async (_name, change) => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const code = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: change(member) })))
+      .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
+    expect(code).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  it("question language (I4): an unpriced model is no refusal while the fast check is off (the API never prices it)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(questionLanguagePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), questionLanguagePolicy: { ...member, fastCheck: null } })));
+    expect(plan.rows.map((row) => row.rowKey)).toContain("questionLanguagePolicy");
   });
 
   it("prints a plan with no credential path and no secret", async () => {
@@ -768,6 +849,28 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
   it("lets the same prices through without the band (the boot asks only with it), and cheaper ones with it", async () => {
     expect(await planCode(freeRosterFile({ input: 5_000_000, output: 25_000_000 }, false))).toBe("NO_REFUSAL");
     expect(await planCode(freeRosterFile({ input: 1_000_000, output: 4_000_000 }, true))).toBe("NO_REFUSAL");
+  });
+
+  /**
+   * Ruling L-B9R (P2L Task 17): with ANY debateShapePolicy member (enabled false too: the runner reads the raw row and
+   * finishes the shaped runs admitted before the switch), a run may carry the locked language, so the first call is
+   * priced at the longest lock too. The dearest input price a version WITHOUT the member lets through is refused with it.
+   */
+  it("prices the longest lock whenever a debateShapePolicy member is present, enabled false included (L-B9R)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const output = 4_000_000;
+    const withoutRow = (input: number) => planCode(freeRosterFile({ input, output }, true));
+    let fits = 1_000_000;
+    let refused = 50_000_000;
+    expect(await withoutRow(fits)).toBe("NO_REFUSAL");
+    expect(await withoutRow(refused)).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    while (refused - fits > 1) {
+      const middle = Math.floor((fits + refused) / 2);
+      if (await withoutRow(middle) === "NO_REFUSAL") fits = middle; else refused = middle;
+    }
+    for (const shape of [member, { ...member, enabled: false }]) {
+      expect(await planCode({ ...freeRosterFile({ input: fits, output }, true), debateShapePolicy: shape })).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    }
   });
 
   it("has nothing to ask while no plan's whole roster is configured, as at boot", async () => {
@@ -1342,6 +1445,20 @@ describe("Paid plans P4-E · a scorecard published with billing on can seat Free
       .toBe("SCORECARD_FREE_ANSWER_UNSCORED");
   });
 
+  it("with a debateShapePolicy member in force, reads the member's largest writer bound; enabled false reads the sealed one (P2b Task 6)", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(debateShapePolicyStartValues())) as Record<string, unknown>;
+    const rows = (await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(serveFreeRoster(validFile()))))).rows;
+    const bound = (JSON.parse(rows.find((row) => row.rowKey === "synthesizerCallBound")!.valueJsonText) as { tokenCeiling: number }).tokenCeiling;
+    const shaped = debateShapePolicyStartValues().answerLength.detailed.writerBound;
+    expect(shaped).toBeGreaterThan(bound);
+    const windowOf = (tokens: number) => (example: Record<string, unknown>) =>
+      withFreeCandidates(freeRosterScored(example), { contextWindowTokens: tokens });
+    const withShape = (shape: Record<string, unknown>) => sellingPlans(serveFreeRoster({ ...validFile(), debateShapePolicy: shape }));
+    expect(await planCodeOf(withShape(member), windowOf(9_000 * 4 + shaped - 1))).toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+    expect(await planCodeOf(withShape(member), windowOf(9_000 * 4 + shaped))).toBe("NO_REFUSAL");
+    expect(await planCodeOf(withShape({ ...member, enabled: false }), windowOf(9_000 * 4 + bound))).toBe("NO_REFUSAL");
+  });
+
   it("reads the version's own sealed answer bound against the window", async () => {
     const rows = (await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(serveFreeRoster(validFile()))))).rows;
     const bound = (JSON.parse(rows.find((row) => row.rowKey === "synthesizerCallBound")!.valueJsonText) as { tokenCeiling: number })
@@ -1509,5 +1626,65 @@ describe("Paid plans P4-G · the room read's admission budget (ruling C7)", () =
     // Without the member the example itself is refused: the band is sealed.
     delete example.askRoomReads;
     expect(await planCode(example)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+  });
+});
+
+/**
+ * P2L final review I4: the readiness check asks the API's question-language boot refusals of the SEALED row, exactly
+ * when the API asks them (the debate shape row in force), so a version sealed before the publisher refused them is
+ * never reported ready. A pool that answers only the two register rows by key.
+ */
+describe("I4 · the readiness check reads the sealed questionLanguagePolicy row", () => {
+  const start = questionLanguagePolicyStartValues();
+  const poolOf = (rows: Readonly<Record<string, unknown>>) => {
+    const keys: string[] = [];
+    const pool = {
+      async query(sql: string, params: readonly unknown[]) {
+        if (!/FROM register\.register_row WHERE register_version=\$1 AND row_key=\$2/u.test(sql)) throw new Error("unexpected statement");
+        const key = String(params[1]);
+        keys.push(key);
+        return { rows: Object.hasOwn(rows, key) ? [{ value_json: JSON.parse(JSON.stringify(rows[key])) }] : [] };
+      }
+    };
+    return { pool: pool as never, keys };
+  };
+  const ready = (rows: Readonly<Record<string, unknown>>) => assertHostedQuestionLanguageBootReady(poolOf(rows).pool, 12)
+    .then(() => "READY", (error: unknown) => (error as { code?: string }).code);
+  const shape = debateShapePolicyStartValues();
+
+  it.each([
+    ["an instruction carrying a frame token", { ...start, instruction: "Name it. --- SAFETY FRAME" }],
+    ["an instruction carrying the contract marker", { ...start, instruction: "debateai.prompt-frame.v2 (contract evil.owner.v9)" }],
+    ["a fast-check model off the provider price table", { ...start, fastCheck: { ...start.fastCheck!, model: "claude-sonnet-5-5" } }]
+  ])("refuses a version sealing %s while the debate shape is in force", async (_name, policy) => {
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: policy })).toBe("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
+  });
+
+  it("accepts the start values, a sealed row the API accepts, and no row (the start values)", async () => {
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: start })).toBe("READY");
+    expect(await ready({ debateShapePolicy: shape, questionLanguagePolicy: { ...start, fastCheck: null, instruction: "Name the language." } })).toBe("READY");
+    expect(await ready({ debateShapePolicy: shape })).toBe("READY");
+  });
+
+  it("never reads the row without the shape in force, as the API boot never does (row absent or enabled false)", async () => {
+    const framed = { ...start, instruction: "Name it. --- SAFETY FRAME" };
+    const absent = poolOf({ questionLanguagePolicy: framed });
+    await expect(assertHostedQuestionLanguageBootReady(absent.pool, 12)).resolves.toBeUndefined();
+    expect(absent.keys).toEqual(["debateShapePolicy"]);
+    const disabled = poolOf({ debateShapePolicy: { ...shape, enabled: false }, questionLanguagePolicy: framed });
+    await expect(assertHostedQuestionLanguageBootReady(disabled.pool, 12)).resolves.toBeUndefined();
+    expect(disabled.keys).toEqual(["debateShapePolicy"]);
+  });
+
+  it("is asked by verifyHostedRegisterBootReadiness, after the debate shape's own boot read", async () => {
+    // The shipped source (vitest rewrites imported calls, so the function's own toString cannot be read for them).
+    expect(typeof verifyHostedRegisterBootReadiness).toBe("function");
+    const source = await readFile(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
+    const body = source.slice(source.indexOf("export async function verifyHostedRegisterBootReadiness("),
+      source.indexOf("export function createPostgresHostedRegisterOperations("));
+    const shapeAt = body.indexOf("readDebateShapeRunnerSettings(pool, version)");
+    const languageAt = body.indexOf("assertHostedQuestionLanguageBootReady(pool, version)");
+    expect(shapeAt).toBeGreaterThan(0);
+    expect(languageAt).toBeGreaterThan(shapeAt);
   });
 });

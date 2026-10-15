@@ -9,6 +9,7 @@ import {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
   StoryCheckerVerdictSchema,
+  assembleStoryCheckerInstruction,
   assembleStorytellerInstruction,
   buildStoryMaterial,
   loadStoryPack,
@@ -78,6 +79,8 @@ function writePack(files: PackFiles = {}): string {
     "pack.json": manifest(),
     "common.md": "Common instructions.\n",
     "checker.md": "Checker instructions.\n",
+    "common-map.md": "Common map instructions.\n",
+    "checker-map.md": "Checker map instructions.\n",
     "shapes/alpha.md": shapeText({ id: "alpha" }),
     "shapes/beta.md": shapeText({ id: "beta" }),
     ...files
@@ -114,6 +117,9 @@ const tooBigInstruction: PackFiles = {
 const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles])[] = [
   ["FILE_MISSING", "checker.md is absent", { "checker.md": null }],
   ["FILE_MISSING", "a listed shape has no file", { "shapes/beta.md": null }],
+  // Ruling W-STORY: the map passages are their own files, required like common.md and checker.md.
+  ["FILE_MISSING", "common-map.md is absent", { "common-map.md": null }],
+  ["FILE_MISSING", "checker-map.md is absent", { "checker-map.md": null }],
   ["FILE_TOO_LARGE", "a file is over the file limit (24 KB)", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
   ["NOT_UTF8", "a file is not UTF-8", { "common.md": Uint8Array.from([0x43, 0xff, 0xfe, 0x0a]) }],
   ["CONTROL_CHARACTER", "a file holds a bell character", { "checker.md": "Checker\u0007 instructions.\n" }],
@@ -132,6 +138,7 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   ["ID_DUPLICATE", "a shape is listed twice", { "pack.json": manifest({ shapes: ["alpha", "alpha"] }) }],
   ["DEFAULT_SHAPE_MISSING", "the default is not listed", { "pack.json": manifest({ default_shape: "gamma" }) }],
   ["TEXT_EMPTY", "common.md is blank", { "common.md": "  \n\n" }],
+  ["TEXT_EMPTY", "checker-map.md is blank", { "checker-map.md": "\n" }],
   ["TEXT_EMPTY", "a shape has no guidance", { "shapes/beta.md": shapeText({ id: "beta", guidance: "" }) }],
   ["FRONT_MATTER_INVALID", "a shape has no front matter", { "shapes/alpha.md": "Just guidance.\n" }],
   ["FRONT_MATTER_INVALID", "a shape has no title", {
@@ -174,7 +181,9 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   }],
   ["INSTRUCTION_TOO_LARGE", "the assembled instruction is over 48 KB", tooBigInstruction],
   ["RESERVED_TOKEN", "common.md carries the frame's banner", { "common.md": "--- SAFETY FRAME pasted here\n" }],
-  ["RESERVED_TOKEN", "checker.md carries a canary-shaped token", { "checker.md": "Watch for DBAI-CANARY-0123 here.\n" }]
+  ["RESERVED_TOKEN", "checker.md carries a canary-shaped token", { "checker.md": "Watch for DBAI-CANARY-0123 here.\n" }],
+  ["RESERVED_TOKEN", "common-map.md carries the frame's banner", { "common-map.md": "--- SAFETY FRAME pasted here\n" }],
+  ["RESERVED_TOKEN", "checker-map.md carries a canary-shaped token", { "checker-map.md": "Watch for DBAI-CANARY-0123 here.\n" }]
 ];
 
 describe("verdict story — the shape pack is refused whole, under the rule it broke", () => {
@@ -246,17 +255,23 @@ describe("verdict story — the shipped pack", () => {
           nodeId: "p", claim: "Yes.", isPosition: true, wayOfKnowing: "REASONING", baseScore: 0.8, finalStrength: 0.8,
           excludedReason: null, authorModel: null, panelDispersion: null, criticSummary: null
         }],
-        arrows: [], sensitivity: [], setAside: []
+        arrows: [], sensitivity: [], setAside: [],
+        // Debate shape P2c: the snapshot ranks by raisedBy; the material carries the claims only (ruling C-ORDER).
+        alsoRaised: [{ claim: "Ask the school about a mid-year move.", raisedBy: 2 }],
+        answersNote: "MAP_UNAVAILABLE"
       },
       enrichment: new Map(), budgetBytes: 40_000, shapeIds: new Set(["general"])
     })).material, "prior").map((field) => field.name);
     expect(material).toContain("prior_objection");
+    expect(material).toEqual(expect.arrayContaining(["also_raised", "answers_note"]));
     const short = Object.keys(StoryBodySchema.shape.short.shape).map((member) => `short.${member}`);
     for (const name of [
       ...material, ...short, "why.reasons", "long.sections", "reviewer_note", "node_refs", "position_ref",
       ...StoryFateSchema.options, "high_cut", "low_cut", "confidence_band"
     ]) {
-      expect([name, pack.common.includes(name) || pack.common.includes(name.split(".").at(-1)!)]).toEqual([name, true]);
+      // Ruling W-STORY: also_raised and answers_note are explained in common-map.md, sent with them.
+      const told = `${pack.common}\n${pack.commonMap}`;
+      expect([name, told.includes(name) || told.includes(name.split(".").at(-1)!)]).toEqual([name, true]);
     }
   });
 
@@ -265,6 +280,32 @@ describe("verdict story — the shipped pack", () => {
       expect([criterion, pack.checker.includes(criterion)]).toEqual([criterion, true]);
     }
     expect(pack.checker).toContain("candidate_story");
+  });
+
+  /**
+   * Debate shape P2c. Controller ruling C-ORDER: also_raised reaches the storyteller and the checker as claims in
+   * order, most-raised first, with no count, so the pack names no raised_by and both files say the story never
+   * states how many AIs raised a point (the checker refuses a story that does). Owner ruling C-STORY (pre-flight
+   * PF-C6): answers_note is one plain sentence the story retells once, in its own words.
+   */
+  it("tells the checker about the points raised but not debated, and the answers note (debate shape P2c)", () => {
+    // Ruling W-STORY (whole-branch review I-1): the passages live in common-map.md and checker-map.md, sent only
+    // with a material that carries the fields; common.md and checker.md stay origin/dev's and never name them.
+    expect(pack.checkerMap).toContain("also_raised");
+    expect(pack.checkerMap).toContain("answers_note");
+    for (const text of [pack.commonMap, pack.checkerMap]) {
+      expect(text).not.toContain("raised_by");
+      expect(text).toContain("most-raised first");
+      expect(text).toContain("with no count");
+    }
+    for (const text of [pack.common, pack.checker]) {
+      expect(text).not.toContain("also_raised");
+      expect(text).not.toContain("answers_note");
+    }
+    expect(pack.commonMap).toContain("never say who raised it or how many did");
+    expect(pack.checkerMap).toContain("never says who raised them or how many AIs did");
+    expect(pack.checkerMap).toContain("a story that states one is not faithful_to_material");
+    expect(pack.commonMap).toContain("## Also raised, not debated");
   });
 
   /**
@@ -422,6 +463,17 @@ describe("verdict story — the assembled instruction's layout", () => {
         "Guidance for beta."
       ].join("\n")
     ].join("\n\n"));
+  });
+
+  it("puts the map passages after the common text and before the shapes, only when asked (ruling W-STORY)", () => {
+    const pack = loadStoryPack(writePack());
+    const plain = assembleStorytellerInstruction(pack);
+    expect(assembleStorytellerInstruction(pack, true)).toBe(
+      plain.replace("Common instructions.\n\n", "Common instructions.\n\nCommon map instructions.\n\n")
+    );
+    expect(plain).not.toContain("Common map instructions.");
+    expect(assembleStoryCheckerInstruction(pack)).toBe("Checker instructions.");
+    expect(assembleStoryCheckerInstruction(pack, true)).toBe("Checker instructions.\n\nChecker map instructions.");
   });
 });
 

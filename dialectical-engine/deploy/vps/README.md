@@ -973,6 +973,60 @@ move: `composerContractHash` and `conformanceContractHash`. No migration, no new
 - **Rolling back** the code means pinning the register version the older code was running on again (the older code
   has no such check, and on the new version it would record its v2 prompts under the v3 fingerprints).
 
+### Upgrading to the debate shape
+
+This release adds the debate shape: before the debate, the AIs map the question (the points people raise and the
+answers worth arguing); then several answers are argued, each by a different AI, and the final answer has a set
+length. It adds two migrations: `migrations/0117_debate_shape_map.sql` (the three tables that keep each debate's map)
+and `migrations/0118_language_check_spend.sql` (the fast language check's cost, recorded as a site cost in the day's
+pot by its one writer, `ledger.record_language_check_spend`). They come after the mail language's
+`migrations/0116_mail_locale.sql`; `pnpm db:migrate` applies 0116 first if the host does not have it yet. It also adds new prompts, so two fingerprints move
+(`judgeContractHash` and `composerContractHash`) and a new one is sealed (`mapContractHash`). The shape itself stays
+off until a register version carries the `debateShapePolicy` member (`deploy/vps/register/README.md`); this upgrade
+only makes the hosts ready for it.
+
+The hosted fast language check (the short Claude Haiku call that settles a question's language before a debate
+starts) stays off until BOTH hold: 0118 is applied (the API checks at start that the writer exists and that its role
+may run it), and `SUPPORT_MODEL_TARGET_JSON` is the Anthropic Messages target (base URL exactly
+`https://api.anthropic.com/v1`), whose key it borrows. Until then the language is settled without it (the site
+language and the local detector), and the person is never blocked. It is also skipped, never blocking, while the
+day's site pot is at its ceiling or after the spend-record breaker latches (a refused grant, a missing writer or a check
+violation, or three failed records in a row: `api.question_language.spend_record_down` in the API log; a restart checks
+again). In 0118, the trigger `language_check_spend_writer_only` lets a `LANGUAGE_CHECK` row in only when the inserting
+role is the writer's owner (`debateai_staff_security_owner`): the check is by role, not by function. It holds because
+that role's other definer writers record only RUN or STORY rows; a future definer writer owned by that role must keep
+it so.
+
+Do these in this order, with the new checkout in place:
+
+1. **Apply the migrations (0117 and 0118, after 0116 if it is not applied yet).** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
+   §4 step 3 does, and close the window (§4 step 5).
+2. **Publish a new hosted register version** from the new checkout (`pnpm register:publish-hosted --file
+   /etc/debateai/register/hosted-register.json`, §11) and write the printed `REGISTER_VERSION=` line into both
+   `api.env` and `runner.env`. Nothing changes yet: the running units read the version only when they start.
+3. **Wait until no debate is queued or running.** Run the command from the verdict-story section above and wait
+   until `unfinished` is 0:
+
+   ```sh
+   sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created_at_seq) AS oldest, max(created_at_seq) AS newest FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+   ```
+
+   Why: the fingerprints are also the keys under which the runner finds a debate's earlier attempts. A debate still
+   running when they change no longer sees those attempts, so it may ask (and pay for) some calls again.
+4. **Restart the API and the runner together**, while `unfinished` is still 0:
+
+   ```sh
+   systemctl restart debateai-api debateai-runner
+   ```
+
+   The runner refuses to start on a register that does not carry the fingerprints of its own prompts
+   (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, `MAP_CONTRACT_HASH_MISMATCH`): if it does, the version pinned is not the
+   one published in step 2.
+
+**Rolling back** means the older checkout and the register version it was running on, pinned again in both files,
+and the same wait for `unfinished` at 0 before the restart. The migration's tables stay; the older code never reads
+them.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
@@ -1893,9 +1947,17 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
+| `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
+| `DEBATE_SHAPE_MAP_HASH_UNSEALED` | the version seals a `debateShapePolicy` row without its `mapContractHash` row (a hand-made version, or one sealed by an older publisher): the runner refuses to start on it, and the publish's boot check refuses it as `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED` after sealing (`HOSTED_REGISTER_NOT_BOOT_READY`): pin nothing; publish again from this code, whose plan seals `mapContractHash`. |
+| `MAP_CONTRACT_HASH_MISMATCH` / `MAP_CONTRACT_HASH_INVALID` | the version's sealed `mapContractHash` is not this runner's map prompts (a version published from other code), or is not a 64-character hex hash: the runner refuses to start, and the publish's boot check says so as `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`: pin nothing; deploy the runner that matches the version, or publish again from the deployed code. |
+| `DEBATE_SHAPE_RUNNER_UNCONFIGURED` | a run admitted with the debate shape was claimed by a runner without the shape settings (no sealed map hash, or no call scheduler): the run is refused. Restart the runner on the register version that seals the `debateShapePolicy` row (with `mapContractHash`), then ask again. |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
+
+**A malformed shaped unfinished receipt** — every preview ask is refused and the API logs `preview.estimate.refused`
+with "malformed debate shape": fail that run's job (its work item), which drops it from `PREVIEW_UNFINISHED_RUNS_SQL`;
+nothing else is needed.
 
 Before restarting anything on a new version, check that the newest version carries the four
 rows a hosted start-up refuses without:

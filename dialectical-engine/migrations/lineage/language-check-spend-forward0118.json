@@ -1,0 +1,17 @@
+{
+  "version": "language-check-spend-forward0118-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0117_debate_shape_map.sql",
+    "manifestSha256": "dec3fd0c71c92d8e6e4de720fe52a4abc56c34e30fbf7906531aa561a66c06f7",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0118_language_check_spend.sql",
+    "sha256": "a8247cecc4dda3a05ec580d5647b19b9de436090a5dc7d316e9b8f539febb2de"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

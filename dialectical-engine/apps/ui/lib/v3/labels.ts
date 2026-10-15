@@ -40,6 +40,14 @@ export function conditionMarkLabel(
     case "CRITIQUE-UNAVAILABLE": return t(catalog, "debateChrome.condition.critiqueUnavailable");
     case "PANEL-PARTIAL": return t(catalog, "debateChrome.condition.panelPartial");
     case "PANEL-DEGRADED-SINGLE-VOICE": return t(catalog, "debateChrome.condition.panelDegradedSingleVoice");
+    case "MAP_ANGLES_FALLBACK": return t(catalog, "debateChrome.condition.mapAnglesFallback");
+    case "MAP_MERGE_FALLBACK": return t(catalog, "debateChrome.condition.mapMergeFallback");
+    case "MAP_CHOOSE_FALLBACK": return t(catalog, "debateChrome.condition.mapChooseFallback");
+    case "MAP_UNAVAILABLE_TODAYS_OPENING": return t(catalog, "debateChrome.condition.mapUnavailable");
+    case "ANSWERS_FILLED": return t(catalog, "debateChrome.condition.answersFilled");
+    case "CHOOSE_QUOTA_FILLED": return t(catalog, "debateChrome.condition.chooseQuotaFilled");
+    case "PANEL-CLOSE-CALL-EXTENDED": return t(catalog, "debateChrome.condition.closeCallExtended");
+    case "SCRUTINY-EXTENDED": return t(catalog, "debateChrome.condition.scrutinyExtended");
     case "AMBIGUOUS_ATTRIBUTION": return t(catalog, "debateChrome.condition.ambiguousAttribution");
     case "STALE": return t(catalog, "debateChrome.condition.stale");
     case "UNDER-REVIEW": return t(catalog, "debateChrome.condition.underReview");

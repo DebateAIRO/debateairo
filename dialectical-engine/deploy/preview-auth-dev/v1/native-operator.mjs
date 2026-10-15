@@ -37,6 +37,31 @@ export function validateCallConcurrencyChoice(value) {
   perModelPerRunner:Object.fromEntries(['default',...vendors.filter(vendor=>vendor!=='default').sort()].map(vendor=>[vendor,runner[vendor]]))};
 }
 /**
+ * The operator's optional debate shape choice (publish-register-v2.ts buildPreviewSourceRowsV2's sixth argument;
+ * kit v3's buildPreviewSourceRowsV3 passes it through as its seventh, spec 2026-10-12 §3.1): the exact word 'off'
+ * (the row published disabled: the start values with enabled false, the preview's rollback) or one plain JSON object
+ * (the policy, with its kind). Shape only: the register's own parser checks the object in buildPreviewSourceRowsV2
+ * (DEBATE_SHAPE_POLICY_INVALID:<path>) before any row is built, for either kit. Like the checker choice, only plan and
+ * publish may carry it.
+ */
+export const DEBATE_SHAPE_OFF='off';
+export function validateDebateShapeChoice(value) {
+ if(value===DEBATE_SHAPE_OFF)return value;
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
+ * The operator's optional question-language choice (spec 2026-10-13, P2L Task 12): kit v2's seventh argument and kit
+ * v3's eighth. One plain JSON object (the policy, with its kind); there is no 'off' word: the owners switch the fast
+ * check off with `"fastCheck": null`. Shape only: the register's own parser checks the object in
+ * buildPreviewSourceRowsV2 (QUESTION_LANGUAGE_POLICY_INVALID:<path>) before any row is built, for either kit. Like the
+ * checker choice, only plan and publish may carry it.
+ */
+export function validateQuestionLanguageChoice(value) {
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
  * Sanity bounds on the owner's hosted-preview ceilings (publish-register-v3.ts PREVIEW_HOSTED_CEILING_BOUNDS; a unit
  * test pins the two equal). They catch a typed extra digit; the ceilings themselves are always the owner's inputs.
  */
@@ -62,8 +87,10 @@ export function validateNativePlan(plan) {
  const chosen=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'checkerChoice');
  const rotation=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'roleRotation');
  const concurrency=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'callConcurrency');
+ const shape=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'debateShape');
+ const language=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'questionLanguage');
  const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(hosted?['hostedBilling']:[])]);
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(hosted?['hostedBilling']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -75,7 +102,15 @@ export function validateNativePlan(plan) {
   validateCallConcurrencyChoice(plan.callConcurrency);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
- // Unlike the three choices above, every operation may carry it: once a hosted version is the base, verify and
+ if(shape){
+  validateDebateShapeChoice(plan.debateShape);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(language){
+  validateQuestionLanguageChoice(plan.questionLanguage);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ // Unlike the choices above, every operation may carry it: once a hosted version is the base, verify and
  // apply-and-plan compose with kit v3 too (kit v2 refuses a base with billing on).
  if(hosted)validateHostedBillingChoice(plan.hostedBilling);
  return plan;
@@ -110,8 +145,8 @@ export async function runNativeOperator() {
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null)
-   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null);
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});

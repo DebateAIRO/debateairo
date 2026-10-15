@@ -28,6 +28,7 @@ import { generateDek, kekId, loadKek } from "../../packages/crypto/src/index.js"
 import { installBootCustody } from "../../apps/api/src/boot-custody.js";
 import { composeAskModelPicker, type AskMoneyPolicy } from "../../apps/api/src/ask-model-picker.js";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import { debateShapeInForce, debateShapePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
 import { SCORECARD_PLAN_CAPS_INVALID } from "@debateai/scorecard";
 import { readExampleScorecardJson, TEST_ENGINE_VERSION } from "../support/scorecardFixtures.js";
 
@@ -105,6 +106,8 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
     billingEnabled?: boolean;
     /** Paid plans P4-E: the declared targets; omitted, none, exactly as before. */
     targets?: readonly ProviderDiscoveryTarget[];
+    /** Debate shape (P2b Task 6): the row in force main.ts passes; omitted, exactly as before. */
+    debateShapePolicy?: DebateShapePolicy | null;
   }>) {
     const logger = input.logger ?? bootLogger();
     const boot = installBootCustody({ logger });
@@ -120,6 +123,7 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
       perRunCeilingMicros: input.perRunCeilingMicros,
       ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
       ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),
+      ...(input.debateShapePolicy === undefined ? {} : { debateShapePolicy: input.debateShapePolicy }),
       log: (line) => lines.push(line),
       engineManifest: input.engineManifest ?? engineManifest,
       bundledScorecard
@@ -276,6 +280,23 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
         pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: FREE_ROSTER_TARGETS
       });
       expect((await settled).plansSold).toBe(true);
+    });
+
+    it("with a debate shape row in force, asks the row's largest writer bound; a disabled row asks the sealed one (P2b Task 6)", async () => {
+      const policy = debateShapePolicyStartValues();
+      // CALL_TOKEN_CEILINGS.synthesizer (4096) fits; the row's detailed writer bound (16,384) does not.
+      const targets = FREE_ROSTER_TARGETS.map((target) => ({ ...target, contextWindowTokens: 9_000 * 4 + CALL_TOKEN_CEILINGS.synthesizer }));
+      const scored = () => poolWithRow({ value_json: followingTheCapRules(freeRosterScored(scorecardJson(5))), source_ref: HOSTED_SOURCE_REF });
+      const run = (debateShapePolicy: DebateShapePolicy | null | undefined) => compose({
+        pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets,
+        ...(debateShapePolicy === undefined ? {} : { debateShapePolicy })
+      }).settled;
+      expect((await run(undefined)).plansSold).toBe(true);
+      await expect(run(policy)).rejects.toThrowError("SCORECARD_FREE_ANSWER_UNSCORED");
+      expect((await run(debateShapeInForce({ ...policy, enabled: false }))).plansSold).toBe(true);
+      const roomy = FREE_ROSTER_TARGETS.map((target) => ({ ...target, contextWindowTokens: 9_000 * 4 + policy.answerLength.detailed.writerBound }));
+      expect((await compose({ pool: scored(), deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: roomy,
+        debateShapePolicy: policy }).settled).plansSold).toBe(true);
     });
 
     it("keeps booting a scorecard that scores no Free-plan model with billing off, and in local mode", async () => {
