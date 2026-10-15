@@ -201,7 +201,9 @@ function schemaFailureMessage(error: z.ZodError): string {
 /**
  * How a step asks its reply to be read: which SHAPE repairs it allows. Each is tried only after a decoded object failed
  * the step's schema, each alone on the decoded object (one repair at most, in this order), and each is accepted only
- * when the repaired object passes the full schema; otherwise the original refusal stands.
+ * when the repaired object passes the full schema. LG-A: when none applies, a step with `fixer` then tries the
+ * schema-guided fixer (`fixReplyStructure`), which may make several repairs at once (STRUCTURE_FIXED); otherwise the
+ * original refusal stands.
  *  - `nestedFields`: NESTED_FIELDS (`nestedFieldsPlan`), the judge's author legs and panel;
  *  - `renamedMembers`: RENAMED_MEMBER (`renameMisnamedMember`), the judge's author legs and panel;
  *  - `unaskedKeys`: UNASKED_KEYS (`dropUnaskedKeys`), the judge's author legs, panel and review;
@@ -330,8 +332,11 @@ function renameMisnamedMember(decoded: unknown, shape: RootShape): Record<string
  * `"way_of_kooking"` the schema never asked for. UNASKED_KEYS: the root keys the schema does not name are dropped
  * (their names are the model's own text, so they are not copied into any message: DL4-F1); the caller accepts the
  * result only if every asked member is then present and valid. Root keys only. A root key named like a field asked for
- * INSIDE a member (a root `"fidelity"` beside `steelman.fidelity`) is never dropped: it may be a second, different value
- * for something that is scored, and which one the model meant is not known. Null when there is no droppable key.
+ * INSIDE a member (a root `"fidelity"` beside `steelman.fidelity`) is never dropped here: it may be a second, different
+ * value for something that is scored, and which one the model meant is not known. Null when there is no droppable key.
+ * LG-A: the fixer behind this repair (`StructuredReadingOptions.fixer`) drops such a key only when its value is a plain
+ * text under a name the schema declares as a text (never as a number, true/false or an enum), or an empty object, an
+ * empty list or null; a root `"fidelity"`, as a number or as text, stays refused.
  */
 function dropUnaskedKeys(decoded: unknown, shape: RootShape): Record<string, unknown> | null {
   const source = plainObject(decoded);
@@ -406,12 +411,14 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
   // LG-A: the fixer, last; the decode's own repairs first in the list.
   if (options.fixer !== undefined) {
     const fixed = fixReplyStructure(decoded, schema, options.fixer);
-    const repaired = fixed === null ? null : schema.safeParse(fixed.value);
-    if (repaired !== null && repaired.success) {
-      const decodeRepair = STRUCTURED_PARSE_REPAIRS[strategy];
-      const before = strategy === "SYNTAX_REPAIRED" ? decodeRepairs : decodeRepair === null ? [] : [decodeRepair];
-      return Object.freeze({ kind: "PARSED", strategy: "STRUCTURE_FIXED", value: repaired.data,
-        repairs: Object.freeze([...before, ...fixed!.repairs]) });
+    if (fixed !== null) {
+      const repaired = schema.safeParse(fixed.value);
+      if (repaired.success) {
+        const decodeRepair = STRUCTURED_PARSE_REPAIRS[strategy];
+        const before = strategy === "SYNTAX_REPAIRED" ? decodeRepairs : decodeRepair === null ? [] : [decodeRepair];
+        return Object.freeze({ kind: "PARSED", strategy: "STRUCTURE_FIXED", value: repaired.data,
+          repairs: Object.freeze([...before, ...fixed.repairs]) });
+      }
     }
   }
   return refused;

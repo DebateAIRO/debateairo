@@ -42,6 +42,16 @@ describe("LG-A: the judge's panel, legs and review read every reply through the 
     expect(classifyStructuredArtifact(noScore, judgeAssessmentSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("SCHEMA_FAILED");
   });
 
+  // (Task 5 review, finding 1) a score written as text under a name the schema declares only as a number is never dropped.
+  it("a text under a score's name stays refused: a root fidelity \"0.4\" beside steelman.fidelity, an evidence.fit \"0.2\"", () => {
+    const rootFidelity = JSON.stringify({ ...ASSESSMENT, fidelity: "0.4" });
+    expect(classifyStructuredArtifact(rootFidelity, judgeAssessmentSchema, STOP, JUDGE_ARTIFACT_READING))
+      .toEqual({ parseStatus: "SCHEMA_FAILED", parseError: "unrecognized_keys@$" });
+    const evidenceFit = JSON.stringify({ ...ASSESSMENT, evidence: { ...ASSESSMENT.evidence, fit: "0.2" } });
+    expect(classifyStructuredArtifact(evidenceFit, judgeAssessmentSchema, STOP, JUDGE_ARTIFACT_READING))
+      .toEqual({ parseStatus: "SCHEMA_FAILED", parseError: "unrecognized_keys@evidence" });
+  });
+
   // (pre-flight PF-A8, L34) the syntax pass's repair and a shape repair after it are both named, the decode's first.
   it("a trailing comma and a root key never asked for: TRAILING_COMMA then UNASKED_KEYS", () => {
     const sent = JSON.stringify({ ...ASSESSMENT, notes: "x" }).replace(/\}$/u, ",}");

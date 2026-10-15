@@ -10,10 +10,12 @@
  * ancestor's schema declares (it moves it to the nearest declaring ancestor whose slot is absent or null; with no free
  * slot the key stays where it is, so the schema still refuses, the fixer returns null and the structure-repair call keeps
  * the words; pre-flight PF-A12, ruling R3), drop a key the schema uses elsewhere unless its value carries nothing of the
- * AI's (contract deviation 8, widened at the Task 4 review: only a plain text under a name not declared as an enum, an
- * empty object, an empty list or null is dropped; a number, true/false, an enum value, or a non-empty object or list
- * such as `evidence.fatalFlags: [{…}]` may be a misplaced score, verdict or block of words, so it is kept and the reply
- * refused; pre-flight PF-A13; at the root as well as inside members, e.g. a root `fidelity` beside `steelman.fidelity`),
+ * AI's (contract deviation 8, widened at the Task 4 review and narrowed at the Task 5 review: only a plain text under a
+ * name the schema declares somewhere as a text and never as an enum, an empty object, an empty list or null is dropped;
+ * a number, true/false, an enum value, a text under a name declared only as a number, true/false or an enum (a score
+ * written as text, `fidelity: "0.4"`), or a non-empty object or list such as `evidence.fatalFlags: [{…}]` may be a
+ * misplaced score, verdict or block of words, so it is kept and the reply refused; pre-flight PF-A13; at the root as well
+ * as inside members, e.g. a root `fidelity` beside `steelman.fidelity`),
  * join paragraphs when one entry's reference list is not a list (its references would be lost), or touch `__proto__`,
  * `prototype` or `constructor`. A repair kind is named only when its member was really written back (L34).
  *
@@ -42,8 +44,9 @@ export type ReplyFixerRepair = ModelJsonStructureRepair | "UNASKED_KEYS";
  * `innerUnaskedKeys: false` keeps EVERY unknown key, at the root as well as inside members: it also turns off the root
  * UNASKED_KEYS drop (pre-flight PF-A15). `unnest: false` leaves a key an ancestor declares where it is (never dropped).
  * Whatever the switches, the fixer never drops a key an ancestor's schema declares (pre-flight PF-A12), nor, under a name
- * the schema uses somewhere, anything but a plain text (not under an enum name), an empty object, an empty list or null
- * (pre-flight PF-A13; contract deviation 8 as widened at the Task 4 review).
+ * the schema uses somewhere, anything but a plain text (under a name declared somewhere as a text, never as an enum), an
+ * empty object, an empty list or null (pre-flight PF-A13; contract deviation 8 as widened at the Task 4 review and
+ * narrowed at the Task 5 review).
  */
 export type ReplyFixerOptions = Readonly<{
   innerUnaskedKeys?: boolean; unnest?: boolean; wrap?: boolean; textForms?: boolean; paragraphs?: boolean; onlyValues?: boolean;
@@ -91,13 +94,17 @@ function schemaAt(schema: z.ZodType, path: Path): z.ZodType | null {
   return current;
 }
 
-/** The names the schema declares: every key any of its objects declares, at any level, and those declared as an enum. */
-type DeclaredNames = Readonly<{ keys: ReadonlySet<string>; enums: ReadonlySet<string> }>;
+/**
+ * The names the schema declares: every key any of its objects declares, at any level; those declared (somewhere) as an
+ * enum; and those declared (somewhere) as a text, a zod string under its wrappers (Task 5 review, finding 1).
+ */
+type DeclaredNames = Readonly<{ keys: ReadonlySet<string>; enums: ReadonlySet<string>; strings: ReadonlySet<string> }>;
 
-/** Every key any object of the schema declares, at any level; `enums`: the keys declared (somewhere) as an enum (pre-flight PF-A13). */
+/** Every key any object of the schema declares, at any level, with its enum and text names (pre-flight PF-A13). */
 function declaredNames(schema: z.ZodType): DeclaredNames {
   const keys = new Set<string>();
   const enums = new Set<string>();
+  const strings = new Set<string>();
   const seen = new Set<z.ZodType>();
   const visit = (node: z.ZodType): void => {
     const inner = unwrapped(node);
@@ -107,6 +114,7 @@ function declaredNames(schema: z.ZodType): DeclaredNames {
       for (const [key, member] of Object.entries(inner.shape as Readonly<Record<string, z.ZodType>>)) {
         keys.add(key);
         if (unwrapped(member) instanceof z.ZodEnum) enums.add(key);
+        if (unwrapped(member) instanceof z.ZodString) strings.add(key);
         visit(member);
       }
     } else if (inner instanceof z.ZodArray) {
@@ -116,7 +124,7 @@ function declaredNames(schema: z.ZodType): DeclaredNames {
     }
   };
   visit(schema);
-  return Object.freeze({ keys, enums });
+  return Object.freeze({ keys, enums, strings });
 }
 
 /**
@@ -241,16 +249,18 @@ function fixedValue(found: unknown, expected: z.ZodType, options: ReplyFixerOpti
 }
 
 /**
- * Contract deviation 8 (widened at the Task 4 review): an unknown key whose name the schema declares somewhere (not on
- * an ancestor) may be dropped only when its value carries nothing that could be the AI's score, verdict or words in the
- * wrong place: a plain text under a name not declared as an enum (GLM's `fallacy.description`), an empty object, an
- * empty list, or null. Anything else (a number, true/false, a value under a name declared as an enum, a non-empty object
- * or list such as `evidence.fatalFlags: [{…}]` or `why.paths: [{…}]`) is kept, so the reply stays refused and the
- * structure-repair call keeps it.
+ * Contract deviation 8 (widened at the Task 4 review, narrowed at the Task 5 review): an unknown key whose name the
+ * schema declares somewhere (not on an ancestor) may be dropped only when its value carries nothing that could be the
+ * AI's score, verdict or words in the wrong place: a plain text under a name the schema declares somewhere AS A TEXT and
+ * never as an enum (GLM's `fallacy.description`, a fatal flag's text), an empty object, an empty list, or null. Anything
+ * else is kept, so the reply stays refused and the structure-repair call keeps it: a number, true/false, a text under a
+ * name declared only as a number, true/false or an enum (a root `fidelity: "0.4"` beside `steelman.fidelity`, an
+ * `evidence.fit: "0.2"`: a score written as text), a non-empty object or list such as `evidence.fatalFlags: [{…}]` or
+ * `why.paths: [{…}]`.
  */
 function droppableNamedValue(key: string, found: unknown, named: DeclaredNames): boolean {
   if (found === null) return true;
-  if (typeof found === "string") return !named.enums.has(key);
+  if (typeof found === "string") return named.strings.has(key) && !named.enums.has(key);
   if (Array.isArray(found)) return found.length === 0;
   if (isRecord(found)) return Object.keys(found).length === 0;
   return false;

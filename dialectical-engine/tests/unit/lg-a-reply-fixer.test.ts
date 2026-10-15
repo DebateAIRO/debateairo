@@ -53,6 +53,13 @@ describe("LG-A fixReplyStructure: what the 2026-10-14 practice runs broke, repai
     expect(fixReplyStructure({ ...ASSESSMENT, fidelity: 0.5, notes: "x" }, judgeAssessmentSchema)).toBeNull();
   });
 
+  // (Task 5 review, finding 1) a text under a name the schema declares only as a number (or true/false, or an enum) may be
+  // a score written as text ("0.4"): kept, so nothing is fixed. A text is dropped only under a name declared as a text.
+  it("never drops a text under a name the schema declares only as a number (a root fidelity \"0.4\", an evidence.fit \"0.2\")", () => {
+    expect(fixReplyStructure({ ...ASSESSMENT, fidelity: "0.4" }, judgeAssessmentSchema)).toBeNull();
+    expect(fixReplyStructure({ ...ASSESSMENT, evidence: { ...ASSESSMENT.evidence, fit: "0.2" } }, judgeAssessmentSchema)).toBeNull();
+  });
+
   it("drops a root key the schema never asked for, under the judge's own name", () => {
     expect(fixReplyStructure({ ...ASSESSMENT, notes: "x" }, judgeAssessmentSchema)).toEqual({ value: ASSESSMENT, repairs: ["UNASKED_KEYS"] });
   });
