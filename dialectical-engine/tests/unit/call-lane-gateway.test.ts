@@ -495,8 +495,12 @@ describe("the runner's wiring (source pins)", () => {
       "            const wrapped = mapOnlyMembers.get(aiRef) ?? sitOutMaker(configured);",
       "            mapOnlyMembers.set(aiRef, wrapped);"
     ].join("\n"));
-    // ...and that book is the runner's UNWRAPPED makers (never the sit-out copies, which are already laned).
-    expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));");
+    // ...and that book is the runner's makers, never the sit-out copies (which are already laned). Reclaim resume
+    // (spec 2026-10-14): on a run taken over from an earlier copy each maker's gateway is first wrapped by the replay
+    // gateway, the innermost wrapper — it lanes nothing; a recorded call it answers still took its slot above it, and
+    // asks the debate's keep-alive first, as a real call does.
+    expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));");
+    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall());\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
     expect(code).toContain("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
   });
 

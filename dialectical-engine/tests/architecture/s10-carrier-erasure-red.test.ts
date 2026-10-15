@@ -196,6 +196,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // which establishes or borrows the session content lease (checked below).
       "apps/api/src/index.ts",
       "apps/evaluator-worker/src/index.ts",
+      // Reclaim resume (spec 2026-10-14): the replay book reads the run's recorded prompts and replies through
+      // prepareLeasedContentEncryptionForRun, which borrows the lease the runner already holds when it is read.
+      "apps/runner/src/run-replay.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",

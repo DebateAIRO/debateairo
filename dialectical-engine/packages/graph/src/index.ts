@@ -268,6 +268,13 @@ function sameEdgePayload(
     && row.kind === input.kind;
 }
 
+/**
+ * Reclaim resume: the claim a copy must still hold to set nodes aside — its work item, its worker id, the claim
+ * deadline it last set (`RunKeepAlive.heldUntil`) and the claim length (one renewal sets the deadline at most that far
+ * beyond it).
+ */
+export type RetireClaimFence = Readonly<{ workItemId: string; workerId: string; heldUntil: Date; claimMs: number }>;
+
 export class GraphWriter {
   constructor(
     private readonly client: PoolClient,
@@ -333,6 +340,32 @@ export class GraphWriter {
       ]
     );
     return inserted.rows[0]!.node_id;
+  }
+
+  /** See GraphRepository.retireNodes. */
+  async retireNodes(keepNodeIds: readonly string[], claim: RetireClaimFence): Promise<number> {
+    // The claim fence, under a share lock (a concurrent claim of the item waits for this transaction): the item is
+    // still CLAIMED by this worker, its deadline is in the future, and it is the deadline this copy set or the one its
+    // own renewal set since (a later claim by another copy can only start after that deadline passed, so its own
+    // deadline lies beyond it by a whole claim).
+    const held = await this.client.query(
+      `SELECT 1 FROM core.work_item
+        WHERE work_item_id=$1 AND run_id=$2 AND state='CLAIMED' AND claimed_by=$3
+          AND claim_deadline > clock_timestamp()
+          AND claim_deadline >= $4::timestamptz - interval '1 millisecond'
+          AND claim_deadline < $4::timestamptz + make_interval(secs => $5)
+        FOR SHARE`,
+      [claim.workItemId, this.runId, claim.workerId, claim.heldUntil, claim.claimMs / 1_000]
+    );
+    if (held.rowCount !== 1) {
+      throw new TypedDomainError("RUNNER_CLAIM_LOST", "Another copy of this debate holds its work item");
+    }
+    const retired = await this.client.query(
+      `UPDATE core.node SET generation_status='stale'
+       WHERE run_id=$1 AND generation_status <> 'stale' AND NOT (node_id = ANY($2::uuid[]))`,
+      [this.runId, [...keepNodeIds]]
+    );
+    return retired.rowCount ?? 0;
   }
 
   async addEdge(input: AddEdgeInput): Promise<string> {
@@ -532,6 +565,19 @@ export class GraphRepository {
     return this.withGraphWrite(input.runId, (writer) => writer.spawnPendingChild(input));
   }
 
+  /**
+   * Reclaim resume (spec 2026-10-14, migration 0119): sets aside every node of the run that is not already set aside
+   * and is not one of `keepNodeIds` (generation_status 'stale'), under the run's graph-write lock, and answers how many
+   * it set aside. A copy that takes a run over calls it with no ids before it writes anything (the dead copy's nodes),
+   * and with its own saved ids before scoring (a dying copy that was still writing). 0119's trigger lets the runtime
+   * change nothing but that one column, one way: a stale node never comes back, and its readers skip it. It is the one
+   * write that changes rows another copy saved, so it is FENCED on the claim (`RetireClaimFence`): a copy that lost
+   * the work item gets RUNNER_CLAIM_LOST and changes nothing.
+   */
+  async retireNodes(runId: string, keepNodeIds: readonly string[], claim: RetireClaimFence): Promise<number> {
+    return this.withGraphWrite(runId, async (writer) => writer.retireNodes(keepNodeIds, claim));
+  }
+
   async readNodeLifecycleEvents(runId: string, signal?: AbortSignal): Promise<readonly NodeLifecycleEvent[]> {
     const [spawned, judging, scored] = await Promise.all([
       queryPrivateStream<{
@@ -556,6 +602,7 @@ export class GraphRepository {
          FROM ledger.ledger_entry AS entry
          JOIN core.node AS node
            ON node.run_id=entry.run_id AND node.node_id::text=entry.subject_item_id
+          AND node.generation_status <> 'stale'
          WHERE entry.run_id=$1 AND entry.action_kind='JUDGEMENT_SCHEDULED'`,
         [runId], signal
       ),
@@ -576,6 +623,7 @@ export class GraphRepository {
          JOIN ledger.propagation_run AS propagation
            ON propagation.propagation_run_id=strength.propagation_run_id
          JOIN core.node AS node ON node.node_id=strength.node_id AND node.run_id=propagation.run_id
+          AND node.generation_status <> 'stale'
          WHERE propagation.run_id=$1`,
         [runId], signal
       )

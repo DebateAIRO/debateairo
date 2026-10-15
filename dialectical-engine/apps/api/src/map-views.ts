@@ -115,9 +115,12 @@ function clip(text: string, limit: number): string {
  * statement, so only a row stored before that rule can hold one). Also-raised claims are
  * merged when they say the same (their makers joined), come most-raised first, ties in the map's
  * order, and only the claims travel; a claim naming an internal field is skipped by the same rule.
- * After a re-claim, P2b keeps the first pass's `root_node_id` (`core.map_position` is written
- * with ON CONFLICT DO NOTHING). If that node is not in the answer the position is dropped
- * here: its title just does not show (pre-flight PF-C19).
+ * After a re-claim, `core.map_position` keeps the first pass's `root_node_id` (it is written
+ * with ON CONFLICT DO NOTHING), but a copy that took the run over after a crash set that root
+ * aside and moved the answer to its own root (migration 0119's `core.map_position_repoint`);
+ * `readMapChoiceForRun` carries the root in force, so the title shows. If the recorded node is
+ * still not in the answer the position is dropped here: its title just does not show
+ * (pre-flight PF-C19).
  */
 export function debateMapViewFrom(record: MapViewSource, nodeIds: ReadonlySet<string>): DebateMapView {
   const seen = new Set<string>();
