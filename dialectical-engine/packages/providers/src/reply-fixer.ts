@@ -9,17 +9,22 @@
  * What the fixer never does: change a word of a text, invent a number, an id, an enum value or a verdict, drop a key an
  * ancestor's schema declares (it moves it to the nearest declaring ancestor whose slot is absent or null; with no free
  * slot the key stays where it is, so the schema still refuses, the fixer returns null and the structure-repair call keeps
- * the words; pre-flight PF-A12, ruling R3), drop a key the schema uses elsewhere when it holds a number or true/false or
- * is declared there as an enum (it may be a misplaced score, verdict or category; pre-flight PF-A13; at the root as well
- * as inside members, e.g. a root `fidelity` beside `steelman.fidelity`), or touch `__proto__`, `prototype` or
- * `constructor`.
+ * the words; pre-flight PF-A12, ruling R3), drop a key the schema uses elsewhere unless its value carries nothing of the
+ * AI's (contract deviation 8, widened at the Task 4 review: only a plain text under a name not declared as an enum, an
+ * empty object, an empty list or null is dropped; a number, true/false, an enum value, or a non-empty object or list
+ * such as `evidence.fatalFlags: [{…}]` may be a misplaced score, verdict or block of words, so it is kept and the reply
+ * refused; pre-flight PF-A13; at the root as well as inside members, e.g. a root `fidelity` beside `steelman.fidelity`),
+ * join paragraphs when one entry's reference list is not a list (its references would be lost), or touch `__proto__`,
+ * `prototype` or `constructor`. A repair kind is named only when its member was really written back (L34).
  *
  * The failure classes (`replyFailureClassOf`) decide what follows a reply the fixer could not repair (L32, L33):
  *  · STRUCTURE: a reply that ended normally, has visible text and holds no readable JSON (prose with no object
  *    included: pre-flight PF-A14, ruling R4, INTERFACE §2.3), or a schema refusal whose every readable issue is about form
- *    (an unknown key; a member there in another container, or a text where an object or list is asked);
- *  · CONTENT: a refusal that needs words or values only the AI can give (a missing score or text, an enum, an out-of-range
- *    number, a content check: language, ids, coverage, wording), and a PATCH_ refusal;
+ *    (an unknown key; a member there in another container, a text where an object or list is asked, or a container
+ *    where a scalar is asked that holds a value of that scalar's kind, `fidelity: {value: 0.7}`);
+ *  · CONTENT: a refusal that needs words or values only the AI can give (a missing score or text, an empty or
+ *    scalar-less container where a scalar is asked, an enum, an out-of-range number, a content check: language, ids,
+ *    coverage, wording), a cut judge list with no whole entry, and a PATCH_ refusal;
  *  · CUT_OFF: the reply ended at its token limit;
  *  · EMPTY: no visible answer text.
  */
@@ -37,14 +42,15 @@ export type ReplyFixerRepair = ModelJsonStructureRepair | "UNASKED_KEYS";
  * `innerUnaskedKeys: false` keeps EVERY unknown key, at the root as well as inside members: it also turns off the root
  * UNASKED_KEYS drop (pre-flight PF-A15). `unnest: false` leaves a key an ancestor declares where it is (never dropped).
  * Whatever the switches, the fixer never drops a key an ancestor's schema declares (pre-flight PF-A12), nor, under a name
- * the schema uses somewhere, a number, true/false, or any value whose declared schema there is an enum (pre-flight PF-A13).
+ * the schema uses somewhere, anything but a plain text (not under an enum name), an empty object, an empty list or null
+ * (pre-flight PF-A13; contract deviation 8 as widened at the Task 4 review).
  */
 export type ReplyFixerOptions = Readonly<{
   innerUnaskedKeys?: boolean; unnest?: boolean; wrap?: boolean; textForms?: boolean; paragraphs?: boolean; onlyValues?: boolean;
 }>;
 export type ReplyFixed = Readonly<{ value: unknown; repairs: readonly ReplyFixerRepair[] }>;
 
-const REPLY_FIXER_LIMITS = Object.freeze({ maxPasses: 8, maxSchemaNodes: 2048, maxWrappers: 16 });
+const REPLY_FIXER_LIMITS = Object.freeze({ maxPasses: 8, maxSchemaNodes: 2048, maxWrappers: 16, maxScalarSearch: 4096 });
 const FIXER_ORDER: readonly ReplyFixerRepair[] = Object.freeze(["UNASKED_KEYS", ...MODEL_JSON_STRUCTURE_REPAIRS]);
 /** PARAGRAPHS_JOINED's join: one blank line, as a story's own paragraphs read. */
 const PARAGRAPH_JOIN = "\n\n";
@@ -174,51 +180,80 @@ function paragraphLists(schema: z.ZodType): readonly string[] | null {
   return others.every((key) => unwrapped(shape[key]!) instanceof z.ZodArray) ? Object.freeze(others) : null;
 }
 
+/** A repaired member and the kind of its repair; the kind is recorded only once the member is written back. */
+type FixedMember = Readonly<{ value: unknown; repair: ReplyFixerRepair }>;
+
+/**
+ * A paragraph entry that may be joined: a string, or an object with a string `text` whose every other key is one of the
+ * paragraph's lists and holds a list (absent is fine). An entry whose list member is not a list is not joined: its
+ * references would be lost (`node_refs: "P1"`), so the fixer leaves it and the structure-repair call keeps it.
+ */
+function joinableParagraph(entry: unknown, lists: readonly string[]): boolean {
+  if (typeof entry === "string") return true;
+  return isRecord(entry) && typeof entry.text === "string"
+    && Object.keys(entry).every((key) => key === "text" || (lists.includes(key) && Array.isArray(entry[key])));
+}
+
 /** A member that is there in the wrong form (or missing with one possible value), repaired; NOT_FIXED otherwise. */
-function fixedValue(found: unknown, expected: z.ZodType, options: ReplyFixerOptions, made: Set<ReplyFixerRepair>): unknown {
+function fixedValue(found: unknown, expected: z.ZodType, options: ReplyFixerOptions): FixedMember | typeof NOT_FIXED {
   if (found === undefined) {
     const only = options.onlyValues === false ? null : onlyValueOf(expected);
-    if (only === null) return NOT_FIXED;
-    made.add("ONLY_VALUE_FILLED");
-    return only.value;
+    return only === null ? NOT_FIXED : { value: only.value, repair: "ONLY_VALUE_FILLED" };
   }
   const lists = paragraphLists(expected);
   if (lists !== null && options.paragraphs !== false && Array.isArray(found) && found.length > 0
-    && found.every((entry) => typeof entry === "string"
-      || (isRecord(entry) && typeof entry.text === "string" && Object.keys(entry).every((key) => key === "text" || lists.includes(key))))) {
+    && found.every((entry) => joinableParagraph(entry, lists))) {
     const joined: Json = { text: found.map((entry) => (typeof entry === "string" ? entry : (entry as Json).text as string)).join(PARAGRAPH_JOIN) };
     for (const list of lists) {
       const merged: unknown[] = [];
+      const seen = new Set<string>();
       for (const entry of found) {
         const items = isRecord(entry) && Array.isArray(entry[list]) ? entry[list] as unknown[] : [];
-        for (const item of items) if (!merged.some((kept) => JSON.stringify(kept) === JSON.stringify(item))) merged.push(item);
+        for (const item of items) {
+          const serialised = JSON.stringify(item);
+          if (seen.has(serialised)) continue;
+          seen.add(serialised);
+          merged.push(item);
+        }
       }
       joined[list] = merged;
     }
-    made.add("PARAGRAPHS_JOINED");
-    return joined;
+    return { value: joined, repair: "PARAGRAPHS_JOINED" };
   }
   if (lists !== null && options.textForms !== false && typeof found === "string") {
     const converted: Json = { text: found };
     for (const list of lists) converted[list] = [];
-    made.add("TEXT_FORM_CONVERTED");
-    return converted;
+    return { value: converted, repair: "TEXT_FORM_CONVERTED" };
   }
   if (expected instanceof z.ZodString && options.textForms !== false && isRecord(found)
     && Object.keys(found).length === 1 && typeof found.text === "string") {
-    made.add("TEXT_FORM_CONVERTED");
-    return found.text;
+    return { value: found.text, repair: "TEXT_FORM_CONVERTED" };
   }
   if (expected instanceof z.ZodObject && options.wrap !== false && Array.isArray(found)) {
     const shape = expected.shape as Readonly<Record<string, z.ZodType>>;
     const listMembers = Object.keys(shape).filter((key) => unwrapped(shape[key]!) instanceof z.ZodArray);
     const others = Object.keys(shape).filter((key) => !listMembers.includes(key));
     if (listMembers.length === 1 && others.every((key) => shape[key]!.safeParse(undefined).success)) {
-      made.add("MEMBER_WRAPPED");
-      return { [listMembers[0]!]: found };
+      return { value: { [listMembers[0]!]: found }, repair: "MEMBER_WRAPPED" };
     }
   }
   return NOT_FIXED;
+}
+
+/**
+ * Contract deviation 8 (widened at the Task 4 review): an unknown key whose name the schema declares somewhere (not on
+ * an ancestor) may be dropped only when its value carries nothing that could be the AI's score, verdict or words in the
+ * wrong place: a plain text under a name not declared as an enum (GLM's `fallacy.description`), an empty object, an
+ * empty list, or null. Anything else (a number, true/false, a value under a name declared as an enum, a non-empty object
+ * or list such as `evidence.fatalFlags: [{…}]` or `why.paths: [{…}]`) is kept, so the reply stays refused and the
+ * structure-repair call keeps it.
+ */
+function droppableNamedValue(key: string, found: unknown, named: DeclaredNames): boolean {
+  if (found === null) return true;
+  if (typeof found === "string") return !named.enums.has(key);
+  if (Array.isArray(found)) return found.length === 0;
+  if (isRecord(found)) return Object.keys(found).length === 0;
+  return false;
 }
 
 /** One pass over the current issues; the repaired copy, or null when nothing applied. */
@@ -248,11 +283,10 @@ function onePass(root: unknown, schema: z.ZodType, options: ReplyFixerOptions, n
           changed = true;
           continue;
         }
-        // A possibly misplaced score, verdict or category under a name the schema uses elsewhere: a number, true/false,
-        // or any value under a name declared as an enum (pre-flight PF-A13). Kept, so the reply stays refused.
-        const found = holder[key];
-        const guarded = typeof found === "number" || typeof found === "boolean" || named.enums.has(key);
-        if ((named.keys.has(key) && guarded) || options.innerUnaskedKeys === false) continue;
+        // A possibly misplaced score, verdict, category or block of words under a name the schema uses elsewhere (pre-flight
+        // PF-A13; contract deviation 8 as widened at the Task 4 review): kept unless `droppableNamedValue`, so the reply
+        // stays refused. A name the schema never declares is dropped whatever it holds (`notes`).
+        if ((named.keys.has(key) && !droppableNamedValue(key, holder[key], named)) || options.innerUnaskedKeys === false) continue;
         delete holder[key];
         made.add(path.length === 0 ? "UNASKED_KEYS" : "INNER_UNASKED_KEYS");
         changed = true;
@@ -262,8 +296,12 @@ function onePass(root: unknown, schema: z.ZodType, options: ReplyFixerOptions, n
     if (issue.code !== "invalid_type" || path.length === 0) continue;
     const expected = schemaAt(schema, path);
     if (expected === null) continue;
-    const fixed = fixedValue(valueAt(next, path), expected, options, made);
-    if (fixed !== NOT_FIXED && setAt(next, path, fixed)) changed = true;
+    const fixed = fixedValue(valueAt(next, path), expected, options);
+    // The kind is logged only when the member was really written back (L34: the log never names a repair not made).
+    if (fixed !== NOT_FIXED && setAt(next, path, fixed.value)) {
+      made.add(fixed.repair);
+      changed = true;
+    }
   }
   return changed ? next : null;
 }
@@ -309,7 +347,8 @@ function refusalIssues(parseError: string): readonly RefusalIssue[] | null {
     const whole = parseError.trim();
     const cut = whole.endsWith("…");
     const text = cut ? whole.slice(0, Math.max(0, whole.lastIndexOf(","))) : whole;
-    if (cut && text === "") return Object.freeze([]);
+    // A cut list with no whole entry says nothing readable: not a form refusal (Task 4 review).
+    if (cut && text === "") return null;
     if (!/^[A-Za-z_]+@[A-Za-z0-9_.$]{1,200}(?:,[A-Za-z_]+@[A-Za-z0-9_.$]{1,200})*$/u.test(text)) return null;
     return text.split(",").map((entry): RefusalIssue => {
       const at = entry.indexOf("@");
@@ -320,12 +359,49 @@ function refusalIssues(parseError: string): readonly RefusalIssue[] | null {
   }
 }
 
-/** A form issue: an unknown key, or a member that is there as a list or an object, or as a text where an object or list is asked. */
+type ScalarKind = "string" | "number" | "boolean";
+/** zod's `expected` for a scalar member, and the JSON kind of value that answers it. */
+const SCALAR_OF_EXPECTED: ReadonlyMap<string, ScalarKind> = new Map([
+  ["string", "string"], ["number", "number"], ["int", "number"], ["bigint", "number"], ["boolean", "boolean"]
+]);
+/** zod's `expected` for a member that is itself a container: a container found there is in another form, never empty content. */
+const CONTAINER_EXPECTED: ReadonlySet<string> = new Set(["object", "array", "tuple", "record"]);
+
+/**
+ * Whether a container holds, anywhere inside it, a value of the asked scalar kind (any text, number or true/false when
+ * the refusal does not say the kind: the judge's `code@path` list). A bounded walk; past the bound the answer is no.
+ */
+function holdsScalar(container: unknown, kind: ScalarKind | null): boolean {
+  const pending: unknown[] = [container];
+  for (let visited = 0; pending.length > 0 && visited < REPLY_FIXER_LIMITS.maxScalarSearch; visited += 1) {
+    const node = pending.pop();
+    if (Array.isArray(node)) {
+      for (const item of node) pending.push(item);
+    } else if (isRecord(node)) {
+      for (const item of Object.values(node)) pending.push(item);
+    } else if (kind === null ? typeof node === "string" || typeof node === "number" || typeof node === "boolean" : typeof node === kind) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A form issue: an unknown key; a list or an object where another container is asked; a text where an object or list is
+ * asked; or a list or an object where a scalar is asked that holds, at any level, a value of that scalar's kind
+ * (`fidelity: {value: 0.7}`). An empty or scalar-less container where a scalar is asked (`fidelity: []`, `headline: {}`)
+ * is missing content: CONTENT (Task 4 review).
+ */
 function formIssue(issue: RefusalIssue, decoded: unknown): boolean {
   if (issue.code === "unrecognized_keys") return true;
   if (issue.code !== "invalid_type") return false;
   const found = valueAt(decoded, issue.path);
-  if (Array.isArray(found) || isRecord(found)) return true;
+  if (Array.isArray(found) || isRecord(found)) {
+    if (issue.expected === undefined) return holdsScalar(found, null);
+    if (CONTAINER_EXPECTED.has(issue.expected)) return true;
+    const kind = SCALAR_OF_EXPECTED.get(issue.expected);
+    return kind !== undefined && holdsScalar(found, kind);
+  }
   return typeof found === "string" && (issue.expected === "object" || issue.expected === "array");
 }
 

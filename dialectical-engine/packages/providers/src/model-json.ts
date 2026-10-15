@@ -67,11 +67,13 @@ const MODEL_JSON_SHAPE_REPAIRS = Object.freeze(["NESTED_FIELDS", "RENAMED_MEMBER
  * LG-A (spec 2026-10-15, L31; INTERFACE §2.1): the schema-guided fixer's repairs (`fixReplyStructure`, ./reply-fixer.ts),
  * every step, in this fixed order (a root key the schema never asked for keeps the name UNASKED_KEYS):
  *  · INNER_UNASKED_KEYS: an unknown key below the root is dropped, unless an ancestor's schema declares it (then it is moved
- *    to the nearest free slot, MEMBER_UNNESTED, never dropped) or the schema declares its name somewhere and its value is a
- *    number, true/false or an enum value there (it may be a misplaced score or verdict, so it is kept and the reply is
- *    refused);
+ *    to the nearest free slot, MEMBER_UNNESTED, never dropped) or the schema declares its name somewhere and its value is
+ *    anything but a plain text (not under an enum name), an empty object, an empty list or null (a number, true/false, an
+ *    enum value or a non-empty object or list may be a misplaced score, verdict or block of words, so it is kept and the
+ *    reply is refused; the same holds for a root key);
  *  · MEMBER_UNNESTED: a member written one level too deep (`long.reviewer_note`) moved to the nearest ancestor whose schema
- *    declares it and whose slot is absent or null;
+ *    declares it and whose slot is absent or null; with no free slot the key stays where it is, so the fixer returns null
+ *    and the structure-repair call keeps the words;
  *  · MEMBER_WRAPPED: a bare value wrapped in its missing parent (`long` written as the sections list);
  *  · TEXT_FORM_CONVERTED: a string where `{text,…}` is asked, or `{text}` where a string is asked;
  *  · PARAGRAPHS_JOINED: a list of strings or paragraphs where one paragraph is asked, joined with a blank line, references merged;

@@ -66,6 +66,26 @@ describe("LG-A fixReplyStructure: what the 2026-10-14 practice runs broke, repai
       .toEqual({ value: ASSESSMENT, repairs: ["INNER_UNASKED_KEYS"] });
   });
 
+  // (contract deviation 8, widened at the Task 4 review) under a name the schema declares elsewhere (not on an ancestor),
+  // only a plain text, an empty object, an empty list or null is dropped; a non-empty object or list may hold a verdict,
+  // a score or the AI's words in the wrong place: kept, so nothing is fixed and the structure-repair call keeps it.
+  it("never drops words, a verdict or a score packed in an object or list under a name the schema uses elsewhere", () => {
+    const flag = { type: "circular", severity: 0.9, description: "Circular." };
+    expect(fixReplyStructure({ ...ASSESSMENT, evidence: { ...ASSESSMENT.evidence, fatalFlags: [flag] } }, judgeAssessmentSchema)).toBeNull();
+    expect(fixReplyStructure({ ...ASSESSMENT, fatalFlags: [flag] }, judgeAssessmentSchema)).toBeNull();
+    expect(fixReplyStructure({ ...ASSESSMENT, fallacy: { ...ASSESSMENT.fallacy, ambiguityFlags: ["vague term"] } }, judgeAssessmentSchema)).toBeNull();
+    expect(fixReplyStructure(story((body) => {
+      body.why.paths = [{ position_ref: "P2", fate: "FELL", line: "Another line.", node_refs: ["P2"] }];
+    }), StoryBodySchema)).toBeNull();
+    expect(fixReplyStructure(story((body) => { body.long.paragraphs = [paragraph("A whole paragraph.", ["P1"])]; }), StoryBodySchema)).toBeNull();
+  });
+
+  it("drops an empty list, an empty object or null under a name the schema uses elsewhere: nothing of the AI's is lost", () => {
+    const sent = { ...ASSESSMENT, evidence: { ...ASSESSMENT.evidence, fatalFlags: [] },
+      fallacy: { ...ASSESSMENT.fallacy, ambiguityFlags: {} }, critic: { ...ASSESSMENT.critic, fidelity: null } };
+    expect(fixReplyStructure(sent, judgeAssessmentSchema)).toEqual({ value: ASSESSMENT, repairs: ["INNER_UNASKED_KEYS"] });
+  });
+
   it("moves a member written one level too deep (GLM's long.reviewer_note) and drops long's unknown keys, in the fixed order", () => {
     const sent = story((body) => { body.long.reviewer_note = paragraph("A note."); body.long.tone = "calm"; delete body.reviewer_note; });
     const fixed = fixReplyStructure(sent, StoryBodySchema);
@@ -124,6 +144,13 @@ describe("LG-A fixReplyStructure: what the 2026-10-14 practice runs broke, repai
     }), StoryBodySchema);
     expect(paragraphs).toEqual({ value: story((body) => { body.reviewer_note = paragraph("First.\n\nSecond.", ["P1", "P2"]); }),
       repairs: ["PARAGRAPHS_JOINED"] });
+  });
+
+  // (Task 4 review) an entry whose reference list is not a list would lose its references when joined: not joined.
+  it("never joins paragraphs when one entry's reference list is not a list", () => {
+    expect(fixReplyStructure(story((body) => {
+      body.reviewer_note = [{ text: "First.", node_refs: "P1" }, paragraph("Second.", ["P2"])];
+    }), StoryBodySchema)).toBeNull();
   });
 
   it("fills a value the schema admits in only one form, and nothing else", () => {
@@ -193,6 +220,31 @@ describe("LG-A replyFailureClassOf (INTERFACE §2.3)", () => {
     expect(replyFailureClassOf({ rawText: JSON.stringify(missing), parseStatus: "SCHEMA_FAILED", parseError: refusal(missing) }, STOP)).toBe("CONTENT");
     expect(replyFailureClassOf({ rawText: JSON.stringify(wrongForm), parseStatus: "SCHEMA_FAILED", parseError: refusal(wrongForm) }, STOP)).toBe("CONTENT");
   });
+  // (Task 4 review) a container where a scalar is asked is form only when it holds a value of that scalar's kind; an
+  // empty or scalar-less one is missing content.
+  it("CONTENT for an empty or scalar-less container where a score or a text is asked; STRUCTURE when it holds the value", () => {
+    const judged = (body: unknown) => {
+      const parsed = judgeAssessmentSchema.safeParse(body);
+      if (parsed.success) throw new Error("must be refused");
+      return { rawText: JSON.stringify(body), parseStatus: "SCHEMA_FAILED" as const, parseError: parsed.error.message };
+    };
+    expect(replyFailureClassOf(judged({ ...ASSESSMENT, steelman: { summary: "s", fidelity: [] } }), STOP)).toBe("CONTENT");
+    expect(replyFailureClassOf(judged({ ...ASSESSMENT, steelman: { summary: "s", fidelity: {} } }), STOP)).toBe("CONTENT");
+    expect(replyFailureClassOf(judged({ ...ASSESSMENT, steelman: { summary: "s", fidelity: { value: "high" } } }), STOP)).toBe("CONTENT");
+    expect(replyFailureClassOf(judged({ ...ASSESSMENT, steelman: { summary: "s", fidelity: { value: 0.7 } } }), STOP)).toBe("STRUCTURE");
+    const headless = story((body) => { body.short.headline = {}; });
+    expect(replyFailureClassOf({ rawText: JSON.stringify(headless), parseStatus: "SCHEMA_FAILED", parseError: refusal(headless) }, STOP)).toBe("CONTENT");
+    const wrapped = (fidelity: unknown) => JSON.stringify({ ...ASSESSMENT, steelman: { summary: "s", fidelity } });
+    expect(replyFailureClassOf({ rawText: wrapped([]), parseStatus: "SCHEMA_FAILED", parseError: "invalid_type@steelman.fidelity" }, STOP)).toBe("CONTENT");
+    expect(replyFailureClassOf({ rawText: wrapped({ value: 0.7 }), parseStatus: "SCHEMA_FAILED", parseError: "invalid_type@steelman.fidelity" }, STOP))
+      .toBe("STRUCTURE");
+  });
+
+  it("CONTENT for a cut judge list with no whole entry: nothing readable is not a form refusal", () => {
+    expect(replyFailureClassOf({ rawText: JSON.stringify(ASSESSMENT), parseStatus: "SCHEMA_FAILED",
+      parseError: `invalid_type@${"a".repeat(498)}…` }, STOP)).toBe("CONTENT");
+  });
+
   it("reads the judge's code@path list and the steps' own content codes", () => {
     const glm = JSON.stringify({ ...ASSESSMENT, evidence: { ...ASSESSMENT.evidence, note: 1 } });
     expect(replyFailureClassOf({ rawText: glm, parseStatus: "SCHEMA_FAILED", parseError: "unrecognized_keys@evidence" }, STOP)).toBe("STRUCTURE");
