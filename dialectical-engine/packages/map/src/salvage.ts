@@ -1,4 +1,4 @@
-import type { MapReplySalvageRepair } from "@debateai/providers";
+import { MAP_REPLY_SALVAGE_REPAIRS, type MapReplySalvageRepair } from "@debateai/providers";
 import type { MapChooseReply } from "./replies.js";
 import { MAP_LEANS, MAP_LIMITS } from "./types.js";
 
@@ -58,12 +58,15 @@ export function mapTrimAtWord(text: string, max: number): string | null {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Records the repairs of one salvage pass, each once, in the fixed order of `MapReplySalvageRepair`. */
-class MapSalvageLog {
+/**
+ * Records the repairs of one salvage pass, each once. `repairs` reads them in the fixed order of the providers' list
+ * (`MAP_REPLY_SALVAGE_REPAIRS`), so a kind added to that list is reported without a second list here.
+ */
+export class MapSalvageLog {
   readonly #made = new Set<MapReplySalvageRepair>();
   note(repair: MapReplySalvageRepair): void { this.#made.add(repair); }
   get repairs(): readonly MapReplySalvageRepair[] {
-    return Object.freeze((["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED"] as const).filter((repair) => this.#made.has(repair)));
+    return Object.freeze(MAP_REPLY_SALVAGE_REPAIRS.filter((repair) => this.#made.has(repair)));
   }
 }
 

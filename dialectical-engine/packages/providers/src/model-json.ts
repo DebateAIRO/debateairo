@@ -31,6 +31,13 @@ export interface ModelReplyFacts {
  *    reasoning written out), the ONE complete object that ends it, bare or inside the reply's one code fence, read
  *    strictly or with INNER_QUOTE or STRAY_QUOTE; made only when the caller asks for it and its check accepts the value
  *    (`ModelJsonDecodeOptions.trailingObjectAccepted`: the step's full schema), never otherwise.
+ *
+ * LG-A (spec 2026-10-15, L31): the syntax pass, tried after the six repairs above, each kind made at most once per reply:
+ *  · TRAILING_COMMA — a comma left before a closing bracket or brace;
+ *  · RAW_LINE_BREAK — a raw line break inside a string value;
+ *  · MODEL_TOKEN_DROPPED — a leaked model control token written into the answer;
+ *  · KEY_COLON_MOVED — a colon written inside a key;
+ *  · BRACKET_INSERTED — one missing bracket, where only one place fits.
  */
 const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT",
   // LG-A (spec 2026-10-15, L31): made by the syntax pass, tried after the repairs above.
@@ -56,8 +63,12 @@ const MODEL_JSON_SHAPE_REPAIRS = Object.freeze(["NESTED_FIELDS", "RENAMED_MEMBER
 /**
  * LG-A (spec 2026-10-15, L31; INTERFACE §2.1): the schema-guided fixer's repairs (`fixReplyStructure`, ./reply-fixer.ts),
  * every step, in this fixed order (a root key the schema never asked for keeps the name UNASKED_KEYS):
- *  · INNER_UNASKED_KEYS: keys the schema never asked for, below the root, dropped (never a key the schema names anywhere);
- *  · MEMBER_UNNESTED: a member written one level too deep moved to the parent that declares it (`long.reviewer_note`);
+ *  · INNER_UNASKED_KEYS: an unknown key below the root is dropped, unless an ancestor's schema declares it (then it is moved
+ *    to the nearest free slot, MEMBER_UNNESTED, never dropped) or the schema declares its name somewhere and its value is a
+ *    number, true/false or an enum value there (it may be a misplaced score or verdict, so it is kept and the reply is
+ *    refused);
+ *  · MEMBER_UNNESTED: a member written one level too deep (`long.reviewer_note`) moved to the nearest ancestor whose schema
+ *    declares it and whose slot is absent or null;
  *  · MEMBER_WRAPPED: a bare value wrapped in its missing parent (`long` written as the sections list);
  *  · TEXT_FORM_CONVERTED: a string where `{text,…}` is asked, or `{text}` where a string is asked;
  *  · PARAGRAPHS_JOINED: a list of strings or paragraphs where one paragraph is asked, joined with a blank line, references merged;
@@ -78,7 +89,7 @@ export type ModelJsonStructureRepair = typeof MODEL_JSON_STRUCTURE_REPAIRS[numbe
  *    24 characters, every reference renamed the same way.
  * `decodeModelJson` never makes them: it does not know any schema.
  */
-const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"] as const);
+export const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"] as const);
 export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
 /**
  * The repair codes a classification can name (`ContentClassification.jsonRepair`): the decode repairs (`ModelJsonDecodeRepair`),
@@ -106,6 +117,9 @@ export function decodedRepairsOf(decoded: Extract<ModelJsonDecoded, { ok: true }
  * LG-A (INTERFACE §2.2, contract deviation 3): a PARSED classification naming its repairs. Each kind once, first
  * occurrence kept. None: no repair key (today's bytes). One: `jsonRepair` alone (today's bytes). Two or more: `jsonRepair`
  * (the step's own headline repair `named`, else the first) and the whole list as `jsonRepairs`.
+ *
+ * Callers pass `repairs` in the fixed order of their lists (the decode, shape, structure and map lists), and `named`, when
+ * given, must be a member of `repairs`: it is the headline, and the list is not re-sorted.
  */
 export function parsedWithRepairs(repairs: readonly ModelJsonRepair[], named: ModelJsonRepair | null = null): ContentClassification {
   const list = repairs.filter((repair, index) => repairs.indexOf(repair) === index);

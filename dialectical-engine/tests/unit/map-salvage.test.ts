@@ -23,6 +23,7 @@ import {
   mapMergeSpec,
   mapPromptContractHash,
   mapProviderPieces,
+  MapSalvageLog,
   mapSnowballSpec,
   mapTrimAtWord,
   type MapKeyPoint,
@@ -317,5 +318,16 @@ describe("map salvage: no prompt text moved, and the practice tool reads replies
     expect([...(practiceMapKeyPointIdsOf(framed.packet.messages) ?? [])]).toEqual(["kp01", "kp07"]);
     expect(practiceMapKeyPointIdsOf(mapProviderPieces(mapAnglesSpec(CTX)).framed.packet.messages)).toBeNull();
     expect(practiceMapKeyPointIdsOf([{ role: "user", content: "not a frame" }])).toBeNull();
+  });
+});
+
+describe("map salvage log: every kind it notes is reported, in the providers' fixed order (LG-A, MAP_IDS_NORMALISED)", () => {
+  it("reports MAP_IDS_NORMALISED beside the kinds noted with it, in the list's order", () => {
+    const log = new MapSalvageLog();
+    log.note("MAP_IDS_NORMALISED");
+    log.note("MAP_IDS_DROPPED");
+    log.note("MAP_TEXT_TRIMMED");
+    expect(log.repairs).toEqual(["MAP_TEXT_TRIMMED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"]);
+    expect(new MapSalvageLog().repairs).toEqual([]);
   });
 });

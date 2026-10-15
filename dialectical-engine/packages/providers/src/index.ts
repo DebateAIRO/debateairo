@@ -2660,6 +2660,7 @@ export {
   contentRepairsOf,
   decodedRepairsOf,
   decodeModelJson,
+  MAP_REPLY_SALVAGE_REPAIRS,
   MODEL_JSON_STRUCTURE_REPAIRS,
   modelJsonFenceBody,
   modelJsonLateRepair,
