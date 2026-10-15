@@ -37,7 +37,7 @@ import {
   measureDispersion,
   parseStructuredArtifact,
   reduceAssessment,
-  structuredParseRepair,
+  parsedStructuredRepairs,
   runJudgePanel,
   selectReducedJudgement,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
@@ -97,6 +97,8 @@ import {
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  fixReplyStructure,
+  parsedWithRepairs,
   promptContractFingerprintText,
   schemaFailureLocator,
   type FramedPrompt,
@@ -612,6 +614,19 @@ const compositionSchema = z.object({
     served_number_refs: z.array(machineIdentifierSchema)
   }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP, "Composer output exceeds the engine segment cap")
 }).strict();
+/**
+ * LG-A (spec 2026-10-15, L31): the writer's answer form (v4, as v3) asks for no served number ("served_number_refs is always []",
+ * packages/serve/src/synthesis.ts), so a reply that left the list out has exactly one value it could have meant. The fixer
+ * reads this twin, which pins it, and fills it (ONLY_VALUE_FILLED); acceptance is still `compositionSchema`'s, unchanged.
+ */
+const compositionFixGuide = z.object({
+  segments: z.array(z.object({
+    segment_id: machineIdentifierSchema,
+    text: z.string().trim().min(1),
+    node_refs: z.array(machineIdentifierSchema),
+    served_number_refs: z.array(machineIdentifierSchema).max(0)
+  }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP)
+}).strict();
 // T9 retired the CONFORMANCE and post-compose-R9 organ schemas with the gates
 // they served: both limbs are evaluator objection criteria now, graded in one
 // EVALUATOR call whose wire shape is `evaluatorVerdictSchema` below.
@@ -843,10 +858,10 @@ export function shapeWriterBound(bound: CallBound, writerBound: number | null): 
   return Object.freeze({ ...bound, tokenCeiling: writerBound });
 }
 
-/** A17: the classification a live synthesis call applies, exported for replay. */
+/** A17: the classification a live synthesis call applies, exported for replay (LG-A: the writer through its fix guide, as live). */
 export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string, reply?: ModelReplyFacts): ContentClassification {
   return role === "SYNTHESIZER"
-    ? classifyStructuredContent(content, compositionSchema, reply)
+    ? classifyStructuredContent(content, compositionSchema, reply, compositionFixGuide)
     : classifyStructuredContent(content, evaluatorVerdictSchema, reply);
 }
 
@@ -2521,7 +2536,7 @@ function hash(value: unknown): string {
  * refused before any strategy runs — the pre-fix refusal, re-asked as before.
  */
 type DecodedReply =
-  | { readonly decoded: true; readonly value: unknown; readonly repair: ModelJsonRepair | null }
+  | { readonly decoded: true; readonly value: unknown; readonly repairs: readonly ModelJsonRepair[] }
   | { readonly decoded: false; readonly message: string };
 
 /**
@@ -2556,40 +2571,48 @@ function topLevelObjectsOpened(content: string): number {
  * All-steps format robustness (2026-10-12): the judge path's strategies now end with the story's two late repairs
  * (straight quotes inside a text escaped; only for a reply that finished normally, closing brackets), so `ending` —
  * how the reply ended, as the gateway saw it — is passed through. Without it the ending is unknown and the last repair
- * is not made. The decoded reply names the repair it needed (`jsonRepair` on the classification).
+ * is not made. The decoded reply names every repair it needed, in order (LG-A, L34: a reply read through the syntax
+ * pass, SYNTAX_REPAIRED, carries its repairs too; the classification's `jsonRepair` / `jsonRepairs`).
  */
 function decodeStructuredReply(content: string, ending?: ModelReplyFacts): DecodedReply {
   try {
-    return { decoded: true, value: JSON.parse(content), repair: null };
+    return { decoded: true, value: JSON.parse(content), repairs: [] };
   } catch (error) {
     const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
     if (topLevelObjectsOpened(content) > 1) return refused;
     const tolerant = parseStructuredArtifact(content, z.unknown(), ending);
-    return tolerant.kind === "PARSED"
-      ? { decoded: true, value: tolerant.value, repair: structuredParseRepair(tolerant.strategy) }
-      : refused;
+    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value, repairs: parsedStructuredRepairs(tolerant) } : refused;
   }
 }
 
-function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, ending?: ModelReplyFacts): T {
+/**
+ * LG-A (spec 2026-10-15, L31): the runner's ONE structured reading (writer and checker): decode; the schema; when the
+ * schema refuses, the reply fixer (on `guide` when the step has one), then the schema again. The classifier and the
+ * parser both call it, so a call accepts exactly the replies its step then reads.
+ */
+function readStructuredValue<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts, guide?: z.ZodType):
+  | { readonly ok: true; readonly value: T; readonly repairs: readonly ModelJsonRepair[] }
+  | { readonly ok: false; readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly message: string } {
   const reply = decodeStructuredReply(content, ending);
-  if (!reply.decoded) throw new TypedDomainError(code, reply.message);
-  try {
-    return schema.parse(reply.value);
-  } catch (error) {
-    throw new TypedDomainError(code, error instanceof Error ? error.message : String(error));
-  }
-}
-
-function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts): ContentClassification {
-  const reply = decodeStructuredReply(content, ending);
-  if (!reply.decoded) return { parseStatus: "PARSE_FAILED", parseError: reply.message };
+  if (!reply.decoded) return { ok: false, parseStatus: "PARSE_FAILED", message: reply.message };
   const parsed = schema.safeParse(reply.value);
-  return !parsed.success
-    ? { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }
-    : reply.repair === null
-      ? { parseStatus: "PARSED", parseError: null }
-      : { parseStatus: "PARSED", parseError: null, jsonRepair: reply.repair };
+  if (parsed.success) return { ok: true, value: parsed.data, repairs: reply.repairs };
+  const fixed = fixReplyStructure(reply.value, guide ?? schema);
+  const refixed = fixed === null ? null : schema.safeParse(fixed.value);
+  return refixed !== null && refixed.success
+    ? { ok: true, value: refixed.data, repairs: [...reply.repairs, ...fixed!.repairs] }
+    : { ok: false, parseStatus: "SCHEMA_FAILED", message: parsed.error.message };
+}
+
+function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, ending?: ModelReplyFacts, guide?: z.ZodType): T {
+  const read = readStructuredValue(content, schema, ending, guide);
+  if (!read.ok) throw new TypedDomainError(code, read.message);
+  return read.value;
+}
+
+function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts, guide?: z.ZodType): ContentClassification {
+  const read = readStructuredValue(content, schema, ending, guide);
+  return read.ok ? parsedWithRepairs(read.repairs) : { parseStatus: read.parseStatus, parseError: read.message };
 }
 
 /**
@@ -2712,9 +2735,9 @@ export const EVALUATOR_PROSE = Object.freeze(["objection"] as const);
  * check (review round 2). Deterministic, and it never throws on model content.
  */
 export function classifyComposedContent(content: string, citation: ComposedCitationContext, reply?: ModelReplyFacts): ContentClassification {
-  const structured = classifyStructuredContent(content, compositionSchema, reply);
+  const structured = classifyStructuredContent(content, compositionSchema, reply, compositionFixGuide);
   if (structured.parseStatus !== "PARSED") return structured;
-  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
+  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply, compositionFixGuide);
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
@@ -3640,7 +3663,7 @@ export function logServeDisclosure(event: string, detail: Readonly<Record<string
 
 /** `reply`: how the accepted reply ended (`rememberingAcceptedReply`), so it is read exactly as its classifier read it. */
 export function parseComposerOutput(content: string, reply?: ModelReplyFacts): z.infer<typeof compositionSchema> {
-  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply);
+  return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR", reply, compositionFixGuide);
 }
 
 /** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call); `reply` as for `parseComposerOutput`. */

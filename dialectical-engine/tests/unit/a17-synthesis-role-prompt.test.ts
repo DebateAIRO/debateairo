@@ -104,4 +104,10 @@ describe("A17 · classifySynthesisRoleContent is the live classification", () =>
     expect(classifySynthesisRoleContent("EVALUATOR", composition).parseStatus).toBe("SCHEMA_FAILED");
     expect(classifySynthesisRoleContent("EVALUATOR", "not json").parseStatus).toBe("PARSE_FAILED");
   });
+
+  it("reads the writer through the live call's fix guide: a left-out served_number_refs is filled (LG-A, ONLY_VALUE_FILLED)", () => {
+    const leftOut = JSON.stringify({ segments: [{ segment_id: "segment:verdict", text: "The proposal holds.", node_refs: ["primary"] }] });
+    expect(classifySynthesisRoleContent("SYNTHESIZER", leftOut)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "ONLY_VALUE_FILLED" });
+    expect(classifySynthesisRoleContent("EVALUATOR", leftOut).parseStatus).toBe("SCHEMA_FAILED");
+  });
 });
