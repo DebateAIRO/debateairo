@@ -109,8 +109,9 @@ describe("LG-A decode: the syntax pass, tried after every repair before it", () 
 
 /**
  * Task 3 review: a straight quote inside a text makes the pass read part of that text as outside it, where a dropped
- * comma, token or colon would change the AI's words. After such a repair INNER_QUOTE is never tried on the cleaned
- * text; the reply is refused and left to the structure-repair call, which keeps every word.
+ * comma, token or colon, or an inserted bracket, would change the AI's words. Round 5: the pass returns a value only when
+ * every string ends where INNER_QUOTE would end it; otherwise the reply is refused and left to the structure-repair call,
+ * which keeps every word.
  */
 describe("LG-A decode: the syntax pass never changes a word", () => {
   it.each([
@@ -135,7 +136,14 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
     ["the short form of the same", "{\"L\":[{\"a\":\"P \",},{\"k\":\"Q\"}],\"b\":[1,]}"],
     ["the short form with the last brace missing", "{\"L\":[{\"a\":\"P \",},{\"k\":\"Q\"}],\"b\":[1]"],
     // The accepted side effect of round 4: a trailing comma after a string value mid-text goes to the structure-repair call.
-    ["a trailing comma after a string value inside an inner object", "{\"o\":{\"a\":\"x\",},\"c\":1}"]
+    ["a trailing comma after a string value inside an inner object", "{\"o\":{\"a\":\"x\",},\"c\":1}"],
+    // Round 5: every string end must be one INNER_QUOTE's own rule (`closesValue`) accepts. In an object a comma after a
+    // value must be followed by `"`: here BRACKET_INSERTED would close the object inside the AI's text.
+    ["an inner quote, a comma and a brace in an object's text, with a trailing comma in a later list",
+      "{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],\"b\":[1,]}"],
+    ["the same with a leaked token in place of the trailing comma", "{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],<|im_end|>\"b\":[1]}"],
+    ["the same with a colon inside a key in place of the trailing comma", "{\"L\":[{\"a:\" \"P \",{\"k\":\"Q\"}],\"b\":[1]}"],
+    ["the same with a raw line break in the text and no other slip", "{\"L\":[{\"a\":\"P \",\n{\"k\":\"Q\"}],\"b\":[1]}"]
   ])("refuses %s rather than change its words", (_name, text) => {
     expect(decodeModelJson(text, STOP).ok).toBe(false);
     expect(modelJsonSyntaxRepair(text, STOP)).toBeNull();
@@ -164,7 +172,20 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
       value: { L: [{ a: "P \",},{\"k\":\"Q" }], b: [1] } });
   });
 
-  it("still repairs a string end that is JSON grammar in the reply itself (round 3 whitelist)", () => {
+  it("the judge never reads an inner quote, comma and opener as a closed object (Task 3 re-review, round 5)", () => {
+    const schema = z.object({ L: z.array(z.record(z.string(), z.string())), b: z.array(z.number()) }).strict();
+    expect(parseStructuredArtifact("{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],\"b\":[1,]}", schema, STOP).kind).toBe("PARSE_FAILURE");
+    expect(parseStructuredArtifact("{\"L\":[{\"a\":\"P \",\n{\"k\":\"Q\"}],\"b\":[1]}", schema, STOP).kind).toBe("PARSE_FAILURE");
+    // Controls: without the slip INNER_QUOTE alone reads the reply and keeps every word (the line break written escaped).
+    const control = "{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],\"b\":[1]}";
+    expect(decodeModelJson(control, STOP)).toEqual({ ok: true, value: { L: [{ a: "P \",{\"k\":\"Q" }], b: [1] }, repair: "INNER_QUOTE" });
+    expect(parseStructuredArtifact(control, schema, STOP)).toMatchObject({ kind: "PARSED", strategy: "INNER_QUOTE",
+      value: { L: [{ a: "P \",{\"k\":\"Q" }], b: [1] } });
+    expect(decodeModelJson("{\"L\":[{\"a\":\"P \",\\n{\"k\":\"Q\"}],\"b\":[1]}", STOP)).toEqual({ ok: true,
+      value: { L: [{ a: "P \",\n{\"k\":\"Q" }], b: [1] }, repair: "INNER_QUOTE" });
+  });
+
+  it("still repairs a string end that is JSON grammar in the reply itself (rounds 3-5)", () => {
     expect(decodedOk("{\"a\":\"x\" ,}").value).toEqual({ a: "x" });
     const moved = decodedOk("{\"severity\":0.2,\"description:\" \"none\",}");
     expect(moved.value).toEqual({ severity: 0.2, description: "none" });

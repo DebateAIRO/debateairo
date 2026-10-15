@@ -45,8 +45,8 @@ const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INN
 /** A repair the tolerant decode can make (no schema known). */
 export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
 /**
- * The five repairs only the syntax pass makes (the decode list's last five). `modelJsonSyntaxRepair` may name CODE_FENCE,
- * INNER_QUOTE and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
+ * The five repairs only the syntax pass makes (the decode list's last five). `modelJsonSyntaxRepair` may name CODE_FENCE
+ * and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
  */
 export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
   "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED">;
@@ -457,17 +457,6 @@ const SYNTAX_REPAIR_LIMITS = Object.freeze({
 });
 const MODEL_TOKEN_BODY = /^[A-Za-z0-9_]+$/u;
 /**
- * The syntax pass's repairs made OUTSIDE strings. A straight quote inside a text makes the pass read part of that text as
- * outside it, where a comma, token or colon dropped would change the AI's words (Task 3 review: `"he typed "[1, 2,]" in
- * the box"`, `"he wrote "<|im_end|>,"k":" done"`, `"he said ",<|im_end|>"k":" ok"`). Two guards keep every word:
- *  · a reading with a doubtful string end (`syntaxClean`'s `doubtful`; certain ends are whitelisted by
- *    `stringEndIsCertain`) refuses all three: the pass returns no value;
- *  · after one of them the cleaned text is never read with INNER_QUOTE.
- * Such a reply is refused by the decode and left to the structure-repair call, which keeps every word.
- */
-const OUTSIDE_STRING_REPAIRS: readonly ModelJsonDecodeRepair[] = Object.freeze(["TRAILING_COMMA", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED"]);
-
-/**
  * The end of the leaked model token `<|name|>` that starts at `index`, or null. The closing `|>` is looked for only
  * inside the token window (`modelTokenMaxChars`), so each `<|` costs at most that many characters (CI-1b: model text is
  * untrusted; an unbounded search made many unclosed `<|` quadratic).
@@ -486,9 +475,6 @@ function nextSignificantPastTokens(text: string, from: number): string | undefin
   return text[index];
 }
 
-/** A character that can open a JSON value or key right after a comma (a closer there is `stringEndIsCertain`'s own case). */
-const AFTER_COMMA_STARTS: ReadonlySet<string> = new Set("\"{[-0123456789tfn");
-
 /** True when everything from `from` to the text's end is closers (`}` / `]`) and blanks; leaked tokens are NOT skipped. */
 function onlyClosersToEnd(text: string, from: number): boolean {
   for (let index = nextSignificant(text, from); index < text.length; index = nextSignificant(text, index + 1)) {
@@ -498,26 +484,19 @@ function onlyClosersToEnd(text: string, from: number): boolean {
 }
 
 /**
- * WHITELIST (Task 3 re-review, rounds 3 and 4): a quote at `from - 1` that the pass took as a string's end is CERTAIN
- * only when, in the reply itself with blanks skipped (leaked tokens are NOT skipped), the next character is `}`, `]`,
- * `:` or the text's end, or it is `,` followed (blanks skipped) by `"`, `{`, `[`, `-`, a digit, `t`, `f` or `n`, or it
- * is `,` then `}` or `]` with nothing but closers (blanks between) after that closer to the text's end. Every other end
- * is doubtful. Why: with this rule a word can change only where the reply already reads as JSON grammar around the
- * quote, which INNER_QUOTE (`closesValue`) reads the same way; a quote followed by a token, a letter or `,<|…|>` may be
- * the AI's own quotation mark, and a repair after it could split its text into an invented key. Round 4: `",}` / `",]`
- * mid-text is exactly the comma TRAILING_COMMA drops, and `closesValue` reads that quote as one that cannot end a value;
- * dropping it there could close an inner object inside the AI's text that the text's own `{` reopens (an invented
- * element). Linear: the closers looked at after one quote's `,}` are never looked at for another quote.
+ * Whether INNER_QUOTE would end a string VALUE at the quote just before `from`, in the reply itself: `closesValue`, its
+ * own context-aware rule, inside an object and inside a list. ONE exception (the common end-of-reply trailing comma): a
+ * quote followed (blanks skipped, leaked tokens not skipped) by `,` and then only closers to the text's end ends the
+ * value in both. Keys need no entry: INNER_QUOTE reads a key strictly, to its first quote, as the pass does.
  */
-function stringEndIsCertain(text: string, from: number): boolean {
+type StringEnd = Readonly<{ inObject: boolean; inArray: boolean }>;
+function innerQuoteEnd(text: string, from: number): StringEnd {
   const at = nextSignificant(text, from);
-  const next = text[at];
-  if (next === undefined || next === "}" || next === "]" || next === ":") return true;
-  if (next !== ",") return false;
-  const afterAt = nextSignificant(text, at + 1);
-  const after = text[afterAt];
-  if (after === "}" || after === "]") return onlyClosersToEnd(text, afterAt + 1);
-  return after !== undefined && AFTER_COMMA_STARTS.has(after);
+  const closer = nextSignificant(text, at + 1);
+  if (text[at] === "," && (text[closer] === "}" || text[closer] === "]") && onlyClosersToEnd(text, closer + 1)) {
+    return { inObject: true, inArray: true };
+  }
+  return { inObject: closesValue(text, from, "object"), inArray: closesValue(text, from, "array") };
 }
 
 /**
@@ -526,13 +505,12 @@ function stringEndIsCertain(text: string, from: number): boolean {
  *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
  *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
  *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
- * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). `doubtful` is set when a quote
- * the pass took as a string's end is not a certain end (`stringEndIsCertain`; a key whose colon is moved excepted): that
- * quote may be the AI's own quotation mark, so the reading of what follows may be wrong.
+ * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). A string ends at its first
+ * unescaped quote; `ends` holds, for each string in order, whether INNER_QUOTE would end it there (`innerQuoteEnd`).
  */
-function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair>; doubtful: boolean }> {
+function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair>; ends: readonly StringEnd[] }> {
   const made = new Set<ModelJsonDecodeRepair>();
-  let doubtful = false;
+  const ends: StringEnd[] = [];
   type Container = { kind: "object" | "array"; expectKey: boolean };
   const stack: Container[] = [];
   let out = "";
@@ -559,7 +537,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       }
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
-      if (!movesColon && !stringEndIsCertain(text, cursor + 1)) doubtful = true;
+      ends.push(innerQuoteEnd(text, cursor + 1));
       if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
@@ -587,7 +565,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     out += character;
     index += 1;
   }
-  return Object.freeze({ text: out, made, doubtful });
+  return Object.freeze({ text: out, made, ends });
 }
 
 /**
@@ -595,10 +573,11 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
  * JSON broke at character 15,642). The scan stops at the first place JSON cannot go on: a value where an object's key
  * belongs, a `:` inside a list, or a closer that does not match. The missing closer is the open container's own. It is
  * tried right before each of that container's commas and right before the stop; the text is accepted only when exactly
- * ONE of those places makes the whole text strict JSON. Null otherwise, and when the only fault is at the very end
- * (CLOSING_BRACKETS's case). Linear scan plus at most `bracketPlacesMax` strict parses (model text is untrusted, CI-1b).
+ * ONE of those places makes the whole text strict JSON, and that text is returned. Null otherwise, and when the only
+ * fault is at the very end (CLOSING_BRACKETS's case). Linear scan plus at most `bracketPlacesMax` strict parses (model
+ * text is untrusted, CI-1b).
  */
-function insertOneBracket(text: string): { readonly value: unknown } | null {
+function insertOneBracket(text: string): string | null {
   type Frame = { close: "}" | "]"; commas: number[]; expectKey: boolean };
   const stack: Frame[] = [];
   let inString = false;
@@ -636,10 +615,10 @@ function insertOneBracket(text: string): { readonly value: unknown } | null {
   if (stop === null) return null;
   const places = [...stop.frame.commas, stop.at];
   if (places.length > SYNTAX_REPAIR_LIMITS.bracketPlacesMax) return null;
-  let found: { readonly value: unknown } | null = null;
+  let found: string | null = null;
   for (const place of places) {
-    const candidate = parsed(`${text.slice(0, place)}${stop.frame.close}${text.slice(place)}`);
-    if (candidate === null) continue;
+    const candidate = `${text.slice(0, place)}${stop.frame.close}${text.slice(place)}`;
+    if (parsed(candidate) === null) continue;
     if (found !== null) return null;
     found = candidate;
   }
@@ -647,13 +626,44 @@ function insertOneBracket(text: string): { readonly value: unknown } | null {
 }
 
 /**
+ * NEVER A CHANGED WORD (Task 3 re-review, round 5): whether every string of `reading` (strict JSON: the cleaned text, its
+ * brackets closed or one inserted; its strings are the scan's, in the same order) ends where INNER_QUOTE would end it,
+ * read in the context of that reading: a key always (INNER_QUOTE reads keys strictly), a value in an object or a list by
+ * `ends`. Then the pass's texts are INNER_QUOTE's texts, so every repair acts outside them (or escapes a line break
+ * inside one) and no word of the AI's can change. The context is the returned reading's, not the scan's: one inserted
+ * bracket can turn what the scan read as a list item into a key (`["a","b","short":{…}` → `["a","b"],"short":{…}`).
+ */
+function readingKeepsEveryWord(reading: string, ends: readonly StringEnd[]): boolean {
+  type Container = { kind: "object" | "array"; expectKey: boolean };
+  const stack: Container[] = [];
+  let ordinal = 0;
+  for (let index = 0; index < reading.length; index += 1) {
+    const character = reading[index]!;
+    const top = stack.at(-1);
+    if (character === "\"") {
+      const end = ends[ordinal];
+      ordinal += 1;
+      if (end === undefined) return false;
+      const isKey = top?.kind === "object" && top.expectKey;
+      if (!isKey && !(top?.kind === "array" ? end.inArray : end.inObject)) return false;
+      for (index += 1; index < reading.length && reading[index] !== "\""; index += 1) if (reading[index] === "\\") index += 1;
+    } else if (character === "{") stack.push({ kind: "object", expectKey: true });
+    else if (character === "[") stack.push({ kind: "array", expectKey: false });
+    else if (character === "}" || character === "]") stack.pop();
+    else if (character === ":" && top?.kind === "object") top.expectKey = false;
+    else if (character === "," && top?.kind === "object") top.expectKey = true;
+  }
+  return true;
+}
+
+/**
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
  * one code fence (named CODE_FENCE too), else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then
- * strict JSON, then (iv) INNER_QUOTE on the cleaned text, only when the clean made no repair outside strings; only for
- * a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then BRACKET_INSERTED. A reply cut off
- * at its token ceiling is never repaired. Null when nothing decodes to one object, and (never a changed word,
- * `OUTSIDE_STRING_REPAIRS`) when a repair outside strings was made on a reading with a string end that is not certain
- * (`stringEndIsCertain`'s whitelist). The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ * strict JSON on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned
+ * text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing decodes to one
+ * object, and (never a changed word) when the reading has a string that INNER_QUOTE would not end where the pass ends it
+ * (`readingKeepsEveryWord`): that reply goes on to the structure-repair call, which keeps every word. The repairs are
+ * named once each, in MODEL_JSON_REPAIRS order.
  */
 export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
@@ -662,29 +672,20 @@ export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   const base = (fenced ?? content).trim();
   if (!base.startsWith("{")) return null;
   const cleaned = syntaxClean(base);
-  // Task 3 re-review: a doubtful string end refuses every repair made outside strings, whatever later step would read it.
-  if (cleaned.doubtful && OUTSIDE_STRING_REPAIRS.some((repair) => cleaned.made.has(repair))) return null;
-  const done = (value: unknown, more: readonly ModelJsonDecodeRepair[]) => {
-    const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
-    return Object.freeze({ value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
+  const reading = (): Readonly<{ text: string; more: readonly ModelJsonDecodeRepair[] }> | null => {
+    if (cleaned.made.size > 0 && parsed(cleaned.text) !== null) return { text: cleaned.text, more: [] };
+    if (!modelReplyFinishedNormally(reply)) return null;
+    const closed = cleaned.made.size > 0 ? closeOpenBrackets(cleaned.text) : null;
+    if (closed !== null && parsed(closed) !== null) return { text: closed, more: ["CLOSING_BRACKETS"] };
+    const inserted = insertOneBracket(cleaned.text);
+    return inserted === null ? null : { text: inserted, more: ["BRACKET_INSERTED"] };
   };
-  if (cleaned.made.size > 0) {
-    const strict = parsed(cleaned.text);
-    if (strict !== null && isPlainObject(strict.value)) return done(strict.value, []);
-    if (!OUTSIDE_STRING_REPAIRS.some((repair) => cleaned.made.has(repair))) {
-      const quoted = escapeInnerQuotes(cleaned.text);
-      const unquoted = quoted === null ? null : parsed(quoted);
-      if (unquoted !== null && isPlainObject(unquoted.value)) return done(unquoted.value, ["INNER_QUOTE"]);
-    }
-  }
-  if (!modelReplyFinishedNormally(reply)) return null;
-  if (cleaned.made.size > 0) {
-    const closed = closeOpenBrackets(cleaned.text);
-    const value = closed === null ? null : parsed(closed);
-    if (value !== null && isPlainObject(value.value)) return done(value.value, ["CLOSING_BRACKETS"]);
-  }
-  const inserted = insertOneBracket(cleaned.text);
-  return inserted !== null && isPlainObject(inserted.value) ? done(inserted.value, ["BRACKET_INSERTED"]) : null;
+  const found = reading();
+  if (found === null || !readingKeepsEveryWord(found.text, cleaned.ends)) return null;
+  const value = parsed(found.text);
+  if (value === null || !isPlainObject(value.value)) return null;
+  const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...found.more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
+  return Object.freeze({ value: value.value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
 }
 
 /**
