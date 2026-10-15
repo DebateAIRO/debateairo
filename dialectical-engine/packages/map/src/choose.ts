@@ -1,3 +1,4 @@
+import { mapNamesInternalWord } from "./internal-words.js";
 import { mapRankKeyPoints, mapRankMergedAnswers } from "./items.js";
 import { MAP_OPPOSITE_SEPARATORS, MAP_OPPOSITE_TEMPLATES } from "./opposite-templates.js";
 import type { MapChooseReply } from "./replies.js";
@@ -9,7 +10,8 @@ import {
   type MapItem,
   type MapKeyPoint,
   type MapMarkRecord,
-  type MapMergedAnswer
+  type MapMergedAnswer,
+  type MapNoteRecord
 } from "./types.js";
 
 /**
@@ -97,10 +99,31 @@ function mapFirstOfEachStatement<T>(entries: readonly T[], statement: (entry: T)
 /** Final review M-3: a text with at least one letter or digit (one that does not normalise to nothing). */
 const hasWords = (text: string): boolean => mapNormaliseText(text) !== "";
 
+/**
+ * Practice 2026-10-15: a text a person may read as a chosen answer or a point: it has words and names no internal field
+ * or item id (`mapNamesInternalWord`). Anything else is skipped whole, never edited.
+ */
+const readable = (text: string): boolean => hasWords(text) && !mapNamesInternalWord(text);
+
+/**
+ * The operator-only note for what the choice left out because it names an internal field or item id: how many key points
+ * (never dealt, never "also raised") and merged answers (never chosen, never filled). Null when there were none.
+ */
+export function mapInternalWordsSkipped(keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[]): MapNoteRecord | null {
+  const points = keyPoints.filter((keyPoint) => mapNamesInternalWord(keyPoint.claim)).length;
+  const answers = mergedAnswers.filter((answer) => mapNamesInternalWord(answer.answer)).length;
+  if (points + answers === 0) return null;
+  return Object.freeze({ note: "INTERNAL_WORDS_SKIPPED", step: "CHOOSE", detail: `key points ${String(points)}, answers ${String(answers)}` });
+}
+
 export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice: MapChoice; marks: readonly MapMarkRecord[] }> {
   const marks: MapMarkRecord[] = [];
-  const ranked = mapRankKeyPoints(input.keyPoints);
-  const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+  // Practice 2026-10-15: a key point whose claim names an internal field or item id is never dealt to an answer (its claim
+  // would be a debater's consideration) nor listed as also raised: as if it were not shown, the rule below for any id the
+  // chooser was not shown. A merged answer or list answer that names one is never chosen or filled, like one with no words.
+  const keyPoints = input.keyPoints.filter((keyPoint) => !mapNamesInternalWord(keyPoint.claim));
+  const ranked = mapRankKeyPoints(keyPoints);
+  const byId = new Map(keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
   // The answer ids are a1..aN with N at most chooseAnswersMax (0117's CHECK), whatever the caller's P says.
   const maxAnswers = Math.min(input.maxAnswers, MAP_LIMITS.chooseAnswersMax);
   // Only the key points the chooser was shown: the check refuses any other id; this holds for any reply (T7-PRIV).
@@ -125,14 +148,16 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   if (input.reply === null) {
     marks.push(Object.freeze({ mark: "MAP_CHOOSE_FALLBACK", step: "CHOOSE", detail: "choose reply missing" }));
     // Final review M-3: a merged answer with no letter or digit is never chosen.
-    const candidates = mapFirstOfEachStatement(mapRankMergedAnswers(input.mergedAnswers).filter((answer) => hasWords(answer.answer)),
+    const candidates = mapFirstOfEachStatement(mapRankMergedAnswers(input.mergedAnswers).filter((answer) => readable(answer.answer)),
       (answer) => answer.answer).slice(0, Math.max(1, maxAnswers));
     candidates.forEach((answer, index) => {
       drafts.push({ answerId: `a${String(index + 1)}`, statement: answer.answer, forIds: [], againstIds: [], rival: null, filled: false,
         opposite: isOpposite(answer.answer) });
     });
   } else {
-    for (const answer of mapFirstOfEachStatement(input.reply.answers, (entry) => entry.statement).slice(0, maxAnswers)) {
+    // The choose check refuses such a statement (MAP_ANSWER_NAMES_FIELD); one that reached here anyway is dropped, never shown.
+    const replyAnswers = input.reply.answers.filter((answer) => !mapNamesInternalWord(answer.statement));
+    for (const answer of mapFirstOfEachStatement(replyAnswers, (entry) => entry.statement).slice(0, maxAnswers)) {
       drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: shownKeyPoints(answer.for), againstIds: shownKeyPoints(answer.against),
         rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement) });
     }
@@ -149,10 +174,10 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     // matched nothing here, the same merged answer could be filled in twice while drafts start empty.
     const taken = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
     // Final review M-3: an answer with no letter or digit never fills a place (the template is the last resort).
-    const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => hasWords(answer.answer)
+    const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => readable(answer.answer)
       && !taken.has(mapNormaliseText(answer.answer)));
     const fromOpposite = input.items.find((item): item is MapAnswerItem => item.kind === "ANSWER"
-      && item.angleKind === "OPPOSITE_CASE" && hasWords(item.answer) && !taken.has(mapNormaliseText(item.answer)));
+      && item.angleKind === "OPPOSITE_CASE" && readable(item.answer) && !taken.has(mapNormaliseText(item.answer)));
     const first = drafts[0];
     const [statement, source]: readonly [string, string] = fromMap !== undefined ? [fromMap.answer, "MAP_CANDIDATE"]
       : fromOpposite !== undefined ? [fromOpposite.answer, "OPPOSITE_CASE_LIST"]

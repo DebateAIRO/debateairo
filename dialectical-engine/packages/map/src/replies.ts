@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ReplyLanguageExpectation } from "@debateai/kernel";
 import { decodeModelJson, type ContentClassification, type ModelJsonRepair, type ModelReplyFacts } from "@debateai/providers";
 import type { MapReplySalvage } from "./salvage.js";
+import { mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
 import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
 
@@ -210,6 +211,10 @@ export function mapChooseCheck(keyPointIds: ReadonlySet<string>, expected: Reply
       const statement = mapNormaliseText(answer.statement);
       if (statement === "") issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NO_WORDS" });
       if (statement !== "" && statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
+      // Practice 2026-10-15: a statement that talks about the prompt's own fields (angle_focus, key_point_id …) or an item id
+      // is about the engine, not the question, and a chosen statement is shown as it is: refused at its own statement,
+      // like MAP_ANSWER_NO_WORDS, so the repair re-asks that member. Never edited.
+      if (mapNamesInternalWord(answer.statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NAMES_FIELD" });
       if (statement !== "") statements.add(statement);
     });
     issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), expected, ["answers"]));

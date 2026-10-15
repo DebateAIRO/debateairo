@@ -1,6 +1,6 @@
 import { DEBATE_MAP_VIEW_LIMITS, DebateMapViewSchema, type Answer, type DebateMapView } from "@debateai/contract";
 import { normalizeRunOwnership, type RunOwnershipAccess } from "@debateai/db";
-import { mapAnswersArgued, mapMergeAlsoRaised } from "@debateai/map";
+import { mapAnswersArgued, mapMergeAlsoRaised, mapNamesInternalWord } from "@debateai/map";
 
 /**
  * DEBATE SHAPE P2c (spec 2026-10-12 §3.3 step 8, §3.4) — the debate page's view of the map:
@@ -110,9 +110,11 @@ function clip(text: string, limit: number): string {
 /**
  * The view. Each position's node is the one the map recorded for it; it is kept only when it is
  * a UUID the answer holds (`answerNodeIds`), so a title never points at a node the page cannot
- * show. So is one with no node, or a second answer on the same node. Also-raised claims are
+ * show. So is one with no node, or a second answer on the same node, or one whose statement
+ * names an internal map field or item id (practice 2026-10-15; the choose check refuses such a
+ * statement, so only a row stored before that rule can hold one). Also-raised claims are
  * merged when they say the same (their makers joined), come most-raised first, ties in the map's
- * order, and only the claims travel.
+ * order, and only the claims travel; a claim naming an internal field is skipped by the same rule.
  * After a re-claim, P2b keeps the first pass's `root_node_id` (`core.map_position` is written
  * with ON CONFLICT DO NOTHING). If that node is not in the answer the position is dropped
  * here: its title just does not show (pre-flight PF-C19).
@@ -122,7 +124,7 @@ export function debateMapViewFrom(record: MapViewSource, nodeIds: ReadonlySet<st
   const positions = record.answers.flatMap((answer) => {
     const nodeId = answer.rootNodeId;
     if (nodeId === null || !NODE_UUID.test(nodeId) || !nodeIds.has(nodeId) || seen.has(nodeId)
-      || answer.statement.trim() === "") return [];
+      || answer.statement.trim() === "" || mapNamesInternalWord(answer.statement)) return [];
     seen.add(nodeId);
     return [{ node_id: nodeId, answer: clip(answer.statement, DEBATE_MAP_VIEW_LIMITS.maxAnswerChars) }];
   }).slice(0, DEBATE_MAP_VIEW_LIMITS.maxPositions);

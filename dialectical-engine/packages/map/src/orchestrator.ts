@@ -1,5 +1,5 @@
 import { lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpectation } from "@debateai/kernel";
-import { mapFinishChoice } from "./choose.js";
+import { mapFinishChoice, mapInternalWordsSkipped } from "./choose.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
 import { mapAddGapPoints, mapApplyMerge, mapCodeMerge, mapSingletonMap, type MapMergedMap } from "./keypoints.js";
 import type { MapPromptContractSet } from "./prompts.js";
@@ -312,6 +312,8 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
   const finished = mapFinishChoice({ reply, keyPoints: merged.keyPoints, mergedAnswers: merged.mergedAnswers, items: allItems,
     languageTag: run.input.languageTag, maxAnswers: Math.min(run.input.maxAnswers, makersPresent), pointsPerAnswer: run.input.pointsPerAnswer });
   run.marks.push(...finished.marks);
+  const skipped = mapInternalWordsSkipped(merged.keyPoints, merged.mergedAnswers);
+  if (skipped !== null) run.mapNote(skipped.note, skipped.step, skipped.detail);
   return run.mapResult({ kind: "MAP", angles, items: allItems, keyPoints: merged.keyPoints, mergedAnswers: merged.mergedAnswers,
     framingChallenges: Object.freeze(challenges), choice: finished.choice });
 }
