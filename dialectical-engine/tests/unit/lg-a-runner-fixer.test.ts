@@ -38,6 +38,30 @@ describe("LG-A: the answer writer and checker read every reply through the fixer
     expect(parseEvaluatorOutput(trailing, STOP)).toEqual(VERDICT);
   });
 
+  it("a stray text under a name the writer's form declares as a text is kept, so the reply is refused (Task 7b)", () => {
+    const segment = { segment_id: "segment:verdict", text: "The answer holds.", node_refs: [NODE], served_number_refs: [] };
+    const rootText = JSON.stringify({ segments: [segment], text: "A sentence the writer meant for the answer." });
+    expect(classifyComposedContent(rootText, citation, STOP).parseStatus).toBe("SCHEMA_FAILED");
+    expect(() => parseComposerOutput(rootText, STOP)).toThrow();
+    const rootId = JSON.stringify({ segments: [segment], segment_id: "segment:reasons" });
+    expect(classifyComposedContent(rootId, citation, STOP).parseStatus).toBe("SCHEMA_FAILED");
+    // A name the form never declares is still dropped, at the root and inside a segment.
+    expect(classifyComposedContent(JSON.stringify({ segments: [segment], notes: "all fine" }), citation, STOP))
+      .toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+    expect(classifyComposedContent(JSON.stringify({ segments: [{ ...segment, notes: "all fine" }] }), citation, STOP))
+      .toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_UNASKED_KEYS" });
+  });
+
+  it("the checker's stray objection is never dropped: refused when the verdict's own objection is taken (Task 7b)", () => {
+    const stray = JSON.stringify({ satisfied: false, objection: "The answer overstates the savings.",
+      criteria: { ...VERDICT.criteria, no_overstatement: false, objection: "It also cites nothing." } });
+    expect(classifyEvaluatorContent(stray, STOP).parseStatus).toBe("SCHEMA_FAILED");
+    expect(() => parseEvaluatorOutput(stray, STOP)).toThrow();
+    // A name the checker's form never declares is still dropped.
+    const notes = JSON.stringify({ ...VERDICT, notes: "all fine" });
+    expect(classifyEvaluatorContent(notes, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+  });
+
   it("a verdict missing a criterion is still refused, and so is a writer's list that holds a value", () => {
     const { citation_tracing: _gone, ...criteria } = VERDICT.criteria;
     expect(classifyEvaluatorContent(JSON.stringify({ ...VERDICT, criteria }), STOP).parseStatus).toBe("SCHEMA_FAILED");

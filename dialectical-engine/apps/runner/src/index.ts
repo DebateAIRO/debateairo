@@ -2589,9 +2589,16 @@ function decodeStructuredReply(content: string, ending?: ModelReplyFacts): Decod
 }
 
 /**
+ * LG-A Task 7b (controller ruling): the writer's and checker's texts face the reader, so the fixer KEEPS a stray text
+ * under a name the schema declares as a text (a root `text` beside `segments[].text`) and the reply stays refused,
+ * instead of dropping the AI's words. Names the schema never declares (`notes`) are still dropped.
+ */
+const RUNNER_READER_FIX_OPTIONS = Object.freeze({ keepDeclaredTexts: true });
+
+/**
  * LG-A (spec 2026-10-15, L31): the runner's ONE structured reading (writer and checker): decode; the schema; when the
- * schema refuses, the reply fixer (on `guide` when the step has one), then the schema again. The classifier and the
- * parser both call it, so a call accepts exactly the replies its step then reads.
+ * schema refuses, the reply fixer (on `guide` when the step has one; `RUNNER_READER_FIX_OPTIONS`), then the schema
+ * again. The classifier and the parser both call it, so a call accepts exactly the replies its step then reads.
  */
 function readStructuredValue<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts, guide?: z.ZodType):
   | { readonly ok: true; readonly value: T; readonly repairs: readonly ModelJsonRepair[] }
@@ -2600,7 +2607,7 @@ function readStructuredValue<T>(content: string, schema: z.ZodType<T>, ending?: 
   if (!reply.decoded) return { ok: false, parseStatus: "PARSE_FAILED", message: reply.message };
   const parsed = schema.safeParse(reply.value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: reply.repairs };
-  const fixed = fixReplyStructure(reply.value, guide ?? schema);
+  const fixed = fixReplyStructure(reply.value, guide ?? schema, RUNNER_READER_FIX_OPTIONS);
   const refixed = fixed === null ? null : schema.safeParse(fixed.value);
   return refixed !== null && refixed.success
     ? { ok: true, value: refixed.data, repairs: [...reply.repairs, ...fixed!.repairs] }
