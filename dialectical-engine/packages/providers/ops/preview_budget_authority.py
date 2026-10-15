@@ -79,7 +79,13 @@ pot and call count include it like any settled call, the caller sees PROVIDER_CH
 the journal line carries alert 'charge_booked_at_reservation'. status counts the day's bookings
 (today_booked_max, today_booked_max_usd) and the halt watcher emails the owner once per new booking.
 A booking neither grows nor resets the unsent streak and never cools or uncools a model (a cool-off
-trial that is booked proves nothing: the next call may be the trial). Everything else still halts
+trial that is booked proves nothing: the next call may be the trial).
+A vendor's server error (owner ruling 2026-10-15, after two GLM answers of HTTP 500 with no usage and no
+model each halted the gate): a reply the profile's optional bookable_server_error accepts (DeepInfra:
+HTTP 500 to 599 with none of the billing keys anywhere in the raw reply) is booked the same way, with
+reason 'vendor_server_error', its HTTP status and the vendor facts an unbilled release keeps (Retry-After,
+rate-limit header names, the short redacted error). The same reservation bounds whatever was billed.
+A profile without the hook (Anthropic) is unchanged. Everything else still halts
 exactly as before: any other failure while sending or reading (a reply too large, a fault in the
 transport itself), a hook that fails on a reply, a reply without accountable usage (also a vendor's
 own timeout answer such as Anthropic's 504), a charge above the reservation (charge_overrun),
@@ -1118,11 +1124,19 @@ class ChargeBookedMax(SafetyError):
 
 
 class _FailedAfterSend(Exception):
-    """Internal: the transport raised one of BOOKABLE_TRANSPORT_FAILURES (error_class: its class name)."""
+    """Internal: a call to book at its reservation. Either the transport raised one of
+    BOOKABLE_TRANSPORT_FAILURES (error_class: its class name; reason transport_failure), or (owner ruling
+    2026-10-15) the vendor answered a server error its profile's bookable_server_error found without any
+    billing field (reason vendor_server_error, with the HTTP status and vendor_refusal_facts)."""
 
-    def __init__(self, error_class):
+    def __init__(self, error_class=None, http_status=None, facts=None):
         super().__init__('failed_after_send')
-        self.error_class = error_class
+        if error_class is not None:
+            self.reason, self.details = 'transport_failure', {'error_class': error_class}
+        else:
+            self.reason = 'vendor_server_error'
+            self.details = {'http_status': http_status if type(http_status) is int else None,
+                            **(facts if isinstance(facts, dict) else no_vendor_facts())}
 
 
 class UnbilledRefusal(Exception):
@@ -1357,6 +1371,12 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             response = helper.redact(raw_response, key, profile.redaction_patterns)
             if unbilled:
                 raise UnbilledRefusal(status, busy, vendor_refusal_facts(response, kept_headers, current(now)))
+            # Owner ruling 2026-10-15: a server error the profile finds without any billing field (DeepInfra's
+            # 5xx, judged on the RAW reply as above) is booked at the reservation, as a connection that failed
+            # after the send is. A profile without the hook (Anthropic) is unchanged; a hook that fails halts.
+            bookable = getattr(profile, 'bookable_server_error', None)
+            if bookable is not None and bookable(status, raw_response) is True:
+                raise _FailedAfterSend(http_status=status, facts=vendor_refusal_facts(response, kept_headers, current(now)))
         except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
                 # Unsent: no entry kept. Unbilled: kept at $0 on the record, and cools its model off.
@@ -1379,11 +1399,11 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             # The reservation bounds the bill: book it as the charge and keep the gate active (no halt reason).
             # A settlement that cannot be written still halts (settle_or_halt), as for any call.
             outcome = settle_or_halt(private, entry_id, day, {
-                'state': BOOKED_MAX, 'held_usd': str(reserved), 'reason': 'transport_failure',
-                'error_class': failed.error_class, 'elapsed_seconds': round(time.monotonic() - started, 6)},
+                'state': BOOKED_MAX, 'held_usd': str(reserved), 'reason': failed.reason, **failed.details,
+                'elapsed_seconds': round(time.monotonic() - started, 6)},
                 None, budget, now, slots)
             log_event({**event, 'model': row.model, 'status': BOOKED_MAX, 'alert': 'charge_booked_at_reservation',
-                       'booked_usd': str(reserved), 'error_class': failed.error_class, **outcome})
+                       'booked_usd': str(reserved), 'reason': failed.reason, **failed.details, **outcome})
             raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {

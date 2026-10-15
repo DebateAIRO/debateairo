@@ -434,6 +434,11 @@ class DeepInfraProfile:
                                          the vendor is busy (the gate cools that model off and
                                          never halts for it); False for any other unbilled error
                                          (counted toward the unsent streak, never cools the model)
+      bookable_server_error(status, response) -> bool  OPTIONAL (2026-10-15): asked of a reply that is not
+                                         an unbilled refusal; True books the call at its reservation
+                                         (settled_reserved_max, reason vendor_server_error) and the
+                                         gate stays active. A profile without it (AnthropicProfile)
+                                         accounts every such reply as before
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -560,6 +565,15 @@ class DeepInfraProfile:
     def busy_refusal(self, status, response):
         """DeepInfra's only unbilled refusal is its 429 ("too many requests"): always busy."""
         return status == 429
+
+    def bookable_server_error(self, status, response):
+        """Owner ruling 2026-10-15: True for a server error (HTTP 500 to 599) whose reply carries none of
+        the billing keys unbilled_refusal looks for, at any depth. Not proof that nothing was billed: the
+        gate books the call at its reservation, which bounds any bill, as for a connection that failed
+        after the send, and stays active. A reply with any of those keys is accounted (and halts) as before."""
+        return (type(status) is int and 500 <= status <= 599 and isinstance(response, dict)
+                and not names_any_key(response, BILLED_KEYS)
+                and not names_any_key_prefixed(response, 'tokens_'))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

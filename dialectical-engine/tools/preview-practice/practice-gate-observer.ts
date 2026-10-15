@@ -158,7 +158,7 @@ export type PracticeGateSummary = Readonly<{
   vendorErrorUnbilled: number;
   concurrencyLimit: number;
   gateRefused: number;
-  /** Calls the gate booked at their maximum: sent, then timed out or cut off (PROVIDER_CHARGE_BOOKED_MAX). Billed. */
+  /** Calls the gate booked at their maximum: sent, then timed out, cut off or answered a server error without a bill (PROVIDER_CHARGE_BOOKED_MAX). Billed. */
   bookedMax: number;
   transportFailed: number;
   stoppedLocally: number;

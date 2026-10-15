@@ -756,8 +756,8 @@ class UnbilledRefusalTests(GateTest):
 
     def test_anything_ambiguous_stays_uncertain_and_halts(self):
         nested_cost = {'error': {'message': 'slow down', 'detail': {'estimated_cost': 0}}}
-        for name, status, reply in (('500_without_usage', 500, dict(self.RATE_LIMITED)),
-                                    ('429_without_error', 429, {'detail': 'slow down'}),
+        # A 5xx without any billing field is booked at its reservation since 2026-10-15 (ServerErrorBookedTests).
+        for name, status, reply in (('429_without_error', 429, {'detail': 'slow down'}),
                                     ('429_empty_error', 429, {'error': ''}),
                                     ('429_with_choices', 429, {**self.RATE_LIMITED, 'choices': []}),
                                     ('429_nested_cost', 429, nested_cost),
@@ -767,8 +767,7 @@ class UnbilledRefusalTests(GateTest):
                                     ('429_tokens_generated', 429, {**self.RATE_LIMITED, 'meta': {'tokens_generated': 3}}),
                                     # Judged on the raw reply: redaction would drop this 'headers' subtree.
                                     ('429_usage_under_redacted_key', 429, {**self.RATE_LIMITED, 'headers': {'usage': {'prompt_tokens': 1}}}),
-                                    ('429_not_json', 429, {'_invalid_json': True}),
-                                    ('529_without_usage', 529, dict(self.RATE_LIMITED))):
+                                    ('429_not_json', 429, {'_invalid_json': True})):
             with self.subTest(name):
                 gate = self.gate().ready()
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
@@ -1706,6 +1705,127 @@ class HaltedRefusalTests(GateTest):
             gate.call('op-1')
         self.assertEqual(json.loads(bridge.refusal_body(SafetyError('AUTHORITY_STOPPED'))),
                          {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+
+
+class ServerErrorBookedTests(GateTest):
+    """Owner ruling 2026-10-15 (option A): a DeepInfra server error (HTTP 500 to 599) with no billing field
+    anywhere in it is booked at its reservation, as a connection that failed after the send is
+    (settled_reserved_max), and the gate stays active. Seen live: GLM answered 500 after about 31 s with no
+    usage and no model (2026-10-14 23:52 and 2026-10-15 07:10 UTC), and each answer halted every DeepInfra
+    model until a re-open. Anything with a billing field, a 4xx and a 200 without usage still halt."""
+    SERVER_ERROR = {'error': {'message': 'Internal Server Error', 'type': 'server_error', 'code': 500}}
+    complete = HaltedRefusalTests.complete
+
+    def answering(self, status, reply):
+        return lambda _sent, _key: (status, json.loads(json.dumps(reply)))
+
+    def assert_booked(self, gate, status, operation_id='op-1'):
+        entry = entry_of(gate, operation_id)
+        self.assertEqual((entry['state'], entry['reason'], entry['http_status']),
+                         ('settled_reserved_max', 'vendor_server_error', status))
+        self.assertEqual((Decimal(entry['held_usd']), Decimal(entry['reserved_usd'])), (RESERVED, RESERVED))
+        report = gate.status()
+        self.assertEqual((report['state'], report['reason'], report['halts'], report['in_flight'], report['today_uncertain']),
+                         ('active', None, [], 0, 0))
+        self.assertEqual((report['today_booked_max'], Decimal(report['today_booked_max_usd'])), (1, RESERVED))
+        return entry
+
+    def assert_halted_uncertain(self, gate):
+        report = gate.status()
+        self.assertEqual((report['state'], report['reason'], report['today_booked_max']), ('halted', 'uncertain_charge', 0))
+        self.assertEqual(entry_of(gate, 'op-1')['state'], 'uncertain')
+
+    def test_a_server_error_without_billing_data_is_booked_at_its_reservation_and_the_gate_stays_active(self):
+        for status, reply in ((500, self.SERVER_ERROR), (502, {'detail': 'Bad Gateway'}), (503, self.SERVER_ERROR),
+                              (504, {'_invalid_json': True}), (529, self.SERVER_ERROR), (599, {})):
+            with self.subTest(status=status):
+                gate = self.gate().ready()
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                    gate.call('op-1', dispatch=self.answering(status, reply))
+                self.assert_booked(gate, status)
+                self.assertEqual(gate.call('op-2')['status'], 200)  # Every model keeps working.
+
+    def test_the_booking_keeps_a_short_redacted_vendor_error_and_journals_the_alert(self):
+        gate = self.gate().ready()
+        reply = {'error': {'message': 'Internal failure for ' + KEY, 'type': 'server_error', 'code': 500}}
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.answering(500, reply))
+        entry = self.assert_booked(gate, 500)
+        self.assertEqual((entry['vendor_error']['type'], entry['vendor_error']['code']), ('server_error', '500'))
+        self.assertTrue(entry['vendor_error']['message'].startswith('Internal failure for '))
+        self.assertNotIn(KEY, json.dumps(gate.day('2026-10-08')))
+        logged = [json.loads(line) for line in self.out.getvalue().splitlines() if line.startswith('{')]
+        booked = [line for line in logged if line.get('status') == 'settled_reserved_max']
+        self.assertEqual(len(booked), 1)
+        self.assertEqual({name: booked[0][name] for name in ('model', 'alert', 'reason', 'http_status', 'authority')},
+                         {'model': MODEL, 'alert': 'charge_booked_at_reservation', 'reason': 'vendor_server_error',
+                          'http_status': 500, 'authority': 'active'})
+        self.assertEqual(Decimal(booked[0]['booked_usd']), RESERVED)
+        self.assertNotIn(KEY, self.out.getvalue())
+
+    def test_a_server_error_carrying_any_billing_field_still_halts_as_before(self):
+        usage = {'prompt_tokens': 10, 'completion_tokens': 0}
+        settled = {**self.SERVER_ERROR, 'model': MODEL, 'usage': usage}
+        gate = self.gate().ready()
+        with self.refused('SETTLED_INTO_HALT'):
+            gate.call('op-1', dispatch=self.answering(500, settled))
+        self.assertEqual((entry_of(gate, 'op-1')['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
+        for name, reply in (('choices', {**self.SERVER_ERROR, 'choices': []}),
+                            ('nested_cost', {'error': {'message': 'failed', 'detail': {'estimated_cost': 0}}}),
+                            ('cost', {**self.SERVER_ERROR, 'cost': 0}),
+                            ('inference_status', {**self.SERVER_ERROR, 'inference_status': {'cost': 0.0001}}),
+                            ('tokens_generated', {**self.SERVER_ERROR, 'meta': {'tokens_generated': 3}}),
+                            # Judged on the raw reply: redaction would drop this 'headers' subtree.
+                            ('usage_under_redacted_key', {**self.SERVER_ERROR, 'headers': {'usage': usage}})):
+            with self.subTest(name):
+                gate = self.gate().ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=self.answering(503, reply))
+                self.assert_halted_uncertain(gate)
+
+    def test_a_client_error_or_an_answer_outside_5xx_without_usage_still_halts(self):
+        for status in (200, 400, 401, 402, 403, 404, 408, 413, 422, 499, 600):
+            with self.subTest(status=status):
+                gate = self.gate().ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=self.answering(status, self.SERVER_ERROR))
+                self.assert_halted_uncertain(gate)
+
+    def test_only_the_deepinfra_profile_books_a_server_error(self):
+        self.assertTrue(DEEPINFRA.bookable_server_error(500, dict(self.SERVER_ERROR)))
+        self.assertTrue(DEEPINFRA.bookable_server_error(599, {'_invalid_json': True}))
+        for status, reply in ((499, self.SERVER_ERROR), (600, self.SERVER_ERROR), (429, self.SERVER_ERROR),
+                              (True, self.SERVER_ERROR), ('500', self.SERVER_ERROR), (500.0, self.SERVER_ERROR),
+                              (500, ['not', 'an', 'object']), (500, {**self.SERVER_ERROR, 'usage': None}),
+                              (500, {'error': {'tokens_input': 1}})):
+            with self.subTest(status=status, reply=reply):
+                self.assertFalse(DEEPINFRA.bookable_server_error(status, reply))
+        # Owner ruling 2026-10-15: Haiku's gate is not changed (its own 504 still halts).
+        self.assertIsNone(getattr(bridge.helper.PROFILES['anthropic'], 'bookable_server_error', None))
+
+    def test_a_failing_hook_is_uncertain_and_halts(self):
+        gate = self.gate().ready()
+        with patch.object(DEEPINFRA, 'bookable_server_error', side_effect=RuntimeError('synthetic')), \
+                self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=self.answering(500, self.SERVER_ERROR))
+        self.assert_halted_uncertain(gate)
+
+    def test_through_ipc_the_caller_sees_the_booked_code_and_no_delivery_halt_is_added(self):
+        # Live, the halt was journaled twice: uncertain_charge, then ipc_or_delivery_failure for the same call.
+        gate = self.gate().ready()
+        line, reply = self.complete(gate, 'op-1', self.answering(500, self.SERVER_ERROR))
+        self.assertEqual((line, reply), (b'HTTP/1.0 409 Conflict', {'error': 'PROVIDER_CHARGE_BOOKED_MAX'}))
+        self.assert_booked(gate, 500)
+
+    def test_a_booked_server_error_neither_grows_nor_resets_the_unsent_streak_and_never_cools_the_model(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-0', dispatch=unreached)
+        for operation_id in ('op-1', 'op-2'):
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                gate.call(operation_id, dispatch=self.answering(500, self.SERVER_ERROR))
+        control = gate.control()
+        self.assertEqual((control['unsent_streak'], control.get('cooling', {}), control['state']), (1, {}, 'active'))
 
 
 class ReasoningTokenTests(GateTest):

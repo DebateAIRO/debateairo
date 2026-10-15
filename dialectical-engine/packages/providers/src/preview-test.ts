@@ -756,7 +756,8 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
 export const PROVIDER_GATE_UNAVAILABLE = "PROVIDER_GATE_UNAVAILABLE" as const;
 /**
  * Slow answer (owner ruling 2026-10-12): the gate's public refusal for a call it reserved and SENT whose vendor
- * connection then failed or ran past the gate's deadline (1,200 s). The gate books the call's whole reservation as its
+ * connection then failed or ran past the gate's deadline (1,200 s), or (owner ruling 2026-10-15, DeepInfra) whose vendor
+ * answered a server error (HTTP 500 to 599) without any billing field. The gate books the call's whole reservation as its
  * charge (ledger state settled_reserved_max) and stays active. Before, it answered PREVIEW_TEST_AUTHORITY_STOPPED,
  * which the app read as the run's money ceiling. It is the app's own sent-and-failed transport failure: the code is
  * PROVIDER_CALL_FAILED (so the gateway records a billed FAILED attempt and the runner cools down and retries as after
