@@ -486,23 +486,37 @@ function nextSignificantPastTokens(text: string, from: number): string | undefin
   return text[index];
 }
 
-/** A character that can open a JSON value or key, or close a container, right after a comma. */
-const AFTER_COMMA_STARTS: ReadonlySet<string> = new Set("\"}]{[-0123456789tfn");
+/** A character that can open a JSON value or key right after a comma (a closer there is `stringEndIsCertain`'s own case). */
+const AFTER_COMMA_STARTS: ReadonlySet<string> = new Set("\"{[-0123456789tfn");
+
+/** True when everything from `from` to the text's end is closers (`}` / `]`) and blanks; leaked tokens are NOT skipped. */
+function onlyClosersToEnd(text: string, from: number): boolean {
+  for (let index = nextSignificant(text, from); index < text.length; index = nextSignificant(text, index + 1)) {
+    if (text[index] !== "}" && text[index] !== "]") return false;
+  }
+  return true;
+}
 
 /**
- * WHITELIST (Task 3 re-review, round 3): a quote at `from - 1` that the pass took as a string's end is CERTAIN only when,
- * in the reply itself with blanks skipped (leaked tokens are NOT skipped), the next character is `}`, `]`, `:` or the
- * text's end, or it is `,` followed (blanks skipped) by `"`, `}`, `]`, `{`, `[`, `-`, a digit, `t`, `f` or `n`. Every
- * other end is doubtful. Why: with this rule a word can change only where the reply already reads as JSON grammar
- * around the quote, which INNER_QUOTE (`closesValue`) reads the same way; a quote followed by a token, a letter or
- * `,<|…|>` may be the AI's own quotation mark, and a repair after it could split its text into an invented key.
+ * WHITELIST (Task 3 re-review, rounds 3 and 4): a quote at `from - 1` that the pass took as a string's end is CERTAIN
+ * only when, in the reply itself with blanks skipped (leaked tokens are NOT skipped), the next character is `}`, `]`,
+ * `:` or the text's end, or it is `,` followed (blanks skipped) by `"`, `{`, `[`, `-`, a digit, `t`, `f` or `n`, or it
+ * is `,` then `}` or `]` with nothing but closers (blanks between) after that closer to the text's end. Every other end
+ * is doubtful. Why: with this rule a word can change only where the reply already reads as JSON grammar around the
+ * quote, which INNER_QUOTE (`closesValue`) reads the same way; a quote followed by a token, a letter or `,<|…|>` may be
+ * the AI's own quotation mark, and a repair after it could split its text into an invented key. Round 4: `",}` / `",]`
+ * mid-text is exactly the comma TRAILING_COMMA drops, and `closesValue` reads that quote as one that cannot end a value;
+ * dropping it there could close an inner object inside the AI's text that the text's own `{` reopens (an invented
+ * element). Linear: the closers looked at after one quote's `,}` are never looked at for another quote.
  */
 function stringEndIsCertain(text: string, from: number): boolean {
   const at = nextSignificant(text, from);
   const next = text[at];
   if (next === undefined || next === "}" || next === "]" || next === ":") return true;
   if (next !== ",") return false;
-  const after = text[nextSignificant(text, at + 1)];
+  const afterAt = nextSignificant(text, at + 1);
+  const after = text[afterAt];
+  if (after === "}" || after === "]") return onlyClosersToEnd(text, afterAt + 1);
   return after !== undefined && AFTER_COMMA_STARTS.has(after);
 }
 
