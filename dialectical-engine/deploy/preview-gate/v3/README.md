@@ -639,8 +639,9 @@ gate with its own README's steps):
 1. Copy the files with install step 1 (`R` set to this release), and the unit file
    `debateai-preview-provider-budget.service` from `$R/deploy/preview-gate/v3/systemd/` to
    `/etc/systemd/system/`; then `systemctl daemon-reload`.
-2. Write the GO again with install step 4 (the new `bridge_sha256` and `helper_sha256`; nothing else
-   changes).
+2. Write the GO again with the new `bridge_sha256` and `helper_sha256`, nothing else changing: change
+   only those two hashes in the current GO, as "Redeploy (2026-10-12)" step 4 below shows. Re-running
+   install step 4's `jq -n` would write the first-install GO (GLM only) and switch the other models off.
 3. `systemctl restart debateai-preview-provider-budget.service`, then re-open with `activate`
    ("Re-open after a halt", step 5; owner's yes): the gate refuses calls under a GO it was not
    activated with.
@@ -665,20 +666,69 @@ the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Ant
 
 ## Redeploy (2026-10-12): calls on their way together count once
 
-Only `preview_budget_authority.py` changed (the helper did not): failures of calls that were on
-their way at the same time now add 1 to the count of five that halts a gate with
-`provider_unreachable`, so one short network blip under 10 calls at once no longer halts it (owner
-ruling O8; spec 2026-10-12 parallel calls, section 3.4). That file's hash (`bridge_sha256`) is in
-both gates' GOs, so root writes a new GO for each gate, DeepInfra and Anthropic, exactly as in the
-existing GO step (here install step 4; README-anthropic.md install step 5), with the same values.
-Nothing else changes: no limit, no unit, no key, no `scope_id`. For each gate, as root:
-1. `stop` (Daily operations, "Emergency off", level 1).
-2. Install the new gate files from the reviewed release (install step 1 of that gate's README) and
+This change is in `preview_budget_authority.py`: failures of calls that were on their way at the
+same time now add 1 to the count of five that halts a gate with `provider_unreachable`, so one short
+network blip under 10 calls at once no longer halts it (owner ruling O8; spec 2026-10-12 parallel
+calls, section 3.4). A release that carries it may carry other gate changes too: the reply-language
+change (#154, 2026-10-12) changed `preview_budget_helper.py` (MiMo's `temperature` 0.7), so a
+release with both brings new versions of BOTH files, and new values for both hashes in each GO
+(`bridge_sha256`, `helper_sha256`).
+Root therefore always installs both files from the release and, in each gate's CURRENT GO, changes
+only those two hashes. Nothing else changes: no limit, no model, no unit, no key, no `scope_id`.
+Never re-run the install step's `jq -n` GO command for this (here install step 4; README-anthropic.md
+install step 5): it writes the first-install GO, GLM only with its own limits, so it would switch
+DeepSeek, MiMo and Qwen off.
+
+The gate files must come from the same release as the app, at or after dev `5d3409d12` (the
+thinking-level menus the live gates have run since 2026-10-12 14:06 UTC; an older helper refuses the
+app's thinking levels). The gate checks MiMo's sampling exactly, so an old helper refuses every MiMo
+call of an app with #154, and the new helper refuses an older app's temperature 1: app and helper go
+up together.
+
+For each gate, as root, when no debate is running (`status` shows `in_flight` 0). The commands are
+for the DeepInfra gate; for the Anthropic gate use
+`G=/opt/debateai-v3-preview/operator/anthropic-budget-v1`,
+`GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json`, its service
+`debateai-preview-anthropic-budget.service` and its README's step numbers.
+1. Keep a copy of both gate files and the GO:
+
+   ```sh
+   G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+   B=/root/preview-archive/redeploy-$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$G"); install -d -o root -g root -m 0700 "$B"
+   cp -a "$G/preview_budget_authority.py" "$G/preview_budget_helper.py" "$GO" "$B/" && ls -l "$B"
+   ```
+2. `stop` (Daily operations, "Emergency off", level 1).
+3. Install both gate files from the reviewed release (install step 1 of that gate's README) and
    check their hashes as that step says.
-3. Write the GO again (the existing GO step): its `bridge_sha256` must match the new file.
-4. Restart the gate's service (`debateai-preview-provider-budget.service`,
+4. Write the GO again, changing ONLY its two hashes. The `diff` is for reading: it shows the two
+   changed hash lines (`bridge_sha256`, `helper_sha256`). The `cmp` line is the check: it compares
+   the two GOs without those two keys, prints `ONLY_HASHES_CHANGED` and only then installs the new GO.
+   If anything else changed, the GO is left as it was and it prints `GO_NOT_REPLACED: stop here`
+   (in a `set -euo pipefail` batch it also ends the batch): do not go on to step 5. The last line
+   printed must list the same models as before:
+
+   ```sh
+   umask 077
+   jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h' "$GO" > "$GO.new"
+   diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
+   cmp <(jq -S 'del(.bridge_sha256,.helper_sha256)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256)' "$GO.new") && echo ONLY_HASHES_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c .enabled_models "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+   ```
+   `deploy/preview-release/v1/README.md` "Publishing the call-concurrency row", step 0, checks both
+   files and both hashes against the release and stops on any difference.
+5. Restart the gate's service (`debateai-preview-provider-budget.service`,
    `debateai-preview-anthropic-budget.service`) so the running gate loads the new code.
-5. `activate` (owner's yes); `status` must show `state` `active`.
+6. `activate` (owner's yes); `status` must show `state` `active`.
+
+To go back: `stop`, put the three files from `$B` back in place (`install -o root -g root -m 0600`
+for the GO, the gate files as install step 1 installs them), restart the service and `activate`.
+
+Restart the runner only after BOTH gates are `active`: the runner reads each gate's number of calls
+at once once, at start-up, from the gate's `/remaining`. A gate it cannot read then runs ONE call at
+a time until the runner's next restart, and the runner's journal shows
+`{"kind":"DEBATEAI_CALL_SCHEDULER","event":"GATE_CAPACITY_UNREAD","gate":"<gate>"}`. So whenever a
+gate is stopped, redeployed or restarted later, restart the runner after it is `active` again. The
+runner prints no line naming the call-concurrency setting; during the first debate after the
+restart, a gate's `status` showing `in_flight` above 1 is the proof that calls run together.
 
 ## Daily operations
 
@@ -708,7 +758,8 @@ Nothing else changes: no limit, no unit, no key, no `scope_id`. For each gate, a
    halt no longer exists). Check on DeepInfra's billing page that those `released_unbilled`
    entries (in that day's record, each with its time) really cost nothing. If they were billed, do
    not re-open: tell the reviewers. If they cost nothing, install the new gate files (install step
-   1), write the GO again (install step 4: its hashes must match the new files), restart the
+   1), write the GO again changing only its two hashes ("Redeploy (2026-10-12)" step 4; never
+   install step 4's `jq -n`, which writes GLM only), restart the
    service (`systemctl restart debateai-preview-provider-budget.service`) so the running gate loads
    the new code, and then re-open with `activate` (step 5 below).
 5. Then run this (owner's yes):
@@ -732,7 +783,11 @@ systemctl stop debateai-preview-provider-budget
 ```
 
 **Change the daily budget or another limit.**
-1. Write the new GO (install step 4, same `scope_id`).
+1. Write the new GO: in the current GO change only that value, the way "Redeploy (2026-10-12)" step 4
+   changes the two hashes (for example `jq '.max_paid_posts_per_day=2500'`), with the same `diff`
+   to read and the same `cmp` check before `install`, the changed key named in `del(...)` instead of
+   the two hashes (`del(.max_paid_posts_per_day)`), and the same `scope_id`. Never re-run install step 4's `jq -n`: it
+   writes the first-install GO, GLM only, and would switch the other models off.
 2. Run `stop`, then `activate`.
 3. If `max_concurrent_calls` changed, also restart the service. Calls refuse with
    `SERVE_RESTART_REQUIRED` until you do.

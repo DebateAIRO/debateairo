@@ -516,7 +516,8 @@ call booked at its maximum; nothing to re-open).
 **Installing the slow-answer change (2026-10-12).** As in README.md "Slow answers (2026-10-12):
 installing this change", with this gate's own files and steps: copy the gate files, `gate_watch.py`
 and the unit `debateai-preview-anthropic-budget.service` (now `TimeoutStopSec=1300`) from the
-release, `systemctl daemon-reload`, write this gate's GO again (new hashes), restart
+release, `systemctl daemon-reload`, write this gate's GO again (only its two hashes change, in the
+current GO, as README.md "Redeploy (2026-10-12)" step 4 shows), restart
 `debateai-preview-anthropic-budget.service` when no debate is running (it may wait up to about 22
 minutes), then `activate` (owner's yes) and run the halt watcher once by hand.
 
@@ -531,8 +532,10 @@ stops the service (up to about 22 minutes, while calls in flight finish; `Timeou
 systemctl stop debateai-preview-anthropic-budget
 ```
 
-**Change the daily budget or another limit.** Write the new GO (install step 5, same
-`scope_id`), then `stop` and `activate`. If `max_concurrent_calls` changed, also restart the
+**Change the daily budget or another limit.** Write the new GO by changing only that value in the
+current GO (as README.md "Change the daily budget or another limit" shows, with its `cmp` check;
+re-running install step 5's `jq -n` would also reset every value changed since the install), same
+`scope_id`, then `stop` and `activate`. If `max_concurrent_calls` changed, also restart the
 service: calls refuse with `SERVE_RESTART_REQUIRED` until you do.
 
 **A new key** (for example after rotating it in the Console): install step 4 with `--replace`
