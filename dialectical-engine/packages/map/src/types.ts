@@ -50,7 +50,10 @@ export type MapMark = typeof MAP_MARKS[number];
 /** What happened along the way that is not a mark: kept for the practice record and the owners' reading. */
 export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED", "MAP_STOPPED",
   // Question language (spec 2026-10-13, L7; ruling CR-3): the angle planner named another language than the lock. Measurement only, for operators: never a condition mark, never shown, never acted on.
-  "LANGUAGE_PLANNER_DISAGREES"] as const);
+  "LANGUAGE_PLANNER_DISAGREES",
+  // Practice 2026-10-15: how many key points and merged answers named an internal field or item id, so were left out of
+  // the choice and of "also raised" (mapInternalWordsSkipped). Operators only: never a condition mark, never shown.
+  "INTERNAL_WORDS_SKIPPED"] as const);
 export type MapNote = typeof MAP_NOTES[number];
 
 export const MAP_STEPS = Object.freeze(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"] as const);

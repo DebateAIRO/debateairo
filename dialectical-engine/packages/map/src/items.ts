@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText } from "./text.js";
 import {
   MAP_FIXED_ANGLE_KINDS,
@@ -157,14 +158,17 @@ const alsoRaisedClaimKey = (claim: string): string => claim.normalize("NFKC").re
 /**
  * Whole-branch review m-4: THE one rule for what "also raised, not debated" lists, used by the story (the runner's
  * story snapshot) and by the debate page (the stored map choice, then the API's map view) alike. Blank claims are left
- * out; claims that say the same are one entry, their makers joined; most-raised (distinct makers, at least one) first,
- * ties in the order given. Running it again on its own output changes nothing.
+ * out, and so is a claim that names one of the map's internal fields or an item id (`mapNamesInternalWord`; practice
+ * 2026-10-15: "… nu e analizată de angle_focus, …"): it is skipped whole, never edited. Claims that say the same are one
+ * entry, their makers joined; most-raised (distinct makers, at least one) first, ties in the order given. Running it
+ * again on its own output changes nothing. Applied again when the API reads a stored list, so a row stored before this
+ * rule is cleaned on the page too.
  */
 export function mapMergeAlsoRaised<T extends Readonly<{ claim: string; makers: readonly string[] }>>(entries: readonly T[]): readonly T[] {
   const merged = new Map<string, { first: T; claim: string; makers: Set<string>; order: number }>();
   for (const [order, entry] of entries.entries()) {
     const claim = entry.claim.trim();
-    if (claim === "") continue;
+    if (claim === "" || mapNamesInternalWord(claim)) continue;
     const key = alsoRaisedClaimKey(claim);
     const known = merged.get(key);
     if (known === undefined) merged.set(key, { first: entry, claim, makers: new Set(entry.makers), order });
