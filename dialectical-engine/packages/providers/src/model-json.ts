@@ -459,9 +459,9 @@ const MODEL_TOKEN_BODY = /^[A-Za-z0-9_]+$/u;
 /**
  * The syntax pass's repairs made OUTSIDE strings. A straight quote inside a text makes the pass read part of that text as
  * outside it, where a comma, token or colon dropped would change the AI's words (Task 3 review: `"he typed "[1, 2,]" in
- * the box"`, `"he wrote "<|im_end|>,"k":" done"`). Two guards keep every word:
- *  · a reading with a doubtful string end (`syntaxClean`'s `doubtful`: a quote the pass took as a string's end although
- *    no `,` `}` `]` `:` or the text's end follows it in the reply) refuses all three: the pass returns no value;
+ * the box"`, `"he wrote "<|im_end|>,"k":" done"`, `"he said ",<|im_end|>"k":" ok"`). Two guards keep every word:
+ *  · a reading with a doubtful string end (`syntaxClean`'s `doubtful`; certain ends are whitelisted by
+ *    `stringEndIsCertain`) refuses all three: the pass returns no value;
  *  · after one of them the cleaned text is never read with INNER_QUOTE.
  * Such a reply is refused by the decode and left to the structure-repair call, which keeps every word.
  */
@@ -486,10 +486,24 @@ function nextSignificantPastTokens(text: string, from: number): string | undefin
   return text[index];
 }
 
-/** The characters that may follow a string's closing quote in JSON (or the text's end): `,` `}` `]` `:`. */
-function stringMayEndBefore(text: string, from: number): boolean {
-  const next = text[nextSignificant(text, from)];
-  return next === undefined || next === "," || next === "}" || next === "]" || next === ":";
+/** A character that can open a JSON value or key, or close a container, right after a comma. */
+const AFTER_COMMA_STARTS: ReadonlySet<string> = new Set("\"}]{[-0123456789tfn");
+
+/**
+ * WHITELIST (Task 3 re-review, round 3): a quote at `from - 1` that the pass took as a string's end is CERTAIN only when,
+ * in the reply itself with blanks skipped (leaked tokens are NOT skipped), the next character is `}`, `]`, `:` or the
+ * text's end, or it is `,` followed (blanks skipped) by `"`, `}`, `]`, `{`, `[`, `-`, a digit, `t`, `f` or `n`. Every
+ * other end is doubtful. Why: with this rule a word can change only where the reply already reads as JSON grammar
+ * around the quote, which INNER_QUOTE (`closesValue`) reads the same way; a quote followed by a token, a letter or
+ * `,<|…|>` may be the AI's own quotation mark, and a repair after it could split its text into an invented key.
+ */
+function stringEndIsCertain(text: string, from: number): boolean {
+  const at = nextSignificant(text, from);
+  const next = text[at];
+  if (next === undefined || next === "}" || next === "]" || next === ":") return true;
+  if (next !== ",") return false;
+  const after = text[nextSignificant(text, at + 1)];
+  return after !== undefined && AFTER_COMMA_STARTS.has(after);
 }
 
 /**
@@ -499,8 +513,8 @@ function stringMayEndBefore(text: string, from: number): boolean {
  *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
  *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
  * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). `doubtful` is set when a quote
- * the pass took as a string's end is followed in the reply by none of `,` `}` `]` `:` or the end (a key whose colon is
- * moved excepted): that quote may be the AI's own quotation mark, so the reading of what follows may be wrong.
+ * the pass took as a string's end is not a certain end (`stringEndIsCertain`; a key whose colon is moved excepted): that
+ * quote may be the AI's own quotation mark, so the reading of what follows may be wrong.
  */
 function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair>; doubtful: boolean }> {
   const made = new Set<ModelJsonDecodeRepair>();
@@ -531,7 +545,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       }
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
-      if (!movesColon && !stringMayEndBefore(text, cursor + 1)) doubtful = true;
+      if (!movesColon && !stringEndIsCertain(text, cursor + 1)) doubtful = true;
       if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
@@ -622,9 +636,10 @@ function insertOneBracket(text: string): { readonly value: unknown } | null {
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
  * one code fence (named CODE_FENCE too), else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then
  * strict JSON, then (iv) INNER_QUOTE on the cleaned text, only when the clean made no repair outside strings; only for
- * a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing
- * decodes to one object, and (never a changed word, `OUTSIDE_STRING_REPAIRS`) when a repair outside strings was made on
- * a reading with a doubtful string end. The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ * a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then BRACKET_INSERTED. A reply cut off
+ * at its token ceiling is never repaired. Null when nothing decodes to one object, and (never a changed word,
+ * `OUTSIDE_STRING_REPAIRS`) when a repair outside strings was made on a reading with a string end that is not certain
+ * (`stringEndIsCertain`'s whitelist). The repairs are named once each, in MODEL_JSON_REPAIRS order.
  */
 export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {

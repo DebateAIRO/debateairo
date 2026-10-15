@@ -121,12 +121,33 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
     ["a token after an inner quote, with a trailing comma in a later list", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1,]}"],
     ["a token after an inner quote, with a trailing comma at the end", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",}"],
     ["a token after an inner quote, with the last brace missing", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1]"],
-    // The accepted side effect: a token right after a string value is left to the structure-repair call.
-    ["a token right after a string value", "{\"a\":\"x\"<|im_end|>}"]
+    // Round 3: a comma right after an inner quote, then a token, is not JSON grammar either.
+    ["a comma and a token after an inner quote, with a trailing comma in a later list", "{\"a\":\"he said \",<|im_end|>\"k\":\" ok\",\"b\":[1,]}"],
+    ["a comma and a spaced token after an inner quote, with a trailing comma at the end", "{\"a\":\"he said \", <|im_end|> \"k\":\" ok\",}"],
+    // The accepted side effects: a token right after a string value, or after its comma, is left to the structure-repair
+    // call (round 2 read the second as {a:"x", b:1}).
+    ["a token right after a string value", "{\"a\":\"x\"<|im_end|>}"],
+    ["a token right after a string value's comma", "{\"a\":\"x\",<|im_end|>\"b\":1}"]
   ])("refuses %s rather than change its words", (_name, text) => {
     expect(decodeModelJson(text, STOP).ok).toBe(false);
     expect(modelJsonSyntaxRepair(text, STOP)).toBeNull();
     expect(parseStructuredArtifact(text, z.unknown(), STOP).kind).toBe("PARSE_FAILURE");
+  });
+
+  it("the judge never drops a split-off part of a text after a comma and a token (Task 3 re-review, round 3)", () => {
+    const schema = z.object({ a: z.string(), b: z.array(z.number()) }).strict();
+    const reply = "{\"a\":\"he said \",<|im_end|>\"k\":\" ok\",\"b\":[1,]}";
+    expect(parseStructuredArtifact(reply, schema, STOP, { unaskedKeys: true }).kind).toBe("PARSE_FAILURE");
+    // Control: without the trailing comma INNER_QUOTE alone reads the reply and keeps every word.
+    expect(decodeModelJson("{\"a\":\"he said \",<|im_end|>\"k\":\" ok\",\"b\":[1]}", STOP)).toEqual({ ok: true,
+      value: { a: "he said \",<|im_end|>\"k\":\" ok", b: [1] }, repair: "INNER_QUOTE" });
+  });
+
+  it("still repairs a string end that is JSON grammar in the reply itself (round 3 whitelist)", () => {
+    expect(decodedOk("{\"a\":\"x\" ,}").value).toEqual({ a: "x" });
+    const moved = decodedOk("{\"severity\":0.2,\"description:\" \"none\",}");
+    expect(moved.value).toEqual({ severity: 0.2, description: "none" });
+    expect(decodedRepairsOf(moved)).toEqual(["TRAILING_COMMA", "KEY_COLON_MOVED"]);
   });
 
   it("the judge never drops a split-off part of a text as an unasked key (Task 3 re-review)", () => {
