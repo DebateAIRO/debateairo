@@ -44,10 +44,11 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   return {
     // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts; e7f7e4b0… is history.
     judgeContractHash: "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612",
-    // serve.synthesizer.v3 (2026-10-12, practice debate 3) + its answer-length variant
-    // (debate shape, 2026-10-13); v1's d96e7cc9…c866, v2's 340e11a6…8b70 and
-    // v3's 4b141d3a…f90f are history.
-    composerContractHash: "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662",
+    // serve.synthesizer.v4 (2026-10-15, owner-approved plain-words wording) + its
+    // answer-length variant length.v2; v1's d96e7cc9…c866, v2's 340e11a6…8b70,
+    // v3's 4b141d3a…f90f and v3 + length.v1's 9a46af29…5662 (debate shape,
+    // 2026-10-13) are history.
+    composerContractHash: "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its answer form is still the 2026-09-04 text.
     // serve.evaluator.v2 (2026-10-12) moved its instruction slot; v1's

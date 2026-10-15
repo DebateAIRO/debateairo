@@ -1797,12 +1797,13 @@ export async function runSynthesisLoop<TCandidate>(
  * The SYNTHESIZER's contract ids. The answer form is code's half of the prompt
  * and is sealed by hash in the register row `composerContractHash`: once a form
  * has shipped, changing it is a NEW contract id, never an edit (the storyteller
- * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1 and v2 stay below
- * as shipped history, byte for byte; v3 is what the runner sends.
+ * v1 -> v2 precedent in `packages/story/src/contracts.ts`). v1, v2 and v3 stay
+ * below as shipped history, byte for byte; v4 is what the runner sends.
  */
 export const SYNTHESIZER_V1_CONTRACT_ID = "serve.synthesizer.v1" as const;
 export const SYNTHESIZER_V2_CONTRACT_ID = "serve.synthesizer.v2" as const;
-export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v3" as const;
+export const SYNTHESIZER_V3_CONTRACT_ID = "serve.synthesizer.v3" as const;
+export const SYNTHESIZER_CONTRACT_ID = "serve.synthesizer.v4" as const;
 
 /**
  * Shipped v1 history. Moved verbatim out of `apps/runner/src/index.ts`, where
@@ -1837,7 +1838,7 @@ export const SYNTHESIZER_V2_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
   + "percentages, expressions, or citation labels in served_number_refs.";
 
 /**
- * Current form (v3, owner-approved content, 2026-10-12). PRACTICE DEBATE 3:
+ * Shipped v3 history (owner-approved content, 2026-10-12). PRACTICE DEBATE 3:
  * v2 told the writer to "include that exact ref when the segment asserts that
  * served number" (so it asserted the number in the text) and v1's two-segment
  * rule asked for "a hypothesis" and "the research plan" (so the model opened
@@ -1846,14 +1847,40 @@ export const SYNTHESIZER_V2_ANSWER_FORM = `${SYNTHESIZER_V1_ANSWER_FORM} `
  * that rests on reasoning alone (serve reads it as the provisional answer and
  * what would settle it, `HYPOTHESIS_WITH_RESEARCH_PLAN`) and v2's identifier
  * grammar, and asks for no served number at all: `served_number_refs` is
- * always []. No rule beyond the owner's content is added.
+ * always []. No rule beyond the owner's content is added. Its fingerprint is
+ * the `composerContractHash` of the preview's register version 12; with its
+ * length variant (`serve.synthesizer.length.v1`) it is the debate shape's
+ * practice value (SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT).
  */
-export const SYNTHESIZER_ANSWER_FORM =
+export const SYNTHESIZER_V3_ANSWER_FORM =
   "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
   + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
   + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
   + "return two segments in order: the first gives the provisional answer and says plainly that it is not yet "
   + "settled; the second says what evidence would settle it. Never start a segment with a heading or a label. "
+  + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
+  + "copy ids exactly and never translate identifiers. served_number_refs is always [].";
+
+/**
+ * Current form (v4, owner-approved wording, 2026-10-15, option 1). The owner's
+ * blind reading of Romanian answers: the writer translated v3's English rule
+ * word for word — "says plainly that it is not yet settled" became
+ * «și acesta nu este încă așezat» (the wrong sense of "settled"), and "what
+ * evidence would settle it" became the heading-like «Ce ar putea stabili
+ * întrebarea:». v4 is v3 with only that clause replaced: the first segment says,
+ * in natural words of the question's language, that the answer may still
+ * change; the second says what evidence would decide it; both are ordinary
+ * sentences in that language, never a translation of the instructions. Every
+ * other sentence is v3's, byte for byte.
+ */
+export const SYNTHESIZER_ANSWER_FORM =
+  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+  + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
+  + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
+  + "return two segments in order: the first gives the provisional answer and says plainly, in natural words of the "
+  + "question's language, that it may still change; the second says what evidence would decide it. Write both as "
+  + "ordinary sentences in that language, never as a translation of these instructions. Never start a segment with "
+  + "a heading or a label. "
   + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
   + "copy ids exactly and never translate identifiers. served_number_refs is always [].";
 
@@ -1871,6 +1898,13 @@ export const SYNTHESIZER_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
   answerForm: SYNTHESIZER_V2_ANSWER_FORM
 });
 
+/** Shipped history, as sent: v3's contract (the v3 instruction, still current, and the v3 form). */
+export const SYNTHESIZER_V3_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_V3_CONTRACT_ID,
+  instruction: SYNTHESIZER_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_V3_ANSWER_FORM
+});
+
 export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_CONTRACT_ID,
   instruction: SYNTHESIZER_INSTRUCTIONS,
@@ -1878,20 +1912,36 @@ export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
 });
 
 /**
- * Debate shape (spec §3.3 step 8): the answer length. A VARIANT of serve.synthesizer.v3 — v3's instruction, then one
- * sentence; the target arrives as the material field `answer_length` ("about N words"). A run without a shape never
- * sends it, so its writer prompt is v3's to the byte. Sealed with v3 by `composerContractHash`
- * (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).
+ * Debate shape (spec §3.3 step 8): the answer length. A VARIANT of the current writer contract — its instruction,
+ * then one sentence; the target arrives as the material field `answer_length` ("about N words"). A run without a
+ * shape never sends it, so its writer prompt is the current contract's to the byte. Sealed with it by
+ * `composerContractHash` (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT). length.v1 was v3's variant (shipped history,
+ * byte for byte); length.v2 is v4's: the same instruction and sentence, v4's form.
  */
-export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v1" as const;
+export const SYNTHESIZER_LENGTH_V1_CONTRACT_ID = "serve.synthesizer.length.v1" as const;
+export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v2" as const;
 export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the number of words named in answer_length; "
   + "it is a target, never a reason to leave out a point the answer needs.";
+/** Shipped history, as sent: v3's length variant (v3's instruction, the length sentence, v3's form). */
+export const SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_V1_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  answerForm: SYNTHESIZER_V3_ANSWER_FORM
+});
 export const SYNTHESIZER_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_CONTRACT_ID,
   instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });
-/** What `composerContractHash` seals from the debate shape on: v3, then the length variant. */
+/**
+ * Shipped history: what `composerContractHash` sealed from the debate shape (2026-10-13) until v4 — v3, then
+ * length.v1 (9a46af29...).
+ */
+export const SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(SYNTHESIZER_V3_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT)
+].join("\n---\n");
+/** What `composerContractHash` seals from v4 (2026-10-15) on: v4, then its length variant length.v2. */
 export const SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
   promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
