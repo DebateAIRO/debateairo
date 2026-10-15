@@ -151,7 +151,9 @@ export const judgeArtifactSchema = z.object({
  * back under its own name (RENAMED_MEMBER, `"critique"` for `"critic"`) and drop root keys never asked for
  * (UNASKED_KEYS, a stray `"way_of_kooking"`), each only when the result passes the full schema.
  */
-export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true, renamedMembers: true, unaskedKeys: true });
+export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ nestedFields: true, renamedMembers: true, unaskedKeys: true,
+  // LG-A (L31): the schema-guided fixer, every repair on.
+  fixer: Object.freeze({}) });
 
 /**
  * MiMo salvage (owner ruling 2026-10-12, "Salvage in code"): how the review reads its artifact. Root keys never asked
@@ -159,7 +161,7 @@ export const JUDGE_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ 
  * schema pins the list to 0 entries and [] is the one value it admits (EMPTY_LIST). A node with edges never gets one:
  * its bearings are measurements nobody may guess.
  */
-export const REVIEW_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ unaskedKeys: true, emptyLists: true });
+export const REVIEW_ARTIFACT_READING: StructuredReadingOptions = Object.freeze({ unaskedKeys: true, emptyLists: true, fixer: Object.freeze({}) });
 
 /**
  * Reply language (2026-10-12): the members of each judge-family reply a reader meets, checked against the question's

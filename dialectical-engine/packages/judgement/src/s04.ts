@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
 import {
+  fixReplyStructure,
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
@@ -9,7 +10,8 @@ import {
   parsedWithRepairs,
   type ContentClassification,
   type ModelJsonRepair,
-  type ModelReplyFacts
+  type ModelReplyFacts,
+  type ReplyFixerOptions
 } from "@debateai/providers";
 
 export { CLAIM_TYPES };
@@ -213,6 +215,11 @@ export interface StructuredReadingOptions {
   readonly renamedMembers?: boolean;
   readonly unaskedKeys?: boolean;
   readonly emptyLists?: boolean;
+  /**
+   * LG-A (spec 2026-10-15, L31; INTERFACE §2.3): the schema-guided fixer (`fixReplyStructure`), tried after the shape
+   * repairs above; its repairs ride in the result's `repairs` (strategy STRUCTURE_FIXED), after the decode's.
+   */
+  readonly fixer?: ReplyFixerOptions;
 }
 
 /**
@@ -373,26 +380,39 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
       : { kind: "PARSED", strategy, value: parsed.data });
   }
   const refused: ParseStructuredArtifactResult<T> = Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
+  if (options === undefined) return refused;
   const shape = rootShapeOf(schema);
-  if (options === undefined || shape === null) return refused;
-  const repairs: readonly ShapeRepair[] = [
-    [options.nestedFields, "NESTED_FIELDS", () => nestFlattenedMembers(decoded, nestedFieldsPlan(schema))],
-    [options.renamedMembers, "RENAMED_MEMBER", () => renameMisnamedMember(decoded, shape)],
-    [options.unaskedKeys, "UNASKED_KEYS", () => dropUnaskedKeys(decoded, shape)],
-    [options.emptyLists, "EMPTY_LIST", () => fillPinnedEmptyLists(decoded, shape)]
-  ];
-  for (const [allowed, repair, build] of repairs) {
-    if (allowed !== true) continue;
-    const candidate = build();
-    if (candidate === null) continue;
-    const repaired = schema.safeParse(candidate);
-    if (!repaired.success) continue;
-    // LG-A (L34, pre-flight PF-A8): a value the syntax pass decoded and a shape repair then fixed names both repairs, in
-    // order (TRAILING_COMMA+UNASKED_KEYS). Every shape strategy names its repair in STRUCTURED_PARSE_REPAIRS, so `!` is safe.
-    return Object.freeze(strategy === "SYNTAX_REPAIRED"
-      ? { kind: "PARSED", strategy: repair, value: repaired.data,
-          repairs: Object.freeze([...decodeRepairs, STRUCTURED_PARSE_REPAIRS[repair]!]) }
-      : { kind: "PARSED", strategy: repair, value: repaired.data });
+  if (shape !== null) {
+    const repairs: readonly ShapeRepair[] = [
+      [options.nestedFields, "NESTED_FIELDS", () => nestFlattenedMembers(decoded, nestedFieldsPlan(schema))],
+      [options.renamedMembers, "RENAMED_MEMBER", () => renameMisnamedMember(decoded, shape)],
+      [options.unaskedKeys, "UNASKED_KEYS", () => dropUnaskedKeys(decoded, shape)],
+      [options.emptyLists, "EMPTY_LIST", () => fillPinnedEmptyLists(decoded, shape)]
+    ];
+    for (const [allowed, repair, build] of repairs) {
+      if (allowed !== true) continue;
+      const candidate = build();
+      if (candidate === null) continue;
+      const repaired = schema.safeParse(candidate);
+      if (!repaired.success) continue;
+      // Pre-flight PF-A8 (as Task 3, L34): after the syntax pass, the decode's repairs first, then the shape repair, so
+      // TRAILING_COMMA + UNASKED_KEYS is logged as both.
+      return Object.freeze(strategy === "SYNTAX_REPAIRED"
+        ? { kind: "PARSED", strategy: repair, value: repaired.data,
+            repairs: Object.freeze([...decodeRepairs, STRUCTURED_PARSE_REPAIRS[repair]!]) }
+        : { kind: "PARSED", strategy: repair, value: repaired.data });
+    }
+  }
+  // LG-A: the fixer, last; the decode's own repairs first in the list.
+  if (options.fixer !== undefined) {
+    const fixed = fixReplyStructure(decoded, schema, options.fixer);
+    const repaired = fixed === null ? null : schema.safeParse(fixed.value);
+    if (repaired !== null && repaired.success) {
+      const decodeRepair = STRUCTURED_PARSE_REPAIRS[strategy];
+      const before = strategy === "SYNTAX_REPAIRED" ? decodeRepairs : decodeRepair === null ? [] : [decodeRepair];
+      return Object.freeze({ kind: "PARSED", strategy: "STRUCTURE_FIXED", value: repaired.data,
+        repairs: Object.freeze([...before, ...fixed!.repairs]) });
+    }
   }
   return refused;
 }
