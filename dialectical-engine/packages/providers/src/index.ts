@@ -21,6 +21,7 @@ import {
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import type { ModelJsonRepair, ModelReplyFacts } from "./model-json.js";
+import type { ReplyFailureClass } from "./reply-fixer.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -56,10 +57,15 @@ export interface PromptPacket {
  * `jsonRepair` (story format robustness, 2026-10-12): the one repair the tolerant decode
  * (`decodeModelJson`) needed before the content passed its checks, so repairs can be counted.
  * Absent for content that was strict JSON, and for every classifier that does not use the decode.
+ *
+ * LG-A (INTERFACE §2.2): `jsonRepairs` is every repair in order, present only when there were two or more (read it
+ * with `contentRepairsOf`). `failureClass` is set by a classifier that knows its refusal's class (`ReplyFailureClass`).
  */
 export type ContentClassification =
-  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair }
-  | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
+  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair;
+      readonly jsonRepairs?: readonly ModelJsonRepair[] }
+  | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string;
+      readonly failureClass?: ReplyFailureClass };
 
 /**
  * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
@@ -2651,17 +2657,26 @@ export {
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 // Story format robustness (2026-10-12): the tolerant decode of a model's JSON answer.
 export {
+  contentRepairsOf,
+  decodedRepairsOf,
   decodeModelJson,
+  MODEL_JSON_STRUCTURE_REPAIRS,
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
+  parsedWithRepairs,
   rememberingAcceptedReply,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
+  type ModelJsonDecodeRepair,
+  type ModelJsonStructureRepair,
+  type ModelJsonSyntaxRepair,
   type MapReplySalvageRepair,
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";
+// LG-A (spec 2026-10-15, L31-L34): the reply fixer's failure classes (the fixer itself lands in ./reply-fixer.ts).
+export { REPLY_FAILURE_CLASSES, type ReplyFailureClass } from "./reply-fixer.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";

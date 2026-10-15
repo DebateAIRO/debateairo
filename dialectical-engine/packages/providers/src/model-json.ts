@@ -32,7 +32,14 @@ export interface ModelReplyFacts {
  *    strictly or with INNER_QUOTE or STRAY_QUOTE; made only when the caller asks for it and its check accepts the value
  *    (`ModelJsonDecodeOptions.trailingObjectAccepted`: the step's full schema), never otherwise.
  */
-const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT"] as const);
+const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT",
+  // LG-A (spec 2026-10-15, L31): made by the syntax pass, tried after the repairs above.
+  "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED"] as const);
+/** A repair the tolerant decode can make (no schema known). */
+export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
+/** The syntax pass's own repairs: the decode list's last five. */
+export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
+  "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED">;
 /**
  * The judge's SHAPE repairs (`packages/judgement/src/s04.ts`), each made only after a decoded object failed its step's
  * schema, and each accepted only when the repaired object then passes that full schema:
@@ -47,26 +54,73 @@ const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INN
  */
 const MODEL_JSON_SHAPE_REPAIRS = Object.freeze(["NESTED_FIELDS", "RENAMED_MEMBER", "UNASKED_KEYS", "EMPTY_LIST"] as const);
 /**
+ * LG-A (spec 2026-10-15, L31; INTERFACE §2.1): the schema-guided fixer's repairs (`fixReplyStructure`, ./reply-fixer.ts),
+ * every step, in this fixed order (a root key the schema never asked for keeps the name UNASKED_KEYS):
+ *  · INNER_UNASKED_KEYS: keys the schema never asked for, below the root, dropped (never a key the schema names anywhere);
+ *  · MEMBER_UNNESTED: a member written one level too deep moved to the parent that declares it (`long.reviewer_note`);
+ *  · MEMBER_WRAPPED: a bare value wrapped in its missing parent (`long` written as the sections list);
+ *  · TEXT_FORM_CONVERTED: a string where `{text,…}` is asked, or `{text}` where a string is asked;
+ *  · PARAGRAPHS_JOINED: a list of strings or paragraphs where one paragraph is asked, joined with a blank line, references merged;
+ *  · ONLY_VALUE_FILLED: a missing value the schema admits in only one form (`served_number_refs: []` on a guide that pins it).
+ */
+export const MODEL_JSON_STRUCTURE_REPAIRS = Object.freeze(["INNER_UNASKED_KEYS", "MEMBER_UNNESTED", "MEMBER_WRAPPED",
+  "TEXT_FORM_CONVERTED", "PARAGRAPHS_JOINED", "ONLY_VALUE_FILLED"] as const);
+export type ModelJsonStructureRepair = typeof MODEL_JSON_STRUCTURE_REPAIRS[number];
+/**
  * The map's SALVAGE repairs (`packages/map/src/salvage.ts`, ruling MAP-SALVAGE 2026-10-14), each made by the map's own
  * reader before any follow-up call, on a decoded reply, and accepted only when the salvaged reply then passes the step's
  * full schema and content check:
  *  · MAP_TEXT_TRIMMED: a too long INTERNAL text (an angle's label or focus, a point's why_it_matters, a framing
  *    challenge) cut at its last word boundary within the limit; a text that can reach a reader is never cut;
  *  · MAP_LEANS_DEFAULTED: a point's missing or unknown `leans` read as "context";
- *  · MAP_IDS_DROPPED: a choose answer's key point ids that are unknown, repeated, or on both of its sides dropped.
+ *  · MAP_IDS_DROPPED: a choose answer's key point ids that are unknown, repeated, or on both of its sides dropped;
+ *  · MAP_IDS_NORMALISED (LG-A): a point id lower-cased and reduced to [a-z0-9-] (accents and marks dropped), cut to
+ *    24 characters, every reference renamed the same way.
  * `decodeModelJson` never makes them: it does not know any schema.
  */
-const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED"] as const);
+const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"] as const);
 export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
 /**
- * The repair codes a classification can name (`ContentClassification.jsonRepair`): this file's six decode repairs, the
- * judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`) and the map's salvage repairs (`MAP_REPLY_SALVAGE_REPAIRS`).
+ * The repair codes a classification can name (`ContentClassification.jsonRepair`): the decode repairs (`ModelJsonDecodeRepair`),
+ * the judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`), the fixer's structure repairs (`ModelJsonStructureRepair`) and the
+ * map's salvage repairs (`MAP_REPLY_SALVAGE_REPAIRS`).
  */
-export type ModelJsonRepair = typeof MODEL_JSON_REPAIRS[number] | typeof MODEL_JSON_SHAPE_REPAIRS[number] | MapReplySalvageRepair;
+export type ModelJsonRepair = ModelJsonDecodeRepair | typeof MODEL_JSON_SHAPE_REPAIRS[number] | ModelJsonStructureRepair
+  | MapReplySalvageRepair;
 
+/**
+ * `repair` is the first repair the decode made (null for strict JSON). `repairs` (LG-A) is present only when the decode
+ * made two or more (the syntax pass may); read the whole list with `decodedRepairsOf`.
+ */
 export type ModelJsonDecoded =
-  | { readonly ok: true; readonly value: unknown; readonly repair: typeof MODEL_JSON_REPAIRS[number] | null }
+  | { readonly ok: true; readonly value: unknown; readonly repair: ModelJsonDecodeRepair | null;
+      readonly repairs?: readonly ModelJsonDecodeRepair[] }
   | { readonly ok: false; readonly error: string };
+
+/** Every repair a decode made, in order. */
+export function decodedRepairsOf(decoded: Extract<ModelJsonDecoded, { ok: true }>): readonly ModelJsonDecodeRepair[] {
+  return decoded.repairs ?? (decoded.repair === null ? Object.freeze([]) : Object.freeze([decoded.repair]));
+}
+
+/**
+ * LG-A (INTERFACE §2.2, contract deviation 3): a PARSED classification naming its repairs. Each kind once, first
+ * occurrence kept. None: no repair key (today's bytes). One: `jsonRepair` alone (today's bytes). Two or more: `jsonRepair`
+ * (the step's own headline repair `named`, else the first) and the whole list as `jsonRepairs`.
+ */
+export function parsedWithRepairs(repairs: readonly ModelJsonRepair[], named: ModelJsonRepair | null = null): ContentClassification {
+  const list = repairs.filter((repair, index) => repairs.indexOf(repair) === index);
+  if (list.length === 0) return { parseStatus: "PARSED", parseError: null };
+  const headline = named ?? list[0]!;
+  return list.length === 1
+    ? { parseStatus: "PARSED", parseError: null, jsonRepair: headline }
+    : { parseStatus: "PARSED", parseError: null, jsonRepair: headline, jsonRepairs: Object.freeze(list) };
+}
+
+/** Every repair a classification names (none for a refusal). */
+export function contentRepairsOf(classification: ContentClassification): readonly ModelJsonRepair[] {
+  if (classification.parseStatus !== "PARSED") return Object.freeze([]);
+  return classification.jsonRepairs ?? (classification.jsonRepair === undefined ? Object.freeze([]) : Object.freeze([classification.jsonRepair]));
+}
 
 /**
  * What a caller lets the decode do beyond its fixed repairs.
@@ -422,14 +476,19 @@ export function decodeModelJson(content: string, reply?: ModelReplyFacts, option
  * never made for it.
  */
 export function rememberingAcceptedReply(classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification) {
-  let accepted: Readonly<{ content: string; reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> | null = null;
+  type Accepted = Readonly<{ reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null; repairs: readonly ModelJsonRepair[] }>;
+  let accepted: (Accepted & Readonly<{ content: string }>) | null = null;
   return Object.freeze({
     classifyContent: (content: string, reply?: ModelReplyFacts): ContentClassification => {
       const classified = classify(content, reply);
-      if (classified.parseStatus === "PARSED") accepted = Object.freeze({ content, reply, repair: classified.jsonRepair ?? null });
+      if (classified.parseStatus === "PARSED") {
+        accepted = Object.freeze({ content, reply, repair: classified.jsonRepair ?? null, repairs: contentRepairsOf(classified) });
+      }
       return classified;
     },
-    acceptedAs: (content: string): Readonly<{ reply: ModelReplyFacts | undefined; repair: ModelJsonRepair | null }> =>
-      accepted !== null && accepted.content === content ? accepted : Object.freeze({ reply: undefined, repair: null })
+    acceptedAs: (content: string): Accepted =>
+      accepted !== null && accepted.content === content
+        ? Object.freeze({ reply: accepted.reply, repair: accepted.repair, repairs: accepted.repairs })
+        : Object.freeze({ reply: undefined, repair: null, repairs: Object.freeze([]) })
   });
 }
