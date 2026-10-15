@@ -945,6 +945,7 @@ packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
+packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/provider-funding.ts
