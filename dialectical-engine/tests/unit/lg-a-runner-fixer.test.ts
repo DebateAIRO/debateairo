@@ -32,6 +32,12 @@ describe("LG-A: the answer writer and checker read every reply through the fixer
       jsonRepair: "CODE_FENCE", jsonRepairs: ["CODE_FENCE", "INNER_UNASKED_KEYS"] });
   });
 
+  it("a checker verdict read only through the syntax pass names its repair (L34: every repair logged)", () => {
+    const trailing = JSON.stringify(VERDICT).replace(/}}$/, ",},}");
+    expect(classifyEvaluatorContent(trailing, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "TRAILING_COMMA" });
+    expect(parseEvaluatorOutput(trailing, STOP)).toEqual(VERDICT);
+  });
+
   it("a verdict missing a criterion is still refused, and so is a writer's list that holds a value", () => {
     const { citation_tracing: _gone, ...criteria } = VERDICT.criteria;
     expect(classifyEvaluatorContent(JSON.stringify({ ...VERDICT, criteria }), STOP).parseStatus).toBe("SCHEMA_FAILED");

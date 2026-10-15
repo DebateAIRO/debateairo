@@ -2534,6 +2534,9 @@ function hash(value: unknown): string {
  * synthesis loop stopped without the objection the final verdict asked for.
  * A reply that is not raw JSON and opens two or more top-level objects is
  * refused before any strategy runs — the pre-fix refusal, re-asked as before.
+ *
+ * LG-A (L34): a decoded reply carries `repairs`, every repair the decode made, in order (none for raw JSON; the syntax
+ * pass's list for SYNTAX_REPAIRED), so the reading (`readStructuredValue`) logs each one ahead of the fixer's.
  */
 type DecodedReply =
   | { readonly decoded: true; readonly value: unknown; readonly repairs: readonly ModelJsonRepair[] }
@@ -2729,8 +2732,9 @@ export const COMPOSED_PROSE = Object.freeze(["segments.*.text"] as const);
 export const EVALUATOR_PROSE = Object.freeze(["objection"] as const);
 
 /**
- * The writer's content classifier: the composition schema first (unchanged),
- * then every segment's prose and every cited ref (I-1). A token the person's
+ * The writer's content classifier: the structured read first (`readStructuredValue`: the composition schema, and
+ * when it refuses, the reply fixer on `compositionFixGuide`, then the schema again; LG-A, L31), then every segment's
+ * prose and every cited ref (I-1), on the value that read returned. A token the person's
  * question or a node's full statement already states is exempt from the prose
  * check (review round 2). Deterministic, and it never throws on model content.
  */
