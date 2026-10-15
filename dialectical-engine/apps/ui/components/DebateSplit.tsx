@@ -131,7 +131,8 @@ export function DebateSplit({
                       className="splitChipRole"
                       style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}
                     >
-                      {role === "root" ? `● ${t(catalog, "debateViews.root")}` : `${pal.arrow} ${localizedRoleLabel(node, catalog, debateChromeCatalog)}`}
+                      <span aria-hidden="true">{role === "root" ? "●" : pal.arrow}</span>{" "}
+                      {role === "root" ? t(catalog, "debateViews.root") : localizedRoleLabel(node, catalog, debateChromeCatalog)}
                     </span>
                     <span className="splitChipClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
                   </button>
@@ -160,15 +161,23 @@ export function DebateSplit({
                 className="roleBadge"
                 style={{ color: focusPal?.text, background: focusPal?.bg, borderColor: focusPal?.border }}
               >
-                {focusPal?.arrow} {localizedRoleLabel(focus, catalog, debateChromeCatalog)}
+                <span aria-hidden="true">{focusPal?.arrow}</span> {localizedRoleLabel(focus, catalog, debateChromeCatalog)}
               </span>
               <ReferenceScoreBadges node={focus} v3Node={v3NodesById?.get(focus.id)} onOpenNode={onOpenNode} composeCatalog={composeCatalog} />
               <span style={{ flex: 1 }} />
               <ReferenceAuthorPill node={focus} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
             </div>
             <ReferenceReviewLine review={v3NodesById?.get(focus.id)?.review} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
-            <div className="splitFocusClaim" role="heading" aria-level={2} tabIndex={-1} ref={focusHeadingRef}>
-              <span className="srOnly">{localizedRoleLabel(focus, catalog, debateChromeCatalog)}: </span>
+            {/* One name for the whole heading: VoiceOver reads a heading split into a hidden
+                prefix and visible text as two runs with a stray "level" between them. */}
+            <div
+              className="splitFocusClaim"
+              role="heading"
+              aria-level={2}
+              tabIndex={-1}
+              ref={focusHeadingRef}
+              aria-label={`${localizedRoleLabel(focus, catalog, debateChromeCatalog)}: ${focus.claim}`}
+            >
               {focus.claim}
             </div>
             {focus.active_generation?.argument ? (
@@ -186,15 +195,15 @@ export function DebateSplit({
                     onChallengeNode(focus, event.currentTarget);
                   }}
                 >
-                  ⚐ {t(catalog, "debateViews.challenge")}
+                  <span aria-hidden="true">⚐</span> {t(catalog, "debateViews.challenge")}
                 </button>
               ) : null}
               <button type="button" className="nodeCtrl" disabled aria-disabled="true">
-                ↻ {t(catalog, "debateViews.regenerate")}
+                <span aria-hidden="true">↻</span> {t(catalog, "debateViews.regenerate")}
               </button>
               <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenNode(focus.id)}>
-                {t(catalog, "debateViews.openFullAnalysis")} ▸
+                {t(catalog, "debateViews.openFullAnalysis")} <span aria-hidden="true">▸</span>
               </button>
             </div>
             </div>
@@ -205,7 +214,7 @@ export function DebateSplit({
           <>
             <div className="splitMeter">
               <div className="splitMeterSide right">
-                <div className="splitMeterLabel pro">↑ {t(catalog, "debateViews.caseFor")}</div>
+                <div className="splitMeterLabel pro"><span aria-hidden="true">↑</span> {t(catalog, "debateViews.caseFor")}</div>
                 <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", pro, locale)}</div>
               </div>
               <div
@@ -215,7 +224,7 @@ export function DebateSplit({
                 }}
               />
               <div className="splitMeterSide left">
-                <div className="splitMeterLabel con">{t(catalog, "debateViews.caseAgainst")} ↓</div>
+                <div className="splitMeterLabel con">{t(catalog, "debateViews.caseAgainst")} <span aria-hidden="true">↓</span></div>
                 <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", con, locale)}</div>
               </div>
             </div>
@@ -236,7 +245,7 @@ export function DebateSplit({
             <span className="splitBattleLine" aria-hidden />
             <div className="splitColumn pro">
               <div className="splitColumnHead pro">
-                <span className="splitColumnIcon pro">↑</span>
+                <span className="splitColumnIcon pro" aria-hidden="true">↑</span>
                 <span>{t(catalog, "debateViews.caseFor")}</span>
               </div>
               {proChildren.length > 0 ? (
@@ -263,7 +272,7 @@ export function DebateSplit({
             </div>
             <div className="splitColumn con">
               <div className="splitColumnHead con">
-                <span className="splitColumnIcon con">↓</span>
+                <span className="splitColumnIcon con" aria-hidden="true">↓</span>
                 <span>{t(catalog, "debateViews.caseAgainst")}</span>
               </div>
               {conChildren.length > 0 ? (
@@ -314,10 +323,10 @@ function PerspectiveCard({
   const { pro, con } = subtreeLean(node);
   return (
     <button type="button" className="splitPerspective" onClick={() => onFocus(node.id)}>
-      <span className="splitPerspectiveBadge">◆ {localizedRoleLabel(node, catalog, debateChromeCatalog)}</span>
+      <span className="splitPerspectiveBadge"><span aria-hidden="true">◆</span> {localizedRoleLabel(node, catalog, debateChromeCatalog)}</span>
       <span className="splitPerspectiveClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
       <span className="splitPerspectiveMeta">
-        {t(catalog, "debateViews.perspectiveBalance", { pro, con })} ▸
+        {t(catalog, "debateViews.perspectiveBalance", { pro, con })} <span aria-hidden="true">▸</span>
       </span>
     </button>
   );
@@ -379,7 +388,7 @@ function SplitCard({
         ) : null}
         <div className="splitCardMeta referenceMetaRow">
           <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
-            {pal.arrow} {localizedRoleLabel(node, catalog, debateChromeCatalog)}
+            <span aria-hidden="true">{pal.arrow}</span> {localizedRoleLabel(node, catalog, debateChromeCatalog)}
           </span>
           <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} condensed composeCatalog={composeCatalog} />
           <span style={{ flex: 1 }} />

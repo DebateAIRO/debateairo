@@ -282,7 +282,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                 void submitCode(code);
             }}>
         <div className="authField"><label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
-        <input ref={codeField} id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" disabled={busy} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? 'enrollment-code-error' : undefined} onChange={e => {
+        <input ref={codeField} id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" disabled={busy} aria-invalid={!!codeError} aria-describedby={codeError ? 'enrollment-code-error' : undefined} onChange={e => {
                 const typed = readSixDigitCode(e.target.value);
                 const shown = typed.valid ? typed.digits : e.target.value;
                 if (shown !== code)

@@ -130,15 +130,23 @@ const SCREEN_READER_PAGE_EDITS: ReadonlyArray<readonly [string, string]> = [
     'aria-label="Change language" aria-expanded="false" aria-haspopup="dialog" aria-controls="_R_id_"><span class="languageSwitcherCode">EN</span>',
     'aria-label="Change language" aria-describedby="_R_id_-current" aria-expanded="false" aria-haspopup="dialog" aria-controls="_R_id_"><span class="languageSwitcherCode" aria-hidden="true">EN</span><span id="_R_id_-current" class="srOnly" lang="en">English</span>'
   ],
-  ['<div class="nodeClaim root">Messi or Ronaldo?</div>', '<div class="nodeClaim root" role="heading" aria-level="2">Messi or Ronaldo?</div>']
+  ['<div class="nodeClaim root">Messi or Ronaldo?</div>', '<div class="nodeClaim root" role="heading" aria-level="2">Messi or Ronaldo?</div>'],
+  [
+    'aria-label="Open scoring diagnostics"><span class="debateScoringDot" aria-hidden="true"></span>Scoring · ',
+    'aria-label="Open scoring diagnostics" aria-describedby="debate-scoring-count"><span class="debateScoringDot" aria-hidden="true"></span><span id="debate-scoring-count">Scoring · '
+  ],
+  ['</button><div class="segment" role="group" aria-label="View">', '</span></button><div class="segment" role="group" aria-label="View">']
 ];
 const SCREEN_READER_LENS_CARD_EDITS: ReadonlyArray<readonly [string, string]> = [
-  ['data-stance="reasoning"><div class="node', 'data-stance="reasoning"><div class="srOnly" role="heading" aria-level="3" id="canvas-arg-node:lens">Scientific: A lens claim under test</div><div class="node'],
+  [
+    'data-score-filter-match="true"><span class="nodeStanceTab" data-stance="reasoning"',
+    'data-score-filter-match="true" data-claim-first="true"><div class="nodeClaim treePreview" role="heading" aria-level="3" id="canvas-arg-node:lens" aria-label="Scientific: A lens claim under test">A lens claim under test</div><span class="nodeStanceTab" data-stance="reasoning"'
+  ],
   [
     '<span class="roleBadge" style="color:var(--text-3);background:var(--surface-sunken);border-color:var(--line-strong)">◆ Scientific</span>',
     '<span class="roleBadge" aria-hidden="true" style="color:var(--text-3);background:var(--surface-sunken);border-color:var(--line-strong)">◆ Scientific</span>'
   ],
-  ['<div class="nodeClaim treePreview">A lens claim under test</div>', '<div class="nodeClaim treePreview" aria-hidden="true">A lens claim under test</div>'],
+  ['<div class="nodeClaim treePreview">A lens claim under test</div>', ''],
   [
     '<button type="button" class="nodeCtrl challenge">⚐ Challenge</button>',
     '<button type="button" class="nodeCtrl challenge" id="canvas-challenge-node:lens" aria-labelledby="canvas-challenge-node:lens canvas-arg-node:lens"><span aria-hidden="true">⚐</span> Challenge</button>'
@@ -146,7 +154,8 @@ const SCREEN_READER_LENS_CARD_EDITS: ReadonlyArray<readonly [string, string]> = 
   [
     '<button type="button" class="nodeCtrl" aria-label="Details">Details',
     '<button type="button" class="nodeCtrl" id="canvas-details-node:lens" aria-label="Details" aria-labelledby="canvas-details-node:lens canvas-arg-node:lens">Details'
-  ]
+  ],
+  ['title="V3 exposes no node-regeneration resource.">↻ Regenerate</button>', 'title="V3 exposes no node-regeneration resource."><span aria-hidden="true">↻</span> Regenerate</button>']
 ];
 function withScreenReaderMarkup(historical: string, lensCard: boolean): string {
   const edits = lensCard ? [...SCREEN_READER_PAGE_EDITS, ...SCREEN_READER_LENS_CARD_EDITS] : SCREEN_READER_PAGE_EDITS;

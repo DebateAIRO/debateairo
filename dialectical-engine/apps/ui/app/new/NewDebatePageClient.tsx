@@ -504,7 +504,7 @@ function NewDebateForm({
                 }}
                 placeholder={t(catalog, "newDebate.topicPlaceholder")}
                 autoFocus
-                required
+                required aria-invalid="false"
               />
             </div>
           </div>

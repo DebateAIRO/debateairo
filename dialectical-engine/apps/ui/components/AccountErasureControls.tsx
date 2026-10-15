@@ -225,7 +225,7 @@ export function AccountErasureControls({
                 autoComplete="off"
                 spellCheck={false}
                 placeholder={t(catalog, "settings.erasure.typeConfirmation", { confirmation: confirmationPhrase })}
-                required
+                required aria-invalid="false"
               />
             </div>
           </div>

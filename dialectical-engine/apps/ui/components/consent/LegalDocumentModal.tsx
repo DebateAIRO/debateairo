@@ -195,7 +195,9 @@ export function LegalDocumentModal({
                 id={`${document.sectionIdPrefix}${section.no}`}
                 className="policySection"
               >
-                <div className="policySectionHead" role="heading" aria-level={3}>
+                {/* One name for the heading: VoiceOver reads the number and title spans as two
+                    runs with a stray "level" between them. */}
+                <div className="policySectionHead" role="heading" aria-level={3} aria-label={`${section.no} ${section.title}`}>
                   <span
                     className="policyNo"
                     data-accent={section.accent}

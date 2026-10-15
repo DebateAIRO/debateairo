@@ -57,13 +57,15 @@ export function ReferenceScoreBadges({
       </span>
     );
   }
+  // Each score button's name starts with the numbers it shows, so a screen reader hears
+  // "BASE 94% FINAL 91%" before what pressing it does (WCAG 2.5.3, label in name).
   if (condensed) {
     return (
       <button
         type="button"
         className="scoreBadgeButton scoreTransition"
         data-ai-generated="true"
-        aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
+        aria-label={`${presentation.badges.map((badge) => badge.pillText).join(" ")}, ${t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}`}
         onClick={(event) => {
           event.stopPropagation();
           onOpenNode(node.id);
@@ -81,7 +83,7 @@ export function ReferenceScoreBadges({
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
+      aria-label={`${presentation.badges.map((badge) => badge.pillText).join(" ")}, ${t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}`}
       onClick={(event) => {
         event.stopPropagation();
         onOpenNode(node.id);

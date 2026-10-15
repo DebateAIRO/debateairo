@@ -387,6 +387,9 @@ function CanvasCard({
   const challengeId = `canvas-challenge-${node.id}`;
   // A stopped or failed path has no footer buttons, so the card itself is the keyboard control.
   const cardIsControl = role !== "root" && (state === "abandoned" || state === "failed");
+  // A finished argument's visible claim is its heading, first in the card's reading order so
+  // the stance, model and scores shown above it are read as part of this card.
+  const claimIsHeading = role !== "root" && state === "done";
 
   return (
     <div
@@ -402,8 +405,10 @@ function CanvasCard({
     >
       {/* Screen readers get the tree as an outline: one heading per argument, its level is its
           depth under the root claim (h2), so heading navigation shows which argument answers
-          which. It sits outside the card so a card that is itself a button keeps it. */}
-      {stanceLabel !== null ? (
+          which. A finished card's heading is its visible claim (inside the card, below); any
+          other card gets this hidden one, outside the card so a card that is itself a button
+          keeps it. The visible heading carries the stance in its one name (aria-label). */}
+      {stanceLabel !== null && !claimIsHeading ? (
         <div className="srOnly" role="heading" aria-level={outlineLevel(placed.depth)} id={headingId}>
           {node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
         </div>
@@ -413,6 +418,7 @@ function CanvasCard({
         style={innerStyle}
         data-bezel="core"
         data-score-filter-match={scoreFilterMatch ? "true" : "false"}
+        data-claim-first={claimIsHeading ? "true" : undefined}
         onClick={openIfDone}
         role={cardIsControl ? "button" : undefined}
         tabIndex={cardIsControl ? 0 : undefined}
@@ -427,6 +433,17 @@ function CanvasCard({
             : undefined
         }
       >
+        {claimIsHeading ? (
+          <div
+            className="nodeClaim treePreview"
+            role="heading"
+            aria-level={outlineLevel(placed.depth)}
+            id={headingId}
+            aria-label={node.claim ? `${stanceLabel}: ${node.claim}` : (stanceLabel ?? undefined)}
+          >
+            {node.claim}
+          </div>
+        ) : null}
         <span
           className="nodeStanceTab"
           data-stance={stance}
@@ -598,7 +615,6 @@ function CanvasCard({
               </div>
             ) : (
               <>
-                <div className="nodeClaim treePreview" aria-hidden="true">{node.claim}</div>
                 <div className="nodeControls nodeReferenceFooter" data-reference-tree-footer>
                   {onChallengeNode ? (
                     <button
@@ -631,7 +647,7 @@ function CanvasCard({
                       aria-disabled="true"
                       title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
                     >
-                      ↻ {t(catalog, "debateViews.regenerate")}
+                      <span aria-hidden="true">↻</span> {t(catalog, "debateViews.regenerate")}
                     </button>
                   ) : null}
                   <span style={{ flex: 1 }} />
@@ -750,7 +766,7 @@ function V3ScoreBadges({
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
+      aria-label={`${presentation.badges.map((badge) => badge.pillText).join(" ")}, ${t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}`}
       onClick={(event) => {
         event.stopPropagation();
         openNodeDetails();

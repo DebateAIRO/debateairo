@@ -24,7 +24,7 @@ export function BillingDetailsFields({
       <div className="billingField">
         <label htmlFor={`${idPrefix}-${name}`}>{t(catalog, labelKey)}</label>
         <input id={`${idPrefix}-${name}`} type={type} value={values[name]} autoComplete={autoComplete} required={required}
-          aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
+          aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined}
           onChange={(event) => onChange(name, event.target.value)} />
         {error ? <p id={errorId} className="authFieldError">{error}</p> : null}
       </div>

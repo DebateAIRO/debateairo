@@ -1540,10 +1540,13 @@ export default function DebatePageClient({
               className="debateScoringPill"
               data-debate-scoring-pill
               aria-label={t(chromeCatalog, "chrome.openScoringDiagnostics")}
+              aria-describedby="debate-scoring-count"
               onClick={() => setScoringDiagnosticsOpen(true)}
             >
               <span className="debateScoringDot" aria-hidden />
-              {t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}
+              {/* The count is the pill's only visible text; the name says what the button does,
+                  so the count travels as its description instead of being dropped. */}
+              <span id="debate-scoring-count">{t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}</span>
             </button>
           </ScoringErrorBoundary>
           {hasTree ? (

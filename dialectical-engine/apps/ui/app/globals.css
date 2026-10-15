@@ -8432,6 +8432,31 @@ a:focus-visible {
   box-shadow: none;
 }
 .threadMetaRow { flex-wrap: nowrap; gap: 6px; }
+/* A finished card's claim is its heading and comes first in the DOM, so a screen reader
+   meets the claim before the stance, model, scores and review that belong to it. `order`
+   keeps those on top for the eye; flex margins do not collapse, so the title's top margin
+   goes to keep the block spacing it had. */
+.threadCard,
+.node[data-claim-first] {
+  display: flex;
+  flex-direction: column;
+}
+.threadCard > .threadMetaRow,
+.threadCard > .positionTitle,
+.threadCard > .nodeReviewLine,
+.node[data-claim-first] > .roleBadge,
+.node[data-claim-first] > .nodeArgHeader,
+.node[data-claim-first] > .positionTitle,
+.node[data-claim-first] > .nodeScoreRow {
+  order: -1;
+}
+.threadCard > .positionTitle,
+.node[data-claim-first] > .positionTitle {
+  margin-top: 0;
+}
+.node[data-claim-first] > .roleBadge {
+  align-self: flex-start;
+}
 .nodeReviewLine {
   display: flex;
   align-items: center;
