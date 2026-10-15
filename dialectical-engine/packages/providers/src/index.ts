@@ -2665,6 +2665,7 @@ export {
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
+  modelJsonSyntaxRepair,
   parsedWithRepairs,
   rememberingAcceptedReply,
   type ModelJsonDecoded,

@@ -124,9 +124,9 @@ describe("B — the story checker's reply is decoded tolerantly, then checked in
     expect(parseCheckerVerdict(cut, STOP)).toMatchObject({ satisfied: false });
   });
 
-  it("a reply that would need any other repair still fails", () => {
+  it("a reply that would need any other repair still fails; a trailing comma is now read (LG-A, TRAILING_COMMA)", () => {
     expect(classifyCheckerContent(VERDICT.replace(/"satisfied"/u, "'satisfied'"), STOP).parseStatus).toBe("PARSE_FAILED");
-    expect(classifyCheckerContent(VERDICT.replace(/\}$/u, ",}"), STOP).parseStatus).toBe("PARSE_FAILED");
+    expect(classifyCheckerContent(VERDICT.replace(/\}$/u, ",}"), STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "TRAILING_COMMA" });
   });
 });
 

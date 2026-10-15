@@ -3,8 +3,8 @@
  *
  * Plain words: a model asked for one JSON object sometimes wraps it in a code fence, writes its thinking
  * before it, closes a quotation with a straight double quote inside a text, or leaves off the last brace.
- * `decodeModelJson` reads such an answer in a fixed order and names the one repair it needed, so callers
- * can count them. It never repairs anything else, it never repairs an answer that was cut off at its token
+ * `decodeModelJson` reads such an answer in a fixed order and names the one repair it needed (the LG-A syntax pass,
+ * tried last, may name several), so callers can count them. It never repairs anything else, it never repairs an answer that was cut off at its token
  * ceiling, and what it returns is only a decoded value: the caller still runs its full schema and content
  * checks on it, and the stored artifact stays the vendor's own bytes.
  *
@@ -445,6 +445,173 @@ function trailingObject(content: string): { readonly value: unknown } | null {
   return null;
 }
 
+/** LG-A: the syntax pass's own bounds (a policy number is never a bare exported constant). */
+const SYNTAX_REPAIR_LIMITS = Object.freeze({
+  /** The longest leaked model token `<|…|>` read as one (the 2026-10-14 `<|code_suffix|>` is 15 characters). */
+  modelTokenMaxChars: 64,
+  /** The most places one missing bracket is tried at; a container with more commas is not "only one place fits". */
+  bracketPlacesMax: 64
+});
+const MODEL_TOKEN_BODY = /^[A-Za-z0-9_]+$/u;
+
+/**
+ * LG-A, one linear pass over a JSON-like text (strings read as JSON reads them; an escaped quote stays inside):
+ *  · RAW_LINE_BREAK — a raw line break, carriage return or tab inside a string, escaped;
+ *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
+ *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks between), dropped;
+ *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
+ * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case).
+ */
+function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair> }> {
+  const made = new Set<ModelJsonDecodeRepair>();
+  type Container = { kind: "object" | "array"; expectKey: boolean };
+  const stack: Container[] = [];
+  let out = "";
+  let index = 0;
+  while (index < text.length) {
+    const character = text[index]!;
+    const top = stack.at(-1);
+    if (character === "\"") {
+      const isKey = top?.kind === "object" && top.expectKey;
+      let body = "";
+      let escaped = false;
+      let cursor = index + 1;
+      for (; cursor < text.length; cursor += 1) {
+        const inner = text[cursor]!;
+        if (escaped) { escaped = false; body += inner; continue; }
+        if (inner === "\\") { escaped = true; body += inner; continue; }
+        if (inner === "\"") break;
+        if (inner === "\n" || inner === "\r" || inner === "\t") {
+          body += inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t";
+          made.add("RAW_LINE_BREAK");
+          continue;
+        }
+        body += inner;
+      }
+      if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
+      if (isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":") {
+        out += `"${body.slice(0, -1)}":`;
+        made.add("KEY_COLON_MOVED");
+        top!.expectKey = false;
+      } else {
+        out += `"${body}"`;
+      }
+      index = cursor + 1;
+      continue;
+    }
+    if (character === "<" && text[index + 1] === "|") {
+      const close = text.indexOf("|>", index + 2);
+      if (close > index + 2 && close + 2 - index <= SYNTAX_REPAIR_LIMITS.modelTokenMaxChars
+        && MODEL_TOKEN_BODY.test(text.slice(index + 2, close))) {
+        made.add("MODEL_TOKEN_DROPPED");
+        index = close + 2;
+        continue;
+      }
+    }
+    if (character === ",") {
+      const next = text[nextSignificant(text, index + 1)];
+      if (next === "}" || next === "]") { made.add("TRAILING_COMMA"); index += 1; continue; }
+      if (top?.kind === "object") top.expectKey = true;
+    } else if (character === "{") stack.push({ kind: "object", expectKey: true });
+    else if (character === "[") stack.push({ kind: "array", expectKey: false });
+    else if (character === "}" || character === "]") stack.pop();
+    else if (character === ":" && top?.kind === "object") top.expectKey = false;
+    out += character;
+    index += 1;
+  }
+  return Object.freeze({ text: out, made });
+}
+
+/**
+ * LG-A, BRACKET_INSERTED: one `}` or `]` left out INSIDE the text (MiMo, 2026-10-14: a 16,094-character story whose
+ * JSON broke at character 15,642). The scan stops at the first place JSON cannot go on: a value where an object's key
+ * belongs, a `:` inside a list, or a closer that does not match. The missing closer is the open container's own. It is
+ * tried right before each of that container's commas and right before the stop; the text is accepted only when exactly
+ * ONE of those places makes the whole text strict JSON. Null otherwise, and when the only fault is at the very end
+ * (CLOSING_BRACKETS's case). Linear scan plus at most `bracketPlacesMax` strict parses (model text is untrusted, CI-1b).
+ */
+function insertOneBracket(text: string): { readonly value: unknown } | null {
+  type Frame = { close: "}" | "]"; commas: number[]; expectKey: boolean };
+  const stack: Frame[] = [];
+  let inString = false;
+  let escaped = false;
+  let stop: Readonly<{ at: number; frame: Frame }> | null = null;
+  for (let index = 0; index < text.length && stop === null; index += 1) {
+    const character = text[index]!;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (isBlank(character)) continue;
+    const top = stack.at(-1);
+    if (top !== undefined && top.close === "}" && top.expectKey && character !== "\"" && character !== "}") {
+      stop = { at: index, frame: top };
+    } else if (character === "\"") {
+      inString = true;
+      if (top !== undefined && top.close === "}" && top.expectKey) top.expectKey = false;
+    } else if (character === "{") {
+      stack.push({ close: "}", commas: [], expectKey: true });
+    } else if (character === "[") {
+      stack.push({ close: "]", commas: [], expectKey: false });
+    } else if (character === ",") {
+      if (top !== undefined) { top.commas.push(index); if (top.close === "}") top.expectKey = true; }
+    } else if (character === ":") {
+      if (top !== undefined && top.close === "]") stop = { at: index, frame: top };
+    } else if (character === "}" || character === "]") {
+      if (top === undefined) return null;
+      if (top.close !== character) stop = { at: index, frame: top };
+      else stack.pop();
+    }
+  }
+  if (stop === null) return null;
+  const places = [...stop.frame.commas, stop.at];
+  if (places.length > SYNTAX_REPAIR_LIMITS.bracketPlacesMax) return null;
+  let found: { readonly value: unknown } | null = null;
+  for (const place of places) {
+    const candidate = parsed(`${text.slice(0, place)}${stop.frame.close}${text.slice(place)}`);
+    if (candidate === null) continue;
+    if (found !== null) return null;
+    found = candidate;
+  }
+  return found;
+}
+
+/**
+ * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
+ * one code fence, else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then strict JSON, then (iv)
+ * INNER_QUOTE on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned
+ * text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing decodes to one
+ * object. The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ */
+export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
+  Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
+  if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
+  const base = (modelJsonFenceBody(content) ?? content).trim();
+  if (!base.startsWith("{")) return null;
+  const cleaned = syntaxClean(base);
+  const done = (value: unknown, more: readonly ModelJsonDecodeRepair[]) => {
+    const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...more]);
+    return Object.freeze({ value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
+  };
+  if (cleaned.made.size > 0) {
+    const strict = parsed(cleaned.text);
+    if (strict !== null && isPlainObject(strict.value)) return done(strict.value, []);
+    const quoted = escapeInnerQuotes(cleaned.text);
+    const unquoted = quoted === null ? null : parsed(quoted);
+    if (unquoted !== null && isPlainObject(unquoted.value)) return done(unquoted.value, ["INNER_QUOTE"]);
+  }
+  if (!modelReplyFinishedNormally(reply)) return null;
+  if (cleaned.made.size > 0) {
+    const closed = closeOpenBrackets(cleaned.text);
+    const value = closed === null ? null : parsed(closed);
+    if (value !== null && isPlainObject(value.value)) return done(value.value, ["CLOSING_BRACKETS"]);
+  }
+  const inserted = insertOneBracket(cleaned.text);
+  return inserted !== null && isPlainObject(inserted.value) ? done(inserted.value, ["BRACKET_INSERTED"]) : null;
+}
+
 /**
  * THE TOLERANT DECODE. In order: (i) strict JSON; (ii) the body of one code fence; (iii) the outermost object
  * when prose stands around it; (iv) the straight quotes inside string values that cannot end them, escaped;
@@ -452,7 +619,8 @@ function trailingObject(content: string): { readonly value: unknown } | null {
  * normally, the brackets still open at the very end, closed. (iv) to (vi) read the fence's body when there is one
  * (`modelJsonLateRepair`). (vii) Last, only when the caller hands `options.trailingObjectAccepted` and the reply
  * finished normally, the one object that ends a reply opening with prose (`trailingObject`), returned only when that
- * check accepts it. Being last, it never changes how a reply any earlier step decodes is read. One repair at most; the
+ * check accepts it. Being last, it never changes how a reply any earlier step decodes is read. (viii) LG-A: the syntax
+ * pass (`modelJsonSyntaxRepair`), last. One repair at most before (viii), which may name several (`repairs`); the
  * first that decodes wins. A reply cut off at its token ceiling (`length`) is decoded strictly or not at all. A
  * failure carries the strict parser's own error, as before this decode existed.
  */
@@ -476,9 +644,15 @@ export function decodeModelJson(content: string, reply?: ModelReplyFacts, option
   const late = modelJsonLateRepair(content, reply);
   if (late !== null) return accept(late.value, late.repair);
   const accepts = options?.trailingObjectAccepted;
-  if (accepts === undefined || !modelReplyFinishedNormally(reply)) return failed;
-  const trailing = trailingObject(content);
-  return trailing !== null && accepts(trailing.value) ? accept(trailing.value, "TRAILING_OBJECT") : failed;
+  if (accepts !== undefined && modelReplyFinishedNormally(reply)) {
+    const trailing = trailingObject(content);
+    if (trailing !== null && accepts(trailing.value)) return accept(trailing.value, "TRAILING_OBJECT");
+  }
+  // LG-A: the syntax pass, last, so no reply an earlier repair reads is read differently.
+  const syntax = modelJsonSyntaxRepair(content, reply);
+  if (syntax === null) return failed;
+  return Object.freeze({ ok: true, value: syntax.value, repair: syntax.repairs[0]!,
+    ...(syntax.repairs.length > 1 ? { repairs: syntax.repairs } : {}) });
 }
 
 /**

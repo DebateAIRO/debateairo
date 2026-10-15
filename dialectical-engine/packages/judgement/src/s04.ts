@@ -5,6 +5,8 @@ import {
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
+  modelJsonSyntaxRepair,
+  parsedWithRepairs,
   type ContentClassification,
   type ModelJsonRepair,
   type ModelReplyFacts
@@ -133,12 +135,14 @@ export type JudgeAssessment = z.infer<typeof judgeAssessmentSchema>;
  * repairs a step may ask for (`StructuredReadingOptions`).
  */
 export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "STRAY_QUOTE" | "CLOSING_BRACKETS"
-  | "NESTED_FIELDS" | "RENAMED_MEMBER" | "UNASKED_KEYS" | "EMPTY_LIST";
+  | "NESTED_FIELDS" | "RENAMED_MEMBER" | "UNASKED_KEYS" | "EMPTY_LIST"
+  // LG-A: the syntax pass (decode) and the schema-guided fixer (Task 5); their repairs travel in `repairs`.
+  | "SYNTAX_REPAIRED" | "STRUCTURE_FIXED";
 
 const STRUCTURED_PARSE_REPAIRS: Readonly<Record<StructuredParseStrategy, ModelJsonRepair | null>> = Object.freeze({
   RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", STRAY_QUOTE: "STRAY_QUOTE",
   CLOSING_BRACKETS: "CLOSING_BRACKETS", NESTED_FIELDS: "NESTED_FIELDS", RENAMED_MEMBER: "RENAMED_MEMBER", UNASKED_KEYS: "UNASKED_KEYS",
-  EMPTY_LIST: "EMPTY_LIST"
+  EMPTY_LIST: "EMPTY_LIST", SYNTAX_REPAIRED: null, STRUCTURE_FIXED: null
 });
 
 /** The repair code a strategy is counted under (`ContentClassification.jsonRepair`); RAW needed none. */
@@ -147,9 +151,21 @@ export function structuredParseRepair(strategy: StructuredParseStrategy): ModelJ
 }
 
 export type ParseStructuredArtifactResult<T> =
-  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly value: T }
+  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly value: T;
+      /**
+       * LG-A: every repair, present only on the new paths (SYNTAX_REPAIRED, STRUCTURE_FIXED, and a shape repair made after
+       * SYNTAX_REPAIRED, pre-flight PF-A8); read with parsedStructuredRepairs.
+       */
+      readonly repairs?: readonly ModelJsonRepair[] }
   | { readonly kind: "PARSE_FAILURE"; readonly message: string }
   | { readonly kind: "SCHEMA_FAILURE"; readonly message: string };
+
+/** LG-A: every repair a PARSED reading made, in order (none for RAW). */
+export function parsedStructuredRepairs(result: Extract<ParseStructuredArtifactResult<unknown>, { kind: "PARSED" }>): readonly ModelJsonRepair[] {
+  if (result.repairs !== undefined) return result.repairs;
+  const repair = STRUCTURED_PARSE_REPAIRS[result.strategy];
+  return repair === null ? Object.freeze([]) : Object.freeze([repair]);
+}
 
 export type ParseJudgeAssessmentResult =
   | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly assessment: JudgeAssessment }
@@ -348,9 +364,14 @@ function fillPinnedEmptyLists(decoded: unknown, shape: RootShape): Record<string
 
 type ShapeRepair = readonly [allowed: boolean | undefined, repair: StructuredParseStrategy, build: () => Record<string, unknown> | null];
 
-function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions): ParseStructuredArtifactResult<T> {
+function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions,
+  decodeRepairs: readonly ModelJsonRepair[] = []): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
-  if (parsed.success) return Object.freeze({ kind: "PARSED", strategy, value: parsed.data });
+  if (parsed.success) {
+    return Object.freeze(strategy === "SYNTAX_REPAIRED"
+      ? { kind: "PARSED", strategy, value: parsed.data, repairs: Object.freeze([...decodeRepairs]) }
+      : { kind: "PARSED", strategy, value: parsed.data });
+  }
   const refused: ParseStructuredArtifactResult<T> = Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
   const shape = rootShapeOf(schema);
   if (options === undefined || shape === null) return refused;
@@ -365,7 +386,13 @@ function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, sc
     const candidate = build();
     if (candidate === null) continue;
     const repaired = schema.safeParse(candidate);
-    if (repaired.success) return Object.freeze({ kind: "PARSED", strategy: repair, value: repaired.data });
+    if (!repaired.success) continue;
+    // LG-A (L34, pre-flight PF-A8): a value the syntax pass decoded and a shape repair then fixed names both repairs, in
+    // order (TRAILING_COMMA+UNASKED_KEYS). Every shape strategy names its repair in STRUCTURED_PARSE_REPAIRS, so `!` is safe.
+    return Object.freeze(strategy === "SYNTAX_REPAIRED"
+      ? { kind: "PARSED", strategy: repair, value: repaired.data,
+          repairs: Object.freeze([...decodeRepairs, STRUCTURED_PARSE_REPAIRS[repair]!]) }
+      : { kind: "PARSED", strategy: repair, value: repaired.data });
   }
   return refused;
 }
@@ -406,6 +433,9 @@ export function parseStructuredArtifact<T>(
   }
   const late = modelJsonLateRepair(content, reply);
   if (late !== null) return schemaResult(late.value, late.repair, schema, options);
+  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair).
+  const syntax = modelJsonSyntaxRepair(content, reply);
+  if (syntax !== null) return schemaResult(syntax.value, "SYNTAX_REPAIRED", schema, options, syntax.repairs);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });
 }
 
@@ -424,8 +454,7 @@ export function classifyStructuredArtifact<T>(
   if (outcome.kind === "PARSED") {
     const issues = check?.(outcome.value) ?? [];
     if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
-    const repair = structuredParseRepair(outcome.strategy);
-    return repair === null ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSED", parseError: null, jsonRepair: repair };
+    return parsedWithRepairs(parsedStructuredRepairs(outcome));
   }
   return { parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED", parseError: outcome.message };
 }

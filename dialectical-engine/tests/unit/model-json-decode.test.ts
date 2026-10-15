@@ -110,13 +110,10 @@ describe("decodeModelJson — what it never repairs", () => {
 
   it.each([
     ["single quotes", "{'a': 1}"],
-    ["a trailing comma", "{\"a\": 1,}"],
     ["a missing comma between members", "{\"a\": 1 \"b\": 2}"],
     ["a comment", "{\"a\": 1 // note\n}"],
     ["an unquoted key", "{a: 1}"],
-    ["a raw line break inside a string", "{\"a\": \"one\ntwo\"}"],
     ["a string still open at the end", "{\"a\": \"abc"],
-    ["a mismatched closer", "{\"a\": [1}"],
     ["a dangling member at the end", "{\"a\": 1, \"b\":"],
     ["prose only", "I could not write the verdict."],
     ["an empty reply", ""]
@@ -124,6 +121,15 @@ describe("decodeModelJson — what it never repairs", () => {
     const result = decodeModelJson(text, STOP);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(typeof result.error).toBe("string");
+  });
+
+  // LG-A (spec 2026-10-15, L31): the syntax pass (`modelJsonSyntaxRepair`, the decode's last step) now reads these three.
+  it.each([
+    { name: "a trailing comma", text: "{\"a\": 1,}", value: { a: 1 }, repair: "TRAILING_COMMA" },
+    { name: "a raw line break inside a string", text: "{\"a\": \"one\ntwo\"}", value: { a: "one\ntwo" }, repair: "RAW_LINE_BREAK" },
+    { name: "a mismatched closer", text: "{\"a\": [1}", value: { a: [1] }, repair: "BRACKET_INSERTED" }
+  ])("reads $name with the syntax pass (LG-A)", ({ text, value, repair }) => {
+    expect(decodeModelJson(text, STOP)).toEqual({ ok: true, value, repair });
   });
 
   it("names the strict parser's own error when nothing decodes", () => {
