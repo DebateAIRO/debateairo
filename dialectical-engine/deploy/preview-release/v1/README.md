@@ -224,7 +224,11 @@ those debates would wait with nobody to run them.
 - `judgeContractHash`: `e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365` becomes
   `aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612`;
 - `composerContractHash`: `4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f` becomes
-  `9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662`;
+  `879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47` (the answer writer `serve.synthesizer.v4`
+  with its answer-length variant `serve.synthesizer.length.v2`: since 2026-10-15 the writer says in natural words
+  of the question's language that a provisional answer may still change, instead of translating "not yet settled"
+  word for word. This branch's earlier value, `9a46af29…` (v3 with `serve.synthesizer.length.v1`), is history: a
+  plan or progress line that names it was made from older code);
 - `mapContractHash` is new: `25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392` (read only
   beside a debate-shape row);
 - `nodeRuntimeVersion` keeps its value with a new source reference, as at every publication.

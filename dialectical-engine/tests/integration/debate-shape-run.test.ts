@@ -645,7 +645,8 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     expect(writers.length).toBeGreaterThan(0);
     for (const writer of writers) {
       const frame = materialOf(writer);
-      expect(frame.contractId).toBe("serve.synthesizer.length.v1");
+      // Answer writer v4 (owner-approved wording, 2026-10-15): the length variant of v4; length.v1 (v3's) is history.
+      expect(frame.contractId).toBe("serve.synthesizer.length.v2");
       // Pre-flight PF-L40 (P2L Task 17): the run is locked (the harness's English), so the language field rides LAST and
       // the length field just before it.
       expect(frame.fields.at(-2)).toEqual({ name: "answer_length", content: `about ${String(shape.answerWords)} words` });

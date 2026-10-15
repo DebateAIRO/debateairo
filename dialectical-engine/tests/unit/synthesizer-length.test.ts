@@ -9,24 +9,27 @@ import { buildSynthesisRolePrompt, shapeWriterBound } from "../../apps/runner/sr
 import { builderFromRecordedPacket, captureMomentPacket } from "../../acceptance/moment-tools.js";
 import { synthesisRequestFixture } from "../support/synthesisRequestFixture.js";
 
+// Answer writer v4 (owner-approved wording, 2026-10-15): the current writer contract is serve.synthesizer.v4 and its
+// length variant serve.synthesizer.length.v2; v3 and length.v1 are sealed history
+// (tests/unit/answer-writer-v4-plain-words.test.ts).
 describe("the answer length (spec §3.3 step 8)", () => {
   it("without a length the writer's prompt is today's, byte for byte", () => {
     const request = synthesisRequestFixture();
     const fixed = (size: number) => Buffer.alloc(size, 7);
     const today = buildSynthesisRolePrompt(request, "English", fixed);
     expect(buildSynthesisRolePrompt(request, "English", fixed, null).packet).toEqual(today.packet);
-    expect(readPromptFrame(today.packet).contractId).toBe("serve.synthesizer.v3");
+    expect(readPromptFrame(today.packet).contractId).toBe("serve.synthesizer.v4");
   });
 
   it("with a length it uses the length variant and adds answer_length last", () => {
     const frame = readPromptFrame(buildSynthesisRolePrompt(synthesisRequestFixture(), "English", undefined, 700).packet);
-    expect(frame.contractId).toBe("serve.synthesizer.length.v1");
+    expect(frame.contractId).toBe("serve.synthesizer.length.v2");
     expect(frame.fields.at(-1)).toEqual({ name: "answer_length", content: "about 700 words" });
     expect(SYNTHESIZER_LENGTH_PROMPT_CONTRACT.instruction).toBe(`${SYNTHESIZER_PROMPT_CONTRACT.instruction} ${SYNTHESIZER_LENGTH_SENTENCE}`);
     expect(SYNTHESIZER_LENGTH_SENTENCE).not.toMatch(/\d/u);
   });
 
-  it("the composer fingerprint is v3 then the length variant", () => {
+  it("the composer fingerprint is the current contract (v4) then the length variant", () => {
     expect(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).toBe([
       promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
       promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT)].join("\n---\n"));
@@ -53,7 +56,7 @@ describe("the answer length (spec §3.3 step 8)", () => {
     expect(builder).toMatchObject({ family: "SYNTHESIS_WRITER", inputs: { answerWords: 700 } });
     const replayedPacket = await captureMomentPacket(builder);
     const replayed = readPromptFrame(replayedPacket);
-    expect(replayed.contractId).toBe("serve.synthesizer.length.v1");
+    expect(replayed.contractId).toBe("serve.synthesizer.length.v2");
     expect(replayed.fields.at(-1)).toEqual({ name: "answer_length", content: "about 700 words" });
     // export-moment's self-check 2: the live builder, fed the read-back inputs, sends the recorded prompt again.
     expect(canonicalPromptFingerprint(replayedPacket.messages)).toBe(canonicalPromptFingerprint(recorded.packet.messages));
@@ -66,7 +69,7 @@ describe("the answer length (spec §3.3 step 8)", () => {
 
   it.each([
     ["the length variant without answer_length", SYNTHESIZER_LENGTH_PROMPT_CONTRACT, [], "MOMENT_FIELD_UNEXPECTED"],
-    ["v3 with answer_length", SYNTHESIZER_PROMPT_CONTRACT, [{ name: "answer_length", content: "about 700 words" }], "MOMENT_FIELD_UNEXPECTED"],
+    ["v4 with answer_length", SYNTHESIZER_PROMPT_CONTRACT, [{ name: "answer_length", content: "about 700 words" }], "MOMENT_FIELD_UNEXPECTED"],
     ["an unreadable answer_length (words, not digits)", SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
       [{ name: "answer_length", content: "about seven words" }], "MOMENT_RECORDED_PROMPT_UNREADABLE"],
     ["an answer_length of zero", SYNTHESIZER_LENGTH_PROMPT_CONTRACT,

@@ -56,6 +56,9 @@ import {
  * 2026-10-12: serve.synthesizer.v3 and serve.evaluator.v2 (practice debate 3)
  * moved `composerContractHash` and `conformanceContractHash` the same way, with
  * the same consequence for a standing ceremony database.
+ *
+ * 2026-10-15: serve.synthesizer.v4 + length.v2 (owner-approved plain-words
+ * wording) moved `composerContractHash` again, the same way.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**
@@ -168,7 +171,8 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     // answer form, or to an owner's instruction slot is a NEW sealed version
     // and none of them can ship under an old hash.
     judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
-    // Debate shape (2026-10-13): the writer's seal is v3 then its answer-length variant.
+    // Debate shape (2026-10-13): the writer's seal is the current contract then its answer-length variant
+    // (since 2026-10-15 v4 + length.v2).
     composerContractHash: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
     conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner

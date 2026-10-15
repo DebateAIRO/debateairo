@@ -7408,10 +7408,15 @@ describe("TERM-01 rework 2 — the composer organ is told the ruled reasoning-an
     // Answer writer v3 (serve.synthesizer.v3, register 12): the clause now asks
     // for the provisional answer, said to be not yet settled, then what evidence
     // would settle it; v1's "hypothesis" and "research plan" words are history.
+    // Answer writer v4 (serve.synthesizer.v4, owner-approved wording, 2026-10-15):
+    // the first segment says, in natural words of the question's language, that the
+    // answer may still change, and the second what evidence would decide it; v3's
+    // "not yet settled" / "would settle it" are history.
     "rest on reasoning alone",
     "return two segments in order",
-    "the first gives the provisional answer and says plainly that it is not yet settled",
-    "the second says what evidence would settle it"
+    "the first gives the provisional answer and says plainly, in natural words of the question's language, that it may still change",
+    "the second says what evidence would decide it",
+    "Write both as ordinary sentences in that language, never as a translation of these instructions."
   ] as const;
 
   async function startContractAwareProviderDouble(): Promise<{

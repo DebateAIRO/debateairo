@@ -671,7 +671,7 @@ export const EVALUATOR_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
  * PRACTICE DEBATE 3 (2026-10-12): `serve.evaluator.v2`, what the runner sends.
  * Only the owners' instruction slot changed (owner approved 2026-10-12,
  * `EVALUATOR_INSTRUCTIONS`): the checker now also grades the reader's rule the
- * writer's `serve.synthesizer.v3` instruction states. The answer form is the
+ * writer's `serve.synthesizer.v3` instruction states (v4 keeps that instruction). The answer form is the
  * same sealed `EVALUATOR_CONTRACT_TEXT`, so the verdict schema below is
  * unchanged. A new instruction is a new contract id, never an edit, and a new
  * `conformanceContractHash` the register must carry before the runner starts

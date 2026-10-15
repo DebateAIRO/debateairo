@@ -55,8 +55,9 @@ const judgeInput = (lock: object) => ({ runId: null, subjectItemId: "s", callSit
 describe("judge-side and answer calls in the locked language (question-language spec 2026-10-13, L6)", () => {
   it("no sealed judge fingerprint moves", () => {
     expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT).digest("hex")).toBe(JUDGE_HASH_AFTER_P2B);
-    // The composer's fingerprint after P2b (9a46af29…): the named sentence is added at call time, never sealed.
-    expect(createHash("sha256").update(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).digest("hex").slice(0, 8)).toBe("9a46af29");
+    // The composer's fingerprint after P2b (9a46af29…), and since answer writer v4 + length.v2 (owner-approved
+    // wording, 2026-10-15) 879d2c5d…: the named sentence is added at call time, never sealed.
+    expect(createHash("sha256").update(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).digest("hex").slice(0, 8)).toBe("879d2c5d");
   });
 
   it("a judge leg without a lock is today's packet; with one it carries the sentence and the field, last", () => {

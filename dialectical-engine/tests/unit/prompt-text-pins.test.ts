@@ -20,7 +20,10 @@ import {
   SYNTHESIZER_V2_ANSWER_FORM,
   SYNTHESIZER_V2_CONTRACT_ID,
   SYNTHESIZER_V2_INSTRUCTIONS,
-  SYNTHESIZER_V2_PROMPT_CONTRACT
+  SYNTHESIZER_V2_PROMPT_CONTRACT,
+  SYNTHESIZER_V3_ANSWER_FORM,
+  SYNTHESIZER_V3_CONTRACT_ID,
+  SYNTHESIZER_V3_PROMPT_CONTRACT
 } from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import {
@@ -315,10 +318,12 @@ describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
     expect(SYNTHESIZER_V2_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_V2_ANSWER_FORM);
   });
 
-  it("supersedes v2 with serve.synthesizer.v3: the owner-approved answer form, plain words, no served number", () => {
-    expect(SYNTHESIZER_CONTRACT_ID).toBe("serve.synthesizer.v3");
-    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
-    expect(SYNTHESIZER_ANSWER_FORM).toBe(
+  // serve.synthesizer.v4 (owner-approved wording, 2026-10-15) superseded v3, so this test now pins v3 from its
+  // exported HISTORY form (SYNTHESIZER_V3_*): the literal below is the same v3 text, byte for byte.
+  it("supersedes v2 with serve.synthesizer.v3: the owner-approved answer form, plain words, no served number (history)", () => {
+    expect(SYNTHESIZER_V3_CONTRACT_ID).toBe("serve.synthesizer.v3");
+    expect(SYNTHESIZER_V3_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v3");
+    expect(SYNTHESIZER_V3_ANSWER_FORM).toBe(
       "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
       + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
       + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
@@ -327,9 +332,34 @@ describe("REVIEW ITEM 4 — the serve prompts, exact shipped texts", () => {
       + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
       + "copy ids exactly and never translate identifiers. served_number_refs is always []."
     );
-    expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_ANSWER_FORM);
+    expect(SYNTHESIZER_V3_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_V3_ANSWER_FORM);
+    expect(SYNTHESIZER_V3_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_INSTRUCTIONS);
     // The words that produced "Hypothesis:" / "Research plan:" headings and an asserted number are gone.
     for (const gone of ["hypothesis", "research plan", "digest", "number:final-strength", "code_label", "served statement"]) {
+      expect(`${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_V3_ANSWER_FORM}`.toLowerCase()).not.toContain(gone);
+    }
+  });
+
+  // The owner's blind reading (2026-10-15): Romanian answers translated v3's "not yet settled" / "would settle it"
+  // word for word. Option 1, owner-approved: v4 replaces only that clause.
+  it("supersedes v3 with serve.synthesizer.v4: the provisional answer in natural words of the question's language", () => {
+    expect(SYNTHESIZER_CONTRACT_ID).toBe("serve.synthesizer.v4");
+    expect(SYNTHESIZER_PROMPT_CONTRACT.contractId).toBe("serve.synthesizer.v4");
+    expect(SYNTHESIZER_ANSWER_FORM).toBe(
+      "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+      + "node_refs lists the ids of the points whose facts the segment states, copied exactly. Add no facts. "
+      + "When the points a segment relies on rest on reasoning alone, with nothing measured or looked up behind them, "
+      + "return two segments in order: the first gives the provisional answer and says plainly, in natural words of the "
+      + "question's language, that it may still change; the second says what evidence would decide it. Write both as "
+      + "ordinary sentences in that language, never as a translation of these instructions. Never start a segment with "
+      + "a heading or a label. "
+      + "segment_id and every node_refs entry must be an ASCII identifier matching ^[A-Za-z0-9][A-Za-z0-9:._-]*$; "
+      + "copy ids exactly and never translate identifiers. served_number_refs is always []."
+    );
+    expect(SYNTHESIZER_PROMPT_CONTRACT.answerForm).toBe(SYNTHESIZER_ANSWER_FORM);
+    expect(SYNTHESIZER_PROMPT_CONTRACT.instruction).toBe(SYNTHESIZER_INSTRUCTIONS);
+    for (const gone of ["hypothesis", "research plan", "digest", "number:final-strength", "code_label", "served statement",
+      "not yet settled", "would settle it"]) {
       expect(`${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_ANSWER_FORM}`.toLowerCase()).not.toContain(gone);
     }
   });
