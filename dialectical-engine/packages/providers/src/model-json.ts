@@ -44,7 +44,10 @@ const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INN
   "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED"] as const);
 /** A repair the tolerant decode can make (no schema known). */
 export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
-/** The syntax pass's own repairs: the decode list's last five. */
+/**
+ * The five repairs only the syntax pass makes (the decode list's last five). `modelJsonSyntaxRepair` may name CODE_FENCE,
+ * INNER_QUOTE and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
+ */
 export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
   "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED">;
 /**
@@ -454,10 +457,13 @@ const SYNTAX_REPAIR_LIMITS = Object.freeze({
 });
 const MODEL_TOKEN_BODY = /^[A-Za-z0-9_]+$/u;
 /**
- * The syntax pass's repairs made OUTSIDE strings. After one of them the cleaned text is never read with INNER_QUOTE: a
- * straight quote inside a text makes the pass read part of that text as outside, so a comma, token or colon dropped
- * there would change the AI's words (Task 3 review: `"he typed "[1, 2,]" in the box"`). Such a reply is refused here and
- * left to the structure-repair call, which keeps every word.
+ * The syntax pass's repairs made OUTSIDE strings. A straight quote inside a text makes the pass read part of that text as
+ * outside it, where a comma, token or colon dropped would change the AI's words (Task 3 review: `"he typed "[1, 2,]" in
+ * the box"`, `"he wrote "<|im_end|>,"k":" done"`). Two guards keep every word:
+ *  · a reading with a doubtful string end (`syntaxClean`'s `doubtful`: a quote the pass took as a string's end although
+ *    no `,` `}` `]` `:` or the text's end follows it in the reply) refuses all three: the pass returns no value;
+ *  · after one of them the cleaned text is never read with INNER_QUOTE.
+ * Such a reply is refused by the decode and left to the structure-repair call, which keeps every word.
  */
 const OUTSIDE_STRING_REPAIRS: readonly ModelJsonDecodeRepair[] = Object.freeze(["TRAILING_COMMA", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED"]);
 
@@ -480,16 +486,25 @@ function nextSignificantPastTokens(text: string, from: number): string | undefin
   return text[index];
 }
 
+/** The characters that may follow a string's closing quote in JSON (or the text's end): `,` `}` `]` `:`. */
+function stringMayEndBefore(text: string, from: number): boolean {
+  const next = text[nextSignificant(text, from)];
+  return next === undefined || next === "," || next === "}" || next === "]" || next === ":";
+}
+
 /**
  * LG-A, one linear pass over a JSON-like text (strings read as JSON reads them; an escaped quote stays inside):
  *  · RAW_LINE_BREAK — a raw line break, carriage return or tab inside a string, escaped;
  *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
  *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
  *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
- * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case).
+ * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). `doubtful` is set when a quote
+ * the pass took as a string's end is followed in the reply by none of `,` `}` `]` `:` or the end (a key whose colon is
+ * moved excepted): that quote may be the AI's own quotation mark, so the reading of what follows may be wrong.
  */
-function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair> }> {
+function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<ModelJsonDecodeRepair>; doubtful: boolean }> {
   const made = new Set<ModelJsonDecodeRepair>();
+  let doubtful = false;
   type Container = { kind: "object" | "array"; expectKey: boolean };
   const stack: Container[] = [];
   let out = "";
@@ -515,7 +530,9 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
         body += inner;
       }
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
-      if (isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":") {
+      const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
+      if (!movesColon && !stringMayEndBefore(text, cursor + 1)) doubtful = true;
+      if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
         top!.expectKey = false;
@@ -542,7 +559,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     out += character;
     index += 1;
   }
-  return Object.freeze({ text: out, made });
+  return Object.freeze({ text: out, made, doubtful });
 }
 
 /**
@@ -604,10 +621,10 @@ function insertOneBracket(text: string): { readonly value: unknown } | null {
 /**
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
  * one code fence (named CODE_FENCE too), else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then
- * strict JSON, then (iv) INNER_QUOTE on the cleaned text, only when the clean made no repair outside strings
- * (`OUTSIDE_STRING_REPAIRS`: never a changed word); only for a reply that finished normally, then (vi) CLOSING_BRACKETS
- * on the cleaned text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing
- * decodes to one object. The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ * strict JSON, then (iv) INNER_QUOTE on the cleaned text, only when the clean made no repair outside strings; only for
+ * a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing
+ * decodes to one object, and (never a changed word, `OUTSIDE_STRING_REPAIRS`) when a repair outside strings was made on
+ * a reading with a doubtful string end. The repairs are named once each, in MODEL_JSON_REPAIRS order.
  */
 export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
@@ -616,6 +633,8 @@ export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   const base = (fenced ?? content).trim();
   if (!base.startsWith("{")) return null;
   const cleaned = syntaxClean(base);
+  // Task 3 re-review: a doubtful string end refuses every repair made outside strings, whatever later step would read it.
+  if (cleaned.doubtful && OUTSIDE_STRING_REPAIRS.some((repair) => cleaned.made.has(repair))) return null;
   const done = (value: unknown, more: readonly ModelJsonDecodeRepair[]) => {
     const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
     return Object.freeze({ value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });

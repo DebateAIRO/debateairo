@@ -116,11 +116,26 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
   it.each([
     ["a leaked token between two inner quotes", "{\"a\":\"he wrote \"<|im_end|>\" here\",}"],
     ["a trailing comma between two inner quotes", "{\"a\":\"he typed \"[1, 2,]\" in the box\",\"b\":[3,]}"],
-    ["a comma before a brace between two inner quotes", "{\"a\":\"say \"a,}\" b\",\"c\":[1,]}"]
+    ["a comma before a brace between two inner quotes", "{\"a\":\"say \"a,}\" b\",\"c\":[1,]}"],
+    // Task 3 re-review: strict JSON on the cleaned text would split the text into an invented key ("k").
+    ["a token after an inner quote, with a trailing comma in a later list", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1,]}"],
+    ["a token after an inner quote, with a trailing comma at the end", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",}"],
+    ["a token after an inner quote, with the last brace missing", "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1]"],
+    // The accepted side effect: a token right after a string value is left to the structure-repair call.
+    ["a token right after a string value", "{\"a\":\"x\"<|im_end|>}"]
   ])("refuses %s rather than change its words", (_name, text) => {
     expect(decodeModelJson(text, STOP).ok).toBe(false);
     expect(modelJsonSyntaxRepair(text, STOP)).toBeNull();
     expect(parseStructuredArtifact(text, z.unknown(), STOP).kind).toBe("PARSE_FAILURE");
+  });
+
+  it("the judge never drops a split-off part of a text as an unasked key (Task 3 re-review)", () => {
+    const schema = z.object({ a: z.string(), b: z.array(z.number()) }).strict();
+    const reply = "{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1,]}";
+    expect(parseStructuredArtifact(reply, schema, STOP, { unaskedKeys: true }).kind).toBe("PARSE_FAILURE");
+    // Control: without the trailing comma INNER_QUOTE alone reads the reply and keeps every word.
+    expect(decodeModelJson("{\"a\":\"he wrote \"<|im_end|>,\"k\":\" done\",\"b\":[1]}", STOP)).toEqual({ ok: true,
+      value: { a: "he wrote \"<|im_end|>,\"k\":\" done", b: [1] }, repair: "INNER_QUOTE" });
   });
 });
 
