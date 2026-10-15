@@ -102,8 +102,10 @@ describe("verdict story — the story classifier", () => {
     });
   });
 
-  it("refuses a member the form does not have", () => {
-    expect(classifyStoryContent(JSON.stringify({ ...story(), notes: "extra" }), INDEX).parseStatus).toBe("SCHEMA_FAILED");
+  it("drops a member the form does not have, names the repair, and reads the story unchanged (LG-A, UNASKED_KEYS)", () => {
+    const content = JSON.stringify({ ...story(), notes: "extra" });
+    expect(classifyStoryContent(content, INDEX)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+    expect(parseStoryBody(content, INDEX)).toEqual(story());
   });
 
   it("refuses a citation of a point the debate does not have, by path, without echoing it", () => {
@@ -620,8 +622,8 @@ describe("verdict story — the checker classifier", () => {
     expect(parseCheckerVerdict(JSON.stringify(objected))).toEqual(objected);
   });
 
-  it("refuses an extra member and text that is not JSON", () => {
-    expect(classifyCheckerContent(JSON.stringify({ ...SATISFIED, score: 9 })).parseStatus).toBe("SCHEMA_FAILED");
+  it("drops an extra member (LG-A, UNASKED_KEYS) and refuses text that is not JSON", () => {
+    expect(classifyCheckerContent(JSON.stringify({ ...SATISFIED, score: 9 }))).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
     expect(classifyCheckerContent("Looks fine to me.").parseStatus).toBe("PARSE_FAILED");
     expect(() => parseCheckerVerdict("Looks fine to me."))
       .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));

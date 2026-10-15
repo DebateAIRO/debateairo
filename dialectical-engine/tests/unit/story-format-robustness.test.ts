@@ -141,12 +141,11 @@ describe("B — the storyteller's reply is decoded tolerantly, then checked in f
     return JSON.stringify({ ...decoded, long, reviewer_note }).slice(0, -1);
   };
 
-  it("the real reply left out the brace closing \"long\": decoded at the end, then refused by the schema with a path", () => {
-    const refused = classifyStoryContent(reply, index, STOP);
-    expect(refused.parseStatus).toBe("SCHEMA_FAILED");
-    // Before, PARSE_FAILED (invalid_json at $); now the one repair packet can name the member that is wrong.
-    expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>))
-      .toEqual({ code: "SCHEMA_FAILED", path: "long" });
+  it("the real reply left out the brace closing \"long\": decoded at the end, then the note moved up in code (LG-A)", () => {
+    // Before LG-A: SCHEMA_FAILED at "long". Now CLOSING_BRACKETS, then MEMBER_UNNESTED (the note was one level too deep).
+    expect(classifyStoryContent(reply, index, STOP)).toEqual({ parseStatus: "PARSED", parseError: null,
+      jsonRepair: "CLOSING_BRACKETS", jsonRepairs: ["CLOSING_BRACKETS", "MEMBER_UNNESTED"] });
+    expect(parseStoryBody(reply, index, STOP)).toEqual(parseStoryBody(shortOnlyAtTheEnd(), index, STOP));
   });
 
   it("the same story missing only its final brace is accepted when the call finished normally", () => {
