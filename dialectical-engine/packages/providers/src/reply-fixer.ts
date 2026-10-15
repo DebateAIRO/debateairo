@@ -47,9 +47,15 @@ export type ReplyFixerRepair = ModelJsonStructureRepair | "UNASKED_KEYS";
  * the schema uses somewhere, anything but a plain text (under a name declared somewhere as a text, never as an enum), an
  * empty object, an empty list or null (pre-flight PF-A13; contract deviation 8 as widened at the Task 4 review and
  * narrowed at the Task 5 review).
+ * `keepDeclaredTexts: true` (LG-A Task 7 review; default false) KEEPS a plain text under a name the schema declares
+ * somewhere as a text instead of dropping it, so the reply stays refused and the structure-repair call keeps its words: a
+ * step whose every such name holds reader-facing prose (the story: a stray `long.sections[0].text`, `short.line`) turns
+ * it on. Names the schema never declares (`long.style`) are still dropped, and null, an empty object and an empty list
+ * still are too.
  */
 export type ReplyFixerOptions = Readonly<{
   innerUnaskedKeys?: boolean; unnest?: boolean; wrap?: boolean; textForms?: boolean; paragraphs?: boolean; onlyValues?: boolean;
+  keepDeclaredTexts?: boolean;
 }>;
 export type ReplyFixed = Readonly<{ value: unknown; repairs: readonly ReplyFixerRepair[] }>;
 
@@ -256,11 +262,11 @@ function fixedValue(found: unknown, expected: z.ZodType, options: ReplyFixerOpti
  * else is kept, so the reply stays refused and the structure-repair call keeps it: a number, true/false, a text under a
  * name declared only as a number, true/false or an enum (a root `fidelity: "0.4"` beside `steelman.fidelity`, an
  * `evidence.fit: "0.2"`: a score written as text), a non-empty object or list such as `evidence.fatalFlags: [{…}]` or
- * `why.paths: [{…}]`.
+ * `why.paths: [{…}]`. With `keepDeclaredTexts`, a text is never dropped here (it may be the AI's prose in the wrong place).
  */
-function droppableNamedValue(key: string, found: unknown, named: DeclaredNames): boolean {
+function droppableNamedValue(key: string, found: unknown, named: DeclaredNames, options: ReplyFixerOptions): boolean {
   if (found === null) return true;
-  if (typeof found === "string") return named.strings.has(key) && !named.enums.has(key);
+  if (typeof found === "string") return options.keepDeclaredTexts !== true && named.strings.has(key) && !named.enums.has(key);
   if (Array.isArray(found)) return found.length === 0;
   if (isRecord(found)) return Object.keys(found).length === 0;
   return false;
@@ -296,7 +302,7 @@ function onePass(root: unknown, schema: z.ZodType, options: ReplyFixerOptions, n
         // A possibly misplaced score, verdict, category or block of words under a name the schema uses elsewhere (pre-flight
         // PF-A13; contract deviation 8 as widened at the Task 4 review): kept unless `droppableNamedValue`, so the reply
         // stays refused. A name the schema never declares is dropped whatever it holds (`notes`).
-        if ((named.keys.has(key) && !droppableNamedValue(key, holder[key], named)) || options.innerUnaskedKeys === false) continue;
+        if ((named.keys.has(key) && !droppableNamedValue(key, holder[key], named, options)) || options.innerUnaskedKeys === false) continue;
         delete holder[key];
         made.add(path.length === 0 ? "UNASKED_KEYS" : "INNER_UNASKED_KEYS");
         changed = true;

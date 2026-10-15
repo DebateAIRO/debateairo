@@ -182,6 +182,24 @@ describe("LG-A fixReplyStructure: what the 2026-10-14 practice runs broke, repai
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     expect(fixReplyStructure(ASSESSMENT, judgeAssessmentSchema)).toBeNull();
   });
+
+  // (Task 7 review) in the story every text name holds a reader's words: with `keepDeclaredTexts` a stray text under a
+  // declared text name is kept (null: the structure-repair call keeps it); a name never declared is still dropped.
+  it("keepDeclaredTexts keeps a stray text under a declared text name and still drops an undeclared one", () => {
+    const probes: readonly ((body: Record<string, any>) => void)[] = [
+      (body) => { body.long.sections[0].text = "An extra paragraph the section wrote outside its list."; },
+      (body) => { body.short.paths[0].text = "An explanation of the position line"; },
+      (body) => { body.short.line = "A stray position line"; },
+      (body) => { body.long.sections[0].headline = "A stray headline for the section"; }
+    ];
+    for (const probe of probes) {
+      expect(fixReplyStructure(story(probe), StoryBodySchema, { keepDeclaredTexts: true })).toBeNull();
+      // Without the option (the judge's readers) the same text is dropped as before.
+      expect(fixReplyStructure(story(probe), StoryBodySchema)).toEqual({ value: STORY, repairs: ["INNER_UNASKED_KEYS"] });
+    }
+    expect(fixReplyStructure(story((body) => { body.long.style = "plain"; }), StoryBodySchema, { keepDeclaredTexts: true }))
+      .toEqual({ value: STORY, repairs: ["INNER_UNASKED_KEYS"] });
+  });
 });
 
 describe("LG-A replyFailureClassOf (INTERFACE §2.3)", () => {

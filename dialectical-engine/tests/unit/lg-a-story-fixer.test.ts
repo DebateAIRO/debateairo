@@ -77,6 +77,26 @@ describe("LG-A: the story's two readers repair form in code (L15, L31)", () => {
     expect(read.long.sections[2]!.paragraphs[0]!.text).toBe("Funding held up, „as the city said\" in its report.");
   });
 
+  // (Task 7 review, L31) a stray text under a name the story uses for prose elsewhere may be the storyteller's words in
+  // the wrong place: kept, so the reply is refused (and goes on to the structure-repair call), never read with it gone.
+  it("never drops a stray text under a name the story declares as a text; an undeclared name is still dropped", () => {
+    const probes: readonly ((sent: Record<string, any>) => void)[] = [
+      (sent) => { sent.long.sections[0].text = "An extra paragraph the section wrote outside its list."; },
+      (sent) => { sent.short.paths[0].text = "An explanation of the position line"; },
+      (sent) => { sent.short.line = "A stray position line"; },
+      (sent) => { sent.long.sections[0].headline = "A stray headline for the section"; }
+    ];
+    for (const probe of probes) {
+      const sent = story();
+      probe(sent);
+      expect(classifyStoryContent(JSON.stringify(sent), INDEX, STOP).parseStatus).toBe("SCHEMA_FAILED");
+    }
+    const styled = story();
+    styled.long.style = "plain";
+    expect(classifyStoryContent(JSON.stringify(styled), INDEX, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_UNASKED_KEYS" });
+    expect(parseStoryBody(JSON.stringify(styled), INDEX, STOP)).toEqual(story());
+  });
+
   it("the checker drops an extra key and keeps every verdict value", () => {
     const content = JSON.stringify({ ...CHECK, criteria: { ...CHECK.criteria, tone_ok: "yes" } });
     expect(classifyCheckerContent(content, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_UNASKED_KEYS" });

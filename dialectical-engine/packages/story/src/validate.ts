@@ -2,7 +2,7 @@ import { z } from "zod";
 import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs, type ContentClassification,
-  type ModelJsonRepair, type ModelReplyFacts } from "@debateai/providers";
+  type ModelJsonRepair, type ModelReplyFacts, type ReplyFixerOptions } from "@debateai/providers";
 import { STORY_CHECKER_LIMITS } from "./contracts.js";
 
 /**
@@ -301,6 +301,12 @@ export const STORY_CHECKER_PROSE = Object.freeze(["objection"] as const);
 /** A step's language check (`replyLanguageCheck`): the issues of an accepted object, empty when it is fine. */
 export type StoryLanguageCheck = (value: unknown) => readonly unknown[];
 
+/**
+ * LG-A Task 7 review (L31): every text name of the story and its check holds words a reader meets, so a stray text under
+ * such a name is kept (the reply goes on to the structure-repair call), never dropped. Unknown names are still dropped.
+ */
+const STORY_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
+
 type StoryRead<T> = Readonly<{ ok: true; value: T; repairs: readonly ModelJsonRepair[] }> | Readonly<{ ok: false; message: string }>;
 
 /**
@@ -310,7 +316,7 @@ type StoryRead<T> = Readonly<{ ok: true; value: T; repairs: readonly ModelJsonRe
 function readStoryBody(value: unknown): StoryRead<StoryBody> {
   const parsed = StoryBodySchema.safeParse(value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
-  const fixed = fixReplyStructure(value, StoryBodySchema);
+  const fixed = fixReplyStructure(value, StoryBodySchema, STORY_FIXER_OPTIONS);
   const refixed = fixed === null ? null : StoryBodySchema.safeParse(fixed.value);
   return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
 }
@@ -318,7 +324,7 @@ function readStoryBody(value: unknown): StoryRead<StoryBody> {
 function readCheckerVerdict(value: unknown): StoryRead<StoryCheckerVerdict> {
   const parsed = StoryCheckerVerdictSchema.safeParse(value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
-  const fixed = fixReplyStructure(value, StoryCheckerVerdictSchema);
+  const fixed = fixReplyStructure(value, StoryCheckerVerdictSchema, STORY_FIXER_OPTIONS);
   const refixed = fixed === null ? null : StoryCheckerVerdictSchema.safeParse(fixed.value);
   return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
 }
