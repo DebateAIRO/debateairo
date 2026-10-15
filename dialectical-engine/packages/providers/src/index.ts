@@ -2677,8 +2677,11 @@ export {
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";
-// LG-A (spec 2026-10-15, L31-L34): the reply fixer's failure classes (the fixer itself lands in ./reply-fixer.ts).
-export { REPLY_FAILURE_CLASSES, type ReplyFailureClass } from "./reply-fixer.js";
+// LG-A (spec 2026-10-15, L31-L34): the reply fixer and the failure classes.
+export {
+  REPLY_FAILURE_CLASSES, fixReplyStructure, replyFailureClassOf,
+  type ReplyFailureClass, type ReplyFixed, type ReplyFixerOptions, type ReplyFixerRepair
+} from "./reply-fixer.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";
