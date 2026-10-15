@@ -26,6 +26,13 @@ import { BackupEmailConfirmation } from "../../apps/ui/components/BackupEmailVer
 import { pickRegion } from "../support/signupRegion.js";
 import { mount, unmount, input } from "./task11-harness.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 vi.mock("@/lib/consumerWebAuthn", () => ({ createConsumerWebAuthnBrowser: () => ({ supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() }) }));
 
 const mounted: Array<Awaited<ReturnType<typeof mount>>> = [];
@@ -91,7 +98,7 @@ describe("sign-up explains a disabled Create account", () => {
   it("names what is missing and stops naming it once done", async () => {
     const host = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn() }} />);
     const button = [...host.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === "Create account")!;
-    expect(button.disabled).toBe(true);
+    expect(isLocked(button)).toBe(true);
     const hint = () => (button.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean).map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
     expect(hint()).toContain("Choose your region");
     expect(hint()).toContain("tick both boxes");

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ContractHttpError, createPasswordResetClient, type PasswordResetClient, type PasswordResetState } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
+import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
+import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
 import { API_BASE } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/password-reset.json";
@@ -13,6 +15,9 @@ const browserClient = createPasswordResetClient(fetch, API_BASE);
 type Phase = "request" | "sent" | "email_link" | "cancel_link" | "password_required" | "completed" | "cancelled" | "refused" | "expired";
 const navigateToRecovery = () => { window.location.assign("/recover"); };
 const navigateToAuthenticatorRecovery = () => { window.location.assign("/recover-authenticator"); };
+// The field an error belongs to, so the field can point at it (aria-invalid + aria-describedby) and take focus.
+type Field = "password" | "confirmation" | "code";
+const FIELD_ID: Readonly<Record<Field, string>> = { password: "password-reset-password", confirmation: "password-reset-confirmation", code: "password-reset-code" };
 
 export function PasswordResetFlow({ catalog = english, locale = "en", client = browserClient, onRecoverAccess = navigateToRecovery, onRecoverAuthenticator = navigateToAuthenticatorRecovery }: Readonly<{
   catalog?: MessageCatalog; locale?: "en" | "ro"; client?: PasswordResetClient; onRecoverAccess?: () => void; onRecoverAuthenticator?: () => void;
@@ -30,10 +35,22 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [switchConfirmation, setSwitchConfirmation] = useState<"saved" | "known" | null>(null);
+  const [errorField, setErrorField] = useState<Field | null>(null);
+  // The invalid field to focus once the form is enabled again.
+  const refocus = useRef<Field | null>(null);
+  const switchSection = useRef<HTMLElement>(null), switchOpener = useRef<HTMLElement | null>(null);
   const link = useRef<string | null>(null), cancellation = useRef<string | null>(null), mounted = useRef(true), inFlight = useRef(false), switchingToRecovery = useRef(false);
   const switchingMethod = useRef<"saved" | "known">("saved");
   const text = (key: string, values: Record<string, string | number> = {}) => t(catalog, key, values);
   const methodText = (key: string) => t(locale === "ro" ? mfaRomanian : mfaEnglish, key);
+  // The server's 30-minute reset session (WCAG 2.2.1): the deadline is shown, a polite region that is always
+  // mounted warns about a minute before it, and an alert says when it ran out. No lifetime is changed here.
+  const announcer = useFormAnnouncer(), expiry = useAlertRegion();
+  const warning = useDeadlineWarning(phase === "password_required" ? expiresAt : null, announcer.announce, text("deadline.warning"));
+  // Every phase replaces the controls that held focus: focus moves to the new phase's headline.
+  const moved = useStepFocus(phase);
+
+  function fieldError(field: Field, message: string) { setErrorField(field); setError(message); refocus.current = field; }
 
   function clearCredentials() { setPassword(""); setConfirmation(""); setCode(""); }
   function clearSecrets() { link.current = null; cancellation.current = null; clearCredentials(); setSwitchConfirmation(null); }
@@ -101,15 +118,19 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
     if (phase !== "password_required" || expiresAt === null) return;
     const remaining = Date.parse(expiresAt) - Date.now();
     if (remaining > 2_147_483_647) return;
-    const timer = setTimeout(() => { clearSecrets(); setPhase("expired"); setUnknown(false); setError(null); }, Math.max(0, remaining));
+    // The typed password and code are secrets for a session that no longer exists, so they are still cleared.
+    const timer = setTimeout(() => { clearSecrets(); setPhase("expired"); setUnknown(false); setError(null); expiry.alert(text("expired.description")); }, Math.max(0, remaining));
     return () => clearTimeout(timer);
   }, [phase, expiresAt]);
+  useEffect(() => { if (phase !== "expired") expiry.clear(); }, [phase, expiry.clear]);
+  useEffect(() => { if (switchConfirmation) switchSection.current?.focus(); }, [switchConfirmation]);
 
   async function perform(operation: () => Promise<void>, reconciliation = false) {
     if (inFlight.current || (unknown && !reconciliation)) return;
     inFlight.current = true;
     setBusy(true);
     setError(null);
+    setErrorField(null);
     setNotice(null);
     try { await operation(); }
     catch (failure) {
@@ -117,9 +138,9 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
       const status = failure instanceof ContractHttpError ? failure.status : 0;
       const serverCode = failure instanceof ContractHttpError ? failure.serverCode : null;
       if (status === 401 && serverCode === "PASSWORD_RESET_PROOF_INVALID" && phase === "password_required") {
-        setCode(""); setError(text("error.code"));
+        setCode(""); fieldError("code", text("error.code"));
       } else if (status === 400) {
-        setCode(""); setError(text("error.password"));
+        setCode(""); fieldError("password", text("error.password"));
       } else if (reconciliation && switchingToRecovery.current && (status === 401 || status === 410)) {
         clearCredentials(); setUnknown(true); setError(text("fallback.unknown"));
       } else if (status === 401 || status === 403 || status === 410) {
@@ -135,9 +156,9 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
   function submitReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || unknown) return;
-    if (password !== confirmation) { setError(text("password.mismatch")); return; }
-    if (password.length < minimum || (maximum !== null && password.length > maximum)) { setError(text("error.password")); return; }
-    if (!/^[0-9]{6}$/.test(code)) { setError(text("error.code.format")); return; }
+    if (password !== confirmation) { fieldError("confirmation", text("password.mismatch")); return; }
+    if (password.length < minimum || (maximum !== null && password.length > maximum)) { fieldError("password", text("error.password")); return; }
+    if (!/^[0-9]{6}$/.test(code)) { fieldError("code", text("error.code.format")); return; }
     void perform(async () => {
       await client.complete(password, code);
       if (mounted.current) { clearSecrets(); setPhase("completed"); }
@@ -146,15 +167,27 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
 
   const prefix = phase === "email_link" ? "link" : phase === "password_required" ? "password" : phase === "completed" ? "done" : phase === "cancel_link" ? "cancel" : phase === "refused" ? "expired" : phase;
   const disabled = busy || unknown;
-  return <AuthShell lang={locale} eyebrow={text("eyebrow")} title={text(`${prefix}.title`)} description={text(`${prefix}.description`)} footer={<>
+  useEffect(() => {
+    if (disabled || refocus.current === null) return;
+    document.getElementById(FIELD_ID[refocus.current])?.focus();
+    refocus.current = null;
+  });
+  const invalid = (field: Field) => error !== null && errorField === field;
+  const describedBy = (field: Field, hint?: string) => [hint, invalid(field) ? "password-reset-error" : null].filter(Boolean).join(" ") || undefined;
+  function openSwitch(event: { currentTarget: HTMLElement }, method: "saved" | "known") { switchOpener.current = event.currentTarget; setSwitchConfirmation(method); }
+  return <AuthShell lang={locale} eyebrow={text("eyebrow")} title={text(`${prefix}.title`)} description={text(`${prefix}.description`)} focusTitle={moved} footer={<>
     <p><a href="/login" onClick={clearSecrets}>{text("login")}</a></p>
     {phase === "request" || phase === "cancelled" || phase === "refused" ? <><p><a href="/recover-authenticator" onClick={clearSecrets}>{methodText("known.link")}</a><span className="authFieldHint">{methodText("known.hint")}</span></p><p><a href="/recover" onClick={clearSecrets}>{text("fallback.link")}</a><span className="authFieldHint"> {text("fallback.hint")}</span></p></>
-      : phase === "password_required" || phase === "email_link" || phase === "cancel_link" ? <><p><button className="authTextButton" type="button" disabled={disabled} onClick={() => setSwitchConfirmation("known")}>{methodText("known.link")}</button></p><p><button className="authTextButton" type="button" disabled={disabled} onClick={() => setSwitchConfirmation("saved")}>{text("fallback.link")}</button><span className="authFieldHint">{text("fallback.switch")}</span></p></>
+      : phase === "password_required" || phase === "email_link" || phase === "cancel_link" ? <><p><button className="authTextButton" type="button" disabled={disabled} onClick={event => openSwitch(event, "known")}>{methodText("known.link")}</button></p><p><button className="authTextButton" type="button" disabled={disabled} onClick={event => openSwitch(event, "saved")}>{text("fallback.link")}</button><span className="authFieldHint">{text("fallback.switch")}</span></p></>
         : phase === "sent" || phase === "expired" ? <p className="authFieldHint">{text("fallback.pending")}</p> : null}
   </>}>
-    {error && <div className="authAlert" role="alert">{error}</div>}
+    {announcer.region}{expiry.region}
+    {phase === "password_required" && expiresAt && <p className="authFieldHint">{text("deadline")} <time dateTime={expiresAt}>{new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : "en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt))}</time></p>}
+    {warning && <p className="authFieldHint">{text("deadline.warning")}</p>}
+    {error && <div className="authAlert" id="password-reset-error" role="alert">{error}</div>}
     {notice && <p className="authFieldHint" role="status">{notice}</p>}
-    {switchConfirmation && <section className="recoveryStatus" aria-label={methodText("switch.title")}><p>{methodText("switch.description")}</p><button className="authPrimary" type="button" disabled={disabled} onClick={() => switchToRecovery(switchConfirmation)}>{methodText("switch.confirm")}</button><button className="authSecondary" type="button" disabled={disabled} onClick={() => setSwitchConfirmation(null)}>{methodText("switch.stay")}</button></section>}
+    {/* Opened from the footer, far below: focus moves to it, and Stay returns focus to the link that opened it. */}
+    {switchConfirmation && <section className="recoveryStatus" ref={switchSection} tabIndex={-1} aria-label={methodText("switch.title")}><p>{methodText("switch.description")}</p><button className="authPrimary" type="button" disabled={disabled} onClick={() => switchToRecovery(switchConfirmation)}>{methodText("switch.confirm")}</button><button className="authSecondary" type="button" disabled={disabled} onClick={() => { setSwitchConfirmation(null); switchOpener.current?.focus(); }}>{methodText("switch.stay")}</button></section>}
     {unknown && <button className="authSecondary" type="button" disabled={busy} onClick={() => void perform(async () => {
       const state = await client.status();
       if (!mounted.current) return;
@@ -182,9 +215,9 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
       if (mounted.current) apply(state);
     })}>{busy ? text("working") : text("continue")}</button>}
     {phase === "password_required" && <form className="authForm" method="post" action="/reset-password" aria-busy={busy} onSubmit={submitReset}>
-      <div className="authField"><label htmlFor="password-reset-password">{text("password.label")}</label><input id="password-reset-password" name="new-password" type="password" autoComplete="new-password" minLength={minimum} maxLength={maximum ?? undefined} value={password} onChange={event => setPassword(event.target.value)} required disabled={disabled} aria-describedby="password-reset-password-hint" /><p id="password-reset-password-hint" className="authFieldHint">{text("password.hint", { minimum })}</p></div>
-      <div className="authField"><label htmlFor="password-reset-confirmation">{text("password.confirm")}</label><input id="password-reset-confirmation" name="confirm-password" type="password" autoComplete="new-password" minLength={minimum} maxLength={maximum ?? undefined} value={confirmation} onChange={event => setConfirmation(event.target.value)} required disabled={disabled} /></div>
-      <div className="authField"><label htmlFor="password-reset-code">{text("code.label")}</label><input id="password-reset-code" name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={12} value={code} onChange={event => setCode(event.target.value.replace(/\s/g, ""))} required disabled={disabled} aria-describedby="password-reset-code-hint" /><p id="password-reset-code-hint" className="authFieldHint">{text("code.hint")}</p></div>
+      <div className="authField"><label htmlFor="password-reset-password">{text("password.label")}</label><input id="password-reset-password" name="new-password" type="password" autoComplete="new-password" minLength={minimum} maxLength={maximum ?? undefined} value={password} onChange={event => setPassword(event.target.value)} required disabled={disabled} aria-invalid={invalid("password") || undefined} aria-describedby={describedBy("password", "password-reset-password-hint")} /><p id="password-reset-password-hint" className="authFieldHint">{text("password.hint", { minimum })}</p></div>
+      <div className="authField"><label htmlFor="password-reset-confirmation">{text("password.confirm")}</label><input id="password-reset-confirmation" name="confirm-password" type="password" autoComplete="new-password" minLength={minimum} maxLength={maximum ?? undefined} value={confirmation} onChange={event => setConfirmation(event.target.value)} required disabled={disabled} aria-invalid={invalid("confirmation") || undefined} aria-describedby={describedBy("confirmation")} /></div>
+      <div className="authField"><label htmlFor="password-reset-code">{text("code.label")}</label><input id="password-reset-code" name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={12} value={code} onChange={event => setCode(event.target.value.replace(/\s/g, ""))} required disabled={disabled} aria-invalid={invalid("code") || undefined} aria-describedby={describedBy("code", "password-reset-code-hint")} /><p id="password-reset-code-hint" className="authFieldHint">{text("code.hint")}</p></div>
       <button className="authPrimary" disabled={disabled}>{busy ? text("working") : text("password.button")}</button>
       <p className="authFieldHint">{text("password.effect")}</p>
     </form>}

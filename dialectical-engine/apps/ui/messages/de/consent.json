@@ -16,5 +16,6 @@
   "consent.policy.close": "Schließen",
   "consent.policy.questions": "Fragen:",
   "consent.policy.gateHint": "Scrollen Sie bis zum Ende der Datenschutzerklärung, um fortzufahren.",
+  "consent.policy.gateOpened": "Sie haben das Ende erreicht. Sie können jetzt fortfahren.",
   "consent.policy.acknowledge": "Ich habe sie gelesen"
 }

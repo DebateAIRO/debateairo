@@ -30,7 +30,7 @@ export function LegalPageLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="screen scroll legalPage">
+    <div className="screen scroll legalPage">
       <div className="legalGrid">
         <nav className="legalNav" aria-label={t(legalCatalog, "legal.navLabel")}>
           <span className="legalNavHead" aria-hidden>
@@ -54,6 +54,6 @@ export function LegalPageLayout({
         </article>
       </div>
       <SiteFooter variant="full" billing={billing} />
-    </main>
+    </div>
   );
 }

@@ -16,5 +16,6 @@
   "consent.policy.close": "閉じる",
   "consent.policy.questions": "お問い合わせ：",
   "consent.policy.gateHint": "続行するには、ポリシーの末尾までスクロールしてください。",
+  "consent.policy.gateOpened": "最後まで到達しました。続行できます。",
   "consent.policy.acknowledge": "読みました"
 }

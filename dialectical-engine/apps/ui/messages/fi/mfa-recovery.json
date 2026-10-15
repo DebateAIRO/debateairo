@@ -61,6 +61,7 @@
   "done.hint": "Sivuston salasanasi pysyy samana. Odota seuraavaa uutta koodia korvaavasta todennussovelluksesta ennen kirjautumista.",
   "login": "Takaisin kirjautumiseen",
   "deadline": "Viimeistele ennen",
+  "deadline.warning": "Tämä palautus vanhenee noin minuutin kuluttua. Sen jälkeen sinun on pyydettävä uusi linkki.",
   "restart.hint": "Määritys keskeytyi. Voit toistaa tämän vaiheen alla näkyvään aikaan asti; aika ei muutu.",
   "cancel": "Peruuta palautus",
   "cancel.title": "Peruutetaanko tämä palautus?",

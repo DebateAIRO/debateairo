@@ -3,6 +3,7 @@
 import type { DebateDetail, SingleShotResult } from "@/lib/types";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 function provenanceLabel(provenance: Record<string, unknown>): string {
   const model = typeof provenance.model_id === "string" ? provenance.model_id : "";
@@ -26,10 +27,11 @@ export function DebateWorkspaceDrawer({
   onClose: () => void;
   catalog?: MessageCatalog;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "debateDrawers.workspace.ariaLabel")}>
+      <aside ref={dialogRef} tabIndex={-1} className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "debateDrawers.workspace.ariaLabel")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <span className="invLabel">{t(catalog, "debateDrawers.workspace.title")}</span>

@@ -101,9 +101,12 @@ export function AccountErasureControls({
 
   useEffect(() => {
     let active = true;
+    const unavailable = t(catalog, "settings.erasure.statusUnavailable");
+    // A good read clears only this poll's own "unavailable" line. A confirmation or an error from
+    // the reader's last action stays until they act again, so a screen reader has time to read it.
     const refresh=()=>client.readAccountErasure().then(
-      (current) => { if (active) { setStatus(current); setMessage(null); } },
-      () => { if (active) setMessage(t(catalog, "settings.erasure.statusUnavailable")); }
+      (current) => { if (active) { setStatus(current); setMessage((shown) => (shown === unavailable ? null : shown)); } },
+      () => { if (active) setMessage(unavailable); }
     );
     void refresh();
     const timer=window.setInterval(()=>{ void refresh(); },5_000);

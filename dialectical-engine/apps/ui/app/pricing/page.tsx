@@ -33,7 +33,7 @@ export default async function PricingPage() {
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const [billingCatalog, plans] = await Promise.all([loadNamespace(locale, "billing"), readPlans()]);
   return (
-    <main className="screen scroll pricingPage">
+    <div className="screen scroll pricingPage">
       <div className="pricingInner">
         <p className="setEyebrow">{t(billingCatalog, "billing.pricing.eyebrow")}</p>
         <h1 className="setTitle">{t(billingCatalog, "billing.pricing.title")}</h1>
@@ -61,6 +61,6 @@ export default async function PricingPage() {
         </section>
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
-    </main>
+    </div>
   );
 }

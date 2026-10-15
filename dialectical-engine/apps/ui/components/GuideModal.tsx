@@ -2,6 +2,7 @@
 
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 const GUIDE_ITEMS = [
   {
@@ -39,24 +40,25 @@ export function GuideModal({
   onClose: () => void;
   catalog?: MessageCatalog;
 }) {
+  const dialogRef = useDialogSurface<HTMLDivElement>(onClose);
   return (
     <div className="modalScrim" onClick={onClose}>
-      <div className="modalCard scroll" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal>
+      <div ref={dialogRef} tabIndex={-1} className="modalCard scroll" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal aria-labelledby="guide-modal-title">
         <div className="modalHead">
           <div>
             <div className="nodeEyebrow" style={{ marginBottom: 6 }}>
               {t(catalog, "debateDrawers.guide.eyebrow")}
             </div>
-            <div className="modalTitle">{t(catalog, "debateDrawers.guide.title")}</div>
+            <div id="guide-modal-title" className="modalTitle">{t(catalog, "debateDrawers.guide.title")}</div>
           </div>
           <button type="button" className="iconBtn" onClick={onClose} aria-label={t(catalog, "debateDrawers.common.close")}>
-            ×
+            <span aria-hidden="true">×</span>
           </button>
         </div>
         <div className="guideList">
           {GUIDE_ITEMS.map((item) => (
             <div key={item.titleKey} className="guideRow">
-              <span className="guideIcon" style={{ background: item.iconBg, color: item.iconColor }}>
+              <span className="guideIcon" aria-hidden="true" style={{ background: item.iconBg, color: item.iconColor }}>
                 {item.icon}
               </span>
               <div>

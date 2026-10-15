@@ -16,5 +16,6 @@
   "consent.policy.close": "Sulgege",
   "consent.policy.questions": "Küsimused:",
   "consent.policy.gateHint": "Jätkamiseks kerige poliitika lõpuni.",
+  "consent.policy.gateOpened": "Jõudsite lõppu. Nüüd saate jätkata.",
   "consent.policy.acknowledge": "Olen selle läbi lugenud"
 }

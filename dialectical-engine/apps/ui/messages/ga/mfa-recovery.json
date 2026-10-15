@@ -61,6 +61,7 @@
   "done.hint": "Fanann do phasfhocal don suíomh mar atá. Fan go dtí an chéad chód nua eile ón aip fhíordheimhnithe ionaid sula síneoidh tú isteach.",
   "login": "Ar ais chuig an síniú isteach",
   "deadline": "Críochnaigh roimh",
+  "deadline.warning": "Rachaidh an t-athshlánú seo in éag i gceann nóiméid nó mar sin. Ina dhiaidh sin, beidh ort nasc nua a iarraidh.",
   "restart.hint": "Stopadh an socrú sular críochnaíodh é. Is féidir leat an chéim seo a dhéanamh arís go dtí an t-am thíos; ní athraíonn an t-am sin.",
   "cancel": "Cealaigh an t-athshlánú",
   "cancel.title": "An bhfuil tú ag iarraidh an t-athshlánú seo a chealú?",

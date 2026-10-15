@@ -71,6 +71,19 @@ function gatedRowClick(inputRef: RefObject<HTMLInputElement | null>, accepted: b
         });
     };
 }
+/* The Privacy Policy / Terms of Service button inside a consent sentence only ever opens its document (a11y
+   repair, 2026-10-15). Left to bubble, the row handler above would untick a ticked box with no word said; the
+   click never reaches the input (the row is a <div>, not a <label>), so it toggles nothing natively either. Ticking
+   still happens only through the document's own "I have read it". Focus goes to the input first, as the row does,
+   so closing the document returns focus to the box it is about. */
+function documentButtonClick(inputRef: RefObject<HTMLInputElement | null>, open: () => void): (event: ReactMouseEvent<HTMLButtonElement>) => void {
+    return (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        inputRef.current?.focus();
+        open();
+    };
+}
 export function SignUpFlow({ turnstile, catalog = authEnglish, client = contractClient, dobLocale = resolveDobLocale('en'), refused: refusedOnArrival = false, reloadPage = () => window.location.reload() }: {
     turnstile?: TurnstilePublicConfig;
     catalog?: MessageCatalog;
@@ -124,6 +137,20 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (flight.current)
             return;
         const form = event.currentTarget;
+        /* Owner ruling V-18 (R17): no account without a region and both boxes ticked. Create account stays
+           focusable (aria-disabled, a11y repair 2026-10-15), so a press made while one is missing — a click on it,
+           or Enter in a field, both of which name it (the form's only submit button) as the submitter — is answered
+           here and sends nothing: the hint is said, and focus goes to the first thing still missing. That is exactly
+           what the native `disabled` used to block; a submission with no submitter was never blocked by it, and it
+           still meets validateSignup's two boxes and the region check below. */
+        if ((event.nativeEvent as SubmitEvent).submitter && (declaredRegion === null || !privacyAccepted || !termsAccepted)) {
+            const missing = declaredRegion === null
+                ? form.querySelector<HTMLElement>(region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger')
+                : !privacyAccepted ? privacyInputRef.current : termsInputRef.current;
+            missing?.focus();
+            announcer.announce(submitHint.join(' '));
+            return;
+        }
         const data = new FormData(form);
         const submitted = String(data.get('email') ?? '').trim();
         const rawPassword = String(data.get('password') ?? '');
@@ -203,6 +230,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     }
     const onPrivacyRowClick = gatedRowClick(privacyInputRef, privacyAccepted, () => setPolicyOpen(true));
     const onTermsRowClick = gatedRowClick(termsInputRef, termsAccepted, () => setTermsOpen(true));
+    const onPrivacyDocumentClick = documentButtonClick(privacyInputRef, () => setPolicyOpen(true));
+    const onTermsDocumentClick = documentButtonClick(termsInputRef, () => setTermsOpen(true));
     function acknowledgePolicy() {
         if (privacyInputRef.current)
             privacyInputRef.current.checked = true;
@@ -248,16 +277,17 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             edit('dateOfBirth');
         }} disabled={busy} minimumAgeMessage={t(catalog, "auth.dob.underAge")}/></div>
  <div className="consentGroup">
- <div className="consentRow" onClick={onPrivacyRowClick}><input className="consentBox" name="privacy-accepted" type="checkbox" required disabled={busy} aria-labelledby={PRIVACY_CONSENT_TEXT_ID} ref={privacyInputRef} aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? 'signup-privacy-error' : undefined} onChange={e => setPrivacyAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink">{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-privacy-error" message={fieldError('privacy')}/>
- <div className="consentRow" onClick={onTermsRowClick}><input className="consentBox" name="terms-accepted" type="checkbox" required disabled={busy} aria-labelledby={TERMS_CONSENT_TEXT_ID} ref={termsInputRef} aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? 'signup-terms-error' : undefined} onChange={e => setTermsAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={TERMS_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink">{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-terms-error" message={fieldError('terms')}/>
+ <div className="consentRow" onClick={onPrivacyRowClick}><input className="consentBox" name="privacy-accepted" type="checkbox" required disabled={busy} aria-labelledby={PRIVACY_CONSENT_TEXT_ID} ref={privacyInputRef} aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? 'signup-privacy-error' : undefined} onChange={e => setPrivacyAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={onPrivacyDocumentClick}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-privacy-error" message={fieldError('privacy')}/>
+ <div className="consentRow" onClick={onTermsRowClick}><input className="consentBox" name="terms-accepted" type="checkbox" required disabled={busy} aria-labelledby={TERMS_CONSENT_TEXT_ID} ref={termsInputRef} aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? 'signup-terms-error' : undefined} onChange={e => setTermsAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={TERMS_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={onTermsDocumentClick}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-terms-error" message={fieldError('terms')}/>
  </div>
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={locale} resetKey={proofReset} onToken={setProof} onError={() => {
                 setProof(null);
                 setError(t(catalog, "auth.pending.proofUnavailable"));
             }}/> : null}
- {/* Owner ruling V-18 (R17) keeps Create account disabled until a region is chosen and both boxes are
-     ticked; the hint says which of those is still missing (auth UI repair, 2026-10-09). */}
- <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ {/* Owner ruling V-18 (R17) keeps Create account unavailable until a region is chosen and both boxes are
+     ticked; the hint says which of those is still missing (auth UI repair, 2026-10-09). It is aria-disabled, not
+     disabled, so Tab still reaches it and its hint (a11y repair, 2026-10-15); submitRegistration refuses the press. */}
+ <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy} aria-disabled={declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth)) || undefined}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
  {submitHint.length ? <p className="authFieldHint" id="signup-submit-hint">{submitHint.join(' ')}</p> : null}
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
  {announcer.region}

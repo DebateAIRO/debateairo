@@ -5,6 +5,7 @@ import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 const RESOLUTIONS: { key: string; labelKey: string }[] = [
   { key: "contested", labelKey: "debateDrawers.investigation.contested" },
@@ -39,6 +40,7 @@ export function InvestigationDrawer({
   /** The interface locale's `compose` catalogue: the scrutiny status table. */
   composeCatalog?: MessageCatalog;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const statuses = scrutinyStatuses(composeCatalog);
   const current = statuses[status] ?? statuses.working;
   const currentLabel = t(catalog, STATUS_LABEL_KEYS[status] ?? STATUS_LABEL_KEYS.working);
@@ -47,7 +49,7 @@ export function InvestigationDrawer({
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "debateDrawers.investigation.title")}>
+      <aside ref={dialogRef} tabIndex={-1} className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "debateDrawers.investigation.title")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <span className="invLabel">{t(catalog, "debateDrawers.investigation.title")}</span>

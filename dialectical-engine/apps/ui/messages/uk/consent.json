@@ -16,5 +16,6 @@
   "consent.policy.close": "Закрити",
   "consent.policy.questions": "Запитання:",
   "consent.policy.gateHint": "Щоб продовжити, прокрутіть політику до кінця.",
+  "consent.policy.gateOpened": "Ви дійшли до кінця. Тепер можна продовжити.",
   "consent.policy.acknowledge": "Я ознайомився(-лася)"
 }

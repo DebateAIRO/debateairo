@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, MouseEvent } from "react";
+import { useEffect, useRef, type CSSProperties, type MouseEvent } from "react";
 import type { ContractNode } from "@/lib/v3/adapter";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
@@ -79,6 +79,20 @@ export function DebateSplit({
   const path = focusNodeId ? findNodePathById(root, focusNodeId) : [root];
   const focus = path.length ? path[path.length - 1] : root;
   const isRootFocus = focus.node_type === "ROOT_CLAIM";
+  // Focus, a chip or a rebuttal unmounts the button that was pressed. When the focused claim
+  // changes, keyboard focus moves to its heading, so the reader lands on what they chose instead
+  // of the top of the page. Not on first render: opening Split must not move focus.
+  // On first render it moves only when focus was already lost to the page (opened from a Map
+  // segment, which unmounts with the Map); from the view switcher, focus stays where it is.
+  const focusHeadingRef = useRef<HTMLDivElement | null>(null);
+  const shownFocusId = useRef<string | null>(null);
+  useEffect(() => {
+    const firstRender = shownFocusId.current === null;
+    if (shownFocusId.current === focus.id) return;
+    shownFocusId.current = focus.id;
+    const lost = document.activeElement === null || document.activeElement === document.body;
+    if (!firstRender || lost) focusHeadingRef.current?.focus();
+  }, [focus.id]);
   const ancestors = path.slice(0, -1);
 
   const { proChildren, conChildren } = partitionArgumentChildren(focus);
@@ -134,7 +148,7 @@ export function DebateSplit({
             <div className="splitFocusRoot">
               <span className="referenceStanceTab root" aria-hidden />
               <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-              <div className="splitFocusRootClaim">{root.claim}</div>
+              <div className="splitFocusRootClaim" role="heading" aria-level={2} tabIndex={-1} ref={focusHeadingRef}>{root.claim}</div>
             </div>
           </div>
         ) : (
@@ -153,9 +167,12 @@ export function DebateSplit({
               <ReferenceAuthorPill node={focus} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
             </div>
             <ReferenceReviewLine review={v3NodesById?.get(focus.id)?.review} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
-            <div className="splitFocusClaim">{focus.claim}</div>
+            <div className="splitFocusClaim" role="heading" aria-level={2} tabIndex={-1} ref={focusHeadingRef}>
+              <span className="srOnly">{localizedRoleLabel(focus, catalog, debateChromeCatalog)}: </span>
+              {focus.claim}
+            </div>
             {focus.active_generation?.argument ? (
-              <div className="splitFocusBody" onMouseUp={(event) => onProseSelect?.(focus, event)}>
+              <div className="splitFocusBody" data-challenge-prose={focus.id} onMouseUp={(event) => onProseSelect?.(focus, event)}>
                 {focus.active_generation.argument}
               </div>
             ) : null}
@@ -383,6 +400,7 @@ function SplitCard({
             {node.active_generation?.argument ? (
               <div
                 className={`threadBody${expanded ? " open" : ""}`}
+                data-challenge-prose={node.id}
                 onMouseUp={(event) => onProseSelect?.(node, event)}
               >
                 {node.active_generation.argument}
@@ -390,7 +408,7 @@ function SplitCard({
             ) : null}
             <div className="nodeControls nodeReferenceFooter">
               <button type="button" className="nodeCtrl focus" onClick={() => onFocus(node.id)}>
-                {t(catalog, "debateViews.focus")} ▸
+                {t(catalog, "debateViews.focus")} <span aria-hidden="true">▸</span>
               </button>
               <span style={{ flex: 1 }} />
               {node.active_generation?.argument ? (
@@ -422,7 +440,7 @@ function SplitCard({
                 onClick={() => onFocus(child.id)}
               >
                 <span className="splitRebuttalRel" style={{ color: cpal.text }}>
-                  ↳ {rel}
+                  <span aria-hidden="true">↳</span> {rel}
                 </span>
                 <span className="splitRebuttalClaim">
                   {renderStateOf(child) === "empty" ? t(catalog, "debateViews.noStrongArgument") : child.claim}

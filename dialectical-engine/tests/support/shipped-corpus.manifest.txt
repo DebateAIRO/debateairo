@@ -457,6 +457,7 @@ apps/ui/components/DebateThread.tsx
 apps/ui/components/DebateTree.tsx
 apps/ui/components/DebateWorkspaceDrawer.tsx
 apps/ui/components/DebatesBuffer.tsx
+apps/ui/components/DocumentTitle.tsx
 apps/ui/components/EmailSettings.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
@@ -515,6 +516,7 @@ apps/ui/components/auth/SocialCompleteFlow.tsx
 apps/ui/components/auth/SocialProviderButtons.tsx
 apps/ui/components/auth/TurnstileChallenge.tsx
 apps/ui/components/auth/VerificationResend.tsx
+apps/ui/components/auth/timedStep.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/BillingDetailsFields.tsx
 apps/ui/components/billing/CancelFlow.tsx
@@ -543,6 +545,7 @@ apps/ui/components/debateReferenceDesign.drawers.source-test.mjs
 apps/ui/components/debateReferenceDesign.public.source-test.mjs
 apps/ui/components/debateReferenceDesign.source-test.mjs
 apps/ui/components/debateReferenceDesign.views.source-test.mjs
+apps/ui/components/dialogSurface.ts
 apps/ui/components/landing/LandingChrome.tsx
 apps/ui/components/landing/LandingHero.tsx
 apps/ui/components/landing/LandingMethod.tsx
@@ -752,6 +755,7 @@ apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/turnstile.ts
 apps/ui/lib/types.ts
+apps/ui/lib/useSelectionChallenge.ts
 apps/ui/lib/v3/adapter.ts
 apps/ui/lib/v3/answerExport.ts
 apps/ui/lib/v3/census.ts

@@ -429,6 +429,9 @@ function NewDebateForm({
       } else {
         setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
       }
+      // Start was disabled while the request ran, which drops keyboard focus to the page.
+      // Put it back in the question so the reader stays in the form the alert talks about.
+      window.setTimeout(() => document.getElementById("topic")?.focus(), 0);
     } finally {
       submitFlight.current = false;
       setSubmitting(false);
@@ -451,7 +454,7 @@ function NewDebateForm({
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
         <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} onFunding={rememberFunding} />
       <form onSubmit={submit} onKeyDown={onKeyDown}>
-          {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
+          {error ? <div className="error" role="alert" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (
             <p className="sensitiveConsentDeclined" role="status">{t(homeCatalog, "home.sensitiveConsent.declined")}</p>
           ) : null}
@@ -570,7 +573,7 @@ function NewDebateForm({
             </p>
           </div>
 
-          {sessionDefaultsError ? <div className="error" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
+          {sessionDefaultsError ? <div className="error" role="alert" style={{ marginTop: 14 }}>{sessionDefaultsError}</div> : null}
 
           <button
             type="button"

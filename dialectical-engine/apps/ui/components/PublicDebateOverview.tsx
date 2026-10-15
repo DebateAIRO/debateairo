@@ -163,7 +163,7 @@ export function PublicDebateOverview({
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
 
   return (
-    <main className="publicOverviewScroll scroll" data-design-turn="3b">
+    <div className="publicOverviewScroll scroll" data-design-turn="3b">
       <div className="publicOverview">
         <div className="publicOverviewInner">
         <section className="publicVerdictShell" aria-labelledby="public-verdict-label" data-ai-generated="true">
@@ -247,6 +247,6 @@ export function PublicDebateOverview({
         </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

@@ -56,7 +56,11 @@ export function LegalDocumentModal({
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const closeRef = React.useRef<HTMLElement | null>(null);
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
+  const endRef = React.useRef<HTMLDivElement | null>(null);
   const [reachedEnd, setReachedEnd] = React.useState(false);
+  // Counts presses of the still-locked button; each one re-says the hint (focus stays put: this
+  // directory's only focus handling is the shared helper's).
+  const [lockedPresses, setLockedPresses] = React.useState(0);
   const catalog = useConsentCatalog();
 
   // The trap, initial placement on the close control, return on close, backdrop close and the
@@ -80,11 +84,26 @@ export function LegalDocumentModal({
     };
     evaluate();
     region.addEventListener("scroll", evaluate);
+    // A screen reader reads with its own cursor and scrolls each line it reads into view; it
+    // does not page this region. The end marker coming into view is the same "reached the end"
+    // the scroll criterion measures, so it latches the gate too.
+    const end = endRef.current;
+    const observer =
+      end !== null && typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(
+            (entries) => {
+              if (entries.some((entry) => entry.isIntersecting)) setReachedEnd(true);
+            },
+            { root: region }
+          )
+        : null;
+    if (observer !== null && end !== null) observer.observe(end);
     // On `resize` too, and on `window`: a taller viewport can show the end of the document
     // without the reader scrolling at all, and a criterion bound only to `scroll` would leave
     // the button disabled with the end marker in plain sight.
     window.addEventListener("resize", evaluate);
     return () => {
+      observer?.disconnect();
       region.removeEventListener("scroll", evaluate);
       window.removeEventListener("resize", evaluate);
     };
@@ -156,7 +175,7 @@ export function LegalDocumentModal({
           {/* `tabindex="0"` plus a name of its own: paging this region is the ONLY way a
               keyboard-only reader can satisfy the scroll gate, and the name says what is inside
               it rather than repeating the dialog's title. */}
-          <div className="policyBody" tabIndex={0} aria-label={document.bodyLabel} ref={bodyRef}>
+          <div className="policyBody" role="region" tabIndex={0} aria-label={document.bodyLabel} ref={bodyRef}>
             <div className="policyJumps">
               {document.jumps.map((jump) => (
                 <button
@@ -176,7 +195,7 @@ export function LegalDocumentModal({
                 id={`${document.sectionIdPrefix}${section.no}`}
                 className="policySection"
               >
-                <div className="policySectionHead">
+                <div className="policySectionHead" role="heading" aria-level={3}>
                   <span
                     className="policyNo"
                     data-accent={section.accent}
@@ -184,6 +203,8 @@ export function LegalDocumentModal({
                   >
                     {section.no}
                   </span>
+                  {/* A flex row drops this space visually; it keeps "03 Title" two words when read. */}
+                  {" "}
                   <span className="policySectionTitle">{section.title}</span>
                 </div>
                 {section.blocks.map((block, blockIndex) =>
@@ -211,7 +232,7 @@ export function LegalDocumentModal({
                 )}
               </div>
             ))}
-            <div className="policyEnd">{document.endMarker}</div>
+            <div className="policyEnd" ref={endRef}>{document.endMarker}</div>
           </div>
           <div className="policyFoot">
             <span className="policyContact">
@@ -231,13 +252,19 @@ export function LegalDocumentModal({
                     {t(catalog, "consent.policy.gateHint")}
                   </span>
                 ) : null}
+                <span className="srOnly" role="status">
+                  {gateOpen ? (
+                    t(catalog, "consent.policy.gateOpened")
+                  ) : lockedPresses > 0 ? (
+                    <span key={lockedPresses}>{t(catalog, "consent.policy.gateHint")}</span>
+                  ) : null}
+                </span>
                 <button
                   type="button"
                   className="policyPrimary"
-                  disabled={!gateOpen}
                   aria-disabled={!gateOpen ? "true" : undefined}
                   aria-describedby={!gateOpen ? document.gateHintId : undefined}
-                  onClick={acknowledge}
+                  onClick={gateOpen ? acknowledge : () => setLockedPresses((count) => count + 1)}
                 >
                   {t(catalog, "consent.policy.acknowledge")}
                 </button>

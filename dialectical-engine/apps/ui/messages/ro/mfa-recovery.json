@@ -61,6 +61,7 @@
   "done.hint": "Parola site-ului rămâne aceeași. Așteptați următorul cod nou din noua aplicație înainte de a vă autentifica.",
   "login": "Înapoi la autentificare",
   "deadline": "Încheiați înainte de",
+  "deadline.warning": "Această recuperare expiră în aproximativ un minut. După aceea, va trebui să solicitați un link nou.",
   "restart.hint": "Configurarea a fost întreruptă. Puteți relua acest pas până la ora afișată mai jos; ora nu se schimbă.",
   "cancel": "Anulați recuperarea",
   "cancel.title": "Anulați această recuperare?",

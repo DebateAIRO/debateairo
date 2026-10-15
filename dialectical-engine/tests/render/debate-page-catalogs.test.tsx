@@ -116,6 +116,46 @@ function currentExpectedActions(historical: string): string {
   return historical.split(RETIRED_SETTINGS_ANCHOR).join("");
 }
 
+// The screen-reader fix (fix/a11y-screen-reader) is a deliberate change since fc3cb865a, applied
+// here as exact edits so every other historical byte must still match: the question as the page
+// h1 and the run state as a status line, the visible title and pill hidden behind them, the
+// language button described by the language in use, the root claim as the outline's h2, and on
+// the lens card the outline heading, the hidden duplicate badge and claim, and the two buttons
+// named after that heading.
+const SCREEN_READER_PAGE_EDITS: ReadonlyArray<readonly [string, string]> = [
+  ['data-actions-collapsed="false">', 'data-actions-collapsed="false"><h1 class="srOnly">Messi or Ronaldo?</h1><p class="srOnly" role="status">Queued</p>'],
+  ['<span class="debateTopTitle">Messi or Ronaldo?</span>', '<span class="debateTopTitle" aria-hidden="true">Messi or Ronaldo?</span>'],
+  ['<span class="pill pillGen">', '<span class="pill pillGen" aria-hidden="true">'],
+  [
+    'aria-label="Change language" aria-expanded="false" aria-haspopup="dialog" aria-controls="_R_id_"><span class="languageSwitcherCode">EN</span>',
+    'aria-label="Change language" aria-describedby="_R_id_-current" aria-expanded="false" aria-haspopup="dialog" aria-controls="_R_id_"><span class="languageSwitcherCode" aria-hidden="true">EN</span><span id="_R_id_-current" class="srOnly" lang="en">English</span>'
+  ],
+  ['<div class="nodeClaim root">Messi or Ronaldo?</div>', '<div class="nodeClaim root" role="heading" aria-level="2">Messi or Ronaldo?</div>']
+];
+const SCREEN_READER_LENS_CARD_EDITS: ReadonlyArray<readonly [string, string]> = [
+  ['data-stance="reasoning"><div class="node', 'data-stance="reasoning"><div class="srOnly" role="heading" aria-level="3" id="canvas-arg-node:lens">Scientific: A lens claim under test</div><div class="node'],
+  [
+    '<span class="roleBadge" style="color:var(--text-3);background:var(--surface-sunken);border-color:var(--line-strong)">◆ Scientific</span>',
+    '<span class="roleBadge" aria-hidden="true" style="color:var(--text-3);background:var(--surface-sunken);border-color:var(--line-strong)">◆ Scientific</span>'
+  ],
+  ['<div class="nodeClaim treePreview">A lens claim under test</div>', '<div class="nodeClaim treePreview" aria-hidden="true">A lens claim under test</div>'],
+  [
+    '<button type="button" class="nodeCtrl challenge">⚐ Challenge</button>',
+    '<button type="button" class="nodeCtrl challenge" id="canvas-challenge-node:lens" aria-labelledby="canvas-challenge-node:lens canvas-arg-node:lens"><span aria-hidden="true">⚐</span> Challenge</button>'
+  ],
+  [
+    '<button type="button" class="nodeCtrl" aria-label="Details">Details',
+    '<button type="button" class="nodeCtrl" id="canvas-details-node:lens" aria-label="Details" aria-labelledby="canvas-details-node:lens canvas-arg-node:lens">Details'
+  ]
+];
+function withScreenReaderMarkup(historical: string, lensCard: boolean): string {
+  const edits = lensCard ? [...SCREEN_READER_PAGE_EDITS, ...SCREEN_READER_LENS_CARD_EDITS] : SCREEN_READER_PAGE_EDITS;
+  return edits.reduce((markup, [before, after]) => {
+    expect(markup.split(before), `exactly one ${before.slice(0, 48)}`).toHaveLength(2);
+    return markup.replace(before, after);
+  }, historical);
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -171,11 +211,11 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     });
     const queued = liftReviewMarks(html);
     expect(queued.marks).toBe(0);
-    expect(reactIds(queued.rest)).toBe(reactIds(currentExpectedActions(headFixture("queued"))));
+    expect(reactIds(queued.rest)).toBe(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("queued"))), false));
     mocks.getDebateServer.mockResolvedValue({ ok: true, debate: debateWithLensBranch(), answer: null });
     const lens = liftReviewMarks(await renderPage("en"));
     expect(lens.marks).toBe(1);
-    expect(reactIds(lens.rest)).toBe(reactIds(currentExpectedActions(headFixture("lens"))));
+    expect(reactIds(lens.rest)).toBe(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("lens"))), true));
   });
 
   it("retains the historical fixture and rejects unrelated content or an unexpected Settings-anchor count", () => {

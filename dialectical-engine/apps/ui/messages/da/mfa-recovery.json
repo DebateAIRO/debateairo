@@ -61,6 +61,7 @@
   "done.hint": "Din adgangskode til hjemmesiden er den samme. Vent på den næste nye kode fra den nye godkendelsesapp, før du logger ind.",
   "login": "Tilbage til login",
   "deadline": "Afslut før",
+  "deadline.warning": "Denne gendannelse udløber om cirka et minut. Derefter skal du anmode om et nyt link.",
   "restart.hint": "Opsætningen blev afbrudt. Du kan gentage dette trin indtil tidspunktet nedenfor; tidspunktet ændrer sig ikke.",
   "cancel": "Annullér gendannelsen",
   "cancel.title": "Vil du annullere denne gendannelse?",

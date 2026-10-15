@@ -10,6 +10,13 @@ import { pickRegion } from "../support/signupRegion.js";
 import english from "../../apps/ui/messages/en/auth.json";
 import romanian from "../../apps/ui/messages/ro/auth.json";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 let root: Root;
 let host: HTMLDivElement;
 const query = <T extends Element>(selector: string): T => {
@@ -247,13 +254,13 @@ describe("RegionField artboard states", () => {
     await click("#signup-region-trigger");
     const continent = query<HTMLButtonElement>('.regionContinent[data-continent="Europe"]');
     expect(continent.type).toBe("button");
-    expect(continent.disabled).toBe(false);
+    expect(isLocked(continent)).toBe(false);
     expect(continent.tabIndex).not.toBe(-1);
     await key('.regionContinent[data-continent="Europe"]', "Enter");
     expect(document.activeElement).toBe(query(".regionBack"));
     const country = query<HTMLButtonElement>('.regionCountry[data-code="RO"]');
     expect(country.type).toBe("button");
-    expect(country.disabled).toBe(false);
+    expect(isLocked(country)).toBe(false);
     expect(country.tabIndex).not.toBe(-1);
     await key('.regionCountry[data-code="RO"]', " ");
     expect(query(".regionName").textContent).toBe("Romania");
@@ -261,7 +268,7 @@ describe("RegionField artboard states", () => {
     await click("#signup-region-trigger");
     const back = query<HTMLButtonElement>(".regionBack");
     expect(back.type).toBe("button");
-    expect(back.disabled).toBe(false);
+    expect(isLocked(back)).toBe(false);
     expect(back.tabIndex).not.toBe(-1);
     await key(".regionBack", "Enter");
     expect(document.activeElement).toBe(query(".regionContinent"));
@@ -322,14 +329,14 @@ describe("RegionField artboard states", () => {
       await act(async () => acknowledge!.click());
     }
     const button = query<HTMLButtonElement>("button.authPrimary");
-    expect(button.disabled).toBe(true);
+    expect(isLocked(button)).toBe(true);
     await pickRegion("RO");
-    expect(button.disabled).toBe(false);
+    expect(isLocked(button)).toBe(false);
     await pickRegion("US");
-    expect(button.disabled).toBe(true);
+    expect(isLocked(button)).toBe(true);
     const select = query<HTMLSelectElement>("#signup-region-state");
     await act(async () => { select.value = "CA"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(button.disabled).toBe(false);
+    expect(isLocked(button)).toBe(false);
   });
 
   it("E12 stops a scripted submit with no complete pick before any client call", async () => {
@@ -346,8 +353,8 @@ describe("RegionField artboard states", () => {
     await fillFlow();
     register.mockImplementation(() => new Promise(() => {}));
     await submitFlow();
-    expect(query<HTMLButtonElement>("#signup-region-trigger").disabled).toBe(true);
-    expect(query<HTMLSelectElement>("#signup-region-state").disabled).toBe(true);
+    expect(isLocked(query<HTMLButtonElement>("#signup-region-trigger"))).toBe(true);
+    expect(isLocked(query<HTMLSelectElement>("#signup-region-state"))).toBe(true);
     await mountFlow("success");
     await pickRegion("US", "TX");
     await fillFlow();

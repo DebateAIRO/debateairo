@@ -16,5 +16,6 @@
   "consent.policy.close": "Luk",
   "consent.policy.questions": "Spørgsmål:",
   "consent.policy.gateHint": "Rul til slutningen af privatlivspolitikken for at fortsætte.",
+  "consent.policy.gateOpened": "Du er nået til slutningen. Nu kan du fortsætte.",
   "consent.policy.acknowledge": "Jeg har læst den"
 }

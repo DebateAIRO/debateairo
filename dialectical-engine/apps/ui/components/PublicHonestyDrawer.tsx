@@ -3,6 +3,7 @@
 import type { PublicDebate } from "@debateai/contract";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 export function PublicHonestyDrawer({
   answer,
@@ -22,10 +23,11 @@ export function PublicHonestyDrawer({
    */
   floorShown?: boolean;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "public.honesty.dialogAria")}>
+      <aside ref={dialogRef} tabIndex={-1} className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "public.honesty.dialogAria")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <div className="nodeEyebrow">{t(catalog, "public.honesty.publishedSnapshot")}</div>

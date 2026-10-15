@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "인터페이스 언어",
   "chrome.searchLanguage": "언어 또는 코드 검색",
   "chrome.changeLanguage": "언어 변경",
+  "chrome.skipToContent": "본문으로 바로가기",
   "chrome.europe": "유럽",
   "chrome.asia": "아시아",
   "chrome.middleEast": "중동",

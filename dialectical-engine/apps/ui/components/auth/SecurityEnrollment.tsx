@@ -9,6 +9,7 @@ import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/l
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
+import { useDeadlineWarning } from './timedStep';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
@@ -26,7 +27,7 @@ export type EnrollmentAuthority = {
     totpUnavailableReason?: 'PASSWORD_UNAVAILABLE' | null;
 };
 export type EnrollmentClient = Pick<ContractClient, 'beginPasskeyEnrollment' | 'completePasskeyEnrollment' | 'beginTotpEnrollment' | 'completeTotpEnrollment' | 'beginRecoveryEnrollment' | 'completeRecoveryEnrollment'>;
-export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, availableMethods }: {
+export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, availableMethods, deadline }: {
     authority: EnrollmentAuthority;
     client?: EnrollmentClient;
     catalog?: MessageCatalog;
@@ -35,6 +36,11 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     onEnrolled?: () => void;
     onExpired?: () => void;
     availableMethods?: readonly ('passkey' | 'totp')[];
+    /**
+     * An outer time limit this set-up runs under (the Settings step-up grant). It is warned about together
+     * with the set-up's own, so one warning is shown; the caller still ends the step when it passes.
+     */
+    deadline?: string;
 }) {
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const sequence = useRef(0);
@@ -49,6 +55,12 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const codeField = useRef<HTMLInputElement>(null);
     const [refocusCode, setRefocusCode] = useState(0);
     const announcer = useFormAnnouncer();
+    // A second, always-mounted polite region for the time warning: the form's region exists only with the form.
+    const warningAnnouncer = useFormAnnouncer();
+    const section = useRef<HTMLElement>(null);
+    const expiredMessage = useRef<HTMLParagraphElement>(null);
+    // Set by the warning's Start again, so the new code field takes focus once the new set-up arrives.
+    const restarted = useRef(false);
     useEffect(() => {
         if (refocusCode)
             codeField.current?.focus();
@@ -62,6 +74,24 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         token: string;
         expiresAt: string;
     } | null>(null);
+    // About a minute before the earliest server deadline (WCAG 2.2.1); no lifetime is changed here.
+    const own = authority.kind === 'recovery' ? authority.expiresAt : totp?.expiresAt;
+    const earliest = [own, deadline].filter((value): value is string => !!value).sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+    const warning = useDeadlineWarning(expired || enrolled ? null : earliest, warningAnnouncer.announce, t(catalog, 'auth.security.expiresSoon'));
+    // Starting the authenticator set-up again gives a new key with a fresh time limit, unless a recovery or
+    // outer deadline is the one running out.
+    const restartable = warning && authority.kind !== 'recovery' && totp !== null && earliest === totp.expiresAt;
+    useEffect(() => {
+        if (totp && restarted.current) {
+            restarted.current = false;
+            codeField.current?.focus();
+        }
+    }, [totp]);
+    // The time-out message replaces the set-up the person was in: focus lands on it, and Start again follows.
+    useEffect(() => {
+        if (expired)
+            expiredMessage.current?.focus();
+    }, [expired]);
     const allowed = authority.kind === 'recovery' ? authority.availableMethods : authority.kind === 'grant' ? availableMethods ?? ['passkey', 'totp'] : ['passkey', 'totp'];
     function clearCeremony() {
         sequence.current++;
@@ -218,17 +248,26 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         }
     }
     const matrix = totp ? totpQrMatrix(totp.uri) : null;
-    if (expired)
-        // The setup's own time limit ran out (the link, if any, was used long before): say so and let the person start over.
-        return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}><p className="authFieldError" role="alert">{t(catalog, "auth.enroll.timedOut")}</p>{authority.kind === 'recovery' ? null : <button type="button" className="authPrimary" onClick={() => {
+    if (enrolled)
+        return <p role="status">{t(catalog, "auth.enroll.methodAdded")}</p>;
+    return <section ref={section} tabIndex={-1} className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}>
+    {warningAnnouncer.region}
+    {/* The setup's own time limit ran out (the link, if any, was used long before): say so and let the person start over.
+        The alert is always mounted, so the time-out is announced as a change. */}
+    <p ref={expiredMessage} tabIndex={-1} className={expired ? 'authFieldError' : 'srOnly'} role="alert">{expired ? t(catalog, "auth.enroll.timedOut") : null}</p>
+    {expired ? authority.kind === 'recovery' ? null : <button type="button" className="authPrimary" onClick={() => {
                 clearCeremony();
                 setError(null);
                 setExpired(false);
-            }}>{t(catalog, "auth.enroll.startAgain")}</button>}</section>;
-    if (enrolled)
-        return <p role="status">{t(catalog, "auth.enroll.methodAdded")}</p>;
-    return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}>
+                // The choices replace the button that held focus.
+                section.current?.focus();
+            }}>{t(catalog, "auth.enroll.startAgain")}</button> : <>
     {error ? <p className="authFieldError" role="alert">{error}</p> : null}
+    {warning ? <p className="authFieldHint">{t(catalog, 'auth.security.expiresSoon')}</p> : null}
+    {restartable ? <button type="button" className="authTextButton" disabled={busy} onClick={() => {
+                restarted.current = true;
+                void beginTotp();
+            }}>{t(catalog, "auth.enroll.startAgain")}</button> : null}
     <p>{t(catalog, "auth.enroll.passkeyPreferred")}</p>
     {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}</p> : null}
     {allowed.includes('passkey') ? <button type="button" className="authPrimary" aria-describedby="enrollment-passkey-help" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
@@ -260,5 +299,6 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         {announcer.region}
       </form>
     </div> : null}
+    </>}
   </section>;
 }

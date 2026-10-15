@@ -16,5 +16,6 @@
   "consent.policy.close": "Închideți",
   "consent.policy.questions": "Întrebări:",
   "consent.policy.gateHint": "Derulați până la sfârșitul politicii pentru a continua.",
+  "consent.policy.gateOpened": "Ați ajuns la final. Acum puteți continua.",
   "consent.policy.acknowledge": "Am citit"
 }

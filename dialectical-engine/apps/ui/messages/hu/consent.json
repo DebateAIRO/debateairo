@@ -16,5 +16,6 @@
   "consent.policy.close": "Bezárás",
   "consent.policy.questions": "Kérdések:",
   "consent.policy.gateHint": "A folytatáshoz görgessen a szabályzat végére.",
+  "consent.policy.gateOpened": "Elérte a végét. Most már folytathatja.",
   "consent.policy.acknowledge": "Elolvastam"
 }

@@ -16,5 +16,6 @@
   "consent.policy.close": "Zapri",
   "consent.policy.questions": "Vprašanja:",
   "consent.policy.gateHint": "Za nadaljevanje se pomaknite do konca pravilnika.",
+  "consent.policy.gateOpened": "Prišli ste do konca. Zdaj lahko nadaljujete.",
   "consent.policy.acknowledge": "Prebral/-a sem ga"
 }

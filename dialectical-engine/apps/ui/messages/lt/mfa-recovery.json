@@ -61,6 +61,7 @@
   "done.hint": "Jūsų svetainės slaptažodis lieka toks pat. Prieš prisijungdami, palaukite kito naujo kodo iš pakaitinės autentifikavimo programėlės.",
   "login": "Grįžti prie prisijungimo",
   "deadline": "Baikite iki",
+  "deadline.warning": "Šis atkūrimas nustos galioti maždaug po minutės. Po to turėsite prašyti naujos nuorodos.",
   "restart.hint": "Nustatymas buvo nutrauktas. Šį veiksmą galite kartoti iki žemiau nurodyto laiko; tas laikas nesikeičia.",
   "cancel": "Atšaukti atkūrimą",
   "cancel.title": "Atšaukti šį atkūrimą?",

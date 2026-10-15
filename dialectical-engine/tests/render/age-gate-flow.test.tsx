@@ -12,6 +12,13 @@ import english from "../../apps/ui/messages/en/auth.json";
 import german from "../../apps/ui/messages/de/auth.json";
 import { pickRegion } from "../support/signupRegion.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 /* Age gate — the sign-up flow (8a → 8j) and the existing-account interstitial (8k). */
 
 const REGISTRATION_MESSAGE =
@@ -128,7 +135,7 @@ describe("sign-up with the date of birth (8a)", () => {
       expect(field(name).getAttribute("aria-invalid")).toBe("true");
       expect(field(name).getAttribute("aria-describedby")).toBe("dob-msg");
     }
-    expect(host.querySelector<HTMLButtonElement>("button.authPrimary")!.disabled).toBe(true);
+    expect(isLocked(host.querySelector<HTMLButtonElement>("button.authPrimary")!)).toBe(true);
     // A scripted submit gets no further than the disabled button would.
     await submit();
     expect(requests).toEqual([]);
@@ -161,7 +168,7 @@ describe("sign-up with the date of birth (8a)", () => {
     await fillForm(date);
     expect(host.querySelector("#dob-msg")!.textContent).toBe(text);
     expect(host.querySelector("#dob-msg")!.getAttribute("data-state")).toBe("bad");
-    expect(host.querySelector<HTMLButtonElement>("button.authPrimary")!.disabled).toBe(true);
+    expect(isLocked(host.querySelector<HTMLButtonElement>("button.authPrimary")!)).toBe(true);
     await submit();
     expect(requests).toEqual([]);
     vi.useRealTimers();

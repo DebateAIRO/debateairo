@@ -16,5 +16,6 @@
   "consent.policy.close": "Tutup",
   "consent.policy.questions": "Pertanyaan:",
   "consent.policy.gateHint": "Gulir hingga akhir kebijakan untuk melanjutkan.",
+  "consent.policy.gateOpened": "Anda sudah sampai di akhir. Sekarang Anda dapat melanjutkan.",
   "consent.policy.acknowledge": "Saya telah membacanya"
 }

@@ -16,5 +16,6 @@
   "consent.policy.close": "Dún",
   "consent.policy.questions": "Ceisteanna:",
   "consent.policy.gateHint": "Scrollaigh go dtí deireadh an bheartais chun leanúint ar aghaidh.",
+  "consent.policy.gateOpened": "Tá an deireadh bainte amach agat. Is féidir leat leanúint ar aghaidh anois.",
   "consent.policy.acknowledge": "Tá sé léite agam"
 }

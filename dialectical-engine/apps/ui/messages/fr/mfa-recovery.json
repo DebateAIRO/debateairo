@@ -61,6 +61,7 @@
   "done.hint": "Le mot de passe de votre site ne change pas. Attendez le prochain code affiché par la nouvelle application d’authentification avant de vous connecter.",
   "login": "Retour à la connexion",
   "deadline": "Terminer avant",
+  "deadline.warning": "Cette récupération expire dans environ une minute. Ensuite, vous devrez demander un nouveau lien.",
   "restart.hint": "La configuration a été interrompue. Vous pouvez recommencer cette étape jusqu’à l’heure indiquée ci-dessous ; cette heure ne change pas.",
   "cancel": "Annuler la récupération",
   "cancel.title": "Annuler cette récupération ?",

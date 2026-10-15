@@ -3,7 +3,7 @@
 import type { CSSProperties, MouseEvent } from "react";
 import type { ContractNode } from "@/lib/v3/adapter";
 import type { DebateNode } from "@/lib/types";
-import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
+import { ROLE_PALETTES, outlineLevel, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { PositionTitle } from "@/components/PositionTitle";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
@@ -95,7 +95,7 @@ export function DebateThread({
           <div className="threadRoot">
             <span className="referenceStanceTab root" aria-hidden />
             <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-            <div className="threadRootClaim">{root.claim}</div>
+            <div className="threadRootClaim" role="heading" aria-level={2}>{root.claim}</div>
             <div className="nodeRootMeta">
               <span>{tPlural(catalog, "debateViews.claimCount", meta.nodes, locale)}</span>
               <span className="sep">/</span>
@@ -180,6 +180,9 @@ function ThreadRowCard({
       : { background: "var(--surface)", borderColor: "var(--line)" };
 
   const canOpen = state === "done";
+  const stanceLabel = localizedRoleLabel(node, catalog, debateChromeCatalog);
+  const headingId = `thread-arg-${node.id}`;
+  const detailsId = `thread-details-${node.id}`;
 
   return (
     <div className="threadRow">
@@ -200,16 +203,15 @@ function ThreadRowCard({
             className="threadCard"
             data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}
             style={cardStyle}
-            role={canOpen ? "button" : undefined}
-            tabIndex={canOpen ? 0 : undefined}
             onClick={canOpen ? () => onOpenNode(node.id) : undefined}
-            onKeyDown={(event) => {
-              if (canOpen && (event.key === "Enter" || event.key === " ")) {
-                event.preventDefault();
-                onOpenNode(node.id);
-              }
-            }}
           >
+          {/* Screen readers get the argument tree as an outline: one heading per argument,
+              its level is its depth under the root claim (h2), so heading navigation shows
+              which argument answers which. The visible badge and claim repeat it, so they
+              are hidden from assistive technology where this heading stands in for them. */}
+          <div className="srOnly" role="heading" aria-level={outlineLevel(trail.length)} id={headingId}>
+            {node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
+          </div>
           <span className="referenceStanceTab" style={{ background: pal.line }} aria-hidden />
           {scrutiny ? (
             <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>
@@ -219,8 +221,8 @@ function ThreadRowCard({
           ) : null}
 
           <div className="threadMetaRow">
-            <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
-              {pal.arrow} {localizedRoleLabel(node, catalog, debateChromeCatalog)}
+            <span className="roleBadge" aria-hidden="true" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
+              {pal.arrow} {stanceLabel}
             </span>
             <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} composeCatalog={composeCatalog} />
             <span style={{ flex: 1 }} />
@@ -248,10 +250,11 @@ function ThreadRowCard({
             </div>
           ) : (
             <>
-              <div className="threadClaim">{node.claim}</div>
+              <div className="threadClaim" aria-hidden="true">{node.claim}</div>
               {generation?.argument ? (
                 <div
                   className={`threadBody${expanded ? " open" : ""}`}
+                  data-challenge-prose={node.id}
                   onMouseUp={(event) => onProseSelect?.(node, event)}
                 >
                   {generation.argument}
@@ -271,6 +274,7 @@ function ThreadRowCard({
                 <button
                   type="button"
                   className="nodeCtrl"
+                  aria-expanded={generation?.argument ? expanded : undefined}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (generation?.argument) onToggleExpand(node.id);
@@ -278,6 +282,18 @@ function ThreadRowCard({
                   }}
                 >
                   {t(catalog, expanded ? "debateViews.showLess" : "debateViews.read")} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="nodeCtrl"
+                  id={detailsId}
+                  aria-labelledby={`${detailsId} ${headingId}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenNode(node.id);
+                  }}
+                >
+                  {t(catalog, "debateViews.details")} <span aria-hidden="true">▸</span>
                 </button>
               </div>
             </>

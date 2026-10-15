@@ -16,5 +16,6 @@
   "consent.policy.close": "Uždaryti",
   "consent.policy.questions": "Klausimai:",
   "consent.policy.gateHint": "Norėdami tęsti, nuslinkite iki politikos pabaigos.",
+  "consent.policy.gateOpened": "Pasiekėte pabaigą. Dabar galite tęsti.",
   "consent.policy.acknowledge": "Perskaičiau"
 }

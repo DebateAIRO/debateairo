@@ -61,6 +61,7 @@
   "done.hint": "Il-password tiegħek għal dan is-sit tibqa’ l-istess. Stenna l-kodiċi ġdid li jmiss mill-app sostitutiva qabel ma tidħol fil-kont.",
   "login": "Lura għad-dħul fil-kont",
   "deadline": "Lesti qabel",
+  "deadline.warning": "Dan ir-rkupru jiskadi f’madwar minuta. Wara dan, ikollok titlob link ġdid.",
   "restart.hint": "L-issettjar inqata’. Tista’ tirrepeti dan il-pass sal-ħin hawn taħt; dak il-ħin ma jinbidilx.",
   "cancel": "Ikkanċella r-rkupru",
   "cancel.title": "Tikkanċella dan ir-rkupru?",

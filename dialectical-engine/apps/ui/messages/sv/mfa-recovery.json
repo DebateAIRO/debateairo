@@ -61,6 +61,7 @@
   "done.hint": "Ditt lösenord för webbplatsen är detsamma. Vänta på nästa nya kod från den nya autentiseringsappen innan du loggar in.",
   "login": "Tillbaka till inloggning",
   "deadline": "Slutför före",
+  "deadline.warning": "Den här återställningen går ut om ungefär en minut. Därefter behöver du begära en ny länk.",
   "restart.hint": "Inställningen avbröts. Du kan upprepa det här steget fram till tiden nedan; tiden ändras inte.",
   "cancel": "Avbryt återställningen",
   "cancel.title": "Vill du avbryta den här återställningen?",

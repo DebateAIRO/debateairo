@@ -61,6 +61,7 @@
   "done.hint": "Web sitesi parolanız aynı kalır. Oturum açmadan önce yeni kimlik doğrulama uygulamanızdaki bir sonraki yeni kodu bekleyin.",
   "login": "Oturum açma ekranına dön",
   "deadline": "Şu tarihten önce tamamlayın",
+  "deadline.warning": "Bu kurtarmanın süresi yaklaşık bir dakika içinde dolacak. Sonrasında yeni bir bağlantı istemeniz gerekecek.",
   "restart.hint": "Kurulum kesildi. Bu adımı aşağıda gösterilen saate kadar tekrarlayabilirsiniz; bu saat değişmez.",
   "cancel": "Kurtarmayı iptal et",
   "cancel.title": "Bu kurtarma iptal edilsin mi?",

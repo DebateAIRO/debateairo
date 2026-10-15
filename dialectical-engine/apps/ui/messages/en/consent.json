@@ -16,5 +16,6 @@
   "consent.policy.close": "Close",
   "consent.policy.questions": "Questions:",
   "consent.policy.gateHint": "Scroll to the end of the policy to continue.",
+  "consent.policy.gateOpened": "You have reached the end. You can now continue.",
   "consent.policy.acknowledge": "I have read it"
 }

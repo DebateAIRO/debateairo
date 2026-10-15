@@ -61,6 +61,7 @@
   "done.hint": "Teie veebisaidi parool jääb samaks. Enne sisselogimist oodake asendusrakendusest järgmist uut koodi.",
   "login": "Tagasi sisselogimise juurde",
   "deadline": "Lõpetage enne",
+  "deadline.warning": "See taastamine aegub umbes minuti pärast. Seejärel peate taotlema uue lingi.",
   "restart.hint": "Seadistamine katkes. Võite seda sammu korrata kuni allpool näidatud ajani; see aeg ei muutu.",
   "cancel": "Tühistage taastamine",
   "cancel.title": "Kas tühistada see taastamine?",

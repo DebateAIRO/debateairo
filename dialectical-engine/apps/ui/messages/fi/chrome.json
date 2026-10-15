@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "KÄYTTÖLIITTYMÄN KIELI",
   "chrome.searchLanguage": "Hae kieltä tai koodia",
   "chrome.changeLanguage": "Vaihda kieltä",
+  "chrome.skipToContent": "Siirry pääsisältöön",
   "chrome.europe": "EUROOPPA",
   "chrome.asia": "AASIA",
   "chrome.middleEast": "LÄHI-ITÄ",

@@ -153,8 +153,18 @@ export function DebateMap({
                 strokeWidth={2}
                 opacity={(hoverId && hoverId !== arc.id ? 0.55 : 1) * arc.opacity}
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${localizedRoleLabel(arc.node, catalog, debateChromeCatalog)}: ${arc.node.claim}`}
                 onClick={() => onOpenSplit(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
+                onFocus={() => setHoverId(arc.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onOpenSplit(arc.id);
+                  }
+                }}
               >
                 <title>{arc.node.claim}</title>
               </path>
@@ -167,15 +177,26 @@ export function DebateMap({
               stroke="var(--core)"
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
+              role="button"
+              tabIndex={0}
+              aria-label={root.claim}
               onClick={() => {
                 setHoverId(null);
                 onOpenSplit(root.id);
               }}
+              onFocus={() => setHoverId(null)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setHoverId(null);
+                  onOpenSplit(root.id);
+                }
+              }}
             >
               <title>{root.claim}</title>
             </circle>
-            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--core)" strokeWidth={2.5} />
-            <circle cx={CX} cy={CY} r={2.4} fill="var(--core)" />
+            <circle cx={CX} cy={CY} r={9} fill="none" stroke="var(--core)" strokeWidth={2.5} aria-hidden="true" />
+            <circle cx={CX} cy={CY} r={2.4} fill="var(--core)" aria-hidden="true" />
           </svg>
         </div>
 
@@ -196,7 +217,7 @@ export function DebateMap({
               <span>{t(catalog, "debateViews.mapInteractionHint")}</span>
               <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>
-                {t(catalog, "debateViews.openInSplit")} ▸
+                {t(catalog, "debateViews.openInSplit")} <span aria-hidden="true">▸</span>
               </button>
             </div>
           </div>

@@ -16,5 +16,6 @@
   "consent.policy.close": "Κλείσιμο",
   "consent.policy.questions": "Ερωτήσεις:",
   "consent.policy.gateHint": "Μετακινηθείτε έως το τέλος της πολιτικής για να συνεχίσετε.",
+  "consent.policy.gateOpened": "Φτάσατε στο τέλος. Τώρα μπορείτε να συνεχίσετε.",
   "consent.policy.acknowledge": "Την έχω διαβάσει"
 }

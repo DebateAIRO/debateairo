@@ -408,3 +408,8 @@ export function claimRoleLabel(
   if (view.claimRole === "CON") return t(catalog, "debateChrome.presentation.con");
   return lensLabelFromNodeType(view.claimRole, catalog);
 }
+
+/** The root claim is h2 (the page h1 is the question); each level below it adds one, capped at h6. */
+export function outlineLevel(depth: number): number {
+  return Math.min(2 + depth, 6);
+}
