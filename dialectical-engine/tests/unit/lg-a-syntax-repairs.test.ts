@@ -143,7 +143,12 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
       "{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],\"b\":[1,]}"],
     ["the same with a leaked token in place of the trailing comma", "{\"L\":[{\"a\":\"P \",{\"k\":\"Q\"}],<|im_end|>\"b\":[1]}"],
     ["the same with a colon inside a key in place of the trailing comma", "{\"L\":[{\"a:\" \"P \",{\"k\":\"Q\"}],\"b\":[1]}"],
-    ["the same with a raw line break in the text and no other slip", "{\"L\":[{\"a\":\"P \",\n{\"k\":\"Q\"}],\"b\":[1]}"]
+    ["the same with a raw line break in the text and no other slip", "{\"L\":[{\"a\":\"P \",\n{\"k\":\"Q\"}],\"b\":[1]}"],
+    // Task 3b: beside another repair, strings are judged in the scan's context; the inserted bracket must not turn a list
+    // VALUE INNER_QUOTE reads into a key.
+    ["a list value read as a key after a bracket, with a trailing comma", "{\"r\":[\"a\",\"K\":[\"ok\"],\"b\":[1,]}"],
+    ["a list value read as a key after a bracket, with a leaked token", "{\"r\":[\"a\",\"K\":[\"ok\"],<|im_end|>\"b\":[1]}"],
+    ["a list text read as a key after a bracket, with a trailing comma", "{\"tags\":[\"red\",\"he wrote \":[\"blue\"],\"n\":[1,]}"]
   ])("refuses %s rather than change its words", (_name, text) => {
     expect(decodeModelJson(text, STOP).ok).toBe(false);
     expect(modelJsonSyntaxRepair(text, STOP)).toBeNull();
@@ -183,6 +188,16 @@ describe("LG-A decode: the syntax pass never changes a word", () => {
       value: { L: [{ a: "P \",{\"k\":\"Q" }], b: [1] } });
     expect(decodeModelJson("{\"L\":[{\"a\":\"P \",\\n{\"k\":\"Q\"}],\"b\":[1]}", STOP)).toEqual({ ok: true,
       value: { L: [{ a: "P \",\n{\"k\":\"Q" }], b: [1] }, repair: "INNER_QUOTE" });
+  });
+
+  it("the judge never reads a list value as a key after a bracket beside another repair (Task 3b)", () => {
+    const schema = z.object({ r: z.array(z.string()), b: z.array(z.number()) });
+    expect(parseStructuredArtifact("{\"r\":[\"a\",\"K\":[\"ok\"],\"b\":[1,]}", schema, STOP).kind).toBe("PARSE_FAILURE");
+    // Control: without the trailing comma INNER_QUOTE alone reads the reply and keeps every word.
+    const control = "{\"r\":[\"a\",\"K\":[\"ok\"],\"b\":[1]}";
+    expect(decodeModelJson(control, STOP)).toEqual({ ok: true, value: { r: ["a", "K\":[\"ok"], b: [1] }, repair: "INNER_QUOTE" });
+    expect(parseStructuredArtifact(control, schema, STOP)).toMatchObject({ kind: "PARSED", strategy: "INNER_QUOTE",
+      value: { r: ["a", "K\":[\"ok"], b: [1] } });
   });
 
   it("still repairs a string end that is JSON grammar in the reply itself (rounds 3-5)", () => {

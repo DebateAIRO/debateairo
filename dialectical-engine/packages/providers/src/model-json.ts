@@ -484,13 +484,20 @@ function onlyClosersToEnd(text: string, from: number): boolean {
 }
 
 /**
+ * One string the scan read, ended at its first unescaped quote. `inObject` / `inArray`: whether INNER_QUOTE would end a
+ * string VALUE at that quote, in the reply itself, inside an object / inside a list (`innerQuoteEnd`). `scanKey`: the
+ * scan read it as a key (a key is read strictly, to its first quote, by INNER_QUOTE as by the pass). `scanInArray`: the
+ * scan read it inside a list.
+ */
+type StringEnd = Readonly<{ inObject: boolean; inArray: boolean; scanKey: boolean; scanInArray: boolean }>;
+
+/**
  * Whether INNER_QUOTE would end a string VALUE at the quote just before `from`, in the reply itself: `closesValue`, its
  * own context-aware rule, inside an object and inside a list. ONE exception (the common end-of-reply trailing comma): a
  * quote followed (blanks skipped, leaked tokens not skipped) by `,` and then only closers to the text's end ends the
- * value in both. Keys need no entry: INNER_QUOTE reads a key strictly, to its first quote, as the pass does.
+ * value in both.
  */
-type StringEnd = Readonly<{ inObject: boolean; inArray: boolean }>;
-function innerQuoteEnd(text: string, from: number): StringEnd {
+function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" | "inArray"> {
   const at = nextSignificant(text, from);
   const closer = nextSignificant(text, at + 1);
   if (text[at] === "," && (text[closer] === "}" || text[closer] === "]") && onlyClosersToEnd(text, closer + 1)) {
@@ -537,7 +544,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       }
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
-      ends.push(innerQuoteEnd(text, cursor + 1));
+      ends.push({ ...innerQuoteEnd(text, cursor + 1), scanKey: isKey, scanInArray: top?.kind === "array" });
       if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
@@ -626,13 +633,22 @@ function insertOneBracket(text: string): string | null {
 }
 
 /**
- * NEVER A CHANGED WORD (Task 3 re-review, round 5): whether every string of `reading` (strict JSON: the cleaned text, its
- * brackets closed or one inserted; its strings are the scan's, in the same order) ends where INNER_QUOTE would end it,
- * read in the context of that reading: a key always (INNER_QUOTE reads keys strictly), a value in an object or a list by
- * `ends`. Then the pass's texts are INNER_QUOTE's texts, so every repair acts outside them (or escapes a line break
- * inside one) and no word of the AI's can change. The context is the returned reading's, not the scan's: one inserted
- * bracket can turn what the scan read as a list item into a key (`["a","b","short":{…}` → `["a","b"],"short":{…}`).
+ * NEVER A CHANGED WORD (Task 3 re-review, round 5; Task 3b): every string the pass returns must end where INNER_QUOTE
+ * would end it (`ends`), so the pass's texts are INNER_QUOTE's texts, every repair acts outside them (or escapes a line
+ * break inside one) and no word of the AI's can change. A key always passes (INNER_QUOTE reads keys strictly); a value
+ * passes by its context, object or list. WHICH context:
+ *  · the SCAN's (`scanKeepsEveryWord`) whenever the pass made any repair of its own besides BRACKET_INSERTED
+ *    (TRAILING_COMMA, MODEL_TOKEN_DROPPED, KEY_COLON_MOVED, RAW_LINE_BREAK): a key passes only where the scan read a key;
+ *  · the RETURNED reading's (`readingKeepsEveryWord`) only when BRACKET_INSERTED is the pass's ONLY repair: then
+ *    INNER_QUOTE already failed on the very same text, and the one inserted bracket can turn what the scan read as a
+ *    list item into a key (the brief's `["a","b","short":{…}` → `["a","b"],"short":{…}`). With another repair beside
+ *    it, that turn could make a list VALUE INNER_QUOTE reads (`["a","K":["ok"]` → `r = ["a", 'K":["ok']`) a key.
  */
+function scanKeepsEveryWord(ends: readonly StringEnd[]): boolean {
+  return ends.every((end) => end.scanKey || (end.scanInArray ? end.inArray : end.inObject));
+}
+
+/** The returned reading's context (see `scanKeepsEveryWord`): `reading` is strict JSON whose strings are the scan's, in order. */
 function readingKeepsEveryWord(reading: string, ends: readonly StringEnd[]): boolean {
   type Container = { kind: "object" | "array"; expectKey: boolean };
   const stack: Container[] = [];
@@ -662,7 +678,8 @@ function readingKeepsEveryWord(reading: string, ends: readonly StringEnd[]): boo
  * strict JSON on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned
  * text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing decodes to one
  * object, and (never a changed word) when the reading has a string that INNER_QUOTE would not end where the pass ends it
- * (`readingKeepsEveryWord`): that reply goes on to the structure-repair call, which keeps every word. The repairs are
+ * (`scanKeepsEveryWord`, or `readingKeepsEveryWord` when BRACKET_INSERTED is the only repair): that reply goes on to the
+ * structure-repair call, which keeps every word. The repairs are
  * named once each, in MODEL_JSON_REPAIRS order.
  */
 export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
@@ -681,7 +698,9 @@ export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
     return inserted === null ? null : { text: inserted, more: ["BRACKET_INSERTED"] };
   };
   const found = reading();
-  if (found === null || !readingKeepsEveryWord(found.text, cleaned.ends)) return null;
+  if (found === null) return null;
+  const bracketOnly = cleaned.made.size === 0 && found.more.includes("BRACKET_INSERTED");
+  if (!(bracketOnly ? readingKeepsEveryWord(found.text, cleaned.ends) : scanKeepsEveryWord(cleaned.ends))) return null;
   const value = parsed(found.text);
   if (value === null || !isPlainObject(value.value)) return null;
   const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...found.more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
