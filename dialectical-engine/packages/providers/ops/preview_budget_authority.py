@@ -13,8 +13,13 @@ above the row's ceiling prices) and settles at the profile's prices for that row
 the provider's reported cost, the larger); its ledger entry records the model, its maker, the
 reservation and settlement prices and the bound; and a reply naming any other model than that
 entry's halts. No reviewed row may reserve more than its profile's per_call_cap_usd for a
-full-size request (profile.max_request_bytes, at its ceiling prices), and activate refuses a GO
-whose max_concurrent_calls x largest enabled worst case exceeds daily_budget_usd. The profile
+full-size request (profile.max_request_bytes, at its ceiling prices), nor, for a final-writer request
+(LG-B, callTier FINAL_WRITER, only under a GO that names max_final_writer_calls F), more than the
+profile's final_writer_per_call_cap_usd for a full-size one (final_writer_max_request_bytes, reserved at
+the row's final_writer_output_bound). activate refuses a GO whose in_flight_worst_case exceeds
+daily_budget_usd: (max_concurrent_calls - F) x the largest enabled standard worst case + F x the
+largest enabled final-writer worst case (F = 0 without the member: max_concurrent_calls x the
+largest standard worst case, as before LG-B). The profile
 API (the helper's DeepInfraProfile docstring lists it) is all the core calls, so a new provider
 is one reviewed profile class.
 
@@ -85,13 +90,24 @@ model each halted the gate): a reply the profile's optional bookable_server_erro
 HTTP 500 to 599 with none of the billing keys anywhere in the raw reply) is booked the same way, with
 reason 'vendor_server_error', its HTTP status and the vendor facts an unbilled release keeps (Retry-After,
 rate-limit header names, the short redacted error). The same reservation bounds whatever was billed.
-A profile without the hook (Anthropic) is unchanged. Everything else still halts
-exactly as before: any other failure while sending or reading (a reply too large, a fault in the
-transport itself), a hook that fails on a reply, a reply without accountable usage (also a vendor's
-own timeout answer such as Anthropic's 504), a charge above the reservation (charge_overrun),
-another model or a non-200 reply, a key, identity or configuration problem, a hold that cannot be
-released, a lost reply or an interrupted call (a booking still in flight at serve start halts, as a
-settled call does).
+A profile without that hook (Anthropic) books its server errors only as below.
+An unreported charge (owner answer M3, 2026-10-15; rulings R1-R3, 2026-10-16): a paid reply whose usage or cost is
+unreported (assess_reply's usage_or_cost_unreported) that the profile's optional bookable_unreported accepts, judged
+on the RAW reply with its accounting and the call's reservation, is booked the same way, with reason
+'charge_unreported', its HTTP status and its accounting (DeepInfra: a 2xx or 5xx whose counts cannot be priced, when no
+cost it reports anywhere and none of the counts it does report price above the reservation; Anthropic: a message,
+status 200, without usage or with unreadable input/output counts whose usage names no premium speed, tier, region,
+server tool or cache write, and a 5xx that is no message and carries no billing key, content, model, token count,
+speed, tier or region, its 504 timeout_error among them). Only a reply that names no model or this call's own model is
+booked. M3 books a reply that carries NO usable bill, never one that carries evidence of a bigger one (fix round 1,
+2026-10-16): a count written as a float or as numeric text, or a cost that is an object or a list, halts. A hook that
+fails halts (accounting_failure). Everything else still halts exactly as before: any other failure while sending or
+reading (a reply too large, a fault in the transport itself), a hook that fails on a reply, a 4xx without accountable
+usage (a key, billing or request problem root must see), a reply whose own reported cost is above its reservation, any
+usage member, speed, service tier, region, server tool, cache count or content block the profile cannot price, a
+charge above the reservation (charge_overrun), a reply naming another model (with or without usable counts), a non-200
+reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply or
+an interrupted call (a booking still in flight at serve start halts, as a settled call does).
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal
@@ -131,15 +147,16 @@ A probe (root, one deliberate call) is never refused for a cool-off, but its out
 Refusal codes the caller sees (PUBLIC_REFUSALS): the three pot codes, PROVIDER_NOT_REACHED,
 PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED (nothing billed, hold released; only the second
 says the model is busy), MODEL_COOLING (nothing reserved or sent), PROVIDER_CHARGE_BOOKED_MAX (sent,
-the connection then failed, booked at the reservation; the gate stays active),
+then the connection failed, the vendor answered a server error without a bill, or its charge went unreported;
+booked at the reservation; the gate stays active),
 and AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
 when this call was checked, before anything was reserved. Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10): one GO's daily_budget_usd is at most MAX_GO_BUDGET_USD ($10.00, the
-DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds the
-daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is
-over TEAM_TOTAL_BUDGET_USD ($12.00: DeepInfra $10.00 + Anthropic $2.00).
+Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15): one GO's daily_budget_usd is at most
+MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds
+the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
+TEAM_TOTAL_BUDGET_USD ($16.00: DeepInfra $12.00 + Anthropic $4.00).
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -147,8 +164,10 @@ allow-list or while another gate's folder or GO is visible.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
-exceed daily_budget_usd by up to max_concurrent_calls x the largest enabled reservation (at most
-the profile's per_call_cap_usd each): calls reserved just before midnight are paid just after it, while
+exceed daily_budget_usd by up to the GO's in_flight_worst_case ((max_concurrent_calls - F) x the
+largest enabled standard reservation, at most per_call_cap_usd each, + F x the largest enabled
+final-writer reservation, at most final_writer_per_call_cap_usd each; F = max_final_writer_calls, 0
+without it): calls reserved just before midnight are paid just after it, while
 the new day's pot is already open. A probe runs beside serve, so for its one call up to
 max_concurrent_calls + 1 calls may be in flight; the pot itself is still checked under the lock.
 """
@@ -209,7 +228,9 @@ REPLY_TIMEOUT_SECONDS = 1290
 DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds the stop's first step).
-MAX_IPC_BYTES = 1024 * 1024
+# LG-B: a final writer's 1 MiB body travels JSON-escaped inside the message (a quote becomes 4 bytes there), so the
+# message may be up to 3 MiB.
+MAX_IPC_BYTES = 3 * 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
 # Provably unsent calls (PROVIDER_NOT_REACHED) and not-busy unbilled errors (PROVIDER_ERROR_UNBILLED)
@@ -237,15 +258,16 @@ STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 # after unbilled refusals; nothing was reserved or sent. AUTHORITY_HALTED: the gate is halted, found
 # by the state check before anything was reserved (never after a reservation: every failure there
 # stays the opaque STOPPED).
-# PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12): this call was sent, the vendor connection then failed or
-# timed out, and its full reservation is booked as its charge; the gate stays active.
+# PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12; owner answer M3): this call was sent and its charge cannot be
+# known (the connection failed or timed out, a server error without a bill, or an unreported charge); its full
+# reservation is booked as its charge; the gate stays active.
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
                              'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
                              'MODEL_COOLING', 'AUTHORITY_HALTED', 'PROVIDER_CHARGE_BOOKED_MAX'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})
-GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
+GO_OPTIONAL = frozenset({'predecessor_ledger_sha256', 'max_final_writer_calls'})
 DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
 SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
 # v1's and v2's names: a client still configured for an older gate must never reach this one.
@@ -266,10 +288,10 @@ ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_M
 # sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
 # reservation; anything else after the reservation stays uncertain and halts.
 BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
-# Owner ruling 2026-10-10: one GO may ask for at most $10.00 a day (the DeepInfra pot), and the
-# daily team total over every provider gate's pot is $12.00 (DeepInfra $10.00 + Anthropic $2.00).
-MAX_GO_BUDGET_USD = Decimal('10.00')
-TEAM_TOTAL_BUDGET_USD = Decimal('12.00')  # Checked only by activate's sum over every gate's GO.
+# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15): one GO may ask for at most $12.00 a day (the
+# DeepInfra pot), and the daily team total over every provider gate's pot is $16.00 (DeepInfra $12.00 + Anthropic $4.00).
+MAX_GO_BUDGET_USD = Decimal('12.00')
+TEAM_TOTAL_BUDGET_USD = Decimal('16.00')  # Checked only by activate's sum over every gate's GO.
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -422,10 +444,57 @@ def cache_write_of(profile, body):
     return asks is not None and asks(body) is True
 
 
-def worst_case_reservation(profile, row):
-    """A full-size request at the highest prices the row can ever reserve at (ceiling_prices):
-    one figure for the per-call cap, the activate check and /remaining, whatever the date."""
-    return reservation_for(profile.max_request_bytes, row, profile.ceiling_prices(row))
+# Length guidance LG-B (L26, L29): the two kinds of request the app declares. No callTier key is STANDARD: every request
+# before LG-B, and the probe's.
+CALL_TIERS = ('STANDARD', 'FINAL_WRITER')
+
+
+def request_tier(input):
+    """The tier an app request declares (callTier), STANDARD when it names none; anything else refuses."""
+    if isinstance(input, dict) and 'callTier' in input:
+        if input['callTier'] not in CALL_TIERS:
+            raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+        return input['callTier']
+    return 'STANDARD'
+
+
+def final_writer_tier_of(profile):
+    """(largest request bytes, per-call cap) of the profile's final-writer tier, or None when it has none."""
+    size = getattr(profile, 'final_writer_max_request_bytes', None)
+    cap = getattr(profile, 'final_writer_per_call_cap_usd', None)
+    return None if size is None or cap is None else (size, cap)
+
+
+def final_writer_slots(go):
+    """How many final-writer calls the GO lets through at once: its max_final_writer_calls, 0 without it (no tier)."""
+    return go.get('max_final_writer_calls', 0)
+
+
+def tier_limits(profile, tier):
+    """(largest request bytes, per-call cap) of one tier."""
+    if tier == 'STANDARD':
+        return profile.max_request_bytes, profile.per_call_cap_usd
+    limits = final_writer_tier_of(profile)
+    if tier != 'FINAL_WRITER' or limits is None:
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    return limits
+
+
+def tier_row(profile, row, tier):
+    """The row as a request of this tier is checked and reserved: a final writer's carries the row's own maximum as its
+    output bound."""
+    if tier == 'STANDARD':
+        return row
+    bound = getattr(row, 'final_writer_output_bound', None)
+    if tier != 'FINAL_WRITER' or final_writer_tier_of(profile) is None or bound is None:
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    return row._replace(output_bound=bound)
+
+
+def worst_case_reservation(profile, row, tier='STANDARD'):
+    """A full-size request of the tier at the highest prices the row can ever reserve at (ceiling_prices): one figure for
+    the per-call cap, the activate check and /remaining, whatever the date."""
+    return reservation_for(tier_limits(profile, tier)[0], tier_row(profile, row, tier), profile.ceiling_prices(row))
 
 
 def _price_ok(value):
@@ -472,7 +541,31 @@ def row_reviewed(profile, model, row):
                 and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
                 and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
-                and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
+                and worst_case_reservation(profile, row) <= profile.per_call_cap_usd
+                and final_writer_row_reviewed(profile, row))
+
+
+def final_writer_row_reviewed(profile, row):
+    """LG-B: a row without its own maximum, or on a profile without the tier, has no final-writer tier (it is refused for
+    one). Otherwise its maximum is between its standard bound and MAX_OUTPUT_BOUND, and a full-size final-writer request
+    reserves no more than the tier's cap."""
+    bound = getattr(row, 'final_writer_output_bound', None)
+    limits = final_writer_tier_of(profile)
+    if bound is None or limits is None:
+        return True
+    return (_int_in(bound, row.output_bound, MAX_OUTPUT_BOUND)
+            and worst_case_reservation(profile, row, 'FINAL_WRITER') <= limits[1])
+
+
+def final_writer_profile_reviewed(profile):
+    """LG-B: a profile's final-writer tier, when it has one: a cap above 0 and at most MAX_PROFILE_CALL_CAP_USD, and a
+    request size from its standard size up to MAX_PROFILE_REQUEST_BYTES."""
+    limits = final_writer_tier_of(profile)
+    if limits is None:
+        return True
+    size, cap = limits
+    return (type(cap) is Decimal and Decimal(0) < cap <= MAX_PROFILE_CALL_CAP_USD
+            and _int_in(size, profile.max_request_bytes, MAX_PROFILE_REQUEST_BYTES))
 
 
 def profile_of(provider):
@@ -484,6 +577,7 @@ def profile_of(provider):
             profile is not None and getattr(profile, 'name', None) == provider and profile.rows
             and type(profile.per_call_cap_usd) is Decimal and Decimal(0) < profile.per_call_cap_usd <= MAX_PROFILE_CALL_CAP_USD
             and _int_in(profile.max_request_bytes, 1024, MAX_PROFILE_REQUEST_BYTES)
+            and final_writer_profile_reviewed(profile)
             and all(row_reviewed(profile, m, r) for m, r in profile.rows.items()))
     except Exception:  # noqa: BLE001 - a profile that cannot even be checked is not reviewed
         reviewed = False
@@ -498,6 +592,33 @@ def enabled_models_valid(models, profile):
 
 def largest_reservation(profile, models):
     return max(worst_case_reservation(profile, profile.rows[model]) for model in models)
+
+
+def largest_final_writer_reservation(profile, models):
+    """LG-B: the largest full-size final-writer hold among these models (0 when none has the tier)."""
+    worst = [worst_case_reservation(profile, profile.rows[model], 'FINAL_WRITER') for model in models
+             if final_writer_tier_of(profile) is not None
+             and getattr(profile.rows[model], 'final_writer_output_bound', None) is not None]
+    return max(worst) if worst else Decimal(0)
+
+
+def in_flight_worst_case(profile, models, max_concurrent, final_writer_calls):
+    """What every call slot may hold at once: up to final_writer_calls of them at the largest final-writer worst case,
+    the rest at the largest standard one. With no final-writer calls (every GO before LG-B): max_concurrent x the
+    largest standard worst case, exactly as before."""
+    standard = largest_reservation(profile, models)
+    final_writer = min(final_writer_calls, max_concurrent)
+    if final_writer == 0:
+        return max_concurrent * standard
+    return ((max_concurrent - final_writer) * standard
+            + final_writer * max(standard, largest_final_writer_reservation(profile, models)))
+
+
+def final_writer_models_valid(profile, models):
+    """LG-B (fix round 1): a GO may name max_final_writer_calls only when its profile has the final-writer tier and every
+    model it enables has its own maximum (final_writer_output_bound); otherwise no final writer could ever be served."""
+    return final_writer_tier_of(profile) is not None and all(
+        getattr(profile.rows[model], 'final_writer_output_bound', None) is not None for model in models)
 
 
 def valid_go(go):
@@ -516,6 +637,8 @@ def valid_go(go):
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
         and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
+        and ('max_final_writer_calls' not in go or (_int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls'])
+                                                    and final_writer_models_valid(profile, go['enabled_models'])))
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
 
@@ -537,7 +660,11 @@ def read_go(path):
 
 
 def limits_of(go):
-    return {name: go[name] for name in ('daily_budget_usd', 'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days')}
+    limits = {name: go[name] for name in ('daily_budget_usd', 'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days')}
+    # LG-B: only a GO that names it carries it, so older states read exactly as before.
+    if 'max_final_writer_calls' in go:
+        limits['max_final_writer_calls'] = go['max_final_writer_calls']
+    return limits
 
 
 def day_ledger_name(day):
@@ -874,9 +1001,11 @@ def activate(private, go_path, host=None, platform=None, now=None, gate_go_paths
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host']:
         raise SafetyError('ACTIVATION_REFUSED')
-    # Every slot holding the largest enabled worst case at once must still fit the day's pot.
+    # Every slot holding the largest enabled worst case it may hold at once must still fit the day's pot (LG-B: the GO's
+    # final-writer slots at the final-writer worst case).
     profile = profile_of(go['provider'])
-    if go['max_concurrent_calls'] * largest_reservation(profile, go['enabled_models']) > Decimal(go['daily_budget_usd']):
+    if in_flight_worst_case(profile, go['enabled_models'], go['max_concurrent_calls'], final_writer_slots(go)) \
+            > Decimal(go['daily_budget_usd']):
         raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
     # Root runs activate in a shell, outside the units that hide the gates' GOs from each other.
     if team_total(go, gate_go_paths, owner_uid) > TEAM_TOTAL_BUDGET_USD:
@@ -931,11 +1060,19 @@ def validate_request(input, go, probe=False, moment=None):
     profile = profile_of(go['provider'])
     if profile is None:
         raise SafetyError('ROOT_GO_INVALID')
-    if not isinstance(input, dict) or set(input) != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
+    if not isinstance(input, dict) \
+            or set(input) - {'callTier'} != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
             or input['scope_id'] != go['scope_id'] or not isinstance(input['operationId'], str) \
             or not re.fullmatch(r'[A-Za-z0-9-]{1,96}', input['operationId']) or not isinstance(input['requestBody'], str) \
-            or len(input['requestBody'].encode()) > profile.max_request_bytes \
             or hashlib.sha256(input['requestBody'].encode()).hexdigest() != input['requestSha256']:
+        raise SafetyError('REQUEST_SCOPE_INVALID')
+    # Length guidance LG-B (controller ruling 5): the tier is the app's declaration; the gate cannot see the step. A
+    # final-writer request needs a GO that names max_final_writer_calls; the probe never sends one.
+    tier = request_tier(input)
+    if tier == 'FINAL_WRITER' and (probe or final_writer_slots(go) == 0):
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    max_bytes, cap = tier_limits(profile, tier)
+    if len(input['requestBody'].encode()) > max_bytes:
         raise SafetyError('REQUEST_SCOPE_INVALID')
     try:
         body = json.loads(input['requestBody'])
@@ -947,7 +1084,8 @@ def validate_request(input, go, probe=False, moment=None):
     row = profile.rows.get(model)
     if row is None or not (probe or model in go['enabled_models']):
         raise SafetyError('MODEL_NOT_ALLOWED')
-    if not profile.body_valid(body, row):
+    checked = tier_row(profile, row, tier)  # The tier's own output bound (a final writer's: the row's own maximum).
+    if not profile.body_valid(body, checked):
         raise SafetyError('REQUEST_PARAMETERS_INVALID')
     raw = input['requestBody'].encode()
     # The exact bytes that will go upstream, fixed before any reservation: a body that cannot be
@@ -967,12 +1105,12 @@ def validate_request(input, go, probe=False, moment=None):
     if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
-    reserved = reservation_for(len(raw), row, prices)
-    if reserved > profile.per_call_cap_usd:
+    reserved = reservation_for(len(raw), checked, prices)
+    if reserved > cap:
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed row; checked anyway.
     if helper.decimal_amount(input['reservedUsd']) != reserved:
         raise SafetyError('RESERVATION_MISMATCH')
-    return outgoing, reserved, row, prices
+    return outgoing, reserved, checked, prices
 
 
 def probe_running(store):
@@ -1056,6 +1194,8 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
+                                       # LG-B (controller ruling 5): logged per tier; a standard entry is unchanged.
+                                       **({'call_tier': 'FINAL_WRITER'} if request_tier(input) == 'FINAL_WRITER' else {}),
                                        'requested_effort': requested_effort, 'peer_uid': peer_uid,
                                        **({'cache_write_requested': '5m'} if cache_write else {}),
                                        **({'probe': True} if probe else {})}
@@ -1118,9 +1258,10 @@ class CallNotSent(SafetyError):
 
 
 class ChargeBookedMax(SafetyError):
-    """PROVIDER_CHARGE_BOOKED_MAX: this call was sent, the vendor connection then failed or timed out,
-    and its full reservation is booked as its charge (settled_reserved_max). The gate stays active and
-    the IPC handler does not halt for it: the booking is already on the record."""
+    """PROVIDER_CHARGE_BOOKED_MAX: this call was sent and its charge cannot be known (the vendor connection then
+    failed or timed out, a server error without a bill, or, owner answer M3, an unreported charge), and its full
+    reservation is booked as its charge (settled_reserved_max). The gate stays active and the IPC handler does not
+    halt for it: the booking is already on the record."""
 
 
 class _FailedAfterSend(Exception):
@@ -1292,11 +1433,14 @@ def bounded_accounting(accounting):
 class CallSlots:
     """One server's call slots, plus its trip: after a failed settlement or a failed halt this
     process reserves nothing more until it is restarted (restart recovery then halts on the
-    interrupted entry)."""
+    interrupted entry). LG-B: final_writer_limit of the slots (the GO's max_final_writer_calls, 0: none) may hold a
+    final-writer call at once."""
 
-    def __init__(self, limit):
+    def __init__(self, limit, final_writer_limit=0):
         self.limit = limit
+        self.final_writer_limit = final_writer_limit
         self._semaphore = threading.BoundedSemaphore(limit)
+        self._final_writer = threading.BoundedSemaphore(final_writer_limit) if final_writer_limit > 0 else None
         self.tripped = False
 
     def trip(self):
@@ -1307,6 +1451,12 @@ class CallSlots:
 
     def release(self):
         self._semaphore.release()
+
+    def acquire_final_writer(self, wait):
+        return self._final_writer is not None and self._final_writer.acquire(timeout=wait)
+
+    def release_final_writer(self):
+        self._final_writer.release()
 
 
 def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None,
@@ -1325,9 +1475,26 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
             or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
         raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
-    if slots.limit != go['max_concurrent_calls']:
+    if slots.limit != go['max_concurrent_calls'] or getattr(slots, 'final_writer_limit', 0) != final_writer_slots(go):
         raise SafetyError('SERVE_RESTART_REQUIRED')
-    if not slots.acquire(slot_wait):
+    # LG-B (fix round 1): a final writer first takes one of the GO's final-writer slots, waiting for it while it holds
+    # nothing, and only then a general slot; either refusal is unbilled, like a full gate. No deadlock: only a final
+    # writer ever waits on the final-writer slots, and it does so before it holds a general slot, so no holder of a
+    # general slot ever waits on them (the one wait while holding something is a final writer's wait for a general
+    # slot, which every holder frees without waiting on anything). And a waiting final writer never keeps a standard
+    # call out of a general slot.
+    final_writer_held = False
+    if request_tier(input) == 'FINAL_WRITER':
+        if not slots.acquire_final_writer(slot_wait):
+            raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+        final_writer_held = True
+    general_held = False
+    try:
+        general_held = slots.acquire(slot_wait)
+    finally:
+        if final_writer_held and not general_held:
+            slots.release_final_writer()
+    if not general_held:
         raise SafetyError('CONCURRENCY_LIMIT_REACHED')
     try:
         if cancelled is not None and cancelled():
@@ -1421,6 +1588,30 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
                                                     'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
                                                    'uncertain_charge', None, None)
+        # Owner answer M3 (2026-10-15; OVERVIEW B-3; rulings R1-R3, 2026-10-16): a paid reply whose usage or cost is
+        # unreported is booked at its reservation when the profile's optional bookable_unreported finds the reservation
+        # bounds it (judged on the RAW reply, as above, with its accounting): settled_reserved_max, reason
+        # charge_unreported, no halt. Anything that may bill above the list price still halts; a hook that fails halts.
+        # Controller ruling (Task 4b review, 2026-10-16): only a reply that names no model or exactly this call's model
+        # (read as for provider_error_or_model_identity: profile.reply_model) is booked; another model may bill above
+        # this row's prices, so it keeps halting (uncertain_charge) as before M3.
+        if halt_reason == 'uncertain_charge' and changes.get('reason') == 'usage_or_cost_unreported':
+            unreported = getattr(profile, 'bookable_unreported', None)
+            try:
+                bookable = (unreported is not None and profile.reply_model(raw_response) in (None, row.model)
+                            and unreported(status, raw_response, changes['accounting'], reserved) is True)
+            except BaseException:
+                bookable = False
+                changes = {**changes, 'reason': 'accounting_failure'}
+            if bookable:
+                changes = {**changes, 'state': BOOKED_MAX, 'held_usd': str(reserved), 'reason': 'charge_unreported'}
+                outcome = settle_or_halt(private, entry_id, day, changes, None, budget, now, slots)
+                log_event({**event, 'model': row.model, 'status': BOOKED_MAX, 'alert': 'charge_booked_at_reservation',
+                           'booked_usd': str(reserved), 'reason': 'charge_unreported', 'http_status': changes['http_status'],
+                           'elapsed_seconds': elapsed, **outcome})
+                if on_settled is not None:  # The probe still prints what it measured.
+                    on_settled({'changes': changes, 'halt_reason': None, 'response': response, 'row': row, **outcome})
+                raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX')
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         log_event({**event, 'model': row.model, 'status': changes['state'], 'halt_reason': halt_reason,
                    'guard_charge_usd': charge, 'elapsed_seconds': elapsed, **outcome})
@@ -1434,7 +1625,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             raise SafetyError('SETTLED_INTO_HALT')
         return reply
     finally:
-        slots.release()
+        slots.release()  # In reverse: the general slot, then the final-writer slot.
+        if final_writer_held:
+            slots.release_final_writer()
 
 
 def bounded_model_name(value):
@@ -1506,7 +1699,8 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
     except SafetyError:
         go_current, allowed = False, frozenset()
     limits = control['limits']
-    serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls'])
+    serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls']
+                                and getattr(slots, 'final_writer_limit', 0) == limits.get('max_final_writer_calls', 0))
     # A probe id in flight (running, or left by a probe that died) makes the next reservation wait
     # or halt (interrupted_probe): say the window is shut, so no debate starts into that.
     serving = serving and not any(entry_id.startswith(PROBE_ENTRY_PREFIX) for entry_id in control['in_flight'])
@@ -1514,7 +1708,7 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
     profile = profile_of(control['provider'])
     if profile is None or not all(model in profile.rows for model in control['enabled_models']):
         raise SafetyError('REMAINING_UNAVAILABLE')  # The state names a row this code no longer reviews.
-    return control['scope_id'], allowed, {
+    reply = {
             'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
             # The app reads amounts as exact nano-USD (at most 9 decimals). A provider's reported cost
             # can carry more, so what is left is rounded DOWN and the largest hold UP: never in the
@@ -1524,6 +1718,12 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
             'max_concurrent_calls': limits['max_concurrent_calls'],
             'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
             'enabled_models': list(control['enabled_models'])}
+    # LG-B: only a state activated with a GO that names max_final_writer_calls answers its final-writer room.
+    if limits.get('max_final_writer_calls', 0) > 0:
+        reply['largest_final_writer_reservation_usd'] = nano_text(
+            largest_final_writer_reservation(profile, control['enabled_models']), ROUND_CEILING)
+        reply['final_writer_max_in_flight'] = limits['max_final_writer_calls']
+    return control['scope_id'], allowed, reply
 
 
 def remaining_answer(snapshot, input, uid):
@@ -1721,7 +1921,8 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
     # next reservation (a probe that died or could not settle).
     lock_fd = hold_probe_lock(private)
     try:
-        execute_request(private, go_path, request, peer_uid=0, slots=CallSlots(go['max_concurrent_calls']),
+        execute_request(private, go_path, request, peer_uid=0,
+                        slots=CallSlots(go['max_concurrent_calls'], final_writer_slots(go)),
                         dispatch=dispatch, key_loader=key_loader, host=host, platform=platform, now=now, probe=True,
                         on_settled=observed.update)
     except SafetyError:
@@ -2049,7 +2250,7 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # Under the serve lock: no other serve on this state can be clearing or binding meanwhile.
         stale_removed = clear_stale_socket(socket_path, owner_uid=owner_uid)
         recovered = recover_interrupted(private)
-        slots = CallSlots(go['max_concurrent_calls'])
+        slots = CallSlots(go['max_concurrent_calls'], final_writer_slots(go))
 
         def execute(data, uid, cancelled, on_reserved):
             return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,

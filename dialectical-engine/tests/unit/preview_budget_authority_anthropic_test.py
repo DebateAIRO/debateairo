@@ -74,7 +74,11 @@ def cached_request(**changes):
 
 
 def is_cached(value):
-    return isinstance(value, dict) and isinstance(value.get('system'), list)
+    """A request that carries a cache mark: the two-block system, or (LG-B) a marked first user turn."""
+    messages = value.get('messages') if isinstance(value, dict) else None
+    return isinstance(value, dict) and (isinstance(value.get('system'), list)
+                                        or (isinstance(messages, list) and messages and isinstance(messages[0], dict)
+                                            and isinstance(messages[0].get('content'), list)))
 
 
 def reservation_of(raw):
@@ -160,7 +164,8 @@ class AnthropicTest(unittest.TestCase):
     def call(self, gate, operation_id='op-1', reply=None, status=200, value=None, dispatch=None, **kwargs):
         if dispatch is None:
             def dispatch(_sent, _key):
-                return status, json.loads(json.dumps(message() if reply is None else reply))
+                # As helper.HttpsTransport parses a reply (final review 2026-10-16, Important 2): floats as Decimals.
+                return status, json.loads(json.dumps(message() if reply is None else reply), parse_float=Decimal)
         options = {'peer_uid': PEER, 'slots': gate.slots, 'dispatch': dispatch, 'key_loader': lambda _private: KEY,
                    'host': HOST, 'platform': 'linux', 'now': gate.clock, 'slot_wait': 0.2}
         options.update(kwargs)
@@ -291,23 +296,78 @@ class ParityAndReservationTests(AnthropicTest):
             bridge.validate_request({**sent, 'reservedUsd': '0.016607299'}, go)
 
 
+class FinalWriterTierTests(AnthropicTest):
+    """Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): Claude Haiku as a final writer may send 1 MiB and ask
+    its own maximum (128,000), under its own per-call cap of $1.00."""
+
+    def test_haiku_final_writer_tier_reserves_at_most_one_dollar(self):
+        parity = json.loads(PARITY.read_text())['final_writer']
+        row = ANTHROPIC.rows[HAIKU]
+        self.assertEqual((ANTHROPIC.final_writer_max_request_bytes, ANTHROPIC.final_writer_per_call_cap_usd, row.final_writer_output_bound),
+                         (1024 * 1024, Decimal('1.00'), 128000))
+        self.assertEqual((parity['request_bytes'], Decimal(parity['per_call_cap_usd'])), (1024 * 1024, Decimal('1.00')))
+        worst = bridge.worst_case_reservation(ANTHROPIC, row, 'FINAL_WRITER')
+        # (1,050,624 x 0.625 + 128,000 x 2.50) / 1e6: a cached full-size request at the upper step.
+        self.assertEqual(worst, Decimal('0.97664'))
+        uncached = bridge.reservation_for(1024 * 1024, bridge.tier_row(ANTHROPIC, row, 'FINAL_WRITER'),
+                                          ANTHROPIC.reservation_prices(row, None, 1024 * 1024))
+        self.assertEqual(parity['rows'], [{'model': HAIKU, 'output_bound': 128000, 'worst_case_reservation_usd': '%.9f' % worst,
+                                           'worst_case_uncached_reservation_usd': '%.9f' % uncached}])
+        self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
+        self.assertLessEqual(worst, bridge.MAX_PROFILE_CALL_CAP_USD)
+
+    def test_a_cached_1_mib_final_writer_request_reserves_at_the_upper_write_price(self):
+        go = bridge.read_go(self.gate(max_final_writer_calls=1).go_path)
+        value = cached_request(max_tokens=128000, messages=[{'role': 'user', 'content': ''}])
+        value['messages'][0]['content'] = 'x' * (1024 * 1024 - len(json.dumps(value).encode()))
+        raw = json.dumps(value)
+        reserved = (Decimal(len(raw.encode()) + 2048) * UPPER_WRITE_IN + Decimal(128000) * CEIL_OUT) / Decimal(1000000)
+        self.assertEqual(reserved, Decimal('0.97664'))
+        _outgoing, got, row, prices = bridge.validate_request({**envelope_text(raw), 'reservedUsd': str(reserved),
+                                                               'callTier': 'FINAL_WRITER'}, go)
+        self.assertEqual((got, row.output_bound, prices), (reserved, 128000, CEILING))
+        with self.refused('REQUEST_SCOPE_INVALID'):  # Without the tier the same body is over the standard 256 KiB.
+            bridge.validate_request(envelope_text(raw), go)
+        with self.subTest('an unreported final-writer charge is booked at the tier hold it took (Task 4b, M3)'):
+            # Unreadable input, a readable output count priced above this body's standard hold but within its
+            # final-writer hold (lower step, 60,000 x 0.50 / 1e6 = $0.03): booked at the hold the call took, the tier's.
+            gate = self.ready(max_final_writer_calls=1)
+            small = json.dumps(request(max_tokens=128000))
+            hold = (Decimal(len(small.encode()) + 2048) * PRICE_IN + Decimal(128000) * PRICE_OUT) / Decimal(1000000)
+            self.assertLess(reservation_of(small), Decimal('0.03'))
+            self.assertLess(Decimal('0.03'), hold)
+            reply = {**message(), 'usage': {'input_tokens': True, 'output_tokens': 60000}}
+            options = {'peer_uid': PEER, 'slots': gate.slots, 'key_loader': lambda _private: KEY, 'host': HOST,
+                       'platform': 'linux', 'now': gate.clock, 'slot_wait': 0.2,
+                       'dispatch': lambda _sent, _key: (200, json.loads(json.dumps(reply)))}
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                bridge.execute_request(gate.private, gate.go_path, {**envelope_text(small), 'reservedUsd': str(hold),
+                                                                    'callTier': 'FINAL_WRITER'}, **options)
+            entry = entry_of(gate)
+            self.assertEqual((entry['state'], entry['reason'], entry['call_tier'], entry['output_bound'], Decimal(entry['held_usd']),
+                              Decimal(entry['reserved_usd'])), ('settled_reserved_max', 'charge_unreported', 'FINAL_WRITER', 128000, hold, hold))
+            self.assertEqual(gate.status()['state'], 'active')
+            # Negative control: at the standard hold the hook would see the count above it (the call would halt).
+            self.assertFalse(ANTHROPIC.bookable_unreported(200, reply, entry['accounting'], reservation_of(small)))
+
+
 class GoAndActivateTests(AnthropicTest):
     def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
-        # Owner's ruling 2026-10-10 (evening): Anthropic $2.00 (this GO) + DeepInfra $10.00 = the $12.00
-        # team total. Each GO alone may ask up to the $10.00 per-GO ceiling, so a $2.01 Anthropic GO is
-        # itself valid: what refuses it is the team-total check at activate.
+        # Owner answer M1 (2026-10-15): Anthropic $4.00 (this GO) + DeepInfra $12.00 = the $16.00 team total. Each GO
+        # alone may ask up to the $12.00 per-GO ceiling, so a $4.01 Anthropic GO is itself valid: what refuses it is
+        # the team-total check at activate.
         def deepinfra_go(gate, budget):
             path = gate.root / 'team-go-deepinfra.json'
             path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'deepinfra',
                                         'daily_budget_usd': budget}))
             os.chmod(path, 0o600)
-        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('12.00'), Decimal('10.00')))
-        gate = self.gate()
-        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '2.00')
+        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('16.00'), Decimal('12.00')))
+        gate = self.gate(daily_budget_usd='4.00')
+        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '4.00')
         gate.init()
-        deepinfra_go(gate, '10.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 2.00 + 10.00 = 12.00 exactly.
-        for mine, theirs in (('2.01', '10.00'), ('2.02', '9.99')):
+        deepinfra_go(gate, '12.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 4.00 + 12.00 = 16.00 exactly.
+        for mine, theirs in (('4.01', '12.00'), ('4.02', '11.99')):
             with self.subTest(anthropic=mine, deepinfra=theirs):
                 gate = self.gate(daily_budget_usd=mine)
                 self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], mine)  # Valid on its own.
@@ -457,16 +517,15 @@ class SettlementTests(AnthropicTest):
                         self.assertLessEqual(len(value), 64)
                         self.assertNotIn('E', value)  # Plain decimals in the ledger.
 
-    def test_missing_usage_halts_with_the_full_hold_kept(self):
-        for name, reply in (('no_usage', without('usage', message())), ('usage_null', {**message(), 'usage': None}),
-                            ('empty_body', {}), ('not_json', {'_invalid_json': True})):
+    def test_a_200_that_is_no_message_halts_with_the_full_hold_kept(self):
+        for name, reply in (('empty_body', {}), ('not_json', {'_invalid_json': True})):
             with self.subTest(name):
                 gate = self.ready()
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
                     self.call(gate, reply=reply)
                 self.assert_uncertain_halt(gate)
 
-    def test_every_usage_shape_the_profile_does_not_know_halts(self):
+    def test_every_usage_shape_the_profile_does_not_know_halts_and_missing_or_unreadable_counts_are_booked(self):
         good = message()
         usage = good['usage']
         cases = {
@@ -525,10 +584,19 @@ class SettlementTests(AnthropicTest):
             'tokens_outside_usage_null': {**good, 'cache_tokens': None},
             'usage_a_list': {**good, 'usage': [1000, 500]},
         })
+        # Owner answer M3 (2026-10-15): a message whose usage is missing or whose input/output counts cannot be read is booked
+        # at its reservation (UnreportedChargeBookedTests); every other shape the profile does not know still halts.
+        # Final review (2026-10-16, Minor 1): a usage of another type (usage_a_list) is not an absent usage: it halts.
+        booked = {'input_float', 'input_bool', 'input_negative', 'output_missing'}
         for name, reply in replies.items():
             with self.subTest(name):
                 self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)['usage_valid'])
                 gate = self.ready()
+                if name in booked:
+                    with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                        self.call(gate, reply=reply, dispatch=lambda _s, _k, r=reply: (200, r))
+                    self.assertEqual((entry_of(gate)['state'], gate.status()['state']), ('settled_reserved_max', 'active'))
+                    continue
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
                     self.call(gate, reply=reply, dispatch=lambda _s, _k, r=reply: (200, r))
                 self.assert_uncertain_halt(gate)
@@ -851,13 +919,12 @@ class UnbilledAndUnsentTests(AnthropicTest):
         self.call(gate, 'next')  # The next call is the trial; its answer ends the cool-off.
         self.assertEqual(gate.status()['cooling'], {})
 
-    def test_key_billing_and_timeout_errors_and_mismatched_types_still_halt(self):
+    def test_key_billing_and_client_errors_and_mismatched_types_still_halt(self):
+        # Ruling R2 (2026-10-16): these 4xx keep halting; a 5xx without any billing field is booked (UnreportedChargeBookedTests).
         cases = {'401_authentication': (401, self.error('authentication_error')),
                  '403_permission': (403, self.error('permission_error')),
                  '402_billing': (402, self.error('billing_error')),
-                 '504_timeout': (504, self.error('timeout_error')),
                  '400_api_error': (400, self.error('api_error')),
-                 '500_invalid_request': (500, self.error('invalid_request_error')),
                  '404_with_usage': (404, {**self.error('not_found_error'), 'usage': {'input_tokens': 1, 'output_tokens': 0}}),
                  '400_with_content': (400, {**self.error('invalid_request_error'), 'content': []})}
         for name, (status, reply) in cases.items():
@@ -893,10 +960,7 @@ class UnbilledAndUnsentTests(AnthropicTest):
             '429_with_model': (429, {**self.RATE, 'model': HAIKU}),
             '429_model_nested': (429, {'type': 'error', 'error': {'type': 'rate_limit_error', 'model': HAIKU}}),
             '429_usage_nested': (429, {'type': 'error', 'error': {'type': 'rate_limit_error', 'detail': {'usage': {}}}}),
-            '500': (500, self.BUSY),
-            '503': (503, self.BUSY),
             '429_invalid_request_error': (429, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'x'}}),
-            '529_api_error': (529, {'type': 'error', 'error': {'type': 'api_error'}}),
             '429_error_text': (429, {'type': 'error', 'error': 'rate_limit_error'}),
             '429_type_message': (429, {**self.RATE, 'type': 'message'}),
             '429_extra_top_key': (429, {**self.RATE, 'detail': 'slow down'}),
@@ -953,11 +1017,141 @@ class UnbilledAndUnsentTests(AnthropicTest):
             self.call(gate, dispatch=broken)
         self.assert_uncertain_halt(gate)
 
-    def test_anthropics_own_504_timeout_answer_still_halts(self):
-        # A vendor answer is judged as before: 504 timeout_error is not provably unbilled and carries no usage.
+    def test_anthropics_own_504_timeout_answer_is_booked_at_the_reservation(self):
+        # M3 ruling R1 (2026-10-16): Anthropic's 504 timeout_error carries no billing field, so the reservation bounds
+        # whatever it billed: booked (settled_reserved_max, reason charge_unreported), and the gate stays active.
         gate = self.ready()
-        with self.refused('NEW_CHARGE_UNCERTAIN'):
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
             self.call(gate, reply={'type': 'error', 'error': {'type': 'timeout_error', 'message': 'timed out'}}, status=504)
+        entry = entry_of(gate)
+        self.assertEqual((entry['state'], entry['reason'], entry['http_status'], entry['held_usd']),
+                         ('settled_reserved_max', 'charge_unreported', 504, entry['reserved_usd']))
+        self.assertEqual((gate.status()['state'], gate.status()['today_booked_max']), ('active', 1))
+
+
+class UnreportedChargeBookedTests(AnthropicTest):
+    """Owner answer M3 (2026-10-15) with rulings R1-R3 (2026-10-16): a message (HTTP 200) without usage or with unreadable
+    input/output counts, and a server error (500 to 599) that is no message and names no billing field, are booked at
+    the reservation (settled_reserved_max, reason charge_unreported); the gate stays active. Premium or unknown billing,
+    a tool or other block, an answer that is no message, and every 4xx still halt."""
+
+    def assert_booked(self, gate, status, reason):
+        entry = entry_of(gate)
+        self.assertEqual((entry['state'], entry['reason'], entry['http_status'], entry['held_usd']),
+                         ('settled_reserved_max', 'charge_unreported', status, entry['reserved_usd']))
+        self.assertEqual(entry['accounting']['invalid_reason'], reason)
+        status_now = gate.status()
+        self.assertEqual((status_now['state'], status_now['halts'], status_now['in_flight'], status_now['today_booked_max']),
+                         ('active', [], 0, 1))
+
+    def test_a_message_without_usage_or_with_unreadable_counts_is_booked(self):
+        for name, reply, reason in (
+                ('no_usage', without('usage', message()), 'usage_missing'),
+                ('usage_null', {**message(), 'usage': None}, 'usage_missing'),
+                ('input_bool', message(input_tokens=True), 'token_counts'),
+                ('output_missing', {**message(), 'usage': {'input_tokens': 1000}}, 'token_counts'),
+                ('output_text_standard_labels', message(output_tokens='500', service_tier='standard', inference_geo='global',
+                                                        speed='standard'), 'token_counts')):
+            with self.subTest(name):
+                gate = self.ready()
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                    self.call(gate, reply=reply)
+                self.assert_booked(gate, 200, reason)
+                self.assertEqual(self.call(gate, 'op-2')['status'], 200)  # Haiku keeps working.
+
+    def test_a_server_error_without_any_billing_field_is_booked(self):
+        # Ruling R1 (2026-10-16): M3 names "the Anthropic twin", the later, general rule over #172's "not now".
+        error = UnbilledAndUnsentTests.error
+        for name, status, reply in (('504_timeout', 504, error('timeout_error')), ('503_overloaded', 503, error('overloaded_error')),
+                                    ('500_invalid_request', 500, error('invalid_request_error')),
+                                    ('529_api_error', 529, {'type': 'error', 'error': {'type': 'api_error'}}),
+                                    ('502_not_json', 502, {'_invalid_json': True}), ('599_empty', 599, {})):
+            with self.subTest(name):
+                self.assertFalse(ANTHROPIC.unbilled_refusal(status, reply))  # Not provably unbilled: booked, not released.
+                gate = self.ready()
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                    self.call(gate, reply=reply, status=status)
+                self.assert_booked(gate, status, 'not_a_message')
+
+    def test_premium_or_unknown_billing_a_block_or_no_message_still_halts(self):
+        cases = {
+            # The #173 guard: each may bill above the list price the reservation holds.
+            'speed_fast_bad_counts': (200, message(input_tokens=True, speed='fast')),
+            'speed_fast': (200, message(speed='fast')),
+            'service_tier_priority_bad_counts': (200, message(output_tokens='500', service_tier='priority')),
+            'inference_geo_us_bad_counts': (200, message(input_tokens=-1, inference_geo='us')),
+            'server_tool_use_bad_counts': (200, message(input_tokens=True, server_tool_use={'web_search_requests': 1})),
+            'cache_write_bad_counts': (200, message(input_tokens=True, cache_creation_input_tokens=500)),
+            # Ruling R3: a usage member the gate does not know.
+            'unknown_usage_member': (200, message(cache_write_tokens=7)),
+            'tool_block_no_usage': (200, without('usage', message(content=[{'type': 'tool_use', 'id': 't', 'name': 'x', 'input': {}}]))),
+            'container_no_usage': (200, {**without('usage', message()), 'container': {'id': 'c', 'expires_at': 'x'}}),
+            'no_message_200': (200, {'_invalid_json': True}),
+            # Controller ruling (2026-10-16): another model may bill above Haiku's prices: never booked.
+            'another_model_no_usage': (200, without('usage', message(model='claude-opus-5-5'))),
+            # Fix round 1 (review 2026-10-16): no usable bill, never evidence of a bigger one.
+            'cache_read_unreadable_bad_counts': (200, message(input_tokens=True, cache_read_input_tokens='x')),
+            'output_details_bad_bad_counts': (200, message(input_tokens=True,
+                                                           output_tokens_details={'thinking_tokens': 'x', 'new': 1})),
+            'output_above_the_hold_bad_counts': (200, message(input_tokens=True, output_tokens=10 ** 9)),
+            'thinking_above_the_hold_bad_counts': (200, message(output_tokens='500',
+                                                                output_tokens_details={'thinking_tokens': 10 ** 9})),
+            'cost_above_the_hold_no_usage': (200, {**without('usage', message()), 'cost': '9.99'}),
+            '201_no_usage': (201, without('usage', message())),
+            '503_speed_fast': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'speed': 'fast'}),
+            '503_service_tier': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'service_tier': 'priority'}),
+            '503_inference_geo': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'inference_geo': 'us'}),
+            '503_with_model': (503, {'type': 'error', 'error': {'type': 'overloaded_error'}, 'model': HAIKU}),
+            '502_with_usage': (502, {'type': 'error', 'error': {'type': 'api_error'}, 'usage': {'output_tokens': 5}}),
+            '503_message_without_usage': (503, without('usage', message())),
+            # Final review (2026-10-16, Minor 1 = Task 9 F4): only an absent or null usage is booked; a usage of
+            # any other type than an object says something the gate cannot read, so it keeps halting.
+            'usage_a_list': (200, {**message(), 'usage': [1000, 500]}),
+            'usage_a_string': (200, {**message(), 'usage': '1000 in, 500 out'}),
+            'usage_a_number': (200, {**message(), 'usage': 1500}),
+        }
+        for name, (status, reply) in cases.items():
+            with self.subTest(name):
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply, status=status)
+                self.assert_uncertain_halt(gate)
+                self.assertEqual(gate.status()['today_booked_max'], 0)
+                self.assertEqual(entry_of(gate)['reason'], 'usage_or_cost_unreported')  # Not booked: the reason stays.
+
+    def test_key_and_billing_errors_and_every_other_4xx_still_halt(self):
+        # Ruling R2 (2026-10-16): not a paid post, and a broken key needs root.
+        error = UnbilledAndUnsentTests.error
+        for status, reply in ((401, error('authentication_error')), (402, error('billing_error')), (403, error('permission_error')),
+                              (400, error('api_error')), (408, error('timeout_error')), (499, {})):
+            with self.subTest(status=status):
+                self.assertFalse(ANTHROPIC.bookable_unreported(status, reply, ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None),
+                                                               Decimal('1')))
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply, status=status)
+                self.assert_uncertain_halt(gate)
+                self.assertEqual(entry_of(gate)['reason'], 'usage_or_cost_unreported')
+
+    def test_a_booking_counts_in_todays_spend_and_journals_the_alert_and_a_failing_hook_halts(self):
+        gate = self.ready()
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            self.call(gate, reply=without('usage', message()))
+        reserved = Decimal(entry_of(gate)['reserved_usd'])
+        status = gate.status()
+        self.assertEqual((status['today_posts'], status['today_booked_max'], Decimal(status['today_spend_usd']),
+                          Decimal(status['today_booked_max_usd'])), (1, 1, reserved, reserved))
+        self.assertEqual(Decimal(status['remaining_today_usd']), Decimal('2.00') - reserved)
+        logged = [json.loads(line) for line in self.out.getvalue().splitlines() if line.startswith('{')]
+        booked = [line for line in logged if line.get('status') == 'settled_reserved_max']
+        self.assertEqual({name: booked[0][name] for name in ('model', 'alert', 'reason', 'http_status', 'authority')},
+                         {'model': HAIKU, 'alert': 'charge_booked_at_reservation', 'reason': 'charge_unreported',
+                          'http_status': 200, 'authority': 'active'})
+        gate = self.ready()
+        with patch.object(ANTHROPIC, 'bookable_unreported', side_effect=RuntimeError('synthetic')), \
+                self.refused('NEW_CHARGE_UNCERTAIN'):
+            self.call(gate, reply=without('usage', message()))
+        self.assertEqual(entry_of(gate)['reason'], 'accounting_failure')
         self.assert_uncertain_halt(gate)
 
 
@@ -1053,8 +1247,8 @@ class RequestShapeTests(AnthropicTest):
         refused += [
             request(messages=[{'role': 'user', 'content': 'x', 'cache_control': {'type': 'ephemeral'}}]),
             request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'x'}]}]),
-            request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'x',
-                                                            'cache_control': {'type': 'ephemeral'}}]}]),
+            # LG-B (L30): one marked text block as the first user turn is now the accepted material mark
+            # (PromptCachingTests' material tests and the shared fixture's material_sent), so it left this list.
             request(messages=[{'role': 'assistant', 'content': 'x'}, {'role': 'user', 'content': 'y'}]),
             request(messages=[{'role': 'system', 'content': 'x'}, {'role': 'user', 'content': 'y'}]),
             request(messages=[{'role': 'user', 'content': 'y'}, {'role': 'system', 'content': 'x'}]),
@@ -1455,6 +1649,46 @@ class PromptCachingTests(AnthropicTest):
         accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)
         self.assertEqual(Decimal(accounting['guard_charge_usd']), cost(LOWER, 200, write_5m=1000, write_1h=2000, output=400))
         self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens']), (1000, 2000))
+
+    def test_the_material_mark_on_the_first_user_turn_is_accepted_and_reserves_at_the_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        value = request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'Offline synthetic material',
+                                                                 'cache_control': dict(CACHE_MARK)}]}])
+        self.assertTrue(ANTHROPIC.body_valid(value, ANTHROPIC.rows[HAIKU]))
+        self.assertIs(ANTHROPIC.cache_write_requested(value), True)  # Its system is the plain string: the mark is the turn's.
+        raw = json.dumps(value)
+        _outgoing, reserved, _row, prices = bridge.validate_request(envelope_text(raw), go)
+        self.assertEqual((reserved, prices), (reservation_of(raw), (WRITE_IN, PRICE_OUT)))
+
+    def test_every_material_body_in_the_shared_fixture_is_accepted_at_its_reservation_or_refused(self):
+        fixture = json.loads(self.FIXTURE.read_text())
+        self.assertEqual((len(fixture['material_sent']), len(fixture['material_refused'])), (3, 10))
+        self.assertNotIn('the two blocks with list content in a message', [case['name'] for case in fixture['refused']])
+        go = bridge.read_go(self.gate().go_path)
+        for case in fixture['material_sent']:
+            with self.subTest(sent=case['name']):
+                body = json.loads(case['body'])
+                self.assertTrue(ANTHROPIC.body_valid(body, ANTHROPIC.rows[HAIKU]))
+                self.assertEqual(Decimal(case['reservedUsd']), reservation_of(case['body']))
+                _outgoing, reserved, _row, prices = bridge.validate_request({**envelope_text(case['body']),
+                                                                             'reservedUsd': case['reservedUsd']}, go)
+                self.assertEqual((reserved, prices), (Decimal(case['reservedUsd']), (WRITE_IN, PRICE_OUT)))
+        for case in fixture['material_refused']:
+            with self.subTest(refused=case['name']):
+                self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    bridge.validate_request(envelope_text(case['body']), go)
+
+    def test_a_marked_material_call_settles_its_write_and_read_at_their_own_prices(self):
+        gate = self.ready()
+        value = request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'Offline synthetic material',
+                                                                 'cache_control': dict(CACHE_MARK)}]}])
+        five = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0}
+        reply = message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=3000, cache_creation=five)
+        self.call(gate, value=value, reply=reply)
+        entry = entry_of(gate)
+        self.assertEqual((entry['state'], entry['cache_write_requested']), ('settled', '5m'))
+        self.assertEqual(Decimal(entry['held_usd']), cost(LOWER, input_tokens=200, read=3000, output=400))
 
 if __name__ == '__main__':
     unittest.main()

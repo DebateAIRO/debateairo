@@ -2,6 +2,7 @@ import { AsyncLocalStorage, AsyncResource } from "node:async_hooks";
 import {
   PREVIEW_PROVIDER_SOCKET_KEYS,
   createPreviewRemainingRpcPort,
+  previewCallTierOf,
   previewModelRowForRef,
   previewProviderSocket,
   providerCallGateUnsent,
@@ -128,7 +129,10 @@ export function laneGateway(input: Readonly<{
           throw error;
         }
       });
-      const ticket = { ...subject, priority: callPriorityOf(request.callSiteKey) };
+      // LG-B (Task 5, fix round 1): a final writer, by the same rule the preview call policy asks the gate's tier with
+      // (previewCallTierOf), waits in the scheduler for one of its gate's final-writer slots, never at the gate.
+      const ticket = { ...subject, priority: callPriorityOf(request.callSiteKey),
+        ...(previewCallTierOf(request) === "FINAL_WRITER" ? { finalWriter: true as const } : {}) };
       if (beforeSlot === undefined) return lane.run(ticket, send);
       // Bound, so the slot request (and the lane's start guard) runs in this caller's context however the wait ends.
       const askForSlot = AsyncResource.bind(() => lane.run(ticket, send));
@@ -214,22 +218,33 @@ export function previewGateRemainingReaders(config: PreviewProviderTestConfig): 
  * Spec §3.2: each preview gate's own slots (`max_concurrent_calls`), read once at boot, so the runner never sends a gate
  * more calls than it holds at once (CONCURRENCY_LIMIT_REACHED): the rest wait in the scheduler. A gate that cannot be
  * read gets ONE slot, and one content-free line names it (never the error's text, which can carry a socket path).
+ * LG-B (Task 5, fix round 1): a gate whose answer names its final-writer slots (`finalWriterMaxInFlight`) gets them too,
+ * so a further final writer waits in the scheduler instead of being refused by the gate; a gate that names none, or
+ * could not be read, gets no final-writer cap (today's behaviour; an unread gate runs one call at a time anyway).
  */
 export async function applyPreviewGateCapacities(input: Readonly<{
-  scheduler: Pick<CallScheduler, "setGateCapacity">;
+  scheduler: Pick<CallScheduler, "setGateCapacity" | "setGateFinalWriterCapacity">;
   gates: readonly Readonly<{ gate: string; remaining: () => Promise<PreviewGateRemaining> }>[];
   log?: (line: string) => void;
 }>): Promise<void> {
   const log = input.log ?? ((line: string) => { console.warn(line); });
   await Promise.all(input.gates.map(async ({ gate, remaining }) => {
     let slots = 1;
+    let finalWriterSlots: number | undefined;
     try {
-      const read = (await remaining()).maxConcurrentCalls;
+      const answer = await remaining();
+      const read = answer.maxConcurrentCalls;
       if (Number.isSafeInteger(read) && read >= 1) slots = read;
       else throw new TypeError("GATE_CAPACITY_INVALID");
+      // The parser already holds it to 1..max_concurrent_calls; anything else is read as one slot (never no cap).
+      const finalWriters = answer.finalWriterMaxInFlight;
+      if (finalWriters !== undefined) {
+        finalWriterSlots = Number.isSafeInteger(finalWriters) && finalWriters >= 1 ? Math.min(finalWriters, slots) : 1;
+      }
     } catch {
       log(JSON.stringify({ kind: "DEBATEAI_CALL_SCHEDULER", event: "GATE_CAPACITY_UNREAD", gate }));
     }
+    if (finalWriterSlots !== undefined) input.scheduler.setGateFinalWriterCapacity(gate, finalWriterSlots);
     input.scheduler.setGateCapacity(gate, slots);
   }));
 }

@@ -41,7 +41,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, type ProviderGateway } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -355,6 +355,19 @@ const runnerCallScheduler = createCallScheduler({
 if (previewConfig !== undefined) {
   await applyPreviewGateCapacities({ scheduler: runnerCallScheduler, gates: previewGateRemainingReaders(previewConfig) });
 }
+/**
+ * Pre-flight PF-B2.3 (LG-B): each preview gate's read-only `/remaining`, by gate, for the call policy: a final writer's
+ * call asks its gate once and gets the final-writer tier only when the gate serves it (a gate older than LG-B: STANDARD).
+ */
+const previewGateRemaining = previewConfig === undefined ? {} : Object.freeze(Object.fromEntries(
+  previewGateRemainingReaders(previewConfig).map(({ gate, remaining }) => [gate, remaining] as const)));
+/**
+ * Task 4 review fix 1: ONE notice for every target's policy, so a final writer sent as STANDARD (its gate offers no
+ * final-writer slots, or could not be read) is one warn line per gate and reason for this runner. Codes only.
+ */
+const previewFinalWriterTierUnread = (event: PreviewFinalWriterTierUnread): void => {
+  console.warn(previewFinalWriterTierUnreadLine(event));
+};
 /** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
 const previewBusy = createPreviewBusyCoordinator();
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
@@ -398,7 +411,9 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
   return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {
     busy: previewBusy,
-    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }
+    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
+    gateRemaining: previewGateRemaining,
+    onFinalWriterTierUnread: previewFinalWriterTierUnread
   });
 }
 /**

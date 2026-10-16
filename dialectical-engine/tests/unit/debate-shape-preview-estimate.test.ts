@@ -28,11 +28,13 @@ const sharesOf = (basis: Readonly<Record<string, unknown>>, panel: readonly Prev
   dearestFor: (models) => models.includes(MIMO) ? MIMO : models[0]! });
 
 describe("the preview prices the answer writer at the run's answer length (spec 2026-10-12 §3.3 step 8)", () => {
-  it("an ANSWER_WRITER call is a debate call unless the run's writer bound is larger", () => {
+  it("the answer writer is priced at the row's own maximum on every receipt (LG-B, L26)", () => {
     const row = previewModelRow(MIMO)!;
-    expect(realisticWorstCasePricer(OUTPUT)(row, "ANSWER_WRITER")).toBe(realisticWorstCasePricer(OUTPUT)(row, "DEBATE"));
-    expect(realisticWorstCasePricer({ ...OUTPUT, answerWriter: 16_384 })(row, "ANSWER_WRITER"))
-      .toBe(previewCallNanoUsd(row, PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, 16_384));
+    const own = previewCallNanoUsd(row, PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, row.finalWriterOutputBound, "FINAL_WRITER");
+    expect(own).toBe(PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL * 430n + 65_536n * 870n);
+    expect(realisticWorstCasePricer(OUTPUT)(row, "ANSWER_WRITER")).toBe(own);
+    // A shape's writer bound no longer lowers or raises it: the writer is a final writer.
+    expect(realisticWorstCasePricer({ ...OUTPUT, answerWriter: 16_384 })(row, "ANSWER_WRITER")).toBe(own);
   });
   it("reads the writer bound (and the map step bounds, X1) from a shape receipt only", () => {
     expect(previewShapeWriterBound(legacy)).toBeNull();
@@ -56,8 +58,12 @@ describe("the preview prices the answer writer at the run's answer length (spec 
     expect(() => estimatePreviewGateNeeds({ roleModels: ROLES, roleProviderRefs: [], storyRounds: 0, callOutputTokens: OUTPUT,
       maxCooldownHoldsPerRun: 2, basis: odd, panel: PANEL })).toThrow(/synthesis-loop sites 7 are odd/u);
   });
-  it("today's debate keeps today's shares; a shaped one puts the writer's sites on ANSWER_WRITER", () => {
-    expect(sharesOf(legacy).shares.some((share) => share.type === "ANSWER_WRITER")).toBe(false);
+  it("every receipt puts the writer's sites on ANSWER_WRITER and the checker's on ANSWER_CHECKER (LG-B, L26)", () => {
+    for (const basis of [legacy, shaped]) {
+      const { shares } = sharesOf(basis);
+      expect([...new Set(shares.filter((share) => share.type === "ANSWER_WRITER").map((share) => share.model))]).toEqual([GLM]);
+      expect([...new Set(shares.filter((share) => share.type === "ANSWER_CHECKER").map((share) => share.model))]).toEqual([GLM]);
+    }
     const writer = sharesOf(shaped).shares.filter((share) => share.type === "ANSWER_WRITER");
     // 3 writer sites x 44 debate calls (one per site: author 18 + panel 10 + reviewer 10 + serve 6) x 2 members.
     expect(writer).toEqual([{ model: GLM, type: "ANSWER_WRITER", numerator: 264n }]);
@@ -145,14 +151,14 @@ describe("PF6: admission prices a new and an unfinished debate, each with ITS OW
   const shapeBlind = (basis: Readonly<Record<string, unknown>>): bigint => estimatePreviewGateNeeds({ roleModels: ROLES,
     roleProviderRefs: [], storyRounds: 0, callOutputTokens: OUTPUT, maxCooldownHoldsPerRun: 2, basis, panel: PANEL,
     pricer: realisticWorstCasePricer(OUTPUT) })[0]!.callsNanoUsd;
-  // What the shape adds, from the rows' list prices alone: GLM writes 3 answers at 16,384 instead of 8,192 tokens; MiMo
-  // (the gate's dearest member) merges and chooses once each at 32,768 instead of 8,192. Before the 15% margin.
-  const glm = previewModelRow(GLM)!;
+  // What the shape adds, from the rows' list prices alone: MiMo (the gate's dearest member) merges and chooses once each
+  // at 32,768 instead of 8,192. Before the 15% margin. LG-B (L26): the writer is a final writer, priced at its row's own
+  // maximum with or without a shape, so the shape no longer adds GLM's 3 answers at 16,384 instead of 8,192.
   const mimo = previewModelRow(MIMO)!;
-  const added = 3n * (16_384n - 8192n) * glm.outputNanoUsdPerToken + 2n * (32_768n - 8192n) * mimo.outputNanoUsdPerToken;
+  const added = 2n * (32_768n - 8192n) * mimo.outputNanoUsdPerToken;
   const withinMargin = (more: bigint): boolean => 100n * more >= 115n * added - 100n && 100n * more <= 115n * added + 100n;
 
-  it("a new shaped debate and an unfinished shaped one are both charged the writer and map step bounds", async () => {
+  it("a new shaped debate and an unfinished shaped one are both charged the map step bounds (the writer at its row's maximum, LG-B)", async () => {
     const run: PreviewUnfinishedRun = { basis: shaped, panel: PANEL, phase: "DEBATE" };
     const { held, needs } = await figures(gate([run]), shaped);
     expect(needs).toBe(held);
@@ -204,9 +210,10 @@ describe("pre-flight PF-B35 / PF-B36: a shaped run's gate is never charged less 
     // The grading share is rounded UP, as the code rounds it (never under-count).
     expect(debateOf([HAIKU])).toBe(authored * debate * members + ceilDiv(judge * debate * members * 1n, 3n) + reviewer * debate * (members - 1n));
     // The DeepInfra gate (three members, min(1, 3/3) = 1): every authored, grading and review site; GLM also holds the
-    // answer checker's sites (a role, not a panel share).
-    expect(debateOf([GLM, MIMO, DEEPSEEK]) - BigInt(roles.ANSWER_CHECKER) * debate * members)
-      .toBe((authored + judge + reviewer) * debate * members);
+    // answer checker's sites (a role, not a panel share), its own kind of call since LG-B (L26).
+    expect(debateOf([GLM, MIMO, DEEPSEEK])).toBe((authored + judge + reviewer) * debate * members);
+    expect(shares.filter((entry) => entry.type === "ANSWER_CHECKER")).toEqual([
+      { model: GLM, type: "ANSWER_CHECKER", numerator: BigInt(roles.ANSWER_CHECKER) * debate * members }]);
   });
 
   it("PF-B35 with close-call extras (J=3, E=2 on six members): a one-member gate carries a fifth of the grading, rounded up", () => {
@@ -226,9 +233,10 @@ describe("pre-flight PF-B35 / PF-B36: a shaped run's gate is never charged less 
     const debateOf = (models: readonly string[]) => shares.filter((entry) => models.includes(entry.model) && entry.type === "DEBATE")
       .reduce((sum, entry) => sum + entry.numerator, 0n);
     expect(debateOf([HAIKU])).toBe(authored * debate * members + ceilDiv(judge * debate * members * 1n, 5n) + reviewer * debate * (members - 1n));
-    // g=5 of J+E=5: every grading site.
-    expect(debateOf([GLM, MIMO, DEEPSEEK]) - BigInt(roles.ANSWER_CHECKER) * debate * members)
-      .toBe((authored + judge + reviewer) * debate * members);
+    // g=5 of J+E=5: every grading site. The answer checker's sites are their own kind of call since LG-B (L26).
+    expect(debateOf([GLM, MIMO, DEEPSEEK])).toBe((authored + judge + reviewer) * debate * members);
+    expect(shares.filter((entry) => entry.type === "ANSWER_CHECKER")).toEqual([
+      { model: GLM, type: "ANSWER_CHECKER", numerator: BigInt(roles.ANSWER_CHECKER) * debate * members }]);
   });
 });
 /** Integer division rounded UP (the estimate's own rounding of a gate's grading share). */

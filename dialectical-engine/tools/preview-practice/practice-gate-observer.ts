@@ -109,6 +109,11 @@ export type PracticeWireEvent = Readonly<{
    * in logs written before it was recorded). The gateway does not keep it in the stored artifact (four counters only).
    */
   cachedInputTokens?: number;
+  /**
+   * LG-B: present only on a final-writer request (the request's own `callTier`, the gate's sixth key), so the practice
+   * prices its output at the final-writer bound; absent on a standard request (and in older logs).
+   */
+  callTier?: "FINAL_WRITER";
 }>;
 
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
@@ -421,7 +426,8 @@ export class PracticeGateObserver {
         if (admitted && this.#stops.has(gate)) { this.#leave(gate); admitted = false; }
         const startedAt = new Date().toISOString();
         const base = { gate, model, startedAt, concurrencyLimit: false, unbilledKind: null,
-          inputTokens: null, outputTokens: null, reasoningTokens: null } as const;
+          inputTokens: null, outputTokens: null, reasoningTokens: null,
+          ...(input.callTier === "FINAL_WRITER" ? { callTier: input.callTier } : {}) } as const;
         if (!admitted) {
           this.#record({ ...base, latencyMs: 0, outcome: "STOPPED", vendorStatus: null, refusalCode: PRACTICE_GATE_STOPPED });
           throw new TypedDomainError(PRACTICE_GATE_STOPPED, `The practice stopped sending to the ${gate} gate`);

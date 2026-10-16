@@ -7,6 +7,8 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 const policy = { perDebate: 3, perModelPerDebate: 2, perModelPerRunner: { default: 4, deepinfra: 3 } };
 const t = (model: string, priority: "AUTHOR" | "PANEL" | "REVIEW" | "OTHER" = "AUTHOR", gate: string | null = null, vendor = "deepinfra") =>
   ({ model, vendor, gate, priority });
+/** A final writer (LG-B) through `gate`. */
+const fw = (model: string, gate: string | null): CallTicket => ({ ...t(model, "OTHER", gate, "x"), finalWriter: true });
 
 describe("call scheduler", () => {
   it("respects perModelPerDebate and perDebate", async () => {
@@ -85,6 +87,60 @@ describe("call scheduler", () => {
     gs[1]!.resolve("ok"); await flush(); expect(started).toEqual([0, 1, 2]);
     s.markGateHealthy("g"); await flush(); expect(started).toEqual([0, 1, 2, 3]);
     gs.forEach((g) => g.resolve("ok")); await Promise.all(runs);
+  });
+  /**
+   * LG-B Task 5, fix round 1 (review): a gate whose /remaining names final-writer slots (finalWriterMaxInFlight, F) takes
+   * at most F final-writer calls at once. A further final writer WAITS here, holding no slot, instead of failing at the
+   * gate (CONCURRENCY_LIMIT_REACHED); every other call goes on through the gate's other slots.
+   */
+  it("a second final writer waits on a gate's final-writer slots while a STANDARD call proceeds, then starts when the first ends", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10 } } });
+    s.setGateCapacity("g", 2); s.setGateFinalWriterCapacity("g", 1); const lane = s.openLane("d1");
+    const started: string[] = []; const gs = new Map<string, ReturnType<typeof deferred>>();
+    const go = (name: string, ticket: CallTicket) => { const g = deferred(); gs.set(name, g);
+      return lane.run(ticket, () => { started.push(name); return g.promise; }); };
+    const fw1 = go("fw1", fw("A", "g")); const fw2 = go("fw2", fw("B", "g")); const std = go("std", t("C", "OTHER", "g", "x"));
+    await flush();
+    expect(started).toEqual(["fw1", "std"]); // fw2 waits holding no gate slot: the STANDARD call took the second one
+    expect(lane.stats().running).toBe(2);
+    gs.get("std")!.resolve("ok"); await flush();
+    expect(started).toEqual(["fw1", "std"]); // a free gate slot alone does not start it: the final writer's slot is taken
+    gs.get("fw1")!.resolve("ok"); await flush();
+    expect(started).toEqual(["fw1", "std", "fw2"]);
+    gs.get("fw2")!.resolve("ok"); await Promise.all([fw1, fw2, std]);
+    expect(s.stats().peakByGate).toEqual({ g: 2 });
+    // Its slot is free again: two final writers in a row still run, one at a time.
+    const after: string[] = []; const a = deferred(); const b = deferred();
+    const both = [lane.run(fw("A", "g"), () => { after.push("a"); return a.promise; }), lane.run(fw("B", "g"), () => { after.push("b"); return b.promise; })];
+    await flush(); expect(after).toEqual(["a"]);
+    a.resolve("ok"); await flush(); expect(after).toEqual(["a", "b"]);
+    b.resolve("ok"); await Promise.all(both);
+  });
+  it("puts no cap on final writers when the gate named no final-writer slots, and none on another gate's", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10 } } });
+    s.setGateCapacity("g", 3); s.setGateCapacity("h", 3); s.setGateFinalWriterCapacity("h", 1); const lane = s.openLane("d1");
+    const started: string[] = []; const gs = Array.from({ length: 3 }, deferred);
+    const runs = gs.map((g, i) => lane.run(fw(`M${i}`, "g"), () => { started.push(`g${i}`); return g.promise; }));
+    await flush(); expect(started).toEqual(["g0", "g1", "g2"]);
+    gs.forEach((g) => g.resolve("ok")); await Promise.all(runs);
+    // Behind no gate a final writer is never capped either.
+    const free = Array.from({ length: 3 }, (_, i) => lane.run(fw(`N${i}`, null), async () => "ok"));
+    await expect(Promise.all(free)).resolves.toEqual(["ok", "ok", "ok"]);
+  });
+  it("a stopped lane rejects a final writer waiting on the gate's final-writer slots, and frees no slot it never took", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 10, perModelPerDebate: 10, perModelPerRunner: { default: 10 } } });
+    s.setGateCapacity("g", 2); s.setGateFinalWriterCapacity("g", 1);
+    const lane = s.openLane("d1"); const other = s.openLane("d2");
+    const first = deferred(); const running = other.run(fw("A", "g"), () => first.promise);
+    let sent = false;
+    const waiting = lane.run(fw("B", "g"), async () => { sent = true; return "never"; });
+    await flush();
+    lane.stop();
+    await expect(waiting).rejects.toMatchObject({ code: CALL_LANE_STOPPED });
+    expect(sent).toBe(false);
+    first.resolve("done"); await expect(running).resolves.toBe("done");
+    // The other debate's next final writer gets the slot: the stopped waiter held none and left none behind.
+    await expect(other.run(fw("C", "g"), async () => "ok")).resolves.toBe("ok");
   });
   it("stop rejects waiting calls, leaves running ones, never leaks a slot", async () => {
     const s = createCallScheduler({ policy: { ...policy, perDebate: 1 } }); const lane = s.openLane("d1");

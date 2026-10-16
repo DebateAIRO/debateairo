@@ -126,7 +126,7 @@
     },
     {
       "name": "max_tokens above the row's bound",
-      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":32769,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":128001,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"}}"
     },
     {
       "name": "fractional max_tokens",

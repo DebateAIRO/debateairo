@@ -704,8 +704,9 @@ describe('spending-gate notices', () => {
       expect(mail).toContain('Subject: Preview: DeepInfra gate: 1 call booked at its maximum today (2026-10-12)');
       expect(mail).toContain('Nothing was halted');
       expect(mail).toContain('settled_reserved_max');
-      // Owner ruling 2026-10-15: the DeepInfra gate also books a server error (HTTP 500 to 599) that carried no bill.
+      // Owner ruling 2026-10-15 and owner answer M3: a server error without a bill and an answer without a bill count are booked too.
       expect(mail).toContain('or DeepInfra answered with a server error (HTTP 500 to 599) that carried no bill');
+      expect(mail).toContain('or with an answer that carried no bill count it could price');
       expect(mail).toContain("DeepInfra's billing page");
       expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3');
       expect(mail).not.toContain(' activate ');
@@ -718,7 +719,7 @@ describe('spending-gate notices', () => {
       await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'anthropic-booked-2_2026_10_12']), layout, deps: h.deps });
       const mail = h.sent[0]!;
       expect(mail).toContain('Subject: Preview: Anthropic gate: 2 calls booked at their maximum today (2026-10-12)');
-      expect(mail).not.toContain('server error');  // Owner ruling 2026-10-15: Haiku's gate books no server error.
+      expect(mail).toContain('or Anthropic answered with a server error (HTTP 500 to 599) that carried no bill, or with an answer that carried no bill count it could price');  // Owner answer M3, ruling R1 (2026-10-16).
       expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1');
       expect(mail).not.toMatch(/\$|usd|deepinfra/i);
     });

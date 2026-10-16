@@ -21,6 +21,7 @@ import {
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
+import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
 import { contentFollowUpSentence } from "./content-follow-up.js";
 
@@ -225,6 +226,25 @@ export interface ProviderCallRequest {
    */
   readonly repairThinkingLevel?: string;
   /**
+   * Length guidance L14/L25 (spec 2026-10-15 §3.3): set ONLY by the preview's call policy (withPreviewProviderCallPolicy),
+   * never by a caller. When an attempt is cut off at its allowance and the vendor's thinking count is above that
+   * allowance minus `answerRoomTokens`, the length retries of this call run at `lowerThinkingLevel` (resolved and refused,
+   * like `thinkingLevel`, before anything is sent); null means the call is already at its lowest level. Absent: every
+   * length retry runs at `thinkingLevel`, today's behaviour on every lane. Never sent.
+   */
+  readonly lengthRetry?: Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }>;
+  /**
+   * Length guidance L29 (spec 2026-10-15 §3.5): this call's request size cap, at most 1 MiB, in place of the module's
+   * 256 KiB (MAX_PROVIDER_REQUEST_PACKET_BYTES). Set ONLY by the preview's call policy, only for the four final writers.
+   * Absent: today's cap, hosted and local byte for byte. Never sent.
+   */
+  readonly packetByteCap?: number;
+  /**
+   * Length guidance L26: this call's largest max_tokens (length retries included), in place of the target's own
+   * (`maxOutputTokens`). Set ONLY by the preview's call policy, only for the four final writers. Never sent.
+   */
+  readonly outputTokenCap?: number;
+  /**
    * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
    * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
    * RECORDED on every attempt's ledger row, never sent. Optional on the type
@@ -236,6 +256,12 @@ export interface ProviderCallRequest {
   readonly candidateId?: string | null;
   /** Model scorecard §2.3: the scorecard version the seat's assignment came from. Recorded, never sent. */
   readonly scorecardVersion?: number | null;
+  /**
+   * Length guidance L27 (spec 2026-10-15 §3.6, INTERFACE §3.2): counts the words of this call's replies when only a part
+   * of the answer is to be counted (LG-D: the storyteller's short version). Absent: `replyWordCount` over the whole reply.
+   * Information only: a counter that throws or answers anything but a whole number records null. Never sent.
+   */
+  readonly actualWordsOf?: (content: string) => number | null;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -327,6 +353,14 @@ export interface ProviderCallResult {
    * repaired reply and the identity and refs are the original AI's (ProviderStructureUnrepairedError).
    */
   readonly repairForm?: "PATCH" | "FULL" | "STRUCTURE";
+  /**
+   * Length guidance L27: the accepted attempt's answer tokens (its output minus its thinking; its output when the vendor
+   * counted the thinking outside it), its cached input tokens as the vendor reported them, and the words its accepted
+   * content holds. Null when not reported or not countable; absent from a gateway or double that builds its own result.
+   */
+  readonly answerTokens?: number | null;
+  readonly cachedInputTokens?: number | null;
+  readonly actualWords?: number | null;
 }
 
 export interface ProviderGateway {
@@ -1326,6 +1360,12 @@ export interface OpenAICompatibleGatewayOptions {
    */
   readonly maxOutputTokens?: number;
   /**
+   * Length guidance L30 (LG-B): on the Anthropic wire only, send the first user turn's material with the cache mark
+   * (anthropic-messages.ts anthropicCacheableMessages). Set by `previewTargetGatewayControls` for the preview's Anthropic
+   * rows. Absent: today's body. Refused on any other wire.
+   */
+  readonly cacheFirstUserTurn?: boolean;
+  /**
    * Model scorecard §2.3: records each attempt's prompt just before it is sent.
    * Optional: the unit doubles and a gateway with no debate run record none.
    * The runner's `createPostgresProviderGateway` always supplies it
@@ -1367,6 +1407,8 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
 const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+/** L29: the largest per-call cap a request may name (`packetByteCap`); the preview gate's own outer request bound. */
+const MAX_PROVIDER_REQUEST_PACKET_BYTES_CEILING = 1024 * 1024;
 /** Patch follow-up: room left in the packet cap for the body's other members around the messages. */
 const PATCH_PACKET_HEADROOM_BYTES = 4 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
@@ -1411,27 +1453,64 @@ export function estimateWindowTokens(messages: PromptPacket["messages"]): number
   return Math.ceil(bytes / WINDOW_BYTES_PER_TOKEN);
 }
 
+/** One bounded counter read leniently from a usage object's member, or null. */
+function usageCounterIn(details: unknown, key: string): number | null {
+  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
+  const value = (details as Readonly<Record<string, unknown>>)[key];
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+}
+
 /**
- * Model scorecard §2.3 — the thinking tokens the vendor reported, read
- * LENIENTLY off the RAW usage block: OpenAI's spelling
- * `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays,
- * which adopt it), else Anthropic's `output_tokens_details.thinking_tokens`
- * (Haiku, spec 2026-10-12 §4.6). Thinking is already inside `output_tokens` /
- * `completion_tokens`, so reading it changes no charge. `null` means not
- * reported: never a guess and never a default zero, because a vendor that says
- * nothing has not said "none".
+ * Model scorecard §2.3 — the thinking tokens the vendor reported, read LENIENTLY off the RAW usage block: OpenAI's
+ * spelling `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays, which adopt it) or a top-level
+ * `reasoning_tokens` — the larger when both are there, exactly as the preview gate charges them (length guidance LG-B,
+ * preview_budget_helper.py account_response) — else Anthropic's `output_tokens_details.thinking_tokens` (Haiku, spec
+ * 2026-10-12 §4.6). Thinking is already inside `output_tokens` / `completion_tokens`, so reading it changes no charge.
+ * `null` means not reported: never a guess and never a default zero, because a vendor that says nothing has not said "none".
  */
 export function reportedReasoningTokens(rawUsage: unknown): number | null {
   if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
   const usage = rawUsage as Readonly<Record<string, unknown>>;
-  const read = (details: unknown, key: string): number | null => {
-    if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
-    const value = (details as Readonly<Record<string, unknown>>)[key];
-    return typeof value === "number" && Number.isSafeInteger(value)
-      && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
-  };
-  return read(usage.completion_tokens_details, "reasoning_tokens")
-    ?? read(usage.output_tokens_details, "thinking_tokens");
+  const reported = [usageCounterIn(usage.completion_tokens_details, "reasoning_tokens"), usageCounterIn(usage, "reasoning_tokens")]
+    .filter((value): value is number => value !== null);
+  return reported.length > 0 ? Math.max(...reported) : usageCounterIn(usage.output_tokens_details, "thinking_tokens");
+}
+
+/**
+ * Length guidance L27 (INTERFACE §3.1): the input tokens the vendor served from its prompt cache, read off the RAW usage
+ * block before the Anthropic reply folds them into `prompt_tokens` (anthropic-messages.ts anthropicUsageAsEngineUsage):
+ * DeepInfra's `prompt_tokens_details.cached_tokens`, else a top-level `cached_tokens`, else Anthropic's
+ * `cache_read_input_tokens`. Null when not reported. Information only. The gate reads a top-level `cached_tokens` only
+ * when `prompt_tokens_details` is an object (preview_budget_helper.py account_response); this reader also takes it
+ * alone, so for a vendor that sends only that member the practice table's cached column can differ from the gate's log.
+ */
+export function reportedCachedInputTokens(rawUsage: unknown): number | null {
+  if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
+  const usage = rawUsage as Readonly<Record<string, unknown>>;
+  return usageCounterIn(usage.prompt_tokens_details, "cached_tokens") ?? usageCounterIn(usage, "cached_tokens")
+    ?? usageCounterIn(usage, "cache_read_input_tokens");
+}
+
+/**
+ * Length guidance L27: the answer's own tokens, the output count minus the thinking; the output count itself when the
+ * thinking is larger (the vendor counted it outside, as the gate's billed_output_tokens reads it). Null when either count
+ * is unknown.
+ */
+export function answerTokensOf(completion: unknown, reasoning: number | null): number | null {
+  if (typeof completion !== "number" || !Number.isSafeInteger(completion) || completion < 0 || reasoning === null) return null;
+  return reasoning <= completion ? completion - reasoning : completion;
+}
+
+/** Length guidance L27: one reply's words by the request's own counter, else `replyWordCount`; null when unknown. Never throws. */
+function replyWordsOf(request: ProviderCallRequest, content: string | null, reply: ModelReplyFacts): number | null {
+  if (content === null) return null;
+  let words: number | null;
+  try {
+    words = request.actualWordsOf !== undefined ? request.actualWordsOf(content) : replyWordCount(content, reply);
+  } catch {
+    return null;
+  }
+  return words !== null && Number.isSafeInteger(words) && words >= 0 && words <= MAX_USAGE_COUNTER ? words : null;
 }
 
 /**
@@ -1741,6 +1820,10 @@ function assertGatewayWire(options: OpenAICompatibleGatewayOptions): boolean {
   if (options.adapterKind !== undefined && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
     throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
   }
+  if (options.cacheFirstUserTurn !== undefined && (typeof options.cacheFirstUserTurn !== "boolean"
+    || (options.cacheFirstUserTurn && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND))) {
+    throw new TypeError("PROVIDER_GATEWAY_CACHE_INVALID");
+  }
   const native = options.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
   if (!isAnthropicHostPairing(native, options.endpoint)) {
     throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
@@ -1788,19 +1871,19 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
    */
   #patchPacket(
     packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
-    fits: (packet: PromptPacket, tokenCeiling: number) => boolean
+    fits: (packet: PromptPacket, tokenCeiling: number) => boolean, packetCap: number, markMaterial: boolean
   ): PromptPacket | null {
     let patch: PromptPacket;
     try {
       patch = buildFramedPatchPrompt(packet, ownReply, plan.locator);
       if (this.#anthropic) {
-        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages });
+        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages, cacheFirstUserTurn: markMaterial });
       }
     } catch (error) {
       if (error instanceof TypedDomainError) return null;
       throw error;
     }
-    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= MAX_PROVIDER_REQUEST_PACKET_BYTES
+    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
       && fits(patch, tokenCeiling)
       ? patch
       : null;
@@ -1822,6 +1905,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       && (!Number.isInteger(request.maxAttemptsThisCall) || request.maxAttemptsThisCall < 1)) {
       throw new TypeError("ProviderCallRequest.maxAttemptsThisCall must be a positive integer");
     }
+    if (request.packetByteCap !== undefined && (!Number.isSafeInteger(request.packetByteCap) || request.packetByteCap < 1
+      || request.packetByteCap > MAX_PROVIDER_REQUEST_PACKET_BYTES_CEILING)) {
+      throw new TypeError("ProviderCallRequest.packetByteCap must be a whole number of bytes, at most 1 MiB");
+    }
+    if (request.outputTokenCap !== undefined && (!Number.isSafeInteger(request.outputTokenCap) || request.outputTokenCap < 1)) {
+      throw new TypeError("ProviderCallRequest.outputTokenCap must be a positive whole number");
+    }
+    // L26/L29: the call's own caps when the preview names them (the final writers), else today's.
+    const packetCap = request.packetByteCap ?? MAX_PROVIDER_REQUEST_PACKET_BYTES;
+    const outputCap = request.outputTokenCap ?? this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER;
     /**
      * Preview retry fix, option B (spec 2026-10-11 §1.1): the POSTs of THIS call, decided once and used
      * by both the loop and the repair test below. Without `maxAttemptsThisCall` it is the bound, as
@@ -1862,6 +1955,24 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     // Spec 2026-10-12 §4.4: the repair POSTs' level, decided and refused here too, before the first byte leaves.
     const repairThinking = request.repairThinkingLevel === undefined
       ? thinking : resolveThinkingLevel(request.repairThinkingLevel, this.#options.thinking, request.providerRef);
+    /**
+     * Length guidance L30 (LG-B; controller ruling PF-B3.9, 2026-10-16): the first user turn's material carries the cache
+     * mark only where a cache read can happen: this call may send a second POST, and its repair POSTs run at the call's
+     * own effort (Anthropic drops the messages cache whenever the effort changes). A one-POST call (the preview's
+     * unrepaired steps; LG-A's structure-repair call, one POST by construction) and a call whose repairs run at the
+     * owner's `slip_fix` level when it differs send today's unmarked body, so they never pay the write premium for a read
+     * that cannot come. Decided once, before the first byte leaves, so every POST of the call has the same body form.
+     */
+    const markMaterial = this.#options.cacheFirstUserTurn === true && callAttempts() >= 2 && repairThinking.sent === thinking.sent;
+    // Length guidance L25: the answer room is a whole number, and the lower level is refused here, before the first byte.
+    const lengthRetry = request.lengthRetry;
+    if (lengthRetry !== undefined && (!Number.isSafeInteger(lengthRetry.answerRoomTokens) || lengthRetry.answerRoomTokens < 0)) {
+      throw new TypeError("ProviderCallRequest.lengthRetry.answerRoomTokens must be a non-negative whole number");
+    }
+    const lowerThinking = lengthRetry === undefined || lengthRetry.lowerThinkingLevel === null
+      ? null : resolveThinkingLevel(lengthRetry.lowerThinkingLevel, this.#options.thinking, request.providerRef);
+    /** L25: set once a cut-off attempt's thinking left the answer no room; this call's length retries then think less. */
+    let thinkLess = false;
     assertProviderCallRecord(request);
     const callFacts = Object.freeze({
       modelRole: request.modelRole ?? null,
@@ -1883,7 +1994,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
      */
     if (this.#anthropic) {
-      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages });
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages, cacheFirstUserTurn: markMaterial });
     }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
@@ -1928,7 +2039,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
-        this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
+        outputCap
       );
       /**
        * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
@@ -1944,7 +2055,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
       // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
-      const attemptThinking = repairForm === undefined ? thinking : repairThinking;
+      // Length guidance L25: the original packet's length retries run one level lower once thinking ate the answer's room.
+      const attemptThinking = repairForm === undefined ? (thinkLess && lowerThinking !== null ? lowerThinking : thinking) : repairThinking;
       // LG-A (L34): what this attempt sends, recorded on its artifact (reply_form); a structure-repair call is STRUCTURE.
       const attemptReplyForm: ReplyForm = lengthCallStepOf(request.callSiteKey) === "structure_repair" ? "STRUCTURE"
         : repairForm ?? (lengthFailures > 0 ? "LENGTH_RETRY" : "ORIGINAL");
@@ -1968,7 +2080,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
             thinkingLevel: attemptThinking.sent,
-            messages: attemptPacket.messages
+            messages: attemptPacket.messages,
+            cacheFirstUserTurn: markMaterial
           });
         } catch (error) {
           // Only a later attempt can get here (the first packet was checked before the loop).
@@ -2022,11 +2135,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         if (!this.#anthropic && this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
-        if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
+        if (Buffer.byteLength(body, "utf8") > packetCap) {
           packetRefused = true;
           throw new TypedDomainError(
             "PROVIDER_PACKET_TOO_LARGE",
-            `Provider request packet exceeded ${MAX_PROVIDER_REQUEST_PACKET_BYTES} bytes`
+            `Provider request packet exceeded ${packetCap} bytes`
           );
         }
         /**
@@ -2122,6 +2235,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         const replyFacts: ModelReplyFacts = Object.freeze({ finishReason });
+        // Length guidance L27: information only, never a reason to refuse or retry. The cached part of the input as the
+        // vendor reported it, and the words this reply wrote.
+        const cachedInputTokens = reportedCachedInputTokens(vendorUsageBlock);
+        const attemptWords = replyWordsOf(request, content, replyFacts);
         /**
          * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
          * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
@@ -2238,6 +2355,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contractHash: request.contractHash,
           contentHash: digest(rawText),
           thinkingTokens: reasoningTokens,
+          cachedInputTokens,
+          actualWords: attemptWords,
           replyForm: attemptReplyForm,
           replyRepairs: attemptRepairs.length === 0 ? null : attemptRepairs,
           replyFailureClass: attemptFailureClass
@@ -2425,6 +2544,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // it owes stays the same — so the next attempt re-sends the
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
+            // Length guidance L25 (spec 2026-10-15 §3.3): the vendor's own count shows thinking used more than the allowance
+            // minus the answer's room, so the retry thinks one level lower (once; a call already at its lowest stays).
+            if (lowerThinking !== null && reasoningTokens !== null
+              && reasoningTokens > attemptTokenCeiling - lengthRetry!.answerRoomTokens) thinkLess = true;
             attemptPacket = request.packet;
             patchPlan = null;
             repairForm = undefined;
@@ -2474,7 +2597,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
               ? Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
                   reason: contentFollowUpSentence(planned.locator.code, attemptFailureClass ?? undefined) }) })
               : planned;
-            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow);
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
               patchPlan = plan;
@@ -2559,6 +2682,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
           reasoningTokens,
+          answerTokens: answerTokensOf(responseJson.usage?.completion_tokens, reasoningTokens),
+          cachedInputTokens,
+          // A merged patch is the first reply with the patch in it: its words are counted on what was accepted.
+          actualWords: acceptedContent === content ? attemptWords
+            : replyWordsOf(request, acceptedContent ?? responseJson.choices[0]!.message.content, replyFacts),
           repairAttempts,
           ...(repairAttempts > 0 && repairForm !== undefined ? { repairForm } : {})
         };
@@ -2796,6 +2924,8 @@ export {
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";
+// Length guidance L27: the words of a reply (information only).
+export { replyWordCount } from "./reply-words.js";
 // LG-A (spec 2026-10-15, L33): the plain-word follow-up sentences.
 export { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence, isContentFollowUpSentence } from "./content-follow-up.js";
 // LG-A (spec 2026-10-15, L31-L34): the reply fixer and the failure classes.
@@ -2828,6 +2958,7 @@ export {
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
+  anthropicCacheableMessages,
   anthropicCacheableSystem,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
@@ -2835,7 +2966,8 @@ export {
   assertAnthropicCredentialShape,
   readAnthropicMessagesReply,
   type AnthropicMessagesReply,
-  type AnthropicSystemBlocks
+  type AnthropicSystemBlocks,
+  type AnthropicTextBlock
 } from "./anthropic-messages.js";
 export * from "./preview-models.js";
 export * from "./preview-remaining.js";

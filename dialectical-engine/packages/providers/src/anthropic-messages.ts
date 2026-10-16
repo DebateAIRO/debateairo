@@ -19,7 +19,9 @@ import type { PromptPacket } from "./index.js";
  * Prompt caching (owner approval 2026-10-12): `system` is either the one string,
  * or, when the engine's framed system text carries its per-call marker tail,
  * exactly two text blocks with the one 5-minute cache mark on the first
- * (anthropicCacheableSystem). Nothing else anywhere carries a cache mark.
+ * (anthropicCacheableSystem). Length guidance L30 (LG-B, 2026-10-15): when the gateway asks
+ * (`cacheFirstUserTurn`, the preview's Anthropic rows), the first user turn is sent as text blocks, its first block
+ * (the fenced material) with the same mark (anthropicCacheableMessages). Nothing else anywhere carries a cache mark.
  *
  * It imports NO value from ./index.ts on purpose: index.ts imports this file,
  * and a value cycle would be read before it is initialised.
@@ -85,8 +87,9 @@ export type AnthropicSystemBlocks = readonly [
  * the marker line on (the per-call values), with none. Joining the two texts gives back `system` byte for byte.
  * Without the marker line, or when the prefix would be only whitespace, the one string, as before. A prefix under
  * the model's cacheable minimum (512 tokens on Claude Haiku 5.5) is simply not cached by the vendor: no error,
- * no write. Never a mark on the messages: their content changes on every call, so a mark there would only pay
- * the write premium.
+ * no write. The messages carry a mark only through anthropicCacheableMessages (LG-B): a call's two tries share
+ * their fence, so their material is the same bytes and the second try can read it from the cache; a new call's
+ * material starts with a new fence and is written again.
  */
 export function anthropicCacheableSystem(system: string): string | AnthropicSystemBlocks {
   const at = system.indexOf(ANTHROPIC_PER_CALL_MARKERS_SEPARATOR);
@@ -102,6 +105,10 @@ export function anthropicCacheableSystem(system: string): string | AnthropicSyst
 }
 
 type WireRole = "user" | "assistant";
+/** LG-B (L30): one text block of the first user turn; only the first block carries the cache mark. */
+export type AnthropicTextBlock = Readonly<{ type: "text"; text: string; cache_control?: Readonly<{ type: "ephemeral" }> }>;
+type WireTurn = Readonly<{ role: WireRole; content: string | readonly AnthropicTextBlock[] }>;
+type JoinedTurn = Readonly<{ role: WireRole; content: string; parts: readonly string[] }>;
 
 /**
  * The packet as this vendor takes it: every system message, in order, joined
@@ -111,10 +118,10 @@ type WireRole = "user" | "assistant";
  */
 function anthropicMessages(messages: PromptPacket["messages"]): Readonly<{
   system: string | null;
-  turns: readonly Readonly<{ role: WireRole; content: string }>[];
+  turns: readonly JoinedTurn[];
 }> {
   const system: string[] = [];
-  const turns: { role: WireRole; content: string }[] = [];
+  const turns: { role: WireRole; content: string; parts: string[] }[] = [];
   for (const message of messages) {
     // Judge review: whitespace-only text is no text (the vendor refuses it); the gate refuses it too.
     if (typeof message.content !== "string" || message.content.trim() === "") {
@@ -130,8 +137,9 @@ function anthropicMessages(messages: PromptPacket["messages"]): Readonly<{
     const previous = turns.at(-1);
     if (previous !== undefined && previous.role === message.role) {
       previous.content = `${previous.content}\n\n${message.content}`;
+      previous.parts.push(message.content);
     } else {
-      turns.push({ role: message.role, content: message.content });
+      turns.push({ role: message.role, content: message.content, parts: [message.content] });
     }
   }
   if (turns.length === 0 || turns[0]!.role !== "user" || turns.at(-1)!.role !== "user") {
@@ -142,8 +150,28 @@ function anthropicMessages(messages: PromptPacket["messages"]): Readonly<{
   }
   return Object.freeze({
     system: system.length === 0 ? null : system.join("\n\n"),
-    turns: Object.freeze(turns.map((turn) => Object.freeze({ role: turn.role, content: turn.content })))
+    turns: Object.freeze(turns.map((turn) => Object.freeze({ role: turn.role, content: turn.content, parts: Object.freeze([...turn.parts]) })))
   });
+}
+
+/** LG-B (L30): every turn as the wire takes it; the first user turn as marked blocks (see anthropicCacheableMessages). */
+function markFirstUserTurn(turns: readonly JoinedTurn[]): readonly WireTurn[] {
+  return Object.freeze(turns.map((turn, index) => index !== 0
+    ? Object.freeze({ role: turn.role, content: turn.content })
+    : Object.freeze({ role: turn.role, content: Object.freeze(turn.parts.map((part, at) => at === 0
+      ? Object.freeze({ type: "text" as const, text: part, cache_control: ANTHROPIC_CACHE_MARK })
+      : Object.freeze({ type: "text" as const, text: `\n\n${part}` }))) })));
+}
+
+/**
+ * Length guidance L30 (owner ruling 2026-10-15; INTERFACE §3.5): the packet's turns with the first user turn as text
+ * blocks: the packet's first user message (the fenced debate material) carries the one 5-minute cache mark; each user
+ * message the adapter joins after it (a full re-ask's rejection block) is its own unmarked block, its text starting with
+ * the blank line the join puts there. The blocks' texts joined give today's joined turn byte for byte; every other
+ * turn is today's string. The gate allows at most 4 such blocks (preview_budget_helper.py messages_valid).
+ */
+export function anthropicCacheableMessages(messages: PromptPacket["messages"]): readonly WireTurn[] {
+  return markFirstUserTurn(anthropicMessages(messages).turns);
 }
 
 /** `output_config` for a level, or nothing at DEFAULT_ONLY; any other level is refused. */
@@ -168,12 +196,14 @@ export function anthropicMessagesRequestBody(input: Readonly<{
   maxTokens: number;
   thinkingLevel: string;
   messages: PromptPacket["messages"];
+  /** LG-B (L30): the first user turn as marked blocks (anthropicCacheableMessages). Absent or false: today's body. */
+  cacheFirstUserTurn?: boolean;
 }>): string {
   const { system, turns } = anthropicMessages(input.messages);
   return JSON.stringify({
     model: input.model,
     max_tokens: input.maxTokens,
-    messages: turns,
+    messages: input.cacheFirstUserTurn === true ? markFirstUserTurn(turns) : turns.map((turn) => ({ role: turn.role, content: turn.content })),
     ...(system === null ? {} : { system: anthropicCacheableSystem(system) }),
     ...effortMember(input.thinkingLevel)
   });

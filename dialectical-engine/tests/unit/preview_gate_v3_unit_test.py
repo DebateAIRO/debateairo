@@ -245,7 +245,10 @@ class UnitFileTests(unittest.TestCase):
                      '**Midnight overlap.**', '10 x $0.1421 = $1.42', 'It never checks it against v2',
                      # 10 at once fits the $10.00 pot with all four switched on (MiMo's worst case),
                      # owner ruling 2026-10-10 (pots and per-call caps).
-                     '$0.14211072 (MiMo) | $1.4211072 | yes', '(256 KiB)', '32,768', 'about 236 KiB'):
+                     '$0.14211072 (MiMo) | $1.4211072 | yes', '(256 KiB)', '32,768', 'about 236 KiB',
+                     # Length guidance LG-B (2026-10-15) and owner answer M1: the GO's final-writer member, the named-field
+                     # GO edit (never the install literal), and the $12.00 pot with one final writer's slot.
+                     'max_final_writer_calls', 'ONLY_NAMED_FIELDS_CHANGED', '"12.00"', '$1.78778112'):
             self.assertIn(name, readme)
         for old in ('"3.50"', '"4.00"', '128 KiB', '163,840', '$0.2276', '$0.0857',  # Superseded figures.
                     'At most 20 a day', '(the gate halts at 20)'):  # The daily unbilled ceiling is gone (2026-10-12).
@@ -253,6 +256,18 @@ class UnitFileTests(unittest.TestCase):
         go_line = [line for line in readme.splitlines() if line.startswith('jq -n') and 'go-v3' in line]
         self.assertEqual(len(go_line), 1)
         self.assertIn('daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,', go_line[0])
+        self.assertIn('max_concurrent_calls:10,max_final_writer_calls:1,', go_line[0])  # LG-B: a first install names the slot too.
+        # LG-B: the live GO is edited by named fields only, and only DeepInfra's GO (fix round 1 of Task 11). Final review
+        # (2026-10-16, Important 1): in two phases, the hashes and M1's budget first, the final-writer slot right before
+        # the proof (the R17 app reads exactly seven /remaining members); an app-only way back removes the slot again.
+        self.assertIn('.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd="12.00"', readme)
+        self.assertIn('del(.bridge_sha256,.helper_sha256,.daily_budget_usd)', readme)
+        self.assertIn("jq '.max_final_writer_calls=1' \"$GO\"", readme)
+        self.assertIn("del(.max_final_writer_calls)", readme)
+        self.assertIn('SLOTS_REMOVED', readme)
+        self.assertIn("""jq -e '.provider=="deepinfra"' "$GO" """, readme)
+        # LG-B: the way back is one two-gate block, never one gate alone.
+        self.assertIn('BOTH_GATES_BACK', readme)
         self.assertIn('enabled_models:["%s"]' % GLM, go_line[0])  # GLM only at first.
 
     def test_readme_one_session_order_ends_with_all_four_on_before_the_first_debate(self):

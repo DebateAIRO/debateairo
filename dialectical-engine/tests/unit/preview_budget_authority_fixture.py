@@ -150,7 +150,7 @@ class Gate:
         os.chmod(self.private, 0o700)
         self.clock = Clock()
         self.go_path = self.write_go(**go_changes)
-        self.slots = bridge.CallSlots(self.go['max_concurrent_calls'])
+        self.slots = bridge.CallSlots(self.go['max_concurrent_calls'], self.go.get('max_final_writer_calls', 0))
 
     def write_go(self, name='go.json', **changes):
         self.go = go_document(**changes)

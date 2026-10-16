@@ -50,13 +50,18 @@ export function openingsDryTargets(config: PreviewProviderTestConfig): readonly 
 
 /**
  * The prompt a gate body carries, for the frame reader: a DeepInfra body's own messages; an Anthropic body's system
- * text put back in front of its turns (a system sent as cache blocks is their texts joined, byte for byte).
+ * text put back in front of its turns (a system sent as cache blocks is their texts joined, byte for byte). Length
+ * guidance L30 (LG-B): a first user turn sent as marked text blocks is their texts joined, the turn byte for byte.
  */
 export function openingsDryPacket(requestBody: string): Readonly<{ model: string; packet: PromptPacket }> {
   const body = JSON.parse(requestBody) as { model?: unknown; messages?: unknown; system?: unknown };
-  const turns = (Array.isArray(body.messages) ? body.messages : []) as PromptPacket["messages"][number][];
+  const joined = (blocks: readonly { text?: unknown }[]): string => blocks.map((block) => (typeof block.text === "string" ? block.text : "")).join("");
+  // LG-B (L30): a turn sent as text blocks (the marked material) is its blocks' texts joined: today's turn byte for byte.
+  const turns = ((Array.isArray(body.messages) ? body.messages : []) as { role: PromptPacket["messages"][number]["role"]; content: unknown }[])
+    .map((turn): PromptPacket["messages"][number] => ({ role: turn.role,
+      content: Array.isArray(turn.content) ? joined(turn.content as { text?: unknown }[]) : String(turn.content) }));
   const system = typeof body.system === "string" ? body.system
-    : Array.isArray(body.system) ? (body.system as { text?: unknown }[]).map((block) => (typeof block.text === "string" ? block.text : "")).join("")
+    : Array.isArray(body.system) ? joined(body.system as { text?: unknown }[])
       : null;
   return Object.freeze({ model: String(body.model), packet: Object.freeze({
     messages: Object.freeze(system === null ? turns : [{ role: "system" as const, content: system }, ...turns]) }) });

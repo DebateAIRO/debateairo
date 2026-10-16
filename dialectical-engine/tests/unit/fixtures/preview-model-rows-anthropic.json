@@ -49,5 +49,14 @@
       "worst_case_reservation_usd": "0.247040000",
       "worst_case_uncached_reservation_usd": "0.214016000"
     }
-  ]
+  ],
+  "final_writer": {
+    "about": "Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): Claude Haiku as a final writer may send up to request_bytes with max_tokens up to output_bound (Anthropic's documented 128K synchronous maximum, read 2026-10-15). A full-size cached request reserves at the upper step's cache-write input price and output price: (1050624 x 0.625 + 128000 x 2.50) / 1e6 = 0.97664 (worst_case_reservation_usd), uncached 0.845312, under per_call_cap_usd (the gate's own MAX_PROFILE_CALL_CAP_USD).",
+    "request_bytes": 1048576,
+    "per_call_cap_usd": "1.00",
+    "rows": [
+      { "model": "claude-haiku-5-5", "output_bound": 128000, "worst_case_reservation_usd": "0.976640000",
+        "worst_case_uncached_reservation_usd": "0.845312000" }
+    ]
+  }
 }

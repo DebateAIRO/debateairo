@@ -68,5 +68,16 @@
       },
       "worst_case_reservation_usd": "0.042371072"
     }
-  ]
+  ],
+  "final_writer": {
+    "about": "Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): the final-writer tier (answer writer, answer checker, storyteller, story checker). A request whose body is over 262144 bytes or whose max_tokens is over the row's output_bound is a final writer's: at most request_bytes, max_tokens at most the row's own output_bound below, and a full-size request reserves ((request_bytes + overhead_bytes) * input + output_bound * output) / 1000000 at most per_call_cap_usd. Each output_bound is the vendor's own maximum output (DeepInfra's max_output_tokens, read 2026-10-15; MiMo lists none: 65536). The gate (preview_budget_helper.py ModelRow.final_writer_output_bound, DeepInfraProfile.final_writer_*) and the app (preview-models.ts finalWriterOutputBound, PREVIEW_CALL_TIER_LIMITS) must both equal this member.",
+    "request_bytes": 1048576,
+    "per_call_cap_usd": "0.75",
+    "rows": [
+      { "model": "zai-org/GLM-5.3-Flash", "output_bound": 131072, "worst_case_reservation_usd": "0.223129600" },
+      { "model": "deepseek-ai/DeepSeek-V4.1-Flash", "output_bound": 131072, "worst_case_reservation_usd": "0.288768000" },
+      { "model": "XiaomiMiMo/MiMo-V2.6-Pro", "output_bound": 65536, "worst_case_reservation_usd": "0.508784640" },
+      { "model": "Qwen/Qwen3.8-Flash", "output_bound": 131072, "worst_case_reservation_usd": "0.168790016" }
+    ]
+  }
 }

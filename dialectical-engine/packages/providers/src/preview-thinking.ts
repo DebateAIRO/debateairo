@@ -100,6 +100,15 @@ export function previewSlipFixLevel(levels: PreviewThinkingLevels | undefined, r
 }
 
 /**
+ * Length guidance L25 (spec 2026-10-15 §3.3): the level one below `level` on the row's strength order, or null when it is
+ * the lowest (or not on the row's menu). A retry after thinking ate the answer's room runs at it.
+ */
+export function previewThinkingLevelBelow(row: PreviewModelRow, level: PreviewEffort): PreviewEffort | null {
+  const at = row.effortsByStrength.indexOf(level);
+  return at < 0 || at === row.effortsByStrength.length - 1 ? null : row.effortsByStrength[at + 1]!;
+}
+
+/**
  * Spec 2026-10-12 §4.4: a level as the request carries it. "default" travels as DEFAULT_ONLY, which the gateway sends as
  * no effort member at all (the vendor's own default).
  */

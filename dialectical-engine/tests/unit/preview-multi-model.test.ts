@@ -204,8 +204,8 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
       { model: MIMO, max_tokens: 0, messages },
       { model: MIMO, max_tokens: 8, messages, stream: false }
     ]) await expect(post(body)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
-    const oversize = { model: MIMO, max_tokens: 8, messages: [{ role: "user", content: "x".repeat(256 * 1024) }] };
-    await expect(post(oversize)).rejects.toThrow();
+    const oversize = { model: MIMO, max_tokens: 8, ...MIMO_SAMPLING, messages: [{ role: "user", content: "x".repeat(1024 * 1024) }] };
+    await expect(post(oversize)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(0);
   });
   it("reserves each row at its own price and bound, with the exact body bytes", async () => {
@@ -218,8 +218,8 @@ describe("the guarded fetch sends only what the gate accepts for the body's row 
     for (const body of bodies) await post(body);
     expect(executions).toHaveLength(3);
     const prices: Array<[bigint, bigint, bigint]> = [[150n, 500n, 32_768n], [200n, 600n, 32_768n], [430n, 870n, 32_768n]];
-    // One token above the cap is refused before any reservation, on every row.
-    for (const body of bodies) await expect(post({ ...body, max_tokens: 32_769 })).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    // One token above the row's own maximum (L26) is refused before any reservation, on every row.
+    for (const body of bodies) await expect(post({ ...body, max_tokens: previewModelRow(body.model as string)!.finalWriterOutputBound + 1 })).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     executions.forEach((execution, index) => {
       const text = JSON.stringify(bodies[index]);
       expect(execution.requestBody).toBe(text);
@@ -430,13 +430,13 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
       output_price_micros_per_million: 382_000, context_window_tokens: 1_000_000 });
     expect(providerTargetGatewayControls(targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!)).toEqual({ contextWindowTokens: 1_000_000 });
   });
-  it("the guarded fetch refuses reasoning_effort, response_format and a bound above 32768, before any reservation", async () => {
+  it("the guarded fetch refuses reasoning_effort, response_format and a bound above the row's own maximum, before any reservation", async () => {
     const { executions, post } = recordingFetch();
     for (const refused of [
       body({ reasoning_effort: "high" }),
       body({ response_format: { type: "json_object" } }),
       body({ reasoning_effort: "high", response_format: { type: "json_object" } }),
-      body({ max_tokens: 32_769 }),
+      body({ max_tokens: 131_073 }),
       body({ max_tokens: 0 })
     ]) await expect(post(refused)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
     expect(executions).toHaveLength(0);
@@ -449,10 +449,14 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
     await post(full);
     expect(executions.map(execution => execution.reservedUsd)).toEqual(["0.042371072"]);
     expect(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, 256 * 1024))).toBe("0.042371072");
-    // One byte more (the hard 256 KiB cap, owner ruling 2026-10-10) is refused before any reservation.
+    // LG-B (L29): one byte more is a final writer's body now (only the call policy makes one): reserved at the row's own
+    // maximum and named to the gate. Above 1 MiB is still refused before any reservation.
     const over = body({ messages: [{ role: "user", content: "x".repeat(256 * 1024 - Buffer.byteLength(empty) + 1) }] });
-    await expect(post(over)).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
-    expect(executions).toHaveLength(1);
+    await post(over);
+    expect(executions[1]!.callTier).toBe("FINAL_WRITER");
+    expect(executions[1]!.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(previewModelRow(QWEN)!, 256 * 1024 + 1, { tier: "FINAL_WRITER" })));
+    await expect(post(body({ messages: [{ role: "user", content: "x".repeat(1024 * 1024) }] }))).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(executions).toHaveLength(2);
   });
   it("the gateway clamps every attempt's answer size to 32768, length retries included, and never sends a level or JSON (only its sampling)", async () => {
     const target = targets(PREVIEW_REVIEWED_PROVIDER_REFS)[4]!;

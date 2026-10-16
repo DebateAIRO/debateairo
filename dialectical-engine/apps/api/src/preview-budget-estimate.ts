@@ -37,6 +37,7 @@ import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
+  PREVIEW_CALL_TIER_LIMITS,
   PREVIEW_MODEL_ROWS_BY_PROVIDER,
   PREVIEW_PROVIDER_NAMES,
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR,
@@ -48,8 +49,10 @@ import {
   previewModelRow,
   previewModelRowForRef,
   previewProviderSocket,
+  previewStorytellerOutputCap,
   previewStorytellerTokenCeiling,
-  previewStoryCheckerTokenCeiling,
+  previewTierOutputBound,
+  type PreviewCallTier,
   type PreviewGateRemaining,
   type PreviewModelRow,
   type PreviewProviderName,
@@ -225,7 +228,10 @@ export type PreviewUnfinishedRun = Readonly<{
  */
 export type PreviewCallOutputTokens = Readonly<{
   debate: number; storyteller: number; storytellerRetry: number; storyChecker: number;
-  /** Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's max_tokens when its run's answer length raises it. */
+  /**
+   * Debate shape (spec 2026-10-12 §3.3 step 8): the answer writer's max_tokens when its run's answer length raises it.
+   * LG-B (L26): the pricers no longer read it; the writer is a final writer, priced at its row's own maximum.
+   */
   answerWriter?: number;
   /** Debate shape (controller ruling X1): the map's merge and choose max_tokens when the run's map step bounds raise them. */
   mapMerge?: number;
@@ -250,8 +256,10 @@ function roleModelList(roles: PreviewRoleModels): readonly string[] {
  * MAP_MERGE / MAP_CHOOSE (at its map step bounds, controller ruling X1); each is a debate call when no bound raises it.
  * STRUCTURE_REPAIR (LG-A, L32; Task 14 controller ruling, never under-count) is a story try's second POST made as the
  * structure-repair call on the repair model, priced at that call's own ceiling (`structureRepairNanoUsd`).
+ * Length guidance LG-B (L26): ANSWER_WRITER (every receipt) and ANSWER_CHECKER are final writers, priced at the row's own
+ * maximum output, like the story's four kinds.
  */
-export type PreviewCallType = "DEBATE" | "ANSWER_WRITER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORYTELLER_RETRY"
+export type PreviewCallType = "DEBATE" | "ANSWER_WRITER" | "ANSWER_CHECKER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORYTELLER_RETRY"
   | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "STRUCTURE_REPAIR" | "PROBE" | "UNBILLED_RETRY";
 export type PreviewBilledCallType = Exclude<PreviewCallType, "UNBILLED_RETRY">;
 
@@ -304,10 +312,17 @@ export function previewGateKeyOf(model: string): PreviewGateKey | undefined {
   return previewModelRow(model)?.provider;
 }
 
-/** One call at a row's list price: its input at the input price, its output clamped to the row's own bound. */
-export function previewCallNanoUsd(row: PreviewModelRow, inputTokens: bigint, outputTokens: number | bigint): bigint {
+/** The tier of each kind of call (LG-B, L26): the answer's and the story's writers and checkers are final writers. */
+const PREVIEW_FINAL_WRITER_CALL_TYPES: ReadonlySet<PreviewCallType> = new Set(["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER",
+  "STORYTELLER_RETRY", "STORY_CHECKER", "STORY_CHECKER_RETRY"]);
+function previewCallTypeTier(type: PreviewCallType): PreviewCallTier {
+  return PREVIEW_FINAL_WRITER_CALL_TYPES.has(type) ? "FINAL_WRITER" : "STANDARD";
+}
+
+/** One call at a row's list price: its input at the input price, its output clamped to its tier's bound on the row. */
+export function previewCallNanoUsd(row: PreviewModelRow, inputTokens: bigint, outputTokens: number | bigint, tier: PreviewCallTier = "STANDARD"): bigint {
   const output = BigInt(outputTokens);
-  const bound = BigInt(row.outputBound);
+  const bound = BigInt(previewTierOutputBound(row, tier));
   return inputTokens * row.inputNanoUsdPerToken + (output < bound ? output : bound) * row.outputNanoUsdPerToken;
 }
 
@@ -334,7 +349,7 @@ export function previewCallAverage(model: string, type: PreviewBilledCallType, m
 /** Where a call's measured usage is recorded: the debate's (the writer and the map are debate calls), the story's, or none. */
 function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBucket | null {
   switch (type) {
-    case "DEBATE": case "ANSWER_WRITER": case "MAP_MERGE": case "MAP_CHOOSE": return "DEBATE";
+    case "DEBATE": case "ANSWER_WRITER": case "ANSWER_CHECKER": case "MAP_MERGE": case "MAP_CHOOSE": return "DEBATE";
     case "STORYTELLER": case "STORYTELLER_RETRY": case "STORY_CHECKER": case "STORY_CHECKER_RETRY": return "STORY";
     // A repair is never averaged: every pricer prices it at its ceiling (`structureRepairNanoUsd`).
     case "STRUCTURE_REPAIR": case "PROBE": return null;
@@ -365,52 +380,53 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
   return (row, type) => {
     if (type === "STRUCTURE_REPAIR") return structureRepairNanoUsd(row, PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS);
     const average = previewCallAverage(row.model, type, measured);
-    return previewCallNanoUsd(row, average.inputTokens, average.outputTokens);
+    return previewCallNanoUsd(row, average.inputTokens, average.outputTokens, previewCallTypeTier(type));
   };
 }
 /**
- * Every call at its input tokens (`inputTokens` by kind) and the max_tokens that call sends out
- * (clamped to the row); a health check at its fixed one-line body and the generation floor.
+ * Every call at its input tokens (`inputTokens` by kind) and the max_tokens that call sends out, clamped to its tier's
+ * bound on the row; a health check at its fixed one-line body and the generation floor. Length guidance LG-B (L26, owner
+ * answer 7): the answer writer and checker and the story checker ask the row's own maximum (both of the checker's tries);
+ * the storyteller its row's allowance (a fast row's own maximum, a slow row's 16,384) and its length retry twice that,
+ * held to previewStorytellerOutputCap. A register without a story prices no story output, as before. LG-A's
+ * structure-repair call keeps its own ceiling (structureRepairNanoUsd, STANDARD tier: controller ruling PF-B4.15).
+ * Final review (2026-10-16, Important 3): on a slow row (GLM, MiMo, Qwen) the call policy now has the answer writer,
+ * answer checker and story checker ask 16,384 with their retry held to `outputBound`, as the slow storyteller; this
+ * estimate keeps pricing them at the row's own maximum on purpose, a safe over-count (it never prices a call below what
+ * it may send).
  */
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
   output: PreviewCallOutputTokens): PreviewCallPricer {
-  const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE" | "STRUCTURE_REPAIR">, number>> = {
-    DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker,
-    // Debate shape: the run's own writer and map step bounds when it has them (previewOutputTokensForBasis), else a debate call's.
-    ANSWER_WRITER: output.answerWriter ?? output.debate, MAP_MERGE: output.mapMerge ?? output.debate, MAP_CHOOSE: output.mapChoose ?? output.debate,
-    // The checker's one repair try, at most its length-retry ceiling (a format repair asks for its ceiling, a length retry twice it).
-    STORY_CHECKER_RETRY: lengthRetryTokenCeiling(output.storyChecker, 1)
-  };
-  // Slow answer (owner ruling 2026-10-12): the storyteller asks for its OWN row's story allowance, and its length retry
-  // twice that (the clamp in previewCallNanoUsd holds it to the row's bound, as the gateway does), never more than
-  // `output` says any storyteller is sent (none, when the register has no story).
-  const storyteller = (row: PreviewModelRow, type: "STORYTELLER" | "STORYTELLER_RETRY"): number => {
-    const own = previewStorytellerTokenCeiling(row);
-    return Math.min(sent[type], type === "STORYTELLER" ? own : lengthRetryTokenCeiling(own, 1));
-  };
-  // Story wording (2026-10-12): the story checker asks for the larger of what `output` says and its row's own checker
-  // allowance (previewStoryCheckerTokenCeiling), and its repair try at most twice that, as the gateway sends them (the
-  // clamp in previewCallNanoUsd holds the retry to the row's bound). None, when the register has no story.
-  const storyChecker = (row: PreviewModelRow, type: "STORY_CHECKER" | "STORY_CHECKER_RETRY"): number => {
-    if (sent[type] === 0) return 0;
-    const own = previewStoryCheckerTokenCeiling(row);
-    return Math.max(sent[type], type === "STORY_CHECKER" ? own : lengthRetryTokenCeiling(own, 1));
+  const outputOf = (row: PreviewModelRow, type: Exclude<PreviewBilledCallType, "PROBE" | "STRUCTURE_REPAIR">): number => {
+    switch (type) {
+      case "DEBATE": return output.debate;
+      case "MAP_MERGE": return output.mapMerge ?? output.debate;
+      case "MAP_CHOOSE": return output.mapChoose ?? output.debate;
+      case "ANSWER_WRITER": case "ANSWER_CHECKER": return row.finalWriterOutputBound;
+      case "STORYTELLER": return output.storyteller === 0 ? 0 : previewStorytellerTokenCeiling(row);
+      case "STORYTELLER_RETRY": return output.storyteller === 0 ? 0
+        : Math.min(lengthRetryTokenCeiling(previewStorytellerTokenCeiling(row), 1), previewStorytellerOutputCap(row));
+      case "STORY_CHECKER": case "STORY_CHECKER_RETRY": return output.storyChecker === 0 ? 0 : row.finalWriterOutputBound;
+      default: return exhaustive(type);
+    }
   };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
     : type === "STRUCTURE_REPAIR" ? structureRepairNanoUsd(row, inputTokens.STRUCTURE_REPAIR)
-    : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type)
-      : type === "STORY_CHECKER" || type === "STORY_CHECKER_RETRY" ? storyChecker(row, type) : sent[type]);
+    : previewCallNanoUsd(row, inputTokens[type], outputOf(row, type), previewCallTypeTier(type));
 }
-const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
+const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, ANSWER_CHECKER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
   STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens, STRUCTURE_REPAIR: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
- * the generation floor.
+ * the generation floor. LG-B: a final writer's input at the final-writer request cap (1 MiB).
  */
 export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
-  return sentOutputPricer(everyCallAt(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL), output);
+  // LG-B (L29): a final writer's body may be up to the final-writer request cap.
+  const finalWriter = previewChargedInputTokens(PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes);
+  return sentOutputPricer({ ...everyCallAt(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL), ANSWER_WRITER: finalWriter, ANSWER_CHECKER: finalWriter,
+    STORYTELLER: finalWriter, STORYTELLER_RETRY: finalWriter, STORY_CHECKER: finalWriter, STORY_CHECKER_RETRY: finalWriter }, output);
 }
 /**
  * REALISTIC_WORST_CASE (owner rulings, 2026-10-10): a debate call's input at a realistic 64 KiB, a
@@ -424,6 +440,7 @@ export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyT
   const storyteller = previewEstimateInputTokens(story.storyteller);
   const storyChecker = previewEstimateInputTokens(story.storyChecker);
   return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
+    ANSWER_CHECKER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     MAP_MERGE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, MAP_CHOOSE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
     STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS }, output);
@@ -601,8 +618,8 @@ type PreviewRotatedRoleKind = "ANSWER" | "ANSWER_WRITER" | "MAP_MERGE" | "MAP_CH
 
 /**
  * Spec 2026-10-11 Part 5: of one gate's panel models, the one whose call of this role kind costs the
- * most at `pricer` (DEBATE for the answer checker; ANSWER_WRITER for the writer, controller ruling PF5: a shaped run's
- * writer may ask for more than a debate call, and without a shape it IS a debate call; MAP_MERGE / MAP_CHOOSE for the
+ * most at `pricer` (ANSWER_CHECKER for the answer checker; ANSWER_WRITER for the writer, controller ruling PF5; both are
+ * final writers on every receipt, LG-B; MAP_MERGE / MAP_CHOOSE for the
  * map's two long steps; STORYTELLER + STORYTELLER_RETRY for the storyteller; STORY_CHECKER + STORY_CHECKER_RETRY for
  * the story checker). The first in panel order wins a tie.
  */
@@ -610,7 +627,7 @@ function dearestByPricer(pricer: PreviewCallPricer, rowOf: (model: string) => Pr
   const cost = (model: string, role: PreviewRotatedRoleKind): bigint => {
     const row = rowOf(model);
     switch (role) {
-      case "ANSWER": return pricer(row, "DEBATE");
+      case "ANSWER": return pricer(row, "ANSWER_CHECKER");
       case "ANSWER_WRITER": case "MAP_MERGE": case "MAP_CHOOSE": return pricer(row, role);
       case "STORYTELLER": return pricer(row, "STORYTELLER") + pricer(row, "STORYTELLER_RETRY");
       case "STORY_CHECKER": return pricer(row, "STORY_CHECKER") + pricer(row, "STORY_CHECKER_RETRY");
@@ -640,9 +657,10 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  * `rotated` (spec 2026-10-11, Part 5): the four roles are panel members, so each role's calls go on
  * every gate that has a panel member, at that gate's `dearestFor` member, and no off-panel role ref
  * is health-checked; without it, today's split exactly.
- * A debate-shape receipt (spec 2026-10-12, read only through the strict reader, PF7): the writer's sites are
- * ANSWER_WRITER calls, and the map's one merge and one choose (controller ruling X1) are taken out of the panel's even
- * share and charged, as MAP_MERGE / MAP_CHOOSE, one whole call each on every gate at its dearest panel member
+ * Every receipt: the writer's sites are ANSWER_WRITER calls and the checker's ANSWER_CHECKER calls (LG-B); a debate-shape
+ * receipt (spec 2026-10-12, read only through the strict reader, PF7) also takes the map's one merge and one choose
+ * (controller ruling X1) out of the panel's even share and charges them, as MAP_MERGE / MAP_CHOOSE, one whole call each
+ * on every gate at its dearest panel member
  * (`dearestFor` at that call's price; a shaped receipt requires it): whichever member holds that seat, its gate
  * is never under-charged. Every other map site (the angles, the lists, a list asked again, the gap rounds) stays an
  * evenly shared debate call. Today's receipt: today's shares exactly.
@@ -703,7 +721,8 @@ export function previewCallShares(input: Readonly<{
     add(model, type, numerator);
     add(model, "UNBILLED_RETRY", numerator);
   };
-  const writerType: PreviewCallType = shaped ? "ANSWER_WRITER" : "DEBATE";
+  // LG-B (L26): the writer is a final writer on every receipt.
+  const writerType: PreviewCallType = "ANSWER_WRITER";
   const mapLongSites = shaped ? 2n : 0n;
   if (input.storyOnly !== true) {
     if (sites === null) {
@@ -743,14 +762,14 @@ export function previewCallShares(input: Readonly<{
       }
       if (rotated) {
         // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5); the
-        // writer's member at the writer's own price (PF5), which is a debate call's without a shape.
+        // writer's member at the writer's own price (PF5), the checker's at the checker's (both final writers, LG-B).
         for (const models of panelGates.values()) {
           addDebate(input.dearestFor!(models, "ANSWER_WRITER"), BigInt(sites.answerWriter) * debate * members, writerType);
-          addDebate(input.dearestFor!(models, "ANSWER"), BigInt(sites.answerChecker) * debate * members);
+          addDebate(input.dearestFor!(models, "ANSWER"), BigInt(sites.answerChecker) * debate * members, "ANSWER_CHECKER");
         }
       } else {
         addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members, writerType);
-        addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
+        addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members, "ANSWER_CHECKER");
       }
     }
     const pickups = BigInt(previewPickups(input.basis, input.maxCooldownHoldsPerRun)) * denominator;
@@ -889,9 +908,17 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
   return gateNeeds(byGate, calls, rowOf, pricer);
 }
 
-/** The money one gate must still have: the debate's calls plus what it may hold at once for calls in flight. */
+/**
+ * The money one gate must still have: the debate's calls plus what it may hold at once for calls in flight. LG-B
+ * (deviation 4): a gate whose GO names final-writer slots holds those slots at the largest final-writer worst case and
+ * the others at the largest standard one; a gate that names none, exactly as before.
+ */
 export function previewGateEstimateNanoUsd(need: PreviewGateNeed, remaining: PreviewGateRemaining): bigint {
-  return need.callsNanoUsd + BigInt(remaining.maxConcurrentCalls) * remaining.largestReservationNanoUsd;
+  const slots = BigInt(remaining.maxConcurrentCalls);
+  const finalWriter = BigInt(Math.min(remaining.finalWriterMaxInFlight ?? 0, remaining.maxConcurrentCalls));
+  const largest = remaining.largestReservationNanoUsd;
+  const finalWriterLargest = remaining.largestFinalWriterReservationNanoUsd ?? 0n;
+  return need.callsNanoUsd + (slots - finalWriter) * largest + finalWriter * (finalWriterLargest > largest ? finalWriterLargest : largest);
 }
 /** The calls one gate must still allow: the debate's calls with margin plus one per call in flight. */
 export function previewGateEstimateCalls(need: PreviewGateNeed, remaining: PreviewGateRemaining): number {

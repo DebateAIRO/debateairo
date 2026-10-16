@@ -25,8 +25,9 @@
 // `status` command. Google (parked) has none.
 // Booked-at-maximum alert (owner ruling 2026-10-12, "Book max cost, keep going"):
 // "gate-booked-<count>_<YYYY>_<MM>_<DD>" (DeepInfra) and "anthropic-booked-<count>_<YYYY>_<MM>_<DD>", queued
-// by the halt watcher whenever status's today_booked_max rises: a call was sent, the vendor connection then
-// failed or timed out, and the gate booked the call's full reservation as its charge and kept working. The
+// by the halt watcher whenever status's today_booked_max rises: a call was sent, then the vendor connection
+// failed or timed out, or the vendor answered a server error or an answer without a bill count (owner ruling
+// 2026-10-15; owner answer M3), and the gate booked the call's full reservation as its charge and kept working. The
 // email names the gate, the day's count and the day, says nothing was halted, and gives the read-only
 // `status` command. Google has none.
 import { constants } from 'node:fs';
@@ -65,13 +66,14 @@ const unbilledNotice = (vendor, folder, privateDir, lookAt) => code => {
   };
 };
 /** The fixed wording of one gate's booked-at-maximum alert (same <count>_<YYYY>_<MM>_<DD> code as the unbilled one).
- * serverErrors: the gate also books a server error that carried no bill (owner ruling 2026-10-15: DeepInfra only). */
-const bookedNotice = (vendor, folder, privateDir, lookAt, serverErrors = false) => code => {
+ * Both gates also book a server error that carried no bill and an answer that carried no bill count it could price
+ * (owner ruling 2026-10-15 for DeepInfra's server errors; owner answer M3, 2026-10-15, for the rest). */
+const bookedNotice = (vendor, folder, privateDir, lookAt) => code => {
   const { count, day } = unbilledCode(code);
   const calls = count === 1 ? '1 call booked at its maximum' : `${count} calls booked at their maximum`;
   return {
     subject: `Preview: ${vendor} gate: ${calls} today (${day})`,
-    lead: `Today (${day}, Bucharest day) ${count === 1 ? 'one model call' : `${count} model calls`} through the ${vendor} gate ${count === 1 ? 'was' : 'were'} sent, but the connection to ${vendor} then failed or timed out before an answer came back (usually a model that was too slow: the gate waits up to 20 minutes)${serverErrors ? `, or ${vendor} answered with a server error (HTTP 500 to 599) that carried no bill` : ''}. The real charge is unknown, so the gate booked the most such a call can cost (its full reservation) as its charge, counted it in today's budget, and kept working. Nothing was halted: this is only a warning. In the gate's records these calls have the state settled_reserved_max; status counts them as today_booked_max (the read-only command below). If you want, compare with ${vendor}'s billing page: the real charge is at most what was booked. You get one email each time the count goes up.`,
+    lead: `Today (${day}, Bucharest day) ${count === 1 ? 'one model call' : `${count} model calls`} through the ${vendor} gate ${count === 1 ? 'was' : 'were'} sent, but the connection to ${vendor} then failed or timed out before an answer came back (usually a model that was too slow: the gate waits up to 20 minutes), or ${vendor} answered with a server error (HTTP 500 to 599) that carried no bill, or with an answer that carried no bill count it could price. The real charge is unknown, so the gate booked the most such a call can cost (its full reservation) as its charge, counted it in today's budget, and kept working. Nothing was halted: this is only a warning. In the gate's records these calls have the state settled_reserved_max; status counts them as today_booked_max (the read-only command below). If you want, compare with ${vendor}'s billing page: the real charge is at most what was booked. You get one email each time the count goes up.`,
     commandIntro: 'To see the count (read-only, as root on the server):',
     command: `/usr/bin/python3 -I ${folder}/preview_budget_authority.py status --private ${privateDir}`,
     lookAt, journal: null
@@ -94,7 +96,7 @@ const NOTICES = Object.freeze({
     lookAt: GATE_UNIT, journal: null
   }),
   'gate-unbilled': unbilledNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT),
-  'gate-booked': bookedNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT, true),
+  'gate-booked': bookedNotice('DeepInfra', GATE_FOLDER, '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', GATE_UNIT),
   'gate-addresses': code => ({
     subject: `Preview: spending gate address list needs an update (${code})`,
     lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (DEEPINFRA_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are DeepInfra\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',

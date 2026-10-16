@@ -1,21 +1,25 @@
 /** One opt-in private preview test; normal provider/roster behavior stays unchanged. */
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
+import {
+  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, lengthCallStepOf, lengthStartWordsOf,
+  storyShortWordsSum, storytellerAnswerRoomTokens
+} from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import type { StructureRepairRoute } from "./structure-repair.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
-import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
+import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
-  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
-  previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
-  previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
+  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
+  PREVIEW_REQUEST_BODY_MAX_BYTES, previewCallTierOfBody, previewModelRow, previewModelRowForRef, previewNanoUsdText,
+  previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
+  previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
 import {
-  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelFor, previewThinkingLevelOnRequest, previewThinkingStepOf,
-  type PreviewThinkingLevels
+  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
+  previewThinkingStepOf, type PreviewThinkingLevels
 } from "./preview-thinking.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
@@ -249,11 +253,12 @@ export function previewProbeControls(target: Readonly<{ model: string }>): Reado
  */
 export function previewTargetGatewayControls(
   config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
-): Readonly<{ maxOutputTokens?: number; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
+): Readonly<{ maxOutputTokens?: number; cacheFirstUserTurn?: true; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
   if (config === undefined) return Object.freeze({});
   const reviewed = previewModelRow(target.model) ?? refused();
   const levels = reviewed.efforts.filter(word => word !== "default");
   return Object.freeze({ maxOutputTokens: reviewed.outputBound,
+    ...(reviewed.provider === "anthropic" ? { cacheFirstUserTurn: true as const } : {}),
     ...(levels.length === 0 ? {} : { thinking: Object.freeze({ parameter: "reasoning_effort" as const, levels: Object.freeze([...levels]) }) }) });
 }
 /**
@@ -275,6 +280,32 @@ function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "C
   return request.lane === "story" && (site === "STORYTELLER"
     ? request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
     : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
+}
+/** Task 4 review fix 1: why a final writer was sent as a STANDARD call (withPreviewProviderCallPolicy's notice). */
+export type PreviewFinalWriterTierUnread = Readonly<{ gate: string; reason: "NOT_OFFERED" | "READ_FAILED" }>;
+/** Each notice hook's (gate, reason) pairs already told: one line per gate and reason for each hook function. */
+const FINAL_WRITER_TIER_UNREAD_TOLD = new WeakMap<(event: PreviewFinalWriterTierUnread) => void, Set<string>>();
+/**
+ * Task 4 review fix 1: the one warn line the runner and the practice log for that notice: the event name, the gate and
+ * the reason. Codes only: no reply text, no key, no model output.
+ */
+export function previewFinalWriterTierUnreadLine(event: PreviewFinalWriterTierUnread): string {
+  return JSON.stringify({ kind: "DEBATEAI_PREVIEW_CALL_TIER", event: "PREVIEW_FINAL_WRITER_TIER_UNREAD", gate: event.gate,
+    reason: event.reason });
+}
+/**
+ * Length guidance L26/L29: the tier of a preview call: FINAL_WRITER for the answer writer and checker (served lane,
+ * SYNTHESIZER / EVALUATOR) and the storyteller and story checker (story lane, the same roles); STANDARD for everything
+ * else, LG-A's structure-repair calls included.
+ */
+export function previewCallTierOf(request: Readonly<{ callSiteKey: string; lane: string; role: string }>): PreviewCallTier {
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  const served = request.lane === "served";
+  const story = request.lane === "story";
+  return (step === "answer_writer" && served && request.role === "SYNTHESIZER")
+    || (step === "answer_checker" && served && request.role === "EVALUATOR")
+    || (step === "story_writer" && story && request.role === "SYNTHESIZER")
+    || (step === "story_checker" && story && request.role === "EVALUATOR") ? "FINAL_WRITER" : "STANDARD";
 }
 /**
  * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
@@ -315,11 +346,14 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
  * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
  * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
- * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling,
- * never above the row's answer cap, which the gate already reserves for every call: previewReservationNanoUsd).
- * Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku), 16,384 on the slower
- * ones (MiMo, Qwen, GLM). A length retry still asks twice the allowance, held to the row's cap by the gateway. The
- * sealed register row is untouched; every other call keeps previewCallBound.
+ * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling).
+ * LG-B (L26, owner answer 7): when its gate offers the final-writer tier, a fast row (DeepSeek, Claude Haiku) asks its
+ * own maximum (`finalWriterOutputBound`) and a slow row (MiMo, Qwen, GLM) 16,384, as the slow row's other three final
+ * writers do since the final review (2026-10-16, Important 3), and the gate reserves a fast row's at the final-writer
+ * bound (Task 5); when the gate does not, the call is STANDARD and asks this allowance held to the row's
+ * `outputBound`, reserved at that bound as today. A length retry still asks twice the allowance, held by the gateway to
+ * the call's cap (previewStorytellerOutputCap on a final writer, `outputBound` otherwise). The sealed register row is
+ * untouched; every other call keeps previewCallBound.
  */
 export function previewStorytellerTokenCeiling(reviewed: Readonly<{ storytellerTokenCeiling: number }>): number {
   return reviewed.storytellerTokenCeiling;
@@ -429,6 +463,24 @@ function retryAfterOf(error: unknown): number | undefined {
   return previewRefusalOf(error, PreviewModelCooling)?.retryAfterSeconds;
 }
 /**
+ * Length guidance L14/L25 (spec 2026-10-15 §3.3, INTERFACE §3.3): what a call's length retry needs to know: the room its
+ * answer may take (from the start values at Standard while no length row exists: LG-C hands the row's words here) and the
+ * level one below the call's own on its row. Undefined for a call with no step (health checks) and for LG-A's
+ * structure-repair call.
+ */
+export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string }>, reviewed: PreviewModelRow,
+  effort: PreviewEffort): Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }> | undefined {
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  if (step === null || step === "structure_repair") return undefined;
+  const start = LENGTH_GUIDANCE_START;
+  const words = lengthStartWordsOf(step);
+  const room = words === null
+    ? storytellerAnswerRoomTokens(storyShortWordsSum(start.story), start.storyLongReferenceWords, start.tokensPerWord)
+    : answerRoomTokens(words, start.runawayMultiplier, start.tokensPerWord);
+  const below = previewThinkingLevelBelow(reviewed, effort);
+  return Object.freeze({ answerRoomTokens: room, lowerThinkingLevel: below === null ? null : previewThinkingLevelOnRequest(below) });
+}
+/**
  * The preview's per-call policy for ONE target. Spec 2026-10-12 §4.4: the owner's `thinking_levels` table
  * picks each call's level by its step (previewThinkingLevelFor), and a call's repair POSTs run at the AI's
  * `slip_fix` level when the owner set one (`repairThinkingLevel`). With no table every call is today's: an
@@ -467,11 +519,37 @@ export function withPreviewProviderCallPolicy(
     sleep?: (milliseconds: number) => Promise<void>;
     busy?: PreviewBusyCoordinator;
     onGateUnsent?: (gate: PreviewProviderName) => void;
+    /**
+     * Pre-flight PF-B2.3 (controller ruling, 2026-10-16): each gate's read-only `/remaining`, by gate. A final writer's
+     * call asks its row's gate once and gets the final-writer tier only when the answer names its final-writer slots
+     * (previewGateOffersFinalWriterTier). Absent, or a read that fails: today's STANDARD call, byte for byte.
+     */
+    gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
+    /**
+     * Task 4 review fix 1 (controller ruling, 2026-10-16): told, content-free, when a final writer falls back to STANDARD
+     * because its gate's answer names no final-writer slots (NOT_OFFERED) or no answer could be read (READ_FAILED: no
+     * reader, or the read failed). Called at most once per gate and reason for one hook function (the composer passes one
+     * function to every target's policy, so: once per process). Never for a debate step, never when the tier is
+     * offered. A hook that throws changes nothing.
+     */
+    onFinalWriterTierUnread?: (event: PreviewFinalWriterTierUnread) => void;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
   const busy = options.busy ?? NO_BUSY_COORDINATION;
+  const gateRemaining = options.gateRemaining?.[reviewed.provider];
+  const tierUnread = (reason: PreviewFinalWriterTierUnread["reason"]): undefined => {
+    const hook = options.onFinalWriterTierUnread;
+    if (hook === undefined) return undefined;
+    const told = FINAL_WRITER_TIER_UNREAD_TOLD.get(hook) ?? new Set<string>();
+    FINAL_WRITER_TIER_UNREAD_TOLD.set(hook, told);
+    const key = `${reviewed.provider}:${reason}`;
+    if (told.has(key)) return undefined;
+    told.add(key);
+    try { hook(Object.freeze({ gate: reviewed.provider, reason })); } catch { /* the hook never changes the call */ }
+    return undefined;
+  };
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
@@ -485,12 +563,49 @@ export function withPreviewProviderCallPolicy(
     if (request.repairThinkingLevel !== undefined) {
       throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
     }
+    // Length guidance L25: the lower level is the policy's alone, never the caller's.
+    if (request.lengthRetry !== undefined) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
+    }
+    // Length guidance L29: the per-call caps are the policy's alone (the final writers), never the caller's.
+    if (request.packetByteCap !== undefined || request.outputTokenCap !== undefined) {
+      throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's size caps itself");
+    }
     const preview = previewCallBound(request.bound, config);
-    const bound = previewStorySite(request, "STORYTELLER")
-      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+    // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; on
+    // a slow row all four keep the storyteller's 16,384 and its retry today's clamp (final review, Important 3, below).
+    // Every other call keeps today's bound and caps.
+    // Pre-flight PF-B2.3 (controller ruling, 2026-10-16): a final writer gets that room only when its gate's `/remaining`
+    // names the final-writer slots, asked once per call (the unbilled resend below reuses the answer); otherwise, and when
+    // the read fails, it is today's STANDARD call, byte for byte, so an app that reaches a gate older than LG-B never sends
+    // it a body it refuses. LG-A's structure-repair calls are STANDARD (previewCallTierOf; Task 4's known limit).
+    const storyteller = previewStorySite(request, "STORYTELLER");
+    const standardBound = storyteller
+      ? Object.freeze({ ...preview, tokenCeiling: Math.min(previewStorytellerTokenCeiling(reviewed), reviewed.outputBound) })
       : previewStorySite(request, "CHECKER")
         ? Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, previewStoryCheckerTokenCeiling(reviewed)) })
         : preview;
+    // Final review (2026-10-16, Important 3, provisional owner ruling): owner answer 7's slow-row rule covers EVERY final
+    // writer. On a slow row (deviation 8: its storyteller allowance is at most its `outputBound`: GLM, MiMo, Qwen) the
+    // answer writer, answer checker and story checker ask the slow storyteller's 16,384 first (never less than today's
+    // bound) and their length retry is held to `outputBound` (previewStorytellerOutputCap), exactly as the slow
+    // storyteller; a fast row (DeepSeek, Claude Haiku) asks its own maximum. The 1 MiB body room stays for all four.
+    const slowRow = reviewed.storytellerTokenCeiling <= reviewed.outputBound;
+    const finalWriter = previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
+      bound: storyteller
+        ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+        : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling,
+          slowRow ? previewStorytellerTokenCeiling(reviewed) : reviewed.finalWriterOutputBound) }),
+      caps: Object.freeze({ packetByteCap: PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes,
+        outputTokenCap: previewStorytellerOutputCap(reviewed) })
+    }) : undefined;
+    let tierDecision: Promise<typeof finalWriter> | undefined;
+    const finalWriterCall = (): Promise<typeof finalWriter> => tierDecision ??= finalWriter === undefined
+      ? Promise.resolve(undefined)
+      : gateRemaining === undefined
+        ? Promise.resolve(tierUnread("READ_FAILED"))
+        : gateRemaining().then((remaining) => previewGateOffersFinalWriterTier(remaining) ? finalWriter : tierUnread("NOT_OFFERED"),
+          () => tierUnread("READ_FAILED"));
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
@@ -500,13 +615,20 @@ export function withPreviewProviderCallPolicy(
     // level when the owner set one; absent, every POST runs at the call's level, as today.
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
-    const level = previewThinkingLevelOnRequest(previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request)));
+    const effort = previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request));
+    const level = previewThinkingLevelOnRequest(effort);
+    const lengthRetry = previewLengthRetryOf(request, reviewed, effort);
     const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
-    const send = () => gateway.call({ ...request, thinkingLevel: level,
-      ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
-      bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
-      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+    const send = async () => {
+      const tier = await finalWriterCall();
+      return gateway.call({ ...request, thinkingLevel: level,
+        ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
+        ...(lengthRetry === undefined ? {} : { lengthRetry }),
+        ...(tier === undefined ? {} : tier.caps),
+        bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
+        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+    };
     /** The first send, after the coordinator admits it; an answer tells the coordinator. */
     const firstSend = async () => {
       await busy.admit(reviewed.model);
@@ -578,9 +700,12 @@ export function previewStructureRepairRoute(targets: readonly Readonly<{ provide
 }
 /**
  * LG-A (Task 14 carry) — THE MOST THE MONEY SEAM CAN PROJECT FOR ONE STRUCTURE-REPAIR CALL on `route`: a body of
- * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds, and the
- * preview's guarded fetch refuses a larger body, so no larger one is ever answered) and the route's token ceiling, on the
- * repair target. Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
+ * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds) and the
+ * route's token ceiling, on the repair target. LG-B (pre-flight PF-B2.9): a repair call is STANDARD (previewCallTierOf),
+ * so it never carries the policy's packetByteCap, and the gateway refuses a request body above
+ * MAX_PROVIDER_REQUEST_PACKET_BYTES (256 KiB) before anything is sent: no larger repair is ever answered. (The guarded
+ * fetch admits up to 1 MiB since LG-B, for the final writers' bodies only; it is no longer what holds the repair.)
+ * Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
  * `rootZeroKeepRoomMicros`). Null for no route.
  */
 export function previewStructureRepairCeiling(route: StructureRepairRoute | null):
@@ -593,6 +718,8 @@ export interface PreviewBudgetExecution {
   readonly requestBody: string;
   readonly requestSha256: string;
   readonly reservedUsd: string;
+  /** LG-B deviation 2: only on a final-writer request (the gate's sixth key); a standard request's message is today's. */
+  readonly callTier?: "FINAL_WRITER";
 }
 /** Root-owned authority reserves atomically before any paid POST, then records or retains its charge. */
 export interface PreviewBudgetPort {
@@ -616,7 +743,7 @@ function effortOnMenu(present: boolean, value: unknown, reviewed: PreviewModelRo
  * 2026-10-12 §4.5: `reasoning_effort`, when present, is a word on the row's menu; absent only where the menu holds
  * "default".
  */
-function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
   if (reviewed.provider !== "deepinfra") return false;
   const hasResponseFormat = Object.hasOwn(body, "response_format");
   const responseFormat = body.response_format;
@@ -630,7 +757,7 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && required.every(key => Object.hasOwn(body, key))
     && effortOnMenu(hasEffort, body.reasoning_effort, reviewed)
     && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
-    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
     && Array.isArray(body.messages);
 }
 /** A text block of exactly `keys`, whose text is not only whitespace. */
@@ -652,19 +779,40 @@ function anthropicSystemAccepted(system: unknown): boolean {
   const mark = first.cache_control;
   return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
 }
-/** An accepted Anthropic body asks for a cache write exactly when its system is the two-block form. */
+/** An accepted Anthropic body asks for a cache write when its system is the two-block form or its first turn is marked (LG-B). */
 function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
-  return Array.isArray(body.system) && anthropicSystemAccepted(body.system);
+  const first = Array.isArray(body.messages) ? body.messages[0] : undefined;
+  return (Array.isArray(body.system) && anthropicSystemAccepted(body.system))
+    || (isPlainObject(first) && Array.isArray(first.content) && anthropicMessagesAccepted(body.messages));
+}
+/**
+ * The Anthropic `messages` the gate accepts (AnthropicProfile.messages_valid): roles alternating user/assistant, first
+ * and last a user turn, each content a text that is not only whitespace; LG-B (L30): the FIRST turn may instead be 1..4
+ * text blocks, the first exactly {type, text, cache_control: {"type": "ephemeral"}}, the rest exactly {type, text}.
+ */
+function anthropicMessagesAccepted(messages: unknown): boolean {
+  const blocksAccepted = (content: unknown): boolean => {
+    if (!Array.isArray(content) || content.length < 1 || content.length > 4) return false;
+    const [first, ...rest] = content as unknown[];
+    if (!isTextBlock(first, ["type", "text", "cache_control"]) || !rest.every((block) => isTextBlock(block, ["type", "text"]))) return false;
+    const mark = first.cache_control;
+    return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
+  };
+  return Array.isArray(messages) && messages.length % 2 === 1
+    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
+      && message.role === (index % 2 === 0 ? "user" : "assistant")
+      && (typeof message.content === "string" ? message.content.trim().length > 0 : index === 0 && blocksAccepted(message.content)));
 }
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
- * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
- * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
+ * `max_tokens` (1..the tier's bound), `messages` (each exactly {role, content: non-empty text},
+ * roles alternating user/assistant, first and last a user turn, as the adapter builds them; LG-B: the first turn may
+ * be the marked material blocks, anthropicMessagesAccepted), an
  * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
  * anthropicSystemAccepted), and `output_config` exactly {"effort": <a word on the row's menu>} (spec 2026-10-12
  * §4.5; absent only where the menu holds "default", which no Anthropic row does). Nothing else, anywhere.
  */
-function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
   if (reviewed.provider !== "anthropic") return false;
   const hasEffort = Object.hasOwn(body, "output_config");
   const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["output_config"] : [])];
@@ -676,11 +824,8 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && (optional === 0 || anthropicSystemAccepted(body.system))
     && (hasEffort ? isPlainObject(effort) && Object.keys(effort).length === 1 && effortOnMenu(true, effort.effort, reviewed)
       : effortOnMenu(false, undefined, reviewed))
-    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
-    && Array.isArray(messages) && messages.length % 2 === 1
-    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
-      && message.role === (index % 2 === 0 ? "user" : "assistant")
-      && typeof message.content === "string" && message.content.trim().length > 0);
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
+    && anthropicMessagesAccepted(messages);
 }
 /** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
 function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
@@ -693,8 +838,8 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
  * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
- * (exact keys, the row's effort and JSON switches and its reviewed sampling, 1 <= max_tokens <= the row's bound, at most
- * 256 KiB), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
+ * (exact keys, the row's effort and JSON switches and its reviewed sampling, at most 256 KiB for a standard call and 1 MiB
+ * for a final writer (LG-B), with 1 <= max_tokens <= that tier's bound), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
  * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
@@ -706,23 +851,30 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
       : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
-      || Buffer.byteLength(init.body, "utf8") > PREVIEW_REQUEST_BODY_MAX_BYTES || carriesKeyHeader(init.headers)) refused();
+      || Buffer.byteLength(init.body, "utf8") > PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes
+      || carriesKeyHeader(init.headers)) refused();
     let decoded: unknown; try { decoded = JSON.parse(init!.body as string); } catch { return refused(); }
     if (!isPlainObject(decoded)) return refused();
     const reviewed: PreviewModelRow = previewModelRow(decoded.model) ?? refused();
-    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed) : anthropicBodyAccepted(decoded, reviewed))) refused();
+    // LG-B deviation 2: a body over a standard call's caps is a final writer's (only the call policy can make one).
+    const bodyBytes = Buffer.byteLength(init!.body as string, "utf8");
+    const tier = previewCallTierOfBody(reviewed, bodyBytes, decoded.max_tokens);
+    const outputBound = previewTierOutputBound(reviewed, tier);
+    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed, outputBound)
+      : anthropicBodyAccepted(decoded, reviewed, outputBound))) refused();
     const port = byProvider[provider];
     if (port === undefined) {
       // A configured provider without its gate: nothing is reserved or sent.
       throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
     }
     const body = init!.body as string;
-    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning. A body carrying the
+    // UTF-8 bytes + template allowance; the tier's full output bound, including hidden reasoning. A body carrying the
     // cache mark reserves its whole input at the step's cache-write price, as the gate does.
-    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"),
-      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded) });
+    const reserved = previewReservationNanoUsd(reviewed, bodyBytes,
+      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded), tier });
     const result = await port.execute({ operationId: randomUUID(), requestBody: body,
-      requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init!.signal ?? undefined);
+      requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved),
+      ...(tier === "FINAL_WRITER" ? { callTier: "FINAL_WRITER" as const } : {}) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }

@@ -294,7 +294,7 @@ describe("the guarded fetch routes by exact URL, each call only to its own provi
     ["a system role in messages", { messages: [{ role: "system", content: "x" }, { role: "user", content: "y" }] }],
     ["no messages", { messages: [] }],
     ["max_tokens 0", { max_tokens: 0 }],
-    ["max_tokens above the bound", { max_tokens: 32_769 }],
+    ["max_tokens above the row's own maximum", { max_tokens: 128_001 }],
     ["fractional max_tokens", { max_tokens: 1.5 }],
     ["no output_config", { output_config: undefined }],
     // Spec 2026-10-12 §4.5: only the reviewed Haiku menu (high, medium, low); "none" and "default" are never wire words here.

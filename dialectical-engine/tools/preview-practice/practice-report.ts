@@ -20,6 +20,7 @@ import {
 } from "./practice-language.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
+import { practiceLengthLines, practiceTokenLines, type PracticeLengthRow, type PracticeTokenRow } from "./practice-tokens.js";
 import {
   latencySummary,
   percentile,
@@ -434,7 +435,10 @@ export function debateReport(input: Readonly<{
     failures: r.failures,
     // LG-A (L34): repairs by kind (counts) and the replies code could not repair (each with a short sample, json only).
     repairsByKind: r.repairsByKind ?? [],
-    unrepaired: r.unrepaired ?? []
+    unrepaired: r.unrepaired ?? [],
+    // Length guidance L27 (LG-B): tokens and words per AI and step (information only).
+    tokensByModelAndStep: r.tokensByModelAndStep ?? [],
+    lengthByModelAndStep: r.lengthByModelAndStep ?? []
   });
 }
 
@@ -565,6 +569,10 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
+  const tokens = report.tokensByModelAndStep as readonly PracticeTokenRow[] | undefined;
+  if (tokens !== undefined) lines.push(...practiceTokenLines(tokens));
+  const words = report.lengthByModelAndStep as readonly PracticeLengthRow[] | undefined;
+  if (words !== undefined) lines.push(...practiceLengthLines(words));
   const rows = (report.byModelAndSite ?? report.byModelAndLane) as readonly Record<string, unknown>[] | undefined;
   if (rows !== undefined && rows.length > 0) {
     lines.push("| model | step | calls | outcomes / statuses | format | p50 s | p90 s | max s |", "|---|---|---|---|---|---|---|---|");

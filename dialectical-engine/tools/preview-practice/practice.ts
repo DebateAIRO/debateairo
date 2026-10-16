@@ -40,6 +40,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { mapPromptContractHash } from "@debateai/map";
 import {
   createPreviewBudgetRpcPort,
+  previewFinalWriterTierUnreadLine,
   previewModelRow,
   type PreviewBudgetPorts,
   type PreviewGateRemaining,
@@ -628,6 +629,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         config: settings.previewConfig,
         targets,
         ports: budgetPorts,
+        gateRemaining: remainingPorts,
+        // Task 4 review fix 1: one function for the whole run, so one line per gate and reason in the practice's log.
+        onFinalWriterTierUnread: (event) => { log(previewFinalWriterTierUnreadLine(event)); },
         observer,
         lanes,
         samples,

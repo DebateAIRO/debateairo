@@ -374,6 +374,71 @@ def names_any_key(value, names):
     return False
 
 
+# Owner answer M3 (2026-10-15): the members under which a reply may report what it cost, at any depth.
+REPORTED_COST_KEYS = ('estimated_cost', 'cost')
+
+
+def reported_costs(value):
+    """Every amount a parsed reply reports under REPORTED_COST_KEYS, at any depth, as Decimals (a null one reports
+    nothing); None when one of them is not a plain non-negative amount, an object or a list included (such a reply is
+    never booked: M3)."""
+    found, stack = [], [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, inner in item.items():
+                if key in REPORTED_COST_KEYS:
+                    if inner is None:
+                        continue
+                    amount = None if isinstance(inner, (dict, list)) else decimal_amount(inner)
+                    if amount is None:
+                        return None
+                    found.append(amount)
+                else:
+                    stack.append(inner)
+        elif isinstance(item, list):
+            stack.extend(item)
+    return found
+
+
+def key_values(value):
+    """Every (key, value) pair of every object at any depth of a parsed JSON value."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, inner in item.items():
+                yield key, inner
+                stack.append(inner)
+        elif isinstance(item, list):
+            stack.extend(item)
+
+
+def doubtful_count(value):
+    """M3, fix round 1 (review 2026-10-16): a float or a number written as text where a count belongs. The gate
+    cannot read it as a whole count, yet it may say the bill is bigger: such a reply is never booked.
+    Final review (2026-10-16, Important 2): the transport parses a reply with parse_float=Decimal, so on the wire a float
+    arrives as a Decimal; any Decimal is doubtful (a whole number parses as an int and never reaches this branch)."""
+    if type(value) is float or isinstance(value, Decimal):
+        return True
+    if not isinstance(value, str):
+        return False
+    try:
+        Decimal(value.strip())
+    except (InvalidOperation, ValueError):
+        return False
+    return True
+
+
+def token_member(key):
+    """A member that names a token count: tokens_* or *_tokens."""
+    return isinstance(key, str) and (key.startswith('tokens_') or key.endswith('_tokens'))
+
+
+def whole_count(value):
+    return value if integer(value) else 0
+
+
 # One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
 # output_bound is both the max_tokens ceiling and what a call reserves for output. efforts (spec 2026-10-12
@@ -383,8 +448,10 @@ def names_any_key(value, names):
 # probe sends. A menu change is a reviewed row change. json_object says whether JSON mode may be asked for. sampling
 # (reviewed 2026-10-12) is None (the request must carry none of the profile's sampling_keys) or a tuple
 # of (name, number) pairs: the request must carry exactly those members with exactly those values.
-ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling',
-                      defaults=(None,))
+# final_writer_output_bound (length guidance LG-B, L26, 2026-10-15) is the model's own maximum output: a final-writer
+# request (callTier FINAL_WRITER) may ask up to it and reserves at it. None: the row has no final-writer tier.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling '
+                      'final_writer_output_bound', defaults=(None, None))
 
 
 PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
@@ -404,6 +471,9 @@ class DeepInfraProfile:
       name, host                         the GO's `provider` value; the HTTPS host (port 443)
       per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
       max_request_bytes (int)            the largest request body accepted (and priced)
+      final_writer_max_request_bytes (int)  OPTIONAL (LG-B): the largest final-writer request body (callTier FINAL_WRITER)
+      final_writer_per_call_cap_usd (Decimal)  OPTIONAL (LG-B): no row may reserve more for one full-size final-writer
+                                         request; a profile without both has no final-writer tier
       redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
       key_pattern (str, optional)        the shape this vendor's key must have (re.fullmatch); the
                                          gate refuses any other key before a reservation, so a
@@ -439,6 +509,12 @@ class DeepInfraProfile:
                                          (settled_reserved_max, reason vendor_server_error) and the
                                          gate stays active. A profile without it (AnthropicProfile)
                                          accounts every such reply as before
+      bookable_unreported(status, response, accounting, reserved) -> bool  OPTIONAL (owner answer M3, 2026-10-15):
+                                         asked only of a paid reply whose usage or cost is unreported
+                                         (assess_reply's usage_or_cost_unreported), with its accounting and the
+                                         call's reservation; True books the call at its reservation
+                                         (settled_reserved_max, reason charge_unreported) and the gate stays
+                                         active. A profile without it accounts every such reply as before (halt)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -446,15 +522,21 @@ class DeepInfraProfile:
     host = 'api.deepinfra.com'
     path = '/v1/openai/chat/completions'
     per_call_cap_usd = Decimal('0.25')
-    # Per-call caps (owner rulings 2026-10-10), the same for every row: a hard 256 KiB request body
-    # cap here, and output_bound 32768 (the max_tokens ceiling and the reservation's output term)
-    # in each row below. The 256 KiB is kept because story requests reach about 236 KiB at the
-    # "high" story size (the largest ordinary request seen was about 51 KB). No call the app makes
-    # asks for more than 24,000 answer tokens (debate 8,192, health checks 8,192, storyteller
-    # 12,000 then 24,000 on retry). Full-size worst cases ((262,144 + 2,048) x input + 32,768 x
-    # output): GLM $0.0560128, DeepSeek $0.0724992, MiMo $0.14211072, Qwen $0.042371072
+    # Per-call caps (owner rulings 2026-10-10), the same for every row: a hard 256 KiB request body cap here, and
+    # output_bound 32768 (the max_tokens ceiling and the reservation's output term) in each row below, for every call but
+    # a final writer's. The 256 KiB is kept because story requests reach about 236 KiB at the "high" story size (the
+    # largest ordinary request seen was about 51 KB). Debate calls and health checks ask for 8,192 tokens; a slow
+    # storyteller for 16,384, then 32,768 on its length retry. Full-size standard worst cases ((262,144 + 2,048) x input
+    # + 32,768 x output): GLM $0.0560128, DeepSeek $0.0724992, MiMo $0.14211072, Qwen $0.042371072
     # (tests/unit/fixtures/preview-model-rows.json).
     max_request_bytes = 256 * 1024
+    # Length guidance LG-B (L26, L29, 2026-10-15): the four final writers (answer writer, answer checker, storyteller,
+    # story checker) may send up to 1 MiB and ask up to each row's final_writer_output_bound (the vendor's own maximum),
+    # reserved at that bound under their own cap of $0.75, when the GO names max_final_writer_calls. Full-size final-writer
+    # worst cases ((1,048,576 + 2,048) x input + bound x output): GLM $0.2231296, DeepSeek $0.288768, MiMo $0.50878464,
+    # Qwen $0.168790016 (the parity file's final_writer member).
+    final_writer_max_request_bytes = 1024 * 1024
+    final_writer_per_call_cap_usd = Decimal('0.75')
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
     key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
@@ -463,12 +545,15 @@ class DeepInfraProfile:
     # Spec 2026-10-12 section 4.1: the words a row's menu may hold. None is no reasoning_effort member at all (the
     # vendor's default); 'none' asks DeepInfra to switch thinking off.
     effort_words = (None, 'none', 'low', 'medium', 'high')
+    # LG-B (L26): final_writer_output_bound is each model's own maximum output (DeepInfra's max_output_tokens, read
+    # 2026-10-15; MiMo lists none, so 65536, its max_new_tokens default ceiling).
     rows = {row.model: row for row in (
         # Thinking levels (spec 2026-10-12 section 2): Z.AI documents low, high and max only; thinking cannot be off.
-        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, ('high', 'low'), True),
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, ('high', 'low'), True,
+                 final_writer_output_bound=131072),
         # Thinking levels: DeepSeek documents none, low, high and max ('medium' is treated as high).
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768,
-                 ('high', 'low', 'none'), False),
+                 ('high', 'low', 'none'), False, final_writer_output_bound=131072),
         # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
         # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95; owner ruling 2026-10-12
         # (reply language): temperature 0.7, after MiMo wrote 10 of its 71 practice replies at 1.0 in another language
@@ -476,7 +561,7 @@ class DeepInfraProfile:
         # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
         # Thinking levels: Xiaomi documents thinking on or off only, no levels.
         ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, (None, 'none'), False,
-                 (('temperature', 0.7), ('top_p', 0.95))),
+                 (('temperature', 0.7), ('top_p', 0.95)), final_writer_output_bound=65536),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
         # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid
@@ -485,7 +570,7 @@ class DeepInfraProfile:
         # Thinking levels: Alibaba documents low, medium and xhigh (its default); 'high' is not a Qwen value.
         ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768,
                  (None, 'low', 'medium', 'none'), False,
-                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))))}
+                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20)), final_writer_output_bound=131072))}
 
     def path_for(self, row):
         return self.path
@@ -574,6 +659,48 @@ class DeepInfraProfile:
         return (type(status) is int and 500 <= status <= 599 and isinstance(response, dict)
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
+
+    def bookable_unreported(self, status, response, accounting, reserved):
+        """Owner answer M3 (2026-10-15; OVERVIEW B-3; ruling R2, 2026-10-16): asked only of a paid reply whose usage or
+        cost is unreported (assess_reply's usage_or_cost_unreported), on the RAW reply. True for an answer (HTTP 200 to
+        299) or a server error (500 to 599, one bookable_server_error did not take: it names a billing field) whose
+        counts cannot be priced, when nothing in it says it cost more than the reservation: every cost it reports
+        anywhere is a plain amount at most `reserved`, and the counts it does report, at the row's list prices, price
+        at most `reserved` too. The gate then books the call at its reservation (reason charge_unreported) and stays
+        active. False for every other status (a 4xx is a key, billing or request problem root must see) and for an
+        accounting the gate had to cut short (oversized_accounting).
+        Fix round 1 (review 2026-10-16: M3 books a reply that carries NO usable bill, never one that carries evidence of
+        a bigger one): False too when any member of `usage`, or any token-count member (tokens_* or *_tokens) anywhere
+        in the reply, is a float or a number written as text (doubtful_count); and the evidence is read at its largest:
+        output is completion plus the largest whole reasoning count (details or top level), or total minus prompt when
+        total_tokens is whole and says more, and every whole token-count member anywhere, added up at the dearer of
+        the row's two prices, must price at most `reserved` too."""
+        if not (type(status) is int and (200 <= status <= 299 or 500 <= status <= 599)):
+            return False
+        if not isinstance(response, dict) or not isinstance(accounting, dict) or accounting.get('usage_valid') is True \
+                or accounting.get('oversized_accounting') is True:
+            return False
+        costs = reported_costs(response)
+        if costs is None or any(cost > reserved for cost in costs):
+            return False
+        usage = response.get('usage')
+        usage = usage if isinstance(usage, dict) else {}
+        if any(key not in REPORTED_COST_KEYS and doubtful_count(inner) for key, inner in key_values(usage)):
+            return False
+        counted = [inner for key, inner in key_values(response) if token_member(key)]
+        if any(doubtful_count(inner) for inner in counted):
+            return False
+        details = usage.get('completion_tokens_details')
+        reasoning = max(whole_count(details.get('reasoning_tokens')) if isinstance(details, dict) else 0,
+                        whole_count(usage.get('reasoning_tokens')))
+        prompt = whole_count(usage.get('prompt_tokens'))
+        output = whole_count(usage.get('completion_tokens')) + reasoning
+        if integer(usage.get('total_tokens')):
+            output = max(output, usage['total_tokens'] - prompt)
+        input_price, output_price = Decimal(accounting['input_usd_per_m']), Decimal(accounting['output_usd_per_m'])
+        listed = (Decimal(prompt) * input_price + Decimal(output) * output_price) / Decimal(1000000)
+        anywhere = Decimal(sum(whole_count(inner) for inner in counted)) * max(input_price, output_price) / Decimal(1000000)
+        return listed <= reserved and anywhere <= reserved
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
@@ -709,10 +836,12 @@ class AnthropicProfile:
     it reserves at the lower step's (0.10, 0.50), the row's own prices. A full 256 KiB request
     reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
 
-    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry ONE
-    cache mark, {"type": "ephemeral"} (5 minutes, no ttl), on the first of exactly two system text
-    blocks (the app's adapter puts the engine's stable instruction and safety frame in the first block
-    and the per-call markers in the second; nothing else anywhere may carry a mark). Such a request
+    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry at most
+    TWO cache marks, each {"type": "ephemeral"} (5 minutes, no ttl): on the first of exactly two system
+    text blocks (the engine's stable instruction and safety frame), and (length guidance LG-B, L30,
+    2026-10-15) on the first block of the FIRST user turn, which may then be 1..4 text blocks (the
+    fenced material, then any user block the adapter joins after it, unmarked). Nothing else anywhere
+    may carry a mark. Such a request
     (cache_write_requested) reserves its WHOLE input at the step's 5-minute cache-write price (lower
     0.125, upper 0.625), the simplest safe rule: the write can never cover more than the input. So the
     dearest request is a full-size cached one, (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, the
@@ -725,11 +854,19 @@ class AnthropicProfile:
     1-hour price on any other call (as before caching). Anthropic reports no cost,
     so the guard charge is that list-price charge. Any usage field this profile does not know, any
     server-tool use, another service tier or region, or a tool block makes the usage invalid: uncertain,
-    and the gate halts.
+    and the gate halts. Owner answer M3 (2026-10-15; rulings R1-R3, 2026-10-16): bookable_unreported books, at the
+    call's reservation, a message without usage or with unreadable input/output counts whose usage names nothing that
+    may bill above the list price (premium_free), and a server error (500 to 599) that is no message and names no
+    billing field; everything named here still halts.
     A reply with a container or context editing (a null one means none was
     used), usage or token counts outside `usage`, or a content block other than text or thinking is
     invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
     the reply (field names and kinds only: reply_outline).
+
+    Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): with a GO that names max_final_writer_calls, a
+    final-writer request (callTier FINAL_WRITER) may send up to 1 MiB and ask up to 128,000 tokens (Haiku 5.5's
+    documented maximum); a full-size cached one reserves (1,050,624 x 0.625 + 128,000 x 2.50) / 1e6 = $0.97664, under
+    this profile's own final-writer cap of $1.00.
     """
     name = 'anthropic'
     host = 'api.anthropic.com'
@@ -737,6 +874,8 @@ class AnthropicProfile:
     api_version = '2023-06-01'
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
+    final_writer_max_request_bytes = 1024 * 1024
+    final_writer_per_call_cap_usd = Decimal('1.00')  # Owner answer 4 (2026-10-15): Haiku as a final writer, $1.00.
     redaction_patterns = (r'sk-ant-[A-Za-z0-9_-]+',)
     # Only the ordinary API form (sk-ant-api + two digits + '-', e.g. api03): an Admin form
     # (sk-ant-admin...) or any other Anthropic credential is refused (platform.claude.com, Admin API
@@ -748,13 +887,15 @@ class AnthropicProfile:
     rows = {row.model: row for row in (
         # The row holds the lower step's prices (the estimate's and a small call's); see reservation_prices.
         # Thinking levels (spec 2026-10-12 section 2): Anthropic documents low, medium, high, xhigh and max for Haiku 5.5.
-        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, ('high', 'medium', 'low'), False),)}
+        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, ('high', 'medium', 'low'), False,
+                 final_writer_output_bound=128000),)}
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
     # Request fields beyond these are refused (no thinking, tools, stream, sampling, top-level cache_control...).
     BODY_FIELDS = frozenset({'model', 'max_tokens', 'messages', 'system', 'output_config'})
-    # The one cache mark a request may carry, on the first of its two system blocks: 5 minutes (no ttl).
+    # The cache mark a request may carry, on the first of its two system blocks and (LG-B) on the first block of its
+    # first user turn: 5 minutes (no ttl).
     CACHE_MARK = {'type': 'ephemeral'}
 
     def path_for(self, row):
@@ -806,18 +947,46 @@ class AnthropicProfile:
                         for block in system)
                 and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK)
 
+    MATERIAL_BLOCKS_MAX = 4
+
+    def messages_valid(self, messages):
+        """Roles alternating user/assistant, starting and ending with a user turn, each content a text that is not only
+        whitespace (JavaScript's trim set); LG-B (L30): the FIRST turn may instead be 1..4 text blocks, the first exactly
+        {type, text, cache_control: {"type": "ephemeral"}}, the rest exactly {type, text}, no text only whitespace."""
+        def text_ok(value):
+            return isinstance(value, str) and bool(value.strip(JS_WHITESPACE))
+
+        def blocks_ok(content):
+            if not (isinstance(content, list) and 1 <= len(content) <= self.MATERIAL_BLOCKS_MAX
+                    and all(isinstance(block, dict) for block in content)):
+                return False
+            first, rest = content[0], content[1:]
+            return (set(first) == {'type', 'text', 'cache_control'} and first['type'] == 'text' and text_ok(first['text'])
+                    and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK
+                    and all(set(block) == {'type', 'text'} and block['type'] == 'text' and text_ok(block['text']) for block in rest))
+        return (isinstance(messages, list) and len(messages) % 2 == 1
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
+                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
+                        and (text_ok(m['content']) or (index == 0 and blocks_ok(m['content'])))
+                        for index, m in enumerate(messages)))
+
     def cache_write_requested(self, body):
-        """True exactly for a body whose system is the accepted two-block form (its one cache mark)."""
-        return bool(isinstance(body, dict) and isinstance(body.get('system'), list) and self.system_valid(body['system']))
+        """True exactly for an accepted body that carries a cache mark: the two-block system, or (LG-B) a marked first turn."""
+        if not isinstance(body, dict):
+            return False
+        system, messages = body.get('system'), body.get('messages')
+        return bool((isinstance(system, list) and self.system_valid(system))
+                    or (isinstance(messages, list) and messages and isinstance(messages[0], dict)
+                        and isinstance(messages[0].get('content'), list) and self.messages_valid(messages)))
 
     def body_valid(self, body, row):
         """Exactly model, max_tokens and messages, an optional system (system_valid: a string, or the two
         blocks that carry the one cache mark), and output_config exactly {"effort": <a word on the row's menu>}
         (spec 2026-10-12 section 4.5; absent only where the menu holds None, which no Anthropic row does). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
-        adapter (anthropic-messages.ts) can send, no more: text content that is not only whitespace
-        (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user turn
-        (the adapter joins same-role turns and refuses a final assistant turn), and a system whose text is
-        not only whitespace when present."""
+        adapter (anthropic-messages.ts) can send, no more (messages_valid): text content that is not only
+        whitespace (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user
+        turn (the adapter joins same-role turns and refuses a final assistant turn), LG-B's marked first turn,
+        and a system whose text is not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         effort_member = 'output_config' in body
@@ -837,11 +1006,7 @@ class AnthropicProfile:
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
-                and isinstance(messages, list) and len(messages) % 2 == 1
-                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
-                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
-                        and isinstance(m['content'], str) and m['content'].strip(JS_WHITESPACE)
-                        for index, m in enumerate(messages)))
+                and self.messages_valid(messages))
 
     def body_effort(self, body):
         """The level a body carries (spec 2026-10-12 section 4.5): output_config's effort, or None for no member."""
@@ -960,7 +1125,8 @@ class AnthropicProfile:
     # 529) cool the model off like DeepInfra's 429s; 400, 404, 413 and 500 are not busy (review
     # 2026-10-12): they count toward the gate-wide unsent streak as before gate v4. Never here, so they halt:
     # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
-    # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
+    # 402 billing_error, 504 timeout_error (the work may have run; since owner answer M3 it is booked at the
+    # reservation by bookable_unreported, never released), and any other status or type.
     UNBILLED_ERRORS = {
         400: frozenset({'invalid_request_error'}),
         404: frozenset({'not_found_error'}),
@@ -998,6 +1164,73 @@ class AnthropicProfile:
         are deterministic for that request, and 500 api_error is Anthropic's own fault: none of them
         is a reason to sit the model out, so the gate counts them toward the unsent streak instead."""
         return status in self.BUSY_STATUSES
+
+    def bookable_unreported(self, status, response, accounting, reserved):
+        """Owner answer M3 (2026-10-15) with rulings R1-R3 (2026-10-16): asked only of a paid reply whose usage is
+        unreported, on the RAW reply. True for (a) a message (HTTP 200) whose usage is missing or whose input and output
+        counts cannot be read (invalid_reason usage_missing or token_counts), when its usage names nothing that may bill
+        above the list price the reservation holds (premium_free); (b) R1: a server error (500 to 599) that is no
+        message and carries no billing key, content, model or token count at any depth (the unbilled_refusal key
+        test): its 504 timeout_error, a 503, a 529 api_error. The gate then books the call at its reservation (reason
+        charge_unreported). Never a 4xx (R2: 401, 402, 403 and the rest: root must look), an unknown usage member (R3,
+        usage_unknown_field: a new member may be a new billing dimension, as speed was on 2026-10-16), a premium speed,
+        tier or region, a server tool, an unpriced reply member, counts outside usage, a tool or other content block,
+        or a cache count it cannot read.
+        Fix round 1 (review 2026-10-16: never a reply that carries evidence of a bigger bill): False too for a message
+        that reports a cost above `reserved` or one that is not a plain amount (reported_costs), whose cache read or
+        thinking split cannot be read (premium_free), or whose counts that can be read as numbers (whole, a float or
+        numeric text) price above `reserved` at their step (counts_within); and for a server error that names a speed,
+        service tier or region. Final review (2026-10-16, Minor 1): a message's usage is booked unread only when it is
+        absent or null; a usage of another type than an object halts."""
+        if type(status) is not int or not isinstance(response, dict) or not isinstance(accounting, dict):
+            return False
+        reason = accounting.get('invalid_reason')
+        if status == 200 and reason in ('usage_missing', 'token_counts'):
+            costs = reported_costs(response)
+            if costs is None or any(cost > reserved for cost in costs):
+                return False
+            usage = response.get('usage')
+            if usage is None:  # Absent or null: nothing reported.
+                return True
+            # Final review (2026-10-16, Minor 1 = Task 9 F4): a usage that is a list, text or a number is not an
+            # absent usage; it says something the gate cannot read, so it halts.
+            return isinstance(usage, dict) and self.premium_free(usage) and self.counts_within(usage, reserved)
+        return (500 <= status <= 599 and reason == 'not_a_message'
+                and not names_any_key(response, BILLED_KEYS + ('content', 'model', 'speed', 'service_tier', 'inference_geo'))
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
+
+    def counts_within(self, usage, reserved):
+        """M3, fix round 1: the counts of an unreadable usage that read as numbers (decimal_amount: whole, a float or
+        numeric text), priced at the step their prompt reaches: input and cache read at their prices, output at the
+        larger of output_tokens and the thinking split, at most `reserved`. Nothing readable counts as 0."""
+        input_tokens = decimal_amount(usage.get('input_tokens')) or Decimal(0)
+        read = decimal_amount(usage.get('cache_read_input_tokens')) or Decimal(0)
+        details = usage.get('output_tokens_details')
+        thinking = decimal_amount(details.get('thinking_tokens')) if isinstance(details, dict) else None
+        output = max(decimal_amount(usage.get('output_tokens')) or Decimal(0), thinking or Decimal(0))
+        step = self.step_for(input_tokens + read)
+        listed = (input_tokens * step.input_usd_per_m + read * step.cache_read_usd_per_m
+                  + output * step.output_usd_per_m) / Decimal(1000000)
+        return listed <= reserved
+
+    @staticmethod
+    def premium_free(usage):
+        """M3: a usage that names nothing that may bill above the reservation's list prices: standard speed, tier and
+        region (or none), no server tool used, and no cache write (the reservation prices a call's input at the plain
+        input price unless the call asked for a write). Fix round 1 (review 2026-10-16): a cache read that is absent or
+        whole, and a thinking split that is absent or as usage_check knows it (known members, whole counts)."""
+        tools = usage.get('server_tool_use')
+        creation = usage.get('cache_creation_input_tokens')
+        read = usage.get('cache_read_input_tokens')
+        details = usage.get('output_tokens_details')
+        return (usage.get('speed') in (None, 'standard') and usage.get('service_tier') in (None, 'standard')
+                and usage.get('inference_geo') in (None, 'global')
+                and (tools is None or isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values()))
+                and (creation is None or type(creation) is int and creation == 0) and usage.get('cache_creation') is None
+                and (read is None or integer(read))
+                and (details is None or isinstance(details, dict) and set(details) <= ANTHROPIC_OUTPUT_DETAIL_KEYS
+                     and all(integer(value) for value in details.values())))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
