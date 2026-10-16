@@ -15,7 +15,15 @@ import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
 import type { Session } from "@debateai/contract";
-import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapeInForce, readDebateShapePolicy, type CallConcurrencyPolicy } from "@debateai/register";
+import {
+  DEBATE_SHAPE_POLICY_ROW_KEY,
+  debateShapeInForce,
+  LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  readDebateShapePolicy,
+  readLengthGuidancePolicy,
+  type CallConcurrencyPolicy,
+  type LengthGuidancePolicy
+} from "@debateai/register";
 import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, structureRepairOriginalKey, type PreviewBudgetPorts, type PreviewGateRemaining } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
@@ -46,16 +54,17 @@ import {
   type PracticeDebateLanguageBlock,
   type PracticeMapLanguage
 } from "./practice-language.js";
+import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
   importPracticeRegister,
-  publishPracticeShapeVersion,
+  publishPracticeOverrideVersion,
   type PracticeNextRegisterVersion,
+  type PracticeOverrideVersion,
   type PracticeRegisterExport,
-  type PracticeRegisterImportReceipt,
-  type PracticeShapeVersion
+  type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
 import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
@@ -200,6 +209,11 @@ export type PracticeDebateResult = Readonly<{
   transcript?: Readonly<{ path: string | null; attempts: number; bytes: number; blanked: Readonly<Record<string, number>>; error: string | null }>;
   /** Debate shape: what the shape run did (practice-shape.ts); absent when the debate ran without a debate-shape row. */
   shape?: PracticeShapeBlock;
+  /**
+   * Length guidance (LG-C, practice-length.ts): where the row came from and the numbers the run was admitted with; absent
+   * when the debate ran without a length row.
+   */
+  length?: PracticeLengthBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
   /**
@@ -533,6 +547,8 @@ export async function runPracticeDebate(input: Readonly<{
   transcriptDirectory?: string | null;
   /** Debate shape (`--shape-policy`, the three ask settings): absent: today's debate command. */
   shape?: PracticeShapeOverride;
+  /** Length guidance (`--length-policy`, LG-C): the checked policy file; absent: the imported register's own row, if any. */
+  length?: LengthGuidancePolicy;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
 }>): Promise<PracticeDebateResult> {
@@ -570,40 +586,44 @@ export async function runPracticeDebate(input: Readonly<{
     if (receipt.codeNext !== undefined && String(nextVersion) !== receipt.registerVersion) {
       throw Object.assign(new Error("PRACTICE_REGISTER_VERSION_MISMATCH"), { code: "PRACTICE_REGISTER_VERSION_MISMATCH" });
     }
-    // Debate shape (--shape-policy) WITHOUT --register-next: ONE more version, in this throwaway database only: the
-    // export's last version with the debate-shape row added (or its own replaced) and this code's four contract hashes.
-    // It is the live version + 1, the number --register-next would take. WITH --register-next the code's next version
-    // already carries the row (practice.ts handed the policy to composePracticeNextRegisterVersion, the kit's own
-    // source build), so nothing more is published: a second version on top would undo the rows it changed (controller
-    // ruling D-REGNEXT). Both compositions below run on the version `settings` names, so the ask path and the runner
-    // read the row exactly as the live services would. The export file is only read; the live register is never reached.
-    const shapeVersion: PracticeShapeVersion | null = input.shape === undefined || input.shape.policy === null
-      || receipt.codeNext !== undefined ? null : await publishPracticeShapeVersion(pool, input.register, receipt, input.shape.policy);
+    // The practice's own version (no --register-next), in this throwaway database only: the export's last version with
+    // the --shape-policy and/or --length-policy rows added (or replaced) and this code's contract hashes. ONE version for
+    // both, the live version + 1, the number --register-next would take. With --register-next the code's next version
+    // carries them already (practice.ts handed the policies to the kit's own source build), so nothing more is
+    // published: a second version on top would undo the rows it changed (controller ruling D-REGNEXT). Both
+    // compositions below run on the version `settings` names, so the ask path and the runner read the rows exactly as
+    // the live services would. The export file is only read; the live register is never reached.
+    const shapePolicy = input.shape === undefined ? null : input.shape.policy;
+    const lengthPolicy = input.length ?? null;
+    const overrideVersion: PracticeOverrideVersion | null = (shapePolicy === null && lengthPolicy === null) || receipt.codeNext !== undefined
+      ? null : await publishPracticeOverrideVersion(pool, input.register, receipt, { shape: shapePolicy, length: lengthPolicy });
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
-    // The practice's own debate-shape version (no --register-next) keeps the settings' mode.
+    // The practice's own override version (no --register-next) keeps the settings' mode.
     const settings: PracticeSettings = receipt.codeNext !== undefined
       ? Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
         ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) })
-      : shapeVersion === null ? input.settings
+      : overrideVersion === null ? input.settings
         : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
     const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
-    if (shapeVersion !== null) {
-      progress(`the debate-shape row ${shapeVersion.row === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
-        + `${shapeVersion.registerVersion}, with this code's contract hashes`);
+    if (overrideVersion !== null) {
+      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow]] as const) {
+        if (change !== null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
+          + `${overrideVersion.registerVersion}, with this code's contract hashes`);
+      }
     }
     // The version both compositions read: the live one, the code's next one, or the practice's own.
     const registerVersion = String(settings.runner.REGISTER_VERSION);
     // report.json's register block names that same version (final review M-2): on the practice's own version the
     // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
-    const reportedRegister: PracticeRegisterImportReceipt = shapeVersion === null ? receipt
-      : Object.freeze({ ...receipt, registerVersion: shapeVersion.registerVersion, importedRegisterVersion: receipt.registerVersion });
+    const reportedRegister: PracticeRegisterImportReceipt = overrideVersion === null ? receipt
+      : Object.freeze({ ...receipt, registerVersion: overrideVersion.registerVersion, importedRegisterVersion: receipt.registerVersion });
     // FLAG only: what the debate-shape row did in that version (with --register-next, as the code's next version's delta:
     // a row whose bytes, value and source ref, equal the export's is in neither list, UNCHANGED; final review M-3).
-    const shapeRowChange: PracticeShapeRowChange | null = shapeVersion !== null ? shapeVersion.row
+    const shapeRowChange: PracticeShapeRowChange | null = overrideVersion !== null ? overrideVersion.shapeRow
       : input.shape === undefined || input.shape.policy === null || receipt.codeNext === undefined ? null
         : receipt.codeNext.addedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "ADDED"
           : receipt.codeNext.changedKeys.includes(DEBATE_SHAPE_POLICY_ROW_KEY) ? "REPLACED" : "UNCHANGED";
@@ -615,8 +635,22 @@ export async function runPracticeDebate(input: Readonly<{
       // Only a caller that composed --register-next without the policy can get here (practice.ts never does).
       throw new PracticeRefusal("PRACTICE_SHAPE_POLICY_NOT_PUBLISHED", "the code's next version was composed without --shape-policy");
     }
+    // Length guidance (LG-C): the length row the debate runs on, read the same way (absent: today's lengths, byte for byte).
+    const lengthRow = await readLengthGuidancePolicy(pool, settings.runner.REGISTER_VERSION);
+    if (lengthPolicy !== null && lengthRow === null) {
+      throw new PracticeRefusal("PRACTICE_LENGTH_POLICY_NOT_PUBLISHED", "the code's next version was composed without --length-policy");
+    }
+    // FLAG only: what the length row did in that version (with --register-next, as the code's next version's delta).
+    const lengthRowChange: PracticeLengthBlock["row"] = overrideVersion !== null ? overrideVersion.lengthRow
+      : lengthPolicy === null || receipt.codeNext === undefined ? null
+        : receipt.codeNext.addedKeys.includes(LENGTH_GUIDANCE_POLICY_ROW_KEY) ? "ADDED"
+          : receipt.codeNext.changedKeys.includes(LENGTH_GUIDANCE_POLICY_ROW_KEY) ? "REPLACED" : "UNCHANGED";
+    const lengthSource = lengthPolicy !== null ? "FLAG" as const : lengthRow !== null ? "REGISTER" as const : null;
     const asked = input.shape?.ask ?? {};
-    if (shapeRow === null && Object.keys(asked).length > 0) {
+    const askedKeys = Object.keys(asked);
+    // With the length row, --answer-length alone needs no debate-shape row: admission reads it from the length row (LG-C).
+    const lengthCarriesIt = lengthRow !== null && askedKeys.every((key) => key === "answerLength");
+    if (shapeRow === null && askedKeys.length > 0 && !lengthCarriesIt) {
       // Without the row the ask path would drop them silently: refused before any AI is asked.
       throw new PracticeRefusal("PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW",
         "--depth-mode, --scrutiny and --answer-length need a debate-shape row (--shape-policy)");
@@ -824,6 +858,19 @@ export async function runPracticeDebate(input: Readonly<{
         progress(`debate shape: what the run did could not be read (${codeOf(error)})`);
       }
     }
+    // Length guidance: the numbers the run was admitted with (its receipt's `length`), read before the database goes. A
+    // reading that breaks costs only this block, never the report.
+    let length: PracticeLengthBlock | undefined;
+    if (lengthSource !== null) {
+      try {
+        length = practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange,
+          frozen: await readPracticeFrozenLength(pool, job.runId) });
+      } catch (error) {
+        progress(`length guidance: what the run was admitted with could not be read (${codeOf(error)})`);
+        length = practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange, frozen: null,
+          unreadable: `FACTS_UNREADABLE:${codeOf(error)}` });
+      }
+    }
     // Question language: the lock and the offer (from the decider), the language the run was stored with, and the
     // planner's naming as the map stored it (operator-only, CR-3). A reading that breaks costs only the planner facts,
     // never the report.
@@ -855,6 +902,7 @@ export async function runPracticeDebate(input: Readonly<{
       parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript }),
       ...(shape === undefined ? {} : { shape }),
+      ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
       ...(deployment === undefined ? {} : { deployment })
     });

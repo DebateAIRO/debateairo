@@ -1,0 +1,389 @@
+{
+  "kind": "LENGTH_GUIDANCE_POLICY",
+  "version": 1,
+  "plans": {
+    "free": {
+      "steps": {
+        "opening": {
+          "short": 180,
+          "standard": 300,
+          "detailed": 450
+        },
+        "pros_cons": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "cross_exchange": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "judge_panel": {
+          "short": 120,
+          "standard": 200,
+          "detailed": 300
+        },
+        "reviewer": {
+          "short": 70,
+          "standard": 120,
+          "detailed": 180
+        },
+        "answer_writer": {
+          "short": 200,
+          "standard": 350,
+          "detailed": 1000
+        },
+        "answer_checker": {
+          "short": 150,
+          "standard": 150,
+          "detailed": 150
+        },
+        "story_checker": {
+          "short": 250,
+          "standard": 250,
+          "detailed": 250
+        },
+        "comparing_judge": {
+          "short": 80,
+          "standard": 80,
+          "detailed": 80
+        },
+        "investigator": {
+          "short": 60,
+          "standard": 60,
+          "detailed": 60
+        }
+      },
+      "story": {
+        "headline": 15,
+        "summary": 120,
+        "confidence": 30,
+        "positionLine": 35,
+        "change": 60,
+        "whyReason": 100
+      },
+      "map": {
+        "claim": 35,
+        "whyItMatters": 35,
+        "candidateAnswer": 25,
+        "angleLabel": 8,
+        "angleFocus": 35,
+        "framingChallenge": 35,
+        "chosenAnswer": 35,
+        "checkReason": 40
+      }
+    },
+    "plus": {
+      "steps": {
+        "opening": {
+          "short": 180,
+          "standard": 300,
+          "detailed": 450
+        },
+        "pros_cons": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "cross_exchange": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "judge_panel": {
+          "short": 120,
+          "standard": 200,
+          "detailed": 300
+        },
+        "reviewer": {
+          "short": 70,
+          "standard": 120,
+          "detailed": 180
+        },
+        "answer_writer": {
+          "short": 200,
+          "standard": 350,
+          "detailed": 1000
+        },
+        "answer_checker": {
+          "short": 150,
+          "standard": 150,
+          "detailed": 150
+        },
+        "story_checker": {
+          "short": 250,
+          "standard": 250,
+          "detailed": 250
+        },
+        "comparing_judge": {
+          "short": 80,
+          "standard": 80,
+          "detailed": 80
+        },
+        "investigator": {
+          "short": 60,
+          "standard": 60,
+          "detailed": 60
+        }
+      },
+      "story": {
+        "headline": 15,
+        "summary": 120,
+        "confidence": 30,
+        "positionLine": 35,
+        "change": 60,
+        "whyReason": 100
+      },
+      "map": {
+        "claim": 35,
+        "whyItMatters": 35,
+        "candidateAnswer": 25,
+        "angleLabel": 8,
+        "angleFocus": 35,
+        "framingChallenge": 35,
+        "chosenAnswer": 35,
+        "checkReason": 40
+      }
+    },
+    "pro": {
+      "steps": {
+        "opening": {
+          "short": 180,
+          "standard": 300,
+          "detailed": 450
+        },
+        "pros_cons": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "cross_exchange": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "judge_panel": {
+          "short": 120,
+          "standard": 200,
+          "detailed": 300
+        },
+        "reviewer": {
+          "short": 70,
+          "standard": 120,
+          "detailed": 180
+        },
+        "answer_writer": {
+          "short": 200,
+          "standard": 350,
+          "detailed": 1000
+        },
+        "answer_checker": {
+          "short": 150,
+          "standard": 150,
+          "detailed": 150
+        },
+        "story_checker": {
+          "short": 250,
+          "standard": 250,
+          "detailed": 250
+        },
+        "comparing_judge": {
+          "short": 80,
+          "standard": 80,
+          "detailed": 80
+        },
+        "investigator": {
+          "short": 60,
+          "standard": 60,
+          "detailed": 60
+        }
+      },
+      "story": {
+        "headline": 15,
+        "summary": 120,
+        "confidence": 30,
+        "positionLine": 35,
+        "change": 60,
+        "whyReason": 100
+      },
+      "map": {
+        "claim": 35,
+        "whyItMatters": 35,
+        "candidateAnswer": 25,
+        "angleLabel": 8,
+        "angleFocus": 35,
+        "framingChallenge": 35,
+        "chosenAnswer": 35,
+        "checkReason": 40
+      }
+    },
+    "max": {
+      "steps": {
+        "opening": {
+          "short": 180,
+          "standard": 300,
+          "detailed": 450
+        },
+        "pros_cons": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "cross_exchange": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "judge_panel": {
+          "short": 120,
+          "standard": 200,
+          "detailed": 300
+        },
+        "reviewer": {
+          "short": 70,
+          "standard": 120,
+          "detailed": 180
+        },
+        "answer_writer": {
+          "short": 200,
+          "standard": 350,
+          "detailed": 1000
+        },
+        "answer_checker": {
+          "short": 150,
+          "standard": 150,
+          "detailed": 150
+        },
+        "story_checker": {
+          "short": 250,
+          "standard": 250,
+          "detailed": 250
+        },
+        "comparing_judge": {
+          "short": 80,
+          "standard": 80,
+          "detailed": 80
+        },
+        "investigator": {
+          "short": 60,
+          "standard": 60,
+          "detailed": 60
+        }
+      },
+      "story": {
+        "headline": 15,
+        "summary": 120,
+        "confidence": 30,
+        "positionLine": 35,
+        "change": 60,
+        "whyReason": 100
+      },
+      "map": {
+        "claim": 35,
+        "whyItMatters": 35,
+        "candidateAnswer": 25,
+        "angleLabel": 8,
+        "angleFocus": 35,
+        "framingChallenge": 35,
+        "chosenAnswer": 35,
+        "checkReason": 40
+      }
+    },
+    "premium": {
+      "steps": {
+        "opening": {
+          "short": 180,
+          "standard": 300,
+          "detailed": 450
+        },
+        "pros_cons": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "cross_exchange": {
+          "short": 150,
+          "standard": 250,
+          "detailed": 380
+        },
+        "judge_panel": {
+          "short": 120,
+          "standard": 200,
+          "detailed": 300
+        },
+        "reviewer": {
+          "short": 70,
+          "standard": 120,
+          "detailed": 180
+        },
+        "answer_writer": {
+          "short": 200,
+          "standard": 350,
+          "detailed": 1000
+        },
+        "answer_checker": {
+          "short": 150,
+          "standard": 150,
+          "detailed": 150
+        },
+        "story_checker": {
+          "short": 250,
+          "standard": 250,
+          "detailed": 250
+        },
+        "comparing_judge": {
+          "short": 80,
+          "standard": 80,
+          "detailed": 80
+        },
+        "investigator": {
+          "short": 60,
+          "standard": 60,
+          "detailed": 60
+        }
+      },
+      "story": {
+        "headline": 15,
+        "summary": 120,
+        "confidence": 30,
+        "positionLine": 35,
+        "change": 60,
+        "whyReason": 100
+      },
+      "map": {
+        "claim": 35,
+        "whyItMatters": 35,
+        "candidateAnswer": 25,
+        "angleLabel": 8,
+        "angleFocus": 35,
+        "framingChallenge": 35,
+        "chosenAnswer": 35,
+        "checkReason": 40
+      }
+    }
+  },
+  "runawayMultiplier": 4,
+  "tokensPerWord": 3,
+  "thinkingRoom": {
+    "opening": 4096,
+    "pros_cons": 6144,
+    "cross_exchange": 6144,
+    "judge_panel": 4096,
+    "reviewer": 2048,
+    "answer_writer": 16384,
+    "answer_checker": 2048,
+    "story_checker": 12288,
+    "comparing_judge": 4096,
+    "investigator": 2048,
+    "story_writer": 65536,
+    "map": 8192
+  },
+  "storyLongReferenceWords": 3000,
+  "charactersPerWord": {
+    "zh": 1.6,
+    "ja": 2,
+    "th": 5
+  },
+  "answerWriterSeesJudgeReasons": false
+}

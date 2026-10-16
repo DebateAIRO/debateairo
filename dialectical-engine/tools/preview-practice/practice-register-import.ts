@@ -44,12 +44,15 @@ import {
   createPostgresRegisterPublicationPort,
   DEBATE_SHAPE_POLICY_ROW_KEY,
   debateShapePolicyRow,
+  LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  lengthGuidancePolicyRow,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   type BootstrapRegister,
   type CallConcurrencyPolicy,
   type DebateShapePolicy,
+  type LengthGuidancePolicy,
   type RegisterPublicationRow
 } from "@debateai/register";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
@@ -222,6 +225,8 @@ export type PracticeNextRegisterChoices = Readonly<{
    * unchanged, R19).
    */
   debateShape?: DebateShapePolicy;
+  /** `--length-policy` with `--register-next` (LG-C): the kit's own source build's `lengthGuidance`, as the plan's `--length-guidance`. */
+  lengthGuidance?: LengthGuidancePolicy;
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
@@ -266,6 +271,11 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
    * choose the kit.
    */
   debateShape?: DebateShapePolicy | null | undefined;
+  /**
+   * `--length-policy`'s policy, already checked by the register's own parser (practice-length.ts); with `--register-next`
+   * it goes into the next version, as the plan's `--length-guidance '<JSON>'`. It does not choose the kit.
+   */
+  lengthGuidance?: LengthGuidancePolicy | null | undefined;
 }>, load: () => Promise<NativeOperatorChecks> = async () => await import(NATIVE_OPERATOR_MODULE) as NativeOperatorChecks):
   Promise<Readonly<{ kit: "v2" | "v3"; hostedBilling: PreviewHostedBillingChoice | null; choices: PracticeNextRegisterChoices }>> {
   const invalid = (flag: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_INPUT_INVALID", flag); };
@@ -293,7 +303,8 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
       ? Object.freeze({ checker: "deepseek" as const, deepseekEnabledOnGate: true as const }) : Object.freeze({ checker: "glm" as const }) }),
     ...(flags.roleRotation === undefined ? {} : { roleRotation: flags.roleRotation as PreviewRoleRotationChoice }),
     ...(callConcurrency === undefined ? {} : { callConcurrency }),
-    ...(flags.debateShape === undefined || flags.debateShape === null ? {} : { debateShape: flags.debateShape })
+    ...(flags.debateShape === undefined || flags.debateShape === null ? {} : { debateShape: flags.debateShape }),
+    ...(flags.lengthGuidance === undefined || flags.lengthGuidance === null ? {} : { lengthGuidance: flags.lengthGuidance })
   });
   return Object.freeze({ kit: hostedBilling === null ? "v2" as const : "v3" as const, hostedBilling, choices });
 }
@@ -361,9 +372,10 @@ export async function composePracticeNextRegisterVersion(
     return rotationEnabled === true ? "on" as const : "off" as const;
   })();
   const runtime = practiceBaseRuntime(baseRows, unsupported);
-  // `choices.debateShape` (controller ruling D-REGNEXT): the kit's own source build's `debateShape`.
+  // `choices.debateShape` (controller ruling D-REGNEXT): the kit's own source build's `debateShape`; `choices.lengthGuidance`
+  // (LG-C) its `lengthGuidance` (the question-language argument stays today's default, null).
   const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), runtime, checker, roleRotation,
-    choices.callConcurrency ?? null, choices.debateShape ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV2({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -416,9 +428,10 @@ export async function composePracticeHostedNextRegisterVersion(
       + "(so does the server's plan without the same flag)");
   }
   // `choices.debateShape` (controller ruling D-REGNEXT): kit v3 hands it to kit v2's source build, as the plan's own
-  // `--debate-shape` does (publish-register-v3.ts), and asks the runner's debate-shape boot refusals before sealing.
+  // `--debate-shape` does (publish-register-v3.ts), and asks the runner's debate-shape boot refusals before sealing;
+  // `choices.lengthGuidance` (LG-C) likewise, as the plan's `--length-guidance`.
   const sourceRows = await buildPreviewSourceRowsV3(bootstrap ?? await loadBootstrapRegister(), runtime, hostedBilling, checker, roleRotation,
-    choices.callConcurrency ?? null, choices.debateShape ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV3({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -556,37 +569,70 @@ export async function practiceCodeContractHashRows(): Promise<readonly RegisterP
 }
 
 /**
- * The practice version's rows: the export's LAST version's rows exactly as imported, with the debate-shape row added
- * (or the export's own replaced) and the code's four contract-hash rows put in place of the export's, in key order.
- * Pure.
+ * Length guidance (LG-C, `--length-policy`): the source ref of the length row the practice adds, so no reader can mistake
+ * the practice's version for a live one.
  */
-export function practiceShapeVersionRows(document: PracticeRegisterExport, policy: DebateShapePolicy,
-  codeHashRows: readonly RegisterPublicationRow[]): Readonly<{ rows: readonly RegisterPublicationRow[]; row: "ADDED" | "REPLACED" }> {
+export const PRACTICE_LENGTH_SOURCE_REF = "preview practice: --length-policy, this throwaway register only" as const;
+
+/** The practice's own version (no --register-next): which override rows it added or replaced. */
+export type PracticeOverrideVersion = Readonly<{
+  baseRegisterVersion: string; registerVersion: string; snapshotSha256: string;
+  shapeRow: "ADDED" | "REPLACED" | null; lengthRow: "ADDED" | "REPLACED" | null;
+}>;
+
+/**
+ * The practice version's rows: the export's last version's rows with each given override row added (or the export's own
+ * replaced) and the code's contract-hash rows in place of the export's, in key order. Pure.
+ */
+export function practiceOverrideVersionRows(document: PracticeRegisterExport,
+  overrides: Readonly<{ shape: DebateShapePolicy | null; length: LengthGuidancePolicy | null }>,
+  codeHashRows: readonly RegisterPublicationRow[]): Readonly<{
+    rows: readonly RegisterPublicationRow[]; shapeRow: "ADDED" | "REPLACED" | null; lengthRow: "ADDED" | "REPLACED" | null;
+  }> {
   const last = document.versions[document.versions.length - 1]!;
   const base = practiceVersionRows(document, last.register_version);
-  const shaped = debateShapePolicyRow(policy, PRACTICE_SHAPE_SOURCE_REF);
-  const replaced = base.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY);
-  const own = new Set<string>([DEBATE_SHAPE_POLICY_ROW_KEY, ...codeHashRows.map((row) => row.rowKey)]);
-  const rows = [...base.filter((row) => !own.has(row.rowKey)),
-    Object.freeze({ rowKey: shaped.rowKey, valueJsonText: shaped.valueJsonText, sourceRef: shaped.sourceRef }), ...codeHashRows]
+  const added: RegisterPublicationRow[] = [];
+  if (overrides.shape !== null) {
+    const row = debateShapePolicyRow(overrides.shape, PRACTICE_SHAPE_SOURCE_REF);
+    added.push(Object.freeze({ rowKey: row.rowKey, valueJsonText: row.valueJsonText, sourceRef: row.sourceRef }));
+  }
+  if (overrides.length !== null) {
+    const row = lengthGuidancePolicyRow(overrides.length, PRACTICE_LENGTH_SOURCE_REF);
+    added.push(Object.freeze({ rowKey: row.rowKey, valueJsonText: row.valueJsonText, sourceRef: row.sourceRef }));
+  }
+  const own = new Set<string>([...added.map((row) => row.rowKey), ...codeHashRows.map((row) => row.rowKey)]);
+  const rows = [...base.filter((row) => !own.has(row.rowKey)), ...added, ...codeHashRows]
     .sort((a, b) => (a.rowKey < b.rowKey ? -1 : a.rowKey > b.rowKey ? 1 : 0));
-  return Object.freeze({ rows: Object.freeze(rows), row: replaced ? "REPLACED" : "ADDED" });
+  const change = (key: string, given: boolean) => !given ? null : base.some((row) => row.rowKey === key) ? "REPLACED" as const : "ADDED" as const;
+  return Object.freeze({ rows: Object.freeze(rows), shapeRow: change(DEBATE_SHAPE_POLICY_ROW_KEY, overrides.shape !== null),
+    lengthRow: change(LENGTH_GUIDANCE_POLICY_ROW_KEY, overrides.length !== null) });
 }
 
 /**
- * Publishes the practice version in the THROWAWAY database only, through the register's own general publication on
- * the export's last version, and proves it: the number allocated is exactly one above, and its rows hash as built.
- * The export document is only read.
+ * The practice version's rows with the debate-shape row alone (see practiceOverrideVersionRows): the export's LAST
+ * version's rows exactly as imported, with the debate-shape row added (or the export's own replaced) and the code's four
+ * contract-hash rows put in place of the export's, in key order. Pure.
  */
-export async function publishPracticeShapeVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
-  policy: DebateShapePolicy): Promise<PracticeShapeVersion> {
-  const { rows, row } = practiceShapeVersionRows(document, policy, await practiceCodeContractHashRows());
+export function practiceShapeVersionRows(document: PracticeRegisterExport, policy: DebateShapePolicy,
+  codeHashRows: readonly RegisterPublicationRow[]): Readonly<{ rows: readonly RegisterPublicationRow[]; row: "ADDED" | "REPLACED" }> {
+  const built = practiceOverrideVersionRows(document, { shape: policy, length: null }, codeHashRows);
+  return Object.freeze({ rows: built.rows, row: built.shapeRow! });
+}
+
+/**
+ * Publishes the practice's override version (the --shape-policy and/or --length-policy rows; ONE version for both) in
+ * the THROWAWAY database only, through the register's own general publication on the export's last version, and proves
+ * it: the number allocated is exactly one above, and its rows hash as built. The export document is only read.
+ */
+export async function publishPracticeOverrideVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
+  overrides: Readonly<{ shape: DebateShapePolicy | null; length: LengthGuidancePolicy | null }>): Promise<PracticeOverrideVersion> {
+  const { rows, shapeRow, lengthRow } = practiceOverrideVersionRows(document, overrides, await practiceCodeContractHashRows());
   const expected = String(BigInt(receipt.registerVersion) + 1n);
   const published = await createPostgresRegisterPublicationPort(pool).publishGeneral({
     publicationId: randomUUID(),
     baseRegisterVersion: parseRegisterVersionText(receipt.registerVersion),
     rows,
-    sourceRef: PRACTICE_SHAPE_SOURCE_REF,
+    sourceRef: overrides.shape !== null ? PRACTICE_SHAPE_SOURCE_REF : PRACTICE_LENGTH_SOURCE_REF,
     deployment: "local"
   });
   if (published.registerVersion !== expected) {
@@ -594,7 +640,21 @@ export async function publishPracticeShapeVersion(pool: Pool, document: Practice
   }
   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
   if (await databaseVersionSnapshotSha256(pool, expected) !== snapshotSha256) {
-    throw new PracticeRegisterError("PRACTICE_REGISTER_HASH_MISMATCH", `version ${expected} (the practice's debate-shape version)`);
+    throw new PracticeRegisterError("PRACTICE_REGISTER_HASH_MISMATCH", `version ${expected} (the practice's override version)`);
   }
-  return Object.freeze({ baseRegisterVersion: receipt.registerVersion, registerVersion: expected, row, snapshotSha256 });
+  return Object.freeze({ baseRegisterVersion: receipt.registerVersion, registerVersion: expected, snapshotSha256, shapeRow, lengthRow });
+}
+
+/** The practice's own version with the debate-shape row alone (see publishPracticeOverrideVersion). */
+export async function publishPracticeShapeVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
+  policy: DebateShapePolicy): Promise<PracticeShapeVersion> {
+  const version = await publishPracticeOverrideVersion(pool, document, receipt, { shape: policy, length: null });
+  return Object.freeze({ baseRegisterVersion: version.baseRegisterVersion, registerVersion: version.registerVersion,
+    row: version.shapeRow!, snapshotSha256: version.snapshotSha256 });
+}
+
+/** INTERFACE §8: the practice's own version with the length row alone, in the throwaway database only. */
+export async function publishPracticeLengthVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
+  policy: LengthGuidancePolicy): Promise<PracticeOverrideVersion> {
+  return publishPracticeOverrideVersion(pool, document, receipt, { shape: null, length: policy });
 }

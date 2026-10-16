@@ -50,10 +50,10 @@ vi.mock("../../tools/preview-practice/practice-throwaway-db.js", () => ({
 vi.mock("../../tools/preview-practice/practice-register-import.js", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../tools/preview-practice/practice-register-import.js")>(),
   importPracticeRegister: vi.fn(async () => seen.receipt),
-  publishPracticeShapeVersion: vi.fn(async (...args: unknown[]) => {
+  publishPracticeOverrideVersion: vi.fn(async (...args: unknown[]) => {
     seen.published.push(args);
-    seen.rows.set(6, args[3]);
-    return { baseRegisterVersion: "5", registerVersion: "6", row: "ADDED", snapshotSha256: "a".repeat(64) };
+    seen.rows.set(6, (args[3] as { shape: unknown }).shape);
+    return { baseRegisterVersion: "5", registerVersion: "6", shapeRow: "ADDED", lengthRow: null, snapshotSha256: "a".repeat(64) };
   })
 }));
 vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
@@ -111,7 +111,7 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(seen.published).toHaveLength(1);
     expect(seen.published[0]![1]).toBe(REGISTER);
     expect(seen.published[0]![2]).toBe(LIVE);
-    expect(seen.published[0]![3]).toEqual(policy);
+    expect(seen.published[0]![3]).toEqual({ shape: policy, length: null });
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
     expect(seen.requests).toHaveLength(1);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });

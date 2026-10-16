@@ -427,6 +427,23 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
+### Length guidance (debate mode, `--length-policy`)
+
+- `--length-policy FILE` puts the length row from FILE into the practice's own throwaway database, and only there (with
+  `--register-next`: into the code's next version, as the server's `--length-guidance` would). The file is checked by the
+  register's own parser before anything is spent; a refusal names only the place that is wrong
+  (`PRACTICE_LENGTH_POLICY_INVALID <path>`, `PRACTICE_LENGTH_POLICY_UNREADABLE`).
+- `tools/preview-practice/length-policy-start.json` holds the owners' start values (spec 2026-10-15 §7).
+- With the row, `--answer-length short|standard|detailed` works without `--shape-policy`.
+- `report.json` gains a `length` block: where the row came from, the version, and the numbers the debate was admitted
+  with. The guided-vs-actual words table fills its "guided" and "over guided" columns. A map row shows its guided words
+  but no "over" share: a map call is told one target per part of each item, and its reply holds several items.
+- A reply put back into its form by the structure call carries no guided words: it counts as accepted, but is left out
+  of the guided median and the "over" share.
+- Comparing levels (ruling L22): run the same question with two or three `--length-policy` files that differ only in the
+  numbers being compared, one run at a time, within the daily test budget. Results are judged by the owners' private
+  method, outside this repository, plus cost and time from the report.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
@@ -1118,6 +1135,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
   out, `language.jsonl`, the report) and debate mode's `--site-language` and `--language-choice`.
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
+- `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
+- `length-policy-start.json`: the owners' start values for `--length-policy`.
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
