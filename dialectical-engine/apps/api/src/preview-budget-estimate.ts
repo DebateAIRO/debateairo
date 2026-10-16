@@ -775,9 +775,11 @@ export function previewCallShares(input: Readonly<{
     // LG-A (L32): a story try's second POST may instead be the structure-repair call on the repair model; it is counted
     // there too, per round and story role, so the repair model's gate is never under-counted (the step's own gate keeps
     // its count: the estimate stays a ceiling). Task 14 controller ruling: as STRUCTURE_REPAIR, at the repair call's own
-    // ceiling, never as a story retry (a checker's retry asks half the repair's answer cap).
+    // ceiling, never as a story retry (a checker's retry asks half the repair's answer cap). The repair call carries no
+    // repair packet of its own, so the preview policy gives it owner ruling 5's one resend after an unbilled refusal: that
+    // UNBILLED_RETRY is counted with it, as for every debate call (Task 14 review).
     const repairModel = input.structureRepairModel ?? null;
-    if (repairModel !== null) add(repairModel, "STRUCTURE_REPAIR", rounds * BigInt(tellers.length + checkers.length));
+    if (repairModel !== null) addDebate(repairModel, rounds * BigInt(tellers.length + checkers.length), "STRUCTURE_REPAIR");
   }
   return Object.freeze({ denominator, shares: Object.freeze(shares) });
 }
