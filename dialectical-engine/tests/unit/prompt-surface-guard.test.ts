@@ -599,6 +599,10 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
       const raw = renderMaterial(toSynthesisPromptMaterial(request));
       const fields = parsedFields(raw);
       expect(fields.map(({ name }) => name).sort()).toEqual(keys);
+      // L30 (LG-B): the field that changes between tries and rounds rides after the stable digest and label (a run's
+      // answer_length and question_language, the same on every try, follow it in the built prompt).
+      expect(fields.at(-1)!.name).toBe(keys.includes("prior_objection") ? "prior_objection"
+        : keys.includes("candidate_statement") ? "candidate_statement" : "code_label");
       const digestField = JSON.parse(fields.find(({ name }) => name === "digest")!.content) as Record<string, unknown>;
       expect(Array.isArray(digestField.omittedPoints)).toBe(true);
       const leakedKeys = fields
