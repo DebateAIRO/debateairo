@@ -510,8 +510,8 @@ app reads as `PREVIEW_GATE_UNREACHABLE` (the live site refuses every new debate)
 
 Phase 1, in the same sitting as the DeepInfra gate, right after it (README.md's section, "Both gates in ONE sitting":
 between the two installs, the gate still on the old code cannot be opened again). "Redeploy (2026-10-12)" steps 1-3 of
-README.md with this gate's `G` and `GO`; write down this gate's archive folder `$B` too (the two-gate
-way back needs it). The alert script is refreshed once, by README.md's section
+README.md with this gate's `G` and `GO`; step 1 prints this gate's archive folder: write down the folder name after
+/root/preview-archive/ too (the two-gate way back needs it). The alert script is refreshed once, by README.md's section
 (its phase 1, step 1), not again here. The GO edit changes only the two hashes and `daily_budget_usd`. The block sets
 `G` and `GO` itself (in the same root shell they may still name the DeepInfra gate) and first checks that the GO is
 Anthropic's (else `WRONG_GO: stop here`):
@@ -552,7 +552,9 @@ Ways back, as README.md's section "Ways back": the app-only block (both gates: `
 from both GOs, both services restarted, then `activate` each) takes away phase 2's slots and gives the R17 app its seven
 members back. The gate files go back only together with the DeepInfra gate, by README.md's two-gate block (both gates
 stopped, both gates' old files and old GOs back, both services restarted, then `activate` each). Never this gate alone:
-its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`).
+its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`). The one exception is README.md's
+half-done sitting: if the sitting stopped after the DeepInfra gate and this gate's phase 1 never began, this GO is still
+the old one, and the DeepInfra gate goes back alone by "Redeploy (2026-10-12)".
 
 This gate matters most for the order: an older Anthropic gate refuses a Haiku message whose first part carries the
 cache mark of this release (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that. So this gate gets the

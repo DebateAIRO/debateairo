@@ -734,7 +734,7 @@ for the DeepInfra gate; for the Anthropic gate use
    ```sh
    G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
    B=/root/preview-archive/redeploy-$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$G"); install -d -o root -g root -m 0700 "$B"
-   cp -a "$G/preview_budget_authority.py" "$G/preview_budget_helper.py" "$GO" "$B/" && ls -l "$B"
+   cp -a "$G/preview_budget_authority.py" "$G/preview_budget_helper.py" "$GO" "$B/" && echo "$B" && ls -l "$B"
    ```
 2. `stop` (Daily operations, "Emergency off", level 1).
 3. Install both gate files from the reviewed release (install step 1 of that gate's README) and
@@ -787,14 +787,14 @@ standard caps and logs one line `PREVIEW_FINAL_WRITER_TIER_UNREAD` per gate. But
 that carries the cache mark (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that refusal. So the gates
 always go first.
 
-Both gates in ONE sitting. Install the DeepInfra gate and the Anthropic gate one right after the other, and go back
-(if ever) with both together, never one alone. Why: a gate's `activate` also reads the other gate's GO and judges it
-with its OWN code's limits. Between the two installs, the gate still on the old code cannot be opened again (for
-example after its halt email): with the DeepInfra GO already on `"12.00"`, the old Anthropic gate refuses
-`TEAM_TOTAL_UNVERIFIABLE` (one GO above its old $10.00 ceiling); with the Anthropic GO already on $4.00, the old
-DeepInfra gate refuses `TEAM_TOTAL_BUDGET_EXCEEDED` ($10.00 + $4.00 is above its old $12.00 team total). The new code
-accepts both the old and the new GOs, so going forward either gate may go first, but only both together stay
-re-openable.
+Both gates in ONE sitting. Install the DeepInfra gate and the Anthropic gate one right after the other, and go back (if
+ever) with both together, never one alone (one exception: the half-done sitting, under "Ways back"). Why: a gate's
+`activate` also reads the other gate's GO and judges it with its OWN code's limits. Between the two installs, the gate
+still on the old code cannot be opened again (for example after its halt email): with the DeepInfra GO already on
+`"12.00"`, the old Anthropic gate refuses `TEAM_TOTAL_UNVERIFIABLE` (one GO above its old $10.00 ceiling); with the
+Anthropic GO already on $4.00, the old DeepInfra gate refuses `TEAM_TOTAL_BUDGET_EXCEEDED` ($10.00 + $4.00 is above its
+old $12.00 team total). The new code accepts both the old and the new GOs, so going forward either gate may go first,
+but only both together stay re-openable.
 
 Two phases (final review, 2026-10-16). The app running on the server today (R17) reads a gate's `/remaining` answer
 strictly: exactly its seven members. A gate whose GO names `max_final_writer_calls` answers nine (it adds its
@@ -825,9 +825,10 @@ install step 0, item 2).
 
 For each gate (DeepInfra here; the Anthropic gate by its own README's section of the same name), as root, when no
 debate is running (`status` shows `in_flight` 0), in a `set -euo pipefail` batch:
-1. "Redeploy (2026-10-12)" steps 1-3: keep a copy of both gate files and the GO (it sets `G`, `GO` and `B`), `stop`,
-   install both gate files from the reviewed release and check their hashes. Write down the archive folder `$B` that
-   step 1 prints (`ls -l "$B"`), for each gate: the two-gate way back below needs both. Once for both gates (the alert script is shared),
+1. "Redeploy (2026-10-12)" steps 1-3: keep a copy of both gate files and the GO (it sets `G`, `GO` and `B`, and prints
+   the archive folder, `/root/preview-archive/redeploy-<time>-deepinfra-budget-v3`), `stop`, install both gate files
+   from the reviewed release and check their hashes. Write down the folder name after /root/preview-archive/ that step
+   1 prints, for each gate: the two-gate way back below needs both. Once for both gates (the alert script is shared),
    refresh the alert script from the same release (`R` set to this release, as install step 1), as install step 9
    does, so the booked-at-maximum email names an answer without a bill count (owner answer M3):
 
@@ -928,8 +929,8 @@ the runner only after both are `active`.
 The gate files: BOTH gates together, in one sitting (the old code of either gate refuses the other gate's new GO, see
 "Both gates in ONE sitting" above). Each gate's GO goes back WITH its files: the old code refuses a GO that names
 `max_final_writer_calls` or asks `"12.00"`. This also takes phase 2's slots away (the archived GOs are the old ones).
-As root, when no debate is running, type the block yourself, putting the two archive folders written down in phase 1,
-step 1 in place of DEEPINFRA_ARCHIVE and ANTHROPIC_ARCHIVE. It checks
+As root, when no debate is running, type the block yourself, putting the two folder names written down in phase 1,
+step 1 (the folder name after /root/preview-archive/) in place of DEEPINFRA_ARCHIVE and ANTHROPIC_ARCHIVE. It checks
 both archives first (it prints `ARCHIVE_MISSING: <file>` or `ARCHIVE_NOT_OLD: <file>` and stops on any doubt), then
 stops both gates, puts both gates' old files and old GOs back, restarts both services, and prints `BOTH_GATES_BACK`:
 
@@ -953,6 +954,12 @@ echo BOTH_GATES_BACK )
 
 Only after `BOTH_GATES_BACK`: `activate` each gate (owner's yes; "Re-open after a halt", step 5, and README-anthropic.md's
 own), then `status` must show `state` `active` for both, and restart the runner after both are `active`.
+
+The half-done sitting, the one exception: if phase 1 stopped after the first gate and the second gate's step 1 never
+ran (no archive folder for it; its files and GO are still the old ones), the two-gate block cannot run. Then go back
+with the one-gate way back of "Redeploy (2026-10-12)" (`stop`, the three files from that gate's `$B` back, restart the
+service, `activate`) for the first gate alone. It works because the other gate's GO is still old, so neither gate's
+code meets a GO it refuses. Restart the runner after both gates are `active`.
 
 ## Daily operations
 
