@@ -47,15 +47,30 @@ export function installRunnerFailureCodes(target=process) {
  target.on('uncaughtException',stop);target.on('unhandledRejection',stop);
  return stop;
 }
+/**
+ * The start mode (`--start`); `launch` is launchRunner, replaced only by tests. The one end that is
+ * not a failure is a stop someone asked for after readiness: `systemctl stop` (SIGTERM) or Ctrl-C
+ * (SIGINT). On that signal the Hatchet worker ends its listener and main returns
+ * (@hatchet-dev/typescript-sdk worker-internal.js); that end prints PREVIEW_RUNNER_STOPPED and
+ * exits 0, so systemd does not run OnFailure= (the owner's "runner failed" email).
+ */
+export async function startRunner(argv,launch=launchRunner) {
+ // Any refusal or later end ends this process: the runner's worker must not stay up unreported.
+ const stop=installRunnerFailureCodes();
+ let started;
+ try{started=await launch(argv);}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
+ let asked=false;
+ const stopped=()=>{process.stdout.write('PREVIEW_RUNNER_STOPPED\n');process.exit(0);};
+ // Listening replaces Node's default end on the signal; with no worker listening too, end here.
+ for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{asked=true;if(process.listenerCount(signal)===1)stopped();});
+ // A long-running worker that ends unasked (returned) or fails (even during an asked stop) is
+ // reported, never a silent exit 0.
+ await started.running.then(()=>asked?stopped():stop(),stop);
+}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const argv=process.argv.slice(2);
  if(argv[0]==='--start'){
-  // Any refusal or later end ends this process: the runner's worker must not stay up unreported.
-  const stop=installRunnerFailureCodes();
-  let started;
-  try{started=await launchRunner(argv.slice(1));}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
-  // A long-running worker that ends at all (failed or returned) is reported, never a silent exit 0.
-  await started.running.then(stop,stop);
+  await startRunner(argv.slice(1));
  }else{
   try{process.stdout.write(`${JSON.stringify(await prepareRunner(argv))}\n`);}catch{process.stderr.write('PREVIEW_RUNNER_PREPARATION_REFUSED\n');process.exitCode=1;}
  }
