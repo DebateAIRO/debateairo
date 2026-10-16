@@ -268,6 +268,8 @@ describe("LG-A withStructureRepair (L32)", () => {
     expect(sent).toMatchObject({ callSiteKey: "REPAIR:STRUCTURE:JUDGE", role: "JUDGE", lane: "served", runId: "run:lg-a",
       subjectItemId: "node:lg-a", providerRef: HAIKU_REF, contractHash: STRUCTURE_REPAIR_CONTRACT_HASH,
       bound: { maxAttempts: 3, tokenCeiling: 32768, deadlineMs: 1_260_000 } });
+    // Final review M-1: one POST by construction, whatever gateway the route names.
+    expect(sent.maxAttemptsThisCall).toBe(1);
     for (const absent of ["thinkingLevel", "repairThinkingLevel", "buildRepairPacket", "modelRole", "structureRepairRouted", "preferredResponseFormat"] as const) {
       expect(sent[absent]).toBeUndefined();
     }

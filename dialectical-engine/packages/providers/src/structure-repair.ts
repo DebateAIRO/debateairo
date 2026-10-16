@@ -386,6 +386,9 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
       role: request.role,
       lane: request.lane,
       bound: Object.freeze({ maxAttempts: request.bound.maxAttempts, tokenCeiling: route.bound.tokenCeiling, deadlineMs: route.bound.deadlineMs }),
+      // Final review M-1: ONE POST by construction (L32 "one cheap structure-only call"), whatever gateway the route names;
+      // the preview's call policy sets the same, and the request carries no repair packet to spend a second on.
+      maxAttemptsThisCall: 1,
       contractHash: STRUCTURE_REPAIR_CONTRACT_HASH,
       providerRef: route.providerRef,
       packet,

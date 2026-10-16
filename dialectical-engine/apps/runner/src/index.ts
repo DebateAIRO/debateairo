@@ -110,6 +110,7 @@ import {
   PROVIDER_USAGE_CAP,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
+  ProviderStructureUnrepairedError,
   lengthRetryTokenCeiling,
   providerTargetPrice,
   rememberingAcceptedReply,
@@ -12089,13 +12090,18 @@ export function createPostgresProviderGateway(
           ...(costEnvelope === undefined ? {} : { costEnvelope })
         });
       } catch (error) {
-        capture?.emit(captureFailureEnvelope({
-          error,
-          taxonomyClass: "PROVIDER_EXHAUSTED",
-          capturePoint: "provider",
-          disposition: "THROWN",
-          source: "first_party"
-        }));
+        // Final review M-2: a routed call that ends for the structure repair (ProviderStructureUnrepairedError) is not
+        // exhausted: withStructureRepair, around this gateway, sends the repair call next, and a repair that does not do
+        // ends there as a content refusal. Only a call that really ended here is captured as a provider failure.
+        if (!(error instanceof ProviderStructureUnrepairedError)) {
+          capture?.emit(captureFailureEnvelope({
+            error,
+            taxonomyClass: "PROVIDER_EXHAUSTED",
+            capturePoint: "provider",
+            disposition: "THROWN",
+            source: "first_party"
+          }));
+        }
         throw error;
       }
       } finally {

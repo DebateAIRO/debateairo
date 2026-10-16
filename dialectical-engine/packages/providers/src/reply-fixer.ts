@@ -446,7 +446,8 @@ export function replyFailureClassOf(rejected: Pick<RejectedProviderContent, "raw
   if (rejected.parseError.startsWith("PATCH_")) return "CONTENT";
   // Pre-flight PF-A14 (ruling R4, INTERFACE §2.3): a reply that ended normally, has visible text and holds no readable
   // JSON is STRUCTURE, prose with no object included. The structure-repair call keeps the words; if content is missing,
-  // the schema check after the repair fails and the content follow-up follows.
+  // the step's check refuses the repaired reply and the call ends as a content refusal (the repair is the routed call's
+  // last try, so no follow-up is sent inside it): only the runner's own final retry may follow (final review M-4).
   if (rejected.parseStatus === "PARSE_FAILED") return "STRUCTURE";
   const issues = refusalIssues(rejected.parseError);
   if (issues === null) return "CONTENT";
