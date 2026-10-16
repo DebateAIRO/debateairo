@@ -230,6 +230,10 @@ class GateUnitTests(unittest.TestCase):
         for stale in ('1.50', '"1.00"', '$3.50', '$5 team', '$5.00', '0.625 per million', '0.428032'):
             self.assertNotIn(stale, readme)
         self.assertIn('.daily_budget_usd="4.00"', readme)
+        # LG-B: the live GO is edited by four named fields only, and only Anthropic's GO (fix round 1 of Task 11).
+        self.assertIn('.max_final_writer_calls=1 | .daily_budget_usd="4.00"', readme)
+        self.assertIn('del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)', readme)
+        self.assertIn("""jq -e '.provider=="anthropic"' "$GO" """, readme)
         self.assertIn('$16.00', readme)
         self.assertIn('DeepInfra $10.00 and Anthropic $2.00, $12.00 together', deepinfra)
         self.assertIn('DeepInfra $12.00 and Anthropic $4.00, $16.00 together', deepinfra)

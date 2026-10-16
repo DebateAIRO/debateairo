@@ -257,6 +257,12 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual(len(go_line), 1)
         self.assertIn('daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,', go_line[0])
         self.assertIn('max_concurrent_calls:10,max_final_writer_calls:1,', go_line[0])  # LG-B: a first install names the slot too.
+        # LG-B: the live GO is edited by four named fields only, and only DeepInfra's GO (fix round 1 of Task 11).
+        self.assertIn('.max_final_writer_calls=1 | .daily_budget_usd="12.00"', readme)
+        self.assertIn('del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)', readme)
+        self.assertIn("""jq -e '.provider=="deepinfra"' "$GO" """, readme)
+        # LG-B: the way back is one two-gate block, never one gate alone.
+        self.assertIn('BOTH_GATES_BACK', readme)
         self.assertIn('enabled_models:["%s"]' % GLM, go_line[0])  # GLM only at first.
 
     def test_readme_one_session_order_ends_with_all_four_on_before_the_first_debate(self):

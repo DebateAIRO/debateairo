@@ -503,9 +503,14 @@ its service `debateai-preview-anthropic-budget.service`, this README's install s
 check that step names), and the day budget `"4.00"` (owner answer M1, 2026-10-15). Never re-run install step 5's
 `jq -n` for this: it writes the first-install GO with its own limits. The GO edit changes only the two hashes,
 `max_final_writer_calls` and `daily_budget_usd`. The alert script is refreshed once, by README.md's section (its
-step 1), not again here:
+step 1), not again here. Install this gate in the same sitting as the DeepInfra gate, right after it (README.md's
+section, "Both gates in ONE sitting": between the two installs, the gate still on the old code cannot be opened
+again). Write down this gate's archive folder `$B` too. The block sets `G` and `GO` itself (in the same root shell
+they may still name the DeepInfra gate) and first checks that the GO is Anthropic's (else `WRONG_GO: stop here`):
 
 ```sh
+G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
 umask 077
 jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .max_final_writer_calls=1 | .daily_budget_usd="4.00"' "$GO" > "$GO.new"
 diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
@@ -516,6 +521,10 @@ The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `1`. `activate
 1 x $0.97664 = $1.22368, inside $4.00, and the team total with DeepInfra's GO: $12.00 + $4.00 = $16.00 (with
 DeepInfra's GO still at $10.00, $14.00). Before the first `activate` on $4.00, the owner raises the workspace's
 monthly spend limit in the Anthropic Console (install step 0, item 2: about $130).
+
+To go back: only together with the DeepInfra gate, by README.md's two-gate block in its section of the same name
+(both gates stopped, both gates' old files and old GOs back, both services restarted, then `activate` each). Never
+this gate alone: its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`).
 
 This gate matters most for the order: an older Anthropic gate refuses a Haiku message whose first part carries the
 cache mark of this release (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that. So this gate gets the
@@ -583,8 +592,8 @@ systemctl stop debateai-preview-anthropic-budget
 **Change the daily budget or another limit.** Write the new GO by changing only that value in the
 current GO (as README.md "Change the daily budget or another limit" shows, with its `cmp` check;
 re-running install step 5's `jq -n` would also reset every value changed since the install), same
-`scope_id`, then `stop` and `activate`. If `max_concurrent_calls` changed, also restart the
-service: calls refuse with `SERVE_RESTART_REQUIRED` until you do.
+`scope_id`, then `stop` and `activate`. If `max_concurrent_calls` or `max_final_writer_calls` changed, also
+restart the service: calls refuse with `SERVE_RESTART_REQUIRED` until you do.
 
 **A new key** (for example after rotating it in the Console): install step 4 with `--replace`
 at the end. The gate reads the key file on every call, so no restart is needed.

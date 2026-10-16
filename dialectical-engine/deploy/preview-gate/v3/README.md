@@ -123,9 +123,11 @@ The gate itself keeps the $16 total:
 - So to move money from one pot to another: first lower one (its new GO, `stop`, `activate`),
   then raise the other.
 
-Each pot is checked once more when it is opened: 10 calls at the same time (the most a GO may
-allow), each setting aside the largest worst case of the switched-on models, must fit in the pot.
-`activate` refuses a GO that does not pass (`CONCURRENCY_EXCEEDS_BUDGET`). The sums for this GO:
+Each pot is checked once more when it is opened: the calls that may run at the same time must fit in the pot. With
+N = `max_concurrent_calls` (10, the most a GO may allow) and F = `max_final_writer_calls` (0 when the GO does not name
+it; 1 since length guidance LG-B), that is (N - F) x the largest standard worst case of the switched-on models + F x
+their largest final-writer worst case. `activate` refuses a GO that does not pass (`CONCURRENCY_EXCEEDS_BUDGET`). The
+sums for this GO:
 
 | Switched on | Largest worst case | x 10 calls at once | Fits in the pot ($10.00 at the first install)? |
 |---|---|---|---|
@@ -784,6 +786,15 @@ standard caps and logs one line `PREVIEW_FINAL_WRITER_TIER_UNREAD` per gate. But
 that carries the cache mark (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that refusal. So the gates
 always go first.
 
+Both gates in ONE sitting. Install the DeepInfra gate and the Anthropic gate one right after the other, and go back
+(if ever) with both together, never one alone. Why: a gate's `activate` also reads the other gate's GO and judges it
+with its OWN code's limits. Between the two installs, the gate still on the old code cannot be opened again (for
+example after its halt email): with the DeepInfra GO already on `"12.00"`, the old Anthropic gate refuses
+`TEAM_TOTAL_UNVERIFIABLE` (one GO above its old $10.00 ceiling); with the Anthropic GO already on $4.00, the old
+DeepInfra gate refuses `TEAM_TOTAL_BUDGET_EXCEEDED` ($10.00 + $4.00 is above its old $12.00 team total). The new code
+accepts both the old and the new GOs, so going forward either gate may go first, but only both together stay
+re-openable.
+
 Order on the server: both gates first, then the runner restart, then the practice proof, then the app of the same
 release. The new gate serves the app already running unchanged: an app that never names a final writer keeps today's
 requests. The app of this release asks for the final-writer tier only from a gate whose `/remaining` names it. Before
@@ -793,7 +804,8 @@ about $130 (README-anthropic.md, install step 0, item 2).
 For each gate (DeepInfra here; the Anthropic gate by its own README's section of the same name), as root, when no
 debate is running (`status` shows `in_flight` 0), in a `set -euo pipefail` batch:
 1. "Redeploy (2026-10-12)" steps 1-3: keep a copy of both gate files and the GO (it sets `G`, `GO` and `B`), `stop`,
-   install both gate files from the reviewed release and check their hashes. Once for both gates (the alert script is
+   install both gate files from the reviewed release and check their hashes. Write down the archive folder `$B` that
+   step 1 prints (`ls -l "$B"`), for each gate: the way back below needs both. Once for both gates (the alert script is
    shared), refresh the alert script from the same release (`R` set to this release, as install step 1), as install
    step 9 does, so the booked-at-maximum email
    names an answer without a bill count (owner answer M3):
@@ -809,9 +821,12 @@ debate is running (`status` shows `in_flight` 0), in a `set -euo pipefail` batch
    limits) and would switch DeepSeek, MiMo and Qwen off. The `diff` is for reading. The `cmp` line is the check: it
    compares the two GOs without those four keys, prints `ONLY_NAMED_FIELDS_CHANGED` and only then installs the new
    GO. If anything else changed, the GO is left as it was and it prints `GO_NOT_REPLACED: stop here` (and the batch
-   ends): do not go on. The last line printed must list the same models as before, `"12.00"`, `10` and `1`:
+   ends): do not go on. The block sets `G` and `GO` itself and first checks that the GO is DeepInfra's (else it prints
+   `WRONG_GO: stop here`). The last line printed must list the same models as before, `"12.00"`, `10` and `1`:
 
    ```sh
+   G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+   jq -e '.provider=="deepinfra"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
    umask 077
    jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .max_final_writer_calls=1 | .daily_budget_usd="12.00"' "$GO" > "$GO.new"
    diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
@@ -833,8 +848,33 @@ debate is running (`status` shows `in_flight` 0), in a `set -euo pipefail` batch
    again) also comes after both gates are `active`. A runner that has not read the final-writer slot sends a second
    final writer straight to the gate, where it waits up to 60 seconds for the one slot and may be refused.
 
-To go back: as "Redeploy (2026-10-12)": `stop`, put the three files from `$B` back in place, restart the service and
-`activate`. The GO goes back WITH the files: the old code refuses a `"12.00"` GO.
+To go back: BOTH gates together, in one sitting (the old code of either gate refuses the other gate's new GO, see
+"Both gates in ONE sitting" above). Each gate's GO goes back WITH its files: the old code refuses a GO that names
+`max_final_writer_calls` or asks `"12.00"`. As root, when no debate is running, type the block yourself, putting the
+two archive folders written down in step 1 in place of DEEPINFRA_ARCHIVE and ANTHROPIC_ARCHIVE. It checks both
+archives first (it prints `ARCHIVE_MISSING: <file>` or `ARCHIVE_NOT_OLD: <file>` and stops on any doubt), then stops
+both gates, puts both gates' old files and old GOs back, restarts both services, and prints `BOTH_GATES_BACK`:
+
+```sh
+( set -euo pipefail
+BD=/root/preview-archive/DEEPINFRA_ARCHIVE; BA=/root/preview-archive/ANTHROPIC_ARCHIVE
+GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3; GOD=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json; PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
+GA=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GOA=/etc/debateai-v3-preview/provider-anthropic-go-v1.json; PA=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1
+for f in "$BD/preview_budget_authority.py" "$BD/preview_budget_helper.py" "$BD/$(basename "$GOD")" "$BA/preview_budget_authority.py" "$BA/preview_budget_helper.py" "$BA/$(basename "$GOA")"; do test -f "$f" || { echo "ARCHIVE_MISSING: $f"; false; }; done
+jq -e '.provider=="deepinfra" and (has("max_final_writer_calls") | not)' "$BD/$(basename "$GOD")" >/dev/null || { echo "ARCHIVE_NOT_OLD: $BD"; false; }
+jq -e '.provider=="anthropic" and (has("max_final_writer_calls") | not)' "$BA/$(basename "$GOA")" >/dev/null || { echo "ARCHIVE_NOT_OLD: $BA"; false; }
+/usr/bin/python3 -I "$GD/preview_budget_authority.py" stop --private "$PD"
+/usr/bin/python3 -I "$GA/preview_budget_authority.py" stop --private "$PA"
+install -o root -g root -m 0644 "$BD/preview_budget_authority.py" "$BD/preview_budget_helper.py" "$GD/"
+install -o root -g root -m 0600 "$BD/$(basename "$GOD")" "$GOD"
+install -o root -g root -m 0644 "$BA/preview_budget_authority.py" "$BA/preview_budget_helper.py" "$GA/"
+install -o root -g root -m 0600 "$BA/$(basename "$GOA")" "$GOA"
+systemctl restart debateai-preview-provider-budget.service debateai-preview-anthropic-budget.service
+echo BOTH_GATES_BACK )
+```
+
+Only after `BOTH_GATES_BACK`: `activate` each gate (owner's yes; "Re-open after a halt", step 5, and README-anthropic.md's
+own), then `status` must show `state` `active` for both, and restart the runner after both are `active`.
 
 ## Daily operations
 
@@ -898,7 +938,7 @@ systemctl stop debateai-preview-provider-budget
    the two hashes (`del(.max_paid_posts_per_day)`), and the same `scope_id`. Never re-run install step 4's `jq -n`: it
    writes the first-install GO, GLM only, and would switch the other models off.
 2. Run `stop`, then `activate`.
-3. If `max_concurrent_calls` changed, also restart the service. Calls refuse with
+3. If `max_concurrent_calls` or `max_final_writer_calls` changed, also restart the service. Calls refuse with
    `SERVE_RESTART_REQUIRED` until you do.
 
 Until step 2, calls refuse ("stopped") and `/remaining` answers `window_open: false`: the gate

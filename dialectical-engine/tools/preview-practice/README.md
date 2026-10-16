@@ -870,11 +870,16 @@ AI. It needs the LG-B gates on the server first: with an older gate the app keep
 caps, and the proof proves nothing (the practice then prints `PREVIEW_FINAL_WRITER_TIER_UNREAD` for that gate). Same
 `D` and `P` as in S-5.
 
-1. B-1 on the LOCAL copy only (the server's api.env and runner.env are not touched): after S-2, merge the storyteller's
-   one-level-lower levels into `$P/settings.env`'s `thinking_levels`, keeping every other entry and step, then check the
-   table. The merge prints only what it changed. The checker must print `OK`, with `story_writer=low` for GLM and Qwen,
-   `story_writer=none` for MiMo (thinking off for the story), `story_writer=medium` for Haiku, and every other override
-   as before. DeepSeek gets no entry: its usual level, `none`, is its lowest.
+1. B-1 on the LOCAL copy only (the server's api.env and runner.env are not touched): after S-5's copy (`scp` brings
+   `settings.env` down to `$P`; it exists on the Mac only then), merge the storyteller's one-level-lower levels into
+   `$P/settings.env`'s `thinking_levels`, keeping every other entry and step, then check the table. "One level lower"
+   means one level below the level the server's table gives the `story_writer` step TODAY: GLM `high` → `low`; Qwen
+   `medium` → `low`; MiMo `default` → `none` (thinking off for the story); Haiku `high` → `medium` (Haiku's usual level
+   on the preview is `medium`, but its `story_writer` step has a `high` override today, and B-1 lowers that override).
+   DeepSeek gets no entry: its level today, `none`, is its lowest. The merge prints one line for each of the four
+   storyteller entries it sets (the level before → the new one), nothing else. The checker must print `OK`, with
+   `story_writer=low` for GLM and Qwen, `story_writer=none` for MiMo, `story_writer=medium` for Haiku, and every other
+   override as before.
 
        python3 -I - "$P/settings.env" <<'PY'
        import json, sys
@@ -896,7 +901,13 @@ caps, and the proof proves nothing (the practice then prints `PREVIEW_FINAL_WRIT
        PY
        node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/settings.env"
 
-2. Before EACH run below: repeat S-3 and copy the two status files down. Check: each gate `state` `active`; the
+2. Before EACH run below: repeat S-3 and copy ONLY the two status files down:
+
+       scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+
+   Never re-run S-5's full copy (`scp ".../practice/*"`) now: it would overwrite the merged `$P/settings.env` with the
+   server's and drop B-1. Re-run the checker (step 1's last line) before each run; it must still show the four
+   `story_writer` levels. Check: each gate `state` `active`; the
    DeepInfra GO's `daily_budget_usd` `"12.00"` and the Anthropic one's `"4.00"`; the Anthropic gate's
    `remaining_today_usd` at least $1.60 (a final writer's hold of $1.22 plus the run's Haiku calls); and each gate's
    `today_spend_usd` plus the run's rough cost inside the testing day's limits ($5 DeepInfra, $1 Haiku). Otherwise stop.
