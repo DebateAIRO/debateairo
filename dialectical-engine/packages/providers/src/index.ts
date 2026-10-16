@@ -21,6 +21,7 @@ import {
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
+import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
 import { contentFollowUpSentence } from "./content-follow-up.js";
 
@@ -236,6 +237,12 @@ export interface ProviderCallRequest {
   readonly candidateId?: string | null;
   /** Model scorecard §2.3: the scorecard version the seat's assignment came from. Recorded, never sent. */
   readonly scorecardVersion?: number | null;
+  /**
+   * Length guidance L27 (spec 2026-10-15 §3.6, INTERFACE §3.2): counts the words of this call's replies when only a part
+   * of the answer is to be counted (LG-D: the storyteller's short version). Absent: `replyWordCount` over the whole reply.
+   * Information only: a counter that throws or answers anything but a whole number records null. Never sent.
+   */
+  readonly actualWordsOf?: (content: string) => number | null;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -327,6 +334,14 @@ export interface ProviderCallResult {
    * repaired reply and the identity and refs are the original AI's (ProviderStructureUnrepairedError).
    */
   readonly repairForm?: "PATCH" | "FULL" | "STRUCTURE";
+  /**
+   * Length guidance L27: the accepted attempt's answer tokens (its output minus its thinking; its output when the vendor
+   * counted the thinking outside it), its cached input tokens as the vendor reported them, and the words its accepted
+   * content holds. Null when not reported or not countable; absent from a gateway or double that builds its own result.
+   */
+  readonly answerTokens?: number | null;
+  readonly cachedInputTokens?: number | null;
+  readonly actualWords?: number | null;
 }
 
 export interface ProviderGateway {
@@ -1411,27 +1426,64 @@ export function estimateWindowTokens(messages: PromptPacket["messages"]): number
   return Math.ceil(bytes / WINDOW_BYTES_PER_TOKEN);
 }
 
+/** One bounded counter read leniently from a usage object's member, or null. */
+function usageCounterIn(details: unknown, key: string): number | null {
+  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
+  const value = (details as Readonly<Record<string, unknown>>)[key];
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+}
+
 /**
- * Model scorecard §2.3 — the thinking tokens the vendor reported, read
- * LENIENTLY off the RAW usage block: OpenAI's spelling
- * `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays,
- * which adopt it), else Anthropic's `output_tokens_details.thinking_tokens`
- * (Haiku, spec 2026-10-12 §4.6). Thinking is already inside `output_tokens` /
- * `completion_tokens`, so reading it changes no charge. `null` means not
- * reported: never a guess and never a default zero, because a vendor that says
- * nothing has not said "none".
+ * Model scorecard §2.3 — the thinking tokens the vendor reported, read LENIENTLY off the RAW usage block: OpenAI's
+ * spelling `completion_tokens_details.reasoning_tokens` (DeepInfra, and the relays, which adopt it) or a top-level
+ * `reasoning_tokens` — the larger when both are there, exactly as the preview gate charges them (length guidance LG-B,
+ * preview_budget_helper.py account_response) — else Anthropic's `output_tokens_details.thinking_tokens` (Haiku, spec
+ * 2026-10-12 §4.6). Thinking is already inside `output_tokens` / `completion_tokens`, so reading it changes no charge.
+ * `null` means not reported: never a guess and never a default zero, because a vendor that says nothing has not said "none".
  */
 export function reportedReasoningTokens(rawUsage: unknown): number | null {
   if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
   const usage = rawUsage as Readonly<Record<string, unknown>>;
-  const read = (details: unknown, key: string): number | null => {
-    if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
-    const value = (details as Readonly<Record<string, unknown>>)[key];
-    return typeof value === "number" && Number.isSafeInteger(value)
-      && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
-  };
-  return read(usage.completion_tokens_details, "reasoning_tokens")
-    ?? read(usage.output_tokens_details, "thinking_tokens");
+  const reported = [usageCounterIn(usage.completion_tokens_details, "reasoning_tokens"), usageCounterIn(usage, "reasoning_tokens")]
+    .filter((value): value is number => value !== null);
+  return reported.length > 0 ? Math.max(...reported) : usageCounterIn(usage.output_tokens_details, "thinking_tokens");
+}
+
+/**
+ * Length guidance L27 (INTERFACE §3.1): the input tokens the vendor served from its prompt cache, read off the RAW usage
+ * block before the Anthropic reply folds them into `prompt_tokens` (anthropic-messages.ts anthropicUsageAsEngineUsage):
+ * DeepInfra's `prompt_tokens_details.cached_tokens`, else a top-level `cached_tokens`, else Anthropic's
+ * `cache_read_input_tokens`. Null when not reported. Information only. The gate reads a top-level `cached_tokens` only
+ * when `prompt_tokens_details` is an object (preview_budget_helper.py account_response); this reader also takes it
+ * alone, so for a vendor that sends only that member the practice table's cached column can differ from the gate's log.
+ */
+export function reportedCachedInputTokens(rawUsage: unknown): number | null {
+  if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
+  const usage = rawUsage as Readonly<Record<string, unknown>>;
+  return usageCounterIn(usage.prompt_tokens_details, "cached_tokens") ?? usageCounterIn(usage, "cached_tokens")
+    ?? usageCounterIn(usage, "cache_read_input_tokens");
+}
+
+/**
+ * Length guidance L27: the answer's own tokens, the output count minus the thinking; the output count itself when the
+ * thinking is larger (the vendor counted it outside, as the gate's billed_output_tokens reads it). Null when either count
+ * is unknown.
+ */
+export function answerTokensOf(completion: unknown, reasoning: number | null): number | null {
+  if (typeof completion !== "number" || !Number.isSafeInteger(completion) || completion < 0 || reasoning === null) return null;
+  return reasoning <= completion ? completion - reasoning : completion;
+}
+
+/** Length guidance L27: one reply's words by the request's own counter, else `replyWordCount`; null when unknown. Never throws. */
+function replyWordsOf(request: ProviderCallRequest, content: string | null, reply: ModelReplyFacts): number | null {
+  if (content === null) return null;
+  let words: number | null;
+  try {
+    words = request.actualWordsOf !== undefined ? request.actualWordsOf(content) : replyWordCount(content, reply);
+  } catch {
+    return null;
+  }
+  return words !== null && Number.isSafeInteger(words) && words >= 0 && words <= MAX_USAGE_COUNTER ? words : null;
 }
 
 /**
@@ -2122,6 +2174,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         const replyFacts: ModelReplyFacts = Object.freeze({ finishReason });
+        // Length guidance L27: information only, never a reason to refuse or retry. The cached part of the input as the
+        // vendor reported it, and the words this reply wrote.
+        const cachedInputTokens = reportedCachedInputTokens(vendorUsageBlock);
+        const attemptWords = replyWordsOf(request, content, replyFacts);
         /**
          * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
          * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
@@ -2238,6 +2294,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contractHash: request.contractHash,
           contentHash: digest(rawText),
           thinkingTokens: reasoningTokens,
+          cachedInputTokens,
+          actualWords: attemptWords,
           replyForm: attemptReplyForm,
           replyRepairs: attemptRepairs.length === 0 ? null : attemptRepairs,
           replyFailureClass: attemptFailureClass
@@ -2559,6 +2617,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           modelVersion: responseJson.model,
           thinkingLevel: thinkingLevelUsed,
           reasoningTokens,
+          answerTokens: answerTokensOf(responseJson.usage?.completion_tokens, reasoningTokens),
+          cachedInputTokens,
+          // A merged patch is the first reply with the patch in it: its words are counted on what was accepted.
+          actualWords: acceptedContent === content ? attemptWords
+            : replyWordsOf(request, acceptedContent ?? responseJson.choices[0]!.message.content, replyFacts),
           repairAttempts,
           ...(repairAttempts > 0 && repairForm !== undefined ? { repairForm } : {})
         };
@@ -2796,6 +2859,8 @@ export {
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";
+// Length guidance L27: the words of a reply (information only).
+export { replyWordCount } from "./reply-words.js";
 // LG-A (spec 2026-10-15, L33): the plain-word follow-up sentences.
 export { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence, isContentFollowUpSentence } from "./content-follow-up.js";
 // LG-A (spec 2026-10-15, L31-L34): the reply fixer and the failure classes.

@@ -35,6 +35,7 @@ beforeAll(async () => {
         ...(level === null ? {} : { x_thinking_level: level }),
         usage: {
           prompt_tokens: 11, completion_tokens: 3, total_tokens: 14,
+          prompt_tokens_details: { cached_tokens: 5 },
           completion_tokens_details: { reasoning_tokens: 9 }
         },
         choices: [{ message: { content: "{\"ok\":true}" }, finish_reason: "stop" }]
@@ -95,8 +96,8 @@ describe("model scorecard — the shipped gateway composition records every call
       thinking_level: "high", raw_artifact_ref: answer.rawArtifactRef
     }]);
     expect((await fixture.database.pool.query(
-      "SELECT thinking_tokens FROM ledger.raw_artifact WHERE raw_artifact_id=$1", [answer.rawArtifactRef]
-    )).rows).toEqual([{ thinking_tokens: 9 }]);
+      "SELECT thinking_tokens, cached_input_tokens, actual_words FROM ledger.raw_artifact WHERE raw_artifact_id=$1", [answer.rawArtifactRef]
+    )).rows).toEqual([{ thinking_tokens: 9, cached_input_tokens: 5, actual_words: 0 }]);
     await expect(readCallPrompt(fixture.database.pool, entries[0]!.attempt_id)).resolves.toEqual({
       runId,
       attemptId: entries[0]!.attempt_id,

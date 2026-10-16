@@ -327,11 +327,11 @@ describe("model scorecard — thinking tokens", () => {
       { completion_tokens_details: { reasoning_tokens: -1 } },
       { completion_tokens_details: { reasoning_tokens: 1.5 } },
       { completion_tokens_details: { reasoning_tokens: "7" } },
-      { completion_tokens_details: { reasoning_tokens: 2 ** 31 } },
-      { reasoning_tokens: 7 }
+      { completion_tokens_details: { reasoning_tokens: 2 ** 31 } }
     ]) {
       expect(reportedReasoningTokens(unreported)).toBeNull();
     }
+    expect(reportedReasoningTokens({ reasoning_tokens: 7 })).toBe(7); // LG-B deviation 6: top-level reasoning is read, as the gate charges it
   });
 
   it("returns the thinking tokens while the artifact's usage keeps only its four counters", async () => {
