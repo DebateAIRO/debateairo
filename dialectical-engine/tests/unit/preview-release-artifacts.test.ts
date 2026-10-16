@@ -905,6 +905,33 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     expect(existsSync(out)).toBe(false);
   });
 
+  /** Length guidance (LG-C): the owners' start values, with their kind, as the operator would type them. */
+  const LENGTH = JSON.parse(JSON.stringify(registerModule.lengthGuidancePolicyStartValues()));
+
+  it('plan --length-guidance: the plan carries the policy, publish carries it on, and none is the default', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-length.json');
+    const plan = read(await run(t.nativePlan('plan', ['--length-guidance', JSON.stringify(LENGTH)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, lengthGuidance: LENGTH });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.lengthGuidance).toEqual(LENGTH);
+    expect(Object.hasOwn(t.plan, 'lengthGuidance')).toBe(false);
+  });
+
+  it.each([
+    ['text that is not JSON', 'plan', ['--length-guidance', 'on']],
+    ['a JSON array', 'plan', ['--length-guidance', '[1]']],
+    ['JSON null', 'plan', ['--length-guidance', 'null']],
+    ['the option on verify', 'verify', ['--length-guidance', '{}']]
+  ])('refuses --length-guidance with %s and writes nothing', async (_name, operation, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--length-guidance'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
   it('refuses the option on publish: publish takes the policy only from its --from plan', async () => {
     const t = await staged();
     const out = join(t.s.art, 'native-plan-concurrency.json');

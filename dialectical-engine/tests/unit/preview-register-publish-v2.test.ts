@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
@@ -318,7 +318,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
@@ -372,7 +372,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
     const calls = text.split('publisher.buildPreviewSourceRowsV2(');
     expect(calls).toHaveLength(2); // the operator's one builder call
-    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null\);/);
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null\);/);
     // What it hands over is the plan's value exactly as the plan check accepted it.
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
@@ -397,7 +397,7 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
@@ -523,6 +523,26 @@ describe('publish kit v2: the optional questionLanguagePolicy row (absent by def
     const bad = { ...value, version: 2 };
     expect(operator.validateNativePlan({ ...plan, questionLanguage: bad })).toBeTruthy(); // shape only
     await expect(build(bad)).rejects.toThrow('QUESTION_LANGUAGE_POLICY_INVALID:$.version');
+  });
+});
+
+describe('publish kit v2: the optional lengthGuidancePolicy row (LG-C, spec 2026-10-15 §3.1)', () => {
+  const policy = lengthGuidancePolicyStartValues();
+  const build = async (lengthGuidance?: unknown) =>
+    [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, null, null, lengthGuidance as any)] as Row[];
+
+  it('adds exactly one row when supplied and nothing by default; optional, never in the reviewed closure', async () => {
+    const absent = await build(), given = await build(policy);
+    expect(absent.map(row => row.rowKey)).not.toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    expect(await build(null)).toEqual(absent);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY)).toEqual(absent);
+  });
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    const bad = JSON.parse(JSON.stringify(policy));
+    bad.tokensPerWord = 9;
+    await expect(build(bad)).rejects.toThrow('LENGTH_GUIDANCE_POLICY_INVALID:tokensPerWord');
   });
 });
 

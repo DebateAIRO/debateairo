@@ -49,6 +49,7 @@ import {
   readEngineVersion,
   readStoryPolicy,
   debateShapePolicyStartValues,
+  lengthGuidancePolicyStartValues,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
   type GeneralRegisterPublication
@@ -416,6 +417,29 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(shapeLines.length).toBeGreaterThanOrEqual(2);
     for (const line of shapeLines) expect(line).not.toContain('"kind"');
     expect(registerReadme).toContain("the plan prints `debate_shape=present`");
+  });
+
+  it("length guidance (LG-C): the optional member seals one ADDITIVE row and says so; no member, no row and no line", async () => {
+    const without = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    expect(without.rows.map((row) => row.rowKey)).not.toContain("lengthGuidancePolicy");
+    expect(renderHostedRegisterPlan(without)).not.toMatch(/^length_guidance/mu);
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: member })));
+    const row = plan.rows.find((entry) => entry.rowKey === "lengthGuidancePolicy");
+    expect(JSON.parse(row!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())));
+    expect(renderHostedRegisterPlan(plan)).toMatch(/^length_guidance=present \(every debate admitted on this version is told target lengths\)$/mu);
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    expect(registerReadme).toContain("`lengthGuidancePolicy`");
+    expect(registerReadme).toContain("HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID");
+  });
+
+  it.each([
+    ["a member carrying kind", { ...JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) }],
+    ["a null member", null],
+    ["a member the parser refuses", { ...(({ kind: _k, ...rest }) => rest)(JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues()))), runawayMultiplier: 1 }]
+  ])("length guidance (LG-C): refuses %s with the file's own code", async (_name, member) => {
+    await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: member }))))
+      .rejects.toMatchObject({ code: "HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID" });
   });
 
   it("question language (P2L Task 12): the optional member seals one ADDITIVE row, the publishers' own; no member, no row", async () => {
