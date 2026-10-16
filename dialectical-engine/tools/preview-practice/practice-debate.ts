@@ -88,11 +88,13 @@ import {
   practiceCallFacts,
   practiceModelCalls,
   practiceRepairKindsByModel,
+  practiceStructureRescuesShown,
   type LatencySummary,
   type PracticeCallTry,
   type PracticeModelCalls,
   type PracticeRepairKinds,
-  type PracticeReplyForm
+  type PracticeReplyForm,
+  type PracticeStructureRescues
 } from "./practice-verdict.js";
 
 /** The practice's one throwaway person's DEK lives only in memory, for this process. */
@@ -262,21 +264,22 @@ const FOLLOW_UPS: ReadonlySet<string> = new Set(["STRUCTURE", "PATCH", "FULL", "
 
 const STRUCTURE_SALVAGE: ReadonlySet<string> = new Set(STRUCTURE_SALVAGE_REPAIRS);
 
-export type PracticeStructureRescues = Readonly<{ inCode: number; byPatch: number; byFullAsk: number }>;
-
 /**
  * Refused-repair salvage, information only: `inCode`, the accepted replies whose recorded repairs name one of A1's drops
  * (`STRUCTURE_SALVAGE_REPAIRS`); `byPatch` / `byFullAsk`, the calls (tries grouped by call, in ledger order) whose first
  * try with a reply was refused for its STRUCTURE and whose first accepted try came back as a PATCH / FULL follow-up (B).
+ * B runs only behind the structure-repair route: a run without one (no Haiku target, `structureRouted` false) sends a
+ * STRUCTURE reply today's patch or full re-ask, which is not B, so its follow-ups are never counted.
  */
-export function practiceStructureRescues(tries: readonly PracticeTryRecord[]): PracticeStructureRescues {
+export function practiceStructureRescues(tries: readonly PracticeTryRecord[],
+  run: Readonly<{ structureRouted: boolean }>): PracticeStructureRescues {
   const inCode = tries.filter((attempt) => attempt.outcome === "OK"
     && (attempt.repairs ?? []).some((repair) => STRUCTURE_SALVAGE.has(repair))).length;
   const byCall = new Map<string, PracticeTryRecord[]>();
   for (const attempt of tries) byCall.set(attempt.callKey, [...(byCall.get(attempt.callKey) ?? []), attempt]);
   let byPatch = 0;
   let byFullAsk = 0;
-  for (const call of byCall.values()) {
+  for (const call of run.structureRouted ? byCall.values() : []) {
     if (call.find((attempt) => attempt.parseStatus !== null)?.failureClass !== "STRUCTURE") continue;
     const accepted = call.find((attempt) => attempt.outcome === "OK");
     if (accepted?.replyForm === "PATCH") byPatch += 1;
@@ -378,9 +381,9 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 }
 
 /** What happened, read from the throwaway database after the debate. */
-async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures"
-  | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls" | "repairsByKind"
-  | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
+async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
+  "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
+  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
     `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text, thinking_level
@@ -514,6 +517,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, replyText: refused?.replyText ?? null }));
   }
   const callList = [...calls.entries()];
+  const structureRescues = practiceStructureRescues(records, run);
   const formatFailures = callList.filter(([, call]) => practiceCallFacts(call.tries).unrecovered).length;
   const answersByModel: Record<string, { answered: number; unanswered: number }> = {};
   for (const [, call] of callList) {
@@ -538,7 +542,8 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
-    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records), structureRescues: practiceStructureRescues(records),
+    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
+    ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
     tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured) };
 }
 
@@ -852,7 +857,7 @@ export async function runPracticeDebate(input: Readonly<{
         progress(`transcript could not be written: ${codeOf(error)}`);
       }
     }
-    const collected = await collect(pool, job.runId);
+    const collected = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
     // Debate shape: what the shape run did, read before the database goes. A reading that breaks costs only this block
     // (NOT_PROVEN: the shape was not shown to run), never the report.
     let shape: PracticeShapeBlock | undefined;

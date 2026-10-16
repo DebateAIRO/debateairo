@@ -501,5 +501,7 @@ export async function composePracticeRunner(input: Readonly<{
   });
   return Object.freeze({ runner, providerTopology, providerTargets, declaredProviderTargets, policy, storyPolicy, previewFetch,
     configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler, callStats,
-    money: money === null ? null : money.summary });
+    money: money === null ? null : money.summary,
+    // Refused-repair salvage: the run had a structure-repair route (its ceiling is set), so a STRUCTURE reply's follow-up is B.
+    structureRouted: previewStructureRepairCeiling(structureRepairRoute) !== null });
 }

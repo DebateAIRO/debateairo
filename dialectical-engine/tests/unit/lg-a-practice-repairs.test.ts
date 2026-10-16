@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { callFamilyOf, issueListFromParseError, practiceJsonRepairOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import {
-  practiceRepairRows, practiceStructureRescues, practiceTryJoiner, practiceUnrepairedRows, recordedSalvageRepairs, type PracticeJoinedTry,
-  type PracticeLedgerTry, type PracticeTryRecord
+  practiceRepairRows, practiceStructureRescues, practiceTryJoiner, practiceUnrepairedRows, recordedSalvageRepairs, type PracticeDebateResult,
+  type PracticeJoinedTry, type PracticeLedgerTry, type PracticeTryRecord
 } from "../../tools/preview-practice/practice-debate.js";
-import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
+import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
+import { debateReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { practiceModelCalls, practiceRepairKindsByModel } from "../../tools/preview-practice/practice-verdict.js";
 import { buildTranscriptAttempts, type TranscriptArtifact, type TranscriptLedgerRow } from "../../tools/preview-practice/practice-transcript.js";
 
@@ -300,22 +301,25 @@ const RESCUES: readonly PracticeTryRecord[] = [
     repairs: null, failureClass: null, issue: null, replyText: null }
 ];
 
+/** The run had a structure-repair route (a Haiku target): a STRUCTURE reply's follow-up is B. */
+const ROUTED = Object.freeze({ structureRouted: true });
+
 describe("refused-repair salvage in the practice report", () => {
   it("A1 is a code repair: no slip, counted by kind and as a rescue in code", () => {
     expect(practiceRepairRows(RESCUES.slice(0, 1))).toEqual([{ model: GLM, step: "judge_panel", kind: "ECHO_DROPPED", count: 1 }]);
     expect(practiceModelCalls([{ model: GLM, tries: [RESCUES[0]!] }] as never)).toEqual({ [GLM]: { answered: 1, slips: 0, repaired: 0, unrecovered: 0 } });
-    expect(practiceStructureRescues(RESCUES.slice(0, 1))).toEqual({ inCode: 1, byPatch: 0, byFullAsk: 0 });
+    expect(practiceStructureRescues(RESCUES.slice(0, 1), ROUTED)).toEqual({ inCode: 1, byPatch: 0, byFullAsk: 0 });
   });
 
   it("B after a refused Haiku copy is the original AI's call fixed by a patch: a warning, never a failure", () => {
     const tries = RESCUES.slice(1).map((attempt) => ({ outcome: attempt.outcome, parseStatus: attempt.parseStatus, replyForm: attempt.replyForm }));
     expect(practiceRepairKindsByModel([{ model: GLM, tries }] as never)).toEqual({ [GLM]: { repairedByPatch: 1, repairedByFullAsk: 0, repairedOtherwise: 0 } });
     expect(practiceUnrepairedRows(RESCUES).every((row) => row.recovered)).toBe(true);
-    expect(practiceStructureRescues(RESCUES.slice(1))).toEqual({ inCode: 0, byPatch: 1, byFullAsk: 0 });
+    expect(practiceStructureRescues(RESCUES.slice(1), ROUTED)).toEqual({ inCode: 0, byPatch: 1, byFullAsk: 0 });
   });
 
   it("counts the rescues and prints one line", () => {
-    expect(practiceStructureRescues(RESCUES)).toEqual({ inCode: 1, byPatch: 1, byFullAsk: 0 });
+    expect(practiceStructureRescues(RESCUES, ROUTED)).toEqual({ inCode: 1, byPatch: 1, byFullAsk: 0 });
     // The file's own report literal (as at :272-273; pre-flight PF-S17: no `debateReportFixture` exists).
     expect(reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f",
       structureRescues: { inCode: 1, byPatch: 1, byFullAsk: 0 } } as never))
@@ -329,5 +333,73 @@ describe("refused-repair salvage in the practice report", () => {
     expect(recordedSalvageRepairs(["CODE_FENCE"])).toBeNull();
     expect(recordedSalvageRepairs([])).toBeNull();
     expect(recordedSalvageRepairs(null)).toBeNull();
+  });
+});
+
+describe("refused-repair salvage in the practice report: review round 1", () => {
+  const none = { before: null, after: null };
+  const result = (extra: Record<string, unknown>) => ({
+    register: null, questionId: "ro", depth: 1,
+    admission: { admitted: true, refusalCode: null, panel: [], satOut: [], rotation: null },
+    run: { runId: "r", workItemOutcome: "COMPLETED", failureCode: null,
+      answer: { served: true, terminal: "SERVED", serveState: null, verdictState: null, conditionMarks: [] },
+      story: { outcome: "READY", failureCode: null } },
+    byModelAndSite: [], probes: [], failures: [], formatFailures: 0, callsByModel: {}, answersByModel: {}, jsonRepairs: [],
+    failedCalls: 0, refusedCalls: 0, remaining: { deepinfra: none, anthropic: none }, seconds: { admission: 1, debate: 2 }, ...extra
+  }) as unknown as PracticeDebateResult;
+  const report = (extra: Record<string, unknown>) => debateReport({ result: result(extra), observer: new PracticeGateObserver(),
+    startedAt: new Date(0), finishedAt: new Date(1_000) });
+
+  it("a run with no rescue keeps today's report: no structureRescues key and no line, whether the field is absent or all zero", () => {
+    const today = report({});
+    const zero = report({ structureRescues: { inCode: 0, byPatch: 0, byFullAsk: 0 } });
+    expect(Object.keys(zero)).not.toContain("structureRescues");
+    expect(JSON.stringify(zero)).toBe(JSON.stringify(today));
+    expect(reportMarkdown(zero)).toBe(reportMarkdown(today));
+    expect(reportMarkdown(zero)).not.toContain("Structure rescues");
+    expect(reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f",
+      structureRescues: { inCode: 0, byPatch: 0, byFullAsk: 0 } } as never)).not.toContain("Structure rescues");
+  });
+
+  it("the debate report copies a non-zero count and prints its line", () => {
+    const rescued = report({ structureRescues: { inCode: 0, byPatch: 0, byFullAsk: 1 } });
+    expect(rescued.structureRescues).toEqual({ inCode: 0, byPatch: 0, byFullAsk: 1 });
+    expect(reportMarkdown(rescued)).toContain("Structure rescues: in code 0, by short follow-up 0, by full re-ask 1");
+  });
+
+  it("a run without a structure route never counts a follow-up as B (today's patch or re-ask), but still counts A1's drops", () => {
+    expect(practiceStructureRescues(RESCUES, { structureRouted: false })).toEqual({ inCode: 1, byPatch: 0, byFullAsk: 0 });
+    expect(practiceStructureRescues(RESCUES, ROUTED)).toEqual({ inCode: 1, byPatch: 1, byFullAsk: 0 });
+  });
+
+  it("the practice passes the runner composition's route to the count (route present = its structure-repair ceiling is set)", () => {
+    const read = (file: string) => readFileSync(new URL(`../../tools/preview-practice/${file}`, import.meta.url), "utf8");
+    expect(read("practice-runner-composition.ts")).toContain("structureRouted: previewStructureRepairCeiling(structureRepairRoute) !== null");
+    expect(read("practice-debate.ts")).toContain("await collect(pool, job.runId, { structureRouted: runner.structureRouted })");
+  });
+
+  it("PF-S26: a B-rescued call is still a slip the same call fixed (a warning), never unrecovered", () => {
+    const tries = RESCUES.slice(1).map((attempt) => ({ outcome: attempt.outcome, parseStatus: attempt.parseStatus, replyForm: attempt.replyForm }));
+    expect(practiceModelCalls([{ model: GLM, tries }] as never)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
+  });
+
+  it("a writer's STRUCTURE reply answered by the full re-ask counts as by full re-ask", () => {
+    const writer: readonly PracticeTryRecord[] = [
+      { callKey: "glm|W", model: GLM, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", outcome: "FAILED", parseStatus: "PARSE_FAILED",
+        replyForm: "ORIGINAL", repairs: null, failureClass: "STRUCTURE", issue: "PARSE_FAILED@$", replyText: "no object" },
+      { callKey: "glm|W", model: GLM, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", outcome: "OK", parseStatus: "PARSED",
+        replyForm: "FULL", repairs: null, failureClass: null, issue: null, replyText: null }
+    ];
+    expect(practiceStructureRescues(writer, ROUTED)).toEqual({ inCode: 0, byPatch: 0, byFullAsk: 1 });
+  });
+
+  it("a call whose first refusal is CONTENT and ends in a patch is today's patch, not a structure rescue", () => {
+    const content: readonly PracticeTryRecord[] = [
+      { callKey: "glm|S", model: GLM, callSiteKey: "STORY:STORYTELLER:1", outcome: "FAILED", parseStatus: "SCHEMA_FAILED",
+        replyForm: "ORIGINAL", repairs: null, failureClass: "CONTENT", issue: "invalid_type@short.headline", replyText: "{}" },
+      { callKey: "glm|S", model: GLM, callSiteKey: "STORY:STORYTELLER:1", outcome: "OK", parseStatus: "PARSED",
+        replyForm: "PATCH", repairs: null, failureClass: null, issue: null, replyText: null }
+    ];
+    expect(practiceStructureRescues(content, ROUTED)).toEqual({ inCode: 0, byPatch: 0, byFullAsk: 0 });
   });
 });
