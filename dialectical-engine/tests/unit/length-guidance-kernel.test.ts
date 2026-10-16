@@ -58,7 +58,8 @@ describe("the start values (spec §7, engine INTERFACE §4, owner G5)", () => {
     expect([LENGTH_GUIDANCE_START.thinkingRoom.comparing_judge, LENGTH_GUIDANCE_START.thinkingRoom.investigator]).toEqual([4096, 2048]);
     expect(Object.keys(LENGTH_GUIDANCE_START.map)).toEqual([...MAP_WORD_TARGET_PARTS]);
     expect(LENGTH_GUIDANCE_START.story).toEqual({ headline: 15, summary: 120, confidence: 30, positionLine: 35, change: 60, whyReason: 100 });
-    expect(LENGTH_GUIDANCE_START.thinkingRoom.story_writer).toBe(16384);
+    // Owner Q-C2 (2026-10-16): the storyteller's thinking room is 64k (was 16384 until LG-C).
+    expect(LENGTH_GUIDANCE_START.thinkingRoom.story_writer).toBe(65536);
     expect([LENGTH_GUIDANCE_START.runawayMultiplier, LENGTH_GUIDANCE_START.tokensPerWord, LENGTH_GUIDANCE_START.storyLongReferenceWords])
       .toEqual([4, 3, 3000]);
     expect(LENGTH_GUIDANCE_START.charactersPerWord).toEqual({ zh: 1.6, ja: 2.0, th: 5.0 });
