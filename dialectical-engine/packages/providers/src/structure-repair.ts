@@ -98,7 +98,7 @@ const VALUE_CHANGING_REPAIRS: ReadonlySet<string> = new Set(["UNASKED_KEYS", "IN
  * (Task 12b): false for a value written in an object with no key name of its own (`{"quality": 0.5, "a sentence", …}`,
  * invalid JSON the scan reads past): its path then names the key before it, which is not its own.
  */
-type ReplyValue = Readonly<{ path: readonly string[]; value: string | number | boolean; keyed?: false }>;
+type ReplyValue = Readonly<{ path: readonly string[]; value: string | number | boolean; keyed?: false; afterText?: true }>;
 type ReplyReading = Readonly<{ values: readonly ReplyValue[]; keys: ReadonlySet<string> }>;
 
 const normalText = (text: string): string => text.normalize("NFC").replace(/\s+/gu, " ").trim();
@@ -237,20 +237,30 @@ function scanValues(text: string): ReplyReading {
    * `fresh`: an object's last key has no value yet; `keyed`: a list was written under a key of its own (its entries are
    * that key's). A value in an object whose last key already has one has no key of its own (Task 12b).
    */
-  type Frame = { object: boolean; key: readonly string[] | null; owned: Map<string, number[]>; fresh: boolean; keyed: boolean };
+  /**
+   * Task 12b round 3: `bareText`, the object's last key took a bare text as its value (not a list, an object or a number),
+   * so a keyless value after it may be that key's list written without its `[`; after a closed `]` it may not.
+   */
+  type Frame = { object: boolean; key: readonly string[] | null; owned: Map<string, number[]>; fresh: boolean; keyed: boolean;
+    bareText: boolean };
   const stack: Frame[] = [];
   const values: ReplyValue[] = [];
   const dropped = new Set<number>();
   const keys = new Set<string>();
   /** Whether the next value at the top of the stack has a key of its own; it uses that key up. */
-  const takeKey = (): boolean => {
+  /** Whether the next value (`text`: a bare text) has a key of its own; it uses that key up. */
+  const takeKey = (text: boolean): boolean => {
     const top = stack.at(-1);
     if (top === undefined) return true;
     if (!top.object) return top.keyed;
     const own = top.fresh && top.key !== null;
+    if (own) top.bareText = text;
     top.fresh = false;
     return own;
   };
+  /** A keyless value right after a key whose own value was a bare text (a list that may have lost its `[`). */
+  const keyless = (path: readonly string[], value: string | number | boolean): ReplyValue =>
+    stack.at(-1)?.bareText === true ? { path, value, keyed: false, afterText: true } : { path, value, keyed: false };
   const record = (value: ReplyValue): void => {
     for (const frame of stack) {
       if (!frame.object || frame.key === null) continue;
@@ -295,14 +305,14 @@ function scanValues(text: string): ReplyReading {
         for (const earlier of top.owned.get(name) ?? []) dropped.add(earlier);
         top.owned.delete(name);
       } else if (top !== undefined) {
-        record(takeKey() ? { path: pathNow(), value } : { path: pathNow(), value, keyed: false });
+        record(takeKey(true) ? { path: pathNow(), value } : keyless(pathNow(), value));
       }
       index = cursor + 1;
       continue;
     }
     if (character === "{" || character === "[") {
-      const keyed = takeKey();
-      stack.push({ object: character === "{", key: null, owned: new Map(), fresh: false, keyed });
+      const keyed = takeKey(false);
+      stack.push({ object: character === "{", key: null, owned: new Map(), fresh: false, keyed, bareText: false });
       index += 1;
       continue;
     }
@@ -313,7 +323,7 @@ function scanValues(text: string): ReplyReading {
       const after = text[index + scalar[0].length];
       if (stack.length > 0 && (after === undefined || SCALAR_AFTER.test(after))) {
         const parsed = scalar[0] === "true" ? true : scalar[0] === "false" ? false : Number(scalar[0]);
-        record(takeKey() ? { path: pathNow(), value: parsed } : { path: pathNow(), value: parsed, keyed: false });
+        record(takeKey(false) ? { path: pathNow(), value: parsed } : keyless(pathNow(), parsed));
       }
       index += scalar[0].length;
       continue;
@@ -416,9 +426,15 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
     const at = path.findIndex((key) => roots.has(key));
     return (at <= 0 ? path : path.slice(at)).join(".");
   };
-  // Task 12b round 2: a value with no key of its own right after a key the form states as a LIST is that list's next
-  // entry, written without its `[` (`"ambiguityFlags": "a", "b"`): it is the AI's own and counts as keyed.
-  const belongs = (entry: ReplyValue): boolean => entry.keyed !== false || shape.lists.has(rooted(entry.path));
+  // Task 12b round 3: the path cut at EVERY root key (and whole), so a wrapper named like a root key (`context.…` around
+  // the whole reply) is no new place either.
+  const cuts = (path: readonly string[]): readonly string[] =>
+    path.flatMap((key, at) => at === 0 || roots.has(key) ? [path.slice(at).join(".")] : []);
+  const statedAt = (path: readonly string[], within: ReadonlySet<string>): boolean => cuts(path).some((cut) => within.has(cut));
+  // Task 12b rounds 2-3: a keyless value right after a key the form states as a LIST, whose own value was a bare text, is
+  // that list's next entry written without its `[` (`"ambiguityFlags": "a", "b"`): the AI's own, a source, kept. After a
+  // list that WAS closed (`["a", "b"], "c"`) it stays keyless: droppable, never a source.
+  const belongs = (entry: ReplyValue): boolean => entry.keyed !== false || (entry.afterText === true && statedAt(entry.path, shape.lists));
   const fits = (source: ReplyValue, target: ReplyValue): boolean => mayComeFrom(source.path, target.path, repair.keys, broken.keys);
   const samePath = (source: ReplyValue, target: ReplyValue): boolean =>
     source.path.length === target.path.length && source.path.every((key, at) => key === target.path[at]);
@@ -467,12 +483,12 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
     const strays = new Set(broken.values.flatMap((other) => {
       if (!belongs(other)) return [];
       const at = rooted(other.path).split(".");
-      return at.length === path.length && at.slice(0, -1).join(".") === parent && !places.has(at.join(".")) ? [at.at(-1)!] : [];
+      return at.length === path.length && at.slice(0, -1).join(".") === parent && !statedAt(other.path, places) ? [at.at(-1)!] : [];
     }));
     return itemKeys.some((keys) => keys.has(path.at(-1)!) && [...strays].filter((key) => keys.has(key)).length >= 2);
   };
   const asked = (entry: ReplyValue): boolean => options.textsKept === "place"
-    ? places.has(rooted(entry.path)) || strayAt(entry) : stated.has(entry.path.at(-1)!);
+    ? statedAt(entry.path, places) || strayAt(entry) : stated.has(entry.path.at(-1)!);
   const keptTexts = repair.values.flatMap((leaf) => typeof leaf.value === "string" ? [` ${normalText(leaf.value)} `] : []);
   return broken.values.every((entry, index) => {
     const text = normal[index]!;

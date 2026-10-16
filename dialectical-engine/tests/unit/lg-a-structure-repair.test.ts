@@ -399,6 +399,64 @@ describe("LG-A Task 12b round 2: wrappers, a missing [, a flat fatal flag", () =
   });
 });
 
+/**
+ * Task 12b round 3 (the reviewer's probes 12r and 12s, each pinned): a keyless value after a list that WAS closed stays
+ * keyless (droppable, never a source); only a list key whose own value was a bare text (a real missing `[`) takes the
+ * values after it. A wrapper named like a root key of the form is no new place either.
+ */
+describe("LG-A Task 12b round 3: a closed list, a wrapper named like a root key", () => {
+  const SM = "The strongest form says fares cover costs on the central lines";
+  const CS = "A plausible counter is that riders on the outer lines pay for it";
+  const F1 = { type: "strawman", severity: 0.9, description: "It attacks a fare rise no one proposed" };
+  const F2 = { type: "ad_hominem", severity: 0.8, description: "It calls the planners lazy" };
+  const base = { steelman: { summary: SM, fidelity: 0.8 }, critic: { summary: CS, counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.5, relevance: 0.7 }, context: { fit: 0.6, ambiguityFlags: ["free for whom is unclear", "central lines undefined"] },
+    fallacy: { severity: 0.9, fatalFlags: [F1] as { type: string; severity: number; description: string }[] } };
+  type Panel = typeof base;
+  const edit = (change: (copy: Panel) => void): Panel => { const copy = structuredClone(base); change(copy); return copy; };
+  const lossy = edit((copy) => { copy.context.ambiguityFlags = []; copy.fallacy.fatalFlags = []; });
+  const slip = (text: string) => text.replace("\"quality\":0.5,", "\"quality\":0.5, \"the sources are mostly local news\",");
+  const both = (broken: string, repaired: unknown) => [
+    structureRepairKeepsWords(broken, repaired, PANEL_ANSWER_FORM, { textsKept: "place" }),
+    structureRepairKeepsWords(broken, repaired, PANEL_ANSWER_FORM, { textsKept: "anywhere" })];
+
+  it("a sentence after a closed list may be left out and is never a new flag (Important 1)", () => {
+    const afterList = JSON.stringify(base).replace("\"central lines undefined\"]", "\"central lines undefined\"], \"and fares may rise later\"");
+    expect(both(afterList, base)).toEqual([true, true]);
+    expect(both(afterList, edit((copy) => { copy.context.ambiguityFlags.push("and fares may rise later"); }))).toEqual([false, false]);
+    expect(both(afterList, edit((copy) => { copy.critic.summary = `${CS} and fares may rise later`; }))).toEqual([false, false]);
+    const afterListNumber = JSON.stringify(base).replace("\"central lines undefined\"]", "\"central lines undefined\"], 0.2");
+    expect(both(afterListNumber, edit((copy) => { copy.context.fit = 0.2; }))).toEqual([false, false]);
+  });
+
+  it("a wrapper named like a root key is no new place (minor)", () => {
+    for (const wrapper of ["context", "fallacy", "evidence", "steelman"]) {
+      const broken = slip(JSON.stringify({ [wrapper]: base }));
+      expect(both(broken, base), wrapper).toEqual([true, true]);
+      expect(both(broken, lossy), wrapper).toEqual([false, false]);
+      expect(both(broken, edit((copy) => { copy.context.ambiguityFlags = []; })), wrapper).toEqual([false, false]);
+      expect(both(broken, edit((copy) => { copy.fallacy.fatalFlags = []; })), wrapper).toEqual([false, false]);
+      expect(both(broken, edit((copy) => { copy.context.ambiguityFlags = ["free for whom is unclear"]; })), wrapper).toEqual([false, false]);
+    }
+    expect(both(slip(JSON.stringify({ response: { fallacy: base } })), lossy)).toEqual([false, false]);
+    expect(both(slip(JSON.stringify({ steelman: { response: base } })), lossy)).toEqual([false, false]);
+  });
+
+  it("flat fatal flags written in fallacy: dropping is refused; a key written twice keeps only its last value", () => {
+    const twoFlat = slip(JSON.stringify(base).replace(`"fatalFlags":[${JSON.stringify(F1)}]`,
+      "\"type\":\"strawman\",\"description\":\"It attacks a fare rise no one proposed\",\"type\":\"ad_hominem\",\"description\":\"It calls the planners lazy\",\"fatalFlags\":[]"));
+    expect(both(twoFlat, edit((copy) => { copy.fallacy.fatalFlags = []; }))).toEqual([false, false]);
+    // As JSON.parse reads the reply, the first flag's type and description are gone, and its severity was never written:
+    // keeping both flags, or the second with the fallacy's own severity reused, invents values. Refused (the safe side).
+    expect(both(twoFlat, edit((copy) => { copy.fallacy.fatalFlags = [{ ...F1 }, { ...F2, severity: 0.9 }]; }))).toEqual([false, false]);
+    expect(both(twoFlat, edit((copy) => { copy.fallacy.fatalFlags = [{ type: F2.type, severity: 0.9, description: F2.description }]; }))).toEqual([false, false]);
+    const oneFlat = slip(JSON.stringify(base).replace(`"fatalFlags":[${JSON.stringify(F1)}]`,
+      "\"type\":\"strawman\",\"description\":\"It attacks a fare rise no one proposed\",\"fatalFlags\":[]"));
+    expect(both(oneFlat, edit((copy) => { copy.fallacy.fatalFlags = []; }))).toEqual([false, false]);
+    expect(both(oneFlat, base)).toEqual([false, false]);
+  });
+});
+
 describe("LG-A withStructureRepair (L32)", () => {
   it("is the gateway itself with no route, and refuses a route it cannot use", () => {
     const { gateway } = previewGlmHarness([]);
