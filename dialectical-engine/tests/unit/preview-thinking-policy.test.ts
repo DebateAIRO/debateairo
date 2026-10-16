@@ -132,7 +132,7 @@ describe("the gateway may set the row's whole reviewed menu, on the preview only
     expect(previewTargetGatewayControls(config, { model: DEEPSEEK })).toEqual({ maxOutputTokens: 32_768, thinking: { parameter: "reasoning_effort", levels: ["high", "low", "none"] } });
     expect(previewTargetGatewayControls(config, { model: MIMO })).toEqual({ maxOutputTokens: 32_768, thinking: { parameter: "reasoning_effort", levels: ["none"] } });
     expect(previewTargetGatewayControls(config, { model: QWEN })).toEqual({ maxOutputTokens: 32_768, thinking: { parameter: "reasoning_effort", levels: ["low", "medium", "none"] } });
-    expect(previewTargetGatewayControls(config, { model: HAIKU })).toEqual({ maxOutputTokens: 32_768, thinking: { parameter: "reasoning_effort", levels: ["high", "medium", "low"] } });
+    expect(previewTargetGatewayControls(config, { model: HAIKU })).toEqual({ maxOutputTokens: 32_768, cacheFirstUserTurn: true, thinking: { parameter: "reasoning_effort", levels: ["high", "medium", "low"] } });
     expect(previewTargetGatewayControls(undefined, { model: DEEPSEEK })).toEqual({});
     expect(() => previewTargetGatewayControls(config, { model: "other/model" })).toThrow();
   });

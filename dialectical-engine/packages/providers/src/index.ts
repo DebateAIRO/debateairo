@@ -1360,6 +1360,12 @@ export interface OpenAICompatibleGatewayOptions {
    */
   readonly maxOutputTokens?: number;
   /**
+   * Length guidance L30 (LG-B): on the Anthropic wire only, send the first user turn's material with the cache mark
+   * (anthropic-messages.ts anthropicCacheableMessages). Set by `previewTargetGatewayControls` for the preview's Anthropic
+   * rows. Absent: today's body. Refused on any other wire.
+   */
+  readonly cacheFirstUserTurn?: boolean;
+  /**
    * Model scorecard §2.3: records each attempt's prompt just before it is sent.
    * Optional: the unit doubles and a gateway with no debate run record none.
    * The runner's `createPostgresProviderGateway` always supplies it
@@ -1814,6 +1820,10 @@ function assertGatewayWire(options: OpenAICompatibleGatewayOptions): boolean {
   if (options.adapterKind !== undefined && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
     throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
   }
+  if (options.cacheFirstUserTurn !== undefined && (typeof options.cacheFirstUserTurn !== "boolean"
+    || (options.cacheFirstUserTurn && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND))) {
+    throw new TypeError("PROVIDER_GATEWAY_CACHE_INVALID");
+  }
   const native = options.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
   if (!isAnthropicHostPairing(native, options.endpoint)) {
     throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
@@ -1861,13 +1871,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
    */
   #patchPacket(
     packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
-    fits: (packet: PromptPacket, tokenCeiling: number) => boolean, packetCap: number
+    fits: (packet: PromptPacket, tokenCeiling: number) => boolean, packetCap: number, markMaterial: boolean
   ): PromptPacket | null {
     let patch: PromptPacket;
     try {
       patch = buildFramedPatchPrompt(packet, ownReply, plan.locator);
       if (this.#anthropic) {
-        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages });
+        anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: tokenCeiling, thinkingLevel, messages: patch.messages, cacheFirstUserTurn: markMaterial });
       }
     } catch (error) {
       if (error instanceof TypedDomainError) return null;
@@ -1945,6 +1955,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     // Spec 2026-10-12 §4.4: the repair POSTs' level, decided and refused here too, before the first byte leaves.
     const repairThinking = request.repairThinkingLevel === undefined
       ? thinking : resolveThinkingLevel(request.repairThinkingLevel, this.#options.thinking, request.providerRef);
+    /**
+     * Length guidance L30 (LG-B; controller ruling PF-B3.9, 2026-10-16): the first user turn's material carries the cache
+     * mark only where a cache read can happen: this call may send a second POST, and its repair POSTs run at the call's
+     * own effort (Anthropic drops the messages cache whenever the effort changes). A one-POST call (the preview's
+     * unrepaired steps; LG-A's structure-repair call, one POST by construction) and a call whose repairs run at the
+     * owner's `slip_fix` level when it differs send today's unmarked body, so they never pay the write premium for a read
+     * that cannot come. Decided once, before the first byte leaves, so every POST of the call has the same body form.
+     */
+    const markMaterial = this.#options.cacheFirstUserTurn === true && callAttempts() >= 2 && repairThinking.sent === thinking.sent;
     // Length guidance L25: the answer room is a whole number, and the lower level is refused here, before the first byte.
     const lengthRetry = request.lengthRetry;
     if (lengthRetry !== undefined && (!Number.isSafeInteger(lengthRetry.answerRoomTokens) || lengthRetry.answerRoomTokens < 0)) {
@@ -1975,7 +1994,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
      */
     if (this.#anthropic) {
-      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages });
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages, cacheFirstUserTurn: markMaterial });
     }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
@@ -2061,7 +2080,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
             thinkingLevel: attemptThinking.sent,
-            messages: attemptPacket.messages
+            messages: attemptPacket.messages,
+            cacheFirstUserTurn: markMaterial
           });
         } catch (error) {
           // Only a later attempt can get here (the first packet was checked before the loop).
@@ -2577,7 +2597,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
               ? Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
                   reason: contentFollowUpSentence(planned.locator.code, attemptFailureClass ?? undefined) }) })
               : planned;
-            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow, packetCap);
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
               patchPlan = plan;
@@ -2938,6 +2958,7 @@ export {
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
+  anthropicCacheableMessages,
   anthropicCacheableSystem,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
@@ -2945,7 +2966,8 @@ export {
   assertAnthropicCredentialShape,
   readAnthropicMessagesReply,
   type AnthropicMessagesReply,
-  type AnthropicSystemBlocks
+  type AnthropicSystemBlocks,
+  type AnthropicTextBlock
 } from "./anthropic-messages.js";
 export * from "./preview-models.js";
 export * from "./preview-remaining.js";

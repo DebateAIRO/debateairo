@@ -834,10 +834,12 @@ class AnthropicProfile:
     it reserves at the lower step's (0.10, 0.50), the row's own prices. A full 256 KiB request
     reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016.
 
-    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry ONE
-    cache mark, {"type": "ephemeral"} (5 minutes, no ttl), on the first of exactly two system text
-    blocks (the app's adapter puts the engine's stable instruction and safety frame in the first block
-    and the per-call markers in the second; nothing else anywhere may carry a mark). Such a request
+    Prompt caching (owner approval 2026-10-12, "caching before the upload"): a request may carry at most
+    TWO cache marks, each {"type": "ephemeral"} (5 minutes, no ttl): on the first of exactly two system
+    text blocks (the engine's stable instruction and safety frame), and (length guidance LG-B, L30,
+    2026-10-15) on the first block of the FIRST user turn, which may then be 1..4 text blocks (the
+    fenced material, then any user block the adapter joins after it, unmarked). Nothing else anywhere
+    may carry a mark. Such a request
     (cache_write_requested) reserves its WHOLE input at the step's 5-minute cache-write price (lower
     0.125, upper 0.625), the simplest safe rule: the write can never cover more than the input. So the
     dearest request is a full-size cached one, (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, the
@@ -890,7 +892,8 @@ class AnthropicProfile:
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
     # Request fields beyond these are refused (no thinking, tools, stream, sampling, top-level cache_control...).
     BODY_FIELDS = frozenset({'model', 'max_tokens', 'messages', 'system', 'output_config'})
-    # The one cache mark a request may carry, on the first of its two system blocks: 5 minutes (no ttl).
+    # The cache mark a request may carry, on the first of its two system blocks and (LG-B) on the first block of its
+    # first user turn: 5 minutes (no ttl).
     CACHE_MARK = {'type': 'ephemeral'}
 
     def path_for(self, row):
@@ -942,18 +945,46 @@ class AnthropicProfile:
                         for block in system)
                 and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK)
 
+    MATERIAL_BLOCKS_MAX = 4
+
+    def messages_valid(self, messages):
+        """Roles alternating user/assistant, starting and ending with a user turn, each content a text that is not only
+        whitespace (JavaScript's trim set); LG-B (L30): the FIRST turn may instead be 1..4 text blocks, the first exactly
+        {type, text, cache_control: {"type": "ephemeral"}}, the rest exactly {type, text}, no text only whitespace."""
+        def text_ok(value):
+            return isinstance(value, str) and bool(value.strip(JS_WHITESPACE))
+
+        def blocks_ok(content):
+            if not (isinstance(content, list) and 1 <= len(content) <= self.MATERIAL_BLOCKS_MAX
+                    and all(isinstance(block, dict) for block in content)):
+                return False
+            first, rest = content[0], content[1:]
+            return (set(first) == {'type', 'text', 'cache_control'} and first['type'] == 'text' and text_ok(first['text'])
+                    and isinstance(first['cache_control'], dict) and first['cache_control'] == self.CACHE_MARK
+                    and all(set(block) == {'type', 'text'} and block['type'] == 'text' and text_ok(block['text']) for block in rest))
+        return (isinstance(messages, list) and len(messages) % 2 == 1
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
+                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
+                        and (text_ok(m['content']) or (index == 0 and blocks_ok(m['content'])))
+                        for index, m in enumerate(messages)))
+
     def cache_write_requested(self, body):
-        """True exactly for a body whose system is the accepted two-block form (its one cache mark)."""
-        return bool(isinstance(body, dict) and isinstance(body.get('system'), list) and self.system_valid(body['system']))
+        """True exactly for an accepted body that carries a cache mark: the two-block system, or (LG-B) a marked first turn."""
+        if not isinstance(body, dict):
+            return False
+        system, messages = body.get('system'), body.get('messages')
+        return bool((isinstance(system, list) and self.system_valid(system))
+                    or (isinstance(messages, list) and messages and isinstance(messages[0], dict)
+                        and isinstance(messages[0].get('content'), list) and self.messages_valid(messages)))
 
     def body_valid(self, body, row):
         """Exactly model, max_tokens and messages, an optional system (system_valid: a string, or the two
         blocks that carry the one cache mark), and output_config exactly {"effort": <a word on the row's menu>}
         (spec 2026-10-12 section 4.5; absent only where the menu holds None, which no Anthropic row does). Nothing else anywhere (contract-BC-wire, Anthropic). It mirrors what the app's
-        adapter (anthropic-messages.ts) can send, no more: text content that is not only whitespace
-        (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user turn
-        (the adapter joins same-role turns and refuses a final assistant turn), and a system whose text is
-        not only whitespace when present."""
+        adapter (anthropic-messages.ts) can send, no more (messages_valid): text content that is not only
+        whitespace (JavaScript's trim set), roles alternating user/assistant starting AND ending with a user
+        turn (the adapter joins same-role turns and refuses a final assistant turn), LG-B's marked first turn,
+        and a system whose text is not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         effort_member = 'output_config' in body
@@ -973,11 +1004,7 @@ class AnthropicProfile:
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
-                and isinstance(messages, list) and len(messages) % 2 == 1
-                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
-                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
-                        and isinstance(m['content'], str) and m['content'].strip(JS_WHITESPACE)
-                        for index, m in enumerate(messages)))
+                and self.messages_valid(messages))
 
     def body_effort(self, body):
         """The level a body carries (spec 2026-10-12 section 4.5): output_config's effort, or None for no member."""

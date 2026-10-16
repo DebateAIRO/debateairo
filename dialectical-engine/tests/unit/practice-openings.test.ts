@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MAP_CONTRACT_IDS, mapPromptContractHash } from "@debateai/map";
-import { readPromptFrame, type PreviewBudgetPort } from "@debateai/providers";
-import { stubVendorReply } from "../support/preview-gate-stubs.js";
+import { anthropicMessagesRequestBody, readPromptFrame, type PreviewBudgetPort, type PromptPacket } from "@debateai/providers";
+import { stubChatBody, stubVendorReply } from "../support/preview-gate-stubs.js";
 import { practiceRunnerPolicy, practiceTurnOrder } from "../../tools/preview-practice/practice-formats.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
 import { PRACTICE_CONTRACT_HASHES } from "../../tools/preview-practice/practice-lanes.js";
@@ -301,5 +301,19 @@ describe("practice openings: a stopped gate ends the run after the arm in progre
   it("an arm that ran with no stop has no STOPPED note", async () => {
     const result = await run("ro-euro", "T,B");
     expect(result.arms.flatMap((arm) => arm.notes.map((note) => note.note))).not.toContain("STOPPED");
+  });
+});
+
+describe("LG-B (L30): an Anthropic body whose first turn is marked reads as today's packet", () => {
+  it("the dry openings tool and the gate stub join a turn's text blocks, so the frame reader sees today's turn", () => {
+    const messages: PromptPacket["messages"] = [{ role: "system", content: "Synthetic frame." },
+      { role: "user", content: "Synthetic material." }, { role: "user", content: "Synthetic rejection." }];
+    const body = (cacheFirstUserTurn: boolean) => anthropicMessagesRequestBody({ model: "claude-haiku-5-5", maxTokens: 8, thinkingLevel: "high",
+      messages, cacheFirstUserTurn });
+    // The marked form is what is really sent: two blocks, the first marked.
+    expect((JSON.parse(body(true)) as { messages: { content: unknown[] }[] }).messages[0]!.content).toHaveLength(2);
+    expect(openingsDryPacket(body(true))).toEqual(openingsDryPacket(body(false)));
+    expect(stubChatBody("anthropic", JSON.parse(body(true)) as Record<string, unknown>))
+      .toBe(stubChatBody("anthropic", JSON.parse(body(false)) as Record<string, unknown>));
   });
 });

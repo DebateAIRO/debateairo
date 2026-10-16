@@ -74,7 +74,11 @@ def cached_request(**changes):
 
 
 def is_cached(value):
-    return isinstance(value, dict) and isinstance(value.get('system'), list)
+    """A request that carries a cache mark: the two-block system, or (LG-B) a marked first user turn."""
+    messages = value.get('messages') if isinstance(value, dict) else None
+    return isinstance(value, dict) and (isinstance(value.get('system'), list)
+                                        or (isinstance(messages, list) and messages and isinstance(messages[0], dict)
+                                            and isinstance(messages[0].get('content'), list)))
 
 
 def reservation_of(raw):
@@ -1237,8 +1241,8 @@ class RequestShapeTests(AnthropicTest):
         refused += [
             request(messages=[{'role': 'user', 'content': 'x', 'cache_control': {'type': 'ephemeral'}}]),
             request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'x'}]}]),
-            request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'x',
-                                                            'cache_control': {'type': 'ephemeral'}}]}]),
+            # LG-B (L30): one marked text block as the first user turn is now the accepted material mark
+            # (PromptCachingTests' material tests and the shared fixture's material_sent), so it left this list.
             request(messages=[{'role': 'assistant', 'content': 'x'}, {'role': 'user', 'content': 'y'}]),
             request(messages=[{'role': 'system', 'content': 'x'}, {'role': 'user', 'content': 'y'}]),
             request(messages=[{'role': 'user', 'content': 'y'}, {'role': 'system', 'content': 'x'}]),
@@ -1639,6 +1643,46 @@ class PromptCachingTests(AnthropicTest):
         accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None, cache_write=True)
         self.assertEqual(Decimal(accounting['guard_charge_usd']), cost(LOWER, 200, write_5m=1000, write_1h=2000, output=400))
         self.assertEqual((accounting['cache_write_5m_tokens'], accounting['cache_write_1h_tokens']), (1000, 2000))
+
+    def test_the_material_mark_on_the_first_user_turn_is_accepted_and_reserves_at_the_write_price(self):
+        go = bridge.read_go(self.gate().go_path)
+        value = request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'Offline synthetic material',
+                                                                 'cache_control': dict(CACHE_MARK)}]}])
+        self.assertTrue(ANTHROPIC.body_valid(value, ANTHROPIC.rows[HAIKU]))
+        self.assertIs(ANTHROPIC.cache_write_requested(value), True)  # Its system is the plain string: the mark is the turn's.
+        raw = json.dumps(value)
+        _outgoing, reserved, _row, prices = bridge.validate_request(envelope_text(raw), go)
+        self.assertEqual((reserved, prices), (reservation_of(raw), (WRITE_IN, PRICE_OUT)))
+
+    def test_every_material_body_in_the_shared_fixture_is_accepted_at_its_reservation_or_refused(self):
+        fixture = json.loads(self.FIXTURE.read_text())
+        self.assertEqual((len(fixture['material_sent']), len(fixture['material_refused'])), (3, 10))
+        self.assertNotIn('the two blocks with list content in a message', [case['name'] for case in fixture['refused']])
+        go = bridge.read_go(self.gate().go_path)
+        for case in fixture['material_sent']:
+            with self.subTest(sent=case['name']):
+                body = json.loads(case['body'])
+                self.assertTrue(ANTHROPIC.body_valid(body, ANTHROPIC.rows[HAIKU]))
+                self.assertEqual(Decimal(case['reservedUsd']), reservation_of(case['body']))
+                _outgoing, reserved, _row, prices = bridge.validate_request({**envelope_text(case['body']),
+                                                                             'reservedUsd': case['reservedUsd']}, go)
+                self.assertEqual((reserved, prices), (Decimal(case['reservedUsd']), (WRITE_IN, PRICE_OUT)))
+        for case in fixture['material_refused']:
+            with self.subTest(refused=case['name']):
+                self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    bridge.validate_request(envelope_text(case['body']), go)
+
+    def test_a_marked_material_call_settles_its_write_and_read_at_their_own_prices(self):
+        gate = self.ready()
+        value = request(messages=[{'role': 'user', 'content': [{'type': 'text', 'text': 'Offline synthetic material',
+                                                                 'cache_control': dict(CACHE_MARK)}]}])
+        five = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0}
+        reply = message(200, 400, cache_creation_input_tokens=0, cache_read_input_tokens=3000, cache_creation=five)
+        self.call(gate, value=value, reply=reply)
+        entry = entry_of(gate)
+        self.assertEqual((entry['state'], entry['cache_write_requested']), ('settled', '5m'))
+        self.assertEqual(Decimal(entry['held_usd']), cost(LOWER, input_tokens=200, read=3000, output=400))
 
 if __name__ == '__main__':
     unittest.main()

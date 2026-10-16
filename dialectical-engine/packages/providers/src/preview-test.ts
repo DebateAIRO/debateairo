@@ -253,11 +253,12 @@ export function previewProbeControls(target: Readonly<{ model: string }>): Reado
  */
 export function previewTargetGatewayControls(
   config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
-): Readonly<{ maxOutputTokens?: number; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
+): Readonly<{ maxOutputTokens?: number; cacheFirstUserTurn?: true; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
   if (config === undefined) return Object.freeze({});
   const reviewed = previewModelRow(target.model) ?? refused();
   const levels = reviewed.efforts.filter(word => word !== "default");
   return Object.freeze({ maxOutputTokens: reviewed.outputBound,
+    ...(reviewed.provider === "anthropic" ? { cacheFirstUserTurn: true as const } : {}),
     ...(levels.length === 0 ? {} : { thinking: Object.freeze({ parameter: "reasoning_effort" as const, levels: Object.freeze([...levels]) }) }) });
 }
 /**
@@ -769,14 +770,35 @@ function anthropicSystemAccepted(system: unknown): boolean {
   const mark = first.cache_control;
   return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
 }
-/** An accepted Anthropic body asks for a cache write exactly when its system is the two-block form. */
+/** An accepted Anthropic body asks for a cache write when its system is the two-block form or its first turn is marked (LG-B). */
 function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
-  return Array.isArray(body.system) && anthropicSystemAccepted(body.system);
+  const first = Array.isArray(body.messages) ? body.messages[0] : undefined;
+  return (Array.isArray(body.system) && anthropicSystemAccepted(body.system))
+    || (isPlainObject(first) && Array.isArray(first.content) && anthropicMessagesAccepted(body.messages));
+}
+/**
+ * The Anthropic `messages` the gate accepts (AnthropicProfile.messages_valid): roles alternating user/assistant, first
+ * and last a user turn, each content a text that is not only whitespace; LG-B (L30): the FIRST turn may instead be 1..4
+ * text blocks, the first exactly {type, text, cache_control: {"type": "ephemeral"}}, the rest exactly {type, text}.
+ */
+function anthropicMessagesAccepted(messages: unknown): boolean {
+  const blocksAccepted = (content: unknown): boolean => {
+    if (!Array.isArray(content) || content.length < 1 || content.length > 4) return false;
+    const [first, ...rest] = content as unknown[];
+    if (!isTextBlock(first, ["type", "text", "cache_control"]) || !rest.every((block) => isTextBlock(block, ["type", "text"]))) return false;
+    const mark = first.cache_control;
+    return isPlainObject(mark) && Object.keys(mark).length === 1 && mark.type === "ephemeral";
+  };
+  return Array.isArray(messages) && messages.length % 2 === 1
+    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
+      && message.role === (index % 2 === 0 ? "user" : "assistant")
+      && (typeof message.content === "string" ? message.content.trim().length > 0 : index === 0 && blocksAccepted(message.content)));
 }
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
  * `max_tokens` (1..the tier's bound), `messages` (each exactly {role, content: non-empty text},
- * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
+ * roles alternating user/assistant, first and last a user turn, as the adapter builds them; LG-B: the first turn may
+ * be the marked material blocks, anthropicMessagesAccepted), an
  * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
  * anthropicSystemAccepted), and `output_config` exactly {"effort": <a word on the row's menu>} (spec 2026-10-12
  * §4.5; absent only where the menu holds "default", which no Anthropic row does). Nothing else, anywhere.
@@ -794,10 +816,7 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && (hasEffort ? isPlainObject(effort) && Object.keys(effort).length === 1 && effortOnMenu(true, effort.effort, reviewed)
       : effortOnMenu(false, undefined, reviewed))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
-    && Array.isArray(messages) && messages.length % 2 === 1
-    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
-      && message.role === (index % 2 === 0 ? "user" : "assistant")
-      && typeof message.content === "string" && message.content.trim().length > 0);
+    && anthropicMessagesAccepted(messages);
 }
 /** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
 function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
