@@ -1027,6 +1027,8 @@ class UnreportedChargeBookedTests(AnthropicTest):
             'tool_block_no_usage': (200, without('usage', message(content=[{'type': 'tool_use', 'id': 't', 'name': 'x', 'input': {}}]))),
             'container_no_usage': (200, {**without('usage', message()), 'container': {'id': 'c', 'expires_at': 'x'}}),
             'no_message_200': (200, {'_invalid_json': True}),
+            # Controller ruling (2026-10-16): another model may bill above Haiku's prices: never booked.
+            'another_model_no_usage': (200, without('usage', message(model='claude-opus-5-5'))),
             '503_with_model': (503, {'type': 'error', 'error': {'type': 'overloaded_error'}, 'model': HAIKU}),
             '502_with_usage': (502, {'type': 'error', 'error': {'type': 'api_error'}, 'usage': {'output_tokens': 5}}),
             '503_message_without_usage': (503, without('usage', message())),

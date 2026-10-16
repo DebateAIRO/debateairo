@@ -1905,6 +1905,8 @@ class UnreportedChargeBookedTests(GateTest):
                 # 40,000 output tokens at GLM's 0.50 per million are $0.02, above the hold of about $0.0167.
                 ('counts_priced_above', 200, {'model': MODEL, 'usage': {'prompt_tokens': 10, 'completion_tokens': 40000, 'total_tokens': 1}}),
                 ('cost_not_an_amount', 200, {'model': MODEL, 'usage': {'estimated_cost': 'about a cent'}}),
+                # Controller ruling (2026-10-16): another model may bill above this row's prices: never booked.
+                ('another_model_no_usage', 200, {'model': 'other/model'}),
                 # Ruling R2 (2026-10-16): a 4xx without usage is not a paid post; a broken key needs root.
                 ('400', 400, {'error': {'message': 'bad request'}}),
                 ('401', 401, {'error': {'message': 'invalid key'}}),

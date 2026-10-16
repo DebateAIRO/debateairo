@@ -97,8 +97,8 @@ its 504 timeout_error among them). A hook that fails halts (accounting_failure).
 as before: any other failure while sending or reading (a reply too large, a fault in the transport itself), a hook
 that fails on a reply, a 4xx without accountable usage (a key, billing or request problem root must see), a reply whose
 own reported cost is above its reservation, any usage member, speed, service tier, region, server tool, cache count
-or content block the profile cannot price, a charge above the reservation (charge_overrun), another model or a non-200
-reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply
+or content block the profile cannot price, a charge above the reservation (charge_overrun), a reply naming another
+model (with or without usable counts), a non-200 reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply
 or an interrupted call (a booking still in flight at serve start halts, as a settled call does).
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
@@ -1436,10 +1436,14 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         # unreported is booked at its reservation when the profile's optional bookable_unreported finds the reservation
         # bounds it (judged on the RAW reply, as above, with its accounting): settled_reserved_max, reason
         # charge_unreported, no halt. Anything that may bill above the list price still halts; a hook that fails halts.
+        # Controller ruling (Task 4b review, 2026-10-16): only a reply that names no model or exactly this call's model
+        # (read as for provider_error_or_model_identity: profile.reply_model) is booked; another model may bill above
+        # this row's prices, so it keeps halting (uncertain_charge) as before M3.
         if halt_reason == 'uncertain_charge' and changes.get('reason') == 'usage_or_cost_unreported':
             unreported = getattr(profile, 'bookable_unreported', None)
             try:
-                bookable = unreported is not None and unreported(status, raw_response, changes['accounting'], reserved) is True
+                bookable = (unreported is not None and profile.reply_model(raw_response) in (None, row.model)
+                            and unreported(status, raw_response, changes['accounting'], reserved) is True)
             except BaseException:
                 bookable = False
                 changes = {**changes, 'reason': 'accounting_failure'}
