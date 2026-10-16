@@ -70,8 +70,6 @@ export type StructureRepairRoute = Readonly<{
   bound: Readonly<{ tokenCeiling: number; deadlineMs: number }>;
 }>;
 
-/** Between two texts' paths in a lookup key. */
-const PATH_JOIN = "\u0000";
 const JSON_ESCAPES: Readonly<Record<string, string>> = Object.freeze({ "\"": "\"", "\\": "\\", "/": "/", b: " ", f: " ", n: "\n", r: "\r", t: "\t" });
 /** A JSON number, true or false written as a value (never a word inside a text, never the digits of an id). */
 const SCALAR_TOKEN = /true|false|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
@@ -79,9 +77,18 @@ const SCALAR_TOKEN = /true|false|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
 const SCALAR_BEFORE = /[\s:,[{]/u;
 const SCALAR_AFTER = /[\s,}\]]/u;
 /** What may follow the quote that closes a text in a broken reply (anything else: the quote sits inside the text). */
-const TEXT_CLOSERS = ",:}]\"";
-/** A name the answer form states: every identifier-like word of it (a superset of its keys, so more texts must survive). */
-const FORM_NAME = /[A-Za-z_][A-Za-z0-9_]*/gu;
+const TEXT_CLOSERS = ":}]\"";
+/**
+ * After `",` the quote closes the text only when JSON goes on after the comma (Task 12 review round 2): a key or text, a
+ * number, an object, a list, true, false or null. Otherwise (`„evident corectă", ci …`, a Romanian or Polish quote closed
+ * with a straight one) the quote and the comma are the text's own.
+ */
+const JSON_GOES_ON = /["\d\-{[tfn]/u;
+/** A broken reply on the structure route finished normally (a cut reply takes the length retry instead). */
+const FINISHED = Object.freeze({ finishReason: "stop" });
+/** The names an answer form states: its quoted keys (`"summary":`, enum labels with them) and its `{a,b,c}` lists. */
+const FORM_QUOTED_NAME = /"([A-Za-z_][A-Za-z0-9_]*)"/gu;
+const FORM_BRACE_LIST = /\{\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)+)\s*\}/gu;
 /** Fixer repairs that drop, cut or rename a value the repair reply gave: the step would then accept other words (L32). */
 const VALUE_CHANGING_REPAIRS: ReadonlySet<string> = new Set(["UNASKED_KEYS", "INNER_UNASKED_KEYS", "MAP_TEXT_TRIMMED",
   "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"]);
@@ -95,6 +102,12 @@ const keyParts = (key: string): string[] => key.split(".").filter((part) => part
 function unescapeJsonText(text: string): string {
   return text.replace(/\\(u[0-9a-fA-F]{4}|["\\/bfnrt])/gu, (_match, escape: string) =>
     escape.startsWith("u") ? String.fromCharCode(Number.parseInt(escape.slice(1), 16)) : JSON_ESCAPES[escape]!);
+}
+
+/** The names `answerForm` states (`FORM_QUOTED_NAME`, `FORM_BRACE_LIST`). */
+function formNames(answerForm: string): readonly string[] {
+  return [...[...answerForm.matchAll(FORM_QUOTED_NAME)].map((match) => match[1]!),
+    ...[...answerForm.matchAll(FORM_BRACE_LIST)].flatMap((match) => match[1]!.split(",").map((name) => name.trim()))];
 }
 
 /** Every text, number and true/false value of a decoded reply, with its key path, and every key name. */
@@ -117,23 +130,50 @@ function readValues(value: unknown): ReplyReading {
 }
 
 /**
- * The same, read from the broken reply's text as it came (it may not decode, and the tolerant decode may read it another
- * way: its INNER_QUOTE reading can take a missing comma's quotes for a text's own): texts with the keys above them, and
- * numbers and true/false only where they stand as JSON values outside every text, inside the reply's object (prose or a
- * code fence around it is never a value). A missing comma does not matter; a straight quote inside a text (one not
- * followed by `,` `:` `}` `]` or another quote) is read as part of the text. On a reply that is valid JSON it reads
- * exactly what JSON.parse reads.
+ * The broken reply's values, read the way the step read it (Task 12 review round 2): the tolerant decode
+ * (`decodeModelJson`, JSON.parse's reading: a duplicate key's LAST value is the one) whenever the reply decodes;
+ * otherwise `scanValues` on its raw text.
+ */
+function readBroken(brokenReply: string): ReplyReading {
+  const decoded = decodeModelJson(brokenReply, FINISHED);
+  return decoded.ok && typeof decoded.value === "object" && decoded.value !== null ? readValues(decoded.value) : scanValues(brokenReply);
+}
+
+/**
+ * The same, read from a reply that does not decode, from its text as it came: texts with the keys above them, and
+ * numbers and true/false only where they stand as JSON values outside every text, inside the reply's object (prose or
+ * a code fence around it is never a value). A missing comma does not matter. A straight quote closes a text only when
+ * `:` `}` `]` or another quote follows it, or a comma and then more JSON (`JSON_GOES_ON`); any other straight quote is
+ * the text's own. A key written twice in one object keeps its last value, as JSON.parse does.
  */
 function scanValues(text: string): ReplyReading {
-  type Frame = { object: boolean; key: readonly string[] | null };
+  /** `owned`: the values read under each key of this object so far, so a key written again drops them (JSON.parse's reading). */
+  type Frame = { object: boolean; key: readonly string[] | null; owned: Map<string, number[]> };
   const stack: Frame[] = [];
   const values: ReplyValue[] = [];
+  const dropped = new Set<number>();
   const keys = new Set<string>();
+  const record = (value: ReplyValue): void => {
+    for (const frame of stack) {
+      if (!frame.object || frame.key === null) continue;
+      const name = frame.key.join(".");
+      frame.owned.set(name, [...(frame.owned.get(name) ?? []), values.length]);
+    }
+    values.push(Object.freeze(value));
+  };
   const pathNow = (): string[] => stack.flatMap((frame) => frame.object && frame.key !== null ? [...frame.key] : []);
-  const nextMark = (from: number): string | undefined => {
+  const markAt = (from: number): number => {
     let at = from;
     while (at < text.length && /\s/u.test(text[at]!)) at += 1;
-    return text[at];
+    return at;
+  };
+  const closes = (quoteAt: number): boolean => {
+    const at = markAt(quoteAt + 1);
+    const after = text[at];
+    if (after === undefined || TEXT_CLOSERS.includes(after)) return true;
+    if (after !== ",") return false;
+    const next = text[markAt(at + 1)];
+    return next === undefined || JSON_GOES_ON.test(next);
   };
   let index = 0;
   while (index < text.length) {
@@ -144,39 +184,38 @@ function scanValues(text: string): ReplyReading {
       for (; cursor < text.length; cursor += 1) {
         const inner = text[cursor]!;
         if (inner === "\\") { body += `${inner}${text[cursor + 1] ?? ""}`; cursor += 1; continue; }
-        if (inner === "\"") {
-          const after = nextMark(cursor + 1);
-          if (after === undefined || TEXT_CLOSERS.includes(after)) break;
-        }
+        if (inner === "\"" && closes(cursor)) break;
         body += inner;
       }
       const value = unescapeJsonText(body);
       const top = stack.at(-1);
-      if (top?.object === true && nextMark(cursor + 1) === ":") {
+      if (top?.object === true && text[markAt(cursor + 1)] === ":") {
         top.key = keyParts(value);
         for (const part of top.key) keys.add(part);
+        const name = top.key.join(".");
+        for (const earlier of top.owned.get(name) ?? []) dropped.add(earlier);
+        top.owned.delete(name);
       } else if (top !== undefined) {
-        values.push(Object.freeze({ path: pathNow(), value }));
+        record({ path: pathNow(), value });
       }
       index = cursor + 1;
       continue;
     }
-    if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null }); index += 1; continue; }
+    if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null, owned: new Map() }); index += 1; continue; }
     if (character === "}" || character === "]") { stack.pop(); index += 1; continue; }
     SCALAR_TOKEN.lastIndex = index;
     const scalar = SCALAR_TOKEN.exec(text);
     if (scalar !== null && (index === 0 || SCALAR_BEFORE.test(text[index - 1]!))) {
       const after = text[index + scalar[0].length];
       if (stack.length > 0 && (after === undefined || SCALAR_AFTER.test(after))) {
-        values.push(Object.freeze({ path: pathNow(),
-          value: scalar[0] === "true" ? true : scalar[0] === "false" ? false : Number(scalar[0]) }));
+        record({ path: pathNow(), value: scalar[0] === "true" ? true : scalar[0] === "false" ? false : Number(scalar[0]) });
       }
       index += scalar[0].length;
       continue;
     }
     index += 1;
   }
-  return Object.freeze({ values, keys });
+  return Object.freeze({ values: values.filter((_value, at) => !dropped.has(at)), keys });
 }
 
 /**
@@ -184,10 +223,17 @@ function scanValues(text: string): ReplyReading {
  * the move only wraps, unwraps or lifts it: every key the source has BELOW the shared key is on the target or gone from the
  * repair (an unwrapped `{value: …}`), and the target has no key ABOVE the shared key that the broken reply already used
  * when the source had keys of its own above it (that would be a move from one existing parent to another: a swap). With
- * no shared key name, only when every key of the source is gone from the repair (a renamed or misplaced key).
+ * no shared key name, only when every key of the source is gone from the repair (a renamed or misplaced key). In every
+ * case (Task 12 review round 2): a value whose parent keys are still in the repair, one of them off the target's path,
+ * may not land under a parent key the source never had (a reviewer note moved into a missing `short.change`); lifting it
+ * out of a wrong parent (`long.reviewer_note` → `reviewer_note`) and wrapping it in new parents keep it.
  */
 function mayComeFrom(source: readonly string[], target: readonly string[], repairedKeys: ReadonlySet<string>,
   brokenKeys: ReadonlySet<string>): boolean {
+  const sourceParents = source.slice(0, -1);
+  const targetParents = target.slice(0, -1);
+  if (sourceParents.some((key) => repairedKeys.has(key) && !target.includes(key))
+    && targetParents.some((key) => !source.includes(key))) return false;
   const targetAt = target.findIndex((key) => source.includes(key));
   if (targetAt < 0) return source.every((key) => !repairedKeys.has(key));
   const sourceAt = source.indexOf(target[targetAt]!);
@@ -195,74 +241,89 @@ function mayComeFrom(source: readonly string[], target: readonly string[], repai
   return sourceAt === 0 || !target.slice(0, targetAt).some((key) => brokenKeys.has(key));
 }
 
-/** True when `wanted` is `parts` (some of them, in any order, each whole) joined by single spaces. */
-function joinedFrom(wanted: string, parts: readonly string[]): boolean {
-  const reached = new Set<number>([0]);
-  for (let at = 0; at < wanted.length; at += 1) {
-    if (!reached.has(at)) continue;
-    for (const part of parts) {
+/**
+ * The broken texts (indices into `texts`) that, each whole, in their own order, joined by single spaces, make `wanted`;
+ * null when none do. Every candidate sat under the same keys (a list's paragraphs).
+ */
+function joinedFrom(wanted: string, candidates: readonly number[], texts: readonly string[]): readonly number[] | null {
+  const search = (at: number, from: number): readonly number[] | null => {
+    for (let next = from; next < candidates.length; next += 1) {
+      const part = texts[candidates[next]!]!;
       if (part === "" || !wanted.startsWith(part, at)) continue;
       const end = at + part.length;
-      if (end === wanted.length) return true;
-      if (wanted[end] === " ") reached.add(end + 1);
+      if (end === wanted.length) return [candidates[next]!];
+      if (wanted[end] !== " ") continue;
+      const rest = search(end + 1, next + 1);
+      if (rest !== null) return [candidates[next]!, ...rest];
     }
-  }
-  return false;
+    return null;
+  };
+  return search(0, 0);
 }
 
 /**
- * The word-for-word check (INTERFACE §2.4, stricter by contract deviation 4; Task 12 review fix round 1). It reads the
- * broken reply's values WITH the keys they sit under (`scanValues`), and the repair's decoded values the same way. TRUE only when:
+ * The word-for-word check (INTERFACE §2.4, stricter by contract deviation 4; Task 12 review fix rounds 1-2). It reads the
+ * broken reply's values WITH the keys they sit under (`readBroken`), and the repair's decoded values the same way. TRUE
+ * only when:
  *  · every non-empty text of `repaired` is one text of the broken reply, whole, or several texts that sat under the same
- *    keys (a list's paragraphs) joined, compared after whitespace is normalised: a changed, added or removed word or
- *    punctuation mark, a cut text, or two fields' texts run together is refused, and a key's NAME is never a text;
+ *    keys (a list's paragraphs) joined in their own order, compared after whitespace is normalised: a changed, added or
+ *    removed word or punctuation mark, a cut text, two fields' texts run together or paragraphs reordered is refused, and
+ *    a key's NAME is never a text;
  *  · every number and every true/false value of `repaired` is a JSON value of the broken reply (never a digit of a text or
- *    an id, never the word "true" in prose), each used once;
- *  · each of those values may come from where it sat (`mayComeFrom`): wrapping, unwrapping, nesting a flattened member,
- *    lifting a member written too deep and renaming a misspelt key keep it; moving it to another field (a swapped score,
- *    a criterion's verdict moved to its neighbour, steelman and critic swapped) is refused;
+ *    an id, never the word "true" in prose);
+ *  · each value of the broken reply is used once: a copy of a text, a score or a verdict into a second field is refused;
+ *  · each value may come from where it sat (`mayComeFrom`): wrapping, unwrapping, nesting a flattened member, lifting a
+ *    member written too deep and renaming a misspelt key keep it; moving it to another field (a swapped score, a
+ *    criterion's verdict moved to its neighbour, steelman and critic swapped, a note moved into a missing field) is
+ *    refused;
  *  · nothing asked was lost: every non-empty text of the broken reply under a name the step's answer form states
- *    (`answerForm`; without it, a key the repair keeps) is, whole, in a text of the repair. Texts under names the form
- *    never states may be dropped, as the step's own fixer drops them.
+ *    (`answerForm`: its quoted keys and its `{a,b,c}` lists; without it, a key the repair keeps) is, whole, in a text of
+ *    the repair. Texts under names the form never states may be dropped, as the step's own fixer drops them.
  * Null and empty texts are never checked: they carry no words (a lost text is caught by the last rule).
  */
 export function structureRepairKeepsWords(brokenReply: string, repaired: unknown, answerForm?: string): boolean {
-  const broken = scanValues(brokenReply);
+  const broken = readBroken(brokenReply);
   const repair = readValues(repaired);
   const fits = (source: ReplyValue, target: ReplyValue): boolean => mayComeFrom(source.path, target.path, repair.keys, broken.keys);
-  const brokenTexts = broken.values.filter((entry): entry is ReplyValue & { value: string } => typeof entry.value === "string");
-  for (const leaf of repair.values) {
-    if (typeof leaf.value !== "string") continue;
-    const wanted = normalText(leaf.value);
-    if (wanted === "") continue;
-    const sources = brokenTexts.filter((entry) => fits(entry, leaf));
-    if (sources.some((entry) => normalText(entry.value) === wanted)) continue;
-    const byPath = new Map<string, string[]>();
-    for (const entry of sources) {
-      const at = entry.path.join(PATH_JOIN);
-      byPath.set(at, [...(byPath.get(at) ?? []), normalText(entry.value)]);
-    }
-    if (![...byPath.values()].some((parts) => joinedFrom(wanted, parts))) return false;
-  }
+  const samePath = (source: ReplyValue, target: ReplyValue): boolean =>
+    source.path.length === target.path.length && source.path.every((key, at) => key === target.path[at]);
+  const normal = broken.values.map((entry) => typeof entry.value === "string" ? normalText(entry.value) : "");
   const used = new Set<number>();
-  const scalars = repair.values.filter((leaf) => typeof leaf.value !== "string");
-  const samePath = (source: ReplyValue, target: ReplyValue): boolean => source.path.join(PATH_JOIN) === target.path.join(PATH_JOIN);
-  const unmatched = scalars.filter((leaf) => {
-    const at = broken.values.findIndex((entry, index) => !used.has(index) && entry.value === leaf.value && samePath(entry, leaf));
+  const free = (index: number): boolean => !used.has(index);
+  const leaves = repair.values.filter((leaf) => typeof leaf.value !== "string" || normalText(leaf.value) !== "");
+  const same = (entry: ReplyValue, index: number, leaf: ReplyValue): boolean => typeof leaf.value === "string"
+    ? typeof entry.value === "string" && normal[index] === normalText(leaf.value) : entry.value === leaf.value;
+  // Each value once: first every value that sits where it sat, then whole values from elsewhere, then joined paragraphs.
+  const waiting = leaves.filter((leaf) => {
+    const at = broken.values.findIndex((entry, index) => free(index) && same(entry, index, leaf) && samePath(entry, leaf));
     if (at >= 0) used.add(at);
     return at < 0;
   });
-  for (const leaf of unmatched) {
-    const at = broken.values.findIndex((entry, index) => !used.has(index) && entry.value === leaf.value && fits(entry, leaf));
-    if (at < 0) return false;
-    used.add(at);
+  const joins = waiting.filter((leaf) => {
+    const at = broken.values.findIndex((entry, index) => free(index) && same(entry, index, leaf) && fits(entry, leaf));
+    if (at >= 0) used.add(at);
+    return at < 0;
+  });
+  for (const leaf of joins) {
+    if (typeof leaf.value !== "string") return false;
+    const byPath = new Map<string, number[]>();
+    broken.values.forEach((entry, index) => {
+      if (!free(index) || typeof entry.value !== "string" || !fits(entry, leaf)) return;
+      const at = entry.path.join("\u0000");
+      byPath.set(at, [...(byPath.get(at) ?? []), index]);
+    });
+    const wanted = normalText(leaf.value);
+    const parts = [...byPath.values()].map((candidates) => joinedFrom(wanted, candidates, normal)).find((found) => found !== null);
+    if (parts === undefined || parts === null) return false;
+    for (const index of parts) used.add(index);
   }
-  const stated = new Set<string>([...repair.keys, ...(answerForm?.match(FORM_NAME) ?? [])]);
+  const stated = new Set<string>([...repair.keys, ...(answerForm === undefined ? [] : formNames(answerForm))]);
   const keptTexts = repair.values.flatMap((leaf) => typeof leaf.value === "string" ? [` ${normalText(leaf.value)} `] : []);
-  return brokenTexts.every((entry) => {
+  return broken.values.every((entry, index) => {
     const name = entry.path.at(-1);
-    const text = normalText(entry.value);
-    return name === undefined || !stated.has(name) || text === "" || keptTexts.some((kept) => kept.includes(` ${text} `));
+    const text = normal[index]!;
+    return typeof entry.value !== "string" || name === undefined || !stated.has(name) || text === ""
+      || keptTexts.some((kept) => kept.includes(` ${text} `));
   });
 }
 

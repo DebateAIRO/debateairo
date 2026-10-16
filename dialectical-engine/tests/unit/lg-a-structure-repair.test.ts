@@ -6,7 +6,7 @@ import { JUDGE_ANSWER_FORM, Judge, classifyStructuredArtifact } from "@debateai/
 import { STORYTELLER_ANSWER_FORM, STORY_CHECKER_ANSWER_FORM } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, framedAnswerForm,
+  ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
   previewThinkingStepOf, readPromptFrame, schemaFailureLocator, structureRepairKeepsWords, withStructureRepair,
   type ProviderCallRequest
 } from "@debateai/providers";
@@ -40,7 +40,9 @@ describe("LG-A framedAnswerForm: the step's own answer form, read back from its 
 });
 
 describe("LG-A structureRepairKeepsWords (deviation 4)", () => {
-  const broken = "{\"answer\": \"The plan holds because fares cover costs\" \"score\": 0.5, \"ok\": true, \"note\": \"a stray remark from the model\"}";
+  // Fix round 2: the missing comma sits after a number. After a text, the tolerant decode (the step's own reading, ruling 2)
+  // takes the quotes for the text's own (INNER_QUOTE) and reads one long text.
+  const broken = "{\"answer\": \"The plan holds because fares cover costs\", \"score\": 0.5 \"ok\": true, \"note\": \"a stray remark from the model\"}";
   it("accepts a copy that only moves, wraps and drops form", () => {
     expect(structureRepairKeepsWords(broken, { answer: "The plan holds because fares cover costs", score: 0.5, ok: true })).toBe(true);
     expect(structureRepairKeepsWords("{\"note\": [\"First text here.\", \"Second text here.\"]}",
@@ -90,7 +92,7 @@ describe("LG-A structureRepairKeepsWords: the reviewer's probes (fix round 1)", 
   });
 
   it("refuses a text the answer form states that the repair left out (Important 1 c)", () => {
-    const broken = "{\"answer\": \"It is so\" \"note\": \"Only for the central lines\", \"score\": 0.5}";
+    const broken = "{\"score\": 0.5 \"answer\": \"It is so\", \"note\": \"Only for the central lines\"}";
     expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, "{\"answer\": string, \"note\": string, \"score\": number}")).toBe(false);
     expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, "{\"answer\": string, \"score\": number}")).toBe(true);
   });
@@ -134,7 +136,7 @@ describe("LG-A structureRepairKeepsWords: the reviewer's probes (fix round 1)", 
   });
 
   it("an enum label is a whole value of the broken reply, never a word of its prose (Important 2)", () => {
-    const broken = "{\"summary\": \"The claim is supported by nothing the material gives\" \"basis\": \"unsupported\"}";
+    const broken = "{\"x\": 1 \"summary\": \"The claim is supported by nothing the material gives\", \"basis\": \"unsupported\"}";
     expect(structureRepairKeepsWords(broken, { summary: "The claim is supported by nothing the material gives", basis: "supported" })).toBe(false);
     expect(structureRepairKeepsWords(broken, { summary: "The claim is supported by nothing the material gives", basis: "unsupported" })).toBe(true);
   });
@@ -143,6 +145,10 @@ describe("LG-A structureRepairKeepsWords: the reviewer's probes (fix round 1)", 
     expect(structureRepairKeepsWords("{\"a\":\"fares rise\" \"b\":\"costs fall\"}", { a: "fares rise b costs fall" })).toBe(false);
     expect(structureRepairKeepsWords("{\"a\":\"fares rise\" \"b\":\"costs fall\"}", { a: "fares rise costs fall" })).toBe(false);
     expect(structureRepairKeepsWords("{\"strong\":\"x\" \"fit\":\"weak\"}", { fit: "strong" })).toBe(false);
+    // The same two, in a reply the tolerant decode does not read (so the raw text is scanned).
+    expect(structureRepairKeepsWords("{\"x\": 1 \"a\":\"fares rise\", \"b\":\"costs fall\"}", { a: "fares rise b costs fall" })).toBe(false);
+    expect(structureRepairKeepsWords("{\"x\": 1 \"a\":\"fares rise\", \"b\":\"costs fall\"}", { a: "fares rise costs fall" })).toBe(false);
+    expect(structureRepairKeepsWords("{\"x\": 1 \"strong\":\"x\", \"fit\":\"weak\"}", { fit: "strong" })).toBe(false);
     // A number is a JSON value, never a digit of an id or of prose.
     expect(structureRepairKeepsWords("{\"refs\": [\"node-1\"], \"why\": \"fares rose 7 percent\" \"x\": 1}", { refs: ["node-1"], why: "fares rose 7 percent", score: 7 })).toBe(false);
   });
@@ -153,9 +159,81 @@ describe("LG-A structureRepairKeepsWords: the reviewer's probes (fix round 1)", 
     expect(structureRepairKeepsWords(`{"long": {"sections": ${JSON.stringify(sections)}, "reviewer_note": ${JSON.stringify(note)}} "reviewer_note": null}`,
       { long: { sections }, reviewer_note: note }, STORYTELLER_ANSWER_FORM)).toBe(true);
     expect(structureRepairKeepsWords("{\"response\": {\"answer\": \"It is so\" \"score\": 0.5}}", { answer: "It is so", score: 0.5 })).toBe(true);
-    expect(structureRepairKeepsWords("{\"headline\": \"Free buses help\" \"summary\": \"They help riders most.\"}",
+    expect(structureRepairKeepsWords("{\"x\": 1 \"headline\": \"Free buses help\", \"summary\": \"They help riders most.\"}",
       { short: { headline: "Free buses help", summary: "They help riders most." } })).toBe(true);
     expect(structureRepairKeepsWords("{\"answer\": \"He said \"no\" today\" \"score\": 0.5}", { answer: "He said \"no\" today", score: 0.5 })).toBe(true);
+  });
+});
+
+/**
+ * Task 12 review, fix round 2: the reviewer's second probes, each pinned. Important 1: a text used twice, or moved into a
+ * field the broken reply never had while its own parent stays. Important 2: replies the tolerant decode reads are read
+ * that way (the step's own reading), and the raw scan keeps a Romanian or Polish quote closed with a straight one.
+ * Minors: joined paragraphs keep their order; the names a form states are its keys, not its prose.
+ */
+describe("LG-A structureRepairKeepsWords: the reviewer's second probes (fix round 2)", () => {
+  const fixture = (name: string) => readFileSync(new URL(`../support/fixtures/judge-format-replies/${name}`, import.meta.url), "utf8");
+  const H = "Free buses help riders most";
+  const N = "The reviewer found the second section thin.";
+  const sections = [{ title: "Fares", paragraphs: [{ text: "Fares fell.", node_refs: ["P1"] }] }];
+  const story = `{"headline": "${H}" "long": {"sections": ${JSON.stringify(sections)}, "reviewer_note": {"text": "${N}", "node_refs": ["P2"]}}}`;
+  const note = { text: N, node_refs: ["P2"] };
+
+  it("refuses a note moved or copied into a field the broken story never had (Important 1)", () => {
+    expect(structureRepairKeepsWords(story, { short: { headline: H, change: note }, long: { sections } }, STORYTELLER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(story, { short: { headline: H, change: note }, long: { sections, reviewer_note: note } }, STORYTELLER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(story, { short: { headline: H, summary: H }, long: { sections, reviewer_note: note } }, STORYTELLER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(story, { short: { headline: H, summary: "Fares fell." }, long: { sections, reviewer_note: note } }, STORYTELLER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(story, { short: { headline: H }, long: { sections, reviewer_note: note } }, STORYTELLER_ANSWER_FORM)).toBe(true);
+  });
+
+  it("refuses the critic's summary copied into a missing root summary (Important 1)", () => {
+    const A = "The plan holds because fares cover costs";
+    const O = "Riders on the outer lines pay for a centre they rarely use";
+    expect(structureRepairKeepsWords(`{"steelman": {"summary": "${A}"} "critic": {"summary": "${O}"}}`,
+      { summary: O, steelman: { summary: A }, critic: { summary: O } }, "{\"summary\": string, \"steelman\": {\"summary\": string}, \"critic\": {\"summary\": string}}")).toBe(false);
+  });
+
+  it("still keeps a lift, a dropped wrapper and a rewrap (Important 1)", () => {
+    expect(structureRepairKeepsWords(`{"long": {"sections": ${JSON.stringify(sections)}, "reviewer_note": ${JSON.stringify(note)}} "reviewer_note": null}`,
+      { long: { sections }, reviewer_note: note }, STORYTELLER_ANSWER_FORM)).toBe(true);
+    expect(structureRepairKeepsWords("{\"response\": {\"x\": \"It is so\" \"score\": 0.5}}", { x: "It is so", score: 0.5 })).toBe(true);
+    expect(structureRepairKeepsWords(`{"response": {"x": 1 "headline": "${H}", "summary": "They help."}}`, { short: { headline: H, summary: "They help." } })).toBe(true);
+  });
+
+  it("accepts a faithful copy of the real straight-quote fixtures (Important 2)", () => {
+    for (const name of ["mimo-judge-attack-ro-straight-quote.txt", "mimo-judge-cross-en-stray-quote.txt", "mimo-panel-pl-critique-for-critic.txt"]) {
+      const text = fixture(name);
+      const decoded = decodeModelJson(text, { finishReason: "stop" });
+      expect(decoded.ok, name).toBe(true);
+      expect(structureRepairKeepsWords(text, decoded.ok ? decoded.value : null, JUDGE_ANSWER_FORM), name).toBe(true);
+    }
+    // A reply the decode does not read: the scan keeps „…", ci … inside the text.
+    const text = "Nu este „evident corectă\", ci doar discutabilă";
+    expect(structureRepairKeepsWords(`{"x": 1 "summary": ${JSON.stringify(text).replace("\\\"", "\"")}}`, { summary: text })).toBe(true);
+  });
+
+  it("a key written twice keeps its last value, as JSON.parse reads it (Important 2)", () => {
+    const O = "Riders on the outer lines pay for a centre they rarely use";
+    expect(structureRepairKeepsWords(`{"satisfied": true, "objection": "${O}", "satisfied": false}`, { satisfied: true, objection: O })).toBe(false);
+    expect(structureRepairKeepsWords(`{"satisfied": true, "objection": "${O}" "satisfied": false}`, { satisfied: true, objection: O })).toBe(false);
+    expect(structureRepairKeepsWords(`{"satisfied": true, "objection": "${O}" "satisfied": false}`, { satisfied: false, objection: O })).toBe(true);
+  });
+
+  it("joined paragraphs keep their order and each paragraph once (minor)", () => {
+    const broken = "{\"x\": 1 \"note\": [\"First text here.\", \"Second text here.\"]}";
+    expect(structureRepairKeepsWords(broken, { note: { text: "First text here.\n\nSecond text here.", node_refs: [] } })).toBe(true);
+    expect(structureRepairKeepsWords(broken, { note: { text: "Second text here.\n\nFirst text here.", node_refs: [] } })).toBe(false);
+    expect(structureRepairKeepsWords(broken, { note: { text: "First text here.\n\nFirst text here.", node_refs: [] } })).toBe(false);
+  });
+
+  it("the names a form states are its quoted keys and its {a,b,c} lists, not its prose (minor)", () => {
+    const stray = `{"x": 1 "headline": "${H}", "the": "A stray remark from the model"}`;
+    expect(structureRepairKeepsWords(stray, { short: { headline: H } }, STORYTELLER_ANSWER_FORM)).toBe(true);
+    // The writer's form names its members in a brace list, unquoted: a text under one of them must survive.
+    const reply = "{\"x\": 1 \"segment_id\": \"s1\", \"summary_line\": \"A stray line from the model\"}";
+    expect(structureRepairKeepsWords(reply, { segment_id: "s1" }, "Return only JSON with {segment_id,summary_line} entries.")).toBe(false);
+    expect(structureRepairKeepsWords(reply, { segment_id: "s1" }, "Return only JSON with a segment_id and a summary_line.")).toBe(true);
   });
 });
 
