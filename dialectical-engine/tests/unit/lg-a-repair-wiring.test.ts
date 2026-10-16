@@ -4,16 +4,31 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
 import {
-  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, buildFramedPrompt,
+  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS, buildFramedPrompt,
   buildFramedRepairPrompt, previewStructureRepairRoute, schemaFailureLocator, withStructureRepair,
   type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
+import { RUN_COST_ENVELOPE_ROOM_KEPT } from "@debateai/budget";
+import { TypedDomainError } from "@debateai/kernel";
+import { mapPromptContractHash } from "@debateai/map";
+import { expansionPhaseStop } from "@debateai/runner";
 import { providerCallSharedWall, storyCallScopeAgrees } from "../../apps/runner/src/index.js";
+import { createRunnerMapCaller, runMapStage } from "../../apps/runner/src/map-stage.js";
 import { laneGateway, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
-import { createCallScheduler, slotsTakenWithin, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
+import { CALL_LANE_STOPPED, createCallScheduler, slotsTakenWithin, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { GLM, HAIKU_REF, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
 
 const haikuGateway: ProviderGateway = { call: async () => { throw new Error("not called"); } };
+const SCHEMA = z.object({ answer: z.string().min(1), score: z.number() }).strict();
+const framed = buildFramedPrompt({ contract: { contractId: "test.lg-a.v1", instruction: "Answer the question in one sentence.",
+  answerForm: "Return only JSON {\"answer\": string, \"score\": number}." }, material: [{ name: "question", content: "Is it so?" }] });
+const request = (): ProviderCallRequest => ({ runId: "run:lg-a", subjectItemId: "node:lg-a", callSiteKey: "JUDGE", role: "JUDGE",
+  lane: "served", bound: { maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 600_000 }, contractHash: "contract:lg-a",
+  providerRef: "preview:fixture-a", packet: framed.packet, modelRole: "POSITION",
+  classifyContent: (content, reply) => classifyStructuredArtifact(content, SCHEMA, reply, { fixer: {} }),
+  buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected)) });
+const BROKEN = "{\"answer\": \"It is so, by the city's own figures\" \"score\": 0.5}";
+const COPY = "{\"answer\": \"It is so, by the city's own figures\", \"score\": 0.5}";
 
 describe("LG-A: the preview's structure-repair route", () => {
   it("is Haiku's own gateway at its whole answer cap and the preview deadline, when Haiku is a target", () => {
@@ -64,16 +79,6 @@ describe("LG-A: a repair call is judged by the key it repairs", () => {
  * native gateway (the preview call policy, the counting gateway) keeps `structureRepairRouted`.
  */
 describe("LG-A: where the structure repair sits", () => {
-  const SCHEMA = z.object({ answer: z.string().min(1), score: z.number() }).strict();
-  const framed = buildFramedPrompt({ contract: { contractId: "test.lg-a.v1", instruction: "Answer the question in one sentence.",
-    answerForm: "Return only JSON {\"answer\": string, \"score\": number}." }, material: [{ name: "question", content: "Is it so?" }] });
-  const request = (): ProviderCallRequest => ({ runId: "run:lg-a", subjectItemId: "node:lg-a", callSiteKey: "JUDGE", role: "JUDGE",
-    lane: "served", bound: { maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 600_000 }, contractHash: "contract:lg-a",
-    providerRef: "preview:fixture-a", packet: framed.packet, modelRole: "POSITION",
-    classifyContent: (content, reply) => classifyStructuredArtifact(content, SCHEMA, reply, { fixer: {} }),
-    buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected)) });
-  const BROKEN = "{\"answer\": \"It is so, by the city's own figures\" \"score\": 0.5}";
-  const COPY = "{\"answer\": \"It is so, by the city's own figures\", \"score\": 0.5}";
   const throughLane = (provider: ProviderGateway, failures: unknown[]) => {
     const scheduler = createCallScheduler({ policy: { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50 } } });
     return laneGateway({ lane: scheduler.openLane("run:lg-a"), scheduler, subject: { model: GLM, vendor: "deepinfra", gate: null },
@@ -228,5 +233,127 @@ describe("LG-A: the repair call through the debate's lane", () => {
     await Promise.all([haikuArgues, repair]);
     expect(calls).toEqual(["REPAIR:STRUCTURE:JUDGE", "REPAIR:STRUCTURE:JUDGE"]);
     expect(lane.stats().peakByModel["claude-haiku-5-5"]).toBe(1);
+  });
+});
+
+/**
+ * Task 13 review, finding 1: a repair that meets a stop of the run's own machinery keeps that stop's name. The debate's
+ * lane stopped while the repair waited for a slot, or the money seam kept root 0's room: the call was sent and billed,
+ * so it must never be filed as the AI's content failure (the map would record FAILED instead of STOPPED).
+ */
+describe("LG-A: a repair stopped by the run keeps the stop's name", () => {
+  const GLM_SUBJECT: CallSubject = Object.freeze({ model: GLM, vendor: "deepinfra", gate: "deepinfra" });
+  const HAIKU_SUBJECT: CallSubject = Object.freeze({ model: "claude-haiku-5-5", vendor: "anthropic", gate: "anthropic" });
+  const subjects = { subjectOf: (providerRef: string): CallSubject => (providerRef === HAIKU_REF ? HAIKU_SUBJECT : GLM_SUBJECT) };
+  const BOUND = Object.freeze({ tokenCeiling: 32768, deadlineMs: 1_260_000 });
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("names the stops it passes after their owners' constants", () => {
+    expect(STRUCTURE_REPAIR_PASSED_STOPS).toEqual([CALL_LANE_STOPPED, RUN_COST_ENVELOPE_ROOM_KEPT]);
+  });
+
+  it("the lane stopped while the repair waited for Haiku's slot: the call ends CALL_LANE_STOPPED, nothing sent to Haiku", async () => {
+    const scheduler = createCallScheduler({ policy: { perDebate: 12, perModelPerDebate: 1, perModelPerRunner: { default: 50 } } });
+    const lane = scheduler.openLane("run:stop");
+    let releaseHaiku!: () => void;
+    const haikuArgues = lane.run({ ...HAIKU_SUBJECT, priority: "AUTHOR" }, () => new Promise<void>((resolve) => { releaseHaiku = resolve; }));
+    const original = previewGlmHarness([{ content: BROKEN }]);
+    const repair = scriptedRepairGateway(COPY);
+    const admitted: string[] = [];
+    const member = laneGateway({ lane, scheduler, subject: GLM_SUBJECT,
+      provider: withStructureRepair(original.gateway, structureRepairThroughLane({ providerRef: HAIKU_REF, gateway: repair.gateway, bound: BOUND }, subjects)),
+      beforeSlot: async (subject) => { admitted.push(subject.model); } });
+    const ended = member.call(request()).catch((caught: unknown) => caught);
+    for (let tries = 0; tries < 100 && !admitted.includes("claude-haiku-5-5"); tries += 1) await flush();
+    await flush();
+    expect(admitted).toEqual([GLM, "claude-haiku-5-5"]);
+    expect(original.executions).toHaveLength(1);
+    lane.stop();
+    const error = await ended;
+    expect(error).toBeInstanceOf(TypedDomainError);
+    expect(error).toMatchObject({ code: CALL_LANE_STOPPED });
+    expect(error).not.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(repair.requests).toHaveLength(0);
+    releaseHaiku();
+    await haikuArgues;
+  });
+
+  it("a repair refused only for root 0's room ends RUN_COST_ENVELOPE_ROOM_KEPT, the room carried on the repair", async () => {
+    const original = previewGlmHarness([{ content: BROKEN }]);
+    const repair = scriptedRepairGateway(new TypedDomainError(RUN_COST_ENVELOPE_ROOM_KEPT, "room kept"));
+    const error = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: BOUND })
+      .call({ ...request(), keepRoomMicros: 5_000 }).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ code: RUN_COST_ENVELOPE_ROOM_KEPT });
+    expect(error).not.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(repair.requests[0]).toMatchObject({ callSiteKey: "REPAIR:STRUCTURE:JUDGE", keepRoomMicros: 5_000 });
+  });
+
+  for (const code of [RUN_COST_ENVELOPE_ROOM_KEPT, CALL_LANE_STOPPED]) {
+    it(`the map reads a repair stopped by ${code} as STOPPED, never FAILED`, async () => {
+      // The map AI's reply is a structure the fixer cannot repair; the repair call meets the stop.
+      const original: ProviderGateway = { call: async (call) => {
+        if (call.structureRepairRouted !== true) throw new Error("the map call was not routed");
+        throw new ProviderStructureUnrepairedError({ rawText: "{\"angles\": [", parseStatus: "SCHEMA_FAILED", parseError: "angles@$" }, 1,
+          "artifact:map", "ledger:map", { provider: "openai-compatible-http", model: GLM, maker: "Z.AI", modelVersion: GLM });
+      } };
+      const repair = scriptedRepairGateway(new TypedDomainError(code, code));
+      const provider = withStructureRepair(original, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: BOUND });
+      const caller = createRunnerMapCaller({
+        runId: "run-1", subjectItemId: "wi-1", mapContractHash: mapPromptContractHash(),
+        judgeBound: { maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 60_000 }, longBounds: { merge: 32_768, choose: 32_768 },
+        memberOf: (aiRef) => ({ provider, providerRef: aiRef }), sitsOut: () => false, satOutBy: () => false,
+        spendStopOf: (error) => expansionPhaseStop(error), abandon: () => false, serial: true, keepRoomMicros: 5_000,
+        laneStopped: (error) => error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED,
+        roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT
+      });
+      const result = await runMapStage({ opening: "ANGLE_MAP", map: {
+        questionLine: "Should buses be free?", languageName: "English", languageTag: "en",
+        seats: [{ aiRef: "a", maker: "ma" }, { aiRef: "b", maker: "mb" }, { aiRef: "c", maker: "mc" }],
+        caller, seed: "run-1", gapRoundsMax: 1, maxAnswers: 3, pointsPerAnswer: 2
+      } });
+      expect(repair.requests).toHaveLength(1);
+      expect(caller.stopped()).toBe(true);
+      expect(caller.spendStop()).toBeNull();
+      expect(result.stoppedBy).toBe(code);
+    });
+  }
+});
+
+/** Task 13 review, finding 2: a call made for a running call takes a freed slot before any lane's new call. */
+describe("LG-A: a waiting repair goes first", () => {
+  it("takes Haiku's freed slot before another debate's Haiku call that waited longer; run calls keep their order", async () => {
+    const HAIKU: CallSubject = Object.freeze({ model: "claude-haiku-5-5", vendor: "anthropic", gate: null });
+    const GLM_SUBJECT: CallSubject = Object.freeze({ model: GLM, vendor: "deepinfra", gate: null });
+    const scheduler = createCallScheduler({ policy: { perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, anthropic: 1 } } });
+    const laneA = scheduler.openLane("run:a");
+    const laneB = scheduler.openLane("run:b");
+    const started: string[] = [];
+    let releaseFirst!: () => void;
+    const first = laneA.run({ ...HAIKU, priority: "AUTHOR" }, () => new Promise<void>((resolve) => { releaseFirst = resolve; }));
+    const other = laneB.run({ ...HAIKU, priority: "AUTHOR" }, async () => { started.push("other debate's Haiku call"); });
+    const glm = laneA.run({ ...GLM_SUBJECT, priority: "AUTHOR" },
+      () => laneA.runWithin(GLM_SUBJECT, { ...HAIKU, priority: "AUTHOR" }, async () => { started.push("repair"); }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(started).toEqual([]);
+    releaseFirst();
+    await Promise.all([first, other, glm]);
+    expect(started).toEqual(["repair", "other debate's Haiku call"]);
+  });
+
+  it("takes Haiku's freed slot before its own debate's Haiku call that waited longer", async () => {
+    const HAIKU: CallSubject = Object.freeze({ model: "claude-haiku-5-5", vendor: "anthropic", gate: null });
+    const GLM_SUBJECT: CallSubject = Object.freeze({ model: GLM, vendor: "deepinfra", gate: null });
+    const scheduler = createCallScheduler({ policy: { perDebate: 12, perModelPerDebate: 1, perModelPerRunner: { default: 50 } } });
+    const lane = scheduler.openLane("run:a");
+    const started: string[] = [];
+    let releaseFirst!: () => void;
+    const first = lane.run({ ...HAIKU, priority: "AUTHOR" }, () => new Promise<void>((resolve) => { releaseFirst = resolve; }));
+    const next = lane.run({ ...HAIKU, priority: "AUTHOR" }, async () => { started.push("next Haiku call"); });
+    const glm = lane.run({ ...GLM_SUBJECT, priority: "AUTHOR" },
+      () => lane.runWithin(GLM_SUBJECT, { ...HAIKU, priority: "OTHER" }, async () => { started.push("repair"); }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    releaseFirst();
+    await Promise.all([first, next, glm]);
+    expect(started).toEqual(["repair", "next Haiku call"]);
   });
 });

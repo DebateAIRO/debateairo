@@ -2806,7 +2806,7 @@ export {
 // LG-A (spec 2026-10-15, L32): the structure-repair call.
 export {
   STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
-  STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
+  STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PASSED_STOPS, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
   structureRepairOriginalKey, withStructureRepair, type StructureRepairRoute
 } from "./structure-repair.js";
 export * from "./preview-test.js";

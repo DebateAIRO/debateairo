@@ -20,7 +20,8 @@ import type { CallConcurrencyPolicy } from "@debateai/register";
  * debate served longest ago on the slot that is tightest for its call goes
  * first, so one debate cannot starve another however busy a third debate is
  * elsewhere. A call held back only by its own debate's limits never holds back
- * another debate's call.
+ * another debate's call. A call made FOR a running call (`runWithin`, the
+ * structure repair) goes before every other waiting call.
  *
  * A debate may also give its lane a START GUARD (spec §2.3, O6): asked, synchronously, each time the lane would start
  * one of its calls, whether that call may still start. A call it refuses is never sent; the lane runs on.
@@ -37,14 +38,22 @@ export interface CallSubject { readonly model: string; readonly vendor: string; 
 export interface CallTicket extends CallSubject { readonly priority: CallPriority; }
 /** Whether a call may still start; asked synchronously, at the moment the lane would start it. */
 export type CallStartGuard = (ticket: CallTicket) => boolean;
+/**
+ * What a lane counted. LG-A (Task 13 review): a call made for a running call through `runWithin` (a structure repair on
+ * a slot it had to take) counts in `calls`, `peakByModel` and `waitedMsByModel` of the model it took; it takes no debate
+ * slot, so `running` and `peakInFlight` never count it. A repair that took nothing (Haiku repairing its own reply) and a
+ * repair made outside any lane never reach the lane and are counted nowhere here.
+ */
 export interface LaneStats {
-  /** This lane's calls running now. */
+  /** This lane's calls running now (repairs made for them excluded). */
   readonly running: number;
   /** Calls the start guard refused (never sent). */
   readonly heldBack: number;
+  /** The most of this lane's calls running at once; repairs excluded (they use their own call's debate slot). */
   readonly peakInFlight: number;
   readonly peakByModel: Readonly<Record<string, number>>;
   readonly waitedMsByModel: Readonly<Record<string, number>>;
+  /** Calls started: every `run` call, and every `runWithin` repair that took a slot. */
   readonly calls: number;
 }
 export interface SchedulerStats {
@@ -92,6 +101,8 @@ export interface CallScheduler {
 }
 
 const PRIORITY_RANK: Readonly<Record<CallPriority, number>> = Object.freeze({ AUTHOR: 0, PANEL: 1, REVIEW: 2, OTHER: 3 });
+/** A call made for a running call (`runWithin`) ranks ahead of every `run` call, in its lane and across the lanes. */
+const WITHIN_RANK = -1;
 
 /** The kind of call a call-site key names: the judge's review calls, panel calls, the judge's own (author) calls, the rest. */
 export function callPriorityOf(callSiteKey: string): CallPriority {
@@ -294,7 +305,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     pumping = true;
     try {
       for (;;) {
-        let chosen: Readonly<{ lane: Lane; index: number; turn: number }> | null = null;
+        let chosen: Readonly<{ lane: Lane; index: number; turn: number; within: boolean }> | null = null;
         for (const lane of lanes) {
           if (lane.stopped) continue;
           // Spec §2.3 (O6): the debate's start guard is asked before any of its waiting calls may start.
@@ -302,7 +313,12 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
           const index = lane.waiting.findIndex((entry) => admissible(lane, entry));
           if (index < 0) continue;
           const turn = turnOf(lane, lane.waiting[index]!);
-          if (chosen === null || turn < chosen.turn) chosen = { lane, index, turn };
+          // A call made for a running call (`runWithin`) takes a freed slot before any lane's `run` call; among the
+          // `run` calls (and among those made for running calls) the turns decide, as before.
+          const within = !lane.waiting[index]!.takes.debate;
+          if (chosen === null || (within && !chosen.within) || (within === chosen.within && turn < chosen.turn)) {
+            chosen = { lane, index, turn, within };
+          }
         }
         if (chosen === null) return;
         start(chosen.lane, chosen.index);
@@ -344,7 +360,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
         const entry: Waiting = Object.freeze({
           ticket,
           takes,
-          rank: PRIORITY_RANK[ticket.priority],
+          // Task 13 review: a call made for a running call goes first (it sits on that call's held slot).
+          rank: takes.debate ? PRIORITY_RANK[ticket.priority] : WITHIN_RANK,
           queuedAt: now(),
           launch: (release: () => void) => {
             let settled: Promise<T>;

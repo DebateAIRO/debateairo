@@ -12,7 +12,7 @@ import {
   type ProviderGateway,
   type StructureRepairRoute
 } from "@debateai/providers";
-import { callPriorityOf, slotsTakenWithin, type CallScheduler, type CallSubject, type DebateCallLane } from "./call-scheduler.js";
+import { callPriorityOf, type CallScheduler, type CallSubject, type DebateCallLane } from "./call-scheduler.js";
 
 /**
  * Parallel AI calls (docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.2, §3.4) — a debate's calls go
@@ -170,10 +170,8 @@ export function structureRepairThroughLane(route: StructureRepairRoute | null, s
     call(request) {
       const held = heldLaneSlot.getStore();
       if (held === undefined) return gateway.call(request);
+      // Haiku's own repair holds every slot it needs already: `runWithin` runs it at once (`slotsTakenWithin`).
       const { lane, scheduler, beforeSlot, subject: heldSubject } = held;
-      // Haiku's own repair holds every slot it needs already: no wait, no slot (`runWithin` would run it at once too).
-      const takes = slotsTakenWithin(heldSubject, subject);
-      if (!takes.model && !takes.gate) return gateway.call(request);
       const send = AsyncResource.bind(async () => {
         try {
           const result = await gateway.call(request);

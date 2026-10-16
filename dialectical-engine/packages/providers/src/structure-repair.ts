@@ -343,6 +343,17 @@ function routable(request: ProviderCallRequest): boolean {
   try { return framedAnswerForm(request.packet).trim() !== ""; } catch { return false; }
 }
 
+/**
+ * Task 13 review, finding 1: the two stops of the run's own machinery a repair call can meet besides the money stops,
+ * which keep their names as they do: the debate's call lane stopped while the repair waited for a slot
+ * (`CALL_LANE_STOPPED`, apps/runner/src/call-scheduler.ts) and the money seam's room-only refusal for root 0
+ * (`RUN_COST_ENVELOPE_ROOM_KEPT`, @debateai/budget; the repair carries the call's `keepRoomMicros`). Turned into a content
+ * refusal, a sent and billed call would be filed as the AI's failure, and the map would record FAILED instead of
+ * STOPPED. Written here because neither package is this one's dependency; tests/unit/lg-a-repair-wiring.test.ts pins
+ * both against their owners' constants.
+ */
+export const STRUCTURE_REPAIR_PASSED_STOPS = Object.freeze(["CALL_LANE_STOPPED", "RUN_COST_ENVELOPE_ROOM_KEPT"] as const);
+
 /** The repair reply's refusal when it changed what the AI wrote (STRUCTURE_REPAIR_NOT_VERBATIM, INTERFACE §9). */
 const NOT_VERBATIM = JSON.stringify([{ code: "custom", path: [], message: "STRUCTURE_REPAIR_NOT_VERBATIM" }]);
 
@@ -398,11 +409,13 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
   } catch (error) {
     // A money stop is the run's own and keeps its name: the cost-envelope refusals, and the run's spend stops
     // (`@debateai/kernel` RUN_LEVEL_SPEND_STOP_CODES), among them (ruling R9, pre-flight PF-A48) the run's attempt ceiling,
-    // which the repair gateway's `assertAttemptAllowed` raises unwrapped before it sends. Every other
+    // which the repair gateway's `assertAttemptAllowed` raises unwrapped before it sends; and so does a stop of the run's
+    // own machinery (STRUCTURE_REPAIR_PASSED_STOPS: the lane stopped, root 0's room kept). Every other
     // way the repair did not do leaves today's refusal. (The list is read here, inside the function: ./index.js re-exports
     // this file, so a module-level copy would read it before index.js has run.)
     if (error instanceof TypedDomainError && ((RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(error.code)
-      || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code))) throw error;
+      || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code)
+      || (STRUCTURE_REPAIR_PASSED_STOPS as readonly string[]).includes(error.code))) throw error;
     throw unaccepted();
   }
   return Object.freeze({

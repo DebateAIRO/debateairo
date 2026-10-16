@@ -71,7 +71,9 @@ export type PracticeParallelBlock = Readonly<{
   gateSlotsAtStart: Readonly<Record<string, PracticeGateSlots>>;
   /** The debate's lanes (one per debate run; 0 when the ask was refused). */
   lanes: number;
+  /** Calls the lanes started; structure repairs that took a repair-model slot included, Haiku self-repairs and unlaned repairs not (`LaneStats.calls`). */
   calls: number;
+  /** The most calls at once in one debate; never a structure repair, which uses its own call's debate slot. */
   peakInFlight: number;
   peakByModel: Readonly<Record<string, number>>;
   /** Time calls waited for a free slot, in whole milliseconds, per model. */
@@ -205,6 +207,9 @@ export function practiceParallelLines(block: PracticeParallelBlock): readonly st
       ? `- ${gate} gate: ${String(slots.slots)} slots, read from the gate at the start`
       : `- ${gate} gate: could not be read at the start, so it ran with 1 slot`);
   }
+  // LG-A (Task 13 review): "(N calls)" counts every call the lanes started, structure repairs that took one of the repair
+  // model's slots included; a Haiku call's repair of its own reply (no slot taken) and a repair outside any lane are not
+  // in it. The "most calls at once" figure counts debate slots, so it never includes a repair (`LaneStats`).
   lines.push(`- most calls at once in the debate: ${String(block.peakInFlight)} (${String(block.calls)} calls)`);
   const gates = Object.entries(block.peakByGate);
   if (gates.length > 0) lines.push(`- most calls at once through each gate: ${gates.map(([gate, n]) => `${gate} ${String(n)}`).join(", ")}`);
