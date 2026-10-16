@@ -1180,7 +1180,8 @@ class AnthropicProfile:
         that reports a cost above `reserved` or one that is not a plain amount (reported_costs), whose cache read or
         thinking split cannot be read (premium_free), or whose counts that can be read as numbers (whole, a float or
         numeric text) price above `reserved` at their step (counts_within); and for a server error that names a speed,
-        service tier or region."""
+        service tier or region. Final review (2026-10-16, Minor 1): a message's usage is booked unread only when it is
+        absent or null; a usage of another type than an object halts."""
         if type(status) is not int or not isinstance(response, dict) or not isinstance(accounting, dict):
             return False
         reason = accounting.get('invalid_reason')
@@ -1189,7 +1190,11 @@ class AnthropicProfile:
             if costs is None or any(cost > reserved for cost in costs):
                 return False
             usage = response.get('usage')
-            return not isinstance(usage, dict) or self.premium_free(usage) and self.counts_within(usage, reserved)
+            if usage is None:  # Absent or null: nothing reported.
+                return True
+            # Final review (2026-10-16, Minor 1 = Task 9 F4): a usage that is a list, text or a number is not an
+            # absent usage; it says something the gate cannot read, so it halts.
+            return isinstance(usage, dict) and self.premium_free(usage) and self.counts_within(usage, reserved)
         return (500 <= status <= 599 and reason == 'not_a_message'
                 and not names_any_key(response, BILLED_KEYS + ('content', 'model', 'speed', 'service_tier', 'inference_geo'))
                 and not names_any_key_prefixed(response, 'tokens_')

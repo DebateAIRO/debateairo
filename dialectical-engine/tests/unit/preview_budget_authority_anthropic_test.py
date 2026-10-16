@@ -586,7 +586,8 @@ class SettlementTests(AnthropicTest):
         })
         # Owner answer M3 (2026-10-15): a message whose usage is missing or whose input/output counts cannot be read is booked
         # at its reservation (UnreportedChargeBookedTests); every other shape the profile does not know still halts.
-        booked = {'input_float', 'input_bool', 'input_negative', 'output_missing', 'usage_a_list'}
+        # Final review (2026-10-16, Minor 1): a usage of another type (usage_a_list) is not an absent usage: it halts.
+        booked = {'input_float', 'input_bool', 'input_negative', 'output_missing'}
         for name, reply in replies.items():
             with self.subTest(name):
                 self.assertFalse(ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)['usage_valid'])
@@ -1047,7 +1048,6 @@ class UnreportedChargeBookedTests(AnthropicTest):
         for name, reply, reason in (
                 ('no_usage', without('usage', message()), 'usage_missing'),
                 ('usage_null', {**message(), 'usage': None}, 'usage_missing'),
-                ('usage_a_list', {**message(), 'usage': [1000, 500]}, 'usage_missing'),
                 ('input_bool', message(input_tokens=True), 'token_counts'),
                 ('output_missing', {**message(), 'usage': {'input_tokens': 1000}}, 'token_counts'),
                 ('output_text_standard_labels', message(output_tokens='500', service_tier='standard', inference_geo='global',
@@ -1104,6 +1104,11 @@ class UnreportedChargeBookedTests(AnthropicTest):
             '503_with_model': (503, {'type': 'error', 'error': {'type': 'overloaded_error'}, 'model': HAIKU}),
             '502_with_usage': (502, {'type': 'error', 'error': {'type': 'api_error'}, 'usage': {'output_tokens': 5}}),
             '503_message_without_usage': (503, without('usage', message())),
+            # Final review (2026-10-16, Minor 1 = Task 9 F4): only an absent or null usage is booked; a usage of
+            # any other type than an object says something the gate cannot read, so it keeps halting.
+            'usage_a_list': (200, {**message(), 'usage': [1000, 500]}),
+            'usage_a_string': (200, {**message(), 'usage': '1000 in, 500 out'}),
+            'usage_a_number': (200, {**message(), 'usage': 1500}),
         }
         for name, (status, reply) in cases.items():
             with self.subTest(name):
