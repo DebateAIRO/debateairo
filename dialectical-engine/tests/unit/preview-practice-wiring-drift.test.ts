@@ -204,6 +204,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "...(storyCeilingMicros === null ? {} : { buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({ runId, price, requireReportedUsage: true }) })",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
       "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",
+      "structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),",
       "bodyCostFallback: envelopeBand !== null,"
     ]) {
       expect(shipped, statement).toContain(statement);

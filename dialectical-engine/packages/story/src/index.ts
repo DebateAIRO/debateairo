@@ -16,6 +16,7 @@ export {
   STORY_CHECKER_ANSWER_FORM,
   STORY_CHECKER_CONTRACT_ID,
   STORY_CHECKER_LIMITS,
+  STORY_CHECKER_RUNAWAY_LIMITS,
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyContractHash,
@@ -24,6 +25,7 @@ export {
 export {
   STORY_BODY_PROSE,
   STORY_CHECKER_PROSE,
+  STORY_FIXER_OPTIONS,
   StoryCheckerVerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,

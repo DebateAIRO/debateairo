@@ -41,7 +41,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -51,7 +51,7 @@ import {
 } from "@debateai/story";
 import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
-import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, targetCallSubjects } from "./call-lane-gateway.js";
+import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
 import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import {
@@ -357,7 +357,7 @@ if (previewConfig !== undefined) {
 }
 /** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
 const previewBusy = createPreviewBusyCoordinator();
-const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
+function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   const price = providerTargetPrice(target);
   if (costEnvelopeGuard !== undefined && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
@@ -400,7 +400,20 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
     busy: previewBusy,
     onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }
   });
-});
+}
+/**
+ * LG-A (spec 2026-10-15, L32; controller ruling 1, ruling R10): every target's gateway first, so the structure-repair
+ * route can name the repair model's own (Haiku's, through its own gate); then every target's gateway is wrapped by
+ * withStructureRepair. The route follows the preview provider config, whatever the deployment mode (the practice runs
+ * hosted with it). Without that config (hosted production, local without the preview) the route is null and each
+ * wrapped gateway is the gateway itself, byte for byte: today's follow-ups. The route's repair calls ask the debate's lane
+ * for the repair model's slots the original call does not hold (`structureRepairThroughLane`): the owner's limits hold.
+ */
+const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
+const structureRepairRoute = previewConfig === undefined ? null : structureRepairThroughLane(
+  previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+const providerTopology = createRunnerProviderTopology(providerTargets,
+  (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
 // what the operator wrote, credential included — a credential resolved from a
@@ -516,6 +529,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // LG-A (Task 14 carry): root 0's room prices its retry as the structure-repair call too, when the route is wired.
+  structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
   // B9 (budget spec §2.9, §2.4): a call while arguing refused for money moves
   // to a cheaper claim-eligible maker — hosted, and only with the
   // costEnvelopePolicy row's three band members: the same `envelopeBand` that

@@ -287,10 +287,19 @@ export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; arg
 }
 
 /**
+ * LG-A (Task 14 carry) — ROOT 0'S RETRY AS THE STRUCTURE-REPAIR CALL. On a routed run (the preview provider config with
+ * the repair model a target, `previewStructureRepairRoute`), root 0's retry after a reply whose structure the fixer cannot
+ * repair is the repair model's call, not root 0's own: at the repair model's price and at the most the money seam can
+ * project for it (`previewStructureRepairCeiling`). Null (hosted production, local): no such retry.
+ */
+export type RootZeroStructureRepair = Readonly<{ price: ProviderTargetPrice; attempt: RootZeroAttempt }>;
+
+/**
  * Root 0's room, in micro-units: the money seam's own projection (`projectedCallCeilingMicros`) of root 0's FIRST ATTEMPT
  * PLUS ONE RETRY (ruling T12-R3, `rootZeroRoomAttempts`), each at the dearest price among the members that could write it
- * (`rootZeroRoomRefs`) — the retry may be the backup's, so its price is never tied to the first attempt's. No price
- * (local mode: no money ceiling) keeps no room.
+ * (`rootZeroRoomRefs`) — the retry may be the backup's, so its price is never tied to the first attempt's. On a routed run
+ * the retry is the larger of that and the structure-repair call at its own price (LG-A, `RootZeroStructureRepair`). No
+ * price (local mode: no money ceiling) keeps no room.
  *
  * FIRST ATTEMPT + ONE RETRY: so a root 0 whose first reply slips its format, is cut at the token bound, or whose main
  * fails after billing still has the money for one more try once the map has spent down to the room (the owner's "always
@@ -298,11 +307,13 @@ export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; arg
  * map call refused only because of this room still stops only the map (T12-R1).
  */
 export function rootZeroKeepRoomMicros(input: Readonly<{ prices: readonly ProviderTargetPrice[]; first: RootZeroAttempt;
-  retries: readonly RootZeroAttempt[] }>): number {
+  retries: readonly RootZeroAttempt[]; structureRepair?: RootZeroStructureRepair | null }>): number {
   if (input.prices.length === 0) return 0;
   const dearest = (attempts: readonly RootZeroAttempt[]) => input.prices.reduce((most, price) => Math.max(most,
     ...attempts.map((attempt) => projectedCallCeilingMicros(price, attempt))), 0);
-  return dearest([input.first]) + dearest(input.retries);
+  const repair = input.structureRepair ?? null;
+  return dearest([input.first])
+    + Math.max(dearest(input.retries), repair === null ? 0 : projectedCallCeilingMicros(repair.price, repair.attempt));
 }
 
 /**

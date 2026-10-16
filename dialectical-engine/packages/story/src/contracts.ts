@@ -96,6 +96,12 @@ const STORY_CHECKER_V1_OBJECTION_LIMIT = "\"objection\": null | non-empty string
 export const STORY_CHECKER_LIMITS = Object.freeze({ maxObjectionChars: 4000 });
 
 /**
+ * LG-A (spec 2026-10-15 §3.4, L28): the checker objection's runaway guard, read by StoryCheckerVerdictSchema
+ * (validate.ts). The v3 form keeps stating STORY_CHECKER_LIMITS' 4000, so its bytes and hash do not move.
+ */
+export const STORY_CHECKER_RUNAWAY_LIMITS = Object.freeze({ maxObjectionChars: 30000 });
+
+/**
  * Current form: v2 byte for byte except the objection's limit, 4000 characters instead of 2000 (R15 practice
  * debate, 2026-10-13: the checker now lists every problem, one short sentence each, and 2000 did not hold them).
  */

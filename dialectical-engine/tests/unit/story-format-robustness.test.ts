@@ -124,9 +124,9 @@ describe("B — the story checker's reply is decoded tolerantly, then checked in
     expect(parseCheckerVerdict(cut, STOP)).toMatchObject({ satisfied: false });
   });
 
-  it("a reply that would need any other repair still fails", () => {
+  it("a reply that would need any other repair still fails; a trailing comma is now read (LG-A, TRAILING_COMMA)", () => {
     expect(classifyCheckerContent(VERDICT.replace(/"satisfied"/u, "'satisfied'"), STOP).parseStatus).toBe("PARSE_FAILED");
-    expect(classifyCheckerContent(VERDICT.replace(/\}$/u, ",}"), STOP).parseStatus).toBe("PARSE_FAILED");
+    expect(classifyCheckerContent(VERDICT.replace(/\}$/u, ",}"), STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "TRAILING_COMMA" });
   });
 });
 
@@ -141,12 +141,11 @@ describe("B — the storyteller's reply is decoded tolerantly, then checked in f
     return JSON.stringify({ ...decoded, long, reviewer_note }).slice(0, -1);
   };
 
-  it("the real reply left out the brace closing \"long\": decoded at the end, then refused by the schema with a path", () => {
-    const refused = classifyStoryContent(reply, index, STOP);
-    expect(refused.parseStatus).toBe("SCHEMA_FAILED");
-    // Before, PARSE_FAILED (invalid_json at $); now the one repair packet can name the member that is wrong.
-    expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>))
-      .toEqual({ code: "SCHEMA_FAILED", path: "long" });
+  it("the real reply left out the brace closing \"long\": decoded at the end, then the note moved up in code (LG-A)", () => {
+    // Before LG-A: SCHEMA_FAILED at "long". Now CLOSING_BRACKETS, then MEMBER_UNNESTED (the note was one level too deep).
+    expect(classifyStoryContent(reply, index, STOP)).toEqual({ parseStatus: "PARSED", parseError: null,
+      jsonRepair: "CLOSING_BRACKETS", jsonRepairs: ["CLOSING_BRACKETS", "MEMBER_UNNESTED"] });
+    expect(parseStoryBody(reply, index, STOP)).toEqual(parseStoryBody(shortOnlyAtTheEnd(), index, STOP));
   });
 
   it("the same story missing only its final brace is accepted when the call finished normally", () => {
@@ -482,13 +481,13 @@ describe("F — R15: the story checker's reasoning-then-verdict reply and its lo
     expect(verdict.satisfied).toBe(false);
     expect(verdict.objection).toHaveLength(2739);
     expect(verdict.criteria.reviewer_note_separate).toBe(true);
-    // Still a limit: one character past 4000 is refused at its path, as 2,739 was at 2000.
-    const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(4001) });
+    // Still a limit: one character past the runaway guard (30,000) is refused at its path
+    const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(30001) });
     const refused = classifyCheckerContent(tooLong, STOP);
     expect(refused.parseStatus).toBe("SCHEMA_FAILED");
     // Practice 2026-10-14: the repair now also states the limit the objection must keep.
     expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>)).toEqual({
-      code: "SCHEMA_FAILED", path: "objection", limit: { path: "objection", bound: "at most", size: 4000, unit: "characters" }
+      code: "SCHEMA_FAILED", path: "objection", limit: { path: "objection", bound: "at most", size: 30000, unit: "characters" }
     });
   });
 
@@ -516,7 +515,7 @@ describe("F — R15: the story checker's reasoning-then-verdict reply and its lo
   });
 
   it("a trailing verdict that fails the checker's schema stays PARSE_FAILED: never a new schema refusal", () => {
-    const overLimit = R15_644_WHOLE.replace("\"objection\": \"1) ", `"objection": "${"x".repeat(4001)} 1) `);
+    const overLimit = R15_644_WHOLE.replace("\"objection\": \"1) ", `"objection": "${"x".repeat(30001)} 1) `);
     const satisfiedWithUnmet = R15_644_WHOLE.replace("\"satisfied\": false", "\"satisfied\": true");
     for (const text of [R15_644, overLimit, satisfiedWithUnmet]) {
       const classified = classifyCheckerContent(text, STOP);

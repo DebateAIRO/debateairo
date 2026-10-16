@@ -1100,6 +1100,24 @@ describe("StoryWriter — a repaired reply is logged by its repair code", () => 
     ]);
   });
 
+  it("logs every repair of a reply that needed two or more, in the lists' fixed order, the first as the headline (LG-A, L34)", async () => {
+    const strayKey = JSON.stringify({ ...(JSON.parse(story()) as Record<string, unknown>), notes: "drafted twice" });
+    const checked = JSON.parse(CHECKER_SATISFIED) as { criteria: Record<string, unknown> } & Record<string, unknown>;
+    const strayCriterion = JSON.stringify({ ...checked, criteria: { ...checked.criteria, tone_ok: "yes" } });
+    const provider = finishingNormally((request) => (isStoryteller(request)
+      ? strayKey.slice(0, -1)
+      : `I checked the story against the material. ${strayCriterion}`));
+    const { writer, inserted, details } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 1 });
+    expect(details.filter((detail) => detail.event === "STORY_REPLY_REPAIRED")).toEqual([
+      { event: "STORY_REPLY_REPAIRED", answerId: SNAPSHOT.answerId, answerVersion: 1, round: 1, site: "STORYTELLER",
+        repair: "CLOSING_BRACKETS", repairs: ["CLOSING_BRACKETS", "UNASKED_KEYS"] },
+      { event: "STORY_REPLY_REPAIRED", answerId: SNAPSHOT.answerId, answerVersion: 1, round: 1, site: "CHECKER",
+        repair: "OUTERMOST_OBJECT", repairs: ["OUTERMOST_OBJECT", "INNER_UNASKED_KEYS"] }
+    ]);
+  });
+
   it("logs nothing for strict replies", async () => {
     const { writer, inserted, events } = harness(providing(finishingNormally(byContract)));
     await writer.writeAfterSettle(SNAPSHOT);

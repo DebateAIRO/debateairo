@@ -22,6 +22,7 @@
  *    The report holds every sample that finished, and every other rule that applied is listed after the abort.
  * When several apply, the first in this order wins: HARNESS_ERROR, ABORTED, FAIL, NOT_PROVEN, PASS_WITH_WARNINGS, PASS.
  */
+import type { ReplyForm } from "@debateai/providers";
 
 export const PRACTICE_VERDICTS = ["PASS", "PASS_WITH_WARNINGS", "FAIL", "NOT_PROVEN", "HARNESS_ERROR", "ABORTED"] as const;
 export type PracticeVerdict = typeof PRACTICE_VERDICTS[number];
@@ -60,9 +61,10 @@ const PRACTICE_FORMAT_STATUSES: ReadonlySet<string> = new Set(["PARSE_FAILED", "
  * (`practiceReplyFormOf`, practice-lanes.ts):
  *  - ORIGINAL: the step's own packet (the first try, a resend after an unbilled refusal, a cut-off reply's resend);
  *  - PATCH: the short follow-up (the model's own first answer as its own turn, then only the failing machine paths);
- *  - FULL: the step's full re-ask (the original packet and one block naming the refusal).
+ *  - FULL: the step's full re-ask (the original packet and one block naming the refusal);
+ *  - STRUCTURE (LG-A): the structure-repair call; LENGTH_RETRY: a cut-off reply's resend, read from the artifact's reply_form.
  */
-export type PracticeReplyForm = "ORIGINAL" | "PATCH" | "FULL";
+export type PracticeReplyForm = ReplyForm;
 
 /**
  * How a repaired call (a slip a later try of the same call fixed) was fixed: the accepted try's form. PATCH and FULL as

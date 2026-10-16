@@ -27,6 +27,7 @@ import {
 import {
   createCallScheduler,
   type CallScheduler,
+  type CallSubject,
   type CallTicket,
   type DebateCallLane
 } from "../../apps/runner/src/call-scheduler.js";
@@ -48,6 +49,7 @@ function recordingLane(): DebateCallLane & { tickets: CallTicket[] } {
   return Object.assign({
     callsAtOnce: 1,
     run: <T>(ticket: CallTicket, call: () => Promise<T>) => { tickets.push(ticket); return call(); },
+    runWithin: <T>(_held: CallSubject, ticket: CallTicket, call: () => Promise<T>) => { tickets.push(ticket); return call(); },
     stop: () => undefined, guardStarts: () => undefined, drained: async () => undefined, close: () => undefined,
     stats: () => ({ running: 0, heldBack: 0, peakInFlight: 0, peakByModel: {}, waitedMsByModel: {}, calls: 0 })
   }, { tickets });

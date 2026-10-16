@@ -54,7 +54,10 @@ describe("the step of a call", () => {
     ["POST_COMPOSE_R9:EVALUATOR:1", "served", "answer_checker"], ["STORY:STORYTELLER:1", "story", "story_writer"],
     ["STORY:CHECKER:2", "story", "story_checker"], ["STORY:STORYTELLER:1", "served", null], ["evaluator.grade-judge-output.v1", "served", null],
     ["MAP:angles", "served", "opening"], ["MAP:list:0", "served", "opening"], ["MAP:merge", "served", "opening"],
-    ["MAP:gap:1", "served", "opening"], ["MAP:choose", "served", "opening"]
+    ["MAP:gap:1", "served", "opening"], ["MAP:choose", "served", "opening"],
+    // LG-A (L32, pre-flight PF-A47): a structure-repair call runs at its repair model's slip_fix level, whatever it repairs.
+    ["REPAIR:STRUCTURE:JUDGE:cross-root:0->1", "served", "slip_fix"], ["REPAIR:STRUCTURE:PANEL:root", "served", "slip_fix"],
+    ["REPAIR:STRUCTURE:STORY:STORYTELLER:1", "story", "slip_fix"]
   ])("%s on %s -> %s", (callSiteKey, lane, step) => {
     expect(previewThinkingStepOf({ callSiteKey, lane })).toBe(step);
   });

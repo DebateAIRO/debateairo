@@ -40,7 +40,7 @@ import {
   type MapReplyCheck,
   type MapSnowballReply
 } from "./replies.js";
-import { mapAnglesSalvage, mapChooseSalvage, mapGapSalvage, mapListSalvage, type MapReplySalvage } from "./salvage.js";
+import { mapAnglesSalvage, mapChooseSalvage, mapGapSalvage, mapListSalvage, mapMergeSalvage, type MapReplySalvage } from "./salvage.js";
 import type { MapAngle, MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem, MapStep } from "./types.js";
 
 /** One map call, fully described: the contract (in the question's language), its material, its check. */
@@ -125,7 +125,8 @@ export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): Ma
   return mapSpecOf("MERGE", ctx, "merge", [mapQuestionField(ctx),
     { name: "points", content: JSON.stringify(points.map((point) => ({ item_id: point.itemId, claim: point.claim, why_it_matters: point.whyItMatters }))) },
     { name: "candidate_answers", content: JSON.stringify(answers.map((answer) => ({ item_id: answer.itemId, answer: answer.answer }))) }],
-  mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage));
+  mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage),
+  mapMergeSalvage);
 }
 
 /** Gap: plain labels only, never counts or authors. */

@@ -4,9 +4,12 @@ import { framedJudgePromptForTest, rootPositionRepairRequestBytesBound, rootPosi
 import { TypedDomainError, questionLanguageForBounds } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
 import {
+  CONTENT_FOLLOW_UP_SENTENCES,
   buildFramedRepairPrompt,
   lengthRetryTokenCeiling,
   OpenAICompatibleProviderGateway,
+  PREVIEW_REQUEST_BODY_MAX_BYTES,
+  previewModelRow,
   type ProviderCallRequest,
   type ProviderCostEnvelopeSeam,
   type ProviderGateway
@@ -44,7 +47,7 @@ const POLICY = Object.freeze({ perRunCeilingMicros: 250_000, dailyCeilingMicros:
   serveReserveBasisPoints: 3_000, serveOverrunBasisPoints: 2_000 });
 const BODY_CEILING = 175_000;
 
-function seamAt(runSpentMicros: number) {
+function seamAt(runSpentMicros: number, price: Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }> = PRICE) {
   const store: ModelSpendStore = {
     recordSpend: async () => undefined,
     readRunSpentMicros: async () => runSpentMicros,
@@ -53,7 +56,7 @@ function seamAt(runSpentMicros: number) {
     admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
   };
   return new CostEnvelopeGuard({ store, policy: POLICY, clock: () => new Date("2026-10-14T00:00:00.000Z") })
-    .providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+    .providerSeam({ runId: "run-1", price, requireReportedUsage: true, phase: "BODY" });
 }
 
 async function decisionAt(runSpentMicros: number, keepRoomMicros?: number): Promise<string> {
@@ -193,6 +196,26 @@ describe("root 0's worst-case call", () => {
     }
   });
 
+  it("LG-A (Task 13): a routed full re-ask, which also says in words what is missing, never frames above the repair room", () => {
+    // With the structure-repair route wired (the preview provider config), root 0's full re-ask carries one of the
+    // plain-word sentences (`machine_rejection_reason`, L33) after the longest code and path; locked and unlocked.
+    const assigned = { kind: "assigned-root" as const, assignedAnswer: "\u0001".repeat(rootZeroMapMaterialChars.answer),
+      mapPoints: "\u0001".repeat(rootZeroMapMaterialChars.points) };
+    const longest = { code: `Z${"9".repeat(63)}`, path: "-".repeat(200) };
+    for (const [language, lock] of [["English", null], ["Romanian", { code: "sr-Cyrl", name: "\u0416".repeat(32) }]] as const) {
+      const repairBound = rootZeroRepairRequestBytes({ questionLine: QUESTION, argumentLanguageName: language, completionTokenCeiling: CEILING,
+        questionLanguage: lock });
+      for (const reason of Object.values(CONTENT_FOLLOW_UP_SENTENCES)) {
+        for (const leg of [{ kind: "primary-root" as const }, assigned]) {
+          for (const claim of ["unknown", "resolved"] as const) {
+            const repair = buildFramedRepairPrompt(framedJudgePromptForTest(leg, QUESTION, language, claim, lock), { ...longest, reason });
+            expect(repairBound, `${language} ${leg.kind} ${claim} ${reason}`).toBeGreaterThanOrEqual(bodyBytes(repair) + 256);
+          }
+        }
+      }
+    }
+  });
+
   it("final review M14: a LOCKED root 0's real repair packets (up to a 64-byte name) never frame above the locked repair room", () => {
     const input = { questionLine: QUESTION, argumentLanguageName: "Romanian", completionTokenCeiling: CEILING };
     const locators = [{ code: "SCHEMA_FAILED", path: "claim" }, { code: `Z${"9".repeat(63)}`, path: "-".repeat(200) }];
@@ -245,6 +268,58 @@ describe("root 0's worst-case call", () => {
     // The room of the first attempt alone (before T12-R3) would leave the length retry refused for money: no answer.
     const firstOnly = BODY_CEILING - projectedCallCeilingMicros(PRICE, attempts.first);
     expect(await decide(firstOnly + projectedCallCeilingMicros(PRICE, attempts.first), attempts.retries[0]!)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+  });
+
+  /**
+   * LG-A (Task 14 carry): on a routed run (the preview provider config with a Haiku target), root 0's retry after a reply
+   * whose structure the fixer cannot repair is the structure-repair call: Haiku's price, Haiku's whole answer cap (the
+   * route's 32,768-token ceiling), and a body the preview wire refuses above PREVIEW_REQUEST_BODY_MAX_BYTES (it carries
+   * root 0's whole broken reply, so no smaller bound holds). Root 0's own seat prices never price it.
+   */
+  const previewPrice = (model: string) => {
+    const row = previewModelRow(model)!;
+    return Object.freeze({ inputMicrosPerMillionTokens: row.inputPriceMicrosPerMillion, outputMicrosPerMillionTokens: row.outputPriceMicrosPerMillion });
+  };
+  const HAIKU_REPAIR = Object.freeze({ price: previewPrice("claude-haiku-5-5"),
+    attempt: Object.freeze({ requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES, completionTokenCeiling: 32_768 }) });
+  const PREVIEW_SEATS = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"];
+
+  it("LG-A (Task 14 carry): a routed run's room also prices the retry as the structure-repair call, at the repair model's price", () => {
+    const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "English", tokenCeiling: CEILING });
+    const repair = projectedCallCeilingMicros(HAIKU_REPAIR.price, HAIKU_REPAIR.attempt);
+    // ceil(262,144 / 2) = 131,072 input tokens at 100,000 per million (13,108, rounded up) + 32,768 at 500,000 (16,384).
+    expect(repair).toBe(13_108 + 16_384);
+    for (const model of PREVIEW_SEATS) {
+      const price = previewPrice(model);
+      const today = rootZeroKeepRoomMicros({ prices: [price], ...attempts });
+      const first = projectedCallCeilingMicros(price, attempts.first);
+      // The under-count: at every preview seat, root 0's own retry is cheaper than the repair call it may be.
+      expect(today, model).toBeLessThan(first + repair);
+      expect(rootZeroKeepRoomMicros({ prices: [price], ...attempts, structureRepair: HAIKU_REPAIR }), model).toBe(first + repair);
+    }
+    // A seat whose own retry is dearer than the repair keeps its own retry: the larger of the two, never the sum.
+    const dear = { inputMicrosPerMillionTokens: 40_000_000, outputMicrosPerMillionTokens: 1_000_000 };
+    const dearToday = rootZeroKeepRoomMicros({ prices: [dear], ...attempts });
+    expect(dearToday - projectedCallCeilingMicros(dear, attempts.first)).toBeGreaterThan(repair);
+    expect(rootZeroKeepRoomMicros({ prices: [dear], ...attempts, structureRepair: HAIKU_REPAIR })).toBe(dearToday);
+    // No route (hosted production, local): today's room exactly; no price (local) keeps no room, route or not.
+    expect(rootZeroKeepRoomMicros({ prices: [PRICE], ...attempts, structureRepair: null })).toBe(rootZeroKeepRoomMicros({ prices: [PRICE], ...attempts }));
+    expect(rootZeroKeepRoomMicros({ prices: [], ...attempts, structureRepair: HAIKU_REPAIR })).toBe(0);
+  });
+
+  it("LG-A (Task 14 carry), through the real seams: after the map spends down to the routed room, root 0's first attempt and the repair call are admitted", async () => {
+    const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "English", tokenCeiling: CEILING });
+    const glm = previewPrice("zai-org/GLM-5.3-Flash");
+    const decide = (spent: number, price: typeof glm, projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>) =>
+      Promise.resolve(seamAt(spent, price).assertCallAllowed(projection)).then(() => "ADMITTED", (error: unknown) => (error as TypedDomainError).code);
+    const afterFirst = (room: number) => BODY_CEILING - room + projectedCallCeilingMicros(glm, attempts.first);
+    const routed = rootZeroKeepRoomMicros({ prices: [glm], ...attempts, structureRepair: HAIKU_REPAIR });
+    expect(await decide(BODY_CEILING - routed, glm, attempts.first)).toBe("ADMITTED");
+    expect(await decide(afterFirst(routed), HAIKU_REPAIR.price, HAIKU_REPAIR.attempt)).toBe("ADMITTED");
+    for (const retry of attempts.retries) expect(await decide(afterFirst(routed), glm, retry)).toBe("ADMITTED");
+    // Today's room would leave the repair call refused for money: no answer.
+    const today = rootZeroKeepRoomMicros({ prices: [glm], ...attempts });
+    expect(await decide(afterFirst(today), HAIKU_REPAIR.price, HAIKU_REPAIR.attempt)).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
   });
 
   it("PF-L38 / L-B64: a locked root 0's room frames the lock at the bound lock (first, retry and repair); no lock is today's room", () => {

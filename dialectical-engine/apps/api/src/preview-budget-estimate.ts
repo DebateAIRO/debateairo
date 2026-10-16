@@ -42,6 +42,7 @@ import {
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR,
   PREVIEW_REQUEST_BODY_MAX_BYTES,
   PREVIEW_REVIEWED_PROVIDER_REFS,
+  PREVIEW_STRUCTURE_REPAIR_MODEL,
   previewCallBound,
   previewChargedInputTokens,
   previewModelRow,
@@ -247,9 +248,11 @@ function roleModelList(roles: PreviewRoleModels): readonly string[] {
  * billed call like the storyteller's STORYTELLER_RETRY. A debate-shape run (spec 2026-10-12) prices its answer
  * writer's calls as ANSWER_WRITER (at its answer length's writer bound) and the map's one merge and one choose as
  * MAP_MERGE / MAP_CHOOSE (at its map step bounds, controller ruling X1); each is a debate call when no bound raises it.
+ * STRUCTURE_REPAIR (LG-A, L32; Task 14 controller ruling, never under-count) is a story try's second POST made as the
+ * structure-repair call on the repair model, priced at that call's own ceiling (`structureRepairNanoUsd`).
  */
 export type PreviewCallType = "DEBATE" | "ANSWER_WRITER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORYTELLER_RETRY"
-  | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "PROBE" | "UNBILLED_RETRY";
+  | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "STRUCTURE_REPAIR" | "PROBE" | "UNBILLED_RETRY";
 export type PreviewBilledCallType = Exclude<PreviewCallType, "UNBILLED_RETRY">;
 
 /**
@@ -276,6 +279,12 @@ export type PreviewBudgetGateSettings = Readonly<{
   callOutputTokens: PreviewCallOutputTokens;
   /** The models of the targets the API health-checks at ask time, paid through the gate even when the ask is refused. */
   askProbeModelIds: readonly string[];
+  /**
+   * LG-A (L32; INTERFACE §2.4): the structure-repair model when the declared targets name it (the rule the runner's route
+   * follows, `previewStructureRepairRoute`), else null; absent reads as null. Each story try's second POST is counted on it
+   * too (only the story's: the other steps' repairs are left to the margin, owner ruling R3).
+   */
+  structureRepairModel?: string | null;
   /** register runDeathPolicy.max_cooldown_holds_per_run: a debate is picked up at most 1 + this many times by cooldown. */
   maxCooldownHoldsPerRun: number;
   /** Earlier preview debates that have not finished (see PREVIEW_UNFINISHED_RUNS_SQL). */
@@ -327,7 +336,8 @@ function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBu
   switch (type) {
     case "DEBATE": case "ANSWER_WRITER": case "MAP_MERGE": case "MAP_CHOOSE": return "DEBATE";
     case "STORYTELLER": case "STORYTELLER_RETRY": case "STORY_CHECKER": case "STORY_CHECKER_RETRY": return "STORY";
-    case "PROBE": return null;
+    // A repair is never averaged: every pricer prices it at its ceiling (`structureRepairNanoUsd`).
+    case "STRUCTURE_REPAIR": case "PROBE": return null;
     default: return exhaustive(type);
   }
 }
@@ -336,11 +346,24 @@ function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBu
 export type PreviewCallPricer = (row: PreviewModelRow, type: PreviewBilledCallType) => bigint;
 
 /**
+ * LG-A (Task 14 controller ruling: the estimate never under-counts) — ONE STRUCTURE-REPAIR CALL AT ITS OWN CEILING: its
+ * input at `inputTokens` (the largest body the preview wire accepts, PREVIEW_REQUEST_BODY_MAX_BYTES, in the pricer's own
+ * token measure: the repair carries the whole broken reply, so no smaller bound holds) and its output at the row's whole
+ * answer cap (the route's token ceiling, `previewStructureRepairRoute`), never the 16,384 of a story checker's retry.
+ */
+function structureRepairNanoUsd(row: PreviewModelRow, inputTokens: bigint): bigint {
+  return previewCallNanoUsd(row, inputTokens, row.outputBound);
+}
+/** The realistic measure of the repair's input (3 bytes per token), shared by the realistic and calibrated pricers. */
+const PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS = previewEstimateInputTokens(PREVIEW_REQUEST_BODY_MAX_BYTES);
+
+/**
  * CALIBRATED_ESTIMATE: the average call of that kind by that model (previewCallAverage) at the row's list price today.
  * The calibrated average ignores a shaped run's writer and map step bounds; switching to it under-prices those calls.
  */
 export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): PreviewCallPricer {
   return (row, type) => {
+    if (type === "STRUCTURE_REPAIR") return structureRepairNanoUsd(row, PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS);
     const average = previewCallAverage(row.model, type, measured);
     return previewCallNanoUsd(row, average.inputTokens, average.outputTokens);
   };
@@ -351,7 +374,7 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
  */
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
   output: PreviewCallOutputTokens): PreviewCallPricer {
-  const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, number>> = {
+  const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE" | "STRUCTURE_REPAIR">, number>> = {
     DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker,
     // Debate shape: the run's own writer and map step bounds when it has them (previewOutputTokensForBasis), else a debate call's.
     ANSWER_WRITER: output.answerWriter ?? output.debate, MAP_MERGE: output.mapMerge ?? output.debate, MAP_CHOOSE: output.mapChoose ?? output.debate,
@@ -375,11 +398,12 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
   };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
+    : type === "STRUCTURE_REPAIR" ? structureRepairNanoUsd(row, inputTokens.STRUCTURE_REPAIR)
     : previewCallNanoUsd(row, inputTokens[type], type === "STORYTELLER" || type === "STORYTELLER_RETRY" ? storyteller(row, type)
       : type === "STORY_CHECKER" || type === "STORY_CHECKER_RETRY" ? storyChecker(row, type) : sent[type]);
 }
 const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
-  STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens });
+  STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens, STRUCTURE_REPAIR: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
@@ -402,7 +426,7 @@ export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyT
   return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     MAP_MERGE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, MAP_CHOOSE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
-    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker }, output);
+    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS }, output);
 }
 
 export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
@@ -632,6 +656,8 @@ export function previewCallShares(input: Readonly<{
   storyRounds: number;
   maxCooldownHoldsPerRun: number;
   askProbeModelIds?: readonly string[];
+  /** LG-A: the structure-repair model (PreviewBudgetGateSettings.structureRepairModel); absent or null counts none. */
+  structureRepairModel?: string | null;
   roleModelOfRef?: (ref: string) => string;
   storyOnly?: boolean;
   debateCallCount?: PreviewDebateCallCount;
@@ -746,6 +772,14 @@ export function previewCallShares(input: Readonly<{
       add(model, "STORY_CHECKER", rounds);
       add(model, "STORY_CHECKER_RETRY", rounds);
     }
+    // LG-A (L32): a story try's second POST may instead be the structure-repair call on the repair model; it is counted
+    // there too, per round and story role, so the repair model's gate is never under-counted (the step's own gate keeps
+    // its count: the estimate stays a ceiling). Task 14 controller ruling: as STRUCTURE_REPAIR, at the repair call's own
+    // ceiling, never as a story retry (a checker's retry asks half the repair's answer cap). The repair call carries no
+    // repair packet of its own, so the preview policy gives it owner ruling 5's one resend after an unbilled refusal: that
+    // UNBILLED_RETRY is counted with it, as for every debate call (Task 14 review).
+    const repairModel = input.structureRepairModel ?? null;
+    if (repairModel !== null) addDebate(repairModel, rounds * BigInt(tellers.length + checkers.length), "STRUCTURE_REPAIR");
   }
   return Object.freeze({ denominator, shares: Object.freeze(shares) });
 }
@@ -797,6 +831,7 @@ export type PreviewEstimateSettings = Readonly<{
   callOutputTokens: PreviewCallOutputTokens;
   maxCooldownHoldsPerRun: number;
   askProbeModelIds?: readonly string[];
+  structureRepairModel?: string | null;
 }>;
 
 /**
@@ -1276,6 +1311,7 @@ export async function readPreviewBudgetGateSettings(
       story: story === null ? null : { storyteller: story.storytellerBound.tokenCeiling, checker: story.checkerBound.tokenCeiling }
     }),
     askProbeModelIds: Object.freeze([...askProbeModelIds]),
+    structureRepairModel: askProbeModelIds.includes(PREVIEW_STRUCTURE_REPAIR_MODEL) ? PREVIEW_STRUCTURE_REPAIR_MODEL : null,
     maxCooldownHoldsPerRun: structural.maxCooldownHoldsPerRun,
     readUnfinishedRuns: async () => {
       const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown; rotated: unknown }>(

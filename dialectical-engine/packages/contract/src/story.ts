@@ -13,13 +13,32 @@ import { MakerLineageSchema } from "./lineage.js";
  * The story body's limits that other code reads, in one place.
  *  - maxPaths: the most paths the short story carries: the schema's cap, and
  *    the ceiling of the material index's `pathCap`, so the two can never disagree.
- *  - confidenceMaxChars: the confidence sentence (spec §14.2), one sentence.
+ *  - confidenceMaxChars: the number the v3 storyteller form states for the confidence sentence (the schema reads STORY_RUNAWAY_LIMITS since LG-A).
  *  - whyReasonsMax: the reasons that decided the answer (spec §14.2), one to three.
  */
 export const STORY_BODY_LIMITS = Object.freeze({
   maxPaths: 8,
   confidenceMaxChars: 300,
   whyReasonsMax: 3
+});
+
+/**
+ * LG-A (spec 2026-10-15 §3.4, rulings L10 and L28; INTERFACE §2.6): the story's text limits are far-away RUNAWAY guards,
+ * about 6 to 10 times what the forms ask for. They stop only an AI that has gone wrong (R16: a fine 326-character
+ * sentence was refused at 240). They apply to every debate: the public short story and stored stories are read with this
+ * same schema, and loosening reads every older story exactly as before, while tightening would turn old pages into 404s.
+ * The v3 forms keep stating today's numbers, so what the AIs are asked does not change. Counts stay as they are.
+ */
+export const STORY_RUNAWAY_LIMITS = Object.freeze({
+  headlineMaxChars: 1000,
+  summaryMaxChars: 6000,
+  confidenceMaxChars: 2000,
+  positionLineMaxChars: 2000,
+  changeMaxChars: 3000,
+  whyReasonMaxChars: 5000,
+  sectionTitleMaxChars: 500,
+  paragraphMaxChars: 15000,
+  reviewerNoteMaxChars: 8000
 });
 
 /**
@@ -44,7 +63,7 @@ export type StoryParagraph = z.infer<ReturnType<typeof StoryParagraphSchema>>;
 export const StoryPathSchema = z.object({
   position_ref: z.string().min(1),
   fate: StoryFateSchema,
-  line: z.string().trim().min(1).max(240),
+  line: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.positionLineMaxChars),
   node_refs: z.array(z.string().min(1)).max(40)
 }).strict();
 export type StoryPath = z.infer<typeof StoryPathSchema>;
@@ -59,22 +78,22 @@ export type StoryPath = z.infer<typeof StoryPathSchema>;
 export const StoryBodySchema = z.object({
   shape_id: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/),
   short: z.object({
-    headline: z.string().trim().min(1).max(160),
-    summary: z.string().trim().min(1).max(900),
-    confidence: z.string().trim().min(1).max(STORY_BODY_LIMITS.confidenceMaxChars),
+    headline: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.headlineMaxChars),
+    summary: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.summaryMaxChars),
+    confidence: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.confidenceMaxChars),
     paths: z.array(StoryPathSchema).min(1).max(STORY_BODY_LIMITS.maxPaths),
-    change: StoryParagraphSchema(400)
+    change: StoryParagraphSchema(STORY_RUNAWAY_LIMITS.changeMaxChars)
   }).strict(),
   why: z.object({
-    reasons: z.array(StoryParagraphSchema(700)).min(1).max(STORY_BODY_LIMITS.whyReasonsMax)
+    reasons: z.array(StoryParagraphSchema(STORY_RUNAWAY_LIMITS.whyReasonMaxChars)).min(1).max(STORY_BODY_LIMITS.whyReasonsMax)
   }).strict(),
   long: z.object({
     sections: z.array(z.object({
-      title: z.string().trim().min(1).max(80),
-      paragraphs: z.array(StoryParagraphSchema(2000)).min(1).max(12)
+      title: z.string().trim().min(1).max(STORY_RUNAWAY_LIMITS.sectionTitleMaxChars),
+      paragraphs: z.array(StoryParagraphSchema(STORY_RUNAWAY_LIMITS.paragraphMaxChars)).min(1).max(12)
     }).strict()).min(3).max(12)
   }).strict(),
-  reviewer_note: StoryParagraphSchema(1200).nullable()
+  reviewer_note: StoryParagraphSchema(STORY_RUNAWAY_LIMITS.reviewerNoteMaxChars).nullable()
 }).strict();
 export type StoryBody = z.infer<typeof StoryBodySchema>;
 

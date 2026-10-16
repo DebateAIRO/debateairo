@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
-import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, structureRepairOriginalKey } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -71,6 +71,10 @@ export type TranscriptArtifact = Readonly<{
   rawText: string;
   /** Decrypted: what the format check said, word for word. */
   parseErrorDetail: string | null;
+  /** LG-A (migration 0120): every repair code made on the reply, its failure class, and the form its try sent; null on older rows. */
+  replyRepairs?: readonly string[] | null;
+  replyFailureClass?: string | null;
+  replyForm?: string | null;
 }>;
 
 /** One attempt's prompt (ledger.call_prompt), decrypted. */
@@ -140,9 +144,17 @@ export type TranscriptAttempt = Readonly<{
     issues: readonly string[];
     /** Accepted replies only: the tolerant repair the shared decode needed (null for strict JSON). */
     jsonRepair: string | null;
+    /** LG-A (L34): every repair code made on the reply (the artifact's own record, else `jsonRepair` split at "+"). */
+    jsonRepairs: readonly string[];
+    /** LG-A: a refused reply's failure class (STRUCTURE, CONTENT, CUT_OFF, EMPTY), from the artifact; null otherwise. */
+    failureClass: string | null;
     finishReason: string | null;
   }>;
-  /** ORIGINAL (the step's own packet), PATCH (the short follow-up), FULL (the full re-ask); null without a prompt. */
+  /**
+   * ORIGINAL (the step's own packet), PATCH (the short follow-up), FULL (the full re-ask), STRUCTURE (LG-A: the
+   * structure-repair call), LENGTH_RETRY (a cut-off reply's resend): the artifact's own record (migration 0120), else read
+   * from the prompt; null without either.
+   */
   replyForm: string | null;
   /** The metadata the gateway stored beside the reply (status, attempt, usage, finish reason, token ceiling, tripwires). */
   metadata: unknown;
@@ -216,7 +228,9 @@ export function buildTranscriptAttempts(input: Readonly<{
     const messages = prompt === undefined ? undefined : parsedJson(prompt.promptText);
     const messageList = Array.isArray(messages) ? messages : null;
     let replyForm: string | null = null;
-    if (messageList !== null) {
+    // LG-A: a structure-repair try is the structure call (its prompt's `machine_rejection_code` block would read as FULL).
+    if (structureRepairOriginalKey(entry.callSiteKey) !== entry.callSiteKey) replyForm = "STRUCTURE";
+    else if (messageList !== null) {
       try { replyForm = practiceReplyFormOf(messageList as Parameters<typeof practiceReplyFormOf>[0]); } catch { replyForm = null; }
     }
     // Ruling MAP-SALVAGE: a choose reply's ids the run did not hold are known only from the call's own prompt.
@@ -239,6 +253,8 @@ export function buildTranscriptAttempts(input: Readonly<{
     const body = artifact === undefined ? undefined : parsedJson(artifact.rawText);
     const vendorBody = typeof body === "object" && body !== null && content !== artifact?.rawText ? body : null;
     const finishReason = artifact === undefined ? null : practiceFinishReasonOf(artifact.metadata);
+    const jsonRepair = entry.outcome === "OK" && content !== null
+      ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds) : null;
     return Object.freeze({
       sequence: Number(entry.sequence),
       ledgerEntryId: entry.ledgerEntryId,
@@ -266,10 +282,13 @@ export function buildTranscriptAttempts(input: Readonly<{
         errorCode: artifact?.parseErrorCode ?? null,
         errorDetail: artifact?.parseErrorDetail ?? null,
         issues: issueListFromParseError(artifact?.parseErrorDetail ?? null),
-        jsonRepair: entry.outcome === "OK" && content !== null ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds) : null,
+        jsonRepair,
+        // LG-A (L34): every repair, from the artifact's own record (migration 0120); else the one worked out from the reply.
+        jsonRepairs: artifact?.replyRepairs ?? (jsonRepair === null ? [] : jsonRepair.split("+")),
+        failureClass: artifact?.replyFailureClass ?? null,
         finishReason
       }),
-      replyForm,
+      replyForm: artifact?.replyForm ?? replyForm,
       metadata: artifact?.metadata ?? null,
       prompt: prompt === undefined ? null : Object.freeze({
         fingerprint: prompt.promptFingerprint,
@@ -296,9 +315,10 @@ export async function readTranscriptAttempts(pool: Pool, runId: string, makers: 
        FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`, [runId])).rows;
   const artifactRows = (await pool.query<{ raw_artifact_id: string; provider: string; provider_ref: string; model_id: string;
     maker: string; model_version: string | null; parse_status: string; parse_error: string | null; metadata_json: unknown;
-    thinking_tokens: number | null; raw_text: string; content_ciphertext: unknown }>(
+    thinking_tokens: number | null; raw_text: string; content_ciphertext: unknown; reply_repairs: string[] | null;
+    reply_failure_class: string | null; reply_form: string | null }>(
     `SELECT raw_artifact_id::text, provider, provider_ref, model_id, maker, model_version, parse_status, parse_error,
-            metadata_json, thinking_tokens, raw_text, content_ciphertext
+            metadata_json, thinking_tokens, raw_text, content_ciphertext, reply_repairs, reply_failure_class, reply_form
        FROM ledger.raw_artifact WHERE run_id=$1`, [runId])).rows;
   const artifacts = new Map<string, TranscriptArtifact>();
   for (const row of artifactRows) {
@@ -308,7 +328,8 @@ export async function readTranscriptAttempts(pool: Pool, runId: string, makers: 
       rawArtifactId: row.raw_artifact_id, provider: row.provider, providerRef: row.provider_ref, modelId: row.model_id,
       maker: row.maker, modelVersion: row.model_version, parseStatus: row.parse_status, parseErrorCode: row.parse_error,
       metadata: row.metadata_json, thinkingTokens: row.thinking_tokens, rawText: stored.rawText,
-      parseErrorDetail: stored.parseErrorDetail ?? null
+      parseErrorDetail: stored.parseErrorDetail ?? null,
+      replyRepairs: row.reply_repairs, replyFailureClass: row.reply_failure_class, replyForm: row.reply_form
     }));
   }
   const prompts = new Map<string, TranscriptPrompt>();

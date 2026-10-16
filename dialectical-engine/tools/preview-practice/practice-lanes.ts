@@ -22,7 +22,7 @@ import {
   nodeReviewArtifactSchema,
   parseStructuredArtifact,
   REVIEW_ARTIFACT_READING,
-  structuredParseRepair,
+  parsedStructuredRepairs,
   type JudgeLeg
 } from "@debateai/judgement";
 import {
@@ -36,13 +36,17 @@ import {
   mapListReplySchema,
   mapListSalvage,
   mapMergeReplySchema,
+  mapMergeSalvage,
   mapSnowballReplySchema,
   type MapReplySalvage
 } from "@debateai/map";
 import {
+  decodedRepairsOf,
   decodeModelJson,
+  fixReplyStructure,
   promptContractFingerprintText,
   rememberingAcceptedReply,
+  structureRepairOriginalKey,
   type CallBound,
   type ContentClassification,
   type ModelReplyFacts,
@@ -77,6 +81,7 @@ import {
 } from "@debateai/serve";
 import {
   STORY_CHECKER_CONTRACT_ID,
+  STORY_FIXER_OPTIONS,
   STORYTELLER_CONTRACT_ID,
   StoryWriter,
   classifyCheckerContent,
@@ -84,7 +89,7 @@ import {
   type StoryRecordInput,
   type StoryWriteInput
 } from "@debateai/story";
-import { TypedDomainError, exhaustive, type WayOfKnowing } from "@debateai/kernel";
+import { TypedDomainError, exhaustive, lengthCallStepOf, type LengthCallStep, type WayOfKnowing } from "@debateai/kernel";
 // The runner's own story snapshot builder (not on the runner package's export list; practice.ts reads the runner's
 // dev register module the same way).
 import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";
@@ -99,10 +104,17 @@ export type PracticeLane = typeof PRACTICE_LANES[number];
 
 /* ------------------------------------------------------------------ diagnosis */
 
+/** A list of `code@path` issues (one or more, comma-joined): machine codes and paths only, never free text. */
+export const PRACTICE_ISSUE_LIST = /^[A-Za-z_]+@[^,\s]*(?:,[A-Za-z_]+@[^,\s]*)*$/u;
+/** A message that is itself a machine code (`STRUCTURE_REPAIR_NOT_VERBATIM`). */
+const MACHINE_CODE = /^[A-Z][A-Z0-9_]*$/u;
+
 /**
  * A format check's error text as `code@path` entries. Two forms exist in the engine: the judge's tolerant parser
  * already writes `code@path,code@path` ($ for the root); the runner's and the story's checks write zod's issue list
- * as JSON (`[{"code":..,"path":[..],..}]`). Anything else (a plain parse error) is returned as one entry.
+ * as JSON (`[{"code":..,"path":[..],..}]`). Anything else (a plain parse error) is returned as one entry. A `custom`
+ * issue whose message is a machine code (`STRUCTURE_REPAIR_NOT_VERBATIM`, LG-A) is named by that code; any other message
+ * stays out (`custom`), so no free text becomes a code.
  */
 export function issueListFromParseError(parseError: string | null | undefined): readonly string[] {
   if (parseError === null || parseError === undefined || parseError.trim() === "") return Object.freeze([]);
@@ -113,14 +125,15 @@ export function issueListFromParseError(parseError: string | null | undefined): 
       if (Array.isArray(issues)) {
         return Object.freeze(issues.map((issue) => {
           const row = (typeof issue === "object" && issue !== null ? issue : {}) as Record<string, unknown>;
-          const code = typeof row.code === "string" ? row.code : typeof row.message === "string" ? row.message : "issue";
+          const coded = row.code === "custom" && typeof row.message === "string" && MACHINE_CODE.test(row.message);
+          const code = typeof row.code === "string" && !coded ? row.code : typeof row.message === "string" ? row.message : "issue";
           const path = Array.isArray(row.path) && row.path.length > 0 ? row.path.map(String).join(".") : "$";
           return `${code}@${path}`;
         }));
       }
     } catch { /* fall through: not the JSON form */ }
   }
-  if (/^[A-Za-z_]+@[^,\s]*(?:,[A-Za-z_]+@[^,\s]*)*$/u.test(text)) return Object.freeze(text.split(","));
+  if (PRACTICE_ISSUE_LIST.test(text)) return Object.freeze(text.split(","));
   return Object.freeze([text.length > 300 ? `${text.slice(0, 300)}...` : text]);
 }
 
@@ -143,10 +156,13 @@ export function replyContentOf(rawText: string): string {
   return rawText;
 }
 
-export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER" | "UNMAPPED";
+export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER"
+  | "STRUCTURE_REPAIR" | "UNMAPPED";
 
 /** Which job a debate call was, from its call-site key (apps/runner/src/index.ts and packages/story naming). */
 export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
+  // LG-A (L32): the structure-repair call, on the repair model, for any step.
+  if (callSiteKey.startsWith("REPAIR:STRUCTURE:")) return "STRUCTURE_REPAIR";
   if (callSiteKey.startsWith("MAP:")) return "MAP";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
@@ -172,9 +188,14 @@ export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
   return (PRACTICE_MAP_STEPS as readonly string[]).includes(step) ? step as PracticeMapStep : null;
 }
 
+/** LG-A (INTERFACE §1.3): a call's step, in the thinking table's words; finer than the family (positions, pros/cons and cross-replies apart). */
+export type PracticeStep = LengthCallStep | "UNMAPPED";
+export function practiceStepOf(callSiteKey: string): PracticeStep {
+  return lengthCallStepOf(callSiteKey) ?? "UNMAPPED";
+}
+
 /** One way a map step's reply is read: its schema and the code salvage its step makes (ruling MAP-SALVAGE). */
 type PracticeMapReading = Readonly<{ schema: Parameters<typeof mapClassifyReply>[2]; salvage: (keyPointIds: ReadonlySet<string> | null) => MapReplySalvage<unknown> }>;
-const noSalvage = (): MapReplySalvage<unknown> => ({});
 
 /**
  * The readings a map step's reply may have. The list key carries both the list and (in a snowball opening) the
@@ -186,7 +207,7 @@ const noSalvage = (): MapReplySalvage<unknown> => ({});
 const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMapReading[]>> = Object.freeze({
   angles: [{ schema: mapAnglesReplySchema, salvage: () => mapAnglesSalvage }],
   list: [{ schema: mapListReplySchema, salvage: () => mapListSalvage }, { schema: mapSnowballReplySchema, salvage: () => mapListSalvage }],
-  merge: [{ schema: mapMergeReplySchema, salvage: noSalvage }],
+  merge: [{ schema: mapMergeReplySchema, salvage: () => mapMergeSalvage }],
   gap: [{ schema: mapGapReplySchema, salvage: () => mapGapSalvage }],
   choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
 });
@@ -230,28 +251,35 @@ export function practiceMapKeyPointIdsOf(messages: PromptPacket["messages"]): Re
 /**
  * Information only (all-steps format robustness, 2026-10-12): which tolerant repair an ACCEPTED reply needed, read by
  * the shared decode (`decodeModelJson`) with how the reply ended (`finish_reason` as the gateway recorded it). Null for
- * strict JSON. The judge's own reading takes the FIRST of several objects where this takes the last, so for such a reply
- * the code may differ; the counts are shown in the report, never a reason for a verdict.
+ * strict JSON; several repairs are named together, joined by "+" (LG-A). The judge's own reading takes the FIRST of
+ * several objects where this takes the last, so for such a reply the code may differ; the counts are shown in the
+ * report, never a reason for a verdict.
  */
 export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string,
   mapKeyPointIds?: ReadonlySet<string> | null): string | null {
   const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
+  // LG-A (L32): a structure-repair try (`REPAIR:STRUCTURE:<key>`) is read as the step it repairs.
+  const key = callSiteKey === undefined ? undefined : structureRepairOriginalKey(callSiteKey);
   // Ruling MAP-SALVAGE (2026-10-14): a map reply is read by its step's own reading, salvage included, and every repair
   // it needed is named, joined by "+" ("INNER_QUOTE+MAP_TEXT_TRIMMED"). A reply that reading refuses (a patch reply holds
   // only the patched members) is read by the shared decode, as before.
-  const map = callSiteKey === undefined ? null : readMapReply(callSiteKey, content, ending, mapKeyPointIds ?? null);
+  const map = key === undefined ? null : readMapReply(key, content, ending, mapKeyPointIds ?? null);
   if (map !== null && map.classification.parseStatus === "PARSED") return map.repairs.length === 0 ? null : map.repairs.join("+");
   // MiMo salvage (2026-10-12): the judge-family steps also make SHAPE repairs (NESTED_FIELDS, RENAMED_MEMBER,
   // UNASKED_KEYS, EMPTY_LIST) that the schema-blind decode cannot see, so with its call-site key a judge, panel or
   // review reply is read by the step's own reader and counted under the repair that reader needed.
   // An ACCEPTED review with no `edge_bearings` was accepted only by EMPTY_LIST, which needs a node with no edges: 0.
-  const structured = callSiteKey === undefined ? null : structuredReadingOf(callSiteKey, content, ending, { whenMissing: 0 });
-  if (structured !== null) return structured.kind === "PARSED" ? structuredParseRepair(structured.strategy) : null;
+  // LG-A (L34): every repair that reader made, joined by "+" like the map's: the syntax pass and the reply fixer
+  // (SYNTAX_REPAIRED, STRUCTURE_FIXED) name their repairs only in that list.
+  const structured = key === undefined ? null : structuredReadingOf(key, content, ending, { whenMissing: 0 });
+  if (structured !== null) return structured.kind === "PARSED" ? parsedStructuredRepairs(structured).join("+") || null : null;
   // R15 practice debate (2026-10-13): the two story sites also read a reply that ends with its one object after prose
   // (TRAILING_OBJECT), and only when that object passed their full checks; this reply WAS accepted, so the object the
-  // decode finds there is the one the site took, and the repair is named.
-  const decoded = decodeModelJson(content, ending, callSiteKey?.startsWith("STORY:") === true ? { trailingObjectAccepted: () => true } : undefined);
-  return decoded.ok ? decoded.repair : null;
+  // decode finds there is the one the site took, and the repair is named. LG-A: every repair the decode made, joined by "+".
+  const decoded = decodeModelJson(content, ending, key?.startsWith("STORY:") === true ? { trailingObjectAccepted: () => true } : undefined);
+  if (!decoded.ok) return null;
+  const repairs = decodedRepairsOf(decoded);
+  return repairs.length === 0 ? null : repairs.join("+");
 }
 
 /** What a review's format check knows about its edge count (`reviewEdgeCountOf`). */
@@ -345,7 +373,8 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
 
 /**
  * Re-runs the job's own format check on a stored reply. The story's storyteller check needs the run's material
- * index (which refs exist), which is not stored: the reply is checked against the story's schema only. The review
+ * index (which refs exist), which is not stored: the reply is checked against the story's schema only (after the reply
+ * fixer, as the live reader reads it). A structure-repair try is checked as the step it repairs. The review
  * check's length rule needs the number of edges: `reviewEdgeCount` (read from the call's own prompt,
  * `practiceReviewEdgeCountOf`) when the caller has it, else the reply's own `edge_bearings` length, so only a length
  * mismatch is not re-detected (the stored detail still names it); a reply with no list and no known count is not read
@@ -353,11 +382,13 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
  */
 export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
-  switch (family) {
+  // LG-A (L32): a structure-repair try is checked as the step it repairs; its own family stays STRUCTURE_REPAIR.
+  const key = structureRepairOriginalKey(callSiteKey);
+  switch (callFamilyOf(key)) {
     case "JUDGE":
     case "PANEL":
     case "REVIEW": {
-      const read = structuredReadingOf(callSiteKey, content, undefined, { known: reviewEdgeCount ?? null, whenMissing: null });
+      const read = structuredReadingOf(key, content, undefined, { known: reviewEdgeCount ?? null, whenMissing: null });
       return { family, issues: read === null ? Object.freeze(["UNMAPPED"]) : fromStructured(read) };
     }
     case "SYNTHESIZER": return { family, issues: fromClassification(classifySynthesisRoleContent("SYNTHESIZER", content)) };
@@ -368,9 +399,15 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       try { parsed = JSON.parse(content); } catch (error) {
         return { family, issues: Object.freeze([`invalid_json@$:${error instanceof Error ? error.message.slice(0, 120) : "parse"}`]) };
       }
-      return { family, issues: fromZod(StoryBodySchema.safeParse(parsed)) };
+      // LG-A (L31): as the live storyteller reads it (packages/story `readStoryBody`, Task 7): the schema; when it refuses,
+      // the reply fixer with the story's own options, then the schema again. A refusal lists the schema's own first reading.
+      const read = StoryBodySchema.safeParse(parsed);
+      if (read.success) return { family, issues: Object.freeze([]) };
+      const fixed = fixReplyStructure(parsed, StoryBodySchema, STORY_FIXER_OPTIONS);
+      if (fixed !== null && StoryBodySchema.safeParse(fixed.value).success) return { family, issues: Object.freeze([]) };
+      return { family, issues: fromZod(read) };
     }
-    case "MAP": return { family, issues: recheckMapReply(callSiteKey, content) };
+    case "MAP": return { family, issues: recheckMapReply(key, content) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }

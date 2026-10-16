@@ -85,6 +85,15 @@ describe("the story's allowance, on the database", () => {
     expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(1);
   });
 
+  it("counts a story's structure-repair call as the story's, and any other repair call as the run's (LG-A, L32)", async () => {
+    const runId = await createLegacyStoryRun(database.pool, `story budget repair count ${randomUUID()}`, `asker:${randomUUID()}`);
+    await appendModelCall(runId, "JUDGE");
+    await appendModelCall(runId, "REPAIR:STRUCTURE:JUDGE");
+    await appendModelCall(runId, "REPAIR:STRUCTURE:STORY:STORYTELLER:1");
+    await appendModelCall(runId, "REPAIR:STRUCTURE:STORY:CHECKER:1");
+    expect(await new BudgetRepository(database.pool).countRunModelAttempts(runId)).toBe(2);
+  });
+
   it("sums a run's debate spend and its story spend apart; the day sees both", async () => {
     const runId = await createLegacyStoryRun(database.pool, `story budget spend ${randomUUID()}`, `asker:${randomUUID()}`);
     const store = new PostgresModelSpendStore(database.pool);

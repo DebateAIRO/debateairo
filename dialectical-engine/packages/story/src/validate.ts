@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import { decodeModelJson, type ContentClassification, type ModelJsonDecoded, type ModelReplyFacts } from "@debateai/providers";
-import { STORY_CHECKER_LIMITS } from "./contracts.js";
+import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs, type ContentClassification,
+  type ModelJsonRepair, type ModelReplyFacts, type ReplyFixerOptions } from "@debateai/providers";
+import { STORY_CHECKER_RUNAWAY_LIMITS } from "./contracts.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -115,12 +116,11 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
 }
 
 /**
- * The objection's limit is the current answer form's (checker v3, 2026-10-13: 4000 characters, raised from 2000 because
- * the checker lists every problem in one objection). Raising it accepts every verdict the older limit accepted.
+ * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
  */
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(STORY_CHECKER_LIMITS.maxObjectionChars).nullable(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
   criteria: z.object({
     faithful_to_material: z.boolean(),
     agrees_with_label: z.boolean(),
@@ -279,13 +279,8 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
  * checks too): otherwise the reply stays the PARSE_FAILED it was, so the repair never turns a refused reply into a
  * differently refused one. It comes after every other repair, so no reply those read is read differently.
  *
- * A PARSED classification carries the repair code only when one was needed.
+ * A PARSED classification names every repair the decode and the fixer made (`parsedWithRepairs`).
  */
-function parsedWith(decoded: Extract<ModelJsonDecoded, { ok: true }>): ContentClassification {
-  return decoded.repair === null
-    ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "PARSED", parseError: null, jsonRepair: decoded.repair };
-}
 
 type StoryDecision =
   | { readonly classification: ContentClassification; readonly body: StoryBody }
@@ -305,20 +300,48 @@ export const STORY_CHECKER_PROSE = Object.freeze(["objection"] as const);
 /** A step's language check (`replyLanguageCheck`): the issues of an accepted object, empty when it is fine. */
 export type StoryLanguageCheck = (value: unknown) => readonly unknown[];
 
+/**
+ * LG-A Task 7 review (L31): every text name of the story and its check holds words a reader meets, so a stray text under
+ * such a name is kept (the reply goes on to the structure-repair call), never dropped. Unknown names are still dropped.
+ */
+export const STORY_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
+
+type StoryRead<T> = Readonly<{ ok: true; value: T; repairs: readonly ModelJsonRepair[] }> | Readonly<{ ok: false; message: string }>;
+
+/**
+ * LG-A (spec 2026-10-15, L15, L31): one reading for both paths (the main one and the trailing-object check): the schema;
+ * when it refuses, the reply fixer, then the schema again. The words of every text stay the storyteller's own.
+ */
+function readStoryBody(value: unknown): StoryRead<StoryBody> {
+  const parsed = StoryBodySchema.safeParse(value);
+  if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
+  const fixed = fixReplyStructure(value, StoryBodySchema, STORY_FIXER_OPTIONS);
+  const refixed = fixed === null ? null : StoryBodySchema.safeParse(fixed.value);
+  return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
+}
+
+function readCheckerVerdict(value: unknown): StoryRead<StoryCheckerVerdict> {
+  const parsed = StoryCheckerVerdictSchema.safeParse(value);
+  if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
+  const fixed = fixReplyStructure(value, StoryCheckerVerdictSchema, STORY_FIXER_OPTIONS);
+  const refixed = fixed === null ? null : StoryCheckerVerdictSchema.safeParse(fixed.value);
+  return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
+}
+
 function decideStory(content: string, index: StoryMaterialIndex, reply: ModelReplyFacts | undefined,
   inQuestionLanguage: StoryLanguageCheck | undefined): StoryDecision {
   assertStoryMaterialIndex(index);
   const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => {
-    const candidate = StoryBodySchema.safeParse(value);
-    return candidate.success && storyContentIssues(candidate.data, index).length === 0;
+    const candidate = readStoryBody(value);
+    return candidate.ok && storyContentIssues(candidate.value, index).length === 0;
   } });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, body: null };
-  const parsed = StoryBodySchema.safeParse(decoded.value);
-  if (!parsed.success) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, body: null };
-  const contentIssues = storyContentIssues(parsed.data, index);
-  const issues = contentIssues.length === 0 ? inQuestionLanguage?.(parsed.data) ?? [] : contentIssues;
+  const read = readStoryBody(decoded.value);
+  if (!read.ok) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: read.message }, body: null };
+  const contentIssues = storyContentIssues(read.value, index);
+  const issues = contentIssues.length === 0 ? inQuestionLanguage?.(read.value) ?? [] : contentIssues;
   return issues.length === 0
-    ? { classification: parsedWith(decoded), body: parsed.data }
+    ? { classification: parsedWithRepairs([...decodedRepairsOf(decoded), ...read.repairs]), body: read.value }
     : { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, body: null };
 }
 
@@ -348,13 +371,13 @@ export function parseStoryBody(content: string, index: StoryMaterialIndex, reply
 
 function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined):
   { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
-  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => StoryCheckerVerdictSchema.safeParse(value).success });
+  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => readCheckerVerdict(value).ok });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, verdict: null };
-  const parsed = StoryCheckerVerdictSchema.safeParse(decoded.value);
-  if (!parsed.success) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message }, verdict: null };
-  const issues = inQuestionLanguage?.(parsed.data) ?? [];
+  const read = readCheckerVerdict(decoded.value);
+  if (!read.ok) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: read.message }, verdict: null };
+  const issues = inQuestionLanguage?.(read.value) ?? [];
   return issues.length === 0
-    ? { classification: parsedWith(decoded), verdict: parsed.data }
+    ? { classification: parsedWithRepairs([...decodedRepairsOf(decoded), ...read.repairs]), verdict: read.value }
     : { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, verdict: null };
 }
 

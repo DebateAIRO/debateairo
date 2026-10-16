@@ -4,6 +4,7 @@ import { request as httpRequest } from "node:http";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
+import type { StructureRepairRoute } from "./structure-repair.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
@@ -550,6 +551,42 @@ export function withPreviewProviderCallPolicy(
       return result;
     });
   } });
+}
+/** LG-A (spec 2026-10-15, L32; controller rulings 1 and 2): the preview's structure-repair model, at its `slip_fix` level. */
+export const PREVIEW_STRUCTURE_REPAIR_MODEL = "claude-haiku-5-5" as const;
+
+/**
+ * LG-A: the preview's structure-repair route, from the configured targets: the target whose model is
+ * PREVIEW_STRUCTURE_REPAIR_MODEL, through ITS OWN gateway (`gatewayOf`: already wrapped by withPreviewProviderCallPolicy,
+ * so its gate, the busy coordinator and the owner's thinking table apply; a repair key's step is `slip_fix`), at the row's
+ * whole answer cap and the preview deadline. Null when no such target is configured: every call keeps today's follow-ups.
+ *
+ * The bound is the one Haiku's preview-wrapped gateway applies anyway: `previewCallBound` sets every preview call's
+ * deadline to PREVIEW_GLM_DEADLINE_MS and raises its token ceiling to at least PREVIEW_GLM_GENERATION_TOKEN_FLOOR (below
+ * the row's), and the row's `outputBound` is what `previewTargetGatewayControls` caps `max_tokens` at. So the route
+ * states exactly what the repair call is held to on the wire (32,768 tokens, 1,260,000 ms), never another promise.
+ */
+export function previewStructureRepairRoute(targets: readonly Readonly<{ providerRef: string; model: string }>[],
+  gatewayOf: (providerRef: string) => ProviderGateway | undefined): StructureRepairRoute | null {
+  const target = targets.find((candidate) => candidate.model === PREVIEW_STRUCTURE_REPAIR_MODEL);
+  if (target === undefined) return null;
+  const gateway = gatewayOf(target.providerRef);
+  const row = previewModelRow(PREVIEW_STRUCTURE_REPAIR_MODEL);
+  if (gateway === undefined || row === undefined) throw new TypeError("STRUCTURE_REPAIR_ROUTE_INVALID");
+  return Object.freeze({ providerRef: target.providerRef, gateway,
+    bound: Object.freeze({ tokenCeiling: row.outputBound, deadlineMs: PREVIEW_GLM_DEADLINE_MS }) });
+}
+/**
+ * LG-A (Task 14 carry) — THE MOST THE MONEY SEAM CAN PROJECT FOR ONE STRUCTURE-REPAIR CALL on `route`: a body of
+ * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds, and the
+ * preview's guarded fetch refuses a larger body, so no larger one is ever answered) and the route's token ceiling, on the
+ * repair target. Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
+ * `rootZeroKeepRoomMicros`). Null for no route.
+ */
+export function previewStructureRepairCeiling(route: StructureRepairRoute | null):
+  Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }> | null {
+  return route === null ? null : Object.freeze({ providerRef: route.providerRef, requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
+    completionTokenCeiling: route.bound.tokenCeiling });
 }
 export interface PreviewBudgetExecution {
   readonly operationId: string;

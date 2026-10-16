@@ -898,6 +898,7 @@ packages/db/src/migration-forward0116.ts
 packages/db/src/migration-forward0117.ts
 packages/db/src/migration-forward0118.ts
 packages/db/src/migration-forward0119.ts
+packages/db/src/migration-forward0120.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -945,6 +946,7 @@ packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
+packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/provider-funding.ts
@@ -1011,6 +1013,7 @@ packages/payments-netopia/src/status.ts
 packages/payments-netopia/src/time.ts
 packages/propagation/src/index.ts
 packages/providers/src/anthropic-messages.ts
+packages/providers/src/content-follow-up.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
 packages/providers/src/model-json.ts
@@ -1023,6 +1026,8 @@ packages/providers/src/preview-thinking.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts
+packages/providers/src/reply-fixer.ts
+packages/providers/src/structure-repair.ts
 packages/providers/src/unbilled-refusal.ts
 packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts

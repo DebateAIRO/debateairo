@@ -2,12 +2,16 @@ import { z } from "zod";
 import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
 import {
+  fixReplyStructure,
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
+  modelJsonSyntaxRepair,
+  parsedWithRepairs,
   type ContentClassification,
   type ModelJsonRepair,
-  type ModelReplyFacts
+  type ModelReplyFacts,
+  type ReplyFixerOptions
 } from "@debateai/providers";
 
 export { CLAIM_TYPES };
@@ -133,12 +137,14 @@ export type JudgeAssessment = z.infer<typeof judgeAssessmentSchema>;
  * repairs a step may ask for (`StructuredReadingOptions`).
  */
 export type StructuredParseStrategy = "RAW" | "ONE_FENCE" | "BRACE_BALANCED" | "INNER_QUOTE" | "STRAY_QUOTE" | "CLOSING_BRACKETS"
-  | "NESTED_FIELDS" | "RENAMED_MEMBER" | "UNASKED_KEYS" | "EMPTY_LIST";
+  | "NESTED_FIELDS" | "RENAMED_MEMBER" | "UNASKED_KEYS" | "EMPTY_LIST"
+  // LG-A: the syntax pass (decode) and the schema-guided fixer (Task 5); their repairs travel in `repairs`.
+  | "SYNTAX_REPAIRED" | "STRUCTURE_FIXED";
 
 const STRUCTURED_PARSE_REPAIRS: Readonly<Record<StructuredParseStrategy, ModelJsonRepair | null>> = Object.freeze({
   RAW: null, ONE_FENCE: "CODE_FENCE", BRACE_BALANCED: "OUTERMOST_OBJECT", INNER_QUOTE: "INNER_QUOTE", STRAY_QUOTE: "STRAY_QUOTE",
   CLOSING_BRACKETS: "CLOSING_BRACKETS", NESTED_FIELDS: "NESTED_FIELDS", RENAMED_MEMBER: "RENAMED_MEMBER", UNASKED_KEYS: "UNASKED_KEYS",
-  EMPTY_LIST: "EMPTY_LIST"
+  EMPTY_LIST: "EMPTY_LIST", SYNTAX_REPAIRED: null, STRUCTURE_FIXED: null
 });
 
 /** The repair code a strategy is counted under (`ContentClassification.jsonRepair`); RAW needed none. */
@@ -147,9 +153,21 @@ export function structuredParseRepair(strategy: StructuredParseStrategy): ModelJ
 }
 
 export type ParseStructuredArtifactResult<T> =
-  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly value: T }
+  | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly value: T;
+      /**
+       * LG-A: every repair, present only on the new paths (SYNTAX_REPAIRED, STRUCTURE_FIXED, and a shape repair made after
+       * SYNTAX_REPAIRED, pre-flight PF-A8); read with parsedStructuredRepairs.
+       */
+      readonly repairs?: readonly ModelJsonRepair[] }
   | { readonly kind: "PARSE_FAILURE"; readonly message: string }
   | { readonly kind: "SCHEMA_FAILURE"; readonly message: string };
+
+/** LG-A: every repair a PARSED reading made, in order (none for RAW). */
+export function parsedStructuredRepairs(result: Extract<ParseStructuredArtifactResult<unknown>, { kind: "PARSED" }>): readonly ModelJsonRepair[] {
+  if (result.repairs !== undefined) return result.repairs;
+  const repair = STRUCTURED_PARSE_REPAIRS[result.strategy];
+  return repair === null ? Object.freeze([]) : Object.freeze([repair]);
+}
 
 export type ParseJudgeAssessmentResult =
   | { readonly kind: "PARSED"; readonly strategy: StructuredParseStrategy; readonly assessment: JudgeAssessment }
@@ -183,7 +201,9 @@ function schemaFailureMessage(error: z.ZodError): string {
 /**
  * How a step asks its reply to be read: which SHAPE repairs it allows. Each is tried only after a decoded object failed
  * the step's schema, each alone on the decoded object (one repair at most, in this order), and each is accepted only
- * when the repaired object passes the full schema; otherwise the original refusal stands.
+ * when the repaired object passes the full schema. LG-A: when none applies, a step with `fixer` then tries the
+ * schema-guided fixer (`fixReplyStructure`), which may make several repairs at once (STRUCTURE_FIXED); otherwise the
+ * original refusal stands.
  *  - `nestedFields`: NESTED_FIELDS (`nestedFieldsPlan`), the judge's author legs and panel;
  *  - `renamedMembers`: RENAMED_MEMBER (`renameMisnamedMember`), the judge's author legs and panel;
  *  - `unaskedKeys`: UNASKED_KEYS (`dropUnaskedKeys`), the judge's author legs, panel and review;
@@ -197,6 +217,11 @@ export interface StructuredReadingOptions {
   readonly renamedMembers?: boolean;
   readonly unaskedKeys?: boolean;
   readonly emptyLists?: boolean;
+  /**
+   * LG-A (spec 2026-10-15, L31; INTERFACE §2.3): the schema-guided fixer (`fixReplyStructure`), tried after the shape
+   * repairs above; its repairs ride in the result's `repairs` (strategy STRUCTURE_FIXED), after the decode's.
+   */
+  readonly fixer?: ReplyFixerOptions;
 }
 
 /**
@@ -307,8 +332,11 @@ function renameMisnamedMember(decoded: unknown, shape: RootShape): Record<string
  * `"way_of_kooking"` the schema never asked for. UNASKED_KEYS: the root keys the schema does not name are dropped
  * (their names are the model's own text, so they are not copied into any message: DL4-F1); the caller accepts the
  * result only if every asked member is then present and valid. Root keys only. A root key named like a field asked for
- * INSIDE a member (a root `"fidelity"` beside `steelman.fidelity`) is never dropped: it may be a second, different value
- * for something that is scored, and which one the model meant is not known. Null when there is no droppable key.
+ * INSIDE a member (a root `"fidelity"` beside `steelman.fidelity`) is never dropped here: it may be a second, different
+ * value for something that is scored, and which one the model meant is not known. Null when there is no droppable key.
+ * LG-A: the fixer behind this repair (`StructuredReadingOptions.fixer`) drops such a key only when its value is a plain
+ * text under a name the schema declares as a text (never as a number, true/false or an enum), or an empty object, an
+ * empty list or null; a root `"fidelity"`, as a number or as text, stays refused.
  */
 function dropUnaskedKeys(decoded: unknown, shape: RootShape): Record<string, unknown> | null {
   const source = plainObject(decoded);
@@ -348,24 +376,50 @@ function fillPinnedEmptyLists(decoded: unknown, shape: RootShape): Record<string
 
 type ShapeRepair = readonly [allowed: boolean | undefined, repair: StructuredParseStrategy, build: () => Record<string, unknown> | null];
 
-function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions): ParseStructuredArtifactResult<T> {
+function schemaResult<T>(decoded: unknown, strategy: StructuredParseStrategy, schema: z.ZodType<T>, options?: StructuredReadingOptions,
+  decodeRepairs: readonly ModelJsonRepair[] = []): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
-  if (parsed.success) return Object.freeze({ kind: "PARSED", strategy, value: parsed.data });
+  if (parsed.success) {
+    return Object.freeze(strategy === "SYNTAX_REPAIRED"
+      ? { kind: "PARSED", strategy, value: parsed.data, repairs: Object.freeze([...decodeRepairs]) }
+      : { kind: "PARSED", strategy, value: parsed.data });
+  }
   const refused: ParseStructuredArtifactResult<T> = Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
+  if (options === undefined) return refused;
   const shape = rootShapeOf(schema);
-  if (options === undefined || shape === null) return refused;
-  const repairs: readonly ShapeRepair[] = [
-    [options.nestedFields, "NESTED_FIELDS", () => nestFlattenedMembers(decoded, nestedFieldsPlan(schema))],
-    [options.renamedMembers, "RENAMED_MEMBER", () => renameMisnamedMember(decoded, shape)],
-    [options.unaskedKeys, "UNASKED_KEYS", () => dropUnaskedKeys(decoded, shape)],
-    [options.emptyLists, "EMPTY_LIST", () => fillPinnedEmptyLists(decoded, shape)]
-  ];
-  for (const [allowed, repair, build] of repairs) {
-    if (allowed !== true) continue;
-    const candidate = build();
-    if (candidate === null) continue;
-    const repaired = schema.safeParse(candidate);
-    if (repaired.success) return Object.freeze({ kind: "PARSED", strategy: repair, value: repaired.data });
+  if (shape !== null) {
+    const repairs: readonly ShapeRepair[] = [
+      [options.nestedFields, "NESTED_FIELDS", () => nestFlattenedMembers(decoded, nestedFieldsPlan(schema))],
+      [options.renamedMembers, "RENAMED_MEMBER", () => renameMisnamedMember(decoded, shape)],
+      [options.unaskedKeys, "UNASKED_KEYS", () => dropUnaskedKeys(decoded, shape)],
+      [options.emptyLists, "EMPTY_LIST", () => fillPinnedEmptyLists(decoded, shape)]
+    ];
+    for (const [allowed, repair, build] of repairs) {
+      if (allowed !== true) continue;
+      const candidate = build();
+      if (candidate === null) continue;
+      const repaired = schema.safeParse(candidate);
+      if (!repaired.success) continue;
+      // Pre-flight PF-A8 (as Task 3, L34): after the syntax pass, the decode's repairs first, then the shape repair, so
+      // TRAILING_COMMA + UNASKED_KEYS is logged as both.
+      return Object.freeze(strategy === "SYNTAX_REPAIRED"
+        ? { kind: "PARSED", strategy: repair, value: repaired.data,
+            repairs: Object.freeze([...decodeRepairs, STRUCTURED_PARSE_REPAIRS[repair]!]) }
+        : { kind: "PARSED", strategy: repair, value: repaired.data });
+    }
+  }
+  // LG-A: the fixer, last; the decode's own repairs first in the list.
+  if (options.fixer !== undefined) {
+    const fixed = fixReplyStructure(decoded, schema, options.fixer);
+    if (fixed !== null) {
+      const repaired = schema.safeParse(fixed.value);
+      if (repaired.success) {
+        const decodeRepair = STRUCTURED_PARSE_REPAIRS[strategy];
+        const before = strategy === "SYNTAX_REPAIRED" ? decodeRepairs : decodeRepair === null ? [] : [decodeRepair];
+        return Object.freeze({ kind: "PARSED", strategy: "STRUCTURE_FIXED", value: repaired.data,
+          repairs: Object.freeze([...before, ...fixed.repairs]) });
+      }
+    }
   }
   return refused;
 }
@@ -406,6 +460,9 @@ export function parseStructuredArtifact<T>(
   }
   const late = modelJsonLateRepair(content, reply);
   if (late !== null) return schemaResult(late.value, late.repair, schema, options);
+  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair).
+  const syntax = modelJsonSyntaxRepair(content, reply);
+  if (syntax !== null) return schemaResult(syntax.value, "SYNTAX_REPAIRED", schema, options, syntax.repairs);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });
 }
 
@@ -424,8 +481,7 @@ export function classifyStructuredArtifact<T>(
   if (outcome.kind === "PARSED") {
     const issues = check?.(outcome.value) ?? [];
     if (issues.length > 0) return { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
-    const repair = structuredParseRepair(outcome.strategy);
-    return repair === null ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSED", parseError: null, jsonRepair: repair };
+    return parsedWithRepairs(parsedStructuredRepairs(outcome));
   }
   return { parseStatus: outcome.kind === "PARSE_FAILURE" ? "PARSE_FAILED" : "SCHEMA_FAILED", parseError: outcome.message };
 }

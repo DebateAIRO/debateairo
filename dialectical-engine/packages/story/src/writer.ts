@@ -444,11 +444,15 @@ export class StoryWriter {
     }
   }
 
-  /** Story format robustness (2026-10-12): an accepted reply that needed a repair, by code and ids only. */
-  #logRepair(site: StoryCallSite, round: number, repair: ModelJsonRepair | null, input: StoryWriteInput): void {
-    if (repair === null) return;
+  /**
+   * Story format robustness (2026-10-12): an accepted reply that needed a repair, by code and ids only. LG-A: `repair` is
+   * the first; `repairs` rides along only when there were two or more.
+   */
+  #logRepair(site: StoryCallSite, round: number, repairs: readonly ModelJsonRepair[], input: StoryWriteInput): void {
+    if (repairs.length === 0) return;
     this.#log("STORY_REPLY_REPAIRED", () => ({
-      answerId: input.answerId, answerVersion: input.answerVersion, round, site, repair
+      answerId: input.answerId, answerVersion: input.answerVersion, round, site, repair: repairs[0]!,
+      ...(repairs.length > 1 ? { repairs: [...repairs] } : {})
     }));
   }
 
@@ -605,7 +609,7 @@ export class StoryWriter {
         // material the storyteller read. Real ids are restored only for storage.
         const accepted = reading.acceptedAs(result.content);
         const body: StoryBody = parseStoryBody(result.content, built.index, accepted.reply);
-        this.#logRepair("STORYTELLER", round, accepted.repair, input);
+        this.#logRepair("STORYTELLER", round, accepted.repairs, input);
         if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
         return {
           artifactRef: result.rawArtifactRef,
@@ -634,7 +638,7 @@ export class StoryWriter {
         const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
         const accepted = reading.acceptedAs(result.content);
         const verdict = parseCheckerVerdict(result.content, accepted.reply);
-        this.#logRepair("CHECKER", round, accepted.repair, input);
+        this.#logRepair("CHECKER", round, accepted.repairs, input);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,

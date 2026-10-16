@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, lengthCallStepOf, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt, buildFramedPatchPrompt } from "./prompt-frame.js";
 import { PATCH_KEY_NOT_REQUESTED, mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
@@ -20,7 +20,9 @@ import {
 } from "./anthropic-messages.js";
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
-import type { ModelJsonRepair, ModelReplyFacts } from "./model-json.js";
+import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
+import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
+import { contentFollowUpSentence } from "./content-follow-up.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -56,10 +58,15 @@ export interface PromptPacket {
  * `jsonRepair` (story format robustness, 2026-10-12): the one repair the tolerant decode
  * (`decodeModelJson`) needed before the content passed its checks, so repairs can be counted.
  * Absent for content that was strict JSON, and for every classifier that does not use the decode.
+ *
+ * LG-A (INTERFACE §2.2): `jsonRepairs` is every repair in order, present only when there were two or more (read it
+ * with `contentRepairsOf`). `failureClass` is set by a classifier that knows its refusal's class (`ReplyFailureClass`).
  */
 export type ContentClassification =
-  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair }
-  | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string };
+  | { readonly parseStatus: "PARSED"; readonly parseError: null; readonly jsonRepair?: ModelJsonRepair;
+      readonly jsonRepairs?: readonly ModelJsonRepair[] }
+  | { readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly parseError: string;
+      readonly failureClass?: ReplyFailureClass };
 
 /**
  * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
@@ -127,6 +134,8 @@ export interface RejectedProviderContent {
   readonly rawText: string;
   readonly parseStatus: ProviderContentRejectionStatus;
   readonly parseError: string;
+  /** LG-A (L33): set only on a routed call's rejection, so the step's own repair packet says in plain words what is missing. */
+  readonly failureClass?: ReplyFailureClass;
 }
 
 export interface ProviderCallRequest {
@@ -172,6 +181,14 @@ export interface ProviderCallRequest {
    * Never sent.
    */
   readonly retryOnlyAfterContentRejection?: boolean;
+  /**
+   * LG-A (spec 2026-10-15, L32, L33; INTERFACE §2.4-§2.5): set ONLY by `withStructureRepair` (./structure-repair.ts), never
+   * by a step. A routed call sends at most 2 POSTs. Its first reply's class decides the one follow-up: STRUCTURE ends the
+   * call with ProviderStructureUnrepairedError (the wrapper sends the structure-repair call); CONTENT gets one PATCH, or a
+   * full re-ask when no member can be named; EMPTY a full re-ask; CUT_OFF today's length retry. Every follow-up states in
+   * plain words what is missing (`machine_rejection_reason`). Absent: today's loop, byte for byte. Never sent.
+   */
+  readonly structureRepairRouted?: boolean;
   /**
    * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
    * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
@@ -252,6 +269,31 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
   }
 }
 
+export const PROVIDER_STRUCTURE_UNREPAIRED = "PROVIDER_STRUCTURE_UNREPAIRED" as const;
+
+/**
+ * LG-A (L32): a routed call's FIRST reply could not be read into its form by code (class STRUCTURE). The gateway ends the
+ * call after that attempt's FAILED row and artifact, with no format re-ask; `withStructureRepair` catches it and sends the
+ * one structure-repair call. It never leaves the wrapper: when the repair does not do, the wrapper throws today's
+ * ProviderContentUnacceptedError built from these same facts. `reply` names who wrote the content (the original AI).
+ * The attempt's ledger row stays FAILED whatever the repair call does (Task 10 review): the repair call's own row is
+ * the call's one OK row, so the terminal facts never count a call twice.
+ */
+export class ProviderStructureUnrepairedError extends TypedDomainError {
+  override readonly code = PROVIDER_STRUCTURE_UNREPAIRED;
+
+  constructor(
+    readonly rejected: RejectedProviderContent,
+    readonly attempts: number,
+    readonly lastRawArtifactRef: string,
+    readonly lastLedgerEntryRef: string,
+    readonly reply: Readonly<Pick<ProviderCallResult, "provider" | "model" | "maker" | "modelVersion" | "thinkingLevel" | "reasoningTokens">>
+  ) {
+    super(PROVIDER_STRUCTURE_UNREPAIRED, rejected.parseError);
+    this.name = "ProviderStructureUnrepairedError";
+  }
+}
+
 /**
  * Multi-model preview, PR B: the wire a call went out on. Recorded on the call
  * result and the raw artifact (`raw_artifact.provider` is free text).
@@ -281,9 +323,10 @@ export interface ProviderCallResult {
    * Patch follow-up (owner design, 2026-10-12): the form of the follow-up the accepted reply answered — "PATCH" when
    * it was the short follow-up and `content` is the first reply with the patch merged in, "FULL" when it was the
    * step's full re-ask. Absent when the accepted reply answered the original packet (or a gateway or double builds
-   * its own result).
+   * its own result). STRUCTURE (LG-A) when the structure-repair call put the reply into its form; `content` is that
+   * repaired reply and the identity and refs are the original AI's (ProviderStructureUnrepairedError).
    */
-  readonly repairForm?: "PATCH" | "FULL";
+  readonly repairForm?: "PATCH" | "FULL" | "STRUCTURE";
 }
 
 export interface ProviderGateway {
@@ -1110,6 +1153,9 @@ export function selectProviderAdapter(
   return Object.freeze({ ...selected });
 }
 
+/** LG-A (INTERFACE §4): what one attempt sent — the step's own packet, the short follow-up, the full re-ask, the structure-repair call, or a cut-off reply's resend. */
+export type ReplyForm = "ORIGINAL" | "PATCH" | "FULL" | "STRUCTURE" | "LENGTH_RETRY";
+
 export interface RawArtifactInput {
   readonly artifactId: string;
   readonly attemptId: string;
@@ -1128,6 +1174,18 @@ export interface RawArtifactInput {
   readonly contentHash: string;
   /** Model scorecard §2.3: the vendor-reported thinking tokens of this attempt; null when not reported. */
   readonly thinkingTokens?: number | null;
+  /** LG-A (INTERFACE §4, migration 0120): every repair the accepted reply needed, in order; null when none. Codes only. */
+  readonly replyRepairs?: readonly ModelJsonRepair[] | null;
+  /** LG-A: the class of a refused reply (`replyFailureClassOf`); null for an accepted one. */
+  readonly replyFailureClass?: ReplyFailureClass | null;
+  /** LG-A: what this attempt sent. */
+  readonly replyForm?: ReplyForm | null;
+  /** LG-B writes it (the vendor's cached input count). */
+  readonly cachedInputTokens?: number | null;
+  /** LG-C writes it (the words the AI was guided to). */
+  readonly guidedWords?: number | null;
+  /** LG-B writes it (the words the AI wrote). */
+  readonly actualWords?: number | null;
 }
 
 export interface ProviderLedgerInput {
@@ -1777,8 +1835,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * `maxAttemptsThisCall`, so for them this is the bound, as before.
      */
     let patchWasSecondPost = false;
-    const callAttempts = (): number => Math.min(request.bound.maxAttempts,
-      (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
+    // LG-A (L32, L33): a routed call follows the routed rule (`structureRepairRouted`); every other call, today's loop.
+    const routed = request.structureRepairRouted === true;
+    const callAttempts = (): number => {
+      const sealed = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
+      // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it.
+      return routed ? Math.min(2, sealed) : Math.min(request.bound.maxAttempts,
+        (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
+    };
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
      * through this method, so holding the frame HERE is what makes "no call
@@ -1881,6 +1945,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
       // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
       const attemptThinking = repairForm === undefined ? thinking : repairThinking;
+      // LG-A (L34): what this attempt sends, recorded on its artifact (reply_form); a structure-repair call is STRUCTURE.
+      const attemptReplyForm: ReplyForm = lengthCallStepOf(request.callSiteKey) === "structure_repair" ? "STRUCTURE"
+        : repairForm ?? (lengthFailures > 0 ? "LENGTH_RETRY" : "ORIGINAL");
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
@@ -2115,6 +2182,26 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           contractId: frame.contractId,
           answer: content ?? rawText
         });
+        // LG-A (L34): a refused reply's class and an accepted reply's repairs, decided before the artifact is written: both
+        // are its columns (migration 0120). Codes only. The class reads the text the classifier checked: after a merged
+        // patch, the merged reply (its issue paths are the merged reply's), else the reply (Task 11 review, finding 4).
+        // A measure is information, never a gate: should reading it throw, the attempt is recorded with none (class null,
+        // repairs null), so the billed artifact and its charge below are never lost (Task 11 review, finding 3).
+        const truncatedReply = finishReason === PROVIDER_FINISH_REASON_LENGTH;
+        let attemptFailureClass: ReplyFailureClass | null = null;
+        let attemptRepairs: readonly ModelJsonRepair[] = [];
+        try {
+          attemptFailureClass =
+            classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
+              ? classifiedContent.failureClass ?? replyFailureClassOf({ rawText: acceptedContent ?? content ?? rawText,
+                  parseStatus: truncatedReply ? PROVIDER_CONTENT_LENGTH_EXCEEDED : classifiedContent.parseStatus,
+                  parseError: classifiedContent.parseError }, replyFacts)
+              : truncatedReply && !strict.success ? "CUT_OFF" : null;
+          attemptRepairs = classifiedContent.parseStatus === "PARSED" ? contentRepairsOf(classifiedContent) : [];
+        } catch {
+          attemptFailureClass = null;
+          attemptRepairs = [];
+        }
         rawArtifactRef = await this.#options.persistRawArtifact({
           artifactId: randomUUID(),
           attemptId,
@@ -2150,7 +2237,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           inputHash,
           contractHash: request.contractHash,
           contentHash: digest(rawText),
-          thinkingTokens: reasoningTokens
+          thinkingTokens: reasoningTokens,
+          replyForm: attemptReplyForm,
+          replyRepairs: attemptRepairs.length === 0 ? null : attemptRepairs,
+          replyFailureClass: attemptFailureClass
         });
         /**
          * V-28 / I4 — THE CHARGE, at the one point every attempt with a body
@@ -2341,6 +2431,31 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // Role rotation, Task 12: the original packet goes out again, so a repair adopted before
             // it no longer describes the reply that is finally accepted. Count afresh from here.
             repairAttempts = 0;
+          } else if (routed && attemptFailureClass === "STRUCTURE") {
+            // LG-A (L32): a format problem never costs a new answer from this AI. On the call's first POST, with a second
+            // allowed, the call ends here for the structure-repair call (withStructureRepair); otherwise it ends as a
+            // content refusal (L33: 2 POSTs in all, never a format re-ask). Pre-flight PF-A42 (ruling R7): the check stays
+            // at 2, never 1 — a call with one POST left ends as a content refusal, a known limit kept on purpose.
+            if (attempt === 1 && callAttempts() >= 2) {
+              // L4-F10 (Task 11 review, finding 1): the structure-repair result takes its identity from this reply
+              // (deviation 7), so the pinned-model check the accept path runs below is run here first, with the same
+              // comparison and the same refusal: a relabelled reply never reaches the repair call (its FAILED row is
+              // already written; the refusal short-circuits).
+              if (!candidate.success || candidate.data.model !== this.#options.model) {
+                throw new TypedDomainError(
+                  "PROVIDER_MODEL_IDENTITY_CHANGED",
+                  `${request.providerRef} is pinned to ${this.#options.model} and the response asserted a different model`
+                );
+              }
+              throw new ProviderStructureUnrepairedError(
+                { rawText: content ?? rawText, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError,
+                  failureClass: "STRUCTURE" },
+                attempt, rawArtifactRef, ledgerEntryRef,
+                Object.freeze({ provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
+                  model: candidate.data.model, maker: this.#options.maker, modelVersion: candidate.data.model,
+                  thinkingLevel: thinkingLevelUsed, reasoningTokens }));
+            }
+            break;
           } else if (request.buildRepairPacket !== undefined) {
             const answeredPatch = patchPlan !== null;
             patchPlan = null;
@@ -2351,9 +2466,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
              * reply that cannot be patched, and a patch that did not do, get the step's full re-ask (step 3), which
              * describes the first reply's refusal.
              */
-            const plan = !patchTried && attemptPacket === request.packet && content !== null && attempt < callAttempts()
+            const planned = !patchTried && attemptPacket === request.packet && content !== null && attempt < callAttempts()
               ? planPatchFollowUp({ content, reply: replyFacts, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError })
               : null;
+            // LG-A (L33): a routed call's short follow-up says in plain words what is missing.
+            const plan = planned !== null && routed
+              ? Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
+                  reason: contentFollowUpSentence(planned.locator.code, attemptFailureClass ?? undefined) }) })
+              : planned;
             const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
@@ -2376,7 +2496,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
                 // landed before one existed. Either way it is what arrived.
                 rawText: content ?? rawText,
                 parseStatus: contentRejection.parseStatus,
-                parseError: contentRejection.parseError
+                parseError: contentRejection.parseError,
+                // LG-A (L33): the step's own builder turns the class into the plain-word reason (schemaFailureLocator).
+                ...(routed && attemptFailureClass !== null ? { failureClass: attemptFailureClass } : {})
               });
               // The repair path is the one that used to carry the model's own
               // rejected output back into the instruction compartment. It goes
@@ -2481,6 +2603,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             || error.code === PROVIDER_THINKING_LEVEL_CHANGED
             || error.code === PROVIDER_THINKING_LEVEL_UNSUPPORTED
             || error.code === PROVIDER_CONTEXT_WINDOW_EXCEEDED
+            // LG-A (L32): the routed call ends for the structure-repair call; its attempt's FAILED row is already written.
+            || error.code === PROVIDER_STRUCTURE_UNREPAIRED
             || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;
@@ -2607,6 +2731,7 @@ export {
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   promptTextHasReservedToken,
+  framedAnswerForm,
   readPromptFrame,
   schemaFailureLimits,
   schemaFailureLocator,
@@ -2651,17 +2776,40 @@ export {
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 // Story format robustness (2026-10-12): the tolerant decode of a model's JSON answer.
 export {
+  contentRepairsOf,
+  decodedRepairsOf,
   decodeModelJson,
+  MAP_REPLY_SALVAGE_REPAIRS,
+  MODEL_JSON_STRUCTURE_REPAIRS,
   modelJsonFenceBody,
   modelJsonLateRepair,
   modelJsonObjectSpans,
+  modelJsonSyntaxRepair,
+  parsedWithRepairs,
   rememberingAcceptedReply,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
+  type ModelJsonDecodeRepair,
+  type ModelJsonStructureRepair,
+  type ModelJsonSyntaxRepair,
   type MapReplySalvageRepair,
   type ModelJsonRepair,
   type ModelReplyFacts
 } from "./model-json.js";
+// LG-A (spec 2026-10-15, L33): the plain-word follow-up sentences.
+export { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence, isContentFollowUpSentence } from "./content-follow-up.js";
+// LG-A (spec 2026-10-15, L31-L34): the reply fixer and the failure classes.
+export {
+  REPLY_FAILURE_CLASSES, fixReplyStructure, replyFailureClassOf,
+  type ReplyFailureClass, type ReplyFixed, type ReplyFixerOptions, type ReplyFixerRepair
+} from "./reply-fixer.js";
+// LG-A (spec 2026-10-15, L32): the structure-repair call.
+export {
+  STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
+  STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PASSED_STOPS, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
+  structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
+  type StructureRepairTextsKept
+} from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";

@@ -6,7 +6,7 @@
  * holds the same menu) are accepted; anything else stops the app at boot. A step the table does not name runs at its AI's
  * usual level, and an AI the table does not name runs at its row's default, which is exactly today's request.
  */
-import { THINKING_LEVEL_DEFAULT_ONLY, debateRoleFromCallSiteKey, exhaustive } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, debateRoleFromCallSiteKey, exhaustive, lengthCallStepOf } from "@debateai/kernel";
 import { previewModelRow, type PreviewEffort, type PreviewModelRow } from "./preview-models.js";
 
 /** Spec 2026-10-12 §4.3: the step names a table may override (slip_fix = a repair POST inside a call). */
@@ -61,6 +61,8 @@ export function parsePreviewThinkingLevels(value: unknown): PreviewThinkingLevel
  * for the two story sites, its lane. Any other call (health checks, the dormant evaluator lane) has no step: null.
  */
 export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; lane?: string }>): PreviewThinkingStep | null {
+  // LG-A (L32): the structure-repair call runs at the repair model's `slip_fix` level (owner's table; absent: its usual level).
+  if (lengthCallStepOf(request.callSiteKey) === "structure_repair") return "slip_fix";
   if (request.lane === "story" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)) return "story_writer";
   if (request.lane === "story" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey)) return "story_checker";
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,

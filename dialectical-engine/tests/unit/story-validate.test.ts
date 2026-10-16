@@ -75,10 +75,10 @@ function refused(result: ContentClassification): { code: string; path: string; l
 /** The refusals below that broke a size limit, and the limit their repair states (practice 2026-10-14). */
 const STATED_SIZE_LIMITS: Readonly<Record<string, Omit<FramedSizeLimit, "path">>> = {
   "a blank confidence sentence": { bound: "at least", size: 1, unit: "characters" },
-  "a confidence sentence over 300 characters": { bound: "at most", size: 300, unit: "characters" },
+  "a confidence sentence over 2000 characters": { bound: "at most", size: 2000, unit: "characters" },
   "a story with no reasons": { bound: "at least", size: 1, unit: "items" },
   "four reasons": { bound: "at most", size: 3, unit: "items" },
-  "a reason over 700 characters": { bound: "at most", size: 700, unit: "characters" }
+  "a reason over 5000 characters": { bound: "at most", size: 5000, unit: "characters" }
 };
 
 describe("verdict story — the story classifier", () => {
@@ -92,18 +92,20 @@ describe("verdict story — the story classifier", () => {
     expect(classifyStoryContent("Here is the story: {", INDEX).parseStatus).toBe("PARSE_FAILED");
   });
 
-  it("refuses a headline over 160 characters with a code and the member's path", () => {
+  it("refuses a headline over 1000 characters with a code and the member's path", () => {
     const body = story();
-    body.short.headline = "h".repeat(161);
+    body.short.headline = "h".repeat(1001);
     // Practice 2026-10-14: a size refusal's repair also states the limit the model must keep.
     expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({
       code: "SCHEMA_FAILED", path: "short.headline",
-      limit: { path: "short.headline", bound: "at most", size: 160, unit: "characters" }
+      limit: { path: "short.headline", bound: "at most", size: 1000, unit: "characters" }
     });
   });
 
-  it("refuses a member the form does not have", () => {
-    expect(classifyStoryContent(JSON.stringify({ ...story(), notes: "extra" }), INDEX).parseStatus).toBe("SCHEMA_FAILED");
+  it("drops a member the form does not have, names the repair, and reads the story unchanged (LG-A, UNASKED_KEYS)", () => {
+    const content = JSON.stringify({ ...story(), notes: "extra" });
+    expect(classifyStoryContent(content, INDEX)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+    expect(parseStoryBody(content, INDEX)).toEqual(story());
   });
 
   it("refuses a citation of a point the debate does not have, by path, without echoing it", () => {
@@ -159,8 +161,8 @@ describe("verdict story — the story classifier", () => {
     ["a blank confidence sentence", (body: StoryBody): void => {
       body.short.confidence = "   ";
     }, "short.confidence"],
-    ["a confidence sentence over 300 characters", (body: StoryBody): void => {
-      body.short.confidence = "s".repeat(301);
+    ["a confidence sentence over 2000 characters", (body: StoryBody): void => {
+      body.short.confidence = "s".repeat(2001);
     }, "short.confidence"],
     ["a story with no reasons", (body: StoryBody): void => {
       body.why.reasons = [];
@@ -168,8 +170,8 @@ describe("verdict story — the story classifier", () => {
     ["four reasons", (body: StoryBody): void => {
       body.why.reasons = [1, 2, 3, 4].map((index) => paragraph(`Reason ${String(index)}.`));
     }, "why.reasons"],
-    ["a reason over 700 characters", (body: StoryBody): void => {
-      body.why.reasons[0]!.text = "r".repeat(701);
+    ["a reason over 5000 characters", (body: StoryBody): void => {
+      body.why.reasons[0]!.text = "r".repeat(5001);
     }, "why.reasons.0.text"],
     ["a story without why", (body: StoryBody): void => {
       delete (body as Partial<StoryBody>).why;
@@ -620,8 +622,8 @@ describe("verdict story — the checker classifier", () => {
     expect(parseCheckerVerdict(JSON.stringify(objected))).toEqual(objected);
   });
 
-  it("refuses an extra member and text that is not JSON", () => {
-    expect(classifyCheckerContent(JSON.stringify({ ...SATISFIED, score: 9 })).parseStatus).toBe("SCHEMA_FAILED");
+  it("drops an extra member (LG-A, UNASKED_KEYS) and refuses text that is not JSON", () => {
+    expect(classifyCheckerContent(JSON.stringify({ ...SATISFIED, score: 9 }))).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
     expect(classifyCheckerContent("Looks fine to me.").parseStatus).toBe("PARSE_FAILED");
     expect(() => parseCheckerVerdict("Looks fine to me."))
       .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));

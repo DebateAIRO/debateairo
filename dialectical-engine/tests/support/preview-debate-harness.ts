@@ -28,6 +28,8 @@ import {
   PREVIEW_GLM_DEADLINE_MS,
   previewModelRow,
   previewProbeControls,
+  previewStructureRepairCeiling,
+  previewStructureRepairRoute,
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
@@ -37,6 +39,7 @@ import {
   PREVIEW_PROVIDER_REF_MODELS,
   PREVIEW_REVIEWED_PROVIDER_REFS,
   withPreviewProviderCallPolicy,
+  withStructureRepair,
   type PreviewProviderTestConfig,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
@@ -69,7 +72,7 @@ import {
 import { DEVELOPMENT_ORGAN_COST_BOUNDS, DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
 import { createCallScheduler, type CallPriority, type CallScheduler, type DebateCallLane } from "../../apps/runner/src/call-scheduler.js";
-import { applyPreviewGateCapacities, previewCallSubjects } from "../../apps/runner/src/call-lane-gateway.js";
+import { applyPreviewGateCapacities, previewCallSubjects, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import {
@@ -181,6 +184,8 @@ export type PreviewRunnerMoney = Readonly<{
   buildCostEnvelopeSeam: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>;
   buildStoryCostEnvelopeSeam?: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildStoryCostEnvelopeSeam"]>;
   providerPrices: ProviderPriceMap;
+  /** LG-A (Task 14 carry): the runner's `structureRepairCeiling`, as main.ts passes it when the route is wired; absent: none. */
+  structureRepairCeiling?: Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }>;
 }>;
 
 export type ComposedPreviewRunner = ReturnType<ReturnType<typeof previewDebateHarness>["previewRunner"]>;
@@ -313,6 +318,12 @@ export function previewDebateHarness(input: Readonly<{
       debateShape?: DebateShapeRunnerSettings;
       /** Plan Task 15 (T12-R0): a hosted runner's money seam and prices; absent, no money bound (local mode). */
       money?: PreviewRunnerMoney;
+      /**
+       * LG-A (final review I-1): wire the structure-repair route exactly as main.ts wires it on the preview — every
+       * target's gateway first, the route named from Haiku's own, through the debate's lane, and every target's gateway
+       * wrapped by withStructureRepair (with the route's ceiling for root 0's room). Absent: no route, today's composition.
+       */
+      structureRepair?: boolean;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -364,7 +375,7 @@ export function previewDebateHarness(input: Readonly<{
     });
     gates.remainingReads.splice(bootReads);
     const busy = createPreviewBusyCoordinator();
-    const topology = createRunnerProviderTopology(TARGETS, (target) => withPreviewProviderCallPolicy(
+    const targetGateway = (target: ProviderDiscoveryTarget) => withPreviewProviderCallPolicy(
       createPostgresProviderGateway(pool(), {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
         ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
@@ -374,7 +385,14 @@ export function previewDebateHarness(input: Readonly<{
         })
       }),
       PREVIEW, target, { sleep: async (milliseconds) => { callSleeps.push(milliseconds); }, busy }
-    ));
+    );
+    // LG-A (final review I-1): main.ts's order when the route is asked for; otherwise each target's gateway as before.
+    const targetGateways = options.structureRepair === true
+      ? new Map(TARGETS.map((target) => [target.providerRef, targetGateway(target)] as const)) : null;
+    const structureRepairRoute = targetGateways === null ? null : structureRepairThroughLane(
+      previewStructureRepairRoute(TARGETS, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(PREVIEW));
+    const topology = createRunnerProviderTopology(TARGETS, (target) => targetGateways === null ? targetGateway(target)
+      : withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
     const story = new StoryWriter({
       pool: pool(), pack: PACK, policy: STORY_POLICY, hosted: false, log: () => undefined,
       resolveProvider: (roleRef) => {
@@ -426,6 +444,9 @@ export function previewDebateHarness(input: Readonly<{
       callScheduler,
       ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
       ...(options.money === undefined ? {} : { providerPrices: options.money.providerPrices }),
+      ...(options.money?.structureRepairCeiling === undefined ? {} : { structureRepairCeiling: options.money.structureRepairCeiling }),
+      ...(options.structureRepair !== true || options.money?.structureRepairCeiling !== undefined ? {}
+        : { structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute) }),
       callSubjects: previewCallSubjects(PREVIEW),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
