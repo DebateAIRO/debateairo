@@ -11,7 +11,8 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
-  QUESTION_LANGUAGE_FIELD, TypedDomainError, exhaustive, questionLanguageFromRun, type DebateRole, type QuestionLanguage
+  LENGTH_GUIDANCE_START, QUESTION_LANGUAGE_FIELD, TypedDomainError, exhaustive, questionLanguageFromRun, type DebateRole,
+  type QuestionLanguage
 } from "@debateai/kernel";
 import {
   PROVIDER_CONTEXT_WINDOW_EXCEEDED,
@@ -31,7 +32,8 @@ import {
   buildSynthesisRolePrompt,
   classifySynthesisRoleContent,
   evaluatorVerdictSchema,
-  parseComposerOutput
+  parseComposerOutput,
+  type RoleLength
 } from "@debateai/runner";
 import type { MomentBuilder, MomentBuilderFamily, MomentFile, ReplayOutcome } from "@debateai/scorecard";
 import {
@@ -166,6 +168,13 @@ function momentQuestionLanguage(builder: TypedMomentBuilder): QuestionLanguage |
 /** The answer length a recorded writer call carried (debate shape), or null: a writer call without one, or a checker call. */
 function momentAnswerWords(builder: TypedMomentBuilder): number | null {
   return builder.family === "SYNTHESIS_WRITER" ? builder.inputs.answerWords ?? null : null;
+}
+
+/** The writer's recorded target as the live builder takes it (always "about N words": a characters target is not replayable). */
+function momentSynthesisLength(builder: TypedMomentBuilder): RoleLength | null {
+  const words = momentAnswerWords(builder);
+  return words === null ? null
+    : Object.freeze({ answerWords: words, ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
 }
 
 /**
@@ -551,7 +560,7 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
     case "SYNTHESIS_CHECKER": {
       const request = synthesisRequestOf(builder);
       const framed = buildSynthesisRolePrompt(
-        request, momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder), momentQuestionLanguage(builder)
+        request, momentArgumentLanguageName(builder), undefined, momentSynthesisLength(builder), momentQuestionLanguage(builder)
       );
       const role = request.role;
       const response = await gateway.call({
@@ -584,7 +593,7 @@ export async function invokeMomentBuilder(builder: TypedMomentBuilder, gateway: 
 export async function captureMomentPacket(builder: TypedMomentBuilder): Promise<PromptPacket> {
   if (builder.family === "SYNTHESIS_WRITER" || builder.family === "SYNTHESIS_CHECKER") {
     return buildSynthesisRolePrompt(
-      synthesisRequestOf(builder), momentArgumentLanguageName(builder), undefined, momentAnswerWords(builder),
+      synthesisRequestOf(builder), momentArgumentLanguageName(builder), undefined, momentSynthesisLength(builder),
       momentQuestionLanguage(builder)
     ).packet;
   }

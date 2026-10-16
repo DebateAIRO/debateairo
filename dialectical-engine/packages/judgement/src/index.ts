@@ -650,6 +650,23 @@ export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
   }
 }
 
+/** Length guidance (spec 2026-10-15 §3.2): which step's target a leg is told, as its job decides it (`judgeLegModelRole`). */
+export function judgeLegLengthStep(leg: JudgeLeg): "opening" | "pros_cons" | "cross_exchange" {
+  switch (leg.kind) {
+    case "primary-root":
+    case "independent-root":
+    case "assigned-root":
+      return "opening";
+    case "support":
+    case "attack":
+      return "pros_cons";
+    case "cross-root":
+      return "cross_exchange";
+    default:
+      return exhaustive(leg);
+  }
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 

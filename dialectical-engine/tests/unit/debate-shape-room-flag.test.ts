@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { AskRoomResponseSchema } from "@debateai/contract";
-import { debateShapePolicyStartValues } from "@debateai/register";
+import { debateShapePolicyStartValues, lengthGuidancePolicyStartValues } from "@debateai/register";
 import type { AskRoomReader } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -37,7 +37,7 @@ function fixtureApplication(): AskApplication {
   };
 }
 
-async function roomBody(input: Readonly<{ policy: boolean; internal?: boolean }>): Promise<string> {
+async function roomBody(input: Readonly<{ policy: boolean; length?: boolean; internal?: boolean; noReader?: boolean }>): Promise<string> {
   const identity = testHttpIdentity("shape-room-flag");
   const askRoom: AskRoomReader = {
     readRoom: async () => ({
@@ -46,8 +46,10 @@ async function roomBody(input: Readonly<{ policy: boolean; internal?: boolean }>
     })
   };
   const api = buildApi({
-    application: fixtureApplication(), sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, askRoom,
-    ...(input.policy ? { debateShapePolicy: debateShapePolicyStartValues() } : {})
+    application: fixtureApplication(), sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
+    ...(input.noReader === true ? {} : { askRoom }),
+    ...(input.policy ? { debateShapePolicy: debateShapePolicyStartValues() } : {}),
+    ...(input.length === true ? { lengthGuidancePolicy: lengthGuidancePolicyStartValues() } : {})
   });
   try {
     const response = await api.inject({ method: "GET", url: ROOM_URL, headers: testSessionHeaders(identity) });
@@ -72,8 +74,33 @@ describe("debate shape P2c — the room says whether the shape settings are in f
     expect(await roomBody({ policy: false, internal: true })).toBe(JSON.stringify(INTERNAL_FITS));
   });
 
-  it("says shape_settings: true, last, on the customer and the internal room when the row is in force", async () => {
-    expect(await roomBody({ policy: true })).toBe(JSON.stringify({ ...CUSTOMER_FITS, shape_settings: true }));
-    expect(await roomBody({ policy: true, internal: true })).toBe(JSON.stringify({ ...INTERNAL_FITS, shape_settings: true }));
+  // LG-C Task 5 (INTERFACE §5.8, ruling Q9): the answer words ride the room after shape_settings; the length switch last.
+  const SHAPE_START = debateShapePolicyStartValues();
+  const SHAPE_WORDS = { short: SHAPE_START.answerLength.short.words, standard: SHAPE_START.answerLength.standard.words,
+    detailed: SHAPE_START.answerLength.detailed.words };
+  const LENGTH_WORDS = { short: 200, standard: 350, detailed: 1000 };
+
+  it("says shape_settings: true, then the shape row's answer words, on the customer and the internal room when the row is in force", async () => {
+    expect(SHAPE_WORDS).toEqual({ short: 200, standard: 350, detailed: 1000 });
+    expect(await roomBody({ policy: true })).toBe(JSON.stringify({ ...CUSTOMER_FITS, shape_settings: true, answer_words: SHAPE_WORDS }));
+    expect(await roomBody({ policy: true, internal: true }))
+      .toBe(JSON.stringify({ ...INTERNAL_FITS, shape_settings: true, answer_words: SHAPE_WORDS }));
+  });
+
+  it("with the length row alone: the length row's words and length_settings: true, no shape_settings", async () => {
+    expect(await roomBody({ policy: false, length: true })).toBe(JSON.stringify({ ...CUSTOMER_FITS, answer_words: LENGTH_WORDS, length_settings: true }));
+    expect(await roomBody({ policy: false, length: true, internal: true }))
+      .toBe(JSON.stringify({ ...INTERNAL_FITS, answer_words: LENGTH_WORDS, length_settings: true }));
+  });
+
+  it("with no room reader (FITS for the query's own tier): the length row's words and length_settings: true", async () => {
+    expect(await roomBody({ policy: false, length: true, noReader: true }))
+      .toBe(JSON.stringify({ ...CUSTOMER_FITS, answer_words: LENGTH_WORDS, length_settings: true }));
+    expect(await roomBody({ policy: false, noReader: true })).toBe(JSON.stringify(CUSTOMER_FITS));
+  });
+
+  it("with both rows: shape_settings, the length row's words (they win), then length_settings", async () => {
+    expect(await roomBody({ policy: true, length: true }))
+      .toBe(JSON.stringify({ ...CUSTOMER_FITS, shape_settings: true, answer_words: LENGTH_WORDS, length_settings: true }));
   });
 });

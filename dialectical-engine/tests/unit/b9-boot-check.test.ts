@@ -250,7 +250,11 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(main).toContain("if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;");
     expect(main).toContain("bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,");
     expect(main).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
-    expect(main).toContain("judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),");
+    // LG-C Task 6 (spec 2026-10-15 §3.3): the first call is checked at the largest guided opening allowance, over the
+    // length row the boot read before this stage.
+    expect(main).toContain(
+      "judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION), lengthGuidancePolicy),");
+    expect(stage).toBeGreaterThan(main.indexOf("boot.run(\"length-guidance-policy\""));
     expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
     // PF-L38: the lock is priced only with the debate-shape row in force (read before this stage).
     expect(main).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");

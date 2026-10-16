@@ -380,6 +380,16 @@ export const AskRoomQuerySchema = z.object({
 }).strict();
 
 /**
+ * Length guidance (spec 2026-10-15 §3.8; controller ruling Q9): the answer writer's three targets for the person's plan,
+ * which the /new page states. A target, not a capacity figure, so it may ride the room read (I6 is about capacity).
+ */
+const AnswerWordsSchema = z.object({
+  short: z.number().int().min(50).max(5000),
+  standard: z.number().int().min(50).max(5000),
+  detailed: z.number().int().min(50).max(5000)
+}).strict();
+
+/**
  * Budget spec §2.7 / AMENDMENTS-R1 A16 — THE ROOM READ: a word, the limit it is
  * about, when that limit resets or the waiting question starts, the person's own
  * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
@@ -397,7 +407,11 @@ const CustomerAskRoomResponseSchema = z.object({
   // Debate shape P2c (Contract deviation 7): present, and only ever `true`, when the deployment's
   // debateShapePolicy row is in force, so the /new page may offer depth mode, scrutiny and answer
   // length. Absent otherwise: the API would drop them, so the page offers none of them.
-  shape_settings: z.literal(true).optional()
+  shape_settings: z.literal(true).optional(),
+  // Length guidance (spec 2026-10-15 §3.8): present only with the length row (its plan's words) or the shape row (its
+  // answer lengths); `length_settings` only when the length row is in force, so the page offers the answer length.
+  answer_words: AnswerWordsSchema.optional(),
+  length_settings: z.literal(true).optional()
 }).strict().superRefine((answer, context) => {
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
@@ -417,7 +431,7 @@ const CustomerAskRoomResponseSchema = z.object({
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
   room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
-  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional()
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional()
 }).strict().superRefine((answer,context)=>{
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))

@@ -42,7 +42,8 @@ import {
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
   DEBATE_SHAPE_POLICY_ROW_KEY, parseDebateShapePolicy, MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, debateShapeInForce,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, parseQuestionLanguagePolicy,
-  type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type QuestionLanguagePolicy, type RegisterPublicationRow
+  LENGTH_GUIDANCE_POLICY_ROW_KEY, parseLengthGuidancePolicy,
+  type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type LengthGuidancePolicy, type QuestionLanguagePolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { costEnvelopeGuardPolicy } from '@debateai/budget';
 import { mapPromptContractHash } from '@debateai/map';
@@ -123,11 +124,12 @@ const withSuffix = (sourceRef:string,suffix:string) => {
  * v2's source build with the hosted story row and the owner's three rows. `hosted` is checked first (the owner's
  * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy, debate shape,
  * question language). `debateShape` is v2's sixth argument, passed through (default null: no row; 'off': the start
- * values disabled); `questionLanguage` is v2's seventh (default null: no row, the code's start values).
+ * values disabled); `questionLanguage` is v2's seventh (default null: no row, the code's start values); `lengthGuidance`
+ * is v2's eighth (default null: no row; LG-C).
  */
-export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
   const choice=previewHostedBillingChoice(hosted);
-  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage);
+  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage,lengthGuidance);
   const byKey=new Map(local.map(row=>[row.rowKey,row]));
   // The hosted builder's story rows: every one but the money row must be v2's, so the hosted build differs by that row alone.
   const story=buildDevelopmentStoryRegisterRows({synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:previewCheckerRoleRef(checker)},'hosted')
@@ -296,6 +298,7 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
     if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
   }
   // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
   parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));

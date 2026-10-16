@@ -62,6 +62,16 @@ export function validateQuestionLanguageChoice(value) {
  return value;
 }
 /**
+ * The operator's optional length-guidance choice (spec 2026-10-15, LG-C): kit v2's eighth argument and kit v3's ninth. One
+ * plain JSON object (the policy, with its kind); there is no 'off' word: a version without the row is the rollback. Shape
+ * only here: the register's own parser checks it in buildPreviewSourceRowsV2 (LENGTH_GUIDANCE_POLICY_INVALID:<path>)
+ * before any row is built. Only plan and publish may carry it.
+ */
+export function validateLengthGuidanceChoice(value) {
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
  * Sanity bounds on the owner's hosted-preview ceilings (publish-register-v3.ts PREVIEW_HOSTED_CEILING_BOUNDS; a unit
  * test pins the two equal). They catch a typed extra digit; the ceilings themselves are always the owner's inputs.
  */
@@ -89,8 +99,9 @@ export function validateNativePlan(plan) {
  const concurrency=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'callConcurrency');
  const shape=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'debateShape');
  const language=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'questionLanguage');
+ const lengthGuided=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lengthGuidance');
  const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(hosted?['hostedBilling']:[])]);
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -108,6 +119,10 @@ export function validateNativePlan(plan) {
  }
  if(language){
   validateQuestionLanguageChoice(plan.questionLanguage);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(lengthGuided){
+  validateLengthGuidanceChoice(plan.lengthGuidance);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
  // Unlike the choices above, every operation may carry it: once a hosted version is the base, verify and
@@ -145,8 +160,8 @@ export async function runNativeOperator() {
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null)
-   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null);
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});

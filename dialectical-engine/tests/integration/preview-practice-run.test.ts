@@ -1061,6 +1061,61 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 ย
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
     expect(stubs.requests).toEqual([]);
   }, 300_000);
+
+  const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
+  type LengthReport = ShapeReport & {
+    length?: { source: string; registerVersion: string; row: string | null;
+      frozen: { plan: string; answerLength: string; steps: Record<string, number> } | null; unreadable: string | null };
+    lengthByModelAndStep?: { model: string; step: string; guidedWords: number | null }[];
+  };
+
+  // (pre-flight PF-C4.4) OVERVIEW C-1 / engine INTERFACE ยง4.1: the writer's words are 200 / 350 / 1,000
+  // (LENGTH_GUIDANCE_START.answerWriterWords, packages/kernel/src/length-guidance.ts:99 at 2d59b9000).
+  it("--length-policy (the owners' start values) with today's shape: frozen on the receipt, the writer told 350 words, guided words in the table: PASS", async () => {
+    const before = exportDigest();
+    const { stubs, env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--length-policy", LENGTH_POLICY_START, "--transcript"], env, quiet);
+    const report = outcome.report as unknown as LengthReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(exportDigest()).toBe(before);
+    expect(report.register).toMatchObject({ registerVersion: "6", importedRegisterVersion: "5" });
+    expect(report.shape).toBeUndefined();
+    expect(report.length).toMatchObject({ source: "FLAG", registerVersion: "6", row: "ADDED",
+      frozen: { plan: "premium", answerLength: "standard", steps: { answer_writer: 350, pros_cons: 250 } } });
+    const writerRows = (report.lengthByModelAndStep ?? []).filter((row) => row.step === "answer_writer");
+    expect(writerRows.length).toBeGreaterThan(0);
+    for (const row of writerRows) expect(row.guidedWords).toBe(350);
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+  }, 900_000);
+
+  it("refuses a malformed or non-JSON --length-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched (Review Focus 5)", async () => {
+    const malformed = join(folder, `length-bad-${randomUUID()}.json`);
+    await writeFile(malformed, JSON.stringify({ ...(JSON.parse(readFileSync(LENGTH_POLICY_START, "utf8")) as object), runawayMultiplier: 99 }));
+    const notJson = join(folder, `length-not-json-${randomUUID()}.json`);
+    await writeFile(notJson, "{not json");
+    for (const bad of [malformed, notJson]) {
+      const { stubs, env, common, quiet } = await scenario();
+      const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--length-policy", bad], env, quiet);
+      expect(outcome.exitCode).toBe(40);
+      expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_LENGTH_POLICY_INVALID"]);
+      expect(stubs.requests).toEqual([]);
+      expect(stubs.remainingReads).toEqual([]);
+    }
+  }, 60_000);
+
+  it("--answer-length detailed with --length-policy and no --shape-policy is accepted; without either row it is refused before any call", async () => {
+    const { env, common, quiet } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--length-policy", LENGTH_POLICY_START, "--answer-length", "detailed"], env, quiet);
+    const report = outcome.report as unknown as LengthReport;
+    expect(report.length?.frozen).toMatchObject({ answerLength: "detailed", steps: { answer_writer: 1000 } });
+    const refused = await scenario();
+    const without = await runPractice(["debate", ...refused.common, "--register-export", registerExportPath, "--depth", "1",
+      "--answer-length", "detailed"], refused.env, refused.quiet);
+    expect(without.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
+    expect(refused.stubs.requests).toEqual([]);
+  }, 900_000);
 });
 
 describe("preview practice: language mode, the question language (P2L)", () => {

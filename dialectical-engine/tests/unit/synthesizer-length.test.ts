@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LENGTH_GUIDANCE_START } from "@debateai/kernel";
 import { buildFramedPrompt, promptContractFingerprintText, readPromptFrame, type PromptContract } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
@@ -22,7 +23,7 @@ describe("the answer length (spec §3.3 step 8)", () => {
   });
 
   it("with a length it uses the length variant and adds answer_length last", () => {
-    const frame = readPromptFrame(buildSynthesisRolePrompt(synthesisRequestFixture(), "English", undefined, 700).packet);
+    const frame = readPromptFrame(buildSynthesisRolePrompt(synthesisRequestFixture(), "English", undefined, { answerWords: 700, ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }).packet);
     expect(frame.contractId).toBe("serve.synthesizer.length.v2");
     expect(frame.fields.at(-1)).toEqual({ name: "answer_length", content: "about 700 words" });
     expect(SYNTHESIZER_LENGTH_PROMPT_CONTRACT.instruction).toBe(`${SYNTHESIZER_PROMPT_CONTRACT.instruction} ${SYNTHESIZER_LENGTH_SENTENCE}`);
@@ -51,7 +52,7 @@ describe("the answer length (spec §3.3 step 8)", () => {
   });
 
   it("a recorded lengthed writer call replays as the length variant (pre-flight PF-B16)", async () => {
-    const recorded = buildSynthesisRolePrompt(synthesisRequestFixture(), "the same language as the question", undefined, 700);
+    const recorded = buildSynthesisRolePrompt(synthesisRequestFixture(), "the same language as the question", undefined, { answerWords: 700, ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
     const builder = builderFromRecordedPacket("ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1", recorded.packet);
     expect(builder).toMatchObject({ family: "SYNTHESIS_WRITER", inputs: { answerWords: 700 } });
     const replayedPacket = await captureMomentPacket(builder);

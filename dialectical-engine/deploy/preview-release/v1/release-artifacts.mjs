@@ -19,6 +19,7 @@
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
 //       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>'] [--question-language '<JSON object>']
+//       [--length-guidance '<JSON object>']
 //       [--hosted-billing '<JSON object>']
 //       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
@@ -30,6 +31,8 @@
 //       (--question-language only with --operation plan; publish carries the plan's choice; default: the base's
 //        question-language row kept as it is, or none (the code's start values); no off word: '"fastCheck": null' in the
 //        policy switches the fast language check off)
+//       (--length-guidance only with --operation plan; publish carries the plan's choice; default: the base's length-guidance row
+//        kept as it is, or none)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -97,7 +100,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--hosted-billing'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--hosted-billing'] }
 });
 
 export class Refusal extends Error {
@@ -452,6 +455,12 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (languageText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--question-language']);
   let languageValue;
   if (languageText !== undefined) try { languageValue = strictJson(Buffer.from(languageText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--question-language']); }
+  // Length guidance (LG-C): the same plumbing, one JSON object only (a version without the row is the rollback);
+  // native-operator.mjs validateLengthGuidanceChoice below, and the register's own parser in either kit.
+  const lengthText = options['--length-guidance'];
+  if (lengthText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--length-guidance']);
+  let lengthValue;
+  if (lengthText !== undefined) try { lengthValue = strictJson(Buffer.from(lengthText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
   // The hosted preview (owner rulings 2026-10-13): the owner's billing switch, ceilings and room-read budget, as one JSON
   // object, for a new `plan` only (native-operator.mjs validateHostedBillingChoice below; publish-register-v3.ts checks it again).
   const hostedText = options['--hosted-billing'];
@@ -476,6 +485,11 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (languageText !== undefined) {
     const check = deps.validateQuestionLanguageChoice ?? (await nativeOperator()).validateQuestionLanguageChoice;
     try { languageChoice = check(languageValue); } catch { refuse('ARGUMENTS_REFUSED', ['--question-language']); }
+  }
+  let lengthChoice;
+  if (lengthText !== undefined) {
+    const check = deps.validateLengthGuidanceChoice ?? (await nativeOperator()).validateLengthGuidanceChoice;
+    try { lengthChoice = check(lengthValue); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
   }
   let hostedChoice;
   if (hostedText !== undefined) {
@@ -541,6 +555,8 @@ async function nativePlanCommand(options, { layout, deps }) {
   const debateShape = operation === 'plan' ? shapeChoice : operation === 'publish' ? from.value.debateShape : undefined;
   // The same for the question-language policy (P2L Task 12): the policy object the plan's operator gave.
   const questionLanguage = operation === 'plan' ? languageChoice : operation === 'publish' ? from.value.questionLanguage : undefined;
+  // The same for the length-guidance policy (LG-C): the policy object the plan's operator gave.
+  const lengthGuidance = operation === 'plan' ? lengthChoice : operation === 'publish' ? from.value.lengthGuidance : undefined;
   // The hosted inputs: a new plan's own; every other operation carries the --from plan's, so publish recomposes the
   // approved snapshot and verify and apply-and-plan compose from a hosted base with kit v3.
   const hostedBilling = operation === 'plan' ? hostedChoice : from.value.hostedBilling;
@@ -553,6 +569,7 @@ async function nativePlanCommand(options, { layout, deps }) {
     ...(callConcurrency === undefined ? {} : { callConcurrency }),
     ...(debateShape === undefined ? {} : { debateShape }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
+    ...(lengthGuidance === undefined ? {} : { lengthGuidance }),
     ...(hostedBilling === undefined ? {} : { hostedBilling })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }

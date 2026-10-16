@@ -1031,6 +1031,14 @@ them.
 
 This release adds one migration, `migrations/0120_reply_measures.sql` (after the reclaim resume's `migrations/0119_reclaim_resume.sql`; `pnpm db:migrate` applies 0119 first if the host does not have it yet). Apply it BEFORE the new code runs: the new code writes six new columns of `ledger.raw_artifact` (`reply_repairs`, `reply_failure_class`, `reply_form`, `cached_input_tokens`, `guided_words`, `actual_words`) with every model call it records, so on a database without them every model call fails. The migration also redefines the terminal facts function `core.read_terminal_recorded_facts` (same signature, owner and grants), so that a step whose answer was put into its form by the structure-repair call counts like that step; the older code never writes such rows, so it reads the same counts as before. Apply it as step 1 of the debate-shape upgrade above does (open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API and the runner. No register version and no new environment key. The structure-repair call itself is wired only where the preview provider config is set; a hosted production host keeps today's follow-ups. Rolling back the code needs no database step: the six columns and the function stay, and the older code never writes the columns.
 
+### Upgrading to length guidance LG-C (the length row)
+
+The length row is OFF until a register version carries the `lengthGuidancePolicy` member (`deploy/vps/register/README.md`).
+In this order, with no debate running across the switch: let running debates finish and admit none; publish the new version from this release
+(`pnpm register:publish-hosted`, with the member to switch length guidance on, without it to keep today's requests) and
+pin it in `REGISTER_VERSION`; restart the API, then the runner. Rollback: publish a version without the member and restart
+the API: every new debate is asked as today; debates admitted with the numbers finish with them.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
@@ -1887,6 +1895,7 @@ version must carry, besides the algorithm's own rows:
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
+| `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |

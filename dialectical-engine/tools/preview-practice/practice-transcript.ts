@@ -19,7 +19,15 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
-import { answerTokensOf, PREVIEW_PROVIDER_REF_MODELS, previewModelRow, replyWordCount, structureRepairOriginalKey } from "@debateai/providers";
+import {
+  answerTokensOf,
+  PREVIEW_PROVIDER_REF_MODELS,
+  previewModelRow,
+  readPromptFrame,
+  replyWordCount,
+  structureRepairOriginalKey,
+  type PromptPacket
+} from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -32,6 +40,7 @@ import {
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
+import { practiceGuidedWordsOfFields } from "./practice-length.js";
 import { redactNamedKeyShapes } from "./practice-redaction.js";
 import { practiceTryTier } from "./practice-tokens.js";
 
@@ -304,7 +313,11 @@ export function buildTranscriptAttempts(input: Readonly<{
         finishReason
       }),
       replyForm: artifact?.replyForm ?? replyForm,
-      guidedWords: artifact?.guidedWords ?? null,
+      // LG-C: the column first; else, for transcript.json only, the target read back from the recorded prompt.
+      guidedWords: artifact?.guidedWords ?? (messageList === null ? null : (() => {
+        try { return practiceGuidedWordsOfFields(readPromptFrame({ messages: messageList as PromptPacket["messages"] }).fields); }
+        catch { return null; }
+      })()),
       actualWords: artifact?.actualWords ?? (content === null ? null : replyWordCount(content, { finishReason })),
       metadata: artifact?.metadata ?? null,
       prompt: prompt === undefined ? null : Object.freeze({

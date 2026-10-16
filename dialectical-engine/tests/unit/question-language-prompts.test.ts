@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { TEXT_NOT_IN_QUESTION_LANGUAGE, argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
+import { LENGTH_GUIDANCE_START, TEXT_NOT_IN_QUESTION_LANGUAGE, argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import {
   buildFramedPrompt, readPromptFrame, type PromptContract, type PromptPacket, type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
@@ -118,9 +118,9 @@ describe("judge-side and answer calls in the locked language (question-language 
 
   it("PF-L40: a lengthed writer call with a lock keeps answer_length, and question_language rides LAST", () => {
     const request = synthesisRequestFixture();   // a SYNTHESIZER request
-    const names = readPromptFrame(buildSynthesisRolePrompt(request, "Romanian", fixed, 300, RO).packet).fields.map((field) => field.name);
+    const names = readPromptFrame(buildSynthesisRolePrompt(request, "Romanian", fixed, { answerWords: 300, ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }, RO).packet).fields.map((field) => field.name);
     expect(names.slice(-2)).toEqual(["answer_length", "question_language"]);
-    expect(readPromptFrame(buildSynthesisRolePrompt(request, "Romanian", fixed, 300, null).packet).fields.at(-1)!.name).toBe("answer_length");
+    expect(readPromptFrame(buildSynthesisRolePrompt(request, "Romanian", fixed, { answerWords: 300, ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }, null).packet).fields.at(-1)!.name).toBe("answer_length");
   });
 
   it("the answer checker's language check reads the lock, not the question (PF-L41(b): a verdict that PARSES)", () => {

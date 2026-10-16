@@ -40,6 +40,7 @@ import {
   parsedStructuredRepairs,
   runJudgePanel,
   selectReducedJudgement,
+  judgeLegLengthStep,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   type ClaimType,
   type CompositionMapRegisterRow,
@@ -55,9 +56,11 @@ import {
   ENGINE_COMPOSITION_SEGMENT_CAP,
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
+  lengthGuidanceAllowanceTokens,
   readVerdictLabelControls,
   resolveScoringOperator,
-  type AdaptiveStoppingControls
+  type AdaptiveStoppingControls,
+  type LengthGuidance
 } from "@debateai/register";
 import {
   BudgetRepository,
@@ -154,7 +157,6 @@ import {
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
-  synthesizerAnswerLengthField,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -186,6 +188,12 @@ import {
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type QuestionLanguage,
+  LENGTH_GUIDANCE_START,
+  LENGTH_GUIDANCE_STEPS,
+  lengthGuidanceText,
+  type CharactersPerWord,
+  type LengthCallStep,
+  type LengthGuidanceStep,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -829,12 +837,12 @@ export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
   randomBytes?: (size: number) => Buffer,
-  answerWords: number | null = null,
+  length: RoleLength | null = null,
   questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
-  // Debate shape (spec §3.3 step 8): only a writer call with an answer length takes the length variant; without one
-  // (every run without a shape, and every checker call) the packet is today's, byte for byte.
-  const lengthed = request.role === "SYNTHESIZER" && answerWords !== null;
+  // Debate shape (spec §3.3 step 8) and length guidance (spec 2026-10-15 §3.2): only a writer call with a target takes the
+  // length variant; without one (and, until LG-C2, every checker call) the packet is today's, byte for byte.
+  const lengthed = request.role === "SYNTHESIZER" && length !== null;
   // V-MINIMUM-PAYLOAD: the one projection, applied once; the length variant only appends its own field after it.
   const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
@@ -847,7 +855,7 @@ export function buildSynthesisRolePrompt(
     ),
     // The language field wraps the ONE projection (and the length field after it): it rides LAST; with no lock
     // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material, questionLanguage),
+    material: withQuestionLanguageField(lengthed ? [...material, answerLengthField(length)] : material, questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
 }
@@ -861,6 +869,32 @@ export function shapeWriterBound(bound: CallBound, writerBound: number | null): 
   if (!Number.isSafeInteger(writerBound) || writerBound < 1) throw new TypeError("SHAPE_WRITER_BOUND_INVALID");
   if (writerBound <= bound.tokenCeiling) return bound;
   return Object.freeze({ ...bound, tokenCeiling: writerBound });
+}
+
+/**
+ * Length guidance (spec 2026-10-15 §3.3; INTERFACE §5.6): a debate step's call bound sized from the run's frozen numbers,
+ * max(today, thinking room + runaway x words x tokens per word), the raise clamped to 32,768; never below today's. Row
+ * absent (null), and every step sized elsewhere (the story: LG-D; the map: map-stage.ts; the structure repair: LG-A),
+ * the bound itself, the same object.
+ */
+export function guidedCallBound(bound: CallBound, step: LengthCallStep, guidance: LengthGuidance | null): CallBound {
+  if (guidance === null || !(LENGTH_GUIDANCE_STEPS as readonly string[]).includes(step)) return bound;
+  const tokenCeiling = lengthGuidanceAllowanceTokens(guidance, step as LengthGuidanceStep, bound.tokenCeiling);
+  return tokenCeiling === bound.tokenCeiling ? bound : Object.freeze({ ...bound, tokenCeiling });
+}
+
+/**
+ * What a synthesis call is told about length (INTERFACE §5.4): the writer's target (`answer_length`), the checker's own
+ * reply target (`ownWords`, LG-C2), the run's language tag (zh / ja / th name characters) and the row's factors. A run
+ * without the length row but with the shape passes the shape's words with `languageCode: null`: today's "about N words".
+ */
+export type RoleLength = Readonly<{
+  answerWords: number; ownWords: number | null; languageCode: string | null; charactersPerWord: CharactersPerWord;
+}>;
+
+/** The writer's `answer_length` field from a RoleLength: today's `synthesizerAnswerLengthField` text when it names words. */
+function answerLengthField(length: RoleLength): Readonly<{ name: "answer_length"; content: string }> {
+  return Object.freeze({ name: "answer_length", content: lengthGuidanceText(length.answerWords, length.languageCode, length.charactersPerWord) });
 }
 
 /** A17: the classification a live synthesis call applies, exported for replay (LG-A: the writer through its fix guide, as live). */
@@ -1828,6 +1862,8 @@ export async function runReviewCatchUp(input: {
       argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
     });
   const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
+  // Length guidance: a catch-up review is sized like the run's own reviews, from the same receipt (never the row).
+  const catchUpLength = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis).length ?? null;
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -1886,7 +1922,7 @@ export async function runReviewCatchUp(input: {
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
         contractHash: input.judgeContractHash,
-        bound: { ...input.judgeBound, maxAttempts },
+        bound: { ...guidedCallBound(input.judgeBound, "reviewer", catchUpLength), maxAttempts },
         // T5 / S3-1: a catch-up review is a real reviewer visit. It measures
         // the edges this node still owns unmeasured — never a false empty list.
         edges: node.sourcedEdges
@@ -5243,6 +5279,12 @@ export class WalkingSkeletonRunner {
      * scheduler (its chains run through the lane; with no concurrency row the lane holds one call at a time).
      */
     const shapeShape = envelopeBasis.shape ?? null;
+    /**
+     * Length guidance (spec 2026-10-15 §3.1): the numbers this run was admitted with (its receipt's `length`), or null —
+     * today's prompts and bounds, byte for byte. The runner never reads the register row: a register change never
+     * reaches a running or re-claimed debate.
+     */
+    const lengthGuidance = envelopeBasis.length ?? null;
     if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
@@ -5822,6 +5864,16 @@ export class WalkingSkeletonRunner {
       ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
       : null;
     /**
+     * The answer writer's target (spec 2026-10-15 §3.2 notes): the length row's words for every debate with it (they win
+     * over the shape's), else a shaped run's answer length (today's "about N words"), else none (today's v4 packet; pre-flight PF-C3.2).
+     */
+    const synthesisLength: RoleLength | null = lengthGuidance !== null
+      ? Object.freeze({ answerWords: lengthGuidance.steps.answer_writer, ownWords: null, languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord })
+      : shapeRun === null ? null
+        : Object.freeze({ answerWords: shapeRun.shape.answerWords, ownWords: null, languageCode: null,
+          charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
+    /**
      * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
      * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a
      * shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive, fields and
@@ -6294,7 +6346,7 @@ export class WalkingSkeletonRunner {
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
               contractHash: judgeContractHash,
-              bound: this.settings.judgeBound
+              bound: guidedCallBound(this.settings.judgeBound, "judge_panel", lengthGuidance)
             })
           });
           // A15c (controller carry 7): the member that ANSWERED, route and
@@ -6878,7 +6930,7 @@ export class WalkingSkeletonRunner {
         const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: this.settings.judgeBound.tokenCeiling }),
+          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -7183,7 +7235,7 @@ export class WalkingSkeletonRunner {
             leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
-            bound: { ...this.settings.judgeBound, maxAttempts }
+            bound: { ...guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
           })
         })
       }).catch((error: unknown) => {
@@ -7414,7 +7466,7 @@ export class WalkingSkeletonRunner {
             leg: input.leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
-            bound: { ...this.settings.judgeBound, maxAttempts }
+            bound: { ...guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
           })
         })
       }).catch(async (error: unknown) => {
@@ -7701,7 +7753,7 @@ export class WalkingSkeletonRunner {
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
               contractHash: this.settings.judgeContractHash,
-              bound: { ...this.settings.judgeBound, maxAttempts },
+              bound: { ...guidedCallBound(this.settings.judgeBound, "reviewer", lengthGuidance), maxAttempts },
               // S3-1: this ONE call measures every edge the node sources.
               edges: authoredNode.sourcedEdges
             })
@@ -9757,7 +9809,7 @@ export class WalkingSkeletonRunner {
         // D2 + A17: ONE builder for the live call and moment:replay, in the question's language. Debate shape (spec §3.3
         // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
         // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords,
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,
           shapeLanguage);
         const packet = framed.packet;
         /**
@@ -9875,8 +9927,11 @@ export class WalkingSkeletonRunner {
             // judge, answering about ONE node, had 180.
             // Debate shape (spec §3.3 step 8): max(the sealed bound, the row's writer bound) — never under the sealed one;
             // the sealed bound itself, the same object, on today's run (`shapeWriterBound`).
-            bound: shapeWriterBound(this.settings.synthesisRolePolicy.synthesizerBound, shapeRun === null ? null : shapeRun.shape.writerBound),
+            bound: guidedCallBound(shapeWriterBound(this.settings.synthesisRolePolicy.synthesizerBound,
+              shapeRun === null ? null : shapeRun.shape.writerBound), "answer_writer", lengthGuidance),
             contractHash: this.settings.composerContractHash,
+            // Length guidance: the writer is told its target, so its words are recorded beside what it wrote.
+            ...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_writer }),
             providerRef: planned.providerRef,
             packet,
             // Task M4 review fix I-1: the schema, then the prose and the cited refs.
@@ -10005,7 +10060,7 @@ export class WalkingSkeletonRunner {
             lane: "served",
             modelRole: "ANSWER_CHECKER",
             // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
-            bound: this.settings.synthesisRolePolicy.evaluatorBound,
+            bound: guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, "answer_checker", lengthGuidance),
             contractHash: this.settings.conformanceContractHash,
             providerRef: planned.providerRef,
             packet,

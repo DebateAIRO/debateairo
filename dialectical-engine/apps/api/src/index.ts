@@ -241,9 +241,12 @@ import {
   structuralBasisProvisionsBackup,
   type DebateShapeCeilingInput,
   type DebateShapePlanKey,
-  type DebateShapePolicy
+  type DebateShapePolicy,
+  type LengthGuidance,
+  type LengthGuidancePolicy
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
+import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
@@ -1754,6 +1757,8 @@ export interface ApiOptions {
   readonly askBilling?: AskBilling;
   /** Debate shape (spec 2026-10-12 §3.1): the register's optional row, for the room read's normalisation. Absent: today's. */
   readonly debateShapePolicy?: DebateShapePolicy;
+  /** Length guidance (spec 2026-10-15 §3.8): the register's optional row, for the room read's normalisation and words. */
+  readonly lengthGuidancePolicy?: LengthGuidancePolicy;
   /**
    * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
    * supplied by main only when hosted with billing on; each route whose member is
@@ -3565,6 +3570,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Length guidance (spec 2026-10-15 §3.8): the plan key the room's settings were decided for, which names the answer
+    // words; without a room reader, the query's own tier.
+    let roomPlanKey: DebateShapePlanKey = "free";
+    if (options.askRoom === undefined) roomPlanKey = debateShapePlanKeyOf(null, query.data.plan_tier);
     const answer: AskRoomAnswer = options.askRoom === undefined
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
@@ -3578,8 +3587,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
               depth_params: roomDepthParams(query.data)
             }, access.ownerRef, options.askBilling);
             const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
-            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan),
-              previewConfig, roomPlan);
+            roomPlanKey = roomPlan;
+            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan,
+              options.lengthGuidancePolicy ?? null), previewConfig, roomPlan);
           })()
         });
     return reply.send(AskRoomResponseSchema.parse({
@@ -3593,7 +3603,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
-      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const })
+      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const }),
+      // Length guidance (spec 2026-10-15 §3.8; ruling Q9): the plan's answer words and the length switch. Without either
+      // row neither member is written: today's body, byte for byte.
+      ...((): Record<string, unknown> => {
+        const words = lengthAnswerWordsFor(options.lengthGuidancePolicy, options.debateShapePolicy, roomPlanKey);
+        return words === null ? {} : { answer_words: { short: words.short, standard: words.standard, detailed: words.detailed } };
+      })(),
+      ...(options.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const })
     }));
   });
 
@@ -4062,6 +4079,8 @@ export interface RunCreationSettings {
     readonly backupSequencesProvisioned: 0 | 1;
     /** Debate shape (spec 2026-10-12 §3.6): the sizes this panel runs (`resolveDebateShape`), or null for today's shape. */
     readonly shape: DebateShapeCeilingInput | null;
+    /** Length guidance (spec 2026-10-15 §3.1): the debate's numbers (`lengthGuidanceForAsk`), or null without the row. */
+    readonly length: LengthGuidance | null;
   }) => Promise<Readonly<Record<string, unknown>>>;
   readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
@@ -4086,6 +4105,11 @@ export interface RunCreationSettings {
    * Absent: every ask's depth_params is today's `{ depth }` and every basis today's, byte for byte.
    */
   readonly debateShapePolicy?: DebateShapePolicy;
+  /**
+   * Length guidance (spec 2026-10-15 §3.1): present only when the register's optional lengthGuidancePolicy row is there.
+   * Absent: no receipt carries `length`, and the answer-length choice is kept only with the shape row, as today.
+   */
+  readonly lengthGuidancePolicy?: LengthGuidancePolicy;
   /** Question language (spec 2026-10-13): read only with `debateShapePolicy`; the first step of submit. */
   readonly questionLanguage?: QuestionLanguagePort;
 }
@@ -4225,7 +4249,9 @@ async function admitWithScorecard(input: Readonly<{
         panelSize,
         backupSequencesProvisioned,
         // Debate shape (spec 2026-10-12 §3.6): on this path each debater is a distinct maker (debaterSeatCount).
-        shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers)
+        shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers),
+        // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
+        length: lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan)
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -4516,7 +4542,9 @@ export async function evaluateAskAdmission(
       // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
       backupSequencesProvisioned: 0,
       shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan,
-        new Set(filteredPanel.map((entry) => entry.maker)).size)
+        new Set(filteredPanel.map((entry) => entry.maker)).size),
+      // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
+      length: lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan)
     });
   } catch (error) {
     markAskRefusal(error);
@@ -4714,8 +4742,10 @@ export class PostgresAskApplication implements AskApplication {
     // interim swap: B6b's room creates a question that WAITs from it, so only a
     // START runs on the Free roster (A5). Without a swap the two are the same.
     // Debate shape (spec 2026-10-12 §3.2): every ask is normalised for its plan key before anything reads it, so the
-    // stored depth_params is `{ depth }` exactly (no row) or all four settings (the row), never anything in between.
+    // stored depth_params is `{ depth }` exactly (no row), `{ depth, answerLength }` (the length row alone, spec
+    // 2026-10-15 §3.1) or all four settings (the shape row), never anything in between.
     const shapePolicy = this.settings.debateShapePolicy ?? null;
+    const lengthPolicy = this.settings.lengthGuidancePolicy ?? null;
     // Question language (spec 2026-10-13, ruling L8): with the shape row, the language is decided first — after the
     // route's crisis, consent, team, admission and country checks, before billing, admission and any lock. A refusal
     // of the person's choice is a 409 the page answers by checking again; an offer ends the request with a 409.
@@ -4741,7 +4771,7 @@ export class PostgresAskApplication implements AskApplication {
     // With billing on, the key is re-derived below from the plan the server resolved.
     let shapePlan: DebateShapePlanKey = Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string)
       ? debateShapePlanKeyOf(null, requestedAsk.plan_tier) : "free";
-    let ask: AskRequest = normaliseAskForDebateShape(requestedAsk, shapePolicy, shapePlan);
+    let ask: AskRequest = normaliseAskForDebateShape(requestedAsk, shapePolicy, shapePlan, lengthPolicy);
     let plannedAsk: AskRequest = ask;
     let applied: AskApplied | null = null;
     let substitutedAt: Date | null = null;
@@ -4756,7 +4786,7 @@ export class PostgresAskApplication implements AskApplication {
       fundingBasis = resolved.fundingBasis;
       // Debate shape: with billing on the plan id decides the key (PLUS, PRO and MAX each their own), not the tier.
       shapePlan = debateShapePlanKeyOf(resolved.planId, resolved.ask.plan_tier);
-      ask = normaliseAskForDebateShape(resolved.ask, shapePolicy, shapePlan);
+      ask = normaliseAskForDebateShape(resolved.ask, shapePolicy, shapePlan, lengthPolicy);
       plannedAsk = ask;
       applied = appliedAskOf(ask);
       // Paid plans S2 (spec §2.6 item 7, "until the picker is live"): with a VALID

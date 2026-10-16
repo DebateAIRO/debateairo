@@ -136,7 +136,10 @@ export function practiceLengthRows(attempts: readonly PracticeMeasuredAttempt[])
     return Object.freeze({
       model, step, guidedWords: latencySummary(guided).p50, accepted: accepted.length,
       actualWords: Object.freeze({ median: words.p50, p90: words.p90, max: words.max }),
-      overGuidedShare: share(compared.filter((attempt) => attempt.actualWords! > attempt.guidedWords!).length, compared.length),
+      // LG-C: a map call is told one target per part of each item (Task 14 records their sum) while its reply holds several
+      // items, so its share is no comparison and stays null; its guided words still show.
+      overGuidedShare: step === "map" ? null
+        : share(compared.filter((attempt) => attempt.actualWords! > attempt.guidedWords!).length, compared.length),
       runawayStops: mine.filter((attempt) => attempt.finishReason === CUT_OFF).length,
       slips: mine.filter((attempt) => attempt.parseStatus !== null && SLIP_STATUSES.has(attempt.parseStatus)).length
     });

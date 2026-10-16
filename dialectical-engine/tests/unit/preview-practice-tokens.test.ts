@@ -101,6 +101,14 @@ describe("guided and actual words per AI and step", () => {
     expect(practiceTokenRows([refused, repaired]).map((row) => [row.model, row.step, row.calls]))
       .toEqual([[HAIKU, "structure_repair", 1], [GLM, "pros_cons", 1]]);
   });
+
+  it("a map row keeps its guided words but has no over share (LG-C, pre-flight PF-C4.1)", () => {
+    const rows = practiceLengthRows([
+      attempt({ callSiteKey: "MAP:list:1", guidedWords: 70, actualWords: 400 }),
+      attempt({ callSiteKey: "MAP:list:2", guidedWords: 70, actualWords: 300 })
+    ]);
+    expect(rows).toEqual([expect.objectContaining({ model: DEEPSEEK, step: "map", guidedWords: 70, accepted: 2, overGuidedShare: null })]);
+  });
 });
 
 describe("formats: each try keeps its bound and its thinking level (pre-flight PF-B4.3)", () => {
