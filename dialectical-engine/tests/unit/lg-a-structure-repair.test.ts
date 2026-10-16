@@ -2,12 +2,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { JUDGE_ANSWER_FORM, Judge, classifyStructuredArtifact } from "@debateai/judgement";
+import { JUDGE_ANSWER_FORM, Judge, PANEL_ANSWER_FORM, PANEL_PROMPT_CONTRACT, classifyStructuredArtifact, judgeAssessmentSchema } from "@debateai/judgement";
 import { STORYTELLER_ANSWER_FORM, STORY_CHECKER_ANSWER_FORM } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
-  previewThinkingStepOf, readPromptFrame, schemaFailureLocator, structureRepairKeepsWords, withStructureRepair,
+  previewThinkingStepOf, readPromptFrame, schemaFailureLocator, structureRepairKeepsWords, structureRepairTextsKeptAt, withStructureRepair,
   type ProviderCallRequest
 } from "@debateai/providers";
 import { GLM, HAIKU_REF, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
@@ -245,6 +245,81 @@ describe("LG-A structureRepairKeepsWords: the reviewer's second probes (fix roun
     const reply = "{\"x\": 1 \"segment_id\": \"s1\", \"summary_line\": \"A stray line from the model\"}";
     expect(structureRepairKeepsWords(reply, { segment_id: "s1" }, "Return only JSON with {segment_id,summary_line} entries.")).toBe(false);
     expect(structureRepairKeepsWords(reply, { segment_id: "s1" }, "Return only JSON with a segment_id and a summary_line.")).toBe(true);
+  });
+});
+
+/**
+ * Task 12b (practice 2026-10-16, transcript seq 475 and 477): GLM's panel judgement wrote a sentence with no key name inside
+ * `evidence` (invalid JSON) and its usual extra `fallacy.description`; Haiku put the rest in the form word for word and left
+ * those two out. The judgement steps' own fixer drops such texts, so the check now keeps a text only where the step keeps
+ * it (controller ruling): a keyless text may go; on the judge legs, the panel and the reviews a text must stay only where
+ * the form states its key at that very place; the steps that keep every declared text keep today's rule.
+ */
+describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", () => {
+  const replies = (name: string) => readFileSync(new URL(`../support/fixtures/structure-repair-replies/${name}`, import.meta.url), "utf8");
+  const BROKEN_PANEL = replies("glm-panel-keyless-evidence-text-broken.txt");
+  const HAIKU_PANEL = replies("glm-panel-keyless-evidence-text-haiku-repair.txt");
+  const PANEL_KEY = "PANEL:JUDGE:cross-root:2->3:preview:fixture-a";
+  const place = { textsKept: "place" as const };
+
+  it("the step's own call-site key says where texts are kept", () => {
+    for (const key of [PANEL_KEY, "PANEL:root", "JUDGE", "JUDGE:critic:root0:r2:p0", "JUDGE:cross-root:0->1", "JUDGE:review:node-1",
+      "REPAIR:STRUCTURE:PANEL:root"]) expect(structureRepairTextsKeptAt(key, "served"), key).toBe("place");
+    for (const [key, lane] of [["COMPOSER:SYNTHESIZER:INITIAL:1", "served"], ["POST_COMPOSE_R9:EVALUATOR:1", "served"],
+      ["STORY:STORYTELLER:1", "story"], ["STORY:CHECKER:2", "story"], ["MAP:angles", "served"], ["VERDICT:judge:1", "served"],
+      ["CONFORMANCE:SEGMENT", "served"]] as const) expect(structureRepairTextsKeptAt(key, lane), key).toBe("anywhere");
+  });
+
+  it("accepts the practice run's panel repair: a keyless sentence and fallacy.description left out", () => {
+    const repaired = JSON.parse(HAIKU_PANEL) as unknown;
+    expect(structureRepairKeepsWords(BROKEN_PANEL, repaired, PANEL_ANSWER_FORM, place)).toBe(true);
+    // A step that keeps every declared text would still need `description` (the form states it, in a fatal flag).
+    expect(structureRepairKeepsWords(BROKEN_PANEL, repaired, PANEL_ANSWER_FORM)).toBe(false);
+  });
+
+  it("accepts it end to end through the wrapper, the panel's own classifier deciding", async () => {
+    const panelFramed = buildFramedPrompt({ contract: PANEL_PROMPT_CONTRACT, material: [{ name: "statement", content: "The statement." }] });
+    const original = previewGlmHarness([{ content: BROKEN_PANEL }]);
+    const repair = route(HAIKU_PANEL);
+    const result = await withStructureRepair(original.gateway, repair.route).call(request({
+      callSiteKey: PANEL_KEY, packet: panelFramed.packet, modelRole: "JUDGE",
+      classifyContent: (content, reply) => classifyStructuredArtifact(content, judgeAssessmentSchema, reply, { fixer: {} }),
+      buildRepairPacket: (rejected) => buildFramedRepairPrompt(panelFramed, schemaFailureLocator(rejected)) }));
+    expect(repair.requests).toHaveLength(1);
+    expect(result).toMatchObject({ content: HAIKU_PANEL, repairForm: "STRUCTURE", model: GLM, rawArtifactRef: original.artifacts[0]!.artifactId });
+  });
+
+  it("still refuses a repair that leaves out a text the form states at that place", () => {
+    const repaired = JSON.parse(HAIKU_PANEL) as { context: { ambiguityFlags: string[] }; critic: Record<string, unknown> };
+    const fewerFlags = { ...repaired, context: { ...repaired.context, ambiguityFlags: repaired.context.ambiguityFlags.slice(1) } };
+    expect(structureRepairKeepsWords(BROKEN_PANEL, fewerFlags, PANEL_ANSWER_FORM, place)).toBe(false);
+    const { summary: _dropped, ...criticWithoutSummary } = repaired.critic;
+    expect(structureRepairKeepsWords(BROKEN_PANEL, { ...repaired, critic: criticWithoutSummary }, PANEL_ANSWER_FORM, place)).toBe(false);
+    // The round-1 probes that rest on this rule, on a "place" step: a stated root note, a stated list's entry, a text made null.
+    expect(structureRepairKeepsWords("{\"score\": 0.5 \"answer\": \"It is so\", \"note\": \"Only for the central lines\"}",
+      { answer: "It is so", score: 0.5 }, "{\"answer\": string, \"note\": string, \"score\": number}", place)).toBe(false);
+    expect(structureRepairKeepsWords("{\"x\": 1 \"why\": [\"Fares fell.\", \"Riders rose.\"]}", { why: ["Fares fell."] }, "{\"why\": [string]}", place)).toBe(false);
+    expect(structureRepairKeepsWords("{\"x\": 1 \"objection\": \"Riders rose.\", \"satisfied\": false}", { objection: null, satisfied: false },
+      "{\"satisfied\": boolean, \"objection\": null | string}", place)).toBe(false);
+    // Without a form, a key the repair keeps (here holding null) is a stated place.
+    expect(structureRepairKeepsWords("{\"x\": 1 \"objection\": \"Riders rose.\", \"satisfied\": false}", { objection: null, satisfied: false },
+      undefined, place)).toBe(false);
+  });
+
+  it("a text under a name the story's form states elsewhere is still required on a story step", () => {
+    const H = "Free buses help riders most";
+    const broken = `{"x": 1 "short": {"headline": "${H}", "text": "A stray sentence from the model"}}`;
+    expect(structureRepairTextsKeptAt("STORY:STORYTELLER:1", "story")).toBe("anywhere");
+    expect(structureRepairKeepsWords(broken, { short: { headline: H } }, STORYTELLER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(broken, { short: { headline: H } }, STORYTELLER_ANSWER_FORM, place)).toBe(true);
+  });
+
+  it("a sentence with no key name of its own may be left out on every step", () => {
+    const broken = "{\"x\": 1 \"answer\": \"It is so\", \"a sentence the model wrote with no key\", \"score\": 0.5}";
+    expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, FORM)).toBe(true);
+    expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, FORM, place)).toBe(true);
+    // A keyless sentence is never a source for a field, not even joined to the text before it.
+    expect(structureRepairKeepsWords(broken, { answer: "It is so a sentence the model wrote with no key", score: 0.5 }, FORM)).toBe(false);
   });
 });
 

@@ -17,7 +17,7 @@
  * import cycle is safe (ESM live bindings).
  */
 import { createHash } from "node:crypto";
-import { RUN_LEVEL_SPEND_STOP_CODES, STRUCTURE_REPAIR_CALL_SITE_PREFIX, TypedDomainError } from "@debateai/kernel";
+import { RUN_LEVEL_SPEND_STOP_CODES, STRUCTURE_REPAIR_CALL_SITE_PREFIX, TypedDomainError, lengthCallStepOf } from "@debateai/kernel";
 import { contentRepairsOf, decodeModelJson } from "./model-json.js";
 import { buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract } from "./prompt-frame.js";
 import {
@@ -93,8 +93,12 @@ const FORM_BRACE_LIST = /\{\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0
 const VALUE_CHANGING_REPAIRS: ReadonlySet<string> = new Set(["UNASKED_KEYS", "INNER_UNASKED_KEYS", "MAP_TEXT_TRIMMED",
   "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"]);
 
-/** One value of a reply with the key names above it (list positions left out; a dotted key read as its parts). */
-type ReplyValue = Readonly<{ path: readonly string[]; value: string | number | boolean }>;
+/**
+ * One value of a reply with the key names above it (list positions left out; a dotted key read as its parts). `keyed`
+ * (Task 12b): false for a value written in an object with no key name of its own (`{"quality": 0.5, "a sentence", …}`,
+ * invalid JSON the scan reads past): its path then names the key before it, which is not its own.
+ */
+type ReplyValue = Readonly<{ path: readonly string[]; value: string | number | boolean; keyed?: false }>;
 type ReplyReading = Readonly<{ values: readonly ReplyValue[]; keys: ReadonlySet<string> }>;
 
 const normalText = (text: string): string => text.normalize("NFC").replace(/\s+/gu, " ").trim();
@@ -108,6 +112,72 @@ function unescapeJsonText(text: string): string {
 function formNames(answerForm: string): readonly string[] {
   return [...[...answerForm.matchAll(FORM_QUOTED_NAME)].map((match) => match[1]!),
     ...[...answerForm.matchAll(FORM_BRACE_LIST)].flatMap((match) => match[1]!.split(",").map((name) => name.trim()))];
+}
+
+/** A quoted form key: a name, then a colon after it. */
+const FORM_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+const FORM_KEY_COLON = /\s*:/uy;
+
+/**
+ * Task 12b: the PLACES `answerForm` states, read from its own nesting: each quoted key followed by `:`, with the quoted keys
+ * of the objects around it (list brackets add nothing, as list positions add nothing to a value's path), dotted
+ * (`fallacy.fatalFlags.description`). Prose around the form's skeleton holds no quoted key followed by `:`, and its
+ * brackets (`number [0,1]`, `string[]`) close where they open.
+ */
+function formPlaces(answerForm: string): ReadonlySet<string> {
+  type Frame = { object: boolean; key: string | null };
+  const stack: Frame[] = [];
+  const places = new Set<string>();
+  for (let index = 0; index < answerForm.length; index += 1) {
+    const character = answerForm[index]!;
+    if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null }); continue; }
+    if (character === "}" || character === "]") { stack.pop(); continue; }
+    if (character !== "\"") continue;
+    const end = answerForm.indexOf("\"", index + 1);
+    if (end < 0) break;
+    const name = answerForm.slice(index + 1, end);
+    const top = stack.at(-1);
+    FORM_KEY_COLON.lastIndex = end + 1;
+    if (top?.object === true && FORM_KEY_COLON.test(answerForm) && FORM_KEY_NAME.test(name)) {
+      top.key = name;
+      places.add([...stack.flatMap((frame) => frame.object && frame.key !== null ? [frame.key] : [])].join("."));
+    }
+    index = end;
+  }
+  return places;
+}
+
+/**
+ * Task 12b (controller ruling, practice 2026-10-16): where a broken text must be kept, as the step's own fixer keeps it.
+ *  · "anywhere": the steps whose readers keep every declared text (`keepDeclaredTexts`: the answer writer and checker,
+ *    the storyteller and the story checker, the map): a text under any name the form states must survive;
+ *  · "place": the judgement package's steps (the judge legs, the panel, the reviews; their fixer drops an unknown key a
+ *    name declared only elsewhere): a text must survive only where the form states that key at the same place.
+ * The wrapper reads the step from the original call-site key with the kernel's step words (`lengthCallStepOf`), the one
+ * vocabulary the thinking table and the length rows already use, so no step builder names it again (contract deviation
+ * 1). Any other key (no step, a future step) keeps the stricter "anywhere".
+ */
+export type StructureRepairTextsKept = "anywhere" | "place";
+const TEXTS_KEPT_AT_PLACE: ReadonlySet<string> = new Set(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer"]);
+export function structureRepairTextsKeptAt(callSiteKey: string, lane?: string): StructureRepairTextsKept {
+  const step = lengthCallStepOf(structureRepairOriginalKey(callSiteKey), lane);
+  return step !== null && TEXTS_KEPT_AT_PLACE.has(step) ? "place" : "anywhere";
+}
+
+/** Task 12b: every key path of a decoded value (dotted, list positions left out), a key holding null or {} included. */
+function keyPlaces(value: unknown): ReadonlySet<string> {
+  const places = new Set<string>();
+  const walk = (node: unknown, path: readonly string[]): void => {
+    if (Array.isArray(node)) { for (const entry of node) walk(entry, path); return; }
+    if (typeof node !== "object" || node === null) return;
+    for (const [key, entry] of Object.entries(node)) {
+      const next = [...path, ...keyParts(key)];
+      places.add(next.join("."));
+      walk(entry, next);
+    }
+  };
+  walk(value, []);
+  return places;
 }
 
 /** Every text, number and true/false value of a decoded reply, with its key path, and every key name. */
@@ -148,11 +218,24 @@ function readBroken(brokenReply: string): ReplyReading {
  */
 function scanValues(text: string): ReplyReading {
   /** `owned`: the values read under each key of this object so far, so a key written again drops them (JSON.parse's reading). */
-  type Frame = { object: boolean; key: readonly string[] | null; owned: Map<string, number[]> };
+  /**
+   * `fresh`: an object's last key has no value yet; `keyed`: a list was written under a key of its own (its entries are
+   * that key's). A value in an object whose last key already has one has no key of its own (Task 12b).
+   */
+  type Frame = { object: boolean; key: readonly string[] | null; owned: Map<string, number[]>; fresh: boolean; keyed: boolean };
   const stack: Frame[] = [];
   const values: ReplyValue[] = [];
   const dropped = new Set<number>();
   const keys = new Set<string>();
+  /** Whether the next value at the top of the stack has a key of its own; it uses that key up. */
+  const takeKey = (): boolean => {
+    const top = stack.at(-1);
+    if (top === undefined) return true;
+    if (!top.object) return top.keyed;
+    const own = top.fresh && top.key !== null;
+    top.fresh = false;
+    return own;
+  };
   const record = (value: ReplyValue): void => {
     for (const frame of stack) {
       if (!frame.object || frame.key === null) continue;
@@ -191,24 +274,31 @@ function scanValues(text: string): ReplyReading {
       const top = stack.at(-1);
       if (top?.object === true && text[markAt(cursor + 1)] === ":") {
         top.key = keyParts(value);
+        top.fresh = true;
         for (const part of top.key) keys.add(part);
         const name = top.key.join(".");
         for (const earlier of top.owned.get(name) ?? []) dropped.add(earlier);
         top.owned.delete(name);
       } else if (top !== undefined) {
-        record({ path: pathNow(), value });
+        record(takeKey() ? { path: pathNow(), value } : { path: pathNow(), value, keyed: false });
       }
       index = cursor + 1;
       continue;
     }
-    if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null, owned: new Map() }); index += 1; continue; }
+    if (character === "{" || character === "[") {
+      const keyed = takeKey();
+      stack.push({ object: character === "{", key: null, owned: new Map(), fresh: false, keyed });
+      index += 1;
+      continue;
+    }
     if (character === "}" || character === "]") { stack.pop(); index += 1; continue; }
     SCALAR_TOKEN.lastIndex = index;
     const scalar = SCALAR_TOKEN.exec(text);
     if (scalar !== null && (index === 0 || SCALAR_BEFORE.test(text[index - 1]!))) {
       const after = text[index + scalar[0].length];
       if (stack.length > 0 && (after === undefined || SCALAR_AFTER.test(after))) {
-        record({ path: pathNow(), value: scalar[0] === "true" ? true : scalar[0] === "false" ? false : Number(scalar[0]) });
+        const parsed = scalar[0] === "true" ? true : scalar[0] === "false" ? false : Number(scalar[0]);
+        record(takeKey() ? { path: pathNow(), value: parsed } : { path: pathNow(), value: parsed, keyed: false });
       }
       index += scalar[0].length;
       continue;
@@ -285,19 +375,27 @@ function joinedFrom(wanted: string, candidates: readonly number[], texts: readon
  *    member written too deep and renaming a misspelt key keep it; moving it to another field (a swapped score, a
  *    criterion's verdict moved to its neighbour, steelman and critic swapped, a note moved into a missing field) is
  *    refused;
- *  · nothing asked was lost: every non-empty text of the broken reply under a name the step's answer form states
- *    (`answerForm`: its quoted keys and its `{a,b,c}` lists; without it, a key the repair keeps) is, whole, in a text of
- *    the repair. Texts under names the form never states may be dropped, as the step's own fixer drops them.
+ *  · nothing asked was lost (Task 12b: as the step's own fixer keeps it, `textsKept`): every non-empty text of the broken
+ *    reply WITH A KEY OF ITS OWN, under a key the step's answer form states — at the same place ("place": the judge legs,
+ *    the panel, the reviews), or anywhere ("anywhere", the default: the steps that keep every declared text) — is,
+ *    whole, in a text of the repair. A text written with no key name, and one under a name the form states only
+ *    elsewhere on a "place" step (GLM's `fallacy.description`), may be dropped, as that step's fixer drops it. The names
+ *    a form states are its quoted keys and its `{a,b,c}` lists, its places its quoted keys within its own nesting
+ *    (`formPlaces`); the repair's own keys and places count too (all there is without `answerForm`). Texts under names the
+ *    form never states may be dropped, as the step's own fixer drops them.
  * Null and empty texts are never checked: they carry no words (a lost text is caught by the last rule).
  */
-export function structureRepairKeepsWords(brokenReply: string, repaired: unknown, answerForm?: string): boolean {
+export function structureRepairKeepsWords(brokenReply: string, repaired: unknown, answerForm?: string,
+  options: Readonly<{ textsKept?: StructureRepairTextsKept }> = {}): boolean {
   const broken = readBroken(brokenReply);
   const repair = readValues(repaired);
   const fits = (source: ReplyValue, target: ReplyValue): boolean => mayComeFrom(source.path, target.path, repair.keys, broken.keys);
   const samePath = (source: ReplyValue, target: ReplyValue): boolean =>
     source.path.length === target.path.length && source.path.every((key, at) => key === target.path[at]);
   const normal = broken.values.map((entry) => typeof entry.value === "string" ? normalText(entry.value) : "");
-  const used = new Set<number>();
+  // Task 12b: a value written with no key name of its own is never a source: placing it under a key is the repair's
+  // guess, not the AI's words where it put them. It may only be left out.
+  const used = new Set<number>(broken.values.flatMap((entry, index) => entry.keyed === false ? [index] : []));
   const free = (index: number): boolean => !used.has(index);
   const leaves = repair.values.filter((leaf) => typeof leaf.value !== "string" || normalText(leaf.value) !== "");
   const same = (entry: ReplyValue, index: number, leaf: ReplyValue): boolean => typeof leaf.value === "string"
@@ -327,11 +425,13 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
     for (const index of parts) used.add(index);
   }
   const stated = new Set<string>([...repair.keys, ...(answerForm === undefined ? [] : formNames(answerForm))]);
+  const places = new Set<string>([...keyPlaces(repaired), ...(answerForm === undefined ? [] : formPlaces(answerForm))]);
+  const asked = (entry: ReplyValue): boolean => options.textsKept === "place"
+    ? places.has(entry.path.join(".")) : stated.has(entry.path.at(-1)!);
   const keptTexts = repair.values.flatMap((leaf) => typeof leaf.value === "string" ? [` ${normalText(leaf.value)} `] : []);
   return broken.values.every((entry, index) => {
-    const name = entry.path.at(-1);
     const text = normal[index]!;
-    return typeof entry.value !== "string" || name === undefined || !stated.has(name) || text === ""
+    return typeof entry.value !== "string" || entry.keyed === false || entry.path.length === 0 || !asked(entry) || text === ""
       || keptTexts.some((kept) => kept.includes(` ${text} `));
   });
 }
@@ -405,7 +505,8 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
           return { parseStatus: "SCHEMA_FAILED", parseError: NOT_VERBATIM };
         }
         const decoded = decodeModelJson(content, reply);
-        return decoded.ok && structureRepairKeepsWords(broken, decoded.value, answerForm)
+        return decoded.ok && structureRepairKeepsWords(broken, decoded.value, answerForm,
+          { textsKept: structureRepairTextsKeptAt(request.callSiteKey, request.lane) })
           ? classified : { parseStatus: "SCHEMA_FAILED", parseError: NOT_VERBATIM };
       }
     });

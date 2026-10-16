@@ -1,0 +1,30 @@
+{
+  "steelman": {
+    "summary": "The statement's strongest form is: when comparing new-build nuclear against wind and solar plus storage, the levelised cost of electricity for new nuclear is typically higher than for utility-scale renewables, and when system-wide costs are included (firming, transmission, curtailment), renewables-plus-storage also tends to come out cheaper in most markets. The claim is deliberately qualified: it concedes that in cases of very high storage requirements, land scarcity, or unusual grid conditions, nuclear's high capacity factor and land efficiency can narrow or reverse the gap. This qualification makes the claim defensible rather than absolute, and it matches the framing of the question, which asks about cost 'for cutting the emissions of a country' — a system-level, not a plant-level, question.",
+    "fidelity": 0.85
+  },
+  "critic": {
+    "summary": "A plausible counter is that the comparison is sensitive to assumptions the statement does not disclose: the capacity mix, storage duration, discount rate, construction timelines, and whether storage is sized for average years or multi-day weather events (Dunkelflaute). 'Generally not cheaper in most markets' sweeps across very different markets — those with abundant hydro interconnection versus isolated, low-wind grids — and the hedging clause ('the gap narrows or reverses under extreme storage needs') is broad enough that it could absorb most counterexamples, making the claim hard to falsify. A critic would ask which markets, which storage durations, and which cost years the 'most markets' judgement rests on, since long-duration storage costs dominate and are less mature than renewable generation costs.",
+    "counterargumentStrength": 0.65,
+    "basis": "PLAUSIBLE_COUNTER"
+  },
+  "evidence": {
+    "quality": 0.5,
+    "statement cites no specific studies, cost figures, or market examples; it reads as a well-informed synthesis rather than an evidenced claim, so its evidential quality is moderate but unverifiable as stated",
+    "relevance": 0.95
+  },
+  "context": {
+    "fit": 0.9,
+    "ambiguityFlags": [
+      "no time horizon given — costs of both technologies are changing and 'cheaper' depends on the build year assumed",
+      "'most markets' is undefined and could mean geographic markets, electricity markets, or countries",
+      "'paired with storage' leaves storage duration and sizing unspecified, which is decisive for the comparison",
+      "levelised and system-cost bases can disagree; the statement appeals to both without distinguishing them"
+    ]
+  },
+  "fallacy": {
+    "severity": 0.2,
+    "fatalFlags": [],
+    "description": "No fatal fallacy. Minor risks: the 'most markets' phrasing borders on an unsupported generalisation, and the hedge about extreme storage needs, land scarcity, or unusual grid conditions, while honest, is vague enough to weaken the claim's falsifiability. These are clarity weaknesses, not reasoning defects of serious severity."
+  }
+}

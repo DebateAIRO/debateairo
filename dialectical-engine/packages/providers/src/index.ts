@@ -2807,7 +2807,8 @@ export {
 export {
   STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
   STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PASSED_STOPS, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
-  structureRepairOriginalKey, withStructureRepair, type StructureRepairRoute
+  structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
+  type StructureRepairTextsKept
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
