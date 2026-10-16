@@ -85,6 +85,33 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
     expect(decodeModelJson("{\"a\": “closed with a straight quote\", \"b\": 1}", STOP).ok).toBe(false);
   });
 
+  // Fix round 1 (review, 2026-10-16): the first closing quote followed by , } ] may belong to a LATER value. A value that
+  // would swallow keys, list items, numbers, objects or straight texts is never read: the decode fails as today.
+  it.each([
+    ["a straight closer, then a later value's closer (key b swallowed)", "{\"a\": “x\", \"b\": “y”}"],
+    ["Romanian „ with a straight closer, then a later „…”", "{\"a\": „Planul e bun\", \"b\": „Altceva”, \"c\": 1}"],
+    ["three list items read as two", "{\"flags\": [\"a\", “b\", “c”]}"],
+    ["a number and true/false swallowed", "{\"a\": “x\", \"n\": 3, \"ok\": true, \"b\": “y”}"],
+    ["an object swallowed", "{\"a\": “x\", \"o\": {\"k\": 1}, \"b\": “y”}"],
+    ["the closer inside a later straight text", "{\"a\": “x\", \"b\": \"y ”, \"c\": \"z\"}"],
+    ["a typographic key swallowed", "{\"a\": „x, “k”: “y”}"],
+    ["the closer belongs to a later value", "{\"a\": “one, \"b\": “two”}"],
+    ["the closer belongs to a later list item", "{\"a\": [“one, “two”]}"]
+  ])("4. %s: not repaired", (_name, text) => {
+    expect(decodeModelJson(text, STOP).ok).toBe(false);
+    expect(classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("PARSE_FAILED");
+  });
+
+  it("a “ value holding another “ before its closer (an unbalanced nested quote) is not repaired; „…„…\"…” still is", () => {
+    expect(decodeModelJson("{\"a\": “He said “yes”, \"b\": “no”}", STOP).ok).toBe(false);
+    expect(decodeModelJson("{\"a\": “He called it “the plan”, and left”, \"b\": 1}", STOP).ok).toBe(false);
+    const romanian = decodedOk("{\"a\": „El a spus „da\" și a plecat”, \"b\": 1}");
+    expect(romanian.value).toEqual({ a: "El a spus „da\" și a plecat", b: 1 });
+    expect(decodedRepairsOf(romanian)).toEqual(["QUOTE_DELIMITERS_STRAIGHTENED"]);
+    const german = decodedOk("{\"a\": „Er sagte “ja” und ging“, \"b\": 1}");
+    expect(german.value).toEqual({ a: "Er sagte “ja” und ging", b: 1 });
+  });
+
   it("5. German „…“ and mixed „…” values are straightened", () => {
     const decoded = decodedOk("{\"a\": „German style, with a comma“, \"b\": „mixed style: it's fine”}");
     expect(decoded.value).toEqual({ a: "German style, with a comma", b: "mixed style: it's fine" });
@@ -98,6 +125,17 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
     expect(decodedOk("{\"list\": [“first”,„second“ ]}").value).toEqual({ list: ["first", "second"] });
   });
 
+  // Fix round 1: a straight list item before a typographic one may also be read as ONE text whose inner quotes INNER_QUOTE
+  // escapes (when a later straight quote can end it). Alone, INNER_QUOTE reads it so, first, as today. Beside an unrelated
+  // typographic member it is REFUSED (the structure call keeps every word), never read as three items: the code cannot
+  // tell which reading the AI meant, and the list must not read differently because of another member.
+  it("6b. [\"he said: \", “quoted”, \"rest\"] is one text alone (today) and refused beside another typographic member", () => {
+    const alone = decodedOk("{\"list\": [\"he said: \", “quoted”, \"rest\"]}");
+    expect(decodedRepairsOf(alone)).toEqual(["INNER_QUOTE"]);
+    expect(alone.value).toEqual({ list: ["he said: \", “quoted”, \"rest"] });
+    expect(decodeModelJson("{\"x\": “top”, \"list\": [\"he said: \", “quoted”, \"rest\"]}", STOP).ok).toBe(false);
+  });
+
   it("escapes a backslash and a raw line break inside such a value (RAW_LINE_BREAK named too)", () => {
     const decoded = decodedOk("{\"a\": “one \\ two\nthree \"four\"”}");
     expect(decoded.value).toEqual({ a: "one \\ two\nthree \"four\"" });
@@ -106,7 +144,9 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
 
   it("never repairs a key: a typographic quote at a key's place leaves the reply as today", () => {
     expect(decodeModelJson("{“a”: \"x\"}", STOP).ok).toBe(false);
-    // Today INNER_QUOTE reads this one as one text (the quote after x cannot end it before a key-less “b”); it still does.
+    // KNOWN WRONG READING, pinned as "no worse than today", not as desired behaviour: INNER_QUOTE (tried before the syntax
+    // pass) reads this as one text `x", “b”: "y` because the quote after x cannot end a value before a key-less “b”. This
+    // fix does not touch INNER_QUOTE, so it reads the same as before it.
     const today = decodedOk("{\"a\": \"x\", “b”: \"y\"}");
     expect(decodedRepairsOf(today)).toEqual(["INNER_QUOTE"]);
     expect(today.value).toEqual({ a: "x\", “b”: \"y" });

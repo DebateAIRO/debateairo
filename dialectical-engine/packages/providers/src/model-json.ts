@@ -500,17 +500,50 @@ const TYPOGRAPHIC_VALUE_CLOSERS: ReadonlyMap<string, string> = new Map([["\u201C
 
 /**
  * The index of the quote that closes the typographic text value opened at `open`: the first of its opener's closing
- * quotes (`TYPOGRAPHIC_VALUE_CLOSERS`) that is followed, blanks skipped, by `,`, `}` or `]`. Null when none is, up to
- * the end of the text. Linear from `open`.
+ * quotes (`TYPOGRAPHIC_VALUE_CLOSERS`) that is followed, blanks skipped, by `,`, `}` or `]`. Linear from `open`.
+ *
+ * Fix round 1 (review 2026-10-16, "never change what the AI said"): that closing quote may belong to a LATER value, so
+ * the text would swallow keys, list items, numbers, objects or straight texts. Null (no repair) when, BEFORE the closing
+ * quote:
+ *  · a straight `"` is followed, blanks skipped, by `,` `:` `}` or `]` (it can end a JSON string: a straight-closed
+ *    value, or a later key or text);
+ *  · a `”` or `“` is followed, blanks skipped, by `:` (it ends a key);
+ *  · for a “ opener only, another “ stands (an unbalanced nested quotation whose own closing quote we could take); a „
+ *    opener may hold „ (the Romanian „…„…"…” nests so);
+ * and when no closing quote comes before the end of the text.
  */
 function typographicValueEnd(text: string, open: number): number | null {
-  const closers = TYPOGRAPHIC_VALUE_CLOSERS.get(text[open]!) ?? "";
+  const opener = text[open]!;
+  const closers = TYPOGRAPHIC_VALUE_CLOSERS.get(opener) ?? "";
   for (let index = open + 1; index < text.length; index += 1) {
-    if (!closers.includes(text[index]!)) continue;
+    const character = text[index]!;
+    if (opener === "\u201C" && character === "\u201C") return null;
+    const straight = character === "\"";
+    if (!straight && character !== "\u201C" && character !== "\u201D") continue;
     const next = text[nextSignificant(text, index + 1)];
-    if (next === "," || next === "}" || next === "]") return index;
+    if (next === ":") return null;
+    if (next === "," || next === "}" || next === "]") {
+      if (straight) return null;
+      if (closers.includes(character)) return index;
+    }
   }
   return null;
+}
+
+/**
+ * Fix round 1: the position of the LAST straight quote (not escaped by a backslash) that INNER_QUOTE could take as the
+ * end of a list item (`closesValue` inside a list), or -1. A straight list item whose quote stands before it can also be
+ * read as one longer text that ends there. One pass.
+ */
+function lastListItemEnd(text: string): number {
+  let last = -1;
+  let backslashes = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (character === "\"" && backslashes % 2 === 0 && closesValue(text, index + 1, "array")) last = index;
+    backslashes = character === "\\" ? backslashes + 1 : 0;
+  }
+  return last;
 }
 
 /**
@@ -533,11 +566,7 @@ function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" |
   if (text[at] === "," && (text[closer] === "}" || text[closer] === "]") && onlyClosersToEnd(text, closer + 1)) {
     return { inObject: true, inArray: true };
   }
-  // QUOTE_DELIMITERS_STRAIGHTENED: in a list, a `,` and then a typographic opening quote is the next item (`["a", “b”]`).
-  // It counts only when that quote is straightened: an opening quote left as it is stands outside every text, and then
-  // nothing decodes.
-  const typographicItem = text[at] === "," && TYPOGRAPHIC_VALUE_CLOSERS.has(text[nextSignificant(text, at + 1)] ?? "");
-  return { inObject: closesValue(text, from, "object"), inArray: typographicItem || closesValue(text, from, "array") };
+  return { inObject: closesValue(text, from, "object"), inArray: closesValue(text, from, "array") };
 }
 
 /**
@@ -565,16 +594,29 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
   let index = 0;
   /** A value may start here: after an object's `:`, a list's `[` or a list's item-separating `,`, blanks only since. */
   let valueSlot = false;
-  /** The opening quotes already found without a closing quote: none can close later either (linear, CI-1b). */
-  const unclosed = new Set<string>();
+  /**
+   * Once one opening quote at a value's place is left as it is, it stands outside every text and nothing can decode, so
+   * no later one is searched (linear, CI-1b).
+   */
+  let typographicRefused = false;
+  /** The opening quotes this pass straightened, by index. */
+  const straightened = new Set<number>();
+  /**
+   * Fix round 1: a straight list item followed by `,` and a typographic opening quote (`["a", “b”]`): `closesValue` does
+   * not end it there. Its end counts as a list item's (`ends[end].inArray`) only when that opener was straightened and no
+   * later straight quote could end it as one longer text (`lastListItemEnd`); otherwise the reading is ambiguous and the
+   * pass refuses it.
+   */
+  const beforeTypographicItem: { end: number; quote: number; opener: number }[] = [];
   while (index < text.length) {
     const character = text[index]!;
     const top = stack.at(-1);
-    if (valueSlot && TYPOGRAPHIC_VALUE_CLOSERS.has(character) && !unclosed.has(character)) {
+    if (valueSlot && !typographicRefused && TYPOGRAPHIC_VALUE_CLOSERS.has(character)) {
       const close = typographicValueEnd(text, index);
       if (close === null) {
-        unclosed.add(character);
+        typographicRefused = true;
       } else {
+        straightened.add(index);
         let body = "";
         for (let cursor = index + 1; cursor < close; cursor += 1) {
           const inner = text[cursor]!;
@@ -617,6 +659,11 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
       ends.push({ ...innerQuoteEnd(text, cursor + 1), scanKey: isKey, scanInArray: top?.kind === "array" });
+      const comma = nextSignificant(text, cursor + 1);
+      const opener = nextSignificant(text, comma + 1);
+      if (!isKey && text[comma] === "," && TYPOGRAPHIC_VALUE_CLOSERS.has(text[opener] ?? "")) {
+        beforeTypographicItem.push({ end: ends.length - 1, quote: cursor, opener });
+      }
       if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
@@ -643,6 +690,12 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     else if (character === ":" && top?.kind === "object") top.expectKey = false;
     out += character;
     index += 1;
+  }
+  if (beforeTypographicItem.some((item) => straightened.has(item.opener))) {
+    const lastEnd = lastListItemEnd(text);
+    for (const item of beforeTypographicItem) {
+      if (straightened.has(item.opener) && lastEnd < item.quote) ends[item.end] = { ...ends[item.end]!, inArray: true };
+    }
   }
   return Object.freeze({ text: out, made, ends });
 }
