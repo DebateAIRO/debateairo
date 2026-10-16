@@ -64,9 +64,9 @@ describe("map replies: angles", () => {
     expect(mapClassifyReply(JSON.stringify({ question_language: "x".repeat(35), ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck).value?.question_language)
       .toBe("x".repeat(35));
     expect(mapClassifyReply(JSON.stringify(ANGLES), STOP, mapAnglesReplySchema, mapAnglesCheck).value?.question_language).toBeUndefined();
-    // The schema stays strict for every other key.
+    // LG-A (L31): any other unknown key is dropped and named; the planner's measured-only question_language is kept.
     expect(mapClassifyReply(JSON.stringify({ question_language: "ro", extra: 1, ...ANGLES }), STOP, mapAnglesReplySchema, mapAnglesCheck)
-      .classification.parseStatus).toBe("SCHEMA_FAILED");
+      .classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
   });
 
   it("refuses an angle kind the planner may not use (GENERAL is the code's own)", () => {

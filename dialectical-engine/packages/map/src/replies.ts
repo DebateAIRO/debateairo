@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ReplyLanguageExpectation } from "@debateai/kernel";
-import { decodeModelJson, type ContentClassification, type ModelJsonRepair, type ModelReplyFacts } from "@debateai/providers";
+import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs, type ContentClassification, type ModelJsonRepair,
+  type ModelReplyFacts, type ReplyFixerOptions } from "@debateai/providers";
 import type { MapReplySalvage } from "./salvage.js";
 import { mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
@@ -14,6 +15,22 @@ import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
  */
 const L = MAP_LIMITS;
 const mapId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/u);
+
+/**
+ * LG-A (pre-flight PF-A30, ruling R5): the fixer's repairs that move a member to another path. The step salvages keep
+ * every path (salvage.ts); these do not, so a refusal's paths after one of them would name members the reply as written
+ * does not have, while the patch follow-up merges into the reply as written.
+ */
+const PATH_MOVING_FIXER_REPAIRS: ReadonlySet<ModelJsonRepair> = new Set<ModelJsonRepair>(["MEMBER_UNNESTED", "MEMBER_WRAPPED", "PARAGRAPHS_JOINED"]);
+
+/**
+ * LG-A Task 9: the map's fixer keeps a stray text under a name the step's schema declares as a text
+ * (`keepDeclaredTexts`). Those names hold the AI's own words, and several reach a reader: a merged key point's `claim`, a
+ * merged `answer`, a chosen answer's `statement`. A merge answer written inside a key point (`key_points[0].answer`)
+ * would otherwise be dropped and the debate would lose that answer without a word; kept, the reply stays refused and
+ * the follow-up (or the structure-repair call) keeps it. A name the schema never declares is still dropped.
+ */
+const MAP_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
 const mapText = (max: number) => z.string().trim().min(1).max(max);
 const mapPoint = z.object({
   claim: mapText(L.claimMaxChars),
@@ -89,9 +106,16 @@ export type MapReplyCheck<T> = (value: T) => readonly MapReplyIssue[];
  * JSON before the schema, then on the parsed value before the content check), the strict schema, then the step's own
  * content check. Without a salvage, a reply is read exactly as before.
  *
- * `repairs`: every repair an ACCEPTED reply needed, in order (the decode's, then the salvage's); empty for a refused one.
- * The classification's one `jsonRepair` names the first salvage repair when there is one (the reply's content was
- * changed), else the decode's.
+ * LG-A (spec 2026-10-15, L31): when the schema refuses the salvaged reply, the reply fixer (`fixReplyStructure`, with
+ * `MAP_FIXER_OPTIONS`) repairs its form and the schema reads it again; the step's own content check follows as before.
+ *
+ * `repairs`: every repair an ACCEPTED reply needed, in order (the decode's, the decoded salvage's, the fixer's, the parsed
+ * salvage's); empty for a refused one. The classification names them all when there are two or more (LG-A), so the
+ * gateway records them (`specs.ts` passes the classification through); its `jsonRepair` names the first salvage repair
+ * when there is one (the reply's content was changed), else the decode's, else the first. A reply the fixer repaired by
+ * moving a member (MEMBER_UNNESTED, MEMBER_WRAPPED, PARAGRAPHS_JOINED) that the content check then refuses is refused
+ * with the schema's own issues on the reply as written, so the patch follow-up's paths name members of the reply it
+ * merges into (pre-flight PF-A30, ruling R5).
  */
 export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | undefined, schema: z.ZodType<T>,
   check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): Readonly<{ classification: ContentClassification; value: T | null;
@@ -100,24 +124,35 @@ export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | un
   const decoded = decodeModelJson(content, reply);
   if (!decoded.ok) return refused({ parseStatus: "PARSE_FAILED", parseError: "MAP_REPLY_NOT_JSON" });
   const before = salvage.decoded?.(decoded.value) ?? { value: decoded.value, repairs: [] };
-  const parsed = schema.safeParse(before.value);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => ({ code: issue.code,
-      path: issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment))), message: "SCHEMA_FAILED" }));
-    return refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) });
+  const first = schema.safeParse(before.value);
+  /** One reading's schema refusal in the gateway's repair format: `{ code, path, message: "SCHEMA_FAILED" }` per issue. */
+  const schemaRefusal = (result: typeof first) => refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(
+    result.success ? [] : result.error.issues.map((issue) => ({ code: issue.code,
+      path: issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment))), message: "SCHEMA_FAILED" }))) });
+  // LG-A (spec 2026-10-15, L31): the reply fixer, after the step's own salvage, on what the schema refused.
+  let parsed = first;
+  let fixerRepairs: readonly ModelJsonRepair[] = [];
+  if (!first.success) {
+    const fixed = fixReplyStructure(before.value, schema, MAP_FIXER_OPTIONS);
+    if (fixed !== null) {
+      const refixed = schema.safeParse(fixed.value);
+      if (refixed.success) { parsed = refixed; fixerRepairs = fixed.repairs; }
+    }
   }
+  if (!parsed.success) return schemaRefusal(parsed);
   const after = salvage.parsed?.(parsed.data) ?? { value: parsed.data, repairs: [] };
   const problems = check(after.value);
   if (problems.length > 0) {
+    // (pre-flight PF-A30, ruling R5) A value the fixer moved a member in is refused with the PRE-fixer schema refusal:
+    // its paths name members of the reply as written, which is what the patch follow-up merges into.
+    if (fixerRepairs.some((repair) => PATH_MOVING_FIXER_REPAIRS.has(repair))) return schemaRefusal(first);
     const issues = problems.map((problem) => ({ code: "custom", path: [...problem.path], message: problem.code }));
     return refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) });
   }
   const salvaged = [...before.repairs, ...after.repairs];
-  const repairs: ModelJsonRepair[] = [...(decoded.repair === null ? [] : [decoded.repair]), ...salvaged];
-  const named = salvaged[0] ?? decoded.repair;
-  const classification: ContentClassification = named === null
-    ? { parseStatus: "PARSED", parseError: null }
-    : { parseStatus: "PARSED", parseError: null, jsonRepair: named };
+  const repairs: ModelJsonRepair[] = [...decodedRepairsOf(decoded), ...before.repairs, ...fixerRepairs, ...after.repairs];
+  // The step's headline repair is today's: its first salvage repair, else the decode's; a fixer-only reply names its first.
+  const classification = parsedWithRepairs(repairs, salvaged[0] ?? decoded.repair);
   return Object.freeze({ classification, value: after.value, repairs: Object.freeze(repairs) });
 }
 

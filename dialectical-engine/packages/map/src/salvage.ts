@@ -103,10 +103,69 @@ function decodedSalvage(fix: (record: Record<string, unknown>, log: MapSalvageLo
   };
 }
 
-/** Angles: each angle's label and focus are read only by the list prompts, never shown. */
+/** LG-A: the keys whose string values are ids the reply defines, and the keys whose values (a string or a list) name ids. */
+const MAP_ID_DEFINING_KEYS: ReadonlySet<string> = new Set(["angle_id", "key_point_id", "answer_id"]);
+const MAP_ID_NAMING_KEYS: ReadonlySet<string> = new Set(["member_item_ids", "for", "against", "strongest_rival"]);
+
+/**
+ * An id as the map's schema writes ids (`mapId` in replies.ts: `^[a-z0-9][a-z0-9-]{0,23}$`), pre-flight PF-A31 (ruling
+ * R6): compatibility-decomposed (NFKD), combining marks dropped (ț → t, ă → a), lower-cased, every run of other
+ * characters (an underscore, a space, a dot, ß, …) one "-", leading and trailing "-" trimmed, then cut to
+ * `MAP_LIMITS.idMaxChars` (24). A "-" left last by the cut is kept: the id pattern admits it, so a non-empty result
+ * always passes it. An id with nothing left (only signs, like "???") is kept as written, so the schema refuses it as
+ * before and the follow-up asks for it.
+ */
+function normalisedMapId(id: string): string {
+  const normalised = id.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
+    .replace(/[^a-z0-9-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, MAP_LIMITS.idMaxChars);
+  return normalised === "" ? id : normalised;
+}
+
+/**
+ * LG-A (structured-outputs-findings §3, "Id in the wrong shape": Qwen's `specific-CEE-comparatie`; ids over 24
+ * characters; engine §5.2 rule 4): MAP_IDS_NORMALISED. Every id the reply defines and every id it names is normalised
+ * (`normalisedMapId`), the same way, so every reference still names its id. Made only when it changes something and no
+ * two defined ids become one (the collision guard: `KP-1` beside `kp-1`, or `kp_1` beside `kp-1`, leaves the reply as
+ * written); the schema then checks every id's shape as before.
+ */
+function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog): Record<string, unknown> {
+  const defined: string[] = [];
+  const collect = (node: unknown): void => {
+    if (Array.isArray(node)) { node.forEach(collect); return; }
+    if (!isRecord(node)) return;
+    for (const [key, value] of Object.entries(node)) {
+      if (MAP_ID_DEFINING_KEYS.has(key) && typeof value === "string") defined.push(value);
+      collect(value);
+    }
+  };
+  collect(reply);
+  if (new Set(defined.map(normalisedMapId)).size !== new Set(defined).size) return reply;
+  let changed = false;
+  const rewrite = (node: unknown, key: string | null): unknown => {
+    if (Array.isArray(node)) return node.map((entry) => rewrite(entry, key !== null && MAP_ID_NAMING_KEYS.has(key) ? key : null));
+    if (isRecord(node)) return Object.fromEntries(Object.entries(node).map(([inner, value]) => [inner, rewrite(value, inner)]));
+    if (typeof node === "string" && key !== null && (MAP_ID_DEFINING_KEYS.has(key) || MAP_ID_NAMING_KEYS.has(key))) {
+      const next = normalisedMapId(node);
+      if (next !== node) changed = true;
+      return next;
+    }
+    return node;
+  };
+  const out = rewrite(reply, null) as Record<string, unknown>;
+  if (!changed) return reply;
+  log.note("MAP_IDS_NORMALISED");
+  return out;
+}
+
+/** Angles: each angle's label and focus are read only by the list prompts, never shown; LG-A: its id normalised. */
 export const mapAnglesSalvage = Object.freeze({
-  decoded: decodedSalvage((reply, log) => eachRecord(reply, "angles", (angle) =>
-    trimMember(trimMember(angle, "label", MAP_LIMITS.angleLabelMaxChars, log), "focus", MAP_LIMITS.angleFocusMaxChars, log)))
+  decoded: decodedSalvage((reply, log) => normaliseMapIds(eachRecord(reply, "angles", (angle) =>
+    trimMember(trimMember(angle, "label", MAP_LIMITS.angleLabelMaxChars, log), "focus", MAP_LIMITS.angleFocusMaxChars, log)), log))
+});
+
+/** LG-A: the merge's own salvage: its key point and answer ids, and the item ids it names, normalised. */
+export const mapMergeSalvage = Object.freeze({
+  decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log))
 });
 
 /** Lists and snowball lists: each point's why_it_matters and lean. Claims and candidate answers stay strict. */
@@ -134,10 +193,12 @@ export const mapGapSalvage = Object.freeze({
  * Choose: in each answer, the key point ids the run does not hold (`keyPointIds`; null when not known, as in the practice
  * tool's format re-check), an id repeated within one list (the first is kept), and an id named on both sides (dropped
  * from both: it cannot count for and against one answer) are dropped. An answer that named points and would be left with
- * none is left as written, so the check refuses it where it did and the follow-up asks for it.
+ * none is left as written, so the check refuses it where it did and the follow-up asks for it. LG-A: before the schema,
+ * every answer id, key point id and rival id is normalised (MAP_IDS_NORMALISED, `normaliseMapIds`).
  */
 export function mapChooseSalvage(keyPointIds: ReadonlySet<string> | null): MapReplySalvage<MapChooseReply> {
   return Object.freeze({
+    decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log)),
     parsed: (value: MapChooseReply): MapSalvaged<MapChooseReply> => {
       const log = new MapSalvageLog();
       const answers = value.answers.map((answer) => {

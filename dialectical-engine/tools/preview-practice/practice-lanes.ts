@@ -36,6 +36,7 @@ import {
   mapListReplySchema,
   mapListSalvage,
   mapMergeReplySchema,
+  mapMergeSalvage,
   mapSnowballReplySchema,
   type MapReplySalvage
 } from "@debateai/map";
@@ -174,7 +175,6 @@ export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
 
 /** One way a map step's reply is read: its schema and the code salvage its step makes (ruling MAP-SALVAGE). */
 type PracticeMapReading = Readonly<{ schema: Parameters<typeof mapClassifyReply>[2]; salvage: (keyPointIds: ReadonlySet<string> | null) => MapReplySalvage<unknown> }>;
-const noSalvage = (): MapReplySalvage<unknown> => ({});
 
 /**
  * The readings a map step's reply may have. The list key carries both the list and (in a snowball opening) the
@@ -186,7 +186,7 @@ const noSalvage = (): MapReplySalvage<unknown> => ({});
 const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMapReading[]>> = Object.freeze({
   angles: [{ schema: mapAnglesReplySchema, salvage: () => mapAnglesSalvage }],
   list: [{ schema: mapListReplySchema, salvage: () => mapListSalvage }, { schema: mapSnowballReplySchema, salvage: () => mapListSalvage }],
-  merge: [{ schema: mapMergeReplySchema, salvage: noSalvage }],
+  merge: [{ schema: mapMergeReplySchema, salvage: () => mapMergeSalvage }],
   gap: [{ schema: mapGapReplySchema, salvage: () => mapGapSalvage }],
   choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
 });

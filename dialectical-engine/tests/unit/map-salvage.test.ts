@@ -132,14 +132,14 @@ describe("map salvage: too long internal texts are trimmed at a word boundary (M
     expect(issuesOf(strict.classification.parseStatus === "PARSED" ? null : strict.classification.parseError))
       .toEqual(["too_big@angles.0.focus", "too_big@angles.1.focus", "too_big@angles.2.focus", "too_big@angles.3.focus"]);
     const out = mapClassifyReply(QWEN_ANGLES, STOP, mapAnglesReplySchema, mapAnglesCheck, mapAnglesSalvage);
-    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED" });
+    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED", jsonRepairs: ["INNER_QUOTE", "MAP_TEXT_TRIMMED"] });
     expect(out.repairs).toEqual(["INNER_QUOTE", "MAP_TEXT_TRIMMED"]);
     out.value!.angles.forEach((angle, index) => expectWordBoundaryPrefix(angle.focus, QWEN_FOCUS[index]!, MAP_LIMITS.angleFocusMaxChars));
     expect(out.value!.angles.map((angle) => angle.label)).toEqual([
       "Argumentul puternic pentru adoptarea rapidă a euro", "Impactul asupra puterii de cumpărare a cetățeanului obișnuit",
       "Ce ar trebui făcut concret și ce condiții tehnice trebuie îndeplinite", "Riscul pierderii instrumentelor de ajustare în fața șocurilor asimetrice"]);
     // The step's own reader (what the runner and the practice tool call) salvages the same way.
-    expect(mapAnglesSpec(CTX).classify(QWEN_ANGLES, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED" });
+    expect(mapAnglesSpec(CTX).classify(QWEN_ANGLES, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED", jsonRepairs: ["INNER_QUOTE", "MAP_TEXT_TRIMMED"] });
     expect(mapAnglesSpec(CTX).read(QWEN_ANGLES, STOP).angles[3]!.focus.length).toBeLessThanOrEqual(240);
   });
 
@@ -225,7 +225,7 @@ describe("map salvage: a missing or unknown lean reads as context (MAP_LEANS_DEF
     const points = (json(HAIKU_LIST).points as Record<string, unknown>[]);
     const reply = JSON.stringify({ ...json(HAIKU_LIST), points: [{ ...points[0], why_it_matters: QWEN_WHY0 }, points[1], points[2]] });
     const out = mapClassifyReply(`\`\`\`json\n${reply}\n\`\`\``, STOP, mapListReplySchema, mapListCheck(RO), mapListSalvage);
-    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED" });
+    expect(out.classification).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "MAP_TEXT_TRIMMED", jsonRepairs: ["CODE_FENCE", "MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED"] });
     expect(out.repairs).toEqual(["CODE_FENCE", "MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED"]);
   });
 
