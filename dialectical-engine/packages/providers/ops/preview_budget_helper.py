@@ -602,9 +602,13 @@ PriceStep = namedtuple('PriceStep', 'name prompt_tokens_up_to input_usd_per_m ca
                                     'cache_write_1h_usd_per_m cache_read_usd_per_m output_usd_per_m')
 ANTHROPIC_USAGE_KEYS = frozenset({'input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens',
                                   'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo',
-                                  'output_tokens_details'})
+                                  'output_tokens_details', 'speed'})
 # usage.output_tokens_details (Messages reference, read 2026-10-11): a read-only split of output_tokens,
 # which stays the inclusive billed total; thinking_tokens <= output_tokens. Nothing in it is charged.
+# usage.speed (Fast mode page, platform.claude.com/docs/en/build-with-claude/fast-mode, read 2026-10-16):
+# "fast" or "standard", the speed the call ran at. Haiku replies carry it since 2026-10-16 (the first one
+# halted the gate). Only "standard" (or no speed at all) is the list price; "fast" is premium pricing, and
+# any other value is unknown, so both stay uncertain and halt, as a service_tier other than standard does.
 ANTHROPIC_OUTPUT_DETAIL_KEYS = frozenset({'thinking_tokens'})
 ANTHROPIC_CACHE_SPLIT_KEYS = frozenset({'ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens'})
 # The characters JavaScript's String.prototype.trim() removes (WhiteSpace and LineTerminator):
@@ -666,7 +670,7 @@ def outline_block(block):
 def reply_outline(response):
     """What an unreadable Anthropic reply looked like, for the operator: its top-level field names
     with each value's kind, its content block types, its usage field names (one level into nested
-    objects) with kinds, and the service_tier and inference_geo labels. Never text, a number, an id
+    objects) with kinds, and the service_tier, inference_geo and speed labels. Never text, a number, an id
     or a name outside lowercase snake_case (it shows as (other)); at most 40 items a list."""
     if not isinstance(response, dict):
         return {'reply_kind': outline_kind(response)}
@@ -685,7 +689,7 @@ def reply_outline(response):
                              for inner, item in value.items())
         outline['usage'] = outline_capped(sorted(names))
         labels = {}
-        for key in ('service_tier', 'inference_geo'):
+        for key in ('service_tier', 'inference_geo', 'speed'):
             if key in usage:
                 value = usage[key]
                 labels[key] = (value if OUTLINE_LABEL.fullmatch(value) else '(other)') if isinstance(value, str) \
@@ -900,6 +904,8 @@ class AnthropicProfile:
             return 'service_tier', None
         if usage.get('inference_geo') not in (None, 'global'):
             return 'inference_geo', None
+        if usage.get('speed') not in (None, 'standard'):
+            return 'speed', None
         # A cache write reported without its 5-minute/1-hour split: on a call that carried the cache mark it
         # is the 5-minute kind (the only mark a request may carry); on any other call it is charged at the
         # dearer 1-hour price (a write the gate did not ask for is priced on the safe side). A split names each part.
