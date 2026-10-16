@@ -28,6 +28,7 @@ import {
   DEBATE_SHAPE_FORMULA_VERSION, assertDebateShapeCeilingInput, debateShapeReceipt, debateShapeSiteCounts
 } from "./debate-shape-ceiling.js";
 import type { DebateShapeCeilingInput } from "./debate-shape-policy.js";
+import { lengthGuidanceReceipt, type LengthGuidance } from "./length-guidance-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -211,6 +212,12 @@ export interface StructuralCeilingInput {
    * makers. Absent: the receipt is DR-184-v4/v5 byte for byte.
    */
   readonly shape?: DebateShapeCeilingInput;
+  /**
+   * Length guidance (spec 2026-10-15 §3.1, ruling L20) — the debate's numbers under the register's optional
+   * `lengthGuidancePolicy` row (`resolveLengthGuidance`), passed only when the row is in force. Absent: no `length`
+   * member, so the receipt is byte for byte today's. Independent of `shape` and of the formula name.
+   */
+  readonly length?: LengthGuidance;
 }
 
 /**
@@ -219,7 +226,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape">[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -536,7 +543,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     formula_version: shaped !== null ? DEBATE_SHAPE_FORMULA_VERSION : backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
     bounds_source_ref: "engine-exports+register",
     // Debate shape: the run's frozen sizes, LAST and only when shaped, so a receipt minted without them keeps its bytes.
-    ...(shaped === null ? {} : { shape: debateShapeReceipt(shaped.shape, shaped.counts, backupSequences) })
+    ...(shaped === null ? {} : { shape: debateShapeReceipt(shaped.shape, shaped.counts, backupSequences) }),
+    // Length guidance: the run's frozen numbers, after everything else and only with the row, so a receipt minted
+    // without them keeps its bytes (Task 3 pins the order).
+    ...(input.length === undefined ? {} : { length: lengthGuidanceReceipt(input.length) })
   });
 }
 
@@ -1233,14 +1243,18 @@ export {
   lengthAnswerWordsOf,
   lengthGuidanceAllowanceTokens,
   lengthGuidanceLargestTokens,
+  lengthGuidanceOfReceipt,
   lengthGuidancePolicyRow,
   lengthGuidancePolicyStartValues,
+  lengthGuidanceReceipt,
+  lengthGuidanceReceiptSchema,
   parseLengthGuidancePolicy,
   readLengthGuidancePolicy,
   resolveLengthGuidance,
   type LengthGuidance,
   type LengthGuidancePlan,
   type LengthGuidancePolicy,
+  type LengthGuidanceReceipt,
   type LengthLevels
 } from "./length-guidance-policy.js";
 export {

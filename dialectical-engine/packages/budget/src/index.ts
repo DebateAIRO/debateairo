@@ -8,7 +8,10 @@ import {
   debateShapeOfReceipt,
   debateShapeReceiptSchema,
   debateShapeSiteCounts,
-  type DebateShapeCeilingInput
+  lengthGuidanceOfReceipt,
+  lengthGuidanceReceiptSchema,
+  type DebateShapeCeilingInput,
+  type LengthGuidance
 } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -211,7 +214,9 @@ const costEnvelopeBasisSchema = z.object({
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1),
   /** Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt. */
-  shape: debateShapeReceiptSchema.optional()
+  shape: debateShapeReceiptSchema.optional(),
+  /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers; present exactly when the row was in force at admission. */
+  length: lengthGuidanceReceiptSchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -362,6 +367,8 @@ export interface CostEnvelopeBasis {
    * reader of a shaped receipt (PF7): later readers take the sizes from here, never from `wire.shape`.
    */
   readonly shape?: DebateShapeCeilingInput;
+  /** Length guidance: the numbers the run was admitted with; absent on every run admitted without the row. */
+  readonly length?: LengthGuidance;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -411,6 +418,7 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
     }),
     serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
     ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
+    ...(parsed.data.length === undefined ? {} : { length: lengthGuidanceOfReceipt(parsed.data.length) }),
     wire: Object.freeze(parsed.data)
   });
 }

@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import {
-  LENGTH_ALLOWANCE_LIMITS, LENGTH_GUIDANCE_START, LENGTH_GUIDANCE_STEPS, answerRoomTokens, guidedAllowanceTokens,
+  LENGTH_ALLOWANCE_LIMITS, LENGTH_GUIDANCE_START, LENGTH_GUIDANCE_STEPS, TypedDomainError, answerRoomTokens, guidedAllowanceTokens,
   type CharactersPerWord, type LengthGuidanceStep, type LengthThinkingRoomKey, type MapWordTargetPart, type StoryWordTargetField
 } from "@debateai/kernel";
 import { AnswerLengthSchema, type AnswerLength } from "@debateai/contract";
@@ -238,4 +238,98 @@ export function lengthGuidanceLargestTokens(policy: LengthGuidancePolicy, step: 
 /** The answer writer's three targets for one plan: what the /new page says (spec §3.8). */
 export function lengthAnswerWordsOf(policy: LengthGuidancePolicy, plan: DebateShapePlanKey): LengthLevels {
   return policy.plans[plan].steps.answer_writer;
+}
+
+const positive = () => z.number().int().positive();
+const atLeastZero = () => z.number().int().min(0);
+/**
+ * The receipt member (INTERFACE §5.5): the debate's numbers in snake_case, version 1, strict at every level. Minted by
+ * `computeStructuralCeilingBasis` at admission and read back by the strict parser (`parseCostEnvelopeBasis`); NOT tied to
+ * the formula version or to the shape member, so it rides with today's shape too (ruling L20).
+ */
+export const lengthGuidanceReceiptSchema = z.object({
+  version: z.literal(1),
+  plan: z.enum(DEBATE_SHAPE_PLAN_KEYS),
+  answer_length: AnswerLengthSchema,
+  steps: z.object({
+    opening: positive(), pros_cons: positive(), cross_exchange: positive(), judge_panel: positive(), reviewer: positive(),
+    answer_writer: positive(), answer_checker: positive(), story_checker: positive(),
+    comparing_judge: positive(), investigator: positive() // pre-flight PF-C1.1, the kernel's order
+  }).strict(),
+  story: z.object({
+    headline: positive(), summary: positive(), confidence: positive(), position_line: positive(), change: positive(),
+    why_reason: positive()
+  }).strict(),
+  map: z.object({
+    claim: positive(), why_it_matters: positive(), candidate_answer: positive(), angle_label: positive(), angle_focus: positive(),
+    framing_challenge: positive(), chosen_answer: positive(), check_reason: positive() // check_reason: pre-flight PF-C1.1
+  }).strict(),
+  thinking_room: z.object({
+    opening: atLeastZero(), pros_cons: atLeastZero(), cross_exchange: atLeastZero(), judge_panel: atLeastZero(),
+    reviewer: atLeastZero(), answer_writer: atLeastZero(), answer_checker: atLeastZero(), story_checker: atLeastZero(),
+    comparing_judge: atLeastZero(), investigator: atLeastZero(), // pre-flight PF-C1.1, before story_writer as in the kernel
+    story_writer: atLeastZero(), map: atLeastZero()
+  }).strict(),
+  runaway_multiplier: z.number().int().min(2).max(10),
+  tokens_per_word: z.number().min(1.5).max(5),
+  story_long_reference_words: positive(),
+  characters_per_word: z.object({ zh: z.number().positive(), ja: z.number().positive(), th: z.number().positive() }).strict(),
+  answer_writer_sees_judge_reasons: z.boolean()
+}).strict();
+export type LengthGuidanceReceipt = z.infer<typeof lengthGuidanceReceiptSchema>;
+
+/** The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted. */
+export function lengthGuidanceReceipt(guidance: LengthGuidance): LengthGuidanceReceipt {
+  const receipt = deepFreeze({
+    version: 1 as const,
+    plan: guidance.plan,
+    answer_length: guidance.answerLength,
+    steps: { ...guidance.steps },
+    story: {
+      headline: guidance.story.headline, summary: guidance.story.summary, confidence: guidance.story.confidence,
+      position_line: guidance.story.positionLine, change: guidance.story.change, why_reason: guidance.story.whyReason
+    },
+    map: {
+      claim: guidance.map.claim, why_it_matters: guidance.map.whyItMatters, candidate_answer: guidance.map.candidateAnswer,
+      angle_label: guidance.map.angleLabel, angle_focus: guidance.map.angleFocus,
+      framing_challenge: guidance.map.framingChallenge, chosen_answer: guidance.map.chosenAnswer,
+      check_reason: guidance.map.checkReason // pre-flight PF-C1.1
+    },
+    thinking_room: { ...guidance.thinkingRoom },
+    runaway_multiplier: guidance.runawayMultiplier,
+    tokens_per_word: guidance.tokensPerWord,
+    story_long_reference_words: guidance.storyLongReferenceWords,
+    characters_per_word: { ...guidance.charactersPerWord },
+    answer_writer_sees_judge_reasons: guidance.answerWriterSeesJudgeReasons
+  });
+  const parsed = lengthGuidanceReceiptSchema.safeParse(receipt);
+  if (!parsed.success) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_LENGTH_INVALID", "The length guidance's receipt does not parse: "
+      + parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.code}`).join("; "));
+  }
+  return receipt;
+}
+
+/** The numbers a run was admitted with, read back from its receipt (the runner's only source: it never reads the row). */
+export function lengthGuidanceOfReceipt(receipt: LengthGuidanceReceipt): LengthGuidance {
+  return deepFreeze({
+    plan: receipt.plan,
+    answerLength: receipt.answer_length,
+    steps: { ...receipt.steps },
+    story: {
+      headline: receipt.story.headline, summary: receipt.story.summary, confidence: receipt.story.confidence,
+      positionLine: receipt.story.position_line, change: receipt.story.change, whyReason: receipt.story.why_reason
+    },
+    map: {
+      claim: receipt.map.claim, whyItMatters: receipt.map.why_it_matters, candidateAnswer: receipt.map.candidate_answer,
+      angleLabel: receipt.map.angle_label, angleFocus: receipt.map.angle_focus, framingChallenge: receipt.map.framing_challenge,
+      chosenAnswer: receipt.map.chosen_answer, checkReason: receipt.map.check_reason // pre-flight PF-C1.1
+    },
+    thinkingRoom: { ...receipt.thinking_room },
+    runawayMultiplier: receipt.runaway_multiplier,
+    tokensPerWord: receipt.tokens_per_word,
+    storyLongReferenceWords: receipt.story_long_reference_words,
+    charactersPerWord: { ...receipt.characters_per_word },
+    answerWriterSeesJudgeReasons: receipt.answer_writer_sees_judge_reasons
+  });
 }
