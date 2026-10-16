@@ -100,6 +100,27 @@ describe("A1 refuses (each with its own reason, so removing that guard turns the
     expect((result as unknown as { base: { evidence: Record<string, unknown> } }).base.evidence).toEqual({ relevance: 0.7 });
   });
 
+  // Fix round 1 (owner answer 3): A drops a keyless TEXT only; a keyless score, verdict or block may be a second answer.
+  const fallacyWith = (extra: string) => pretty(BASE).replace("\"fatalFlags\": []", `"fatalFlags": [],\n    ${extra}`);
+  it("a keyless object holding a second score (P1)", () => {
+    expect(panel(fallacyWith("{\"severity\": 0.9}"))).toEqual({ kind: "REFUSED", reason: "NOT_DROPPABLE" });
+  });
+
+  it("a keyless number (P4)", () => {
+    expect(panel(fallacyWith("0.9"))).toEqual({ kind: "REFUSED", reason: "NOT_DROPPABLE" });
+  });
+
+  it("a keyless list after a list that was closed (P3)", () => {
+    const flags = pretty(BASE).replace("\"central lines undefined\"\n    ]", "\"central lines undefined\"\n    ],\n    [\"second flag\"]");
+    expect(panel(flags)).toEqual({ kind: "REFUSED", reason: "NOT_DROPPABLE" });
+  });
+
+  it("an object that shapes to nothing is no echo: dropped as unasked (fix round 1)", () => {
+    const result = panel(pretty({ ...BASE, fallacy: { ...BASE.fallacy, context: { note: NOTE } } }));
+    expect(result).toMatchObject({ kind: "ACCEPTED", repairs: ["UNASKED_VALUE_DROPPED"] });
+    expect((result as { content: string }).content).toBe(JSON.stringify(BASE));
+  });
+
   it("a keyless value right after a key the form states as a list (a lost '[' needs a move)", () => {
     const broken = pretty(BASE).replace("\"ambiguityFlags\": [\n      \"free for whom is unclear\",\n      \"central lines undefined\"\n    ]",
       "\"ambiguityFlags\": \"free for whom is unclear\", \"central lines undefined\"");

@@ -106,7 +106,7 @@ export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
  * Refused-repair salvage (2026-10-16, A1): the DROPS `salvageStructureReply` (./structure-repair.ts) makes in code, with no
  * call, on a STRUCTURE reply read as a tree, before the structure-repair call. It only ever drops a value, never moves,
  * changes or fills one, and its result is accepted only when the step's own check then accepts it:
- *  · KEYLESS_VALUE_DROPPED: a value written in an object with no key name of its own (judge steps only);
+ *  · KEYLESS_VALUE_DROPPED: a text written in an object with no key name of its own (judge steps only);
  *  · DUPLICATE_KEY_DROPPED: a key written again in one object with the SAME value;
  *  · ECHO_DROPPED: a value under a name the form states at one other place, equal to the value kept there;
  *  · UNASKED_VALUE_DROPPED: a text, null, `{}` or `[]` under a name not stated at its place, as the step's fixer drops it.

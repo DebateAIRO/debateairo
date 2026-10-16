@@ -735,8 +735,15 @@ function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string
     const targets = [...form.places].filter((place) => lastName(place) === name);
     if (targets.length !== 1) { refuse("NOT_DROPPABLE"); return; }
     const event = { place: targets[0]!, value: undefined as unknown };
-    events.push(event);
+    const at = events.push(event) - 1;
     event.value = stated(node, event.place);
+    // Fix round 1: an object every member of which was dropped echoes nothing; its drops were each allowed, so it is an
+    // unasked value left out (any refusal inside it is still an event of its own).
+    if (isPlainObject(event.value) && Object.keys(event.value).length === 0) {
+      events.splice(at, 1);
+      drops.add("UNASKED_VALUE_DROPPED");
+      return;
+    }
     drops.add("ECHO_DROPPED");
   };
   function shapeObject(node: ReplyTree & { kind: "object" }, parent: string | null, asWritten: boolean): Record<string, unknown> {
@@ -745,7 +752,10 @@ function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string
     let lastKey: string | null = null;
     for (const member of node.members) {
       if (member.key === null) {
-        if (textsKept === "anywhere") refuse("KEYLESS_KEPT");
+        // Fix round 1 (owner answer 3): only a keyless TEXT may be dropped; a keyless score, verdict, object or list may
+        // be a second answer, so it refuses.
+        if (!isTextNode(member.value)) refuse("NOT_DROPPABLE");
+        else if (textsKept === "anywhere") refuse("KEYLESS_KEPT");
         else if (member.afterText && lastKey !== null && form.lists.has(placeOf(parent, lastKey))) refuse("KEYLESS_LIST_ENTRY");
         else drops.add("KEYLESS_VALUE_DROPPED");
         continue;
@@ -779,11 +789,12 @@ function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string
 
 /**
  * A1 (refused-repair salvage, 2026-10-16): the verified subset of a STRUCTURE reply, read in code with no call. It DROPS
- * only: a value written with no key (only where `textsKept` is "place", the judge steps; and never right after a text
+ * only: a TEXT written with no key (only where `textsKept` is "place", the judge steps; and never right after a text
  * under a key the form states as a list, where it is a list's lost `[`); a repeat of a key with the SAME value; a text,
  * null, `{}` or `[]` under a name not stated at its place, as the step's own fixer drops it (on a "place" step a text only
  * under a name the form never states or states as a text, never under a number, true/false or enum label list name); and
- * an exact echo of the value kept at the one stated place of that name. A value at a place the form states as a scalar is
+ * an exact echo of the value kept at the one stated place of that name (an object left with no member is no echo). A keyless
+ * number, true/false, null, object or list refuses. A value at a place the form states as a scalar is
  * kept exactly as written, a wrapper and all. A dotted key, any other drop and a key written twice with two values refuse.
  *
  * With no tree, an object the tolerant decode reads is the base, with no drop. The base counts only when
