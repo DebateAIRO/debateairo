@@ -1029,6 +1029,18 @@ class UnreportedChargeBookedTests(AnthropicTest):
             'no_message_200': (200, {'_invalid_json': True}),
             # Controller ruling (2026-10-16): another model may bill above Haiku's prices: never booked.
             'another_model_no_usage': (200, without('usage', message(model='claude-opus-5-5'))),
+            # Fix round 1 (review 2026-10-16): no usable bill, never evidence of a bigger one.
+            'cache_read_unreadable_bad_counts': (200, message(input_tokens=True, cache_read_input_tokens='x')),
+            'output_details_bad_bad_counts': (200, message(input_tokens=True,
+                                                           output_tokens_details={'thinking_tokens': 'x', 'new': 1})),
+            'output_above_the_hold_bad_counts': (200, message(input_tokens=True, output_tokens=10 ** 9)),
+            'thinking_above_the_hold_bad_counts': (200, message(output_tokens='500',
+                                                                output_tokens_details={'thinking_tokens': 10 ** 9})),
+            'cost_above_the_hold_no_usage': (200, {**without('usage', message()), 'cost': '9.99'}),
+            '201_no_usage': (201, without('usage', message())),
+            '503_speed_fast': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'speed': 'fast'}),
+            '503_service_tier': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'service_tier': 'priority'}),
+            '503_inference_geo': (503, {'type': 'error', 'error': {'type': 'api_error'}, 'inference_geo': 'us'}),
             '503_with_model': (503, {'type': 'error', 'error': {'type': 'overloaded_error'}, 'model': HAIKU}),
             '502_with_usage': (502, {'type': 'error', 'error': {'type': 'api_error'}, 'usage': {'output_tokens': 5}}),
             '503_message_without_usage': (503, without('usage', message())),
@@ -1040,6 +1052,7 @@ class UnreportedChargeBookedTests(AnthropicTest):
                     self.call(gate, reply=reply, status=status)
                 self.assert_uncertain_halt(gate)
                 self.assertEqual(gate.status()['today_booked_max'], 0)
+                self.assertEqual(entry_of(gate)['reason'], 'usage_or_cost_unreported')  # Not booked: the reason stays.
 
     def test_key_and_billing_errors_and_every_other_4xx_still_halt(self):
         # Ruling R2 (2026-10-16): not a paid post, and a broken key needs root.
@@ -1053,6 +1066,7 @@ class UnreportedChargeBookedTests(AnthropicTest):
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
                     self.call(gate, reply=reply, status=status)
                 self.assert_uncertain_halt(gate)
+                self.assertEqual(entry_of(gate)['reason'], 'usage_or_cost_unreported')
 
     def test_a_booking_counts_in_todays_spend_and_journals_the_alert_and_a_failing_hook_halts(self):
         gate = self.ready()

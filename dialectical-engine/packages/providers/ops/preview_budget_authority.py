@@ -92,14 +92,17 @@ on the RAW reply with its accounting and the call's reservation, is booked the s
 'charge_unreported', its HTTP status and its accounting (DeepInfra: a 2xx or 5xx whose counts cannot be priced, when no
 cost it reports anywhere and none of the counts it does report price above the reservation; Anthropic: a message,
 status 200, without usage or with unreadable input/output counts whose usage names no premium speed, tier, region,
-server tool or cache write, and a 5xx that is no message and carries no billing key, content, model or token count,
-its 504 timeout_error among them). A hook that fails halts (accounting_failure). Everything else still halts exactly
-as before: any other failure while sending or reading (a reply too large, a fault in the transport itself), a hook
-that fails on a reply, a 4xx without accountable usage (a key, billing or request problem root must see), a reply whose
-own reported cost is above its reservation, any usage member, speed, service tier, region, server tool, cache count
-or content block the profile cannot price, a charge above the reservation (charge_overrun), a reply naming another
-model (with or without usable counts), a non-200 reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply
-or an interrupted call (a booking still in flight at serve start halts, as a settled call does).
+server tool or cache write, and a 5xx that is no message and carries no billing key, content, model, token count,
+speed, tier or region, its 504 timeout_error among them). Only a reply that names no model or this call's own model is
+booked. M3 books a reply that carries NO usable bill, never one that carries evidence of a bigger one (fix round 1,
+2026-10-16): a count written as a float or as numeric text, or a cost that is an object or a list, halts. A hook that
+fails halts (accounting_failure). Everything else still halts exactly as before: any other failure while sending or
+reading (a reply too large, a fault in the transport itself), a hook that fails on a reply, a 4xx without accountable
+usage (a key, billing or request problem root must see), a reply whose own reported cost is above its reservation, any
+usage member, speed, service tier, region, server tool, cache count or content block the profile cannot price, a
+charge above the reservation (charge_overrun), a reply naming another model (with or without usable counts), a non-200
+reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply or
+an interrupted call (a booking still in flight at serve start halts, as a settled call does).
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal

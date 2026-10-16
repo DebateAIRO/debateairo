@@ -1857,10 +1857,11 @@ class UnreportedChargeBookedTests(GateTest):
                          (1, RESERVED, RESERVED))
         return entry
 
-    def assert_halted_uncertain(self, gate):
+    def assert_halted_uncertain(self, gate, reason='usage_or_cost_unreported'):
         report = gate.status()
         self.assertEqual((report['state'], report['reason'], report['today_booked_max']), ('halted', 'uncertain_charge', 0))
-        self.assertEqual(entry_of(gate, 'op-1')['state'], 'uncertain')
+        # Fix round 1 (review 2026-10-16): a reply that is not booked keeps the reason assess_reply gave it.
+        self.assertEqual((entry_of(gate, 'op-1')['state'], entry_of(gate, 'op-1')['reason']), ('uncertain', reason))
 
     def test_an_answer_without_accountable_usage_is_booked_at_its_reservation_and_the_gate_stays_active(self):
         for name, reply in (('no_usage', provider_response(None)),
@@ -1907,6 +1908,23 @@ class UnreportedChargeBookedTests(GateTest):
                 ('cost_not_an_amount', 200, {'model': MODEL, 'usage': {'estimated_cost': 'about a cent'}}),
                 # Controller ruling (2026-10-16): another model may bill above this row's prices: never booked.
                 ('another_model_no_usage', 200, {'model': 'other/model'}),
+                # Fix round 1 (review 2026-10-16): M3 books a reply that carries NO usable bill, never one that carries
+                # evidence of a bigger one. total_tokens implies 4,999,980 output tokens ($2.50 at GLM's 0.50).
+                ('total_implies_more_output', 200, {'model': MODEL, 'usage': {'prompt_tokens': 10, 'completion_tokens': 10,
+                                                                               'total_tokens': 5000000}}),
+                ('count_a_float', 200, {'model': MODEL, 'usage': {'prompt_tokens': 10, 'completion_tokens': 400000.0}}),
+                ('count_numeric_text', 200, {'model': MODEL, 'usage': {'prompt_tokens': '10', 'completion_tokens': 10}}),
+                ('cost_like_numeric_text', 200, {'model': MODEL, 'usage': {'total_cost': '5.00'}}),
+                # The largest whole reasoning count counts, even when its other copy cannot be read.
+                ('reasoning_in_details_above', 200, {'model': MODEL, 'usage': {
+                    'prompt_tokens': 10, 'completion_tokens': 10, 'completion_tokens_details': {'reasoning_tokens': 400000},
+                    'reasoning_tokens': 'x'}}),
+                ('cost_an_object', 200, {'model': MODEL, 'usage': {'estimated_cost': {'usd': '5.00'}}}),
+                ('cost_a_list', 200, {'model': MODEL, 'usage': {'estimated_cost': ['5.00']}}),
+                ('tokens_member_above', 503, {'error': {'message': 'x'}, 'inference_status': {'tokens_generated': 5000000,
+                                                                                               'tokens_input': 10}}),
+                ('tokens_member_text', 503, {'error': {'message': 'x'}, 'inference_status': {'tokens_generated': '12'}}),
+                ('tokens_member_float', 503, {'error': {'message': 'x'}, 'inference_status': {'tokens_generated': 12.0}}),
                 # Ruling R2 (2026-10-16): a 4xx without usage is not a paid post; a broken key needs root.
                 ('400', 400, {'error': {'message': 'bad request'}}),
                 ('401', 401, {'error': {'message': 'invalid key'}}),
@@ -1938,8 +1956,7 @@ class UnreportedChargeBookedTests(GateTest):
         with patch.object(DEEPINFRA, 'bookable_unreported', side_effect=RuntimeError('synthetic')), \
                 self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1', dispatch=self.answering(200, provider_response(None)))
-        self.assert_halted_uncertain(gate)
-        self.assertEqual(entry_of(gate, 'op-1')['reason'], 'accounting_failure')
+        self.assert_halted_uncertain(gate, 'accounting_failure')
 
 
 class ReasoningTokenTests(GateTest):

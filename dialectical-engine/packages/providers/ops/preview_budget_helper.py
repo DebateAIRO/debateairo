@@ -380,16 +380,17 @@ REPORTED_COST_KEYS = ('estimated_cost', 'cost')
 
 def reported_costs(value):
     """Every amount a parsed reply reports under REPORTED_COST_KEYS, at any depth, as Decimals (a null one reports
-    nothing); None when one of them is not a plain non-negative amount (such a reply is never booked: M3)."""
+    nothing); None when one of them is not a plain non-negative amount, an object or a list included (such a reply is
+    never booked: M3)."""
     found, stack = [], [value]
     while stack:
         item = stack.pop()
         if isinstance(item, dict):
             for key, inner in item.items():
-                if key in REPORTED_COST_KEYS and not isinstance(inner, (dict, list)):
+                if key in REPORTED_COST_KEYS:
                     if inner is None:
                         continue
-                    amount = decimal_amount(inner)
+                    amount = None if isinstance(inner, (dict, list)) else decimal_amount(inner)
                     if amount is None:
                         return None
                     found.append(amount)
@@ -398,6 +399,42 @@ def reported_costs(value):
         elif isinstance(item, list):
             stack.extend(item)
     return found
+
+
+def key_values(value):
+    """Every (key, value) pair of every object at any depth of a parsed JSON value."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, inner in item.items():
+                yield key, inner
+                stack.append(inner)
+        elif isinstance(item, list):
+            stack.extend(item)
+
+
+def doubtful_count(value):
+    """M3, fix round 1 (review 2026-10-16): a float or a number written as text where a count belongs. The gate
+    cannot read it as a whole count, yet it may say the bill is bigger: such a reply is never booked."""
+    if type(value) is float:
+        return True
+    if not isinstance(value, str):
+        return False
+    try:
+        Decimal(value.strip())
+    except (InvalidOperation, ValueError):
+        return False
+    return True
+
+
+def token_member(key):
+    """A member that names a token count: tokens_* or *_tokens."""
+    return isinstance(key, str) and (key.startswith('tokens_') or key.endswith('_tokens'))
+
+
+def whole_count(value):
+    return value if integer(value) else 0
 
 
 # One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
@@ -615,7 +652,13 @@ class DeepInfraProfile:
         anywhere is a plain amount at most `reserved`, and the counts it does report, at the row's list prices, price
         at most `reserved` too. The gate then books the call at its reservation (reason charge_unreported) and stays
         active. False for every other status (a 4xx is a key, billing or request problem root must see) and for an
-        accounting the gate had to cut short (oversized_accounting)."""
+        accounting the gate had to cut short (oversized_accounting).
+        Fix round 1 (review 2026-10-16: M3 books a reply that carries NO usable bill, never one that carries evidence of
+        a bigger one): False too when any member of `usage`, or any token-count member (tokens_* or *_tokens) anywhere
+        in the reply, is a float or a number written as text (doubtful_count); and the evidence is read at its largest:
+        output is completion plus the largest whole reasoning count (details or top level), or total minus prompt when
+        total_tokens is whole and says more, and every whole token-count member anywhere, added up at the dearer of
+        the row's two prices, must price at most `reserved` too."""
         if not (type(status) is int and (200 <= status <= 299 or 500 <= status <= 599)):
             return False
         if not isinstance(response, dict) or not isinstance(accounting, dict) or accounting.get('usage_valid') is True \
@@ -624,11 +667,24 @@ class DeepInfraProfile:
         costs = reported_costs(response)
         if costs is None or any(cost > reserved for cost in costs):
             return False
-        prompt = accounting.get('prompt_tokens') or 0
-        output = (accounting.get('completion_tokens') or 0) + (accounting.get('reasoning_tokens') or 0)
-        listed = (Decimal(prompt) * Decimal(accounting['input_usd_per_m'])
-                  + Decimal(output) * Decimal(accounting['output_usd_per_m'])) / Decimal(1000000)
-        return listed <= reserved
+        usage = response.get('usage')
+        usage = usage if isinstance(usage, dict) else {}
+        if any(key not in REPORTED_COST_KEYS and doubtful_count(inner) for key, inner in key_values(usage)):
+            return False
+        counted = [inner for key, inner in key_values(response) if token_member(key)]
+        if any(doubtful_count(inner) for inner in counted):
+            return False
+        details = usage.get('completion_tokens_details')
+        reasoning = max(whole_count(details.get('reasoning_tokens')) if isinstance(details, dict) else 0,
+                        whole_count(usage.get('reasoning_tokens')))
+        prompt = whole_count(usage.get('prompt_tokens'))
+        output = whole_count(usage.get('completion_tokens')) + reasoning
+        if integer(usage.get('total_tokens')):
+            output = max(output, usage['total_tokens'] - prompt)
+        input_price, output_price = Decimal(accounting['input_usd_per_m']), Decimal(accounting['output_usd_per_m'])
+        listed = (Decimal(prompt) * input_price + Decimal(output) * output_price) / Decimal(1000000)
+        anywhere = Decimal(sum(whole_count(inner) for inner in counted)) * max(input_price, output_price) / Decimal(1000000)
+        return listed <= reserved and anywhere <= reserved
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
@@ -1068,29 +1124,57 @@ class AnthropicProfile:
         charge_unreported). Never a 4xx (R2: 401, 402, 403 and the rest: root must look), an unknown usage member (R3,
         usage_unknown_field: a new member may be a new billing dimension, as speed was on 2026-10-16), a premium speed,
         tier or region, a server tool, an unpriced reply member, counts outside usage, a tool or other content block,
-        or a cache count it cannot read. `reserved` is not needed here: nothing Anthropic reports is a cost."""
+        or a cache count it cannot read.
+        Fix round 1 (review 2026-10-16: never a reply that carries evidence of a bigger bill): False too for a message
+        that reports a cost above `reserved` or one that is not a plain amount (reported_costs), whose cache read or
+        thinking split cannot be read (premium_free), or whose counts that can be read as numbers (whole, a float or
+        numeric text) price above `reserved` at their step (counts_within); and for a server error that names a speed,
+        service tier or region."""
         if type(status) is not int or not isinstance(response, dict) or not isinstance(accounting, dict):
             return False
         reason = accounting.get('invalid_reason')
         if status == 200 and reason in ('usage_missing', 'token_counts'):
+            costs = reported_costs(response)
+            if costs is None or any(cost > reserved for cost in costs):
+                return False
             usage = response.get('usage')
-            return not isinstance(usage, dict) or self.premium_free(usage)
+            return not isinstance(usage, dict) or self.premium_free(usage) and self.counts_within(usage, reserved)
         return (500 <= status <= 599 and reason == 'not_a_message'
-                and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
+                and not names_any_key(response, BILLED_KEYS + ('content', 'model', 'speed', 'service_tier', 'inference_geo'))
                 and not names_any_key_prefixed(response, 'tokens_')
                 and not names_any_key_suffixed(response, '_tokens'))
+
+    def counts_within(self, usage, reserved):
+        """M3, fix round 1: the counts of an unreadable usage that read as numbers (decimal_amount: whole, a float or
+        numeric text), priced at the step their prompt reaches: input and cache read at their prices, output at the
+        larger of output_tokens and the thinking split, at most `reserved`. Nothing readable counts as 0."""
+        input_tokens = decimal_amount(usage.get('input_tokens')) or Decimal(0)
+        read = decimal_amount(usage.get('cache_read_input_tokens')) or Decimal(0)
+        details = usage.get('output_tokens_details')
+        thinking = decimal_amount(details.get('thinking_tokens')) if isinstance(details, dict) else None
+        output = max(decimal_amount(usage.get('output_tokens')) or Decimal(0), thinking or Decimal(0))
+        step = self.step_for(input_tokens + read)
+        listed = (input_tokens * step.input_usd_per_m + read * step.cache_read_usd_per_m
+                  + output * step.output_usd_per_m) / Decimal(1000000)
+        return listed <= reserved
 
     @staticmethod
     def premium_free(usage):
         """M3: a usage that names nothing that may bill above the reservation's list prices: standard speed, tier and
         region (or none), no server tool used, and no cache write (the reservation prices a call's input at the plain
-        input price unless the call asked for a write)."""
+        input price unless the call asked for a write). Fix round 1 (review 2026-10-16): a cache read that is absent or
+        whole, and a thinking split that is absent or as usage_check knows it (known members, whole counts)."""
         tools = usage.get('server_tool_use')
         creation = usage.get('cache_creation_input_tokens')
+        read = usage.get('cache_read_input_tokens')
+        details = usage.get('output_tokens_details')
         return (usage.get('speed') in (None, 'standard') and usage.get('service_tier') in (None, 'standard')
                 and usage.get('inference_geo') in (None, 'global')
                 and (tools is None or isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values()))
-                and (creation is None or type(creation) is int and creation == 0) and usage.get('cache_creation') is None)
+                and (creation is None or type(creation) is int and creation == 0) and usage.get('cache_creation') is None
+                and (read is None or integer(read))
+                and (details is None or isinstance(details, dict) and set(details) <= ANTHROPIC_OUTPUT_DETAIL_KEYS
+                     and all(integer(value) for value in details.values())))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

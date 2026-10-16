@@ -279,7 +279,8 @@ The smallest pot that passes with all four switched on is $1.43.
   that is unclear still halts exactly as before: an error in the 400s without token counts (such as
   a refused key or a billing problem: root must look), an answer whose own reported cost is above
   what was set aside, an answer that costs more than was set aside (`charge_overrun`), an answer
-  from another model or with another status than 200, an answer too large to read, a fault in the
+  from another model (with or without token counts), an answer with token counts and another status
+  than 200, an answer too large to read, a fault in the
   gate's own sending code, a key or set-up problem, a lost answer, or a call cut off by a crash or
   restart of the gate (a booked call that was not yet fully written halts at the next start, as a
   normal call does).
@@ -307,8 +308,11 @@ The smallest pot that passes with all four switched on is $1.43.
   status `http_status` and the counts it could read in `accounting`), keeps working, the app sees
   `PROVIDER_CHARGE_BOOKED_MAX`, and the owner gets the same email. Only when nothing in the answer
   says it cost more: if the answer reports a cost (`estimated_cost` or `cost`, anywhere in it) above
-  the amount set aside, a cost that is not a plain amount, or token counts that already price above
-  it, the gate still halts (`uncertain_charge`), because that may be a real overcharge.
+  the amount set aside, a cost that is not a plain amount, token counts that already price above
+  it (the largest reading counts: `total_tokens` minus the prompt when it says more, the larger
+  reasoning count, and every `tokens_…` or `…_tokens` member anywhere), a count written as a
+  decimal or as text such as `"10"`, or an answer that names another model, the gate still halts
+  (`uncertain_charge`), because that may be a real overcharge.
 - **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
   reached" means the connection failed before anything was sent. A "too many requests" answer in
   between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,

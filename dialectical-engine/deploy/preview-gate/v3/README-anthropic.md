@@ -171,9 +171,12 @@ cache reads.
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
   is wrong or lacks a permission and root must look; 402 (`billing_error`); any other error in the
   400s that is not one of the unbilled answers above (ruling R2 of 2026-10-16); any error answer
-  with a billing field, content, a model or a token count in it; a status-200 answer that is not a
-  message; and any usage field the gate does not know (ruling R3: a new field may be a new way to
-  bill, as `speed` was on 2026-10-16).
+  with a billing field, content, a model, a token count, a speed, a service tier or a region in it;
+  a status-200 answer that is not a message; an answer that names another model than the one asked
+  for; a message without a bill count that still reports a cost, a cache read or thinking count the
+  gate cannot read, or counts that already price above the amount set aside; and any usage field
+  the gate does not know (ruling R3: a new field may be a new way to bill, as `speed` was on
+  2026-10-16).
 - **Start check: the addresses only.** Anthropic has no list of models that can be read without
   a key, so there is no model check at start. The start check never sends the key, or any
   request, to Anthropic. Before every start it checks that every address of `api.anthropic.com`
