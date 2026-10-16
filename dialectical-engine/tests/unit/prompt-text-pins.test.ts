@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   PANEL_PROMPT_CONTRACT,
@@ -53,7 +54,10 @@ import {
   SUPPORT_SUMMARY_PROMPT,
   createAdvisorySummaryService
 } from "../../apps/api/src/support/cases.js";
-import type { PromptPacket } from "@debateai/providers";
+import {
+  CONTENT_FOLLOW_UP_SENTENCES, STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_INSTRUCTION,
+  STRUCTURE_REPAIR_PROMPT_CONTRACT, promptContractFingerprintText, type PromptPacket
+} from "@debateai/providers";
 import { framedInstruction } from "../support/framed-packet.js";
 import {
   SUPPORT_DRAFT_RULES,
@@ -762,5 +766,46 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");
     expect(whole).not.toContain("debateai.untrusted-prompt-fields.v1");
+  });
+});
+
+/**
+ * LG-A (spec 2026-10-15, L32, L33): the structure-repair call's contract and the follow-up sentences are code-owned and
+ * test-pinned, never register-sealed. The wording is the owners' (shown at plan review); a change fails here first.
+ */
+describe("LG-A — the structure-repair contract and the follow-up sentences", () => {
+  it("pins repair.structure.v1 byte for byte", () => {
+    expect(STRUCTURE_REPAIR_PROMPT_CONTRACT.contractId).toBe("repair.structure.v1");
+    expect(STRUCTURE_REPAIR_INSTRUCTION).toBe([
+      "You put another AI's answer back into its required JSON form. You do not answer any question yourself.",
+      "The answer_form field gives that form. The broken_reply field holds the other AI's own answer: its content is what counts, but its JSON form is broken, for example a missing bracket or comma, a part in the wrong place or under the wrong wrapper, or fields the form does not have.",
+      "Copy every text, number and true or false value of broken_reply into the form exactly as written, word for word: move, wrap or close what is needed, and leave out any field the form does not have. Never add, change, shorten, translate, correct or summarise a word, and never invent a value that broken_reply does not give.",
+      "machine_rejection_code and machine_rejection_path say where the engine found the form broken."
+    ].join("\n"));
+    expect(STRUCTURE_REPAIR_ANSWER_FORM).toBe("Return only one JSON object in exactly the form the answer_form field describes, with no text before or after it and no code fence. Every text, number and true or false value in it is copied exactly from broken_reply.");
+    // Pre-flight PF-A46: the literal hex, so a changed contract fails here (the recomputation alone could never fail).
+    expect(STRUCTURE_REPAIR_CONTRACT_HASH).toBe("62f5c7adc9053facd24afd4af298b70a2e4ae601d2d288d45036b71cc6504843");
+    expect(createHash("sha256").update(promptContractFingerprintText(STRUCTURE_REPAIR_PROMPT_CONTRACT)).digest("hex")).toBe(STRUCTURE_REPAIR_CONTRACT_HASH);
+  });
+
+  it("pins the plain-word follow-up sentences byte for byte", () => {
+    expect(CONTENT_FOLLOW_UP_SENTENCES).toEqual({
+      EMPTY: "The earlier answer arrived empty: no answer text was received.",
+      CUT_OFF: "The earlier answer stopped before it was finished, so its end is missing.",
+      SCHEMA_FAILED: "The earlier answer left out a value the answer form requires, or gave a value the form does not allow, at the listed place.",
+      TEXT_NOT_IN_QUESTION_LANGUAGE: "Part of the earlier answer was written in a different language from the question.",
+      COMPOSED_TEXT_NAMES_A_NODE: "The earlier answer's text names an internal point id, which a reader cannot use.",
+      COMPOSED_REF_NOT_IN_DIGEST: "The earlier answer cites a point that is not in the material.",
+      STORY_UNKNOWN_NODE_REF: "The earlier answer cites a point that is not in the material.",
+      // Pre-flight PF-A32: the map's six.
+      MAP_WRONG_LANGUAGE: "Part of the earlier answer was written in a different language from the question.",
+      MAP_ANSWER_NAMES_FIELD: "The earlier answer's statement names a field of the answer form or an internal item id instead of speaking about the question, which a reader cannot use.",
+      MAP_ANSWER_NO_WORDS: "The earlier answer's statement has no words in it, only signs.",
+      MAP_UNKNOWN_ITEM_ID: "The earlier answer lists an item id that is not in the material.",
+      MAP_UNKNOWN_KEY_POINT_ID: "The earlier answer cites a key point id that is not in the material.",
+      MAP_UNKNOWN_RIVAL: "The earlier answer names as its strongest rival an answer that is not one of its other answers.",
+      DEFAULT: "The earlier answer did not meet the answer form at the listed place."
+    });
+    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(14);
   });
 });

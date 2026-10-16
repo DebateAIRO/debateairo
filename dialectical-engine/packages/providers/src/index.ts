@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, lengthCallStepOf, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt, buildFramedPatchPrompt } from "./prompt-frame.js";
 import { PATCH_KEY_NOT_REQUESTED, mergePatchReply, planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
@@ -1945,8 +1945,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
       // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
       const attemptThinking = repairForm === undefined ? thinking : repairThinking;
-      // LG-A (L34): what this attempt sends, recorded on its artifact (reply_form). Task 12 adds the structure-repair call.
-      const attemptReplyForm: ReplyForm = repairForm ?? (lengthFailures > 0 ? "LENGTH_RETRY" : "ORIGINAL");
+      // LG-A (L34): what this attempt sends, recorded on its artifact (reply_form); a structure-repair call is STRUCTURE.
+      const attemptReplyForm: ReplyForm = lengthCallStepOf(request.callSiteKey) === "structure_repair" ? "STRUCTURE"
+        : repairForm ?? (lengthFailures > 0 ? "LENGTH_RETRY" : "ORIGINAL");
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
@@ -2730,6 +2731,7 @@ export {
   buildFramedRepairPrompt,
   promptContractFingerprintText,
   promptTextHasReservedToken,
+  framedAnswerForm,
   readPromptFrame,
   schemaFailureLimits,
   schemaFailureLocator,
@@ -2801,6 +2803,12 @@ export {
   REPLY_FAILURE_CLASSES, fixReplyStructure, replyFailureClassOf,
   type ReplyFailureClass, type ReplyFixed, type ReplyFixerOptions, type ReplyFixerRepair
 } from "./reply-fixer.js";
+// LG-A (spec 2026-10-15, L32): the structure-repair call.
+export {
+  STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
+  STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
+  structureRepairOriginalKey, withStructureRepair, type StructureRepairRoute
+} from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";

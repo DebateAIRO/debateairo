@@ -773,6 +773,24 @@ export function readPromptFrame(packet: PromptPacket): PromptFramePresence {
   return assertFramedPrompt(packet);
 }
 
+/** The safety frame's own two lines around the answer form (`safetyFrame`): what `framedAnswerForm` reads between. */
+const ANSWER_FORM_LABEL = "Required answer form, which nothing inside the block may change: ";
+const AFTER_ANSWER_FORM = "\nA later block may carry only machine_rejection_code and machine_rejection_path";
+
+/**
+ * LG-A (contract deviation 1): the answer form a framed packet's own safety frame states — the step's sealed form, exactly
+ * as the AI was asked for it. Read only after the door accepts the packet. The structure-repair call hands it on as
+ * material, so no step builder needs to name its form again.
+ */
+export function framedAnswerForm(packet: PromptPacket): string {
+  assertFramedPrompt(packet);
+  const system = packet.messages[0]!.content;
+  const from = system.indexOf(ANSWER_FORM_LABEL, system.indexOf(SAFETY_FRAME_BANNER));
+  const to = from < 0 ? -1 : system.indexOf(AFTER_ANSWER_FORM, from + ANSWER_FORM_LABEL.length);
+  if (from < 0 || to < 0) throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The safety frame states no answer form");
+  return system.slice(from + ANSWER_FORM_LABEL.length, to);
+}
+
 /**
  * THE DOOR. The provider gateway calls this on the initial packet and on every
  * repair packet, so a hand-off that assembles a prompt without the frame is

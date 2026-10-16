@@ -255,6 +255,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/evaluator/src/index.ts",
       "packages/judgement/src/index.ts",
       "packages/providers/src/preview-test.ts",
+      // LG-A (L32): the structure-repair wrapper hands each call, routed, to the target gateway it wraps, and sends the
+      // one structure-repair call through the repair model's own gateway, naming the original call's run. It opens no
+      // lease and reads no content of its own (the runner's leased gateway does, around it).
+      "packages/providers/src/structure-repair.ts",
       // Verdict story: the writer calls ONLY the gateway the runner hands it (the
       // run-required, leased gateway above), from the post-settle hook inside the
       // runner's lease, and every request names the run it belongs to.
@@ -271,6 +275,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/lane: "story",/);
     expect(contents.get("packages/providers/src/preview-test.ts")).toMatch(/gateway\.call\(\{\s*\.\.\.request,/);
+    expect(contents.get("packages/providers/src/structure-repair.ts")).toMatch(/route\.gateway\.call\(\{\s*runId: request\.runId,/);
+    expect(contents.get("packages/providers/src/structure-repair.ts")).not.toMatch(privatePrimitive);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/withPublicSampleLease\(sample/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/provider\.classify/);
     expect(contents.get("packages/evaluator/src/index.ts")).toMatch(/withRunContentLease/);
