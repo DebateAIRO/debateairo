@@ -226,6 +226,14 @@ export interface ProviderCallRequest {
    */
   readonly repairThinkingLevel?: string;
   /**
+   * Length guidance L14/L25 (spec 2026-10-15 §3.3): set ONLY by the preview's call policy (withPreviewProviderCallPolicy),
+   * never by a caller. When an attempt is cut off at its allowance and the vendor's thinking count is above that
+   * allowance minus `answerRoomTokens`, the length retries of this call run at `lowerThinkingLevel` (resolved and refused,
+   * like `thinkingLevel`, before anything is sent); null means the call is already at its lowest level. Absent: every
+   * length retry runs at `thinkingLevel`, today's behaviour on every lane. Never sent.
+   */
+  readonly lengthRetry?: Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }>;
+  /**
    * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
    * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
    * RECORDED on every attempt's ledger row, never sent. Optional on the type
@@ -1914,6 +1922,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     // Spec 2026-10-12 §4.4: the repair POSTs' level, decided and refused here too, before the first byte leaves.
     const repairThinking = request.repairThinkingLevel === undefined
       ? thinking : resolveThinkingLevel(request.repairThinkingLevel, this.#options.thinking, request.providerRef);
+    // Length guidance L25: the answer room is a whole number, and the lower level is refused here, before the first byte.
+    const lengthRetry = request.lengthRetry;
+    if (lengthRetry !== undefined && (!Number.isSafeInteger(lengthRetry.answerRoomTokens) || lengthRetry.answerRoomTokens < 0)) {
+      throw new TypeError("ProviderCallRequest.lengthRetry.answerRoomTokens must be a non-negative whole number");
+    }
+    const lowerThinking = lengthRetry === undefined || lengthRetry.lowerThinkingLevel === null
+      ? null : resolveThinkingLevel(lengthRetry.lowerThinkingLevel, this.#options.thinking, request.providerRef);
+    /** L25: set once a cut-off attempt's thinking left the answer no room; this call's length retries then think less. */
+    let thinkLess = false;
     assertProviderCallRecord(request);
     const callFacts = Object.freeze({
       modelRole: request.modelRole ?? null,
@@ -1996,7 +2013,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
       // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
-      const attemptThinking = repairForm === undefined ? thinking : repairThinking;
+      // Length guidance L25: the original packet's length retries run one level lower once thinking ate the answer's room.
+      const attemptThinking = repairForm === undefined ? (thinkLess && lowerThinking !== null ? lowerThinking : thinking) : repairThinking;
       // LG-A (L34): what this attempt sends, recorded on its artifact (reply_form); a structure-repair call is STRUCTURE.
       const attemptReplyForm: ReplyForm = lengthCallStepOf(request.callSiteKey) === "structure_repair" ? "STRUCTURE"
         : repairForm ?? (lengthFailures > 0 ? "LENGTH_RETRY" : "ORIGINAL");
@@ -2483,6 +2501,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // it owes stays the same — so the next attempt re-sends the
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
+            // Length guidance L25 (spec 2026-10-15 §3.3): the vendor's own count shows thinking used more than the allowance
+            // minus the answer's room, so the retry thinks one level lower (once; a call already at its lowest stays).
+            if (lowerThinking !== null && reasoningTokens !== null
+              && reasoningTokens > attemptTokenCeiling - lengthRetry!.answerRoomTokens) thinkLess = true;
             attemptPacket = request.packet;
             patchPlan = null;
             repairForm = undefined;

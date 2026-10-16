@@ -26,6 +26,7 @@ import {
   parseProviderDiscoveryTargets,
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
   providerTargetGatewayControls,
+  previewTargetGatewayControls,
   withPreviewProviderCallPolicy,
   createPreviewBusyCoordinator,
   PreviewChargeBookedMax,
@@ -822,6 +823,8 @@ describe("PROVIDER_CHARGE_BOOKED_MAX: a sent call the gate charged at its reserv
     const recording: PreviewBudgetPort = { execute: (input, signal) => { sent.push(input.requestBody); return port.execute(input, signal); } };
     return withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
       endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+      // As apps/runner/src/main.ts composes it: the preview's own controls after the target's (LG-B Task 3).
+      ...previewTargetGatewayControls(preview, target),
       fetchImplementation: createPreviewGuardedFetch(recording),
       persistRawArtifact: async (artifact) => artifact.artifactId,
       appendLedgerEntry: async (entry) => { ledger.push(entry); return entry.attemptId; },

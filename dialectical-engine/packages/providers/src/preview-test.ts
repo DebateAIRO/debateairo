@@ -1,7 +1,10 @@
 /** One opt-in private preview test; normal provider/roster behavior stays unchanged. */
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
+import {
+  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, lengthCallStepOf, lengthStartWordsOf,
+  storyShortWordsSum, storytellerAnswerRoomTokens
+} from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import type { StructureRepairRoute } from "./structure-repair.js";
@@ -11,11 +14,11 @@ import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-bus
 import {
   PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
   previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
-  previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
+  previewRostersHonourMakerRule, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
 import {
-  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelFor, previewThinkingLevelOnRequest, previewThinkingStepOf,
-  type PreviewThinkingLevels
+  parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
+  previewThinkingStepOf, type PreviewThinkingLevels
 } from "./preview-thinking.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
@@ -429,6 +432,24 @@ function retryAfterOf(error: unknown): number | undefined {
   return previewRefusalOf(error, PreviewModelCooling)?.retryAfterSeconds;
 }
 /**
+ * Length guidance L14/L25 (spec 2026-10-15 §3.3, INTERFACE §3.3): what a call's length retry needs to know: the room its
+ * answer may take (from the start values at Standard while no length row exists: LG-C hands the row's words here) and the
+ * level one below the call's own on its row. Undefined for a call with no step (health checks) and for LG-A's
+ * structure-repair call.
+ */
+export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string }>, reviewed: PreviewModelRow,
+  effort: PreviewEffort): Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }> | undefined {
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  if (step === null || step === "structure_repair") return undefined;
+  const start = LENGTH_GUIDANCE_START;
+  const words = lengthStartWordsOf(step);
+  const room = words === null
+    ? storytellerAnswerRoomTokens(storyShortWordsSum(start.story), start.storyLongReferenceWords, start.tokensPerWord)
+    : answerRoomTokens(words, start.runawayMultiplier, start.tokensPerWord);
+  const below = previewThinkingLevelBelow(reviewed, effort);
+  return Object.freeze({ answerRoomTokens: room, lowerThinkingLevel: below === null ? null : previewThinkingLevelOnRequest(below) });
+}
+/**
  * The preview's per-call policy for ONE target. Spec 2026-10-12 §4.4: the owner's `thinking_levels` table
  * picks each call's level by its step (previewThinkingLevelFor), and a call's repair POSTs run at the AI's
  * `slip_fix` level when the owner set one (`repairThinkingLevel`). With no table every call is today's: an
@@ -485,6 +506,10 @@ export function withPreviewProviderCallPolicy(
     if (request.repairThinkingLevel !== undefined) {
       throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
     }
+    // Length guidance L25: the lower level is the policy's alone, never the caller's.
+    if (request.lengthRetry !== undefined) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
+    }
     const preview = previewCallBound(request.bound, config);
     const bound = previewStorySite(request, "STORYTELLER")
       ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
@@ -500,11 +525,14 @@ export function withPreviewProviderCallPolicy(
     // level when the owner set one; absent, every POST runs at the call's level, as today.
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
-    const level = previewThinkingLevelOnRequest(previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request)));
+    const effort = previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request));
+    const level = previewThinkingLevelOnRequest(effort);
+    const lengthRetry = previewLengthRetryOf(request, reviewed, effort);
     const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
     const send = () => gateway.call({ ...request, thinkingLevel: level,
       ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
+      ...(lengthRetry === undefined ? {} : { lengthRetry }),
       bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
       ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
     /** The first send, after the coordinator admits it; an answer tells the coordinator. */

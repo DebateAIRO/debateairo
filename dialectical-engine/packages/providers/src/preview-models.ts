@@ -111,6 +111,12 @@ export type PreviewModelRow = Readonly<{
   efforts: readonly PreviewEffort[];
   /** The level this row runs at when the owner's setting names none: exactly today's request. */
   defaultEffort: PreviewEffort;
+  /**
+   * Length guidance L25 (spec 2026-10-15 §3.3): the same levels as `efforts`, strongest first, as each maker documents
+   * them ("default" is the maker's own default: GLM's high, MiMo's thinking on, Qwen's xhigh). A retry after thinking ate
+   * the answer's room runs one place lower (previewThinkingLevelBelow). App only: the gate checks a level's menu, not its order.
+   */
+  effortsByStrength: readonly PreviewEffort[];
   /** Whether response_format {"type":"json_object"} may be sent. */
   jsonObject: boolean;
   /**
@@ -154,6 +160,7 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
   outputBound: number; storytellerTokenCeiling: number; storyCheckerTokenCeiling?: number; efforts: readonly PreviewEffort[];
+  effortsByStrength: readonly PreviewEffort[];
   jsonObject: boolean; contextWindowTokens?: number;
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
   sampling?: PreviewSampling;
@@ -174,12 +181,17 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
-  const { upperStep, sampling, cacheWriteInputUsdPerM, efforts, ...plain } = input;
+  const { upperStep, sampling, cacheWriteInputUsdPerM, efforts, effortsByStrength, ...plain } = input;
   // Spec 2026-10-12 §4.1: a non-empty menu of distinct level words; the Anthropic wire has no "default" or "none".
   if (efforts.length === 0 || new Set(efforts).size !== efforts.length
     || efforts.some(word => !(PREVIEW_EFFORT_WORDS as readonly string[]).includes(word))
     || (provider === "anthropic" && efforts.some(word => word === "default" || word === "none"))) {
     throw new TypeError("PREVIEW_MODEL_ROW_EFFORTS_INVALID");
+  }
+  // L25: the strength order holds exactly the menu's levels, each once.
+  if (effortsByStrength.length !== efforts.length || new Set(effortsByStrength).size !== effortsByStrength.length
+    || effortsByStrength.some(word => !efforts.includes(word))) {
+    throw new TypeError("PREVIEW_MODEL_ROW_EFFORT_ORDER_INVALID");
   }
   // The storyteller's allowance is a whole number of tokens within the row's own cap (the guarded fetch and the gate
   // refuse a max_tokens above it) and not below the generation floor every preview call keeps.
@@ -210,6 +222,7 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
     ...plain,
     efforts: Object.freeze([...efforts]),
     defaultEffort: efforts[0]!,
+    effortsByStrength: Object.freeze([...effortsByStrength]),
     ...(sampling === undefined ? {} : { sampling: Object.freeze(Object.fromEntries(
       PREVIEW_SAMPLING_KEYS.filter(key => Object.hasOwn(sampling, key)).map(key => [key, sampling[key]!]))) as PreviewSampling }),
     ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
@@ -233,10 +246,12 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
   deepinfra: Object.freeze([
     // Thinking levels (spec 2026-10-12 §2): Z.AI documents low, high and max only, and thinking cannot be switched off.
     row("deepinfra", { model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["high", "low"], jsonObject: true }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["high", "low"],
+      effortsByStrength: ["high", "low"], jsonObject: true }),
     // Thinking levels (spec 2026-10-12 §2): DeepSeek documents none, low, high and max ("medium" is treated as high).
     row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "low", "none"], jsonObject: false }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "low", "none"],
+      effortsByStrength: ["high", "low", "none"], jsonObject: false }),
     // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
     // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
     // DeepInfra page recommends temperature 1.0, top_p 0.95; owner ruling 2026-10-12 (reply language): temperature 0.7,
@@ -249,7 +264,8 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS,
       // Story wording (practice debate 2, 2026-10-12): room for its thinking as the story checker (see the field).
-      storyCheckerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"], jsonObject: false,
+      storyCheckerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"],
+      effortsByStrength: ["default", "none"], jsonObject: false,
       sampling: { temperature: 0.7, top_p: 0.95 } }),
     // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
     // Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid mid-answer into
@@ -257,7 +273,8 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     // it runs at its makers' thinking-mode settings: temperature 0.6, top_p 0.95, top_k 20.
     // Thinking levels (spec 2026-10-12 §2): Alibaba documents low, medium and xhigh (its default); "high" is not a Qwen value.
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "low", "medium", "none"], jsonObject: false,
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "low", "medium", "none"],
+      effortsByStrength: ["default", "medium", "low", "none"], jsonObject: false,
       contextWindowTokens: 1_000_000,
       sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
   ]),
@@ -271,7 +288,8 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
   anthropic: Object.freeze([
     // Thinking levels (spec 2026-10-12 §2): Anthropic documents low, medium, high, xhigh and max for Haiku 5.5.
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "medium", "low"], jsonObject: false,
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "medium", "low"],
+      effortsByStrength: ["high", "medium", "low"], jsonObject: false,
       cacheWriteInputUsdPerM: "0.125",
       upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
   ])
