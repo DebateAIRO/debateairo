@@ -191,7 +191,7 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE" });
   });
 
-  it("BUG-01 T7/T10 declares the incident extra key and bogus claim_type as retryable schema failures", async () => {
+  it("BUG-01 T7/T10: the incident's undeclared extra key is now repaired in code (LG-A L15/L31, deviation 8); a bogus claim_type stays a retryable schema failure", async () => {
     const validArtifact = {
       statement: "A test-layer judgement.", way_of_knowing: "REASONING", locator: null,
       restatement_text: "A test-layer judgement.", restatement_status: "PASS", value_laden: false,
@@ -216,8 +216,10 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
       leg: { kind: "primary-root" },
       bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 5_000 }
     })).rejects.toMatchObject({ code: "JUDGE_SCHEMA_FAILURE", message: "last schema error" });
+    // LG-A Task 5 (controller-ratified deviation 8): the undeclared notes_absent key is dropped
+    // by INNER_UNASKED_KEYS, so the first reply is PARSED; claim_type "bogus" still fails the schema.
     expect(classifications).toEqual([
-      expect.objectContaining({ parseStatus: "SCHEMA_FAILED" }),
+      { parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_UNASKED_KEYS" },
       expect.objectContaining({ parseStatus: "SCHEMA_FAILED" })
     ]);
   });
