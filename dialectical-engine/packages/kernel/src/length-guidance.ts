@@ -84,3 +84,110 @@ export function lengthCallStepOf(callSiteKey: string, lane?: string): LengthCall
   const role = debateRoleFromCallSiteKey(callSiteKey);
   return role === null ? null : STEP_OF_ROLE[role];
 }
+
+/**
+ * Spec §7 Standard words, as the engine INTERFACE §4.1 amends them; LG-C's lengthGuidancePolicyStartValues() is built from
+ * these, so they cannot drift.
+ */
+export const LENGTH_GUIDANCE_START = Object.freeze({
+  standardWords: Object.freeze({
+    opening: 300, pros_cons: 250, cross_exchange: 250, judge_panel: 200, reviewer: 120, answer_writer: 350,
+    answer_checker: 150, story_checker: 250, comparing_judge: 80, investigator: 60
+  }) satisfies Readonly<Record<LengthGuidanceStep, number>>,
+  shortFactor: 0.6, detailedFactor: 1.5,
+  /** Owner G5 (engine INTERFACE §4.1): the answer writer's Short / Standard / Detailed words. */
+  answerWriterWords: Object.freeze({ short: 200, standard: 350, detailed: 1000 }),
+  sameAtEveryLevel: Object.freeze(["answer_checker", "story_checker", "comparing_judge", "investigator"] as const),
+  story: Object.freeze({ headline: 15, summary: 120, confidence: 30, positionLine: 35, change: 60, whyReason: 100 }),
+  map: Object.freeze({ claim: 35, whyItMatters: 35, candidateAnswer: 25, angleLabel: 8, angleFocus: 35,
+    framingChallenge: 35, chosenAnswer: 35, checkReason: 40 }) satisfies Readonly<Record<MapWordTargetPart, number>>,
+  thinkingRoom: Object.freeze({ opening: 4096, pros_cons: 6144, cross_exchange: 6144, judge_panel: 4096, reviewer: 2048,
+    answer_writer: 16384, answer_checker: 2048, story_checker: 12288, comparing_judge: 4096, investigator: 2048,
+    story_writer: 16384, map: 8192 }) satisfies Readonly<Record<LengthThinkingRoomKey, number>>,
+  runawayMultiplier: 4, tokensPerWord: 3, storyLongReferenceWords: 3000,
+  charactersPerWord: Object.freeze({ zh: 1.6, ja: 2.0, th: 5.0 }),
+  /** The short story's counts (contract STORY_BODY_LIMITS: at most 8 position lines, at most 3 why-reasons). */
+  storyCounts: Object.freeze({ positionLines: 8, whyReasons: 3 })
+});
+
+/**
+ * Engine INTERFACE §4.2: the preview thinking-table step each length-only engine step runs at (R2 maps their roles; the
+ * table itself is unchanged).
+ */
+export const LENGTH_STEP_THINKING_STEP = Object.freeze({ comparing_judge: "judge_panel", investigator: "reviewer" } as const);
+
+/** Factors for languages written without spaces: characters per word. */
+export type CharactersPerWord = Readonly<{ zh: number; ja: number; th: number }>;
+
+function positive(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) throw new TypeError("LENGTH_ANSWER_ROOM_INVALID");
+  return value;
+}
+
+/** L14: the room the answer itself may need: runaway factor x guided words x tokens per word, rounded up. */
+export function answerRoomTokens(guidedWords: number, runawayMultiplier: number, tokensPerWord: number): number {
+  return Math.ceil(positive(runawayMultiplier) * positive(guidedWords) * positive(tokensPerWord));
+}
+
+/** L14 for the storyteller: its short words plus the whole long story's reference words (no runaway factor). */
+export function storytellerAnswerRoomTokens(shortWordsSum: number, longReferenceWords: number, tokensPerWord: number): number {
+  return Math.ceil((positive(shortWordsSum) + positive(longReferenceWords)) * positive(tokensPerWord));
+}
+
+/** The short story's guided words added up: each line counted as often as the story may hold it. */
+export function storyShortWordsSum(story: Readonly<Record<StoryWordTargetField, number>>,
+  counts: Readonly<{ positionLines: number; whyReasons: number }> = LENGTH_GUIDANCE_START.storyCounts): number {
+  return story.headline + story.summary + story.confidence + counts.positionLines * story.positionLine
+    + story.change + counts.whyReasons * story.whyReason;
+}
+
+/**
+ * The words a step is guided to with no length row (the start values at Standard): a map call counts one item's parts;
+ * the storyteller (its own sum, `storyShortWordsSum`) and the structure-repair call have none.
+ */
+export function lengthStartWordsOf(step: LengthCallStep): number | null {
+  if (step === "story_writer" || step === "structure_repair") return null;
+  if (step === "map") return Object.values(LENGTH_GUIDANCE_START.map).reduce((sum, words) => sum + words, 0);
+  return LENGTH_GUIDANCE_START.standardWords[step];
+}
+
+const HAN = /\p{Script=Han}/gu;
+const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+const THAI = /\p{Script=Thai}/gu;
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/gu;
+
+function countMatches(text: string, pattern: RegExp): number {
+  return text.match(pattern)?.length ?? 0;
+}
+
+/** One string's words: 0 unless it is prose (3+ space-separated words, or 6+ Han/Kana/Thai characters). */
+function stringWords(text: string, factors: CharactersPerWord): number {
+  const han = countMatches(text, HAN);
+  const kana = countMatches(text, KANA);
+  const thai = countMatches(text, THAI);
+  const spaced = text.replace(UNSPACED, " ").split(/\s+/u).filter((token) => token.length > 0).length;
+  if (spaced < 3 && han + kana + thai < 6) return 0;
+  const cjk = han + kana === 0 ? 0 : (han + kana) / (kana > 0 ? factors.ja : factors.zh);
+  return spaced + cjk + thai / factors.th;
+}
+
+/**
+ * Spec §3.6: the words of every prose value of a decoded reply, however deeply nested. Keys are never counted; ids, enum
+ * values and short labels are not prose (fewer than three words). Chinese counts characters / zh (/ ja when the text holds
+ * Kana), Thai characters / th; every other script counts space-separated words. Rounded to a whole number at the end.
+ */
+export function proseWordCount(value: unknown,
+  charactersPerWord: CharactersPerWord = LENGTH_GUIDANCE_START.charactersPerWord): number {
+  for (const factor of [charactersPerWord.zh, charactersPerWord.ja, charactersPerWord.th]) {
+    if (!Number.isFinite(factor) || factor <= 0) throw new TypeError("LENGTH_CHARACTERS_PER_WORD_INVALID");
+  }
+  let total = 0;
+  const stack: unknown[] = [value];
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (typeof item === "string") total += stringWords(item, charactersPerWord);
+    else if (Array.isArray(item)) stack.push(...item);
+    else if (typeof item === "object" && item !== null) stack.push(...Object.values(item));
+  }
+  return Math.round(total);
+}
