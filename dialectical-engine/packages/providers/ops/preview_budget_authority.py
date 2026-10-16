@@ -13,8 +13,13 @@ above the row's ceiling prices) and settles at the profile's prices for that row
 the provider's reported cost, the larger); its ledger entry records the model, its maker, the
 reservation and settlement prices and the bound; and a reply naming any other model than that
 entry's halts. No reviewed row may reserve more than its profile's per_call_cap_usd for a
-full-size request (profile.max_request_bytes, at its ceiling prices), and activate refuses a GO
-whose max_concurrent_calls x largest enabled worst case exceeds daily_budget_usd. The profile
+full-size request (profile.max_request_bytes, at its ceiling prices), nor, for a final-writer request
+(LG-B, callTier FINAL_WRITER, only under a GO that names max_final_writer_calls F), more than the
+profile's final_writer_per_call_cap_usd for a full-size one (final_writer_max_request_bytes, reserved at
+the row's final_writer_output_bound). activate refuses a GO whose in_flight_worst_case exceeds
+daily_budget_usd: (max_concurrent_calls - F) x the largest enabled standard worst case + F x the
+largest enabled final-writer worst case (F = 0 without the member: max_concurrent_calls x the
+largest standard worst case, as before LG-B). The profile
 API (the helper's DeepInfraProfile docstring lists it) is all the core calls, so a new provider
 is one reviewed profile class.
 
@@ -159,8 +164,10 @@ allow-list or while another gate's folder or GO is visible.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
-exceed daily_budget_usd by up to max_concurrent_calls x the largest enabled reservation (at most
-the profile's per_call_cap_usd each): calls reserved just before midnight are paid just after it, while
+exceed daily_budget_usd by up to the GO's in_flight_worst_case ((max_concurrent_calls - F) x the
+largest enabled standard reservation, at most per_call_cap_usd each, + F x the largest enabled
+final-writer reservation, at most final_writer_per_call_cap_usd each; F = max_final_writer_calls, 0
+without it): calls reserved just before midnight are paid just after it, while
 the new day's pot is already open. A probe runs beside serve, so for its one call up to
 max_concurrent_calls + 1 calls may be in flight; the pot itself is still checked under the lock.
 """
@@ -607,6 +614,13 @@ def in_flight_worst_case(profile, models, max_concurrent, final_writer_calls):
             + final_writer * max(standard, largest_final_writer_reservation(profile, models)))
 
 
+def final_writer_models_valid(profile, models):
+    """LG-B (fix round 1): a GO may name max_final_writer_calls only when its profile has the final-writer tier and every
+    model it enables has its own maximum (final_writer_output_bound); otherwise no final writer could ever be served."""
+    return final_writer_tier_of(profile) is not None and all(
+        getattr(profile.rows[model], 'final_writer_output_bound', None) is not None for model in models)
+
+
 def valid_go(go):
     if not isinstance(go, dict) or not GO_REQUIRED <= set(go) or not set(go) <= GO_REQUIRED | GO_OPTIONAL:
         return False
@@ -623,7 +637,8 @@ def valid_go(go):
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
         and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
-        and ('max_final_writer_calls' not in go or _int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls']))
+        and ('max_final_writer_calls' not in go or (_int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls'])
+                                                    and final_writer_models_valid(profile, go['enabled_models'])))
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
 
@@ -1462,15 +1477,26 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
     if slots.limit != go['max_concurrent_calls'] or getattr(slots, 'final_writer_limit', 0) != final_writer_slots(go):
         raise SafetyError('SERVE_RESTART_REQUIRED')
-    if not slots.acquire(slot_wait):
-        raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+    # LG-B (fix round 1): a final writer first takes one of the GO's final-writer slots, waiting for it while it holds
+    # nothing, and only then a general slot; either refusal is unbilled, like a full gate. No deadlock: only a final
+    # writer ever waits on the final-writer slots, and it does so before it holds a general slot, so no holder of a
+    # general slot ever waits on them (the one wait while holding something is a final writer's wait for a general
+    # slot, which every holder frees without waiting on anything). And a waiting final writer never keeps a standard
+    # call out of a general slot.
     final_writer_held = False
+    if request_tier(input) == 'FINAL_WRITER':
+        if not slots.acquire_final_writer(slot_wait):
+            raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+        final_writer_held = True
+    general_held = False
     try:
-        # LG-B: a final writer also takes one of the GO's final-writer slots, or is refused unbilled, like a full gate.
-        if request_tier(input) == 'FINAL_WRITER':
-            if not slots.acquire_final_writer(slot_wait):
-                raise SafetyError('CONCURRENCY_LIMIT_REACHED')
-            final_writer_held = True
+        general_held = slots.acquire(slot_wait)
+    finally:
+        if final_writer_held and not general_held:
+            slots.release_final_writer()
+    if not general_held:
+        raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+    try:
         if cancelled is not None and cancelled():
             raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
         key = (key_loader or helper.read_key)(private)
@@ -1599,9 +1625,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             raise SafetyError('SETTLED_INTO_HALT')
         return reply
     finally:
+        slots.release()  # In reverse: the general slot, then the final-writer slot.
         if final_writer_held:
             slots.release_final_writer()
-        slots.release()
 
 
 def bounded_model_name(value):

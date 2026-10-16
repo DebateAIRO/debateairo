@@ -323,6 +323,27 @@ class FinalWriterTierTests(AnthropicTest):
         self.assertEqual((got, row.output_bound, prices), (reserved, 128000, CEILING))
         with self.refused('REQUEST_SCOPE_INVALID'):  # Without the tier the same body is over the standard 256 KiB.
             bridge.validate_request(envelope_text(raw), go)
+        with self.subTest('an unreported final-writer charge is booked at the tier hold it took (Task 4b, M3)'):
+            # Unreadable input, a readable output count priced above this body's standard hold but within its
+            # final-writer hold (lower step, 60,000 x 0.50 / 1e6 = $0.03): booked at the hold the call took, the tier's.
+            gate = self.ready(max_final_writer_calls=1)
+            small = json.dumps(request(max_tokens=128000))
+            hold = (Decimal(len(small.encode()) + 2048) * PRICE_IN + Decimal(128000) * PRICE_OUT) / Decimal(1000000)
+            self.assertLess(reservation_of(small), Decimal('0.03'))
+            self.assertLess(Decimal('0.03'), hold)
+            reply = {**message(), 'usage': {'input_tokens': True, 'output_tokens': 60000}}
+            options = {'peer_uid': PEER, 'slots': gate.slots, 'key_loader': lambda _private: KEY, 'host': HOST,
+                       'platform': 'linux', 'now': gate.clock, 'slot_wait': 0.2,
+                       'dispatch': lambda _sent, _key: (200, json.loads(json.dumps(reply)))}
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                bridge.execute_request(gate.private, gate.go_path, {**envelope_text(small), 'reservedUsd': str(hold),
+                                                                    'callTier': 'FINAL_WRITER'}, **options)
+            entry = entry_of(gate)
+            self.assertEqual((entry['state'], entry['reason'], entry['call_tier'], entry['output_bound'], Decimal(entry['held_usd']),
+                              Decimal(entry['reserved_usd'])), ('settled_reserved_max', 'charge_unreported', 'FINAL_WRITER', 128000, hold, hold))
+            self.assertEqual(gate.status()['state'], 'active')
+            # Negative control: at the standard hold the hook would see the count above it (the call would halt).
+            self.assertFalse(ANTHROPIC.bookable_unreported(200, reply, entry['accounting'], reservation_of(small)))
 
 
 class GoAndActivateTests(AnthropicTest):

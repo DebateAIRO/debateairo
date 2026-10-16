@@ -161,6 +161,7 @@ export class PracticeCallStats {
         this.#gateSlots.set(gate, slots);
         scheduler.setGateCapacity(gate, slots);
       },
+      setGateFinalWriterCapacity: (gate: string, slots: number) => { scheduler.setGateFinalWriterCapacity(gate, slots); },
       markGateUnhealthy: (gate: string) => { scheduler.markGateUnhealthy(gate); },
       markGateHealthy: (gate: string) => { scheduler.markGateHealthy(gate); },
       stats: () => scheduler.stats()

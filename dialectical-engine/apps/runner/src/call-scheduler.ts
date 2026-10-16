@@ -11,8 +11,11 @@ import type { CallConcurrencyPolicy } from "@debateai/register";
  *  · the model's slots inside that debate (`perModelPerDebate`),
  *  · the model's slots across the whole runner (`perModelPerRunner[vendor]`,
  *    else `perModelPerRunner.default`),
- *  · and, for a call through a gate that announced its slots, the gate's slots
- *    (ONE while the gate cannot reach its vendor, spec §3.4).
+ *  · for a call through a gate that announced its slots, the gate's slots
+ *    (ONE while the gate cannot reach its vendor, spec §3.4),
+ *  · and, for a final writer (LG-B) through a gate that announced final-writer
+ *    slots, those too: a further final writer waits here, holding no slot, while
+ *    the gate's other slots serve every other call.
  *
  * Waiting calls of a debate go author first, then panel, then review, then the
  * rest, each kind in arrival order. Debates take turns (round robin) on each
@@ -35,7 +38,14 @@ export const CALL_LANE_HELD_BACK = "CALL_LANE_HELD_BACK" as const;
 
 export type CallPriority = "AUTHOR" | "PANEL" | "REVIEW" | "OTHER";
 export interface CallSubject { readonly model: string; readonly vendor: string; readonly gate: string | null; }
-export interface CallTicket extends CallSubject { readonly priority: CallPriority; }
+export interface CallTicket extends CallSubject {
+  readonly priority: CallPriority;
+  /**
+   * LG-B (Task 5, fix round 1): the call is a final writer (the preview's final-writer tier, `previewCallTierOf`). Through
+   * a gate that announced final-writer slots (`setGateFinalWriterCapacity`) it also needs one of those. Absent: no.
+   */
+  readonly finalWriter?: true;
+}
 /** Whether a call may still start; asked synchronously, at the moment the lane would start it. */
 export type CallStartGuard = (ticket: CallTicket) => boolean;
 /**
@@ -94,6 +104,11 @@ export interface CallScheduler {
   openLane(debateId: string): DebateCallLane;
   /** The gate's own slots (preview /remaining max_concurrent_calls); absent gate = unlimited. */
   setGateCapacity(gate: string, slots: number): void;
+  /**
+   * LG-B (Task 5, fix round 1): how many final writers the gate takes at once (preview /remaining
+   * final_writer_max_in_flight). Never set (a gate that names none): final writers take only the gate's own slots.
+   */
+  setGateFinalWriterCapacity(gate: string, slots: number): void;
   /** While unhealthy a gate admits ONE call in flight (spec §3.4). */
   markGateUnhealthy(gate: string): void;
   markGateHealthy(gate: string): void;
@@ -219,6 +234,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
   const gatePeak = new Map<string, number>();
   const gateCapacity = new Map<string, number>();
   const unhealthyGates = new Set<string>();
+  const gateFinalWriterRunning = new Map<string, number>();
+  const gateFinalWriterCapacity = new Map<string, number>();
 
   const runnerCapFor = (vendor: string): number =>
     Object.hasOwn(policy.perModelPerRunner, vendor) ? policy.perModelPerRunner[vendor]! : policy.perModelPerRunner.default;
@@ -228,12 +245,19 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     return gateCapacity.get(gate) ?? Number.POSITIVE_INFINITY;
   };
 
+  /** The gate whose final-writer slots this call takes (a final writer through a gate that announced them), else null. */
+  const finalWriterGateOf = (ticket: CallTicket, takes: SlotsTaken): string | null =>
+    takes.gate && ticket.finalWriter === true && ticket.gate !== null && gateFinalWriterCapacity.has(ticket.gate) ? ticket.gate : null;
+
   const admissible = (lane: Lane, entry: Waiting): boolean => {
     const { ticket, takes } = entry;
+    const finalWriterGate = finalWriterGateOf(ticket, takes);
     return (!takes.debate || lane.running < policy.perDebate)
       && (!takes.model || ((lane.runningByModel.get(ticket.model) ?? 0) < policy.perModelPerDebate
         && (runnerRunningByModel.get(ticket.model) ?? 0) < runnerCapFor(ticket.vendor)))
-      && (!takes.gate || ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate));
+      && (!takes.gate || ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate))
+      && (finalWriterGate === null
+        || (gateFinalWriterRunning.get(finalWriterGate) ?? 0) < gateFinalWriterCapacity.get(finalWriterGate)!);
   };
 
   type SharedSlot = Readonly<{ key: string; headroom: number }>;
@@ -244,6 +268,12 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     }] : [];
     if (takes.gate && ticket.gate !== null) {
       slots.push({ key: `gate:${ticket.gate}`, headroom: gateLimitFor(ticket.gate) - (gateRunning.get(ticket.gate) ?? 0) });
+    }
+    // LG-B: debates take turns on a gate's final-writer slots too.
+    const finalWriterGate = finalWriterGateOf(ticket, takes);
+    if (finalWriterGate !== null) {
+      slots.push({ key: `final-writer:${finalWriterGate}`,
+        headroom: gateFinalWriterCapacity.get(finalWriterGate)! - (gateFinalWriterRunning.get(finalWriterGate) ?? 0) });
     }
     return slots;
   };
@@ -263,6 +293,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     const [entry] = lane.waiting.splice(index, 1);
     const { model, gate } = entry!.ticket;
     const { takes } = entry!;
+    // Read once at the start: the slot taken here is the one released, whatever is announced meanwhile.
+    const finalWriterGate = finalWriterGateOf(entry!.ticket, takes);
 
     if (takes.debate) {
       lane.running += 1;
@@ -273,6 +305,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
       raisePeak(runnerPeakByModel, model, bump(runnerRunningByModel, model));
     }
     if (takes.gate && gate !== null) raisePeak(gatePeak, gate, bump(gateRunning, gate));
+    if (finalWriterGate !== null) bump(gateFinalWriterRunning, finalWriterGate);
     lane.calls += 1;
     serveTick += 1;
     for (const slot of sharedSlotsOf(entry!.ticket, takes)) lane.lastServedOn.set(slot.key, serveTick);
@@ -288,6 +321,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
         drop(runnerRunningByModel, model);
       }
       if (takes.gate && gate !== null) drop(gateRunning, gate);
+      if (finalWriterGate !== null) drop(gateFinalWriterRunning, finalWriterGate);
       if (takes.debate && lane.running === 0) for (const resolve of lane.drainWaiters.splice(0)) resolve();
       pump();
     };
@@ -428,6 +462,10 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     openLane,
     setGateCapacity(gate: string, slots: number): void {
       gateCapacity.set(gate, slots);
+      pump();
+    },
+    setGateFinalWriterCapacity(gate: string, slots: number): void {
+      gateFinalWriterCapacity.set(gate, slots);
       pump();
     },
     markGateUnhealthy(gate: string): void {

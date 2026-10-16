@@ -60,6 +60,7 @@ function recordingScheduler(): CallScheduler & { marks: string[] } {
   return Object.assign({
     openLane: () => { throw new Error("not used"); },
     setGateCapacity: (gate: string, slots: number) => { marks.push(`capacity:${gate}:${String(slots)}`); },
+    setGateFinalWriterCapacity: (gate: string, slots: number) => { marks.push(`final-writer:${gate}:${String(slots)}`); },
     markGateUnhealthy: (gate: string) => { marks.push(`unhealthy:${gate}`); },
     markGateHealthy: (gate: string) => { marks.push(`healthy:${gate}`); },
     stats: () => ({ peakByGate: {}, peakByModel: {} })
@@ -78,6 +79,23 @@ describe("laneGateway: the call's kind reaches the scheduler", () => {
     }
     expect(lane.tickets.map((ticket) => ticket.priority)).toEqual(["AUTHOR", "AUTHOR", "PANEL", "REVIEW", "OTHER", "OTHER"]);
     for (const ticket of lane.tickets) expect({ model: ticket.model, vendor: ticket.vendor, gate: ticket.gate }).toEqual(SUBJECT);
+  });
+
+  it("marks a final writer's ticket (LG-B: the preview's final-writer tier), and no other call's", async () => {
+    const lane = recordingLane();
+    const provider: ProviderGateway = { call: async (req) => answer(req.callSiteKey) };
+    const gateway = laneGateway({ lane, scheduler: recordingScheduler(), subject: SUBJECT, provider });
+    const call = (callSiteKey: string, laneName: string, role: string) =>
+      gateway.call({ callSiteKey, lane: laneName, role, providerRef: "ref:a" } as unknown as ProviderCallRequest);
+    await call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER");
+    await call("POST_COMPOSE_R9:EVALUATOR:1", "served", "EVALUATOR");
+    await call("STORY:STORYTELLER:1", "story", "SYNTHESIZER");
+    await call("REPAIR:STRUCTURE:STORY:STORYTELLER:1", "story", "SYNTHESIZER"); // A structure repair stays STANDARD.
+    await call("PANEL:node-1", "served", "CRITIC");
+    await call("JUDGE", "served", "JUDGE");
+    expect(lane.tickets.map((ticket) => ticket.finalWriter === true)).toEqual([true, true, true, false, false, false]);
+    // A call that is no final writer carries no member at all (its ticket is today's).
+    for (const ticket of lane.tickets.slice(3)) expect(Object.hasOwn(ticket, "finalWriter")).toBe(false);
   });
 
   it("hands the provider the request unchanged and returns its result unchanged", async () => {
@@ -310,9 +328,10 @@ describe("call subjects", () => {
   });
 });
 
-const remaining = (maxConcurrentCalls: number): PreviewGateRemaining => Object.freeze({
+const remaining = (maxConcurrentCalls: number, finalWriterMaxInFlight?: number): PreviewGateRemaining => Object.freeze({
   state: "active", windowOpen: true, remainingNanoUsd: 1n, remainingCalls: 1, maxConcurrentCalls,
-  largestReservationNanoUsd: 1n, enabledModels: Object.freeze([])
+  largestReservationNanoUsd: 1n, enabledModels: Object.freeze([]),
+  ...(finalWriterMaxInFlight === undefined ? {} : { largestFinalWriterReservationNanoUsd: 1n, finalWriterMaxInFlight })
 });
 
 describe("each preview gate's slots, read once at boot", () => {
@@ -330,6 +349,46 @@ describe("each preview gate's slots, read once at boot", () => {
     expect([...scheduler.marks].sort()).toEqual(["capacity:anthropic:1", "capacity:deepinfra:6"]);
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0]!)).toEqual({ kind: "DEBATEAI_CALL_SCHEDULER", event: "GATE_CAPACITY_UNREAD", gate: "anthropic" });
+  });
+
+  it("sets a gate's final-writer slots from its /remaining only when it names them (LG-B)", async () => {
+    const scheduler = recordingScheduler();
+    const lines: string[] = [];
+    await applyPreviewGateCapacities({
+      scheduler,
+      gates: [
+        { gate: "deepinfra", remaining: async () => remaining(6, 1) },
+        { gate: "anthropic", remaining: async () => remaining(2) },
+        { gate: "google", remaining: async () => { throw new TypedDomainError("PREVIEW_GATE_UNREACHABLE", "socket /run/secret said no"); } }
+      ],
+      log: (line) => { lines.push(line); }
+    });
+    // deepinfra names one; anthropic names none (no extra cap, today's); google could not be read (one slot, one line).
+    expect([...scheduler.marks].sort()).toEqual(["capacity:anthropic:2", "capacity:deepinfra:6", "capacity:google:1", "final-writer:deepinfra:1"]);
+    expect(lines.map((line) => JSON.parse(line) as unknown)).toEqual([{ kind: "DEBATEAI_CALL_SCHEDULER", event: "GATE_CAPACITY_UNREAD", gate: "google" }]);
+  });
+
+  it("a second final writer waits in the runner, never at the gate, while a STANDARD call goes on (LG-B)", async () => {
+    const scheduler = createCallScheduler({ policy: WIDE });
+    await applyPreviewGateCapacities({ scheduler, gates: [{ gate: "deepinfra", remaining: async () => remaining(2, 1) }], log: () => undefined });
+    const lane = scheduler.openLane("debate-1");
+    const answers = new Map<string, ReturnType<typeof deferred<ProviderCallResult>>>();
+    const sent: string[] = [];
+    const gateway = laneGateway({ lane, scheduler, subject: SUBJECT, provider: { call: (req) => {
+      sent.push(req.callSiteKey); const d = deferred<ProviderCallResult>(); answers.set(req.callSiteKey, d); return d.promise;
+    } } });
+    const call = (callSiteKey: string, laneName: string, role: string) =>
+      gateway.call({ callSiteKey, lane: laneName, role, providerRef: "ref:a" } as unknown as ProviderCallRequest);
+    const story = call("STORY:STORYTELLER:1", "story", "SYNTHESIZER");
+    const writer = call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER");
+    const panel = call("PANEL:node-1", "served", "CRITIC");
+    await flush();
+    expect(sent).toEqual(["STORY:STORYTELLER:1", "PANEL:node-1"]);
+    answers.get("STORY:STORYTELLER:1")!.resolve(answer("ok")); await flush();
+    expect(sent).toEqual(["STORY:STORYTELLER:1", "PANEL:node-1", "COMPOSER:SYNTHESIZER:INITIAL:1"]);
+    for (const each of answers.values()) each.resolve(answer("ok"));
+    await Promise.all([story, writer, panel]);
+    lane.close();
   });
 
   it("a gate that announces fewer slots queues the rest instead of letting the gate refuse them", async () => {

@@ -12,6 +12,7 @@ import os
 import socket
 import sys
 import threading
+import time
 import types
 import unittest
 from decimal import Decimal
@@ -562,6 +563,46 @@ class FinalWriterTierTests(GateTest):
             # Its final-writer slot is free again too.
             bridge.execute_request(gate.private, gate.go_path, fw_envelope(value, 'fw-5'), dispatch=answered, **options)
             self.assertEqual(entry_of(gate, 'fw-5')['state'], 'settled')
+        with self.subTest('a final writer waiting for its slot holds no general slot (fix round 1)'):
+            # Two slots, one of them for a final writer: while one final writer runs and a second waits for the
+            # final-writer slot, a standard call still finds the other general slot (the waiter took none).
+            two = self.fw_gate(max_concurrent_calls=2)
+            waiting = {**self.options(two), 'slot_wait': 2.0}
+            results = {}
+
+            def second_final_writer():
+                try:
+                    bridge.execute_request(two.private, two.go_path, fw_envelope(body(model=DEEPSEEK, max_tokens=131072), 'fw-b'),
+                                           dispatch=answered, **waiting)
+                    results['fw-b'] = 'settled'
+                except SafetyError as error:
+                    results['fw-b'] = str(error)
+
+            def while_running(_sent, _key):
+                waiter = threading.Thread(target=second_final_writer)
+                waiter.start()
+                time.sleep(0.3)  # The second final writer is now waiting for the final-writer slot.
+                try:
+                    bridge.execute_request(two.private, two.go_path, envelope(body(model=DEEPSEEK), 'std-b'),
+                                           dispatch=answered, **{**waiting, 'slot_wait': 0.2})
+                    results['std-b'] = 'settled'
+                except SafetyError as error:
+                    results['std-b'] = str(error)
+                self.assertTrue(waiter.is_alive())  # Still waiting: the first final writer has not answered yet.
+                self.addCleanup(waiter.join, 5)
+                results['waiter'] = waiter
+                return answered(_sent, _key)
+            bridge.execute_request(two.private, two.go_path, fw_envelope(body(model=DEEPSEEK, max_tokens=131072), 'fw-a'),
+                                   dispatch=while_running, **waiting)
+            results.pop('waiter').join(5)
+            self.assertEqual(results, {'std-b': 'settled', 'fw-b': 'settled'})  # The waiter starts once the first ends.
+            self.assertEqual([entry_of(two, op)['state'] for op in ('fw-a', 'std-b', 'fw-b')], ['settled'] * 3)
+            # Every slot is free again: two final writers in a row, then two standard calls at once.
+            self.assertTrue(two.slots.acquire(0) and two.slots.acquire(0))
+            two.slots.release()
+            two.slots.release()
+            self.assertTrue(two.slots.acquire_final_writer(0))
+            two.slots.release_final_writer()
         # A server started before the GO named the member must restart first.
         with self.refused('SERVE_RESTART_REQUIRED'):
             bridge.execute_request(gate.private, gate.go_path, envelope(body(model=DEEPSEEK), 'std-2'), dispatch=answered,
@@ -575,6 +616,29 @@ class FinalWriterTierTests(GateTest):
         for count in (0, 5, True, 1.0, '1', None):
             with self.subTest(count=count), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', max_final_writer_calls=count))
+        # Fix round 1: a GO may name final-writer calls only when its profile and every enabled row have the tier.
+        fake = FakeVendorProfile()
+        fake.rows = {**fake.rows, 'fake/writer-1': bridge.helper.ModelRow(
+            'fake/writer-1', 'FakeMaker', Decimal('0.10'), Decimal('0.20'), 4096, (None,), False, final_writer_output_bound=8192)}
+        untiered = FakeVendorProfile()
+        untiered.name = 'untiered'
+        untiered.final_writer_max_request_bytes = None
+        untiered.rows = {'fake/writer-1': fake.rows['fake/writer-1']}
+        with patch.dict(bridge.helper.PROFILES, {'fakevendor': fake, 'untiered': untiered}):
+            for name, changes, ok in (('every_row_has_the_tier', {'enabled_models': ['fake/writer-1']}, True),
+                                      ('a_row_without_the_tier', {'enabled_models': ['fake/writer-1', 'fake/model-1']}, False),
+                                      ('only_rows_without_the_tier', {'enabled_models': ['fake/model-1']}, False),
+                                      ('a_profile_without_the_tier', {'provider': 'untiered', 'enabled_models': ['fake/writer-1']}, False)):
+                with self.subTest(name):
+                    path = gate.write_go(name=name + '.json', **{'provider': 'fakevendor', **changes}, max_final_writer_calls=1)
+                    if ok:
+                        self.assertEqual(bridge.read_go(path)['max_final_writer_calls'], 1)
+                    else:
+                        with self.refused('ROOT_GO_INVALID'):
+                            bridge.read_go(path)
+                    # Without the member the same GO reads as today.
+                    self.assertNotIn('max_final_writer_calls', bridge.read_go(gate.write_go(name=name + '-plain.json',
+                                                                                          **{'provider': 'fakevendor', **changes})))
         # All four rows, 10 at once, one of them a final writer: 9 x 0.14211072 + 0.50878464 = 1.78778112.
         for budget, ok in (('1.78', False), ('1.79', True)):
             with self.subTest(budget=budget):
@@ -596,6 +660,9 @@ class FinalWriterTierTests(GateTest):
         self.assertEqual(len(bridge.remaining_report(plain.private, plain.go_path, {'scope_id': SCOPE}, now=plain.clock)), 7)
         fw = self.fw_gate()
         report = bridge.remaining_report(fw.private, fw.go_path, {'scope_id': SCOPE}, slots=fw.slots, now=fw.clock)
+        self.assertEqual(sorted(report), ['enabled_models', 'final_writer_max_in_flight', 'largest_final_writer_reservation_usd',
+                                          'largest_reservation_usd', 'max_concurrent_calls', 'remaining_calls', 'remaining_usd',
+                                          'state', 'window_open'])
         self.assertEqual((report['final_writer_max_in_flight'], Decimal(report['largest_final_writer_reservation_usd']),
                           Decimal(report['largest_reservation_usd']), report['window_open']),
                          (1, Decimal('0.50878464'), Decimal('0.14211072'), True))
