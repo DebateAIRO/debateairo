@@ -258,6 +258,14 @@ when it answered more than 10: FAIL when slips > max(1, floor(answered / 10)). T
 when it reads a reply (a code fence, prose around the answer, a straight quote inside a text, a missing closing bracket
 at the very end of a reply that finished normally) are counted in the report as information, never as slips.
 
+`repairsByKind` (LG-A): every repair code made in code on an accepted reply, counted per AI and step (`opening`,
+`pros_cons`, `cross_exchange`, `judge_panel`, `reviewer`, `answer_writer`, `answer_checker`, `story_writer`,
+`story_checker`, `map`, `structure_repair`). `unrepaired`: every reply code could not repair, with its class
+(STRUCTURE, CONTENT, CUT_OFF, EMPTY), its first issue, the follow-up the same call sent next (STRUCTURE = the cheap
+structure-repair call on Haiku, PATCH, FULL, LENGTH_RETRY, or NONE), whether the call recovered, and its first 400
+characters (report.json only). A call fixed by the structure-repair call is one call of the original AI, repaired: a
+warning, never a failure. `report.md` shows the counts and the codes only.
+
 How a slip was fixed (patch follow-up, owner design 2026-10-12; information only, the verdict is the same either way).
 When a reply was a readable answer with only some parts wrong, the app first sends a SHORT follow-up: the AI gets its
 own answer back and is asked only for the wrong parts (for example `{"value_laden": true}`), which the app puts into
@@ -1006,8 +1014,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
 - `practice-lanes.ts`, `practice-formats.ts`: the jobs and the formats mode; `practice-levels.ts`: its `--levels`
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
-  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode; `practice-transcript.ts`: its
-  `--transcript` file.
+  `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode (`practice-debate.ts` also builds the
+  report's two LG-A tables, `repairsByKind` and `unrepaired`); `practice-transcript.ts`: its `--transcript` file.
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
@@ -1033,5 +1041,6 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
+  `tests/unit/lg-a-practice-repairs.test.ts` (the two LG-A tables, the step keys, a structure-repair try read as its step),
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

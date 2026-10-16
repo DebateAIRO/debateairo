@@ -8,7 +8,7 @@
 import { mkdirSync, realpathSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import type { PracticeDebateResult } from "./practice-debate.js";
+import type { PracticeDebateResult, PracticeRepairRow, PracticeUnrepairedRow } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import {
@@ -431,7 +431,10 @@ export function debateReport(input: Readonly<{
       ...repairTotals(r.repairKindsByModel ?? {}),
       jsonRepairs: (r.jsonRepairs ?? []).length
     }),
-    failures: r.failures
+    failures: r.failures,
+    // LG-A (L34): repairs by kind (counts) and the replies code could not repair (each with a short sample, json only).
+    repairsByKind: r.repairsByKind ?? [],
+    unrepaired: r.unrepaired ?? []
   });
 }
 
@@ -519,6 +522,21 @@ export function reportMarkdown(report: PracticeReport): string {
         + `by full re-ask ${String(entry.repairedByFullAsk ?? 0)}, otherwise ${String(entry.repairedOtherwise ?? 0)}), `
         + `${String(entry.unrecovered)} never fixed`
         + `${entry.slipRateExceeded ? " (over the slip rule)" : ""}; tolerant repairs ${JSON.stringify(entry.jsonRepairs)}`);
+    }
+    lines.push("");
+  }
+  const repairs = report.repairsByKind as readonly PracticeRepairRow[] | undefined;
+  if (repairs !== undefined && repairs.length > 0) {
+    lines.push("Repairs made in code (LG-A; information only, never a slip):", "", "| model | step | repair | count |", "|---|---|---|---|");
+    for (const row of repairs) lines.push(`| ${row.model} | ${row.step} | ${row.kind} | ${String(row.count)} |`);
+    lines.push("");
+  }
+  const unrepaired = report.unrepaired as readonly PracticeUnrepairedRow[] | undefined;
+  if (unrepaired !== undefined && unrepaired.length > 0) {
+    lines.push("Replies code could not repair (codes only; the samples are in report.json):", "");
+    for (const row of unrepaired) {
+      lines.push(`- ${row.model} · ${row.step} · ${row.failureClass} · ${row.code}@${row.path} · next: ${row.followUp}`
+        + `${row.recovered ? " · recovered" : " · not recovered"}`);
     }
     lines.push("");
   }
