@@ -2251,7 +2251,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // Length guidance L27: information only, never a reason to refuse or retry. The cached part of the input as the
         // vendor reported it, and the words this reply wrote.
         const cachedInputTokens = reportedCachedInputTokens(vendorUsageBlock);
-        const attemptWords = replyWordsOf(request, content, replyFacts);
+        // A reply A1 rescues is counted again on what was accepted (the hook below).
+        let attemptWords = replyWordsOf(request, content, replyFacts);
         /**
          * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
          * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
@@ -2332,12 +2333,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           attemptFailureClass = null;
           attemptRepairs = [];
         }
-        // Refused-repair salvage (2026-10-16, A1): a routed call's first reply of class STRUCTURE is read in code, with no
-        // call, before its artifact is written. A rescued reply is accepted here as the original AI's own reply: its artifact
-        // PARSED with A1's drops among its repairs, its OK row at the call's own key, no structure-repair call. A throw is
-        // no rescue (the reply goes on as it was refused), never a lost artifact.
-        if (routed && attempt === 1 && patchPlan === null && attemptFailureClass === "STRUCTURE" && content !== null
-          && request.structureSalvage !== undefined) {
+        // Refused-repair salvage (2026-10-16, A1): a routed call's reply to the ORIGINAL question (the first POST, or the
+        // length retry that sends it again; never a reply to a follow-up packet) of class STRUCTURE, not cut off, is read
+        // in code, with no call, before its artifact is written. A rescued reply is accepted here as the original AI's own
+        // reply: its artifact PARSED with A1's drops among its repairs and its words counted on what was accepted, its OK
+        // row at the call's own key, no structure-repair call. A1 sends nothing, so the routed call's POSTs stay as they
+        // were. A throw is no rescue (the reply goes on as it was refused), never a lost artifact.
+        if (routed && patchPlan === null && attemptPacket === request.packet && attemptFailureClass === "STRUCTURE"
+          && !truncatedReply && content !== null && request.structureSalvage !== undefined) {
           let salvaged: StructureSalvaged | null = null;
           try {
             salvaged = request.structureSalvage(content, replyFacts);
@@ -2349,6 +2352,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             classifiedContent = salvaged.classification;
             attemptFailureClass = null;
             attemptRepairs = contentRepairsOf(salvaged.classification);
+            attemptWords = replyWordsOf(request, salvaged.content, replyFacts);
           }
         }
         rawArtifactRef = await this.#options.persistRawArtifact({
