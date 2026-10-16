@@ -274,14 +274,15 @@ The smallest pot that passes with all four switched on is $1.43.
     the halt marker), so a failed email is not retried.
 
   DeepInfra's real charge for such a call can only be lower, so the pot stays safe; DeepInfra's
-  billing page shows the real figure. A server error from DeepInfra without a bill is handled the
-  same way (next point). Everything else that is unclear still halts exactly as
-  before: an answer without token counts that is not such a server error (for example a normal
-  answer, status 200, without them, or an error in the 400s, such as a refused key),
-  an answer that costs more than was set aside (`charge_overrun`), an answer from another model or
-  with another status than 200, an answer too large to read, a fault in the gate's own sending
-  code, a key or set-up problem, a lost answer, or a call cut off by a crash or restart of the gate
-  (a booked call that was not yet fully written halts at the next start, as a normal call does).
+  billing page shows the real figure. A server error from DeepInfra without a bill (next point) and
+  an answer without a bill count (the point after it) are handled the same way. Everything else
+  that is unclear still halts exactly as before: an error in the 400s without token counts (such as
+  a refused key or a billing problem: root must look), an answer whose own reported cost is above
+  what was set aside, an answer that costs more than was set aside (`charge_overrun`), an answer
+  from another model or with another status than 200, an answer too large to read, a fault in the
+  gate's own sending code, a key or set-up problem, a lost answer, or a call cut off by a crash or
+  restart of the gate (a booked call that was not yet fully written halts at the next start, as a
+  normal call does).
 - **A DeepInfra server error without a bill: booked at its maximum, never a halt** (owner ruling of
   2026-10-15). On 14 and 15 October GLM twice answered after about 31 seconds with "HTTP 500:
   internal server error": a complete answer, but with no token counts, no cost and no model name.
@@ -293,9 +294,21 @@ The smallest pot that passes with all four switched on is $1.43.
   (`http_status`) and DeepInfra's short error text with anything key-like removed (`vendor_error`).
   The gate keeps working, the app sees `PROVIDER_CHARGE_BOOKED_MAX` and retries as after a timeout,
   and the owner gets the same email. Whether DeepInfra bills such an answer is not known; whatever
-  it bills can only be lower than what was booked. A server error that does carry a billing field,
-  an error in the 400s, and a normal answer without token counts still halt as before. The
-  Anthropic gate is unchanged (owner ruling of 2026-10-15): its own 504 still halts.
+  it bills can only be lower than what was booked. A server error that does carry a billing field
+  but no token counts is booked as an answer without a bill count (next point); an error in the
+  400s still halts as before. Since owner answer M3 the Anthropic gate books its own server errors
+  without a bill, its 504 among them, the same way (README-anthropic.md).
+- **An answer without a bill count: booked at its maximum, never a halt** (owner answer M3 of
+  2026-10-15, built in LG-B). DeepInfra sometimes answers (status 200 to 299, or a server error from
+  500 to 599 that does carry a billing field) without token counts the gate can price: no `usage`,
+  `usage` empty or `null`, counts that are not whole numbers or do not add up, or an answer that is
+  not JSON at all. Nobody knows the bill, but the amount set aside is again the most it can cost, so
+  the gate charges exactly that (`settled_reserved_max`, with the reason `charge_unreported`, its
+  status `http_status` and the counts it could read in `accounting`), keeps working, the app sees
+  `PROVIDER_CHARGE_BOOKED_MAX`, and the owner gets the same email. Only when nothing in the answer
+  says it cost more: if the answer reports a cost (`estimated_cost` or `cost`, anywhere in it) above
+  the amount set aside, a cost that is not a plain amount, or token counts that already price above
+  it, the gate still halts (`uncertain_charge`), because that may be a real overcharge.
 - **Five in a row that never reached DeepInfra halt the gate** with `provider_unreachable`. "Never
   reached" means the connection failed before anything was sent. A "too many requests" answer in
   between neither adds to that count nor resets it. (For Anthropic, its not-busy error answers, 400,
@@ -752,7 +765,7 @@ restart, a gate's `status` showing `in_flight` above 1 is the proof that calls r
 - `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
 - `today_by_model`: spend and number of calls per model today;
 - `today_unbilled_releases`: today's "too many requests" answers kept at $0 (no limit; they never halt the gate; the halt watcher emails once a day when the count reaches its threshold);
-- `today_booked_max` and `today_booked_max_usd`: today's calls whose connection timed out or broke after they were sent, or that DeepInfra answered with a server error without a bill (reason `vendor_server_error`, since 2026-10-15), each charged the most it could cost (state `settled_reserved_max`; already inside `today_spend_usd`; never a halt; one email each time the number goes up);
+- `today_booked_max` and `today_booked_max_usd`: today's calls whose connection timed out or broke after they were sent, or that DeepInfra answered with a server error without a bill (reason `vendor_server_error`, since 2026-10-15) or without a bill count it could price (reason `charge_unreported`, owner answer M3), each charged the most it could cost (state `settled_reserved_max`; already inside `today_spend_usd`; never a halt; one email each time the number goes up);
 - `cooling`: per model, the short cool-off after such answers (`refusals`, `window_seconds`, `until_utc`, `trial`, `cooling_now`). A model is listed after its first such answer; `cooling_now` is true while it waits. `activate` does not clear it: the wait runs on after a re-open, and only a normal answer from that model (or the wait running out, then a trial) ends it;
 - `state`, `reason` and `halts`;
 - `window_open` and `open_until_utc`;
@@ -767,8 +780,10 @@ restart, a gate's `status` showing `in_flight` above 1 is the proof that calls r
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), check the
    DeepInfra billing page for that time before re-opening. Its full worst-case cost stays
    counted in that day's pot. (A call that only timed out or lost its connection after it was sent,
-   or that DeepInfra answered with a server error without a bill (since 2026-10-15),
-   no longer halts: it is booked at its maximum, `settled_reserved_max`, and needs no re-open.)
+   that DeepInfra answered with a server error without a bill (since 2026-10-15), or that DeepInfra
+   answered without a bill count it could price (`charge_unreported`, owner answer M3) no longer
+   halts: it is booked at its maximum, `settled_reserved_max`, and needs no re-open. An answer whose
+   own reported cost was above its hold, or an error in the 400s, still halts here.)
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named.
 4. A gate halted with `unbilled_release_ceiling` was halted by the code before 2026-10-12 (that

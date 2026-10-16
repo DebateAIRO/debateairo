@@ -85,13 +85,21 @@ model each halted the gate): a reply the profile's optional bookable_server_erro
 HTTP 500 to 599 with none of the billing keys anywhere in the raw reply) is booked the same way, with
 reason 'vendor_server_error', its HTTP status and the vendor facts an unbilled release keeps (Retry-After,
 rate-limit header names, the short redacted error). The same reservation bounds whatever was billed.
-A profile without the hook (Anthropic) is unchanged. Everything else still halts
-exactly as before: any other failure while sending or reading (a reply too large, a fault in the
-transport itself), a hook that fails on a reply, a reply without accountable usage (also a vendor's
-own timeout answer such as Anthropic's 504), a charge above the reservation (charge_overrun),
-another model or a non-200 reply, a key, identity or configuration problem, a hold that cannot be
-released, a lost reply or an interrupted call (a booking still in flight at serve start halts, as a
-settled call does).
+A profile without that hook (Anthropic) books its server errors only as below.
+An unreported charge (owner answer M3, 2026-10-15; rulings R1-R3, 2026-10-16): a paid reply whose usage or cost is
+unreported (assess_reply's usage_or_cost_unreported) that the profile's optional bookable_unreported accepts, judged
+on the RAW reply with its accounting and the call's reservation, is booked the same way, with reason
+'charge_unreported', its HTTP status and its accounting (DeepInfra: a 2xx or 5xx whose counts cannot be priced, when no
+cost it reports anywhere and none of the counts it does report price above the reservation; Anthropic: a message,
+status 200, without usage or with unreadable input/output counts whose usage names no premium speed, tier, region,
+server tool or cache write, and a 5xx that is no message and carries no billing key, content, model or token count,
+its 504 timeout_error among them). A hook that fails halts (accounting_failure). Everything else still halts exactly
+as before: any other failure while sending or reading (a reply too large, a fault in the transport itself), a hook
+that fails on a reply, a 4xx without accountable usage (a key, billing or request problem root must see), a reply whose
+own reported cost is above its reservation, any usage member, speed, service tier, region, server tool, cache count
+or content block the profile cannot price, a charge above the reservation (charge_overrun), another model or a non-200
+reply with accountable usage, a key, identity or configuration problem, a hold that cannot be released, a lost reply
+or an interrupted call (a booking still in flight at serve start halts, as a settled call does).
 
 Unbilled refusals (owner ruling 5, 2026-10-10; per model since 2026-10-12): anything after the connect
 stays uncertain and halts as before, with one exception: a reply the profile's unbilled_refusal
@@ -131,15 +139,16 @@ A probe (root, one deliberate call) is never refused for a cool-off, but its out
 Refusal codes the caller sees (PUBLIC_REFUSALS): the three pot codes, PROVIDER_NOT_REACHED,
 PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED (nothing billed, hold released; only the second
 says the model is busy), MODEL_COOLING (nothing reserved or sent), PROVIDER_CHARGE_BOOKED_MAX (sent,
-the connection then failed, booked at the reservation; the gate stays active),
+then the connection failed, the vendor answered a server error without a bill, or its charge went unreported;
+booked at the reservation; the gate stays active),
 and AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
 when this call was checked, before anything was reserved. Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10): one GO's daily_budget_usd is at most MAX_GO_BUDGET_USD ($10.00, the
-DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds the
-daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is
-over TEAM_TOTAL_BUDGET_USD ($12.00: DeepInfra $10.00 + Anthropic $2.00).
+Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15): one GO's daily_budget_usd is at most
+MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds
+the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
+TEAM_TOTAL_BUDGET_USD ($16.00: DeepInfra $12.00 + Anthropic $4.00).
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -237,8 +246,9 @@ STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 # after unbilled refusals; nothing was reserved or sent. AUTHORITY_HALTED: the gate is halted, found
 # by the state check before anything was reserved (never after a reservation: every failure there
 # stays the opaque STOPPED).
-# PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12): this call was sent, the vendor connection then failed or
-# timed out, and its full reservation is booked as its charge; the gate stays active.
+# PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12; owner answer M3): this call was sent and its charge cannot be
+# known (the connection failed or timed out, a server error without a bill, or an unreported charge); its full
+# reservation is booked as its charge; the gate stays active.
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
                              'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
                              'MODEL_COOLING', 'AUTHORITY_HALTED', 'PROVIDER_CHARGE_BOOKED_MAX'})
@@ -266,10 +276,10 @@ ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_M
 # sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
 # reservation; anything else after the reservation stays uncertain and halts.
 BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
-# Owner ruling 2026-10-10: one GO may ask for at most $10.00 a day (the DeepInfra pot), and the
-# daily team total over every provider gate's pot is $12.00 (DeepInfra $10.00 + Anthropic $2.00).
-MAX_GO_BUDGET_USD = Decimal('10.00')
-TEAM_TOTAL_BUDGET_USD = Decimal('12.00')  # Checked only by activate's sum over every gate's GO.
+# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15): one GO may ask for at most $12.00 a day (the
+# DeepInfra pot), and the daily team total over every provider gate's pot is $16.00 (DeepInfra $12.00 + Anthropic $4.00).
+MAX_GO_BUDGET_USD = Decimal('12.00')
+TEAM_TOTAL_BUDGET_USD = Decimal('16.00')  # Checked only by activate's sum over every gate's GO.
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -1118,9 +1128,10 @@ class CallNotSent(SafetyError):
 
 
 class ChargeBookedMax(SafetyError):
-    """PROVIDER_CHARGE_BOOKED_MAX: this call was sent, the vendor connection then failed or timed out,
-    and its full reservation is booked as its charge (settled_reserved_max). The gate stays active and
-    the IPC handler does not halt for it: the booking is already on the record."""
+    """PROVIDER_CHARGE_BOOKED_MAX: this call was sent and its charge cannot be known (the vendor connection then
+    failed or timed out, a server error without a bill, or, owner answer M3, an unreported charge), and its full
+    reservation is booked as its charge (settled_reserved_max). The gate stays active and the IPC handler does not
+    halt for it: the booking is already on the record."""
 
 
 class _FailedAfterSend(Exception):
@@ -1421,6 +1432,26 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
                                                     'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
                                                    'uncertain_charge', None, None)
+        # Owner answer M3 (2026-10-15; OVERVIEW B-3; rulings R1-R3, 2026-10-16): a paid reply whose usage or cost is
+        # unreported is booked at its reservation when the profile's optional bookable_unreported finds the reservation
+        # bounds it (judged on the RAW reply, as above, with its accounting): settled_reserved_max, reason
+        # charge_unreported, no halt. Anything that may bill above the list price still halts; a hook that fails halts.
+        if halt_reason == 'uncertain_charge' and changes.get('reason') == 'usage_or_cost_unreported':
+            unreported = getattr(profile, 'bookable_unreported', None)
+            try:
+                bookable = unreported is not None and unreported(status, raw_response, changes['accounting'], reserved) is True
+            except BaseException:
+                bookable = False
+                changes = {**changes, 'reason': 'accounting_failure'}
+            if bookable:
+                changes = {**changes, 'state': BOOKED_MAX, 'held_usd': str(reserved), 'reason': 'charge_unreported'}
+                outcome = settle_or_halt(private, entry_id, day, changes, None, budget, now, slots)
+                log_event({**event, 'model': row.model, 'status': BOOKED_MAX, 'alert': 'charge_booked_at_reservation',
+                           'booked_usd': str(reserved), 'reason': 'charge_unreported', 'http_status': changes['http_status'],
+                           'elapsed_seconds': elapsed, **outcome})
+                if on_settled is not None:  # The probe still prints what it measured.
+                    on_settled({'changes': changes, 'halt_reason': None, 'response': response, 'row': row, **outcome})
+                raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX')
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         log_event({**event, 'model': row.model, 'status': changes['state'], 'halt_reason': halt_reason,
                    'guard_charge_usd': charge, 'elapsed_seconds': elapsed, **outcome})

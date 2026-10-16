@@ -1712,7 +1712,8 @@ class ServerErrorBookedTests(GateTest):
     anywhere in it is booked at its reservation, as a connection that failed after the send is
     (settled_reserved_max), and the gate stays active. Seen live: GLM answered 500 after about 31 s with no
     usage and no model (2026-10-14 23:52 and 2026-10-15 07:10 UTC), and each answer halted every DeepInfra
-    model until a re-open. Anything with a billing field, a 4xx and a 200 without usage still halt."""
+    model until a re-open. A 4xx still halts; an answer or a server error that names a billing field but has no
+    usable counts is booked as unreported since owner answer M3 (UnreportedChargeBookedTests)."""
     SERVER_ERROR = {'error': {'message': 'Internal Server Error', 'type': 'server_error', 'code': 500}}
     complete = HaltedRefusalTests.complete
 
@@ -1763,7 +1764,7 @@ class ServerErrorBookedTests(GateTest):
         self.assertEqual(Decimal(booked[0]['booked_usd']), RESERVED)
         self.assertNotIn(KEY, self.out.getvalue())
 
-    def test_a_server_error_carrying_any_billing_field_still_halts_as_before(self):
+    def test_a_server_error_carrying_any_billing_field_is_settled_or_booked_as_unreported(self):
         usage = {'prompt_tokens': 10, 'completion_tokens': 0}
         settled = {**self.SERVER_ERROR, 'model': MODEL, 'usage': usage}
         gate = self.gate().ready()
@@ -1779,12 +1780,16 @@ class ServerErrorBookedTests(GateTest):
                             ('usage_under_redacted_key', {**self.SERVER_ERROR, 'headers': {'usage': usage}})):
             with self.subTest(name):
                 gate = self.gate().ready()
-                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
                     gate.call('op-1', dispatch=self.answering(503, reply))
-                self.assert_halted_uncertain(gate)
+                entry = entry_of(gate, 'op-1')
+                # Owner answer M3 (2026-10-15): no usable counts and no cost above the hold: booked as unreported.
+                self.assertEqual((entry['state'], entry['reason'], entry['http_status'], Decimal(entry['held_usd'])),
+                                 ('settled_reserved_max', 'charge_unreported', 503, RESERVED))
+                self.assertEqual((gate.status()['state'], gate.status()['today_booked_max']), ('active', 1))
 
-    def test_a_client_error_or_an_answer_outside_5xx_without_usage_still_halts(self):
-        for status in (200, 400, 401, 402, 403, 404, 408, 413, 422, 499, 600):
+    def test_a_client_error_or_a_status_outside_2xx_and_5xx_without_usage_still_halts(self):
+        for status in (400, 401, 402, 403, 404, 408, 413, 422, 499, 600):
             with self.subTest(status=status):
                 gate = self.gate().ready()
                 with self.refused('NEW_CHARGE_UNCERTAIN'):
@@ -1800,8 +1805,10 @@ class ServerErrorBookedTests(GateTest):
                               (500, {'error': {'tokens_input': 1}})):
             with self.subTest(status=status, reply=reply):
                 self.assertFalse(DEEPINFRA.bookable_server_error(status, reply))
-        # Owner ruling 2026-10-15: Haiku's gate is not changed (its own 504 still halts).
+        # Owner ruling 2026-10-15: Haiku's gate has no bookable_server_error. Since owner answer M3 (ruling R1, 2026-10-16) its
+        # server errors without any billing field are booked through bookable_unreported (UnreportedChargeBookedTests).
         self.assertIsNone(getattr(bridge.helper.PROFILES['anthropic'], 'bookable_server_error', None))
+        self.assertTrue(callable(getattr(bridge.helper.PROFILES['anthropic'], 'bookable_unreported', None)))
 
     def test_a_failing_hook_is_uncertain_and_halts(self):
         gate = self.gate().ready()
@@ -1826,6 +1833,111 @@ class ServerErrorBookedTests(GateTest):
                 gate.call(operation_id, dispatch=self.answering(500, self.SERVER_ERROR))
         control = gate.control()
         self.assertEqual((control['unsent_streak'], control.get('cooling', {}), control['state']), (1, {}, 'active'))
+
+
+class UnreportedChargeBookedTests(GateTest):
+    """Owner answer M3 (2026-10-15; OVERVIEW B-3; rulings R2, R3 and 16b, 2026-10-16): a paid answer whose usage or cost
+    is unreported (status 200 to 299, or a server error that names a billing field) is booked at its reservation
+    (settled_reserved_max, reason charge_unreported) and the gate stays active, as long as nothing in it says it cost
+    more. A reported cost or readable counts above the reservation, a cost that is not a plain amount and every 4xx
+    still halt (a real overcharge, or a key or billing problem root must see)."""
+    complete = HaltedRefusalTests.complete
+
+    def answering(self, status, reply):
+        return lambda _sent, _key: (status, json.loads(json.dumps(reply)))
+
+    def assert_booked(self, gate, status, operation_id='op-1'):
+        entry = entry_of(gate, operation_id)
+        self.assertEqual((entry['state'], entry['reason'], entry['http_status']), ('settled_reserved_max', 'charge_unreported', status))
+        self.assertEqual((Decimal(entry['held_usd']), Decimal(entry['reserved_usd'])), (RESERVED, RESERVED))
+        report = gate.status()
+        self.assertEqual((report['state'], report['reason'], report['halts'], report['in_flight'], report['today_uncertain']),
+                         ('active', None, [], 0, 0))
+        self.assertEqual((report['today_booked_max'], Decimal(report['today_booked_max_usd']), Decimal(report['today_spend_usd'])),
+                         (1, RESERVED, RESERVED))
+        return entry
+
+    def assert_halted_uncertain(self, gate):
+        report = gate.status()
+        self.assertEqual((report['state'], report['reason'], report['today_booked_max']), ('halted', 'uncertain_charge', 0))
+        self.assertEqual(entry_of(gate, 'op-1')['state'], 'uncertain')
+
+    def test_an_answer_without_accountable_usage_is_booked_at_its_reservation_and_the_gate_stays_active(self):
+        for name, reply in (('no_usage', provider_response(None)),
+                            ('usage_null', {**provider_response(None), 'usage': None}),
+                            ('not_json', {'_invalid_json': True}),
+                            ('totals_off', {'model': MODEL, 'usage': {'prompt_tokens': 100, 'completion_tokens': 50, 'total_tokens': 151}}),
+                            ('cost_within_the_hold', {'model': MODEL, 'usage': {'estimated_cost': '0.01'}})):
+            with self.subTest(name):
+                gate = self.gate().ready()
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                    gate.call('op-1', dispatch=self.answering(200, reply))
+                self.assert_booked(gate, 200)
+                self.assertEqual(gate.call('op-2')['status'], 200)  # Every model keeps working.
+        gate = self.gate().ready()  # Any 2xx is an answer.
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+            gate.call('op-1', dispatch=self.answering(203, provider_response(None)))
+        self.assert_booked(gate, 203)
+
+    def test_a_server_error_naming_a_billing_field_without_usable_counts_is_booked_and_the_streak_stays(self):
+        gate = self.gate().ready()
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call('op-0', dispatch=unreached)
+        error = {'error': {'message': 'Internal Server Error', 'type': 'server_error'}}
+        for operation_id, status, reply in (('op-1', 502, {**error, 'choices': []}),
+                                            ('op-2', 503, {**error, 'usage': {'prompt_tokens': 'many'}}),
+                                            ('op-3', 500, {**error, 'inference_status': {'cost': 0.0001}})):
+            self.assertFalse(DEEPINFRA.bookable_server_error(status, json.loads(json.dumps(reply))))  # It names a billing field.
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                gate.call(operation_id, dispatch=self.answering(status, reply))
+            entry = entry_of(gate, operation_id)
+            self.assertEqual((entry['state'], entry['reason'], entry['http_status']), ('settled_reserved_max', 'charge_unreported', status))
+        control = gate.control()
+        # A booking neither grows nor resets the unsent streak and never cools the model.
+        self.assertEqual((control['unsent_streak'], control.get('cooling', {}), control['state']), (1, {}, 'active'))
+        self.assertEqual(gate.status()['today_booked_max'], 3)
+
+    def test_a_cost_or_count_above_the_reservation_an_unreadable_cost_or_a_4xx_still_halts(self):
+        over = str(RESERVED + Decimal('0.000000001'))
+        for name, status, reply in (
+                ('reported_cost_above', 200, {'model': MODEL, 'usage': {'estimated_cost': over}}),
+                ('nested_cost_above', 503, {'error': {'message': 'failed'}, 'inference_status': {'cost': '1.00'}}),
+                # 40,000 output tokens at GLM's 0.50 per million are $0.02, above the hold of about $0.0167.
+                ('counts_priced_above', 200, {'model': MODEL, 'usage': {'prompt_tokens': 10, 'completion_tokens': 40000, 'total_tokens': 1}}),
+                ('cost_not_an_amount', 200, {'model': MODEL, 'usage': {'estimated_cost': 'about a cent'}}),
+                # Ruling R2 (2026-10-16): a 4xx without usage is not a paid post; a broken key needs root.
+                ('400', 400, {'error': {'message': 'bad request'}}),
+                ('401', 401, {'error': {'message': 'invalid key'}}),
+                ('402', 402, {'error': {'message': 'payment required'}}),
+                ('403', 403, {'error': {'message': 'forbidden'}}),
+                ('422', 422, {'error': {'message': 'unprocessable'}})):
+            with self.subTest(name):
+                gate = self.gate().ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=self.answering(status, reply))
+                self.assert_halted_uncertain(gate)
+
+    def test_through_ipc_the_caller_sees_the_booked_code_and_the_journal_names_the_reason(self):
+        gate = self.gate().ready()
+        line, reply = self.complete(gate, 'op-1', self.answering(200, provider_response(None)))
+        self.assertEqual((line, reply), (b'HTTP/1.0 409 Conflict', {'error': 'PROVIDER_CHARGE_BOOKED_MAX'}))
+        self.assert_booked(gate, 200)
+        logged = [json.loads(text) for text in self.out.getvalue().splitlines() if text.startswith('{')]
+        booked = [entry for entry in logged if entry.get('status') == 'settled_reserved_max']
+        self.assertEqual(len(booked), 1)
+        self.assertEqual({name: booked[0][name] for name in ('model', 'alert', 'reason', 'http_status', 'authority')},
+                         {'model': MODEL, 'alert': 'charge_booked_at_reservation', 'reason': 'charge_unreported',
+                          'http_status': 200, 'authority': 'active'})
+        self.assertEqual(Decimal(booked[0]['booked_usd']), RESERVED)
+        self.assertNotIn('ipc_or_delivery_failure', self.out.getvalue())
+
+    def test_a_failing_hook_is_uncertain_and_halts(self):
+        gate = self.gate().ready()
+        with patch.object(DEEPINFRA, 'bookable_unreported', side_effect=RuntimeError('synthetic')), \
+                self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=self.answering(200, provider_response(None)))
+        self.assert_halted_uncertain(gate)
+        self.assertEqual(entry_of(gate, 'op-1')['reason'], 'accounting_failure')
 
 
 class ReasoningTokenTests(GateTest):
@@ -1874,9 +1986,9 @@ class ReasoningTokenTests(GateTest):
 
 
 class TeamTotalTests(GateTest):
-    """Round 2 review, figures from the owner's ruling of 2026-10-10: one GO is at most $10.00 a
-    day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the $12.00 team
-    total (DeepInfra $10.00 + Anthropic $2.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
+    """Round 2 review, figures from the owner's ruling of 2026-10-10 as raised by owner answer M1 (2026-10-15): one GO
+    is at most $12.00 a day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the $16.00 team
+    total (DeepInfra $12.00 + Anthropic $4.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
 
     def other_go(self, gate, provider, budget='1.50', **fields):
         path = gate.root / ('team-go-' + provider + '.json')
@@ -1885,28 +1997,28 @@ class TeamTotalTests(GateTest):
         os.chmod(path, 0o600)
         return path
 
-    def test_one_go_is_capped_at_ten_dollars_and_the_team_total_is_twelve(self):
-        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('10.00'), Decimal('12.00')))
+    def test_one_go_is_capped_at_twelve_dollars_and_the_team_total_is_sixteen(self):
+        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('12.00'), Decimal('16.00')))
         gate = self.gate()
-        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='10.00'))['daily_budget_usd'], '10.00')
-        for budget in ('10.01', '12.00', '50.00'):
+        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='12.00'))['daily_budget_usd'], '12.00')
+        for budget in ('12.01', '16.00', '50.00'):
             with self.subTest(budget=budget), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', daily_budget_usd=budget))
 
     def test_missing_other_gos_count_zero_and_the_sum_may_reach_the_total(self):
-        gate = self.gate(daily_budget_usd='10.00').ready()  # No other GO exists.
+        gate = self.gate(daily_budget_usd='12.00').ready()  # No other GO exists.
         self.assertEqual(gate.status()['state'], 'active')
-        self.other_go(gate, 'anthropic', '2.00')
+        self.other_go(gate, 'anthropic', '4.00')
         bridge.stop_authority(gate.private, now=gate.clock)
-        self.assertEqual(gate.activate()['state'], 'active')  # 10.00 + 2.00 = 12.00 exactly.
+        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 = 16.00 exactly.
         self.assertEqual(bridge.team_total(gate.go, {'deepinfra': str(gate.go_path),
                                                      'anthropic': str(gate.root / 'team-go-anthropic.json')},
-                                           os.getuid()), Decimal('12.00'))
+                                           os.getuid()), Decimal('16.00'))
 
     def test_a_sum_over_the_team_total_refuses(self):
-        for others in ({'anthropic': '2.01'}, {'anthropic': '1.50', 'google': '0.51'}, {'google': '10.00'}):
+        for others in ({'anthropic': '4.01'}, {'anthropic': '3.50', 'google': '0.51'}, {'google': '12.00'}):
             with self.subTest(others=others):
-                gate = self.gate(daily_budget_usd='10.00')
+                gate = self.gate(daily_budget_usd='12.00')
                 gate.init()
                 for provider, budget in others.items():
                     self.other_go(gate, provider, budget)
@@ -1914,28 +2026,27 @@ class TeamTotalTests(GateTest):
                     gate.activate()
                 self.assertEqual(gate.control()['state'], 'initialized')
 
-    def test_the_owners_pots_ten_plus_two_reach_the_total_and_one_cent_more_refuses(self):
-        # Owner ruling 2026-10-10: DeepInfra $10.00 (2,000 calls, 10 at once, all four models),
-        # Anthropic $2.00.
-        proposed = {'daily_budget_usd': '10.00', 'max_paid_posts_per_day': 2000, 'max_concurrent_calls': 10,
+    def test_the_owners_pots_twelve_plus_four_reach_the_total_and_one_cent_more_refuses(self):
+        # Owner answer M1 (2026-10-15): DeepInfra $12.00 (2,000 calls, 10 at once, all four models), Anthropic $4.00.
+        proposed = {'daily_budget_usd': '12.00', 'max_paid_posts_per_day': 2000, 'max_concurrent_calls': 10,
                     'enabled_models': ALL}
         gate = self.gate(**proposed)
         gate.init()
-        self.other_go(gate, 'anthropic', '2.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 10.00 + 2.00 = 12.00 exactly.
+        self.other_go(gate, 'anthropic', '4.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 = 16.00 exactly.
         gate = self.gate(**proposed)
         gate.init()
-        self.other_go(gate, 'anthropic', '2.01')
-        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 10.00 + 2.01 = 12.01.
+        self.other_go(gate, 'anthropic', '4.01')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 12.00 + 4.01 = 16.01.
             gate.activate()
         self.assertEqual(gate.control()['state'], 'initialized')
-        # A DeepInfra GO of 10.01 never gets as far as the sum: one GO is at most $10.00.
+        # A DeepInfra GO of 12.01 never gets as far as the sum: one GO is at most $12.00.
         with self.refused('ROOT_GO_INVALID'):
-            bridge.read_go(gate.write_go(name='over.json', **{**proposed, 'daily_budget_usd': '10.01'}))
-        # The same sum seen from the Anthropic side: its 2.01 beside DeepInfra's 10.00 is over too.
-        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '2.01'}
-        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '10.00'))},
-                                           os.getuid()), Decimal('12.01'))
+            bridge.read_go(gate.write_go(name='over.json', **{**proposed, 'daily_budget_usd': '12.01'}))
+        # The same sum seen from the Anthropic side: its 4.01 beside DeepInfra's 12.00 is over too.
+        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '4.01'}
+        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '12.00'))},
+                                           os.getuid()), Decimal('16.01'))
 
     def test_this_providers_own_listed_go_is_not_counted_twice(self):
         gate = self.gate(daily_budget_usd='10.00')
@@ -1963,9 +2074,9 @@ class TeamTotalTests(GateTest):
                 elif name == 'budget_over_cap':
                     path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
                                                 'daily_budget_usd': '50.00'}))
-                elif name == 'budget_over_go_cap':  # One cent over the $10.00 a single GO may ask for.
+                elif name == 'budget_over_go_cap':  # One cent over the $12.00 a single GO may ask for.
                     path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
-                                                'daily_budget_usd': '10.01'}))
+                                                'daily_budget_usd': '12.01'}))
                 elif name == 'too_large':
                     path.write_text(' ' * (bridge.TEAM_GO_BYTES + 1))
                 elif name == 'group_writable':

@@ -374,6 +374,32 @@ def names_any_key(value, names):
     return False
 
 
+# Owner answer M3 (2026-10-15): the members under which a reply may report what it cost, at any depth.
+REPORTED_COST_KEYS = ('estimated_cost', 'cost')
+
+
+def reported_costs(value):
+    """Every amount a parsed reply reports under REPORTED_COST_KEYS, at any depth, as Decimals (a null one reports
+    nothing); None when one of them is not a plain non-negative amount (such a reply is never booked: M3)."""
+    found, stack = [], [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, inner in item.items():
+                if key in REPORTED_COST_KEYS and not isinstance(inner, (dict, list)):
+                    if inner is None:
+                        continue
+                    amount = decimal_amount(inner)
+                    if amount is None:
+                        return None
+                    found.append(amount)
+                else:
+                    stack.append(inner)
+        elif isinstance(item, list):
+            stack.extend(item)
+    return found
+
+
 # One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
 # (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
 # output_bound is both the max_tokens ceiling and what a call reserves for output. efforts (spec 2026-10-12
@@ -439,6 +465,12 @@ class DeepInfraProfile:
                                          (settled_reserved_max, reason vendor_server_error) and the
                                          gate stays active. A profile without it (AnthropicProfile)
                                          accounts every such reply as before
+      bookable_unreported(status, response, accounting, reserved) -> bool  OPTIONAL (owner answer M3, 2026-10-15):
+                                         asked only of a paid reply whose usage or cost is unreported
+                                         (assess_reply's usage_or_cost_unreported), with its accounting and the
+                                         call's reservation; True books the call at its reservation
+                                         (settled_reserved_max, reason charge_unreported) and the gate stays
+                                         active. A profile without it accounts every such reply as before (halt)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024), with the row's sampling
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -574,6 +606,29 @@ class DeepInfraProfile:
         return (type(status) is int and 500 <= status <= 599 and isinstance(response, dict)
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
+
+    def bookable_unreported(self, status, response, accounting, reserved):
+        """Owner answer M3 (2026-10-15; OVERVIEW B-3; ruling R2, 2026-10-16): asked only of a paid reply whose usage or
+        cost is unreported (assess_reply's usage_or_cost_unreported), on the RAW reply. True for an answer (HTTP 200 to
+        299) or a server error (500 to 599, one bookable_server_error did not take: it names a billing field) whose
+        counts cannot be priced, when nothing in it says it cost more than the reservation: every cost it reports
+        anywhere is a plain amount at most `reserved`, and the counts it does report, at the row's list prices, price
+        at most `reserved` too. The gate then books the call at its reservation (reason charge_unreported) and stays
+        active. False for every other status (a 4xx is a key, billing or request problem root must see) and for an
+        accounting the gate had to cut short (oversized_accounting)."""
+        if not (type(status) is int and (200 <= status <= 299 or 500 <= status <= 599)):
+            return False
+        if not isinstance(response, dict) or not isinstance(accounting, dict) or accounting.get('usage_valid') is True \
+                or accounting.get('oversized_accounting') is True:
+            return False
+        costs = reported_costs(response)
+        if costs is None or any(cost > reserved for cost in costs):
+            return False
+        prompt = accounting.get('prompt_tokens') or 0
+        output = (accounting.get('completion_tokens') or 0) + (accounting.get('reasoning_tokens') or 0)
+        listed = (Decimal(prompt) * Decimal(accounting['input_usd_per_m'])
+                  + Decimal(output) * Decimal(accounting['output_usd_per_m'])) / Decimal(1000000)
+        return listed <= reserved
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
@@ -725,7 +780,10 @@ class AnthropicProfile:
     1-hour price on any other call (as before caching). Anthropic reports no cost,
     so the guard charge is that list-price charge. Any usage field this profile does not know, any
     server-tool use, another service tier or region, or a tool block makes the usage invalid: uncertain,
-    and the gate halts.
+    and the gate halts. Owner answer M3 (2026-10-15; rulings R1-R3, 2026-10-16): bookable_unreported books, at the
+    call's reservation, a message without usage or with unreadable input/output counts whose usage names nothing that
+    may bill above the list price (premium_free), and a server error (500 to 599) that is no message and names no
+    billing field; everything named here still halts.
     A reply with a container or context editing (a null one means none was
     used), usage or token counts outside `usage`, or a content block other than text or thinking is
     invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
@@ -960,7 +1018,8 @@ class AnthropicProfile:
     # 529) cool the model off like DeepInfra's 429s; 400, 404, 413 and 500 are not busy (review
     # 2026-10-12): they count toward the gate-wide unsent streak as before gate v4. Never here, so they halt:
     # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
-    # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
+    # 402 billing_error, 504 timeout_error (the work may have run; since owner answer M3 it is booked at the
+    # reservation by bookable_unreported, never released), and any other status or type.
     UNBILLED_ERRORS = {
         400: frozenset({'invalid_request_error'}),
         404: frozenset({'not_found_error'}),
@@ -998,6 +1057,40 @@ class AnthropicProfile:
         are deterministic for that request, and 500 api_error is Anthropic's own fault: none of them
         is a reason to sit the model out, so the gate counts them toward the unsent streak instead."""
         return status in self.BUSY_STATUSES
+
+    def bookable_unreported(self, status, response, accounting, reserved):
+        """Owner answer M3 (2026-10-15) with rulings R1-R3 (2026-10-16): asked only of a paid reply whose usage is
+        unreported, on the RAW reply. True for (a) a message (HTTP 200) whose usage is missing or whose input and output
+        counts cannot be read (invalid_reason usage_missing or token_counts), when its usage names nothing that may bill
+        above the list price the reservation holds (premium_free); (b) R1: a server error (500 to 599) that is no
+        message and carries no billing key, content, model or token count at any depth (the unbilled_refusal key
+        test): its 504 timeout_error, a 503, a 529 api_error. The gate then books the call at its reservation (reason
+        charge_unreported). Never a 4xx (R2: 401, 402, 403 and the rest: root must look), an unknown usage member (R3,
+        usage_unknown_field: a new member may be a new billing dimension, as speed was on 2026-10-16), a premium speed,
+        tier or region, a server tool, an unpriced reply member, counts outside usage, a tool or other content block,
+        or a cache count it cannot read. `reserved` is not needed here: nothing Anthropic reports is a cost."""
+        if type(status) is not int or not isinstance(response, dict) or not isinstance(accounting, dict):
+            return False
+        reason = accounting.get('invalid_reason')
+        if status == 200 and reason in ('usage_missing', 'token_counts'):
+            usage = response.get('usage')
+            return not isinstance(usage, dict) or self.premium_free(usage)
+        return (500 <= status <= 599 and reason == 'not_a_message'
+                and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
+
+    @staticmethod
+    def premium_free(usage):
+        """M3: a usage that names nothing that may bill above the reservation's list prices: standard speed, tier and
+        region (or none), no server tool used, and no cache write (the reservation prices a call's input at the plain
+        input price unless the call asked for a write)."""
+        tools = usage.get('server_tool_use')
+        creation = usage.get('cache_creation_input_tokens')
+        return (usage.get('speed') in (None, 'standard') and usage.get('service_tier') in (None, 'standard')
+                and usage.get('inference_geo') in (None, 'global')
+                and (tools is None or isinstance(tools, dict) and all(type(v) is int and v == 0 for v in tools.values()))
+                and (creation is None or type(creation) is int and creation == 0) and usage.get('cache_creation') is None)
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

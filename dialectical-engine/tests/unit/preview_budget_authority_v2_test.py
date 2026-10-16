@@ -201,7 +201,7 @@ class GoValidationTests(GateTest):
         return gate, gate.write_go(name='candidate.json', **changes)
 
     def test_valid_go_is_accepted_with_bounds_inclusive(self):
-        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '10.00'},
+        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '12.00'},
                         {'max_paid_posts_per_day': 1}, {'max_paid_posts_per_day': 5000},
                         {'max_concurrent_calls': 1}, {'max_concurrent_calls': 10},
                         {'open_days': 1}, {'open_days': 31}, {'scope_id': 'a'}, {'scope_id': 'a' + 'b' * 95},
@@ -218,8 +218,8 @@ class GoValidationTests(GateTest):
             {'scope_id': 'a' * 97}, {'scope_id': 7}, {'target_host': ''}, {'target_host': 'bad host'},
             {'target_host': 'h' * 129}, {'allowed_peer_uids': []}, {'allowed_peer_uids': [-1]},
             {'allowed_peer_uids': [True]}, {'allowed_peer_uids': ['994']}, {'allowed_peer_uids': 994},
-            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '10.01'}, {'daily_budget_usd': '50.00'},
-            {'daily_budget_usd': '12.00'}, {'daily_budget_usd': '5'},
+            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '12.01'}, {'daily_budget_usd': '50.00'},
+            {'daily_budget_usd': '16.00'}, {'daily_budget_usd': '5'},
             {'daily_budget_usd': '5.001'}, {'daily_budget_usd': 5.0}, {'daily_budget_usd': '-1.00'},
             {'daily_budget_usd': 'NaN'}, {'daily_budget_usd': '1e1'}, {'max_paid_posts_per_day': 0},
             {'max_paid_posts_per_day': 5001}, {'max_paid_posts_per_day': True}, {'max_paid_posts_per_day': 2.0},
@@ -705,24 +705,27 @@ class HaltTests(GateTest):
         self.assertEqual(Decimal(entry['held_usd']), RESERVED)
         self.assertNotIn(KEY, json.dumps(gate.day('2026-10-08')))
 
-    def test_missing_usage_and_cost_holds_full_reservation_and_halts(self):
+    def test_missing_usage_and_cost_is_booked_at_the_reservation_and_the_gate_stays_active(self):
         gate = self.gate().ready()
-        with self.refused('NEW_CHARGE_UNCERTAIN'):
+        with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):  # Owner answer M3 (2026-10-15): booked, never a halt.
             gate.call('op-1', charge=None)
-        entry = self.assert_halted(gate, 'uncertain_charge', 'uncertain')
-        self.assertEqual(Decimal(entry['held_usd']), RESERVED)
+        entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+        self.assertEqual((entry['state'], entry['reason'], Decimal(entry['held_usd'])), ('settled_reserved_max', 'charge_unreported', RESERVED))
+        self.assertEqual((gate.status()['state'], gate.status()['today_booked_max']), ('active', 1))
 
-    def test_reported_cost_without_valid_token_counts_is_uncertain_and_halts(self):
+    def test_reported_cost_within_the_hold_without_valid_token_counts_is_booked(self):
         for usage in ({'estimated_cost': 0}, {'estimated_cost': '0.01'},
                       {'prompt_tokens': 'many', 'completion_tokens': 1, 'estimated_cost': '0.01'},
                       {'prompt_tokens': 3, 'estimated_cost': '0.01'},
                       {'prompt_tokens': 3, 'completion_tokens': 4, 'total_tokens': 99, 'estimated_cost': '0.01'}):
             with self.subTest(usage=usage):
                 gate = self.gate().ready()
-                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
                     gate.call('op-1', dispatch=lambda _b, _k, u=usage: (200, {'model': MODEL, 'usage': u}))
-                entry = self.assert_halted(gate, 'uncertain_charge', 'uncertain')
-                self.assertEqual(Decimal(entry['held_usd']), RESERVED)
+                entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+                self.assertEqual((entry['state'], entry['reason'], Decimal(entry['held_usd'])),
+                                 ('settled_reserved_max', 'charge_unreported', RESERVED))
+                self.assertEqual(gate.status()['state'], 'active')
 
     def test_charge_is_the_larger_of_token_price_and_reported_cost(self):
         # Each charge stays within the GLM hold (about $0.0167 with output bound 32768).
@@ -1904,8 +1907,9 @@ class BookedAtReservationTests(GateTest):
 
     def test_a_reply_that_cannot_be_bounded_or_overruns_still_halts(self):
         gate = self.gate().ready()
-        with self.refused('NEW_CHARGE_UNCERTAIN'):
-            gate.call('op-1', charge=None)  # A reply without usage.
+        over = str(RESERVED + Decimal('0.000000001'))
+        with self.refused('NEW_CHARGE_UNCERTAIN'):  # M3: a reported cost above the hold, without valid counts, still halts.
+            gate.call('op-1', dispatch=lambda _b, _k: (200, {'model': MODEL, 'usage': {'estimated_cost': over}}))
         self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'uncertain_charge'))
         gate = self.gate().ready()
         with self.refused('SETTLED_INTO_HALT'):

@@ -161,12 +161,19 @@ cache reads.
   call alone fails with `PROVIDER_CHARGE_BOOKED_MAX`. `status` shows `today_booked_max` and
   `today_booked_max_usd`, and the halt watcher emails the owner each time that number goes up
   (recorded first in `/var/lib/debateai-preview-anthropic-halt-watch/announced-booked.json`). An
-  answer that does come back is judged exactly as before: Anthropic's own 504 timeout answer still
-  halts (next point).
+  answer that comes back is judged as before, with one change (owner answer M3, ruling R1 of
+  2026-10-16): a server error (500 to 599) that is no message and carries no billing field, no
+  content, no model and no token count anywhere (Anthropic's own 504 `timeout_error`, a 503, a 529
+  `api_error`), and a message (status 200) without `usage` or whose input and output token counts
+  are not whole numbers, are booked the same way, with the reason `charge_unreported`. When that
+  message's `usage` names a premium speed, another service tier or region, server tools or a cache
+  write, it still halts.
 - **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
-  is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
-  because the work may already have run; any error type that does not belong to its status; and
-  any error answer with anything else in it.
+  is wrong or lacks a permission and root must look; 402 (`billing_error`); any other error in the
+  400s that is not one of the unbilled answers above (ruling R2 of 2026-10-16); any error answer
+  with a billing field, content, a model or a token count in it; a status-200 answer that is not a
+  message; and any usage field the gate does not know (ruling R3: a new field may be a new way to
+  bill, as `speed` was on 2026-10-16).
 - **Start check: the addresses only.** Anthropic has no list of models that can be read without
   a key, so there is no model check at start. The start check never sends the key, or any
   request, to Anthropic. Before every start it checks that every address of `api.anthropic.com`
@@ -482,10 +489,11 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,
 `remaining_today_usd`, `today_unbilled_releases` (refusals kept at $0; no limit), `today_booked_max`
-and `today_booked_max_usd` (calls whose connection timed out or broke after they were sent, each
-charged the most it could cost; already inside `today_spend_usd`; never a halt), `cooling`
-(Haiku's cool-off, if any; `activate` does not clear it), `unsent_streak`, `state`, `reason`,
-`halts` and `window_open`.
+and `today_booked_max_usd` (calls whose connection timed out or broke after they were sent, or
+that Anthropic answered with a server error or a message without a bill count, reason
+`charge_unreported` (owner answer M3), each charged the most it could cost; already inside
+`today_spend_usd`; never a halt), `cooling` (Haiku's cool-off, if any; `activate` does not clear
+it), `unsent_streak`, `state`, `reason`, `halts` and `window_open`.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1
@@ -496,7 +504,10 @@ charged the most it could cost; already inside `today_spend_usd`; never a halt),
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), look at the usage
    page of the preview workspace in the Anthropic Console for that time before re-opening. Its
    full set-aside amount stays counted in that day's pot. (A call that only timed out or lost its
-   connection after it was sent no longer halts: it is booked at its maximum and needs no re-open.)
+   connection after it was sent, or that Anthropic answered with a server error or a message
+   without a bill count (`charge_unreported`, owner answer M3), no longer halts: it is booked at its
+   maximum and needs no re-open. A 401, 402 or 403, or a premium or unknown usage field, still
+   halts here.)
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named. For an answer the gate could not price, the entry's
    `accounting.invalid_reason` names the check it failed and `accounting.reply_shape` outlines the
