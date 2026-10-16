@@ -174,3 +174,74 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
     expect(performance.now() - started).toBeLessThan(500);
   });
 });
+
+/**
+ * Fix round 2 (practice debate 2026-10-16, the real GLM reply): the reply opened with an echoed fence line and a blank
+ * line before its JSON. OUTERMOST_OBJECT reads prose before an object, but the syntax pass read only a reply that opens
+ * with `{`, so the two never combined. Now, for a reply that does not open with `{`, the syntax pass reads the slice the
+ * reader's own outermost-object strategy takes: the decode's OUTERMOST_OBJECT (the LAST object that decodes), the
+ * judge's BRACE_BALANCED (the FIRST balanced object).
+ */
+describe("QUOTE_DELIMITERS_STRAIGHTENED fix round 2: the syntax pass reads the object after prose", () => {
+  const FENCE_LINE = "#|DEBATEAI-FENCE-0123456789abcdef0123456789abcdef|#\n\n";
+  const { description: _dropped, ...fallacyWithout } = JUDGE_VALUE.fallacy;
+  const ASKED_VALUE = { ...JUDGE_VALUE, fallacy: fallacyWithout };
+
+  it("(1) a judge-shaped reply after a fence-like line, five “…” texts: decoded and PARSED, OUTERMOST_OBJECT named first", () => {
+    const reply = `${FENCE_LINE}${GLM_JUDGE_REPLY}`;
+    const decoded = decodedOk(reply);
+    expect(decodedRepairsOf(decoded)).toEqual(["OUTERMOST_OBJECT", "QUOTE_DELIMITERS_STRAIGHTENED"]);
+    expect(decoded.value).toEqual(JUDGE_VALUE);
+    expect(classifyStructuredArtifact(reply, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING)).toEqual({
+      parseStatus: "PARSED", parseError: null, jsonRepair: "OUTERMOST_OBJECT",
+      jsonRepairs: ["OUTERMOST_OBJECT", "QUOTE_DELIMITERS_STRAIGHTENED", "INNER_UNASKED_KEYS"] });
+    const textsKept = structureRepairTextsKeptAt("JUDGE:cross-root:3->1", "served");
+    expect(structureRepairKeepsWords(reply, ASKED_VALUE, JUDGE_ANSWER_FORM, { textsKept })).toBe(true);
+  });
+
+  it("(2) prose before a JSON with a trailing comma: OUTERMOST_OBJECT + TRAILING_COMMA, in the decode and the judge", () => {
+    const decoded = decodedOk("Here is my answer:\n{\"a\": \"x\", \"b\": [1, 2,],}");
+    expect(decodedRepairsOf(decoded)).toEqual(["OUTERMOST_OBJECT", "TRAILING_COMMA"]);
+    expect(decoded.value).toEqual({ a: "x", b: [1, 2] });
+    const judged = `Here is my answer:\n${JSON.stringify(ASKED_VALUE).replace(/\}$/u, ",}")}`;
+    expect(classifyStructuredArtifact(judged, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING)).toEqual({
+      parseStatus: "PARSED", parseError: null, jsonRepair: "OUTERMOST_OBJECT", jsonRepairs: ["OUTERMOST_OBJECT", "TRAILING_COMMA"] });
+  });
+
+  it("(3) prose before a JSON that a round-1 guard refuses stays refused", () => {
+    for (const json of ["{\"a\": “x\", \"b\": “y”}", "{\"flags\": [\"a\", “b\", “c”]}", "{\"a\": “He said “yes”, \"b\": “no”}"]) {
+      const reply = `${FENCE_LINE}${json}`;
+      expect(decodeModelJson(reply, STOP).ok, json).toBe(false);
+      expect(classifyStructuredArtifact(reply, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus, json).toBe("PARSE_FAILED");
+    }
+    // A reply cut off at its token ceiling is still never repaired.
+    expect(decodeModelJson(`${FENCE_LINE}${GLM_JUDGE_REPLY}`, { finishReason: "length" }).ok).toBe(false);
+  });
+
+  it("(3) prose holding its own {…} before the real object: each reader keeps its own outermost-object rule", () => {
+    // Today, straight: the decode's OUTERMOST_OBJECT takes the LAST object that decodes; the judge's BRACE_BALANCED the FIRST.
+    expect(decodeModelJson("Draft {\"k\": 1} then:\n{\"a\": \"y\"}", STOP)).toEqual({ ok: true, value: { a: "y" }, repair: "OUTERMOST_OBJECT" });
+    // The same with the syntax pass: the decode takes the last object the pass reads; a brace pair in the prose is not one.
+    const decoded = decodedOk("Draft {note} then:\n{\"a\": “y”}");
+    expect(decoded.value).toEqual({ a: "y" });
+    expect(decodedRepairsOf(decoded)).toEqual(["OUTERMOST_OBJECT", "QUOTE_DELIMITERS_STRAIGHTENED"]);
+    const later = decodedOk("Draft {\"a\": “first”} then:\n{\"a\": “second”}");
+    expect(later.value).toEqual({ a: "second" });
+    // The judge reads only the FIRST balanced object, as BRACE_BALANCED does: `{note}` is not one, so nothing is read.
+    const judged = `Draft {note} then:\n${GLM_JUDGE_REPLY}`;
+    expect(classifyStructuredArtifact(judged, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("PARSE_FAILED");
+    // A reply that opens with `{` is read whole, as before: prose after the object is not dropped by the syntax pass.
+    expect(decodeModelJson("{\"a\": “y”} and a note", STOP).ok).toBe(false);
+  });
+
+  // CI-1b: each span is read once, from the last back; spans never overlap, so the work stays linear in the reply.
+  it.each([
+    ["prose and 100 000 spans that never decode", `note ${"{\"a\": “x}".repeat(100000)}`],
+    ["prose and 100 000 spans each missing one bracket", `note ${"{\"a\": [1, 2, 3, 4}".repeat(100000)}`]
+  ])("answers %s in linear time", (_name, text) => {
+    const started = performance.now();
+    decodeModelJson(text, STOP);
+    classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+});
