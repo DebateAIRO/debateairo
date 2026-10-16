@@ -63,10 +63,12 @@ describe("LG-A: the estimate counts each story try's second POST on the repair m
     for (const tier of ["low", "medium", "high"] as const) {
       const pricer = realisticWorstCasePricer(output, tier);
       expect(pricer(haiku, "STRUCTURE_REPAIR"), tier).toBe(realistic);
-      // Never below the story retry it may stand in for (the checker's retry asks only 16,384 tokens on Haiku).
-      expect(pricer(haiku, "STRUCTURE_REPAIR")).toBeGreaterThanOrEqual(pricer(haiku, "STORY_CHECKER_RETRY"));
-      expect(pricer(haiku, "STRUCTURE_REPAIR")).toBeGreaterThanOrEqual(pricer(haiku, "STORYTELLER_RETRY"));
+      // LG-B (L26): a final writer's retry may now ask more than the repair call's 32,768 (Haiku's story retries ask its
+      // 128,000); the repair is counted in addition to the step's own retry, never instead, so the ceiling holds.
+      expect(pricer(haiku, "STORY_CHECKER_RETRY")).toBeGreaterThan(pricer(haiku, "STRUCTURE_REPAIR"));
     }
+    const routed = shares(HAIKU);
+    expect([routed(GLM, "STORYTELLER_RETRY"), routed(DEEPSEEK, "STORY_CHECKER_RETRY"), routed(HAIKU, "STRUCTURE_REPAIR")]).toEqual([2n, 2n, 4n]);
     // Strict bound: (262,144 + 2,048) input tokens at one byte each, at the row's lower-step price (strict mode prices every
     // Haiku call at the owner's lower step; the gate itself reserves a body above 100,000 tokens at the upper step).
     expect(strictUpperBoundPricer(output)(haiku, "STRUCTURE_REPAIR")).toBe(264_192n * 100n + 32_768n * 500n);

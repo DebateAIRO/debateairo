@@ -305,15 +305,15 @@ describe("A — on the preview the storyteller asks for its row's own story allo
     expect(sent).toEqual({ debate: 8192, storyteller: 131_072, storytellerRetry: 262_144, storyChecker: 8192 });
     const strict = strictUpperBoundPricer(sent);
     const deepseek = { inputNanoUsdPerToken: 200n, outputNanoUsdPerToken: 600n };
-    // The retry is clamped to the row's bound, exactly as the gateway clamps what it sends.
+    // LG-B (L26): DeepSeek is a fast storyteller: its own maximum on both tries, its input at the final-writer cap.
     for (const type of ["STORYTELLER", "STORYTELLER_RETRY"] as const) {
-      expect(strict(rowOf(DEEPSEEK), type)).toBe(264_192n * deepseek.inputNanoUsdPerToken + 32_768n * deepseek.outputNanoUsdPerToken);
+      expect(strict(rowOf(DEEPSEEK), type)).toBe(BigInt(1024 * 1024 + 2048) * deepseek.inputNanoUsdPerToken + 131_072n * deepseek.outputNanoUsdPerToken);
     }
     // MiMo asks 16,384 first; its length retry asks twice that, which its 32,768 bound holds.
-    expect(strict(rowOf(MIMO), "STORYTELLER")).toBe(264_192n * 430n + 16_384n * 870n);
-    expect(strict(rowOf(MIMO), "STORYTELLER_RETRY")).toBe(264_192n * 430n + 32_768n * 870n);
-    expect(strict(rowOf(QWEN), "STORYTELLER")).toBe(264_192n * 113n + 16_384n * 382n);
-    expect(strict(rowOf(GLM), "STORYTELLER")).toBe(264_192n * 150n + 16_384n * 500n);
+    expect(strict(rowOf(MIMO), "STORYTELLER")).toBe(BigInt(1024 * 1024 + 2048) * 430n + 16_384n * 870n);
+    expect(strict(rowOf(MIMO), "STORYTELLER_RETRY")).toBe(BigInt(1024 * 1024 + 2048) * 430n + 32_768n * 870n);
+    expect(strict(rowOf(QWEN), "STORYTELLER")).toBe(BigInt(1024 * 1024 + 2048) * 113n + 16_384n * 382n);
+    expect(strict(rowOf(GLM), "STORYTELLER")).toBe(BigInt(1024 * 1024 + 2048) * 150n + 16_384n * 500n);
   });
 });
 
@@ -404,7 +404,7 @@ describe("D — the start-of-debate estimate counts the checker's repair as a bi
   it("prices the checker's repair at its length-retry ceiling, clamped to the row", () => {
     const sent = previewCallOutputTokens(CONFIG, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
     const strict = strictUpperBoundPricer(sent);
-    expect(strict(rowOf(DEEPSEEK), "STORY_CHECKER_RETRY")).toBe(264_192n * 200n + 16_384n * 600n);
+    expect(strict(rowOf(DEEPSEEK), "STORY_CHECKER_RETRY")).toBe(BigInt(1024 * 1024 + 2048) * 200n + 131_072n * 600n);
   });
 });
 
@@ -438,18 +438,18 @@ describe("E — story wording (practice debate 2, 2026-10-12): MiMo's story chec
     expect(classifyCheckerContent(verdictThenThinking, { finishReason: "length" }).parseStatus).not.toBe("PARSED");
   });
 
-  it("the start-of-debate estimate prices MiMo's checker at what is sent, and every other row's as before", () => {
+  it("the start-of-debate estimate prices every story checker at its row's own maximum (LG-B)", () => {
     const sent = previewCallOutputTokens(CONFIG, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
     expect(sent.storyChecker).toBe(8192);
     const strict = strictUpperBoundPricer(sent);
     const mimo = rowOf(MIMO);
-    expect(strict(mimo, "STORY_CHECKER") - strict(mimo, "DEBATE")).toBe(8192n * mimo.outputNanoUsdPerToken);
-    expect(strict(mimo, "STORY_CHECKER_RETRY")).toBe(strict(mimo, "DEBATE") + (32_768n - 8192n) * mimo.outputNanoUsdPerToken);
+    expect(strict(mimo, "STORY_CHECKER")).toBe(BigInt(1024 * 1024 + 2048) * 430n + 65_536n * 870n);
+    expect(strict(mimo, "STORY_CHECKER_RETRY")).toBe(BigInt(1024 * 1024 + 2048) * 430n + 65_536n * 870n);
     const deepseek = rowOf(DEEPSEEK);
-    expect(strict(deepseek, "STORY_CHECKER")).toBe(strict(deepseek, "DEBATE"));
+    expect(strict(deepseek, "STORY_CHECKER")).toBe(BigInt(1024 * 1024 + 2048) * 200n + 131_072n * 600n);
     // None, when the register has no story.
     const none = strictUpperBoundPricer(previewCallOutputTokens(CONFIG, { debate: [2048], story: null }));
-    expect(none(mimo, "STORY_CHECKER")).toBe(none(mimo, "DEBATE") - 8192n * mimo.outputNanoUsdPerToken);
+    expect(none(mimo, "STORY_CHECKER")).toBe(BigInt(1024 * 1024 + 2048) * 430n);
   });
 });
 
