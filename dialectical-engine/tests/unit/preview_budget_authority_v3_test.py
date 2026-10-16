@@ -1965,7 +1965,7 @@ class ServerErrorBookedTests(GateTest):
     complete = HaltedRefusalTests.complete
 
     def answering(self, status, reply):
-        return lambda _sent, _key: (status, json.loads(json.dumps(reply)))
+        return lambda _sent, _key: (status, wire(reply))
 
     def assert_booked(self, gate, status, operation_id='op-1'):
         entry = entry_of(gate, operation_id)
@@ -2091,7 +2091,7 @@ class UnreportedChargeBookedTests(GateTest):
     complete = HaltedRefusalTests.complete
 
     def answering(self, status, reply):
-        return lambda _sent, _key: (status, json.loads(json.dumps(reply)))
+        return lambda _sent, _key: (status, wire(reply))
 
     def assert_booked(self, gate, status, operation_id='op-1'):
         entry = entry_of(gate, operation_id)
@@ -2135,7 +2135,7 @@ class UnreportedChargeBookedTests(GateTest):
         for operation_id, status, reply in (('op-1', 502, {**error, 'choices': []}),
                                             ('op-2', 503, {**error, 'usage': {'prompt_tokens': 'many'}}),
                                             ('op-3', 500, {**error, 'inference_status': {'cost': 0.0001}})):
-            self.assertFalse(DEEPINFRA.bookable_server_error(status, json.loads(json.dumps(reply))))  # It names a billing field.
+            self.assertFalse(DEEPINFRA.bookable_server_error(status, wire(reply)))  # It names a billing field.
             with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
                 gate.call(operation_id, dispatch=self.answering(status, reply))
             entry = entry_of(gate, operation_id)
@@ -2698,6 +2698,12 @@ class SamplingTests(GateTest):
         with patch.dict(DEEPINFRA.rows, {QWEN: qwen._replace(sampling=(('top_k', True),))}):
             self.assertIsNone(bridge.profile_of('deepinfra'))
 
+
+
+def wire(reply):
+    """A vendor reply as helper.HttpsTransport hands it to the gate: JSON, parsed with parse_float=Decimal (final review
+    2026-10-16, Important 2: a float count reaches the hooks as a Decimal, never as a float)."""
+    return json.loads(json.dumps(reply), parse_float=Decimal)
 
 
 def with_headers(status, reply, headers):

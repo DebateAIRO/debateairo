@@ -416,8 +416,10 @@ def key_values(value):
 
 def doubtful_count(value):
     """M3, fix round 1 (review 2026-10-16): a float or a number written as text where a count belongs. The gate
-    cannot read it as a whole count, yet it may say the bill is bigger: such a reply is never booked."""
-    if type(value) is float:
+    cannot read it as a whole count, yet it may say the bill is bigger: such a reply is never booked.
+    Final review (2026-10-16, Important 2): the transport parses a reply with parse_float=Decimal, so on the wire a float
+    arrives as a Decimal; any Decimal is doubtful (a whole number parses as an int and never reaches this branch)."""
+    if type(value) is float or isinstance(value, Decimal):
         return True
     if not isinstance(value, str):
         return False

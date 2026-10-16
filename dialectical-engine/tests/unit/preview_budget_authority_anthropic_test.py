@@ -164,7 +164,8 @@ class AnthropicTest(unittest.TestCase):
     def call(self, gate, operation_id='op-1', reply=None, status=200, value=None, dispatch=None, **kwargs):
         if dispatch is None:
             def dispatch(_sent, _key):
-                return status, json.loads(json.dumps(message() if reply is None else reply))
+                # As helper.HttpsTransport parses a reply (final review 2026-10-16, Important 2): floats as Decimals.
+                return status, json.loads(json.dumps(message() if reply is None else reply), parse_float=Decimal)
         options = {'peer_uid': PEER, 'slots': gate.slots, 'dispatch': dispatch, 'key_loader': lambda _private: KEY,
                    'host': HOST, 'platform': 'linux', 'now': gate.clock, 'slot_wait': 0.2}
         options.update(kwargs)
