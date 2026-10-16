@@ -5,7 +5,7 @@ import {
   type CharactersPerWord, type LengthGuidanceStep, type LengthThinkingRoomKey, type MapWordTargetPart, type StoryWordTargetField
 } from "@debateai/kernel";
 import { AnswerLengthSchema, type AnswerLength } from "@debateai/contract";
-import { DEBATE_SHAPE_PLAN_KEYS, type DebateShapePlanKey } from "./debate-shape-policy.js";
+import { DEBATE_SHAPE_PLAN_KEYS, debateShapeWriterCeiling, type DebateShapePlanKey, type DebateShapePolicy } from "./debate-shape-policy.js";
 import { canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst, type CanonicalRegisterJson } from "./register-publication.js";
 
 /**
@@ -332,4 +332,24 @@ export function lengthGuidanceOfReceipt(receipt: LengthGuidanceReceipt): LengthG
     charactersPerWord: { ...receipt.characters_per_word },
     answerWriterSeesJudgeReasons: receipt.answer_writer_sees_judge_reasons
   });
+}
+
+/**
+ * The answer writer's and answer checker's call ceilings a boot-time eligibility check must ask (the Free answer-job
+ * check, API and hosted publish): the sealed bounds, raised by the shape row's largest writer bound and by the largest
+ * guided allowance any plan and answer length can ask. Without either row: the sealed bounds.
+ */
+export function answerJobTokenCeilings(sealed: Readonly<{ writer: number; checker: number }>,
+  shapePolicyInForce: DebateShapePolicy | null, lengthPolicy: LengthGuidancePolicy | null):
+  Readonly<{ ANSWER_WRITER: number; ANSWER_CHECKER: number }> {
+  const writer = debateShapeWriterCeiling(sealed.writer, shapePolicyInForce);
+  return Object.freeze({
+    ANSWER_WRITER: lengthPolicy === null ? writer : lengthGuidanceLargestTokens(lengthPolicy, "answer_writer", writer),
+    ANSWER_CHECKER: lengthPolicy === null ? sealed.checker : lengthGuidanceLargestTokens(lengthPolicy, "answer_checker", sealed.checker)
+  });
+}
+
+/** B9 (the run ceiling covers one call): the first position's max_tokens, raised to the largest guided opening allowance. */
+export function lengthGuidedFirstCallCeiling(sealedJudgeTokens: number, lengthPolicy: LengthGuidancePolicy | null): number {
+  return lengthPolicy === null ? sealedJudgeTokens : lengthGuidanceLargestTokens(lengthPolicy, "opening", sealedJudgeTokens);
 }

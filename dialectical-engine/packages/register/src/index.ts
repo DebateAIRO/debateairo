@@ -1240,6 +1240,7 @@ export {
 } from "./debate-shape-policy.js";
 export {
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  answerJobTokenCeilings,
   lengthAnswerWordsOf,
   lengthGuidanceAllowanceTokens,
   lengthGuidanceLargestTokens,
@@ -1248,6 +1249,7 @@ export {
   lengthGuidancePolicyStartValues,
   lengthGuidanceReceipt,
   lengthGuidanceReceiptSchema,
+  lengthGuidedFirstCallCeiling,
   parseLengthGuidancePolicy,
   readLengthGuidancePolicy,
   resolveLengthGuidance,

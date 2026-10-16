@@ -95,6 +95,7 @@ import {
   readDebateShapePolicy,
   debateShapeInForce,
   readLengthGuidancePolicy,
+  lengthGuidedFirstCallCeiling,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -720,6 +721,7 @@ const modelPicker = await composeAskModelPicker({
   billingEnabled,
   // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).
   debateShapePolicy: debateShapeInForcePolicy,
+  lengthGuidancePolicy,
   log: (line) => console.error(line)
 });
 /**
@@ -738,7 +740,8 @@ await boot.run("run-ceiling-covers-one-call", async () => {
   if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
-    judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
+    // Length guidance (spec 2026-10-15 §3.3): a first position may ask up to the largest guided opening allowance.
+    judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION), lengthGuidancePolicy),
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38: with the debate-shape row in force a run may be shaped, and its first call carries the locked
     // language (the named sentence and the question_language field): priced at the longest lock too. Row absent: today's.

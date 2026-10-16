@@ -88,6 +88,7 @@ import {
   readEngineVersion,
   readEnvelopeFormulaInputs,
   readJudgeTokenCeiling,
+  lengthGuidedFirstCallCeiling,
   readLengthGuidancePolicy,
   readModelScorecard,
   readPanelDiscoveryPolicy,
@@ -95,7 +96,8 @@ import {
   readStoryPolicyFromRegister,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
-  type DeploymentMode
+  type DeploymentMode,
+  type LengthGuidancePolicy
 } from "@debateai/register";
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
@@ -218,13 +220,15 @@ async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
   scorecardState: string;
   /** main.ts's `debateShapeInForcePolicy !== null`: a shaped run's first call carries the locked language. */
   questionLanguageLocked: boolean;
+  /** Length guidance (spec 2026-10-15 §3.3), as main.ts: the first call is checked at the largest guided opening allowance. */
+  lengthGuidancePolicy: LengthGuidancePolicy | null;
 }>): Promise<void> {
   const { pool, money: { costEnvelopeRows }, declaredProviderTargets } = input;
   const billingEnabled = input.money.registerBillingEnabled;
   if (costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
-    judgeTokenCeiling: await readJudgeTokenCeiling(pool, input.registerVersion),
+    judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, input.registerVersion), input.lengthGuidancePolicy),
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38, as main.ts: with the debate-shape row in force a run may be shaped, and its first call carries
     // the locked language: priced at the longest lock too. Row absent (or switched off): today's price.
@@ -347,11 +351,13 @@ export async function composePracticeAsk(input: Readonly<{
     // picker's billing rules apply only under a VALID scorecard, which the preview refuses (PREVIEW_SCORECARD_CONFLICT).
     billingEnabled: false,
     debateShapePolicy: debateShapeInForcePolicy,
+    lengthGuidancePolicy,
     log: (line) => input.log?.(line)
   });
   if (money !== null) {
     await assertPracticeRunCeilingCoversOneCall({ pool, registerVersion: version, money, declaredProviderTargets,
-      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null });
+      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null,
+      lengthGuidancePolicy });
   }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);

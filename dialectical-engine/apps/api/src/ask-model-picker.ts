@@ -3,19 +3,22 @@ import { z } from "zod";
 import { mostOneRunMaySpendMicros, parseCostEnvelopeBasis, type CostEnvelopeBasis } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
-import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
+import { TypedDomainError, type DebateRole, type LengthGuidanceStep, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
+  answerJobTokenCeilings,
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   DEBATE_SHAPE_FORMULA_VERSION,
-  debateShapeWriterCeiling,
   debateShapeSiteCounts,
+  lengthGuidanceAllowanceTokens,
   readBundledModelScorecard,
   readEngineVersion,
   readModelScorecard,
   type DebateShapeCeilingInput,
   type DebateShapePolicy,
   type DebateShapeSiteCounts,
+  type LengthGuidance,
+  type LengthGuidancePolicy,
   type ModelScorecardReadResult
 } from "@debateai/register";
 import {
@@ -143,13 +146,17 @@ export function answerTokenCeilingsForBasis(
   basis: Readonly<Record<string, unknown>>
 ): Readonly<Record<DebateRole, number>> {
   const shaped = admittedShapeOf(basis);
-  if (shaped === null) return ceilings;
-  const { writerBound, mapMergeBound, mapChooseBound } = shaped.shape;
-  return Object.freeze({
+  const length = admittedLengthOf(basis);
+  if (shaped === null && length === null) return ceilings;
+  const withShape: Readonly<Record<DebateRole, number>> = shaped === null ? ceilings : {
     ...ceilings,
-    POSITION: Math.max(ceilings.POSITION, mapMergeBound, mapChooseBound),
-    ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, writerBound)
-  });
+    POSITION: Math.max(ceilings.POSITION, shaped.shape.mapMergeBound, shaped.shape.mapChooseBound),
+    ANSWER_WRITER: Math.max(ceilings.ANSWER_WRITER, shaped.shape.writerBound)
+  };
+  // Length guidance (spec 2026-10-15 §3.3): each role at the allowance the runner sends it (never below the row above).
+  if (length === null) return Object.freeze({ ...withShape });
+  return Object.freeze(Object.fromEntries((Object.keys(ROLE_LENGTH_STEPS) as DebateRole[]).map((role) =>
+    [role, lengthGuidanceAllowanceTokens(length, ROLE_LENGTH_STEPS[role], withShape[role])])) as Record<DebateRole, number>);
 }
 
 /** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */
@@ -236,6 +243,8 @@ export function askModelPickerSettings(input: Readonly<{
    * Only the Free answer-job check reads it.
    */
   debateShapePolicy?: DebateShapePolicy | null;
+  /** Length guidance (spec 2026-10-15 §3.10): the row, or null; only the Free answer-job check reads it. */
+  lengthGuidancePolicy?: LengthGuidancePolicy | null;
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
@@ -268,10 +277,9 @@ export function askModelPickerSettings(input: Readonly<{
   // Debate shape (P2b Task 6, pre-flight PF-B22): with a row in force a Free `detailed` answer asks the writer for up to
   // the row's largest writer bound, and Free's writer has no fallback. Only this check reads it: `answerTokenCeilings`
   // (the settings the picker seats with) keep the sealed bounds; a run's own writer bound comes from its receipt.
-  const freeAnswerCeilings = Object.freeze({
-    ANSWER_WRITER: debateShapeWriterCeiling(answerTokenCeilings.ANSWER_WRITER, input.debateShapePolicy ?? null),
-    ANSWER_CHECKER: answerTokenCeilings.ANSWER_CHECKER
-  });
+  const freeAnswerCeilings = answerJobTokenCeilings(
+    { writer: answerTokenCeilings.ANSWER_WRITER, checker: answerTokenCeilings.ANSWER_CHECKER },
+    input.debateShapePolicy ?? null, input.lengthGuidancePolicy ?? null);
   // Paid plans P4-E (Part 3b re-review M-4; ruling C4): the backstop of the publish-time
   // check. With billing on a Free ask's answer writer and checker take a scored Free-roster
   // model or none, so a scorecard under which no declared Free-roster model can take one of
@@ -337,6 +345,8 @@ export async function composeAskModelPicker(input: Readonly<{
   billingEnabled?: boolean;
   /** Debate shape (P2b Task 6): the row in force, handed to `askModelPickerSettings`'s Free answer-job check. */
   debateShapePolicy?: DebateShapePolicy | null;
+  /** Length guidance (spec 2026-10-15 §3.10): the row, or null; handed to `askModelPickerSettings`'s Free answer-job check. */
+  lengthGuidancePolicy?: LengthGuidancePolicy | null;
   log: (line: string) => void;
   engineManifest?: URL;
   bundledScorecard?: URL;
@@ -356,6 +366,7 @@ export async function composeAskModelPicker(input: Readonly<{
     ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
     ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),
     ...(input.debateShapePolicy === undefined ? {} : { debateShapePolicy: input.debateShapePolicy }),
+    ...(input.lengthGuidancePolicy === undefined ? {} : { lengthGuidancePolicy: input.lengthGuidancePolicy }),
     callTokenCeilings: input.callTokenCeilings,
     log: input.log
   }));
@@ -487,6 +498,32 @@ export function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Reado
   if (shape === undefined) throw malformedDebateShape("the receipt carries no shape member");
   return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
 }
+
+function malformedLengthGuidance(reason: string): TypedDomainError {
+  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, `The admitted structural basis carries malformed length guidance: ${reason}`);
+}
+
+/**
+ * Length guidance (spec 2026-10-15 §3.1, §3.10): the run's frozen numbers, read ONLY through the strict receipt parser,
+ * as `admittedShapeOf` reads the shape; null for a receipt without the member. Shared by the picker and the preview estimate.
+ */
+export function admittedLengthOf(basis: Readonly<Record<string, unknown>>): LengthGuidance | null {
+  if (basis.length === undefined) return null;
+  let parsed: CostEnvelopeBasis;
+  try {
+    parsed = parseCostEnvelopeBasis(basis);
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === COST_ENVELOPE_UNRESOLVED) throw malformedLengthGuidance(error.message);
+    throw error;
+  }
+  return parsed.length ?? null;
+}
+
+/** Which length step each picker role's calls are (the map's calls are POSITION's: their allowance is LG-C2's, Task 14). */
+const ROLE_LENGTH_STEPS = Object.freeze({
+  POSITION: "opening", SUPPORT_ATTACK: "pros_cons", CROSS_EXCHANGE: "cross_exchange", JUDGE: "judge_panel",
+  REVIEWER: "reviewer", ANSWER_WRITER: "answer_writer", ANSWER_CHECKER: "answer_checker"
+} as const satisfies Readonly<Record<DebateRole, LengthGuidanceStep>>);
 
 /**
  * Expected calls per role, one per call site, from the basis admission pinned.

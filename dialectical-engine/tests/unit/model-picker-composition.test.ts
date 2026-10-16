@@ -33,8 +33,11 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain(
       "  callTokenCeilings,\n  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,\n  billingEnabled,\n"
       + "  // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).\n"
-      + "  debateShapePolicy: debateShapeInForcePolicy,\n  log: (line) => console.error(line)\n});"
+      + "  debateShapePolicy: debateShapeInForcePolicy,\n  lengthGuidancePolicy,\n  log: (line) => console.error(line)\n});"
     );
+    // LG-C Task 6 (spec 2026-10-15 §3.10): the length row, read by its own earlier boot stage, reaches the same check.
+    expect(source.indexOf('boot.run("length-guidance-policy"')).toBeGreaterThan(-1);
+    expect(source.indexOf('boot.run("length-guidance-policy"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf("const billingEnabled = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf('boot.run("call-token-ceilings"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
