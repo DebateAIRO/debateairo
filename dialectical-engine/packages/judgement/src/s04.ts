@@ -460,7 +460,7 @@ export function parseStructuredArtifact<T>(
   }
   const late = modelJsonLateRepair(content, reply);
   if (late !== null) return schemaResult(late.value, late.repair, schema, options);
-  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair).
+  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair; after prose, its one rule).
   const syntax = modelJsonSyntaxRepair(content, reply);
   if (syntax !== null) return schemaResult(syntax.value, "SYNTAX_REPAIRED", schema, options, syntax.repairs);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });

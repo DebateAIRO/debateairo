@@ -37,19 +37,25 @@ export interface ModelReplyFacts {
  *  · RAW_LINE_BREAK — a raw line break inside a string value;
  *  · MODEL_TOKEN_DROPPED — a leaked model control token written into the answer;
  *  · KEY_COLON_MOVED — a colon written inside a key;
- *  · BRACKET_INSERTED — one missing bracket, where only one place fits.
+ *  · BRACKET_INSERTED — one missing bracket, where only one place fits;
+ *  · QUOTE_DELIMITERS_STRAIGHTENED — (practice debate 2026-10-16, GLM-5.3-Flash on a cross-exchange judge leg) a text
+ *    VALUE written between typographic double quotes (“…”, „…“, „…”) instead of straight ones, its two delimiters read
+ *    as straight quotes (`typographicValueEnd`).
  */
 const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT",
   // LG-A (spec 2026-10-15, L31): made by the syntax pass, tried after the repairs above.
-  "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED"] as const);
+  "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED",
+  // Practice debate 2026-10-16: made by the syntax pass too, appended so no earlier name moves.
+  "QUOTE_DELIMITERS_STRAIGHTENED"] as const);
 /** A repair the tolerant decode can make (no schema known). */
 export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
 /**
- * The five repairs only the syntax pass makes (the decode list's last five). `modelJsonSyntaxRepair` may name CODE_FENCE
+ * The six repairs only the syntax pass makes (the decode list's last six). `modelJsonSyntaxRepair` may name CODE_FENCE
  * and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
  */
 export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
-  "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED">;
+  "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED"
+  | "QUOTE_DELIMITERS_STRAIGHTENED">;
 /**
  * The judge's SHAPE repairs (`packages/judgement/src/s04.ts`), each made only after a decoded object failed its step's
  * schema, and each accepted only when the repaired object then passes that full schema:
@@ -486,6 +492,61 @@ function onlyClosersToEnd(text: string, from: number): boolean {
 }
 
 /**
+ * QUOTE_DELIMITERS_STRAIGHTENED (practice debate 2026-10-16): the typographic double quotes that may OPEN a text value,
+ * each with the closing quotes that may end it: “ (U+201C) closes with ” (U+201D); „ (U+201E) closes with “ (U+201C,
+ * the German „…“) or ” (U+201D).
+ */
+const TYPOGRAPHIC_VALUE_CLOSERS: ReadonlyMap<string, string> = new Map([["\u201C", "\u201D"], ["\u201E", "\u201C\u201D"]]);
+
+/**
+ * The index of the quote that closes the typographic text value opened at `open`: the first of its opener's closing
+ * quotes (`TYPOGRAPHIC_VALUE_CLOSERS`) that is followed, blanks skipped, by `,`, `}` or `]`. Linear from `open`.
+ *
+ * Fix round 1 (review 2026-10-16, "never change what the AI said"): that closing quote may belong to a LATER value, so
+ * the text would swallow keys, list items, numbers, objects or straight texts. Null (no repair) when, BEFORE the closing
+ * quote:
+ *  · a straight `"` is followed, blanks skipped, by `,` `:` `}` or `]` (it can end a JSON string: a straight-closed
+ *    value, or a later key or text);
+ *  · a `”` or `“` is followed, blanks skipped, by `:` (it ends a key);
+ *  · for a “ opener only, another “ stands (an unbalanced nested quotation whose own closing quote we could take); a „
+ *    opener may hold „ (the Romanian „…„…"…” nests so);
+ * and when no closing quote comes before the end of the text.
+ */
+function typographicValueEnd(text: string, open: number): number | null {
+  const opener = text[open]!;
+  const closers = TYPOGRAPHIC_VALUE_CLOSERS.get(opener) ?? "";
+  for (let index = open + 1; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (opener === "\u201C" && character === "\u201C") return null;
+    const straight = character === "\"";
+    if (!straight && character !== "\u201C" && character !== "\u201D") continue;
+    const next = text[nextSignificant(text, index + 1)];
+    if (next === ":") return null;
+    if (next === "," || next === "}" || next === "]") {
+      if (straight) return null;
+      if (closers.includes(character)) return index;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fix round 1: the position of the LAST straight quote (not escaped by a backslash) that INNER_QUOTE could take as the
+ * end of a list item (`closesValue` inside a list), or -1. A straight list item whose quote stands before it can also be
+ * read as one longer text that ends there. One pass.
+ */
+function lastListItemEnd(text: string): number {
+  let last = -1;
+  let backslashes = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (character === "\"" && backslashes % 2 === 0 && closesValue(text, index + 1, "array")) last = index;
+    backslashes = character === "\\" ? backslashes + 1 : 0;
+  }
+  return last;
+}
+
+/**
  * One string the scan read, ended at its first unescaped quote. `inObject` / `inArray`: whether INNER_QUOTE would end a
  * string VALUE at that quote, in the reply itself, inside an object / inside a list (`innerQuoteEnd`). `scanKey`: the
  * scan read it as a key (a key is read strictly, to its first quote, by INNER_QUOTE as by the pass). `scanInArray`: the
@@ -513,7 +574,14 @@ function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" |
  *  · RAW_LINE_BREAK — a raw line break, carriage return or tab inside a string, escaped;
  *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
  *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
- *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
+ *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`;
+ *  · QUOTE_DELIMITERS_STRAIGHTENED — outside every straight-quoted string, a typographic opening quote “ or „ at a VALUE's
+ *    place (right after an object's `:`, or right after a list's `[` or item-separating `,`, blanks only between) opens a
+ *    text that ends at its closing quote (`typographicValueEnd`); both become straight quotes, every straight quote and
+ *    backslash inside is escaped and a raw line break, carriage return or tab inside is escaped as RAW_LINE_BREAK
+ *    escapes it (and named so). No other character changes. With no such closing quote the opening quote is left as it
+ *    is (and nothing decodes). A key's place is never repaired, and a typographic quote inside a straight-quoted string
+ *    is that string's own.
  * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). A string ends at its first
  * unescaped quote; `ends` holds, for each string in order, whether INNER_QUOTE would end it there (`innerQuoteEnd`).
  */
@@ -524,9 +592,53 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
   const stack: Container[] = [];
   let out = "";
   let index = 0;
+  /** A value may start here: after an object's `:`, a list's `[` or a list's item-separating `,`, blanks only since. */
+  let valueSlot = false;
+  /**
+   * Once one opening quote at a value's place is left as it is, it stands outside every text and nothing can decode, so
+   * no later one is searched (linear, CI-1b).
+   */
+  let typographicRefused = false;
+  /** The opening quotes this pass straightened, by index. */
+  const straightened = new Set<number>();
+  /**
+   * Fix round 1: a straight list item followed by `,` and a typographic opening quote (`["a", “b”]`): `closesValue` does
+   * not end it there. Its end counts as a list item's (`ends[end].inArray`) only when that opener was straightened and no
+   * later straight quote could end it as one longer text (`lastListItemEnd`); otherwise the reading is ambiguous and the
+   * pass refuses it.
+   */
+  const beforeTypographicItem: { end: number; quote: number; opener: number }[] = [];
   while (index < text.length) {
     const character = text[index]!;
     const top = stack.at(-1);
+    if (valueSlot && !typographicRefused && TYPOGRAPHIC_VALUE_CLOSERS.has(character)) {
+      const close = typographicValueEnd(text, index);
+      if (close === null) {
+        typographicRefused = true;
+      } else {
+        straightened.add(index);
+        let body = "";
+        for (let cursor = index + 1; cursor < close; cursor += 1) {
+          const inner = text[cursor]!;
+          if (inner === "\"" || inner === "\\") body += `\\${inner}`;
+          else if (inner === "\n" || inner === "\r" || inner === "\t") {
+            body += inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t";
+            made.add("RAW_LINE_BREAK");
+          } else body += inner;
+        }
+        out += `"${body}"`;
+        made.add("QUOTE_DELIMITERS_STRAIGHTENED");
+        // Its end is the rule's own (a closing quote followed by `,` `}` or `]`), so it passes the word check.
+        ends.push({ inObject: true, inArray: true, scanKey: false, scanInArray: top?.kind === "array" });
+        valueSlot = false;
+        index = close + 1;
+        continue;
+      }
+    }
+    if (!isBlank(character)) {
+      valueSlot = (character === ":" && top?.kind === "object") || character === "["
+        || (character === "," && top?.kind === "array");
+    }
     if (character === "\"") {
       const isKey = top?.kind === "object" && top.expectKey;
       let body = "";
@@ -547,6 +659,11 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
       ends.push({ ...innerQuoteEnd(text, cursor + 1), scanKey: isKey, scanInArray: top?.kind === "array" });
+      const comma = nextSignificant(text, cursor + 1);
+      const opener = nextSignificant(text, comma + 1);
+      if (!isKey && text[comma] === "," && TYPOGRAPHIC_VALUE_CLOSERS.has(text[opener] ?? "")) {
+        beforeTypographicItem.push({ end: ends.length - 1, quote: cursor, opener });
+      }
       if (movesColon) {
         out += `"${body.slice(0, -1)}":`;
         made.add("KEY_COLON_MOVED");
@@ -573,6 +690,12 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     else if (character === ":" && top?.kind === "object") top.expectKey = false;
     out += character;
     index += 1;
+  }
+  if (beforeTypographicItem.some((item) => straightened.has(item.opener))) {
+    const lastEnd = lastListItemEnd(text);
+    for (const item of beforeTypographicItem) {
+      if (straightened.has(item.opener) && lastEnd < item.quote) ends[item.end] = { ...ends[item.end]!, inArray: true };
+    }
   }
   return Object.freeze({ text: out, made, ends });
 }
@@ -675,25 +798,18 @@ function readingKeepsEveryWord(reading: string, ends: readonly StringEnd[]): boo
 }
 
 /**
- * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts). On the body of
- * one code fence (named CODE_FENCE too), else the whole reply, trimmed, which must open with `{`: `syntaxClean`, then
- * strict JSON on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned
- * text, then BRACKET_INSERTED. A reply cut off at its token ceiling is never repaired. Null when nothing decodes to one
- * object, and (never a changed word) when the reading has a string that INNER_QUOTE would not end where the pass ends it
- * (`scanKeepsEveryWord`, or `readingKeepsEveryWord` when BRACKET_INSERTED is the only repair): that reply goes on to the
- * structure-repair call, which keeps every word. The repairs are
- * named once each, in MODEL_JSON_REPAIRS order.
+ * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS on one object's text, which opens with `{`: `syntaxClean`, then strict JSON
+ * on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then
+ * BRACKET_INSERTED (never when `bracketRepairs` is false: the object read after prose must decode whole). Null when
+ * nothing decodes to one object, and (never a changed word) when the reading has a string that INNER_QUOTE would not end
+ * where the pass ends it (`scanKeepsEveryWord`, or `readingKeepsEveryWord` when BRACKET_INSERTED is the only repair).
  */
-export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
-  Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
-  if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
-  const fenced = modelJsonFenceBody(content);
-  const base = (fenced ?? content).trim();
-  if (!base.startsWith("{")) return null;
+function syntaxRepairObject(base: string, reply: ModelReplyFacts | undefined, bracketRepairs: boolean):
+  Readonly<{ value: unknown; made: ReadonlySet<ModelJsonDecodeRepair> }> | null {
   const cleaned = syntaxClean(base);
   const reading = (): Readonly<{ text: string; more: readonly ModelJsonDecodeRepair[] }> | null => {
     if (cleaned.made.size > 0 && parsed(cleaned.text) !== null) return { text: cleaned.text, more: [] };
-    if (!modelReplyFinishedNormally(reply)) return null;
+    if (!bracketRepairs || !modelReplyFinishedNormally(reply)) return null;
     const closed = cleaned.made.size > 0 ? closeOpenBrackets(cleaned.text) : null;
     if (closed !== null && parsed(closed) !== null) return { text: closed, more: ["CLOSING_BRACKETS"] };
     const inserted = insertOneBracket(cleaned.text);
@@ -705,8 +821,48 @@ export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   if (!(bracketOnly ? readingKeepsEveryWord(found.text, cleaned.ends) : scanKeepsEveryWord(cleaned.ends))) return null;
   const value = parsed(found.text);
   if (value === null || !isPlainObject(value.value)) return null;
-  const made = new Set<ModelJsonDecodeRepair>([...cleaned.made, ...found.more, ...(fenced === null ? [] : ["CODE_FENCE" as const])]);
-  return Object.freeze({ value: value.value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
+  return Object.freeze({ value: value.value, made: new Set<ModelJsonDecodeRepair>([...cleaned.made, ...found.more]) });
+}
+
+/**
+ * Fix round 3 (review 2026-10-16): the ONE object of a reply that opens with prose, or null. The reply must have exactly
+ * the shape "prose with no brace, one object, optional prose with no brace": the object runs from the reply's first `{`
+ * to its last `}`, with no `}` before it and no `{` after it. The brace-span scanner (`modelJsonObjectSpans`) is never
+ * used here: it reads only straight quotes, so an odd straight quote inside a typographic text („da" or an inch mark 5")
+ * would cut the object in the wrong place. A brace in the prose before the object can only be read as the object's
+ * own start, and that text must then decode whole as one object. Linear: indexOf and slices only (CI-1b).
+ */
+function objectAfterProse(text: string): string | null {
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first <= 0 || last < first) return null;
+  if (text.slice(0, first).includes("}") || text.slice(last + 1).includes("{")) return null;
+  return text.slice(first, last + 1);
+}
+
+/**
+ * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts), on the body of
+ * one code fence (named CODE_FENCE too), else the whole reply, trimmed (`syntaxRepairObject`). A reply cut off at its
+ * token ceiling is never repaired. A reply that opens with `{` is read whole, as before. Fix rounds 2-3 (practice debate
+ * 2026-10-16, GLM's reply opened with an echoed fence line): a reply that opens with anything else is read only when it
+ * has one object after prose (`objectAfterProse`); that object must decode WHOLE, with no bracket repair (CLOSING_BRACKETS
+ * and BRACKET_INSERTED treat the text's end as the reply's end), and OUTERMOST_OBJECT is named too. Every other rule of
+ * the pass applies to it as to a whole reply. Null when nothing decodes to one object: that reply goes on to the
+ * structure-repair call, which keeps every word. The repairs are named once each, in MODEL_JSON_REPAIRS order.
+ */
+export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
+  Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
+  if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
+  const fenced = modelJsonFenceBody(content);
+  const base = (fenced ?? content).trim();
+  const opensWithObject = base.startsWith("{");
+  const object = opensWithObject ? base : objectAfterProse(base);
+  if (object === null) return null;
+  const found = syntaxRepairObject(object, reply, opensWithObject);
+  if (found === null) return null;
+  const made = new Set<ModelJsonDecodeRepair>([...found.made, ...(fenced === null ? [] : ["CODE_FENCE" as const]),
+    ...(opensWithObject ? [] : ["OUTERMOST_OBJECT" as const])]);
+  return Object.freeze({ value: found.value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
 }
 
 /**
