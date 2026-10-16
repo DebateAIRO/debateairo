@@ -460,9 +460,8 @@ export function parseStructuredArtifact<T>(
   }
   const late = modelJsonLateRepair(content, reply);
   if (late !== null) return schemaResult(late.value, late.repair, schema, options);
-  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair). Fix round 2 (2026-10-16): a
-  // reply that opens with prose is read on the object BRACE_BALANCED takes, the first balanced one.
-  const syntax = modelJsonSyntaxRepair(content, reply, "FIRST_BALANCED");
+  // LG-A: the syntax pass, last (packages/providers/src/model-json.ts modelJsonSyntaxRepair; after prose, its one rule).
+  const syntax = modelJsonSyntaxRepair(content, reply);
   if (syntax !== null) return schemaResult(syntax.value, "SYNTAX_REPAIRED", schema, options, syntax.repairs);
   return Object.freeze({ kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" });
 }

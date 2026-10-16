@@ -2920,7 +2920,6 @@ export {
   type ModelJsonDecodeRepair,
   type ModelJsonStructureRepair,
   type ModelJsonSyntaxRepair,
-  type ModelJsonObjectAfterProse,
   type MapReplySalvageRepair,
   type ModelJsonRepair,
   type ModelReplyFacts

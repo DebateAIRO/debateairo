@@ -1,6 +1,9 @@
 // tests/unit/quote-delimiters.test.ts
 import { describe, expect, it } from "vitest";
-import { JUDGE_ANSWER_FORM, JUDGE_ARTIFACT_READING, classifyStructuredArtifact, judgeArtifactSchema } from "@debateai/judgement";
+import { z } from "zod";
+import {
+  JUDGE_ANSWER_FORM, JUDGE_ARTIFACT_READING, classifyStructuredArtifact, judgeArtifactSchema, parseStructuredArtifact
+} from "@debateai/judgement";
 import { decodeModelJson, decodedRepairsOf, structureRepairKeepsWords, structureRepairTextsKeptAt } from "@debateai/providers";
 
 const STOP = { finishReason: "stop" } as const;
@@ -178,11 +181,11 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
 /**
  * Fix round 2 (practice debate 2026-10-16, the real GLM reply): the reply opened with an echoed fence line and a blank
  * line before its JSON. OUTERMOST_OBJECT reads prose before an object, but the syntax pass read only a reply that opens
- * with `{`, so the two never combined. Now, for a reply that does not open with `{`, the syntax pass reads the slice the
- * reader's own outermost-object strategy takes: the decode's OUTERMOST_OBJECT (the LAST object that decodes), the
- * judge's BRACE_BALANCED (the FIRST balanced object).
+ * with `{`, so the two never combined. Now (fix round 3, one rule for both readers), for a reply that does not open with
+ * `{`, the syntax pass reads the one object of a reply shaped "prose with no brace, the object, optional prose with no
+ * brace": the text from its first `{` to its last `}`, decoded whole, with no bracket repair.
  */
-describe("QUOTE_DELIMITERS_STRAIGHTENED fix round 2: the syntax pass reads the object after prose", () => {
+describe("QUOTE_DELIMITERS_STRAIGHTENED fix rounds 2-3: the syntax pass reads the one object after prose", () => {
   const FENCE_LINE = "#|DEBATEAI-FENCE-0123456789abcdef0123456789abcdef|#\n\n";
   const { description: _dropped, ...fallacyWithout } = JUDGE_VALUE.fallacy;
   const ASKED_VALUE = { ...JUDGE_VALUE, fallacy: fallacyWithout };
@@ -218,23 +221,56 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED fix round 2: the syntax pass reads the o
     expect(decodeModelJson(`${FENCE_LINE}${GLM_JUDGE_REPLY}`, { finishReason: "length" }).ok).toBe(false);
   });
 
-  it("(3) prose holding its own {…} before the real object: each reader keeps its own outermost-object rule", () => {
-    // Today, straight: the decode's OUTERMOST_OBJECT takes the LAST object that decodes; the judge's BRACE_BALANCED the FIRST.
-    expect(decodeModelJson("Draft {\"k\": 1} then:\n{\"a\": \"y\"}", STOP)).toEqual({ ok: true, value: { a: "y" }, repair: "OUTERMOST_OBJECT" });
-    // The same with the syntax pass: the decode takes the last object the pass reads; a brace pair in the prose is not one.
-    const decoded = decodedOk("Draft {note} then:\n{\"a\": “y”}");
-    expect(decoded.value).toEqual({ a: "y" });
+  // Fix round 3 (review 2026-10-16): after prose the object is NOT chosen by the brace-span scanner (it reads only straight
+  // quotes, so an odd straight quote inside a typographic text cuts it in the wrong place). Only one shape is read: prose
+  // with no brace, ONE object, optional prose with no brace; that object is decoded WHOLE, with no bracket repair.
+  // The reviewer's two inputs: round 2 read a CUT piece (a member dropped, or only the last member). Under round 3's rule
+  // the whole object is decoded, so both now read the TRUE object, never a piece, in both readers.
+  it.each([
+    ["a „…\" inside “…” (round 2 dropped the last member)",
+      "Here is my answer:\n{\"intro\": “He said „yes\" loudly”, \"details\": {\"note\": “Then „no\" quietly”, \"n\": 1}, \"last\": “end”}",
+      { intro: "He said „yes\" loudly", details: { note: "Then „no\" quietly", n: 1 }, last: "end" }],
+    ["an inch mark 5\" inside “…” (round 2 read only the last member)",
+      "Answer:\n{\"tags\": [\"one\", \"two\"], \"detail\": {\"note\": “a 5\" screen”, \"inner\": {\"q\": \"a \\\"b\\\" c\"}}, \"last\": {\"t\": “final”}}",
+      { tags: ["one", "two"], detail: { note: "a 5\" screen", inner: { q: "a \"b\" c" } }, last: { t: "final" } }]
+  ])("(3) round 3: %s: read whole, the true object, never a cut piece", (_name, reply, truth) => {
+    const decoded = decodedOk(reply);
+    expect(decoded.value).toEqual(truth);
     expect(decodedRepairsOf(decoded)).toEqual(["OUTERMOST_OBJECT", "QUOTE_DELIMITERS_STRAIGHTENED"]);
-    const later = decodedOk("Draft {\"a\": “first”} then:\n{\"a\": “second”}");
-    expect(later.value).toEqual({ a: "second" });
-    // The judge reads only the FIRST balanced object, as BRACE_BALANCED does: `{note}` is not one, so nothing is read.
+    const judged = parseStructuredArtifact(reply, z.record(z.string(), z.unknown()), STOP);
+    expect(judged).toMatchObject({ kind: "PARSED", strategy: "SYNTAX_REPAIRED", value: truth });
+  });
+
+  it("(3) round 3: a Romanian „da\" inside “…” after a fence line now decodes, whole", () => {
+    const decoded = decodedOk(`${FENCE_LINE}{"a": “El a spus „da" și a plecat”, "b": 1}`);
+    expect(decoded.value).toEqual({ a: "El a spus „da\" și a plecat", b: 1 });
+    expect(decodedRepairsOf(decoded)).toEqual(["OUTERMOST_OBJECT", "QUOTE_DELIMITERS_STRAIGHTENED"]);
+  });
+
+  it("(3) round 3: prose with no brace may follow the object; a brace in the prose before or after means no syntax pass", () => {
+    expect(decodedOk("Answer:\n{\"a\": “y”}\nThat is all.").value).toEqual({ a: "y" });
+    // Today, straight, OUTERMOST_OBJECT keeps its own rule (the last object that decodes): untouched.
+    expect(decodeModelJson("Draft {\"k\": 1} then:\n{\"a\": \"y\"}", STOP)).toEqual({ ok: true, value: { a: "y" }, repair: "OUTERMOST_OBJECT" });
+    for (const reply of ["Draft {note} then:\n{\"a\": “y”}", "Draft {\"a\": “first”} then:\n{\"a\": “second”}",
+      "Answer:\n{\"a\": “y”}\nNote {x}.", "Answer: } {\"a\": “y”}"]) {
+      expect(decodeModelJson(reply, STOP).ok, reply).toBe(false);
+    }
+    // A later object that decodes strictly is OUTERMOST_OBJECT's own reading (the last that decodes), tried before the pass.
+    expect(decodeModelJson("Answer:\n{\"a\": “y”}\n{\"a\": 2}", STOP)).toEqual({ ok: true, value: { a: 2 }, repair: "OUTERMOST_OBJECT" });
     const judged = `Draft {note} then:\n${GLM_JUDGE_REPLY}`;
     expect(classifyStructuredArtifact(judged, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("PARSE_FAILED");
     // A reply that opens with `{` is read whole, as before: prose after the object is not dropped by the syntax pass.
     expect(decodeModelJson("{\"a\": “y”} and a note", STOP).ok).toBe(false);
   });
 
-  // CI-1b: each span is read once, from the last back; spans never overlap, so the work stays linear in the reply.
+  it("(3) round 3: after prose no bracket repair is made (the object must decode whole)", () => {
+    expect(decodeModelJson("Answer:\n{\"a\": [1, 2}", STOP).ok).toBe(false);
+    expect(decodeModelJson("Answer:\n{\"a\": “x”, \"b\": [1, 2}", STOP).ok).toBe(false);
+    // The same objects opening the reply keep today's bracket repairs.
+    expect(decodedRepairsOf(decodedOk("{\"a\": “x”, \"b\": [1, 2}"))).toEqual(["BRACKET_INSERTED", "QUOTE_DELIMITERS_STRAIGHTENED"]);
+  });
+
+  // CI-1b: the object after prose is one slice, read once: linear in the reply.
   it.each([
     ["prose and 100 000 spans that never decode", `note ${"{\"a\": “x}".repeat(100000)}`],
     ["prose and 100 000 spans each missing one bracket", `note ${"{\"a\": [1, 2, 3, 4}".repeat(100000)}`]

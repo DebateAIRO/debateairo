@@ -800,16 +800,16 @@ function readingKeepsEveryWord(reading: string, ends: readonly StringEnd[]): boo
 /**
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS on one object's text, which opens with `{`: `syntaxClean`, then strict JSON
  * on the cleaned text; only for a reply that finished normally, then (vi) CLOSING_BRACKETS on the cleaned text, then
- * BRACKET_INSERTED. Null when nothing decodes to one object, and (never a changed word) when the reading has a string
- * that INNER_QUOTE would not end where the pass ends it (`scanKeepsEveryWord`, or `readingKeepsEveryWord` when
- * BRACKET_INSERTED is the only repair).
+ * BRACKET_INSERTED (never when `bracketRepairs` is false: the object read after prose must decode whole). Null when
+ * nothing decodes to one object, and (never a changed word) when the reading has a string that INNER_QUOTE would not end
+ * where the pass ends it (`scanKeepsEveryWord`, or `readingKeepsEveryWord` when BRACKET_INSERTED is the only repair).
  */
-function syntaxRepairObject(base: string, reply: ModelReplyFacts | undefined):
+function syntaxRepairObject(base: string, reply: ModelReplyFacts | undefined, bracketRepairs: boolean):
   Readonly<{ value: unknown; made: ReadonlySet<ModelJsonDecodeRepair> }> | null {
   const cleaned = syntaxClean(base);
   const reading = (): Readonly<{ text: string; more: readonly ModelJsonDecodeRepair[] }> | null => {
     if (cleaned.made.size > 0 && parsed(cleaned.text) !== null) return { text: cleaned.text, more: [] };
-    if (!modelReplyFinishedNormally(reply)) return null;
+    if (!bracketRepairs || !modelReplyFinishedNormally(reply)) return null;
     const closed = cleaned.made.size > 0 ? closeOpenBrackets(cleaned.text) : null;
     if (closed !== null && parsed(closed) !== null) return { text: closed, more: ["CLOSING_BRACKETS"] };
     const inserted = insertOneBracket(cleaned.text);
@@ -825,45 +825,43 @@ function syntaxRepairObject(base: string, reply: ModelReplyFacts | undefined):
 }
 
 /**
- * Fix round 2 (practice debate 2026-10-16): which object a reply that opens with prose gives the syntax pass, each
- * reader's own outermost-object rule (`modelJsonObjectSpans`, the balanced `{…}` spans):
- *  · "LAST_THAT_DECODES": the decode's OUTERMOST_OBJECT (`outermostObject`): the last span the pass reads as one object;
- *  · "FIRST_BALANCED": the judge's BRACE_BALANCED (s04.ts `firstBalancedObject`): the first span, and only it.
+ * Fix round 3 (review 2026-10-16): the ONE object of a reply that opens with prose, or null. The reply must have exactly
+ * the shape "prose with no brace, one object, optional prose with no brace": the object runs from the reply's first `{`
+ * to its last `}`, with no `}` before it and no `{` after it. The brace-span scanner (`modelJsonObjectSpans`) is never
+ * used here: it reads only straight quotes, so an odd straight quote inside a typographic text („da" or an inch mark 5")
+ * would cut the object in the wrong place. A brace in the prose before the object can only be read as the object's
+ * own start, and that text must then decode whole as one object. Linear: indexOf and slices only (CI-1b).
  */
-export type ModelJsonObjectAfterProse = "LAST_THAT_DECODES" | "FIRST_BALANCED";
+function objectAfterProse(text: string): string | null {
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first <= 0 || last < first) return null;
+  if (text.slice(0, first).includes("}") || text.slice(last + 1).includes("{")) return null;
+  return text.slice(first, last + 1);
+}
 
 /**
  * LG-A (spec 2026-10-15, L31): THE SYNTAX PASS, the tolerant decode's last step and the judge's (s04.ts), on the body of
  * one code fence (named CODE_FENCE too), else the whole reply, trimmed (`syntaxRepairObject`). A reply cut off at its
- * token ceiling is never repaired. A reply that opens with `{` is read whole. Fix round 2 (practice debate 2026-10-16,
- * GLM's reply opened with an echoed fence line): a reply that opens with anything else is read on the one object its
- * reader's outermost-object rule takes (`afterProse`), and OUTERMOST_OBJECT is named too; the pass's every rule applies
- * to that object as to a whole reply. Null when nothing decodes to one object: that reply goes on to the
+ * token ceiling is never repaired. A reply that opens with `{` is read whole, as before. Fix rounds 2-3 (practice debate
+ * 2026-10-16, GLM's reply opened with an echoed fence line): a reply that opens with anything else is read only when it
+ * has one object after prose (`objectAfterProse`); that object must decode WHOLE, with no bracket repair (CLOSING_BRACKETS
+ * and BRACKET_INSERTED treat the text's end as the reply's end), and OUTERMOST_OBJECT is named too. Every other rule of
+ * the pass applies to it as to a whole reply. Null when nothing decodes to one object: that reply goes on to the
  * structure-repair call, which keeps every word. The repairs are named once each, in MODEL_JSON_REPAIRS order.
  */
-export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts, afterProse: ModelJsonObjectAfterProse = "LAST_THAT_DECODES"):
+export function modelJsonSyntaxRepair(content: string, reply?: ModelReplyFacts):
   Readonly<{ value: unknown; repairs: readonly ModelJsonDecodeRepair[] }> | null {
   if (reply?.finishReason === TRUNCATED_FINISH_REASON) return null;
   const fenced = modelJsonFenceBody(content);
   const base = (fenced ?? content).trim();
-  let found: Readonly<{ value: unknown; made: ReadonlySet<ModelJsonDecodeRepair> }> | null = null;
-  let outermost = false;
-  if (base.startsWith("{")) {
-    found = syntaxRepairObject(base, reply);
-  } else {
-    outermost = true;
-    // The first span only, or the spans from the last back to the first one the pass reads (that is the last that decodes).
-    const all = modelJsonObjectSpans(base);
-    const first = afterProse === "FIRST_BALANCED" ? all.next() : null;
-    const spans = first === null ? [...all].reverse() : first.done === true ? [] : [first.value];
-    for (const span of spans) {
-      found = syntaxRepairObject(span, reply);
-      if (found !== null) break;
-    }
-  }
+  const opensWithObject = base.startsWith("{");
+  const object = opensWithObject ? base : objectAfterProse(base);
+  if (object === null) return null;
+  const found = syntaxRepairObject(object, reply, opensWithObject);
   if (found === null) return null;
   const made = new Set<ModelJsonDecodeRepair>([...found.made, ...(fenced === null ? [] : ["CODE_FENCE" as const]),
-    ...(outermost ? ["OUTERMOST_OBJECT" as const] : [])]);
+    ...(opensWithObject ? [] : ["OUTERMOST_OBJECT" as const])]);
   return Object.freeze({ value: found.value, repairs: Object.freeze(MODEL_JSON_REPAIRS.filter((kind) => made.has(kind))) });
 }
 
