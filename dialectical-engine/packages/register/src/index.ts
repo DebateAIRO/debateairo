@@ -1229,6 +1229,21 @@ export {
   type DebateShapeScrutinyBudget
 } from "./debate-shape-policy.js";
 export {
+  LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  lengthAnswerWordsOf,
+  lengthGuidanceAllowanceTokens,
+  lengthGuidanceLargestTokens,
+  lengthGuidancePolicyRow,
+  lengthGuidancePolicyStartValues,
+  parseLengthGuidancePolicy,
+  readLengthGuidancePolicy,
+  resolveLengthGuidance,
+  type LengthGuidance,
+  type LengthGuidancePlan,
+  type LengthGuidancePolicy,
+  type LengthLevels
+} from "./length-guidance-policy.js";
+export {
   QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION,
   QUESTION_LANGUAGE_POLICY_ROW_KEY,
   parseQuestionLanguagePolicy,
