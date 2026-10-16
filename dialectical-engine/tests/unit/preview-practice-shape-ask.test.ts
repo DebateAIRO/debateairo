@@ -5,10 +5,13 @@
 // import and the two compositions are stand-ins here (nothing is started, nothing is sent); the integration suite
 // (tests/integration/preview-practice-run.test.ts) runs the real ones.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
+import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
+import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
+import { practiceLengthBlockLines } from "../../tools/preview-practice/practice-length.js";
 import { OPENINGS_QUESTIONS } from "../../tools/preview-practice/practice-openings-questions.js";
 import { PRACTICE_LANGUAGE_CASES } from "../../tools/preview-practice/practice-questions.js";
+import { debateReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { parsePracticeRegisterExport, type PracticeRegisterImportReceipt } from "../../tools/preview-practice/practice-register-import.js";
 import type { PracticeSettings, PracticeSockets } from "../../tools/preview-practice/practice-settings.js";
 
@@ -17,6 +20,8 @@ const seen = vi.hoisted(() => ({
   versions: new Set<string>(),
   /** The row the stand-in register holds, by version. */
   rows: new Map<number, unknown>(),
+  /** The length row the stand-in register holds, by version (LG-C). */
+  lengthRows: new Map<number, unknown>(),
   receipt: null as unknown,
   published: [] as unknown[][],
   readVersions: [] as number[],
@@ -35,7 +40,8 @@ vi.mock("@debateai/register", async (importOriginal) => ({
   readDebateShapePolicy: vi.fn(async (_pool: unknown, version: number) => {
     seen.readVersions.push(version);
     return seen.rows.get(version) ?? null;
-  })
+  }),
+  readLengthGuidancePolicy: vi.fn(async (_pool: unknown, version: number) => seen.lengthRows.get(version) ?? null)
 }));
 vi.mock("../../tools/preview-practice/practice-throwaway-db.js", () => ({
   startPracticeDatabase: vi.fn(async () => {
@@ -52,8 +58,11 @@ vi.mock("../../tools/preview-practice/practice-register-import.js", async (impor
   importPracticeRegister: vi.fn(async () => seen.receipt),
   publishPracticeOverrideVersion: vi.fn(async (...args: unknown[]) => {
     seen.published.push(args);
-    seen.rows.set(6, (args[3] as { shape: unknown }).shape);
-    return { baseRegisterVersion: "5", registerVersion: "6", shapeRow: "ADDED", lengthRow: null, snapshotSha256: "a".repeat(64) };
+    const overrides = args[3] as { shape: unknown; length: unknown };
+    seen.rows.set(6, overrides.shape);
+    seen.lengthRows.set(6, overrides.length);
+    return { baseRegisterVersion: "5", registerVersion: "6", shapeRow: overrides.shape === null ? null : "ADDED",
+      lengthRow: overrides.length === null ? null : "ADDED", snapshotSha256: "a".repeat(64) };
   })
 }));
 vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
@@ -100,6 +109,7 @@ function debate(extra: Readonly<Record<string, unknown>>) {
 beforeEach(() => {
   seen.versions = new Set(["4", "5"]);
   seen.rows.clear();
+  seen.lengthRows.clear();
   seen.receipt = LIVE;
   for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests]) list.length = 0;
 });
@@ -193,6 +203,22 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     await expect(debate({ shape: { policy: null, ask: { scrutiny: "deep" } } }))
       .rejects.toMatchObject({ code: "PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW" });
     expect([seen.askVersions, seen.requests]).toEqual([[], []]);
+  });
+
+  it("--length-policy, the ask not dispatched: the result and report.json still carry the length block, with no frozen numbers (fix round 1, Minor 5)", async () => {
+    const result = await debate({ length: lengthGuidancePolicyStartValues(), shape: { policy: null, ask: { answerLength: "detailed" } } });
+    expect(result.admission).toMatchObject({ admitted: false, refusalCode: "NOT_DISPATCHED" });
+    expect(seen.published[0]![3]).toEqual({ shape: null, length: lengthGuidancePolicyStartValues() });
+    // --answer-length alone passes with the length row and no debate-shape row (LG-C).
+    expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, answerLength: "detailed" });
+    const block = { source: "FLAG", registerVersion: "6", row: "ADDED", frozen: null, unreadable: null };
+    expect(result.length).toEqual(block);
+    expect(result.shape).toBeUndefined();
+    // The stand-in runner's call stats are empty ({}), which no report table reads; they are left out here.
+    const report = debateReport({ result: { ...result, parallel: undefined } as never, observer: new PracticeGateObserver(),
+      startedAt: new Date(0), finishedAt: new Date(1_000) });
+    expect(report.length).toEqual(block);
+    expect(reportMarkdown(report)).toContain(practiceLengthBlockLines(result.length!).join("\n"));
   });
 
   it("--shape-policy on a code's next version composed without it: refused before the ask is composed", async () => {

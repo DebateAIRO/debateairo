@@ -30,8 +30,9 @@ function exportWith(rows: readonly Readonly<{ row_key: string; value_json: strin
 }
 
 describe("--length-policy (spec §3.7, ruling L22)", () => {
-  it("the start file is the start values", () => {
+  it("the start file is the start values, byte for byte", () => {
     expect(parsePracticeLengthPolicyText(START_TEXT)).toEqual(lengthGuidancePolicyStartValues());
+    expect(START_TEXT).toBe(JSON.stringify(lengthGuidancePolicyStartValues(), null, 2) + "\n");
   });
 
   it("is a known debate flag, read before anything starts, and debate-only", () => {

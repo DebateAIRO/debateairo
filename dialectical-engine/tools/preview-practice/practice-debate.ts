@@ -767,6 +767,8 @@ export async function runPracticeDebate(input: Readonly<{
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
         ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
+        // Length guidance: where the row came from, with no frozen numbers (no run was admitted).
+        ...(lengthSource === null ? {} : { length: practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange, frozen: null }) }),
         ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
           planner: null, storedLanguage: null }) }),
         ...(deployment === undefined ? {} : { deployment })

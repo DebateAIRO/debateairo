@@ -1089,6 +1089,21 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
   }, 900_000);
 
+  it("refuses a malformed or non-JSON --length-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched (Review Focus 5)", async () => {
+    const malformed = join(folder, `length-bad-${randomUUID()}.json`);
+    await writeFile(malformed, JSON.stringify({ ...(JSON.parse(readFileSync(LENGTH_POLICY_START, "utf8")) as object), runawayMultiplier: 99 }));
+    const notJson = join(folder, `length-not-json-${randomUUID()}.json`);
+    await writeFile(notJson, "{not json");
+    for (const bad of [malformed, notJson]) {
+      const { stubs, env, common, quiet } = await scenario();
+      const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--length-policy", bad], env, quiet);
+      expect(outcome.exitCode).toBe(40);
+      expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_LENGTH_POLICY_INVALID"]);
+      expect(stubs.requests).toEqual([]);
+      expect(stubs.remainingReads).toEqual([]);
+    }
+  }, 60_000);
+
   it("--answer-length detailed with --length-policy and no --shape-policy is accepted; without either row it is refused before any call", async () => {
     const { env, common, quiet } = await scenario();
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
