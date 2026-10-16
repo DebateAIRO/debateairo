@@ -591,4 +591,12 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
     expect(source.match(/<Text\b/gu)).toHaveLength(7);
     expect(source.match(/hyphenationCallback=\{reportLineBreaker\(/gu)).toHaveLength(3);
   });
+
+  it("lets a position row and the reviewer-note box wrap across pages; the reservation line stays whole (LG-A, L10)", () => {
+    expect(source).toContain("<View key={index} style={[styles.pathRow, look.row]} minPresenceAhead={36}>");
+    expect(source).not.toMatch(/styles\.pathRow, look\.row\]\} wrap=\{false\}/u);
+    expect(source).toContain("<View style={styles.box}>");
+    expect(source).toContain("<KeepWithNext ahead={36} style={styles.boxTitleBox}>");
+    expect(source).toContain("<Words look={look} style={styles.reservation} wrap={false} text={model.reservation} />");
+  });
 });

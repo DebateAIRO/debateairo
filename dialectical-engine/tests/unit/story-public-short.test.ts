@@ -182,26 +182,26 @@ describe("public short story limits", () => {
   const paths = (count: number): PublicStoryShort["paths"] =>
     Array.from({ length: count }, (_, index) => ({ ...path, position_ref: `node:position-${String(index)}` }));
   const probes: readonly (readonly [string, Partial<PublicStoryShort>, boolean])[] = [
-    ["a headline of 160 characters", { headline: at(160) }, true],
-    ["a headline of 161 characters", { headline: at(161) }, false],
+    ["a headline of 1000 characters", { headline: at(1000) }, true],
+    ["a headline of 1001 characters", { headline: at(1001) }, false],
     ["a blank headline", { headline: "   " }, false],
-    ["a summary of 900 characters", { summary: at(900) }, true],
-    ["a summary of 901 characters", { summary: at(901) }, false],
-    ["a confidence sentence of 300 characters", { confidence: at(300) }, true],
-    ["a confidence sentence of 301 characters", { confidence: at(301) }, false],
+    ["a summary of 6000 characters", { summary: at(6000) }, true],
+    ["a summary of 6001 characters", { summary: at(6001) }, false],
+    ["a confidence sentence of 2000 characters", { confidence: at(2000) }, true],
+    ["a confidence sentence of 2001 characters", { confidence: at(2001) }, false],
     ["a blank confidence sentence", { confidence: "   " }, false],
     ["no path", { paths: [] }, false],
     ["8 paths", { paths: paths(8) }, true],
     ["9 paths", { paths: paths(9) }, false],
-    ["a path line of 240 characters", { paths: [{ ...path, line: at(240) }] }, true],
-    ["a path line of 241 characters", { paths: [{ ...path, line: at(241) }] }, false],
+    ["a path line of 2000 characters", { paths: [{ ...path, line: at(2000) }] }, true],
+    ["a path line of 2001 characters", { paths: [{ ...path, line: at(2001) }] }, false],
     ["a path citing 40 points", { paths: [{ ...path, node_refs: refs(40) }] }, true],
     ["a path citing 41 points", { paths: [{ ...path, node_refs: refs(41) }] }, false],
     ["a fate outside the four", { paths: [{ ...path, fate: "MAYBE" as never }] }, false],
-    ["a change text of 400 characters", { change: { text: at(400), node_refs: [] } }, true],
-    ["a change text of 401 characters", { change: { text: at(401), node_refs: [] } }, false],
-    ["a reviewer's note of 1200 characters", { reviewer_note: { text: at(1200), node_refs: [] } }, true],
-    ["a reviewer's note of 1201 characters", { reviewer_note: { text: at(1201), node_refs: [] } }, false]
+    ["a change text of 3000 characters", { change: { text: at(3000), node_refs: [] } }, true],
+    ["a change text of 3001 characters", { change: { text: at(3001), node_refs: [] } }, false],
+    ["a reviewer's note of 8000 characters", { reviewer_note: { text: at(8000), node_refs: [] } }, true],
+    ["a reviewer's note of 8001 characters", { reviewer_note: { text: at(8001), node_refs: [] } }, false]
   ];
 
   it.each(probes)("agrees with the story body on %s", (_name, change, accepted) => {

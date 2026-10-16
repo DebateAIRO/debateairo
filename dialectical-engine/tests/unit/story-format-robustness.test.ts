@@ -481,13 +481,13 @@ describe("F — R15: the story checker's reasoning-then-verdict reply and its lo
     expect(verdict.satisfied).toBe(false);
     expect(verdict.objection).toHaveLength(2739);
     expect(verdict.criteria.reviewer_note_separate).toBe(true);
-    // Still a limit: one character past 4000 is refused at its path, as 2,739 was at 2000.
-    const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(4001) });
+    // Still a limit: one character past the runaway guard (30,000) is refused at its path
+    const tooLong = JSON.stringify({ ...JSON.parse(R15_646), objection: "x".repeat(30001) });
     const refused = classifyCheckerContent(tooLong, STOP);
     expect(refused.parseStatus).toBe("SCHEMA_FAILED");
     // Practice 2026-10-14: the repair now also states the limit the objection must keep.
     expect(schemaFailureLocator(refused as Exclude<ContentClassification, { parseStatus: "PARSED" }>)).toEqual({
-      code: "SCHEMA_FAILED", path: "objection", limit: { path: "objection", bound: "at most", size: 4000, unit: "characters" }
+      code: "SCHEMA_FAILED", path: "objection", limit: { path: "objection", bound: "at most", size: 30000, unit: "characters" }
     });
   });
 
@@ -515,7 +515,7 @@ describe("F — R15: the story checker's reasoning-then-verdict reply and its lo
   });
 
   it("a trailing verdict that fails the checker's schema stays PARSE_FAILED: never a new schema refusal", () => {
-    const overLimit = R15_644_WHOLE.replace("\"objection\": \"1) ", `"objection": "${"x".repeat(4001)} 1) `);
+    const overLimit = R15_644_WHOLE.replace("\"objection\": \"1) ", `"objection": "${"x".repeat(30001)} 1) `);
     const satisfiedWithUnmet = R15_644_WHOLE.replace("\"satisfied\": false", "\"satisfied\": true");
     for (const text of [R15_644, overLimit, satisfiedWithUnmet]) {
       const classified = classifyCheckerContent(text, STOP);

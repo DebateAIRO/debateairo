@@ -3,7 +3,7 @@ import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/co
 import { TypedDomainError } from "@debateai/kernel";
 import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs, type ContentClassification,
   type ModelJsonRepair, type ModelReplyFacts, type ReplyFixerOptions } from "@debateai/providers";
-import { STORY_CHECKER_LIMITS } from "./contracts.js";
+import { STORY_CHECKER_RUNAWAY_LIMITS } from "./contracts.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -116,12 +116,11 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
 }
 
 /**
- * The objection's limit is the current answer form's (checker v3, 2026-10-13: 4000 characters, raised from 2000 because
- * the checker lists every problem in one objection). Raising it accepts every verdict the older limit accepted.
+ * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
  */
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(STORY_CHECKER_LIMITS.maxObjectionChars).nullable(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
   criteria: z.object({
     faithful_to_material: z.boolean(),
     agrees_with_label: z.boolean(),

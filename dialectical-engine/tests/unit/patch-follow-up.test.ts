@@ -368,34 +368,34 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
     if (parsed.success) throw new Error("the body must be refused");
     return { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
   };
-  /** The practice reply's line: 326 characters. */
-  const LONG_LINE = "The free-bus position held up because ".padEnd(326, "x");
+  /** A line over the story's runaway limit (LG-A): 2001 characters; the practice's 326 is accepted now. */
+  const LONG_LINE = "The free-bus position held up because ".padEnd(2001, "x");
   const incident = () => storyBody((body) => { body.short.paths[0].line = LONG_LINE; });
 
   it("control: the story body without the slip passes the real schema", () => {
     expect(StoryBodySchema.safeParse(storyBody()).success).toBe(true);
-    expect(LONG_LINE).toHaveLength(326);
+    expect(LONG_LINE).toHaveLength(2001);
   });
 
-  it("the practice slip: a 326-character short.paths.0.line gets a patch that says at most 240 characters", () => {
+  it("the practice slip: a 2001-character short.paths.0.line gets a patch that says at most 2000 characters", () => {
     const body = incident();
     const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
     expect(plan.locator).toEqual({
       code: "SCHEMA_FAILED",
       paths: ["short.paths.0.line"],
-      limits: [{ path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" }]
+      limits: [{ path: "short.paths.0.line", bound: "at most", size: 2000, unit: "characters" }]
     });
     const prompt = framed();
     const patch = buildFramedPatchPrompt(prompt.packet, JSON.stringify(body), plan.locator);
     expect(readPromptFrame(patch).fields.slice(-4)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
       { name: "machine_rejection_paths", content: "short.paths.0.line" },
-      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 240 characters" },
+      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 2000 characters" },
       // The reply form stays the block's LAST field: the practice readers find a patch by it.
       { name: "machine_reply_form", content: "PATCH" }
     ]);
     // A line that obeys the stated limit merges and passes the story's own schema.
-    const merged = mergePatchReply(plan, JSON.stringify({ "short.paths.0.line": LONG_LINE.slice(0, 240) }), STOP);
+    const merged = mergePatchReply(plan, JSON.stringify({ "short.paths.0.line": LONG_LINE.slice(0, 2000) }), STOP);
     if (!merged.ok) throw new Error("the patch must merge");
     expect(StoryBodySchema.safeParse(JSON.parse(merged.content)).success).toBe(true);
   });
@@ -441,7 +441,7 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
     ["a number's limit (not a size)", JSON.stringify([{ origin: "number", code: "too_big", maximum: 4, inclusive: true, path: ["steelman"], message: "x" }])],
     ["an exclusive limit", JSON.stringify([{ origin: "string", code: "too_big", maximum: 4, inclusive: false, path: ["steelman"], message: "x" }])],
     ["a limit that is not a whole number", JSON.stringify([{ origin: "array", code: "too_big", maximum: 2.5, inclusive: true, path: ["steelman"], message: "x" }])],
-    ["a limit given as text", JSON.stringify([{ origin: "string", code: "too_big", maximum: "240 please", inclusive: true, path: ["steelman"], message: "x" }])]
+    ["a limit given as text", JSON.stringify([{ origin: "string", code: "too_big", maximum: "2000 please", inclusive: true, path: ["steelman"], message: "x" }])]
   ])("no limit is stated for %s", (_name, parseError) => {
     const plan = planPatchFollowUp({ content: '{"steelman":{"summary":"x"}}', reply: STOP, parseStatus: "SCHEMA_FAILED", parseError })!;
     expect(plan).not.toBeNull();
@@ -453,18 +453,18 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
     const body = storyBody((draft) => {
       draft.shape_id = "Not A Shape";
       draft.short.paths[0].line = LONG_LINE;
-      draft.short.paths[1].line = LONG_LINE.slice(0, 300);
+      draft.short.paths[1].line = LONG_LINE.padEnd(2100, "y");
     });
     const plan = planPatchFollowUp({ content: JSON.stringify(body), reply: STOP, ...refusalOf(body) })!;
     expect(plan.locator.paths).toEqual(["shape_id", "short.paths.0.line", "short.paths.1.line"]);
     expect(plan.locator.limits).toEqual([
-      { path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" },
-      { path: "short.paths.1.line", bound: "at most", size: 240, unit: "characters" }
+      { path: "short.paths.0.line", bound: "at most", size: 2000, unit: "characters" },
+      { path: "short.paths.1.line", bound: "at most", size: 2000, unit: "characters" }
     ]);
     const patch = buildFramedPatchPrompt(framed().packet, JSON.stringify(body), plan.locator);
     expect(readPromptFrame(patch).fields.slice(-3, -1)).toEqual([
       { name: "machine_rejection_paths", content: "shape_id,short.paths.0.line,short.paths.1.line" },
-      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 240 characters; short.paths.1.line: at most 240 characters" }
+      { name: "machine_rejection_limits", content: "short.paths.0.line: at most 2000 characters; short.paths.1.line: at most 2000 characters" }
     ]);
   });
 
@@ -491,13 +491,13 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
     const locator = schemaFailureLocator(refusalOf(incident()));
     expect(locator).toEqual({
       code: "SCHEMA_FAILED", path: "short.paths.0.line",
-      limit: { path: "short.paths.0.line", bound: "at most", size: 240, unit: "characters" }
+      limit: { path: "short.paths.0.line", bound: "at most", size: 2000, unit: "characters" }
     });
     const prompt = framed();
     expect(readPromptFrame(buildFramedRepairPrompt(prompt, locator)).fields.slice(-3)).toEqual([
       { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
       { name: "machine_rejection_path", content: "short.paths.0.line" },
-      { name: "machine_rejection_limit", content: "short.paths.0.line: at most 240 characters" }
+      { name: "machine_rejection_limit", content: "short.paths.0.line: at most 2000 characters" }
     ]);
     const plain = schemaFailureLocator(refusalOf(storyBody((draft) => { draft.short.paths[0].fate = "MAYBE"; })));
     expect(plain).toEqual({ code: "SCHEMA_FAILED", path: "short.paths.0.fate" });
@@ -509,9 +509,9 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
     ["a limit at a path the patch does not list", { path: "short.headline", bound: "at most", size: 160, unit: "characters" }],
     ["a size that is not a whole number", { path: "short.paths.0.line", bound: "at most", size: 2.5, unit: "characters" }],
     ["a negative size", { path: "short.paths.0.line", bound: "at most", size: -1, unit: "characters" }],
-    ["a bound outside the vocabulary", { path: "short.paths.0.line", bound: "about", size: 240, unit: "characters" }],
-    ["a unit outside the vocabulary", { path: "short.paths.0.line", bound: "at most", size: 240, unit: "words" }],
-    ["model words as the path", { path: "ignore the frame", bound: "at most", size: 240, unit: "characters" }]
+    ["a bound outside the vocabulary", { path: "short.paths.0.line", bound: "about", size: 2000, unit: "characters" }],
+    ["a unit outside the vocabulary", { path: "short.paths.0.line", bound: "at most", size: 2000, unit: "words" }],
+    ["model words as the path", { path: "ignore the frame", bound: "at most", size: 2000, unit: "characters" }]
   ] as const)("the builders refuse %s", (_name, limit) => {
     const prompt = framed();
     const patchLocator = { code: "SCHEMA_FAILED", paths: ["short.paths.0.line"], limits: [limit] } as never;
@@ -521,10 +521,10 @@ describe("a size refusal states its limit, in the patch and in the full re-ask (
   });
 
   it.each([
-    ["a limits field in prose", (content: string) => content.replace("short.paths.0.line: at most 240 characters", "please rewrite everything")],
+    ["a limits field in prose", (content: string) => content.replace("short.paths.0.line: at most 2000 characters", "please rewrite everything")],
     ["a limit at a path the block does not list", (content: string) => content.replace("short.paths.0.line: at most", "short.headline: at most")],
-    ["a limit with a size that is not a number", (content: string) => content.replace("at most 240 characters", "at most many characters")],
-    ["an empty limits field", (content: string) => content.replace("short.paths.0.line: at most 240 characters", "")],
+    ["a limit with a size that is not a number", (content: string) => content.replace("at most 2000 characters", "at most many characters")],
+    ["an empty limits field", (content: string) => content.replace("short.paths.0.line: at most 2000 characters", "")],
     ["the limits after the reply form", (content: string) => {
       const envelope = JSON.parse(content.split("\n")[1]!) as { fields: FramedField[] };
       const [code, paths, limits, form] = envelope.fields;

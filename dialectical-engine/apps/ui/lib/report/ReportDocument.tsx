@@ -92,6 +92,8 @@ const styles = StyleSheet.create({
   // The note worth knowing, and the gentle line for a story with a reservation
   box: { marginTop: 16, paddingVertical: 11, paddingHorizontal: 13, borderWidth: 1, borderColor: NOTE_BORDER, borderRadius: 6, backgroundColor: NOTE_BG },
   boxTitle: { fontWeight: 700, fontSize: 8, letterSpacing: 1.2, color: MUTED, marginBottom: 6 },
+  // LG-A (L10): the reviewer note's title box, kept with the note's first lines when the note wraps across pages.
+  boxTitleBox: { marginBottom: 0 },
   boxText: { fontSize: BODY, lineHeight: 1.55 },
   reservation: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 13, borderWidth: 1, borderColor: LINE, borderRadius: 6, fontSize: 9, lineHeight: 1.5, fontStyle: "italic", color: MUTED },
 
@@ -241,7 +243,9 @@ function StoryText({ look, paragraph, variant }: {
 }
 
 type BoxStyle = typeof styles.headingBox | typeof styles.headingFirstBox | typeof styles.subheadingBox
-  | typeof styles.sectionTitleBox | typeof styles.entryHeadBox;
+  | typeof styles.sectionTitleBox | typeof styles.entryHeadBox
+  // LG-A (L10; pre-flight PF-A24): the reviewer note's title box.
+  | typeof styles.boxTitleBox;
 
 /** A heading-like line that never ends a page: it moves to the next page unless `ahead` points of what follows fit after it. */
 function KeepWithNext({ ahead, style, id, children }: {
@@ -309,8 +313,10 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
       <Heading look={look} title={inShort.title} />
       <Words look={look} style={styles.headline} text={inShort.headline} />
       <Words look={look} style={styles.paragraph} text={inShort.summary} />
+      {/* LG-A (spec 2026-10-15 §3.4, L10): a position line may run to 2,000 characters, so a row may wrap across pages;
+          minPresenceAhead keeps its start from being left alone at the foot of a page. */}
       {inShort.paths.map((path, index) => (
-        <View key={index} style={[styles.pathRow, look.row]} wrap={false}>
+        <View key={index} style={[styles.pathRow, look.row]} minPresenceAhead={36}>
           <Words look={look} style={[styles.fate, look.tracked, look.fate]} text={capitals(model, path.fateWords)} />
           <StoryText look={look} paragraph={path.line} variant="pathLine" />
         </View>
@@ -336,9 +342,13 @@ function LongStory({ look }: { look: Look }): JSX.Element {
           ))}
         </Fragment>
       ))}
+      {/* LG-A (L10): the note may run to 8,000 characters, so the box may wrap across pages; its title stays with the
+          note's first lines. The reservation line below is a fixed catalogue sentence and keeps wrap={false}. */}
       {model.reviewerNote === null ? null : (
-        <View style={styles.box} wrap={false}>
-          <Words look={look} style={[styles.boxTitle, look.tracked]} text={capitals(model, model.reviewerNote.title)} />
+        <View style={styles.box}>
+          <KeepWithNext ahead={36} style={styles.boxTitleBox}>
+            <Words look={look} style={[styles.boxTitle, look.tracked]} text={capitals(model, model.reviewerNote.title)} />
+          </KeepWithNext>
           <StoryText look={look} paragraph={model.reviewerNote.paragraph} variant="box" />
         </View>
       )}

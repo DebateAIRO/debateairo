@@ -386,6 +386,21 @@ describe("renderReportPdf (spec §10)", () => {
     ]);
   }, 120_000);
 
+  it("renders a story at the runaway limits: long position lines and a long reviewer note wrap across pages (LG-A, L10)", async () => {
+    const plain = storyFixture("READY");
+    const long: AnswerStory = JSON.parse(JSON.stringify(plain)) as AnswerStory;
+    const words = (count: number) => Array.from({ length: count }, (_, i) => `word${String(i % 97)}`).join(" ");
+    long.story!.short.paths = long.story!.short.paths.map((path) => ({ ...path, line: words(400).slice(0, 2000) }));
+    long.story!.reviewer_note = { text: words(1500).slice(0, 8000), node_refs: [] };
+    const at = new Date("2026-09-26T12:00:00.000Z");
+    const pages = (pdf: Buffer) => pdf.toString("latin1").match(/\/Type \/Page\b/g)?.length ?? 0;
+    const before = await renderReportPdf({ answer: STORY_FIXTURE_ANSWER, story: plain, generatedAt: at, catalogs: ENGLISH });
+    const after = await renderReportPdf({ answer: STORY_FIXTURE_ANSWER, story: long, generatedAt: at, catalogs: ENGLISH });
+    expect(after.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(after.toString("latin1")).not.toContain("(undefined)");
+    expect(pages(after)).toBeGreaterThan(pages(before));
+  }, 120_000);
+
   it("refuses to print a language it cannot print correctly, instead of printing it wrongly", async () => {
     // Arabic: react-pdf 4.9.0 drops the vertical mark positions its dotted letters need (reportLanguage.ts).
     const arabic: ReportCatalogs = { ...ENGLISH, locale: "ar" };
