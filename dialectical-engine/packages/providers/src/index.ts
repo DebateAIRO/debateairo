@@ -2110,7 +2110,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         followUpPacket = this.#patchPacket(request.packet, first.rejected.rawText, followUp.plan, followUpTokenCeiling,
           repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
       } else {
-        // As `#patchPacket`: a packet the step's builder or the door refuses is one that cannot go out.
+        // As `#patchPacket`: a packet the step's builder or the door refuses is one that cannot go out. A chosen swallow
+        // (spec §6 step 3, "only if B cannot be sent, today's refusal"): the refusal is the first reply's, never the builder's.
         let full: PromptPacket | undefined;
         try {
           full = request.buildRepairPacket?.({ ...first.rejected, failureClass: "STRUCTURE" });
@@ -3068,7 +3069,9 @@ export {
   structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
   type StructureRepairTextsKept,
   // Refused-repair salvage (2026-10-16, A1): the verified subset of a STRUCTURE reply, read in code with no call.
-  salvageStructureReply, structureSalvageFor, type StructureSalvage, type StructureSalvageRefusal
+  salvageStructureReply, structureSalvageFor, type StructureSalvage, type StructureSalvageRefusal,
+  // Refused-repair salvage (2026-10-16, B): the one follow-up to the original AI after a structure-repair call that did not do.
+  structureFollowUpFor
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.

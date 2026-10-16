@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   CONTENT_FOLLOW_UP_SENTENCES, OpenAICompatibleProviderGateway, PreviewVendorRefusedUnbilled, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
   appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, isContentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
@@ -388,5 +389,38 @@ describe("B: the routed call's second POST, sent alone", () => {
     const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
     await expect(harness.native.call({ ...request, structureFollowUp: { form: "FULL", first: firstOf(error) } })).rejects.toThrow(TypeError);
     expect(harness.executions).toHaveLength(1);
+  });
+
+  // Task 4 review (carried into Task 5): spec §6 step 3, "only if B cannot be sent, today's refusal". A FULL packet the step's
+  // builder refuses (a TypedDomainError) or the door refuses (not framed) is one that cannot be sent: no POST, no row.
+  it("a FULL follow-up the builder or the door refuses sends nothing and ends with the first reply's refusal", async () => {
+    const refusingBuilders = [
+      () => { throw new TypedDomainError("PROMPT_REPAIR_NOT_A_LOCATOR", "the builder refuses"); },
+      () => ({ messages: [{ role: "user" as const, content: "not framed" }] })
+    ];
+    for (const buildRepairPacket of refusingBuilders) {
+      const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: JSON.stringify(BASE) }]);
+      const refusal = await harness.gateway.call({ ...request, buildRepairPacket, structureRepairRouted: true,
+        structureFollowUp: { form: "FULL", first: firstOf(error) } }).catch((caught: unknown) => caught);
+      expect(harness.executions).toHaveLength(1);
+      expect(harness.ledger).toHaveLength(1);
+      expect(refusal).toBeInstanceOf(ProviderContentUnacceptedError);
+      expect(refusal).toMatchObject({ lastRawArtifactRef: error.lastRawArtifactRef, lastLedgerEntryRef: error.lastLedgerEntryRef });
+    }
+  });
+
+  // Task 4 review (carried into Task 5): A1 reads only a reply to the ORIGINAL packet, never B's, even when B's request
+  // carries it and B's reply is of class STRUCTURE.
+  it("A1 is never called on B's reply, PATCH or FULL, though B's request carries it", async () => {
+    for (const form of ["PATCH", "FULL"] as const) {
+      const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: WRAPPED_QUALITY }]);
+      let salvageCalls = 0;
+      const structureSalvage = () => { salvageCalls += 1; return { content: JSON.stringify(BASE), classification: classifyPanel(JSON.stringify(BASE)) }; };
+      const followUp = form === "PATCH" ? { form, plan: planFor(WRAPPED), first: firstOf(error) } : { form, first: firstOf(error) };
+      await expect(harness.gateway.call({ ...request, structureRepairRouted: true, structureSalvage, structureFollowUp: followUp }))
+        .rejects.toBeInstanceOf(ProviderContentUnacceptedError);
+      expect(harness.executions).toHaveLength(2);
+      expect(salvageCalls).toBe(0);
+    }
   });
 });

@@ -499,14 +499,18 @@ describe("LG-A withStructureRepair (L32)", () => {
     }
   });
 
-  it("refuses a repair that turns a wrapped non-number into an invented score (Task 4 carry)", async () => {
+  it("a refused invented score goes on to the original AI's own short follow-up", async () => {
     const wrapped = "{\"answer\": \"It is so, by the city's own figures\", \"score\": {\"value\": \"high\"}}";
-    const original = previewGlmHarness([{ content: wrapped }]);
+    const original = previewGlmHarness([{ content: wrapped }, { content: "{\"score\": 0.4}" }]);
     const repair = route("{\"answer\": \"It is so, by the city's own figures\", \"score\": 0.7}");
-    const error = await withStructureRepair(original.gateway, repair.route).call(request()).catch((caught: unknown) => caught);
+    const result = await withStructureRepair(original.gateway, repair.route).call(request());
     expect(repair.requests).toHaveLength(1);
-    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 1, lastRawArtifactRef: original.artifacts[0]!.artifactId });
-    expect(original.executions).toHaveLength(1);
+    expect(original.executions).toHaveLength(2);
+    const fields = readPromptFrame({ messages: (JSON.parse(original.executions[1]!.requestBody) as { messages: never }).messages }).fields;
+    expect(fields).toContainEqual({ name: "machine_rejection_paths", content: "score" });
+    // The original AI's own number (0.4), never Haiku's invented 0.7.
+    expect(result).toMatchObject({ repairForm: "PATCH", model: GLM });
+    expect(JSON.parse(result.content)).toEqual({ answer: "It is so, by the city's own figures", score: 0.4 });
   });
 
   it("refuses a repair the step's fixer would cut down: a part kept, the rest under a key it drops (Important 1)", async () => {

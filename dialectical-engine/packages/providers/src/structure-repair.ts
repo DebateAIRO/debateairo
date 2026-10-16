@@ -17,6 +17,13 @@
  * structure-repair call, no REPAIR:STRUCTURE row, its artifact PARSED with A1's drops among its repairs. Otherwise the
  * call goes on exactly as above.
  *
+ * Refused-repair salvage (2026-10-16, B; spec §6 option iii): when the repair call does not do (its copy refused, the repair
+ * model unavailable, its gate halted, a transport death), its failure never leaves the wrapper. The ORIGINAL AI gets one
+ * short follow-up (`structureFollowUpFor`), the same call's second POST on its own gateway: PATCH asks only the members the
+ * step still refuses on A1's object; FULL asks the answer writer or checker, whose reply could not be read at all, for the
+ * whole answer again. With no follow-up to send, or when it does not do, the call ends as today's refusal. Only the run's
+ * own stops (money, the lane stopped, root 0's room kept) pass through from the repair call, and then B is not sent.
+ *
  * The contract is code-owned and test-pinned (tests/unit/prompt-text-pins.test.ts), never register-sealed; its instruction
  * is the owners' wording, shown to them at plan review.
  *
@@ -29,11 +36,15 @@ import {
   STRUCTURE_SALVAGE_REPAIRS, contentRepairsOf, decodeModelJson, modelJsonFenceBody, parsedWithRepairs,
   type ModelReplyFacts, type StructureSalvageRepair
 } from "./model-json.js";
-import { buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract } from "./prompt-frame.js";
+import {
+  appendFramedRejection, buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract
+} from "./prompt-frame.js";
+import { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence } from "./content-follow-up.js";
+import { planPatchFollowUp } from "./patch-follow-up.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
   type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway,
-  type StructureSalvaged
+  type RejectedProviderContent, type StructureFirstReply, type StructureFollowUp, type StructureSalvaged
 } from "./index.js";
 
 export const STRUCTURE_REPAIR_CONTRACT_ID = "repair.structure.v1" as const;
@@ -871,6 +882,48 @@ export function structureSalvageFor(request: ProviderCallRequest):
   };
 }
 
+/** Refused-repair salvage (B, owner answer 2): the only steps whose unreadable reply gets the whole answer asked again. */
+const FULL_FOLLOW_UP_STEPS: ReadonlySet<string> = new Set(["answer_writer", "answer_checker"]);
+
+/**
+ * Refused-repair salvage (2026-10-16, B; spec §6 option iii): the one follow-up to the ORIGINAL AI after the structure-repair
+ * call did not do, planned from its first reply (`first`). A1 reads that reply again (`salvageStructureReply`, the step's
+ * answer form, where it keeps texts and its own check): when A1 built an object the step still refuses at 1-8 settable
+ * members (PARTIAL), PATCH asks only those members, on A1's object; when no object could be read at all, the answer writer
+ * and the answer checker (and only they, with a full re-ask of their own) get FULL, the whole answer again. Anything else is
+ * null: no follow-up, the call ends as today's refusal. It may throw (the step's classifier, `framedAnswerForm`); its one
+ * caller treats a throw as null.
+ */
+export function structureFollowUpFor(request: ProviderCallRequest, first: StructureFirstReply): StructureFollowUp | null {
+  const classify = request.classifyContent;
+  if (classify === undefined) return null;
+  const salvage = salvageStructureReply({ content: first.rejected.rawText, reply: FINISHED, answerForm: framedAnswerForm(request.packet),
+    textsKept: structureRepairTextsKeptAt(request.callSiteKey, request.lane), classify });
+  if (salvage.kind === "PARTIAL") {
+    const planned = planPatchFollowUp({ content: JSON.stringify(salvage.base), reply: FINISHED,
+      parseStatus: salvage.classification.parseStatus, parseError: salvage.classification.parseError });
+    if (planned === null) return null;
+    const plan = Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
+      reason: contentFollowUpSentence(planned.locator.code, "STRUCTURE") }) });
+    return Object.freeze({ form: "PATCH" as const, plan, first });
+  }
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  if (salvage.kind === "NO_OBJECT" && step !== null && FULL_FOLLOW_UP_STEPS.has(step) && request.buildRepairPacket !== undefined) {
+    return Object.freeze({ form: "FULL" as const, first });
+  }
+  return null;
+}
+
+/**
+ * B's FULL re-ask (controller ruling on Task 3): the step's own packet, then its rejection block (the step's own builder
+ * appends the same block to the same packet), whose plain-word reason is the owner's sentence for an unreadable reply,
+ * named here by its constant; no code or class selects it.
+ */
+function unreadableReplyRepairPacket(packet: PromptPacket): (rejected: RejectedProviderContent) => PromptPacket {
+  return (rejected) => appendFramedRejection(packet, { ...schemaFailureLocator({ parseStatus: rejected.parseStatus,
+    parseError: rejected.parseError }), reason: CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD });
+}
+
 /**
  * Task 13 review, finding 1: the two stops of the run's own machinery a repair call can meet besides the money stops,
  * which keep their names as they do: the debate's call lane stopped while the repair waited for a slot
@@ -885,10 +938,27 @@ export const STRUCTURE_REPAIR_PASSED_STOPS = Object.freeze(["CALL_LANE_STOPPED",
 /** The repair reply's refusal when it changed what the AI wrote (STRUCTURE_REPAIR_NOT_VERBATIM, INTERFACE §9). */
 const NOT_VERBATIM = JSON.stringify([{ code: "custom", path: [], message: "STRUCTURE_REPAIR_NOT_VERBATIM" }]);
 
-async function repairStructure(request: ProviderCallRequest, unrepaired: ProviderStructureUnrepairedError,
+async function repairStructure(gateway: ProviderGateway, request: ProviderCallRequest, unrepaired: ProviderStructureUnrepairedError,
   route: StructureRepairRoute): Promise<ProviderCallResult> {
   const unaccepted = (): ProviderContentUnacceptedError => new ProviderContentUnacceptedError(unrepaired.attempts,
     unrepaired.rejected.parseStatus, unrepaired.rejected.parseError, unrepaired.lastRawArtifactRef, unrepaired.lastLedgerEntryRef);
+  /**
+   * Refused-repair salvage (B, spec §6 option iii): the structure-repair call did not do, so the ORIGINAL AI gets its one
+   * short follow-up, the same call's second POST on its own gateway (`structureFollowUp`). No follow-up planned: today's
+   * refusal. Every error of that POST is the original AI's own and passes through unchanged.
+   */
+  const followUp = async (): Promise<ProviderCallResult> => {
+    let planned: StructureFollowUp | null;
+    try {
+      planned = structureFollowUpFor(request, { rejected: unrepaired.rejected, rawArtifactRef: unrepaired.lastRawArtifactRef,
+        ledgerEntryRef: unrepaired.lastLedgerEntryRef, materialMarked: unrepaired.materialMarked });
+    } catch {
+      planned = null; // a throw while planning is no B, never a lost refusal (as Task 2's hook; pre-flight PF-S9)
+    }
+    if (planned === null) throw unaccepted();
+    return gateway.call({ ...request, structureRepairRouted: true, structureFollowUp: planned,
+      ...(planned.form === "FULL" ? { buildRepairPacket: unreadableReplyRepairPacket(request.packet) } : {}) });
+  };
   const classify = request.classifyContent!;
   const broken = unrepaired.rejected.rawText;
   let packet: PromptPacket;
@@ -943,12 +1013,13 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
     // (`@debateai/kernel` RUN_LEVEL_SPEND_STOP_CODES), among them (ruling R9, pre-flight PF-A48) the run's attempt ceiling,
     // which the repair gateway's `assertAttemptAllowed` raises unwrapped before it sends; and so does a stop of the run's
     // own machinery (STRUCTURE_REPAIR_PASSED_STOPS: the lane stopped, root 0's room kept). Every other
-    // way the repair did not do leaves today's refusal. (The list is read here, inside the function: ./index.js re-exports
-    // this file, so a module-level copy would read it before index.js has run.)
+    // way the repair did not do (refused, unavailable, cut off, a transport death) never leaves the wrapper: it goes on to
+    // the original AI's follow-up B. (The list is read here, inside the function: ./index.js re-exports this file, so a
+    // module-level copy would read it before index.js has run.)
     if (error instanceof TypedDomainError && ((RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(error.code)
       || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code)
       || (STRUCTURE_REPAIR_PASSED_STOPS as readonly string[]).includes(error.code))) throw error;
-    throw unaccepted();
+    return followUp();
   }
   return Object.freeze({
     ...unrepaired.reply,
@@ -970,8 +1041,10 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
  * one), INSIDE every wrapper the runner adds per run — the candidate stamp, the sit-out book, the call lane, the
  * keep-alive, the cheaper-model fallback and the seat caller's backup. ProviderStructureUnrepairedError must never reach
  * those: the seat caller's switching rule (`seatFailureCause`, A16) and the fallbacks read typed codes, and an
- * unrepaired reply is neither a transport failure nor a money stop. Wrapped there, a call ends as today's
- * ProviderContentUnacceptedError (or a money stop, unchanged) whenever the repair does not do. The route's own gateway
+ * unrepaired reply is neither a transport failure nor a money stop. Wrapped there, the repair call's own failure never
+ * leaves the wrapper (only the run's own stops pass through as themselves): the original AI's follow-up B is sent instead,
+ * as that AI's own second POST, and its outcome is the call's (an accepted answer, today's
+ * ProviderContentUnacceptedError, or the original AI's own transport failure or stop, unchanged). The route's own gateway
  * is never wrapped in a route: a repair call is never routed again (`routable`).
  */
 export function withStructureRepair(gateway: ProviderGateway, route: StructureRepairRoute | null): ProviderGateway {
@@ -989,7 +1062,7 @@ export function withStructureRepair(gateway: ProviderGateway, route: StructureRe
         return await gateway.call({ ...request, structureRepairRouted: true, ...(salvage === null ? {} : { structureSalvage: salvage }) });
       } catch (error) {
         if (!(error instanceof ProviderStructureUnrepairedError)) throw error;
-        return repairStructure(request, error, route);
+        return repairStructure(gateway, request, error, route);
       }
     }
   });
