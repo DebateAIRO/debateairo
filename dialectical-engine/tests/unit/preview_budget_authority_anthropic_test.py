@@ -477,6 +477,7 @@ class SettlementTests(AnthropicTest):
             'inference_geo_us': {'inference_geo': 'us'},
             'service_tier_priority': {'service_tier': 'priority'},
             'service_tier_batch': {'service_tier': 'batch'},
+            'speed_fast': {'speed': 'fast'},
             'unknown_usage_key': {'cache_write_tokens': 0},
             'cache_split_not_summing': {'cache_creation_input_tokens': 3000,
                                         'cache_creation': {'ephemeral_5m_input_tokens': 1000, 'ephemeral_1h_input_tokens': 1000}},
@@ -554,6 +555,51 @@ class SettlementTests(AnthropicTest):
         self.assertEqual(entry_of(gate)['state'], 'settled')
         self.assertEqual(gate.status()['state'], 'active')
 
+    @staticmethod
+    def halted_shape(**usage):
+        """The reply that halted the live gate at 02:59:54 UTC on 2026-10-16, field for field as its ledger
+        outline shows it (HTTP 200, Haiku), with made-up numbers: every member it carried, usage.speed included."""
+        return {**message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
+                          cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
+                          service_tier='standard', inference_geo='global',
+                          output_tokens_details={'thinking_tokens': 60}, **usage),
+                'container': None, 'stop_details': None, 'diagnostics': None}
+
+    def test_usage_speed_standard_or_absent_settles_at_the_list_price(self):
+        # Fast mode page (platform.claude.com/docs/en/build-with-claude/fast-mode, read 2026-10-16): usage.speed
+        # is "fast" or "standard", the speed the call ran at. "standard" is the list price; so is a reply without it.
+        expected = cost(LOWER, 2000, output=100)
+        for name, reply in (('standard', self.halted_shape(speed='standard')), ('absent', self.halted_shape()),
+                            ('null', self.halted_shape(speed=None)), ('plain_standard', message(2000, 100, speed='standard'))):
+            with self.subTest(name):
+                accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+                self.assertTrue(accounting['usage_valid'])
+                self.assertEqual(Decimal(accounting['guard_charge_usd']), expected)
+                gate = self.ready()
+                self.call(gate, reply=reply)
+                entry = entry_of(gate)
+                self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
+                self.assertEqual(gate.status()['state'], 'active')
+
+    def test_any_other_usage_speed_halts_and_the_outline_names_it(self):
+        # "fast" is premium pricing (the same page: Opus fast mode at 2x the list price), and the reviewed row
+        # holds Haiku's standard prices only; any value the docs do not name is unknown. Both stay uncertain.
+        for name, value, label in (('fast', 'fast', 'fast'), ('priority', 'priority', 'priority'),
+                                   ('capitalised', 'Standard', '(other)'), ('empty', '', '(other)'),
+                                   ('number', 1, 'number'), ('object', {'mode': 'standard'}, 'object')):
+            with self.subTest(name):
+                reply = self.halted_shape(speed=value)
+                accounting = ANTHROPIC.account(reply, ANTHROPIC.rows[HAIKU], None)
+                self.assertFalse(accounting['usage_valid'])
+                self.assertEqual(accounting['invalid_reason'], 'speed')
+                self.assertEqual(accounting['reply_shape']['usage_labels'],
+                                 {'service_tier': 'standard', 'inference_geo': 'global', 'speed': label})
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply)
+                self.assert_uncertain_halt(gate)
+                self.assertEqual(entry_of(gate)['accounting']['invalid_reason'], 'speed')
+
     def test_an_unreadable_usage_records_which_check_failed(self):
         cases = {
             'not_a_message': ({**message(), 'type': 'error'}, 'not_a_message'),
@@ -570,6 +616,7 @@ class SettlementTests(AnthropicTest):
             'server_tool_use': (message(server_tool_use={'web_search_requests': 1}), 'server_tool_use'),
             'service_tier': (message(service_tier='priority'), 'service_tier'),
             'inference_geo': (message(inference_geo='us'), 'inference_geo'),
+            'speed': (message(speed='fast'), 'speed'),
             'cache_split': (message(cache_creation={'ephemeral_5m_input_tokens': 5, 'ephemeral_1h_input_tokens': 0}),
                             'cache_split'),
         }
@@ -1001,7 +1048,7 @@ class RequestShapeTests(AnthropicTest):
                      'stream': False, 'metadata': {'user_id': 'u'}, 'stop_sequences': ['x'], 'temperature': 0,
                      'top_p': 1, 'top_k': 1, 'cache_control': {'type': 'ephemeral'}, 'inference_geo': 'global',
                      'service_tier': 'standard_only', 'container': 'c', 'mcp_servers': [], 'reasoning_effort': 'high',
-                     'response_format': {'type': 'json_object'}}
+                     'response_format': {'type': 'json_object'}, 'speed': 'fast'}
         refused = [request(**{name: value}) for name, value in forbidden.items()]
         refused += [
             request(messages=[{'role': 'user', 'content': 'x', 'cache_control': {'type': 'ephemeral'}}]),

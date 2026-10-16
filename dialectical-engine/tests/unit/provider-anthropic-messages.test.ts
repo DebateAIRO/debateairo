@@ -356,7 +356,7 @@ describe("PR B — usage in the engine's shape", () => {
   it("input = input + cache creation + cache read; output = output_tokens", () => {
     expect(anthropicUsageAsEngineUsage({
       input_tokens: 100, output_tokens: 40, cache_creation_input_tokens: 7, cache_read_input_tokens: 3,
-      service_tier: "standard"
+      service_tier: "standard", speed: "standard"
     })).toStrictEqual({ prompt_tokens: 110, completion_tokens: 40, total_tokens: 150 });
     expect(anthropicUsageAsEngineUsage({
       input_tokens: 5, output_tokens: 1, cache_creation_input_tokens: null
