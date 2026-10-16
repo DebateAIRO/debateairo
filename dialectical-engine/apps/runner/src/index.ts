@@ -103,6 +103,7 @@ import {
   replyFailureClassOf,
   promptContractFingerprintText,
   schemaFailureLocator,
+  structureRepairOriginalKey,
   type FramedPrompt,
   type PromptContract,
   OpenAICompatibleProviderGateway,
@@ -11803,6 +11804,18 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
 }
 
 /**
+ * Verdict story — the story scope (spec 2026-09-26 §8), as `createPostgresProviderGateway` decides it: a story-lane call
+ * names one of the story's own call sites with that site's role, and no other lane uses the STORY: namespace. LG-A: a
+ * structure-repair call (`REPAIR:STRUCTURE:<key>`) is judged by the key it repairs, so a story repair keeps the story's
+ * lane, allowance and money (L32).
+ */
+export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" | "callSiteKey" | "role">): boolean {
+  const key = structureRepairOriginalKey(request.callSiteKey);
+  const storyScope = request.lane === "story";
+  return !((storyScope || key.startsWith(STORY_CALL_SITE_PREFIX)) && (!storyScope || storyCallSiteRole(key) !== request.role));
+}
+
+/**
  * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH CEILING A CALL
  * SEES. An answer-writing call is the synthesizer or the evaluator on the
  * served lane, and only that pair: the judges use the served lane too, so the
@@ -11838,8 +11851,8 @@ export function providerCallSharedWall(
   request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">
 ): SharedWallApplication {
   if (request.lane !== "served" || providerCallCostEnvelopePhase(request) !== "BODY") return "EXEMPT";
-  // Paid plans S1a: an assigned run's first call carries its seat marker.
-  return seatBaseCallSiteKey(request.callSiteKey) === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";
+  // Paid plans S1a: an assigned run's first call carries its seat marker. LG-A: a structure-repair call is its original's.
+  return seatBaseCallSiteKey(structureRepairOriginalKey(request.callSiteKey)) === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";
 }
 
 /**
@@ -11946,8 +11959,7 @@ export function createPostgresProviderGateway(
        * be used for a free-form or out-of-range call.
        */
       const storyScope = request.lane === "story";
-      if ((storyScope || request.callSiteKey.startsWith(STORY_CALL_SITE_PREFIX))
-        && (!storyScope || storyCallSiteRole(request.callSiteKey) !== request.role)) {
+      if (!storyCallScopeAgrees(request)) {
         throw new TypedDomainError(
           "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
           "A story call and the STORY: call-site namespace must agree"

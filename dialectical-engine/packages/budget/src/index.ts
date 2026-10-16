@@ -648,7 +648,8 @@ export class BudgetRepository {
   /**
    * The run-wide attempt ceiling's count. Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED
    * rows (provably unbilled refusals) are left out, so a storm of free 429s never turns into
-   * RUN_COST_ENVELOPE_EXHAUSTED.
+   * RUN_COST_ENVELOPE_EXHAUSTED. LG-A (spec 2026-10-15, L32): a story's structure-repair call
+   * (`REPAIR:STRUCTURE:STORY:…`) is the story's, like the story call it repairs, so it is left out too.
    */
   async countRunModelAttempts(runId: string): Promise<number> {
     const result = await this.pool.query<{ count: string }>(
@@ -656,6 +657,7 @@ export class BudgetRepository {
        FROM ledger.ledger_entry
        WHERE run_id = $1 AND action_kind = 'MODEL_CALL' AND outcome <> 'REFUSED'
          AND call_site_key NOT LIKE 'STORY:%'
+         AND call_site_key NOT LIKE 'REPAIR:STRUCTURE:STORY:%'
          AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)`,
       [runId]
     );

@@ -81,16 +81,19 @@ import {
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
+  previewStructureRepairRoute,
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   providerTargetPrice,
   resolveProviderTargetCredentials,
   type ProviderDiscoveryTarget,
   withPreviewProviderCallPolicy,
+  withStructureRepair,
   type PreviewBudgetPorts,
   type PreviewGateRemaining,
   type PreviewProviderName,
-  type PreviewProviderTestConfig
+  type PreviewProviderTestConfig,
+  type ProviderGateway
 } from "@debateai/providers";
 import { StoryWriter, loadStoryPack, resolveStoryPackDir, type StoryPack } from "@debateai/story";
 import {
@@ -316,7 +319,7 @@ export async function composePracticeRunner(input: Readonly<{
   const providerTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
   });
-  const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
+  function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
     const price = providerTargetPrice(target);
     if (costEnvelopeGuard !== undefined && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
@@ -347,7 +350,17 @@ export async function composePracticeRunner(input: Readonly<{
       onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
-  });
+  }
+  /**
+   * LG-A (spec 2026-10-15, L32; ruling R10), as main.ts: every target's gateway first, so the structure-repair route can
+   * name the repair model's own (Haiku's, through its own gate); then every target's gateway is wrapped by
+   * withStructureRepair. The practice always has the preview provider config, so the route is built whenever Haiku is a
+   * target (the practice proof exercises it); without a Haiku target it is null and nothing is wrapped.
+   */
+  const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
+  const structureRepairRoute = previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef));
+  const providerTopology = createRunnerProviderTopology(providerTargets,
+    (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
   const runRepository = new RunRepository(pool);
   assertRunnerPrimaryProviderConfiguration({
     primary: providerTopology.primary,
