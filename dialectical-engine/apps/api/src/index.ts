@@ -246,7 +246,7 @@ import {
   type LengthGuidancePolicy
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
-import { lengthGuidanceForAsk } from "./length-guidance-ask.js";
+import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
@@ -1757,6 +1757,8 @@ export interface ApiOptions {
   readonly askBilling?: AskBilling;
   /** Debate shape (spec 2026-10-12 §3.1): the register's optional row, for the room read's normalisation. Absent: today's. */
   readonly debateShapePolicy?: DebateShapePolicy;
+  /** Length guidance (spec 2026-10-15 §3.8): the register's optional row, for the room read's normalisation and words. */
+  readonly lengthGuidancePolicy?: LengthGuidancePolicy;
   /**
    * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
    * supplied by main only when hosted with billing on; each route whose member is
@@ -3568,6 +3570,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Length guidance (spec 2026-10-15 §3.8): the plan key the room's settings were decided for, which names the answer
+    // words; without a room reader, the query's own tier.
+    let roomPlanKey: DebateShapePlanKey = "free";
+    if (options.askRoom === undefined) roomPlanKey = debateShapePlanKeyOf(null, query.data.plan_tier);
     const answer: AskRoomAnswer = options.askRoom === undefined
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
@@ -3581,8 +3587,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
               depth_params: roomDepthParams(query.data)
             }, access.ownerRef, options.askBilling);
             const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
-            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan),
-              previewConfig, roomPlan);
+            roomPlanKey = roomPlan;
+            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan,
+              options.lengthGuidancePolicy ?? null), previewConfig, roomPlan);
           })()
         });
     return reply.send(AskRoomResponseSchema.parse({
@@ -3596,7 +3603,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
-      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const })
+      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const }),
+      // Length guidance (spec 2026-10-15 §3.8; ruling Q9): the plan's answer words and the length switch. Without either
+      // row neither member is written: today's body, byte for byte.
+      ...((): Record<string, unknown> => {
+        const words = lengthAnswerWordsFor(options.lengthGuidancePolicy, options.debateShapePolicy, roomPlanKey);
+        return words === null ? {} : { answer_words: { short: words.short, standard: words.standard, detailed: words.detailed } };
+      })(),
+      ...(options.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const })
     }));
   });
 

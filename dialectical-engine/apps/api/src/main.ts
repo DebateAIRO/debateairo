@@ -1623,6 +1623,8 @@ const api = buildApi({
   ...(askBilling === undefined ? {} : { askBilling }),
   // Debate shape: the room read normalises its query under the same row as submit.
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Length guidance: the room read normalises under the same row as submit and names the plan's answer words.
+  ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

@@ -35,6 +35,8 @@ const SHAPE_ROOM = { room: "FITS", scope: null, resets_at: null, waiting_run_ref
 /** The same room from an API with no row in force: the member is absent. */
 const { shape_settings: _flag, ...PLAIN_ROOM } = SHAPE_ROOM;
 const CHOICE_KEYS = ["depth_mode", "scrutiny", "answer_length"] as const;
+/** LG-C Task 5 (spec 2026-10-15 §3.8): a room from an API with the length row alone, which names its answer words. */
+const LENGTH_ROOM = { ...PLAIN_ROOM, answer_words: { short: 200, standard: 350, detailed: 1000 }, length_settings: true } as const;
 
 import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
 import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
@@ -216,6 +218,29 @@ describe("debate shape P2c — the /new controls", () => {
     // The room is read for today's query only.
     expect(roomQueries().length).toBeGreaterThan(0);
     for (const query of roomQueries()) for (const key of CHOICE_KEYS) expect(query).not.toHaveProperty(key);
+  });
+
+  it("with the length row alone: shows only the answer length, and sends and reads the room with answer_length alone", async () => {
+    mocks.getAskRoom.mockResolvedValue(LENGTH_ROOM);
+    await renderPage();
+    await inputValue("#topic", "Should the city fund the tram extension?");
+    await click("#planTier-premium");
+    await click(".ndOptionsToggle");
+    expect(document.querySelector("#depthMode")).toBeNull();
+    expect(document.querySelector("#scrutinyDepth")).toBeNull();
+    expect(document.querySelectorAll('[data-field="answerLength"]')).toHaveLength(3);
+    await click("#answerLength-detailed");
+    expect(roomQueries().at(-1)).toMatchObject({ answer_length: "detailed" });
+    for (const query of roomQueries()) {
+      expect(query).not.toHaveProperty("depth_mode");
+      expect(query).not.toHaveProperty("scrutiny");
+    }
+    await submitForm();
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    const sent = mocks.createDebate.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(sent).toMatchObject({ answer_length: "detailed" });
+    expect(sent).not.toHaveProperty("depth_mode");
+    expect(sent).not.toHaveProperty("scrutiny");
   });
 
   it("reads the room with the three choices only once it says they are in force, and keeps them shown when a later read fails", async () => {
