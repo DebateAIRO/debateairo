@@ -77,16 +77,16 @@ describe("(2) time: the gate, not the app, decides when a call has taken too lon
 });
 
 describe("(3) the storyteller's allowance is a reviewed per-row field, smaller on the slower rows", () => {
-  const expected: Readonly<Record<string, number>> = { [GLM]: 16_384, [DEEPSEEK]: 32_768, [MIMO]: 16_384, [QWEN]: 16_384, [HAIKU]: 32_768 };
+  const expected: Readonly<Record<string, number>> = { [GLM]: 16_384, [DEEPSEEK]: 131_072, [MIMO]: 16_384, [QWEN]: 16_384, [HAIKU]: 128_000 };
 
-  it("MiMo, Qwen and GLM: 16,384; DeepSeek and Claude Haiku: their whole 32,768 cap", () => {
+  it("MiMo, Qwen and GLM: 16,384; DeepSeek and Claude Haiku: their own maximum (L26)", () => {
     expect(Object.fromEntries(PREVIEW_MODEL_ROWS.map((row) => [row.model, row.storytellerTokenCeiling]))).toEqual(expected);
   });
 
-  it("never above the row's answer cap, never below the preview's generation floor", () => {
+  it("never above the row's own maximum, never below the preview's generation floor", () => {
     for (const row of PREVIEW_MODEL_ROWS) {
       expect(Number.isSafeInteger(row.storytellerTokenCeiling)).toBe(true);
-      expect(row.storytellerTokenCeiling).toBeLessThanOrEqual(row.outputBound);
+      expect(row.storytellerTokenCeiling).toBeLessThanOrEqual(row.finalWriterOutputBound);
       expect(row.storytellerTokenCeiling).toBeGreaterThanOrEqual(8192);
     }
   });

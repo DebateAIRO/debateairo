@@ -771,7 +771,7 @@ describe("one ask at a time is estimated and started on the preview (review find
     const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
       budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM] }))!;
     expect(previewCallOutputTokens(config, { debate: [2048, 16_000], story: { storyteller: 12_000, checker: 2048 } }))
-      .toEqual({ debate: 16_000, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
+      .toEqual({ debate: 16_000, storyteller: 131_072, storytellerRetry: 262_144, storyChecker: 8192 });
     expect(previewCallOutputTokens(config, { debate: [2048], story: null })).toEqual({ debate: 8192, storyteller: 0, storytellerRetry: 0, storyChecker: 0 });
     const invalid = "PREVIEW_CALL_CEILINGS_INVALID";
     expect(() => previewCallOutputTokens(config, { debate: [], story: null })).toThrow(invalid);
@@ -1075,9 +1075,10 @@ describe("what one debate is estimated at with today's register (realistic worst
     return { deepinfra: figure(sums.deepinfra, 10, HOLD), ...(hasHaiku ? { anthropic: figure(sums.anthropic, 2, ANTHROPIC_HOLD) } : {}) };
   };
   it("no call the app makes asks for more than the 32,768-token answer cap (owner ruling, 2026-10-10)", () => {
-    expect(sent).toEqual({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
-    // The storyteller's retry (twice its 32,768) is held to the cap by the row's clamp below, as the gateway holds it.
-    for (const tokens of [sent.debate, sent.storyteller, sent.storyChecker]) expect(tokens).toBeLessThanOrEqual(32_768);
+    expect(sent).toEqual({ debate: 8192, storyteller: 131_072, storytellerRetry: 262_144, storyChecker: 8192 });
+    // LG-B (L26): the storyteller asks the largest row's own maximum (DeepSeek, 131,072); every other ceiling stays within the cap.
+    for (const tokens of [sent.debate, sent.storyChecker]) expect(tokens).toBeLessThanOrEqual(32_768);
+    expect(sent.storyteller).toBe(131_072);
     // Even a register ceiling above the cap is clamped by each row's bound before it is priced (and the
     // gateway clamps what is sent, preview-multi-model.test.ts).
     for (const row of [GLM, DEEPSEEK, MIMO, QWEN].map((model) => previewModelRow(model)!)) {

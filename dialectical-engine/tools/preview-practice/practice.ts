@@ -628,6 +628,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         config: settings.previewConfig,
         targets,
         ports: budgetPorts,
+        gateRemaining: remainingPorts,
         observer,
         lanes,
         samples,

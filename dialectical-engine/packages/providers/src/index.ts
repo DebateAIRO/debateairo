@@ -234,6 +234,17 @@ export interface ProviderCallRequest {
    */
   readonly lengthRetry?: Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }>;
   /**
+   * Length guidance L29 (spec 2026-10-15 §3.5): this call's request size cap, at most 1 MiB, in place of the module's
+   * 256 KiB (MAX_PROVIDER_REQUEST_PACKET_BYTES). Set ONLY by the preview's call policy, only for the four final writers.
+   * Absent: today's cap, hosted and local byte for byte. Never sent.
+   */
+  readonly packetByteCap?: number;
+  /**
+   * Length guidance L26: this call's largest max_tokens (length retries included), in place of the target's own
+   * (`maxOutputTokens`). Set ONLY by the preview's call policy, only for the four final writers. Never sent.
+   */
+  readonly outputTokenCap?: number;
+  /**
    * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
    * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
    * RECORDED on every attempt's ledger row, never sent. Optional on the type
@@ -1390,6 +1401,8 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
 const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+/** L29: the largest per-call cap a request may name (`packetByteCap`); the preview gate's own outer request bound. */
+const MAX_PROVIDER_REQUEST_PACKET_BYTES_CEILING = 1024 * 1024;
 /** Patch follow-up: room left in the packet cap for the body's other members around the messages. */
 const PATCH_PACKET_HEADROOM_BYTES = 4 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
@@ -1848,7 +1861,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
    */
   #patchPacket(
     packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
-    fits: (packet: PromptPacket, tokenCeiling: number) => boolean
+    fits: (packet: PromptPacket, tokenCeiling: number) => boolean, packetCap: number
   ): PromptPacket | null {
     let patch: PromptPacket;
     try {
@@ -1860,7 +1873,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       if (error instanceof TypedDomainError) return null;
       throw error;
     }
-    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= MAX_PROVIDER_REQUEST_PACKET_BYTES
+    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
       && fits(patch, tokenCeiling)
       ? patch
       : null;
@@ -1882,6 +1895,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       && (!Number.isInteger(request.maxAttemptsThisCall) || request.maxAttemptsThisCall < 1)) {
       throw new TypeError("ProviderCallRequest.maxAttemptsThisCall must be a positive integer");
     }
+    if (request.packetByteCap !== undefined && (!Number.isSafeInteger(request.packetByteCap) || request.packetByteCap < 1
+      || request.packetByteCap > MAX_PROVIDER_REQUEST_PACKET_BYTES_CEILING)) {
+      throw new TypeError("ProviderCallRequest.packetByteCap must be a whole number of bytes, at most 1 MiB");
+    }
+    if (request.outputTokenCap !== undefined && (!Number.isSafeInteger(request.outputTokenCap) || request.outputTokenCap < 1)) {
+      throw new TypeError("ProviderCallRequest.outputTokenCap must be a positive whole number");
+    }
+    // L26/L29: the call's own caps when the preview names them (the final writers), else today's.
+    const packetCap = request.packetByteCap ?? MAX_PROVIDER_REQUEST_PACKET_BYTES;
+    const outputCap = request.outputTokenCap ?? this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER;
     /**
      * Preview retry fix, option B (spec 2026-10-11 §1.1): the POSTs of THIS call, decided once and used
      * by both the loop and the repair test below. Without `maxAttemptsThisCall` it is the bound, as
@@ -1997,7 +2020,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
-        this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
+        outputCap
       );
       /**
        * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
@@ -2092,11 +2115,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         if (!this.#anthropic && this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
-        if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
+        if (Buffer.byteLength(body, "utf8") > packetCap) {
           packetRefused = true;
           throw new TypedDomainError(
             "PROVIDER_PACKET_TOO_LARGE",
-            `Provider request packet exceeded ${MAX_PROVIDER_REQUEST_PACKET_BYTES} bytes`
+            `Provider request packet exceeded ${packetCap} bytes`
           );
         }
         /**
@@ -2554,7 +2577,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
               ? Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
                   reason: contentFollowUpSentence(planned.locator.code, attemptFailureClass ?? undefined) }) })
               : planned;
-            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow);
+            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow, packetCap);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
               patchPlan = plan;

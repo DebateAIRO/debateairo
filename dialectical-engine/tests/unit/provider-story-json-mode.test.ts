@@ -143,7 +143,7 @@ describe("preview budget transport admits only the exact optional JSON mode", ()
         .map(response_format => ({ ...base, response_format })),
       { ...base, response_format: { type: "json_object" }, stream: false },
       { ...base, response_format: { type: "json_object" }, reasoning_effort: "medium" },
-      { ...base, response_format: { type: "json_object" }, max_tokens: 32_769 },
+      { ...base, response_format: { type: "json_object" }, max_tokens: 131_073 },
       { ...base, response_format: { type: "json_object" }, model: "other/model" }
     ]) await expect(fetcher(`${ENDPOINT}/chat/completions`, { method: "POST", body: JSON.stringify(body) })).rejects.toThrow();
     expect(calls).toBe(0);

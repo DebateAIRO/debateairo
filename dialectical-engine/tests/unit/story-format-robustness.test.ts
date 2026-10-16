@@ -302,7 +302,7 @@ describe("A — on the preview the storyteller asks for its row's own story allo
   it("the start-of-debate estimate prices the storyteller at what is sent: each row's own story allowance", () => {
     const sent = previewCallOutputTokens(CONFIG, { debate: [2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
     // The largest any row's storyteller asks for; each row is priced at its own allowance below.
-    expect(sent).toEqual({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
+    expect(sent).toEqual({ debate: 8192, storyteller: 131_072, storytellerRetry: 262_144, storyChecker: 8192 });
     const strict = strictUpperBoundPricer(sent);
     const deepseek = { inputNanoUsdPerToken: 200n, outputNanoUsdPerToken: 600n };
     // The retry is clamped to the row's bound, exactly as the gateway clamps what it sends.

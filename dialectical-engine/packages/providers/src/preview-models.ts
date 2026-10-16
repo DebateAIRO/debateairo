@@ -89,9 +89,16 @@ export type PreviewModelRow = Readonly<{
   /** Largest max_tokens ever sent, and the output side of every reservation. */
   outputBound: number;
   /**
-   * The max_tokens the preview's storyteller asks for on its first attempt (previewStorytellerTokenCeiling); its length
-   * retry asks twice it, held to `outputBound`. Never above `outputBound`, never below the generation floor (8,192).
-   * Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku); 16,384 on the slower
+   * Length guidance L26: the model's own maximum output, as its vendor documents it: the largest max_tokens a final-writer
+   * call may send and the output side of its reservation. At least `outputBound`, at most 1,048,576 (the gate's
+   * MAX_OUTPUT_BOUND). A change is a reviewed row change here, in the gate's row and in the parity file's `final_writer`.
+   */
+  finalWriterOutputBound: number;
+  /**
+   * The max_tokens the preview's storyteller asks for on its first attempt (previewStorytellerTokenCeiling). Length
+   * guidance L26 / owner answer 7 (2026-10-15): a fast row asks its own maximum (`finalWriterOutputBound`, so above
+   * `outputBound`); a slow row keeps 16,384, and its length retry stays held to `outputBound` (previewStorytellerOutputCap).
+   * Never below the generation floor (8,192). Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku); 16,384 on the slower
    * ones (MiMo, Qwen, GLM), whose story at 17 tokens a second could otherwise run past the gate's 1,200 s. App only: the
    * gate checks max_tokens against `outputBound` alone, so the gate's parity files do not carry it.
    */
@@ -144,6 +151,20 @@ export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
  */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /**
+ * Length guidance L26/L29 (owner answers 4 and 7, 2026-10-15): the preview's two kinds of call. FINAL_WRITER is the
+ * answer writer, the answer checker, the storyteller and the story checker: a request of up to 1 MiB, each model's own
+ * maximum output (`finalWriterOutputBound`), and the gate's own per-call money cap ($0.75; $1.00 on the Anthropic gate,
+ * whose one row is Claude Haiku). Every other call is STANDARD: 256 KiB, the row's `outputBound`, $0.25 — today's caps.
+ * The gates hold the same caps (preview_budget_helper.py, final_writer_*); a change is a reviewed change on both sides.
+ */
+export type PreviewCallTier = "STANDARD" | "FINAL_WRITER";
+export const PREVIEW_CALL_TIER_LIMITS = Object.freeze({
+  STANDARD: Object.freeze({ requestBodyMaxBytes: 256 * 1024,
+    perCallCapUsd: Object.freeze({ deepinfra: "0.25", anthropic: "0.25" }) }),
+  FINAL_WRITER: Object.freeze({ requestBodyMaxBytes: 1024 * 1024,
+    perCallCapUsd: Object.freeze({ deepinfra: "0.75", anthropic: "1.00" }) })
+});
+/**
  * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
  * of every reservation). Debate calls and health checks ask for 8,192; the storyteller asks for its row's story
  * allowance (storytellerTokenCeiling: this whole cap on the fast rows, PREVIEW_SLOW_STORY_TOKENS on the slower ones,
@@ -159,7 +180,8 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
-  outputBound: number; storytellerTokenCeiling: number; storyCheckerTokenCeiling?: number; efforts: readonly PreviewEffort[];
+  outputBound: number; finalWriterOutputBound: number; storytellerTokenCeiling: number; storyCheckerTokenCeiling?: number;
+  efforts: readonly PreviewEffort[];
   effortsByStrength: readonly PreviewEffort[];
   jsonObject: boolean; contextWindowTokens?: number;
   upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string; cacheWriteInputUsdPerM?: string }>;
@@ -193,9 +215,14 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
     || effortsByStrength.some(word => !efforts.includes(word))) {
     throw new TypeError("PREVIEW_MODEL_ROW_EFFORT_ORDER_INVALID");
   }
-  // The storyteller's allowance is a whole number of tokens within the row's own cap (the guarded fetch and the gate
-  // refuse a max_tokens above it) and not below the generation floor every preview call keeps.
-  if (!Number.isSafeInteger(input.storytellerTokenCeiling) || input.storytellerTokenCeiling > input.outputBound
+  // Length guidance L26: the model's own maximum, never below the row's standard bound, never above the gate's outer bound.
+  if (!Number.isSafeInteger(input.finalWriterOutputBound) || input.finalWriterOutputBound < input.outputBound
+    || input.finalWriterOutputBound > 1024 * 1024) {
+    throw new TypeError("PREVIEW_MODEL_ROW_FINAL_WRITER_BOUND_INVALID");
+  }
+  // The storyteller's allowance is a whole number of tokens within the row's own maximum (a fast row asks it all, a slow
+  // row keeps 16,384) and not below the generation floor every preview call keeps.
+  if (!Number.isSafeInteger(input.storytellerTokenCeiling) || input.storytellerTokenCeiling > input.finalWriterOutputBound
     || input.storytellerTokenCeiling < PREVIEW_STORY_TOKENS_FLOOR) {
     throw new TypeError("PREVIEW_MODEL_ROW_STORYTELLER_CEILING_INVALID");
   }
@@ -245,12 +272,14 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
 export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName, readonly PreviewModelRow[]>> = Object.freeze({
   deepinfra: Object.freeze([
     // Thinking levels (spec 2026-10-12 §2): Z.AI documents low, high and max only, and thinking cannot be switched off.
+    // L26: DeepInfra's max_output_tokens 131,072 (api.deepinfra.com/models/zai-org/GLM-5.3-Flash, read 2026-10-15).
     row("deepinfra", { model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["high", "low"],
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, finalWriterOutputBound: 128 * 1024, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["high", "low"],
       effortsByStrength: ["high", "low"], jsonObject: true }),
     // Thinking levels (spec 2026-10-12 §2): DeepSeek documents none, low, high and max ("medium" is treated as high).
+    // L26: DeepInfra's max_output_tokens 131,072 (…/deepseek-ai/DeepSeek-V4.1-Flash, read 2026-10-15); a fast storyteller asks it all.
     row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "low", "none"],
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: 128 * 1024, finalWriterOutputBound: 128 * 1024, efforts: ["high", "low", "none"],
       effortsByStrength: ["high", "low", "none"], jsonObject: false }),
     // Owner approval 2026-10-12: in a live practice run MiMo closed Romanian quotation marks („…) with a straight double
     // quote inside its JSON (nine times in one judging reply), then wrote a second JSON answer in the same reply. Its
@@ -261,8 +290,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     // double quote, DeepInfra's JSON constraint ended the string there and forced the rest into garbage (a 141-character
     // reply with 11 issues), while without JSON mode the engine's reader (INNER_QUOTE) repairs that exact slip with no call.
     // Thinking levels (spec 2026-10-12 §2): Xiaomi documents thinking on or off only, no levels.
+    // L26: DeepInfra lists no max_output_tokens (null, …/XiaomiMiMo/MiMo-V2.6-Pro, read 2026-10-15); its max_new_tokens default is at most 65,536, the careful figure until Xiaomi's own page is read. A slow storyteller (owner answer 7).
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS,
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, finalWriterOutputBound: 64 * 1024, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS,
       // Story wording (practice debate 2, 2026-10-12): room for its thinking as the story checker (see the field).
       storyCheckerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "none"],
       effortsByStrength: ["default", "none"], jsonObject: false,
@@ -272,8 +302,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     // random multilingual tokens in a live practice run (2 of its first 4 calls unreadable). It thinks by default, so
     // it runs at its makers' thinking-mode settings: temperature 0.6, top_p 0.95, top_k 20.
     // Thinking levels (spec 2026-10-12 §2): Alibaba documents low, medium and xhigh (its default); "high" is not a Qwen value.
+    // L26: DeepInfra's max_output_tokens 131,072 (…/Qwen/Qwen3.8-Flash, read 2026-10-15).
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "low", "medium", "none"],
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, finalWriterOutputBound: 128 * 1024, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, efforts: ["default", "low", "medium", "none"],
       effortsByStrength: ["default", "medium", "low", "none"], jsonObject: false,
       contextWindowTokens: 1_000_000,
       sampling: { temperature: 0.6, top_p: 0.95, top_k: 20 } })
@@ -287,8 +318,9 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
   // The gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
     // Thinking levels (spec 2026-10-12 §2): Anthropic documents low, medium, high, xhigh and max for Haiku 5.5.
+    // L26: "Max output: 128K tokens" on the synchronous Messages API (platform.claude.com/docs/en/models/haiku-5-5/overview, read 2026-10-15). A full 1 MiB cached final-writer call holds (1,050,624 x 0.625 + 128,000 x 2.50) / 1e6 = $0.97664, under its gate's $1.00 (owner answer 4).
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_ANSWER_CAP_TOKENS, efforts: ["high", "medium", "low"],
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: 128 * 1000, finalWriterOutputBound: 128 * 1000, efforts: ["high", "medium", "low"],
       effortsByStrength: ["high", "medium", "low"], jsonObject: false,
       cacheWriteInputUsdPerM: "0.125",
       upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
@@ -390,20 +422,41 @@ export function previewChargedInputTokens(bodyBytes: number): bigint {
 }
 
 /**
- * Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD, at the row's
- * prices, or at its upper step's when the charged input tokens are above that step's threshold.
- * Prompt caching (2026-10-12): a request that asks for a cache write (`cacheWrite`, only ever on a row
- * that may cache) prices its whole input at that step's 5-minute cache-write price instead, exactly as
- * the gate's AnthropicProfile.reservation_prices does (tests/unit/fixtures/anthropic-cache-bodies.json).
+ * Contract A §3: ((body bytes + 2048) x input + output bound x output), in nano-USD, at the row's prices, or at its upper
+ * step's when the charged input tokens are above that step's threshold. Prompt caching (2026-10-12): a request that asks
+ * for a cache write prices its whole input at that step's 5-minute cache-write price instead, exactly as the gate's
+ * AnthropicProfile.reservation_prices does. Length guidance L29 (LG-B): the output bound is the TIER's — the row's
+ * `outputBound` for a standard call (today's figure), its `finalWriterOutputBound` for a final writer — never the
+ * request's own max_tokens: a vendor may report thinking outside its output count, so the hold stays the whole bound.
  */
 export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number,
-  options: Readonly<{ cacheWrite?: boolean }> = {}): bigint {
+  options: Readonly<{ cacheWrite?: boolean; tier?: PreviewCallTier }> = {}): bigint {
   const tokens = previewChargedInputTokens(bodyBytes);
   const step = reviewed.upperStep !== undefined && tokens > BigInt(reviewed.upperStep.aboveChargedInputTokens)
     ? reviewed.upperStep : reviewed;
   const input = options.cacheWrite === true ? step.cacheWriteInputNanoUsdPerToken : step.inputNanoUsdPerToken;
   if (input === undefined) throw new TypeError("PREVIEW_MODEL_ROW_CANNOT_CACHE");
-  return tokens * input + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
+  return tokens * input + BigInt(previewTierOutputBound(reviewed, options.tier ?? "STANDARD")) * step.outputNanoUsdPerToken;
+}
+
+/** L26/L29: the output bound of a call of this tier on this row. */
+export function previewTierOutputBound(row: PreviewModelRow, tier: PreviewCallTier): number {
+  return tier === "FINAL_WRITER" ? row.finalWriterOutputBound : row.outputBound;
+}
+
+/** Owner answer 7: a slow storyteller's length retry stays held to `outputBound`; a fast one's to its own maximum. */
+export function previewStorytellerOutputCap(row: PreviewModelRow): number {
+  return row.storytellerTokenCeiling > row.outputBound ? row.finalWriterOutputBound : row.outputBound;
+}
+
+/**
+ * LG-B deviation 2: the tier the guarded fetch declares for a body it can only read: FINAL_WRITER when the body is over a
+ * standard call's caps (its bytes, or a whole-number max_tokens above the row's `outputBound`). Only the preview call
+ * policy can make such a body (the gateway's packetByteCap/outputTokenCap), so no other call reaches this tier.
+ */
+export function previewCallTierOfBody(row: PreviewModelRow, bodyBytes: number, maxTokens: unknown): PreviewCallTier {
+  return bodyBytes > PREVIEW_CALL_TIER_LIMITS.STANDARD.requestBodyMaxBytes
+    || (typeof maxTokens === "number" && Number.isSafeInteger(maxTokens) && maxTokens > row.outputBound) ? "FINAL_WRITER" : "STANDARD";
 }
 
 /** The reviewed row for a target's own base URL and model name, if any (any provider). */

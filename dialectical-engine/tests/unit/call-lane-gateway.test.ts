@@ -524,7 +524,7 @@ describe("the runner's wiring (source pins)", () => {
     expect(MAIN.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createRunInFlight\(\)/gu) ?? []).toHaveLength(2);
-    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }\n  });");
+    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining\n  });");
     // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
     expect(MAIN).toContain("...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");

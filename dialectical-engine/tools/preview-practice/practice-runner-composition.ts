@@ -349,6 +349,7 @@ export async function composePracticeRunner(input: Readonly<{
     return withPreviewProviderCallPolicy(gateway, previewConfig, target, {
       busy: previewBusy,
       onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
+      gateRemaining: input.remaining,
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
   }

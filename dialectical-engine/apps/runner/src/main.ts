@@ -355,6 +355,12 @@ const runnerCallScheduler = createCallScheduler({
 if (previewConfig !== undefined) {
   await applyPreviewGateCapacities({ scheduler: runnerCallScheduler, gates: previewGateRemainingReaders(previewConfig) });
 }
+/**
+ * Pre-flight PF-B2.3 (LG-B): each preview gate's read-only `/remaining`, by gate, for the call policy: a final writer's
+ * call asks its gate once and gets the final-writer tier only when the gate serves it (a gate older than LG-B: STANDARD).
+ */
+const previewGateRemaining = previewConfig === undefined ? {} : Object.freeze(Object.fromEntries(
+  previewGateRemainingReaders(previewConfig).map(({ gate, remaining }) => [gate, remaining] as const)));
 /** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
 const previewBusy = createPreviewBusyCoordinator();
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
@@ -398,7 +404,8 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
   return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {
     busy: previewBusy,
-    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }
+    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
+    gateRemaining: previewGateRemaining
   });
 }
 /**

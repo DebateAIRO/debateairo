@@ -164,6 +164,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // unsent refusal, on both sides.
       expect(code).toContain("callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model)");
       expect(code).toContain("onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }");
+      expect(code).toMatch(/gateRemaining: (previewGateRemaining|input\.remaining)/u);
     }
     for (const key of ["callScheduler", "callSubjects", "renewals"]) {
       expect(objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {").has(key), key).toBe(true);

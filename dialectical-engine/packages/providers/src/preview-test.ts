@@ -9,12 +9,13 @@ import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderG
 import { assertFramedPrompt } from "./prompt-frame.js";
 import type { StructureRepairRoute } from "./structure-repair.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
-import { createPreviewRemainingRpcPort, type PreviewRemainingPort } from "./preview-remaining.js";
+import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
-  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
-  previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
-  previewRostersHonourMakerRule, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
+  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
+  PREVIEW_REQUEST_BODY_MAX_BYTES, previewCallTierOfBody, previewModelRow, previewModelRowForRef, previewNanoUsdText,
+  previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
+  previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
 import {
   parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
@@ -280,6 +281,20 @@ function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "C
     : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
 }
 /**
+ * Length guidance L26/L29: the tier of a preview call: FINAL_WRITER for the answer writer and checker (served lane,
+ * SYNTHESIZER / EVALUATOR) and the storyteller and story checker (story lane, the same roles); STANDARD for everything
+ * else, LG-A's structure-repair calls included.
+ */
+export function previewCallTierOf(request: Readonly<{ callSiteKey: string; lane: string; role: string }>): PreviewCallTier {
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  const served = request.lane === "served";
+  const story = request.lane === "story";
+  return (step === "answer_writer" && served && request.role === "SYNTHESIZER")
+    || (step === "answer_checker" && served && request.role === "EVALUATOR")
+    || (step === "story_writer" && story && request.role === "SYNTHESIZER")
+    || (step === "story_checker" && story && request.role === "EVALUATOR") ? "FINAL_WRITER" : "STANDARD";
+}
+/**
  * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
  * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check). The current
  * checker is v3 since 2026-10-13 (the objection's limit raised to 4000 characters).
@@ -488,11 +503,18 @@ export function withPreviewProviderCallPolicy(
     sleep?: (milliseconds: number) => Promise<void>;
     busy?: PreviewBusyCoordinator;
     onGateUnsent?: (gate: PreviewProviderName) => void;
+    /**
+     * Pre-flight PF-B2.3 (controller ruling, 2026-10-16): each gate's read-only `/remaining`, by gate. A final writer's
+     * call asks its row's gate once and gets the final-writer tier only when the answer names its final-writer slots
+     * (previewGateOffersFinalWriterTier). Absent, or a read that fails: today's STANDARD call, byte for byte.
+     */
+    gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
   const busy = options.busy ?? NO_BUSY_COORDINATION;
+  const gateRemaining = options.gateRemaining?.[reviewed.provider];
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
@@ -510,12 +532,34 @@ export function withPreviewProviderCallPolicy(
     if (request.lengthRetry !== undefined) {
       throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview chooses this model's thinking level itself");
     }
+    // Length guidance L29: the per-call caps are the policy's alone (the final writers), never the caller's.
+    if (request.packetByteCap !== undefined || request.outputTokenCap !== undefined) {
+      throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's size caps itself");
+    }
     const preview = previewCallBound(request.bound, config);
-    const bound = previewStorySite(request, "STORYTELLER")
-      ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+    // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; a
+    // slow storyteller keeps its 16,384 and its retry today's clamp. Every other call keeps today's bound and caps.
+    // Pre-flight PF-B2.3 (controller ruling, 2026-10-16): a final writer gets that room only when its gate's `/remaining`
+    // names the final-writer slots, asked once per call (the unbilled resend below reuses the answer); otherwise, and when
+    // the read fails, it is today's STANDARD call, byte for byte, so an app that reaches a gate older than LG-B never sends
+    // it a body it refuses. LG-A's structure-repair calls are STANDARD (previewCallTierOf; Task 4's known limit).
+    const storyteller = previewStorySite(request, "STORYTELLER");
+    const standardBound = storyteller
+      ? Object.freeze({ ...preview, tokenCeiling: Math.min(previewStorytellerTokenCeiling(reviewed), reviewed.outputBound) })
       : previewStorySite(request, "CHECKER")
         ? Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, previewStoryCheckerTokenCeiling(reviewed)) })
         : preview;
+    const finalWriter = previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
+      bound: storyteller
+        ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
+        : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, reviewed.finalWriterOutputBound) }),
+      caps: Object.freeze({ packetByteCap: PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes,
+        outputTokenCap: storyteller ? previewStorytellerOutputCap(reviewed) : reviewed.finalWriterOutputBound })
+    }) : undefined;
+    let tierDecision: Promise<typeof finalWriter> | undefined;
+    const finalWriterCall = (): Promise<typeof finalWriter> => tierDecision ??= finalWriter === undefined || gateRemaining === undefined
+      ? Promise.resolve(undefined)
+      : gateRemaining().then((remaining) => previewGateOffersFinalWriterTier(remaining) ? finalWriter : undefined, () => undefined);
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
@@ -530,11 +574,15 @@ export function withPreviewProviderCallPolicy(
     const lengthRetry = previewLengthRetryOf(request, reviewed, effort);
     const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
-    const send = () => gateway.call({ ...request, thinkingLevel: level,
-      ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
-      ...(lengthRetry === undefined ? {} : { lengthRetry }),
-      bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1, attemptScope: "actor",
-      ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+    const send = async () => {
+      const tier = await finalWriterCall();
+      return gateway.call({ ...request, thinkingLevel: level,
+        ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
+        ...(lengthRetry === undefined ? {} : { lengthRetry }),
+        ...(tier === undefined ? {} : tier.caps),
+        bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
+        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+    };
     /** The first send, after the coordinator admits it; an answer tells the coordinator. */
     const firstSend = async () => {
       await busy.admit(reviewed.model);
@@ -606,9 +654,12 @@ export function previewStructureRepairRoute(targets: readonly Readonly<{ provide
 }
 /**
  * LG-A (Task 14 carry) — THE MOST THE MONEY SEAM CAN PROJECT FOR ONE STRUCTURE-REPAIR CALL on `route`: a body of
- * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds, and the
- * preview's guarded fetch refuses a larger body, so no larger one is ever answered) and the route's token ceiling, on the
- * repair target. Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
+ * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds) and the
+ * route's token ceiling, on the repair target. LG-B (pre-flight PF-B2.9): a repair call is STANDARD (previewCallTierOf),
+ * so it never carries the policy's packetByteCap, and the gateway refuses a request body above
+ * MAX_PROVIDER_REQUEST_PACKET_BYTES (256 KiB) before anything is sent: no larger repair is ever answered. (The guarded
+ * fetch admits up to 1 MiB since LG-B, for the final writers' bodies only; it is no longer what holds the repair.)
+ * Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
  * `rootZeroKeepRoomMicros`). Null for no route.
  */
 export function previewStructureRepairCeiling(route: StructureRepairRoute | null):
@@ -621,6 +672,8 @@ export interface PreviewBudgetExecution {
   readonly requestBody: string;
   readonly requestSha256: string;
   readonly reservedUsd: string;
+  /** LG-B deviation 2: only on a final-writer request (the gate's sixth key); a standard request's message is today's. */
+  readonly callTier?: "FINAL_WRITER";
 }
 /** Root-owned authority reserves atomically before any paid POST, then records or retains its charge. */
 export interface PreviewBudgetPort {
@@ -644,7 +697,7 @@ function effortOnMenu(present: boolean, value: unknown, reviewed: PreviewModelRo
  * 2026-10-12 §4.5: `reasoning_effort`, when present, is a word on the row's menu; absent only where the menu holds
  * "default".
  */
-function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
   if (reviewed.provider !== "deepinfra") return false;
   const hasResponseFormat = Object.hasOwn(body, "response_format");
   const responseFormat = body.response_format;
@@ -658,7 +711,7 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && required.every(key => Object.hasOwn(body, key))
     && effortOnMenu(hasEffort, body.reasoning_effort, reviewed)
     && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
-    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
     && Array.isArray(body.messages);
 }
 /** A text block of exactly `keys`, whose text is not only whitespace. */
@@ -686,13 +739,13 @@ function anthropicBodyAsksCacheWrite(body: Record<string, unknown>): boolean {
 }
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
- * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
+ * `max_tokens` (1..the tier's bound), `messages` (each exactly {role, content: non-empty text},
  * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
  * optional `system` (a non-empty text, or the two blocks carrying the one cache mark:
  * anthropicSystemAccepted), and `output_config` exactly {"effort": <a word on the row's menu>} (spec 2026-10-12
  * §4.5; absent only where the menu holds "default", which no Anthropic row does). Nothing else, anywhere.
  */
-function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
   if (reviewed.provider !== "anthropic") return false;
   const hasEffort = Object.hasOwn(body, "output_config");
   const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["output_config"] : [])];
@@ -704,7 +757,7 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
     && (optional === 0 || anthropicSystemAccepted(body.system))
     && (hasEffort ? isPlainObject(effort) && Object.keys(effort).length === 1 && effortOnMenu(true, effort.effort, reviewed)
       : effortOnMenu(false, undefined, reviewed))
-    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
     && Array.isArray(messages) && messages.length % 2 === 1
     && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
       && message.role === (index % 2 === 0 ? "user" : "assistant")
@@ -721,8 +774,8 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
  * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
- * (exact keys, the row's effort and JSON switches and its reviewed sampling, 1 <= max_tokens <= the row's bound, at most
- * 256 KiB), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
+ * (exact keys, the row's effort and JSON switches and its reviewed sampling, at most 256 KiB for a standard call and 1 MiB
+ * for a final writer (LG-B), with 1 <= max_tokens <= that tier's bound), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
  * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
@@ -734,23 +787,30 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
       : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
-      || Buffer.byteLength(init.body, "utf8") > PREVIEW_REQUEST_BODY_MAX_BYTES || carriesKeyHeader(init.headers)) refused();
+      || Buffer.byteLength(init.body, "utf8") > PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes
+      || carriesKeyHeader(init.headers)) refused();
     let decoded: unknown; try { decoded = JSON.parse(init!.body as string); } catch { return refused(); }
     if (!isPlainObject(decoded)) return refused();
     const reviewed: PreviewModelRow = previewModelRow(decoded.model) ?? refused();
-    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed) : anthropicBodyAccepted(decoded, reviewed))) refused();
+    // LG-B deviation 2: a body over a standard call's caps is a final writer's (only the call policy can make one).
+    const bodyBytes = Buffer.byteLength(init!.body as string, "utf8");
+    const tier = previewCallTierOfBody(reviewed, bodyBytes, decoded.max_tokens);
+    const outputBound = previewTierOutputBound(reviewed, tier);
+    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed, outputBound)
+      : anthropicBodyAccepted(decoded, reviewed, outputBound))) refused();
     const port = byProvider[provider];
     if (port === undefined) {
       // A configured provider without its gate: nothing is reserved or sent.
       throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
     }
     const body = init!.body as string;
-    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning. A body carrying the
+    // UTF-8 bytes + template allowance; the tier's full output bound, including hidden reasoning. A body carrying the
     // cache mark reserves its whole input at the step's cache-write price, as the gate does.
-    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"),
-      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded) });
+    const reserved = previewReservationNanoUsd(reviewed, bodyBytes,
+      { cacheWrite: provider === "anthropic" && anthropicBodyAsksCacheWrite(decoded), tier });
     const result = await port.execute({ operationId: randomUUID(), requestBody: body,
-      requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init!.signal ?? undefined);
+      requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved),
+      ...(tier === "FINAL_WRITER" ? { callTier: "FINAL_WRITER" as const } : {}) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }

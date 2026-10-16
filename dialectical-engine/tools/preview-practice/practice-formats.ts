@@ -44,6 +44,8 @@ import {
   createPreviewGuardedFetch,
   type PreviewBudgetPorts,
   type PreviewEffort,
+  type PreviewGateRemaining,
+  type PreviewProviderName,
   type PreviewProviderTestConfig,
   type ProviderDiscoveryTarget,
   type ProviderGateway,
@@ -148,6 +150,7 @@ function recordingGateway(input: Readonly<{
   guardedFetch: typeof fetch;
   sink: PracticeSink;
   sleep?: (milliseconds: number) => Promise<void>;
+  gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
 }>): ProviderGateway {
   const http = new OpenAICompatibleProviderGateway({
     fetchImplementation: input.guardedFetch,
@@ -162,7 +165,8 @@ function recordingGateway(input: Readonly<{
     // As the runner's gateway records each attempt's prompt (ledger.call_prompt), but only its form is kept here.
     persistCallPrompt: async (prompt) => { input.sink.forms.set(prompt.attemptId, practiceReplyFormOf(prompt.messages)); }
   });
-  return withPreviewProviderCallPolicy(http, input.config, input.target, input.sleep === undefined ? {} : { sleep: input.sleep });
+  return withPreviewProviderCallPolicy(http, input.config, input.target, { ...(input.sleep === undefined ? {} : { sleep: input.sleep }),
+    ...(input.gateRemaining === undefined ? {} : { gateRemaining: input.gateRemaining }) });
 }
 
 /**
@@ -176,10 +180,12 @@ export function practiceJobGateway(input: Readonly<{
   config: PreviewProviderTestConfig;
   guardedFetch: typeof fetch;
   sleep?: (milliseconds: number) => Promise<void>;
+  gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
 }>): Readonly<{ gateway: ProviderGateway; sink: PracticeSink; endedBusy: () => boolean }> {
   const sink: PracticeSink = { artifacts: [], ledger: [], forms: new Map<string, PracticeReplyForm | null>() };
   const recording = recordingGateway({ target: input.target, config: input.config, guardedFetch: input.guardedFetch, sink,
-    ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+    ...(input.sleep === undefined ? {} : { sleep: input.sleep }),
+    ...(input.gateRemaining === undefined ? {} : { gateRemaining: input.gateRemaining }) });
   let endedBusy = false;
   const gateway: ProviderGateway = Object.freeze({
     call: async (request: Parameters<ProviderGateway["call"]>[0]) => {
@@ -382,6 +388,8 @@ export async function runPracticeFormats(input: Readonly<{
   stopSignal?: AbortSignal;
   /** Spec 2026-10-12 §4.8 (`--levels`): each listed model's runs; a model not listed runs once, as without it. */
   levels?: PracticeLevelPlan;
+  /** Each gate's read-only `/remaining` (pre-flight PF-B2.3): the final writers' tier when the gate serves it; absent: STANDARD. */
+  gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
 }>): Promise<PracticeFormatsResult> {
   const budgetMs = input.busyWaitMs ?? 0;
   // Each model's waits: the time used of its budget, its waits so far and in a row, and the wait it is parked in.
@@ -440,7 +448,8 @@ export async function runPracticeFormats(input: Readonly<{
       // calls' failures, so the job's own outcome cannot say it). Spec 2026-10-12 §4.8: a `--levels` run's job is asked
       // with a config naming only that run's level.
       const job = practiceJobGateway({ target, config: run === undefined ? input.config : practiceLevelConfig(input.config, run), guardedFetch,
-        ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
+        ...(input.sleep === undefined ? {} : { sleep: input.sleep }),
+        ...(input.gateRemaining === undefined ? {} : { gateRemaining: input.gateRemaining }) });
       const { gateway, sink } = job;
       const eventsBefore = input.observer.events.length;
       const started = performance.now();
