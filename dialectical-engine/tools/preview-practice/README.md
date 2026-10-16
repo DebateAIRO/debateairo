@@ -295,8 +295,9 @@ their input tokens, the part read from the cache (`cachedInputTokens`, as DeepIn
 `cache_read_input_tokens` report it), `callsReportingCache` (answers that reported a cached count at all) and
 `cachedShare` (cached / input); report.md has one line per AI. Formats also shows `cachedInputTokens` per job and per
 model and job. Input tokens count the way the app counts them: for Anthropic its cache reads and cache writes are
-included (Anthropic's own `input_tokens` leaves them out). The database keeps no cached count (only four counters are
-stored per call), so it is read from the gates' answers as the practice watches them.
+included (Anthropic's own `input_tokens` leaves them out). `cacheByModel` is read from the gates' answers as the
+practice watches them; since length guidance LG-B the database keeps each call's cached count too
+(`cached_input_tokens`), and the debate report's `tokensByModelAndStep.cachedShare` is read from there.
 
 Calls at once (debate only, information only): `parallel` in report.json, "Calls at once" in report.md. It gives the
 setting the runner ran with (`setting`, written the way `--call-concurrency` takes it, and where it came from: `source`
@@ -306,6 +307,24 @@ calls that really went at once in the debate (`peakInFlight`), per model (`peakB
 how long each model's calls waited for a free slot in all (`waitedMsByModel`, milliseconds), the calls (`calls`), and
 how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
 it (`busyProbesByModel`).
+
+### Tokens and words per AI and step (every debate, length guidance LG-B)
+
+`report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
+row per AI and step (opening, pros_cons, cross_exchange, judge_panel, reviewer, answer_writer, answer_checker,
+story_writer, story_checker, map, structure_repair, and UNMAPPED for a call of no step):
+- tokens: how many tries (each try whose reply was stored; a call's retries count apart); thinking and answer tokens
+  (p50 / p90 / max); the share of the input the vendor read from its cache; how many length retries thought one level
+  lower because thinking had used up the answer's room; how many tries asked for more than the standard 32,768 tokens
+  (the final writers' own maximum; a slow storyteller keeps 16,384 and is not counted here). Haiku's structure-repair
+  tries are Haiku's own row (`structure_repair`): Haiku spent those tokens;
+- words: the words each step was guided to (empty until a length row exists), how many replies were accepted, the
+  words they wrote (median / p90 / max), the share longer than guided, how many replies were stopped at their allowance,
+  and how many were refused for their form. A reply Haiku put back into its form counts for the AI and step that wrote
+  it: the words are that AI's, copied word for word.
+Nothing here is ever checked against anything: the owner reads it to tune each AI. `transcript.json` has the same
+measures per call (`usage.answerTokens`, `guidedWords`, `actualWords`). Formats mode has no such tables; each try in its
+`samples.jsonl` carries `tokenCeiling` (the bound it asked for) and `thinkingLevel` (the level it ran at).
 
 ### The new debate shape (debate mode, `--shape-policy`)
 
@@ -843,6 +862,70 @@ together (a slip fixed by the second try is a warning; a step failed for good, o
 model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
 bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
+### S-6c, Mac: the LG-B proof (between the LG-B gates and the LG-B app upload)
+
+Length guidance LG-B: the final writers now ask each model's own maximum, so the proof makes sure Haiku writes a story
+at least once, measures the storyteller's thinking one level lower (OVERVIEW B-1), then runs one whole debate with every
+AI. It needs the LG-B gates on the server first: with an older gate the app keeps its final writers at the standard
+caps, and the proof proves nothing (the practice then prints `PREVIEW_FINAL_WRITER_TIER_UNREAD` for that gate). Same
+`D` and `P` as in S-5.
+
+1. B-1 on the LOCAL copy only (the server's api.env and runner.env are not touched): after S-2, merge the storyteller's
+   one-level-lower levels into `$P/settings.env`'s `thinking_levels`, keeping every other entry and step, then check the
+   table. The merge prints only what it changed. The checker must print `OK`, with `story_writer=low` for GLM and Qwen,
+   `story_writer=none` for MiMo (thinking off for the story), `story_writer=medium` for Haiku, and every other override
+   as before. DeepSeek gets no entry: its usual level, `none`, is its lowest.
+
+       python3 -I - "$P/settings.env" <<'PY'
+       import json, sys
+       path = sys.argv[1]
+       KEY = "PREVIEW_PROVIDER_TEST_CONFIG_JSON"
+       lines = open(path).read().split("\n")
+       hits = [i for i, line in enumerate(lines) if line.startswith(KEY + "=")]
+       assert len(hits) == 1, "exactly one config line"
+       cfg = json.loads(lines[hits[0]][len(KEY) + 1:])
+       table = cfg.setdefault("thinking_levels", {})
+       B1 = {"zai-org/GLM-5.3-Flash": "low", "XiaomiMiMo/MiMo-V2.6-Pro": "none", "Qwen/Qwen3.8-Flash": "low", "claude-haiku-5-5": "medium"}
+       for model, level in B1.items():
+           steps = table.setdefault(model, {}).setdefault("steps", {})
+           print(f"B-1: {model} story_writer {steps.get('story_writer')!r} -> {level!r} (local settings.env only)")
+           steps["story_writer"] = level
+       lines[hits[0]] = KEY + "=" + json.dumps(cfg, separators=(",", ":"), ensure_ascii=False)
+       json.loads(lines[hits[0]][len(KEY) + 1:])
+       open(path, "w").write("\n".join(lines))
+       PY
+       node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/settings.env"
+
+2. Before EACH run below: repeat S-3 and copy the two status files down. Check: each gate `state` `active`; the
+   DeepInfra GO's `daily_budget_usd` `"12.00"` and the Anthropic one's `"4.00"`; the Anthropic gate's
+   `remaining_today_usd` at least $1.60 (a final writer's hold of $1.22 plus the run's Haiku calls); and each gate's
+   `today_spend_usd` plus the run's rough cost inside the testing day's limits ($5 DeepInfra, $1 Haiku). Otherwise stop.
+3. The formats run (Haiku writes a story at least once). It runs with `--sequential`: formats mode sends its calls
+   without the runner's call queue, so with DeepSeek and MiMo both on final-writer jobs a second final writer would
+   wait at the DeepInfra gate's one final-writer slot (up to 60 seconds) and be refused. One call at a time avoids
+   that:
+
+       PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --models claude-haiku-5-5,deepseek-ai/DeepSeek-V4.1-Flash,XiaomiMiMo/MiMo-V2.6-Pro --lanes SYNTHESIZER,EVALUATOR,STORYTELLER,STORY_CHECKER --samples 1 --sequential --out "$P/lg-b-formats"
+
+4. The storyteller A/B (B-1 measured before the server's table changes; about $0.50): MiMo with thinking on and off,
+   Haiku at high and medium, two samples each, each run sending only its own level (S-6b). Then the side-by-side page
+   for the owner (`--side-by-side`, S-6b):
+
+       PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --models XiaomiMiMo/MiMo-V2.6-Pro,claude-haiku-5-5 --lanes STORYTELLER --samples 2 --levels "XiaomiMiMo/MiMo-V2.6-Pro=default,none;claude-haiku-5-5=high,medium" --out "$P/lg-b-story-levels"
+       node_modules/.bin/tsx tools/preview-practice/practice.ts report --side-by-side "$P/lg-b-story-levels/samples.jsonl" --lanes STORYTELLER --out "$P/lg-b-story-page"
+
+5. The whole debate:
+
+       PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --transcript --out "$P/lg-b-debate"
+
+Since R17 the live register carries this code's prompt seals and LG-B changes none, so the debate runs without
+`--register-next`; add it only if the debate is refused with `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`. Pass: the
+owner's bar (practice-pass-bar); in every report no gate stop and no gate refusal (`gates.<gate>.observed.stop` null,
+`gateRefused` 0) and no failure naming `REQUEST_SCOPE_INVALID`, `RESERVATION_MISMATCH` or `PREVIEW_CALL_TIER_INVALID`;
+Haiku's STORYTELLER sample answered, its first try asking 128,000 tokens at `medium`; no reply with zero visible words
+after a "lower" retry; and the two tables filled for every AI that answered. The A/B has no pass bar of its own: it is
+what the owner reads before the server's `story_writer` levels change.
+
 ### S-8, Mac: the whole-debate comparison (today's shape and the new shape)
 
 What it is, in plain words:
@@ -1026,6 +1109,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
   "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
   `practice-questions.ts`.
+- `practice-tokens.ts`: the tokens and words per AI and step (length guidance LG-B, information only).
 - `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
   `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).
   The map itself is the package `packages/map`. Tests: `tests/unit/map-*.test.ts`, `tests/unit/practice-openings*.test.ts`.

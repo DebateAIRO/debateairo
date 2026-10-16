@@ -95,26 +95,27 @@ What is new in v3:
 - A price change is a reviewed code change (the gate, the app and their shared test file),
   never an edit of the GO.
 
-### Money: DeepInfra's share of the $12 team total
+### Money: DeepInfra's share of the team total ($16 since LG-B)
 
-The owner's team limit is $12 a day (owner ruling, 2026-10-10). It is split into one pot per
-provider, each with its own gate. For now there are two: DeepInfra and Anthropic. Google is
-parked. The split (owner ruling, 2026-10-10):
+The owner's team limit was $12 a day (owner ruling, 2026-10-10); since length guidance LG-B it is $16 a day (owner
+answer M1, 2026-10-15). It is split into one pot per provider, each with its own gate. For now there are two: DeepInfra
+and Anthropic. Google is parked. The split (owner answer M1, 2026-10-15; until then DeepInfra $10.00 and Anthropic
+$2.00):
 
 | Gate | Pot per day | Calls per day | Calls at once | Status |
 |---|---|---|---|---|
-| DeepInfra (this gate) | $10.00 | 2,000 | 10 | this README |
-| Anthropic (Claude Haiku) | $2.00 | 600 | 2 | its own gate: README-anthropic.md |
+| DeepInfra (this gate) | $12.00 | 2,000 | 10 | this README |
+| Anthropic (Claude Haiku) | $4.00 | 600 | 2 | its own gate: README-anthropic.md |
 | Google | none | - | - | parked; the split is set again if it comes back |
-| **Total** | **$12.00** | **2,600** | | |
+| **Total** | **$16.00** | **2,600** | | |
 
-Until the Anthropic gate is open, the preview spends at most $10.00 a day.
+Until the Anthropic gate is open, the preview spends at most $12.00 a day.
 
-The gate itself keeps the $12 total:
-- One GO may never ask for more than $10.00 a day.
+The gate itself keeps the $16 total:
+- One GO may never ask for more than $12.00 a day.
 - `activate` adds this GO's pot to the pots in the other gates' GO files (Anthropic's and
   Google's, at their fixed places in `/etc/debateai-v3-preview/`) and refuses when the sum is
-  above $12.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
+  above $16.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
   $0. A GO file that is there but cannot be read, is not root's, can be written by others, or is
   not a proper GO refuses (`TEAM_TOTAL_UNVERIFIABLE`): the gate never guesses the total.
 - `activate` can see the other GO files because root runs it in a shell. The running gates
@@ -126,12 +127,13 @@ Each pot is checked once more when it is opened: 10 calls at the same time (the 
 allow), each setting aside the largest worst case of the switched-on models, must fit in the pot.
 `activate` refuses a GO that does not pass (`CONCURRENCY_EXCEEDS_BUDGET`). The sums for this GO:
 
-| Switched on | Largest worst case | x 10 calls at once | Fits in $10.00? |
+| Switched on | Largest worst case | x 10 calls at once | Fits in the pot ($10.00 at the first install)? |
 |---|---|---|---|
 | GLM only (the first `activate`) | $0.0560128 (GLM) | $0.560128 | yes |
 | All four | $0.14211072 (MiMo) | $1.4211072 | yes ($8.57 to spare) |
+| All four, one of the 10 a final writer (LG-B, max_final_writer_calls 1) | $0.50878464 (MiMo final writer) + 9 x $0.14211072 | $1.78778112 | yes, inside $12.00 |
 
-The smallest pot that passes with all four switched on is $1.43.
+The smallest pot that passes with all four switched on is $1.43; with a final writer's slot (LG-B), $1.79.
 
 ## Decisions you should know about
 
@@ -424,9 +426,10 @@ stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-deepinfra-authori
 | `scope_id` | `preview-deepinfra-v3-20261010` | A new name for the new pot (use the switch-over date). The app's configuration must carry the same `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name (measured for v2). The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as in v2. No one else may ask. |
-| `daily_budget_usd` | `"10.00"` | DeepInfra's share of the $12 team total (owner ruling, 2026-10-10; Anthropic has $2.00). A string with two decimals; at most `"10.00"`, and `activate` checks the sum with the other gates' GOs. |
+| `daily_budget_usd` | `"10.00"` | DeepInfra's share of the team total at the first install (owner ruling, 2026-10-10; Anthropic $2.00). Since length guidance LG-B (owner answer M1, 2026-10-15) the live GO carries `"12.00"` (Anthropic $4.00, $16.00 together), written by "Length guidance LG-B (2026-10-15): installing this change". A string with two decimals; at most `"12.00"`, and `activate` checks the sum with the other gates' GOs (at most $16.00). |
 | `max_paid_posts_per_day` | `2000` | A second fuse on the number of paid calls (owner ruling, 2026-10-10). Refusals kept as unbilled ($0) do not count. |
-| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.1421 (MiMo) = $1.42 fits in $10.00. |
+| `max_concurrent_calls` | `10` | Owner ruling ("10 at once"); 10 is the most a v3 GO may ask (v2 stays at most 8). 10 x $0.1421 (MiMo) = $1.42 fits in $10.00. Since LG-B, with one final writer: 9 x $0.1421 + 1 x $0.5088 = $1.79, inside $12.00. |
+| `max_final_writer_calls` | `1` | Length guidance LG-B (2026-10-15): how many final-writer calls (the answer writer and checker, the storyteller and the story checker) may be on their way at once. Each may send up to 1 MiB and ask the model's own maximum (GLM, DeepSeek, Qwen 131,072 tokens; MiMo 65,536), held under its own cap of $0.75. Without this member the gate refuses every final-writer request; the app of the LG-B release then reads that the gate offers no final-writer tier (`/remaining`) and keeps its final writers at the standard caps. `activate` then checks 9 x $0.14211072 + 1 x $0.50878464 (MiMo) = $1.78778112 ($1.79), inside $12.00. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 | `predecessor_ledger_sha256` | v2 state hash | Optional. Records which v2 state this pot follows. Written down only; never checked. |
 
@@ -437,7 +440,7 @@ G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 PRED=$(sha256sum /var/lib/debateai-v3-preview/provider-team-authority-v2/team-control.json | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
+jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,max_final_writer_calls:1,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
 install -o root -g root -m 0600 /root/preview-archive/provider-deepinfra-go-v3.json /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 jq -c . /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 ```
@@ -457,8 +460,8 @@ What to expect:
   `"daily_budget_usd": "10.00"` and `"today_by_model": {}`.
 - A refusal is one line `{"status": "refused", "error": "<CODE>"}`. For example,
   `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash, a pot
-  above $10.00, or a v2 GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 10 worst-case
-  calls), `TEAM_TOTAL_BUDGET_EXCEEDED` (with the other gates' pots it would be above $12.00),
+  above $12.00, or a v2 GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 10 worst-case
+  calls), `TEAM_TOTAL_BUDGET_EXCEEDED` (with the other gates' pots it would be above $16.00),
   `TEAM_TOTAL_UNVERIFIABLE` (another gate's GO file is there but cannot be trusted; check its owner,
   mode and contents) or `ACTIVATION_REFUSED` (wrong host or state).
 
@@ -696,6 +699,7 @@ restart them, and check with `systemctl show -p InaccessiblePaths <unit>` that e
 `/etc/debateai-v3-preview/provider-anthropic-go-v1.json`. The exact commands are in
 README-anthropic.md, step 3a. The near-term setup is DeepInfra and Anthropic only (Google later);
 the daily split (owner's ruling, 2026-10-10 evening) is DeepInfra $10.00 and Anthropic $2.00, $12.00 together.
+Since length guidance LG-B (owner answer M1, 2026-10-15): DeepInfra $12.00 and Anthropic $4.00, $16.00 together.
 
 ## Redeploy (2026-10-12): calls on their way together count once
 
@@ -762,6 +766,75 @@ a time until the runner's next restart, and the runner's journal shows
 gate is stopped, redeployed or restarted later, restart the runner after it is `active` again. The
 runner prints no line naming the call-concurrency setting; during the first debate after the
 restart, a gate's `status` showing `in_flight` above 1 is the proof that calls run together.
+
+## Length guidance LG-B (2026-10-15): installing this change
+
+This release changes the gate's two code files (so their hashes change), adds one GO member,
+`max_final_writer_calls`, and carries the owner's new day budgets (owner answer M1, 2026-10-15: DeepInfra $12.00,
+Anthropic $4.00, $16.00 together; the gate's code now allows at most $12.00 per GO and $16.00 for the team). It lets
+the four final writers (the answer writer and checker, the storyteller and the story checker) send up to 1 MiB and ask
+each model's own maximum output, under their own per-call cap ($0.75 here, $1.00 on the Anthropic gate), one such call
+at a time. Every other call keeps 256 KiB, 32,768 tokens and $0.25, byte for byte.
+
+The two gate files carry three changes of this release, so ONE upload brings them all to both gates: an answer without
+a bill count is booked at its reservation instead of halting the gate (owner answer M3), the final-writer tier above,
+and the cache mark on the material of Claude Haiku's first message (its repeats are read from Anthropic's cache,
+cheaper). An older gate offers no final-writer tier: the app of this release then keeps its final writers at the
+standard caps and logs one line `PREVIEW_FINAL_WRITER_TIER_UNREAD` per gate. But an older gate refuses a Haiku message
+that carries the cache mark (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that refusal. So the gates
+always go first.
+
+Order on the server: both gates first, then the runner restart, then the practice proof, then the app of the same
+release. The new gate serves the app already running unchanged: an app that never names a final writer keeps today's
+requests. The app of this release asks for the final-writer tier only from a gate whose `/remaining` names it. Before
+the Anthropic gate's GO goes to $4.00, the owner raises the workspace's monthly spend limit in the Anthropic Console to
+about $130 (README-anthropic.md, install step 0, item 2).
+
+For each gate (DeepInfra here; the Anthropic gate by its own README's section of the same name), as root, when no
+debate is running (`status` shows `in_flight` 0), in a `set -euo pipefail` batch:
+1. "Redeploy (2026-10-12)" steps 1-3: keep a copy of both gate files and the GO (it sets `G`, `GO` and `B`), `stop`,
+   install both gate files from the reviewed release and check their hashes. Once for both gates (the alert script is
+   shared), refresh the alert script from the same release (`R` set to this release, as install step 1), as install
+   step 9 does, so the booked-at-maximum email
+   names an answer without a bill count (owner answer M3):
+
+   ```sh
+   ( set -eu; test -d "$R/deploy/preview-gate/v3"
+   L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+   install -o root -g root -m 0644 $R/deploy/preview-lifecycle/v1/alert.mjs $L/alert.mjs
+   grep -qF 'an answer that carried no bill count' $L/alert.mjs )
+   ```
+2. Write the GO again, changing ONLY its two hashes, `max_final_writer_calls` (new, `1`) and `daily_budget_usd`
+   (`"12.00"`). Never re-run install step 4's `jq -n` for this: it writes the first-install GO (GLM only, with its own
+   limits) and would switch DeepSeek, MiMo and Qwen off. The `diff` is for reading. The `cmp` line is the check: it
+   compares the two GOs without those four keys, prints `ONLY_NAMED_FIELDS_CHANGED` and only then installs the new
+   GO. If anything else changed, the GO is left as it was and it prints `GO_NOT_REPLACED: stop here` (and the batch
+   ends): do not go on. The last line printed must list the same models as before, `"12.00"`, `10` and `1`:
+
+   ```sh
+   umask 077
+   jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .max_final_writer_calls=1 | .daily_budget_usd="12.00"' "$GO" > "$GO.new"
+   diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
+   cmp <(jq -S 'del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+   ```
+
+   The new code accepts `max_final_writer_calls` only from 1 up to `max_concurrent_calls`, and only when every
+   switched-on model has its own final-writer maximum (all four DeepInfra models and Claude Haiku have one); any other
+   GO is refused at `activate` with `ROOT_GO_INVALID`.
+3. Restart the gate's service (`debateai-preview-provider-budget.service`) so the running gate loads the new code.
+4. `activate` (owner's yes); `status` must show `state` `active` and `daily_budget_usd` `"12.00"`. A refusal
+   `CONCURRENCY_EXCEEDS_BUDGET` means the day's pot cannot hold the calls in flight: (`max_concurrent_calls` - 1) x the
+   largest standard worst case + 1 x the largest final-writer worst case (here 9 x $0.14211072 + 1 x $0.50878464 =
+   $1.78778112). `TEAM_TOTAL_BUDGET_EXCEEDED` means the GO files add up to more than $16.00 (with the Anthropic GO still
+   at its old $2.00 the sum is $14.00, also allowed, so either gate may go first).
+5. Restart the runner only after BOTH gates are `active` (the last paragraph of "Redeploy (2026-10-12)"); otherwise it
+   runs one call at a time (`GATE_CAPACITY_UNREAD`). The runner reads each gate's `/remaining` once, at start-up: its
+   calls at once and, from the app of this release on, its final-writer slots. So the app upload (it starts the runner
+   again) also comes after both gates are `active`. A runner that has not read the final-writer slot sends a second
+   final writer straight to the gate, where it waits up to 60 seconds for the one slot and may be refused.
+
+To go back: as "Redeploy (2026-10-12)": `stop`, put the three files from `$B` back in place, restart the service and
+`activate`. The GO goes back WITH the files: the old code refuses a `"12.00"` GO.
 
 ## Daily operations
 
@@ -863,5 +936,5 @@ ss -xlp | grep deepinfra-budget-v3
   prints one line. For DeepSeek, MiMo and Qwen it answers the open questions: thinking setting
   accepted, exact model name in the answer, usage reported.
 - Run without `systemd-run`, the probe refuses with `PROBE_FENCE_REQUIRED`.
-- `activate` reads the Anthropic GO (once that gate exists) and refuses a total above $12.00.
+- `activate` reads the Anthropic GO (once that gate exists) and refuses a total above $16.00.
 - The halt email names the v3 `activate` command (one `stop` gives one email).
