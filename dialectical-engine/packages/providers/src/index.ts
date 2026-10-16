@@ -2182,15 +2182,25 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           answer: content ?? rawText
         });
         // LG-A (L34): a refused reply's class and an accepted reply's repairs, decided before the artifact is written: both
-        // are its columns (migration 0120). Codes only.
+        // are its columns (migration 0120). Codes only. The class reads the text the classifier checked: after a merged
+        // patch, the merged reply (its issue paths are the merged reply's), else the reply (Task 11 review, finding 4).
+        // A measure is information, never a gate: should reading it throw, the attempt is recorded with none (class null,
+        // repairs null), so the billed artifact and its charge below are never lost (Task 11 review, finding 3).
         const truncatedReply = finishReason === PROVIDER_FINISH_REASON_LENGTH;
-        const attemptFailureClass: ReplyFailureClass | null =
-          classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
-            ? classifiedContent.failureClass ?? replyFailureClassOf({ rawText: content ?? rawText,
-                parseStatus: truncatedReply ? PROVIDER_CONTENT_LENGTH_EXCEEDED : classifiedContent.parseStatus,
-                parseError: classifiedContent.parseError }, replyFacts)
-            : truncatedReply && !strict.success ? "CUT_OFF" : null;
-        const attemptRepairs = classifiedContent.parseStatus === "PARSED" ? contentRepairsOf(classifiedContent) : [];
+        let attemptFailureClass: ReplyFailureClass | null = null;
+        let attemptRepairs: readonly ModelJsonRepair[] = [];
+        try {
+          attemptFailureClass =
+            classifiedContent.parseStatus === "PARSE_FAILED" || classifiedContent.parseStatus === "SCHEMA_FAILED"
+              ? classifiedContent.failureClass ?? replyFailureClassOf({ rawText: acceptedContent ?? content ?? rawText,
+                  parseStatus: truncatedReply ? PROVIDER_CONTENT_LENGTH_EXCEEDED : classifiedContent.parseStatus,
+                  parseError: classifiedContent.parseError }, replyFacts)
+              : truncatedReply && !strict.success ? "CUT_OFF" : null;
+          attemptRepairs = classifiedContent.parseStatus === "PARSED" ? contentRepairsOf(classifiedContent) : [];
+        } catch {
+          attemptFailureClass = null;
+          attemptRepairs = [];
+        }
         rawArtifactRef = await this.#options.persistRawArtifact({
           artifactId: randomUUID(),
           attemptId,
@@ -2426,13 +2436,22 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // content refusal (L33: 2 POSTs in all, never a format re-ask). Pre-flight PF-A42 (ruling R7): the check stays
             // at 2, never 1 — a call with one POST left ends as a content refusal, a known limit kept on purpose.
             if (attempt === 1 && callAttempts() >= 2) {
+              // L4-F10 (Task 11 review, finding 1): the structure-repair result takes its identity from this reply
+              // (deviation 7), so the pinned-model check the accept path runs below is run here first, with the same
+              // comparison and the same refusal: a relabelled reply never reaches the repair call (its FAILED row is
+              // already written; the refusal short-circuits).
+              if (!candidate.success || candidate.data.model !== this.#options.model) {
+                throw new TypedDomainError(
+                  "PROVIDER_MODEL_IDENTITY_CHANGED",
+                  `${request.providerRef} is pinned to ${this.#options.model} and the response asserted a different model`
+                );
+              }
               throw new ProviderStructureUnrepairedError(
                 { rawText: content ?? rawText, parseStatus: contentRejection.parseStatus, parseError: contentRejection.parseError,
                   failureClass: "STRUCTURE" },
                 attempt, rawArtifactRef, ledgerEntryRef,
                 Object.freeze({ provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
-                  model: candidate.success ? candidate.data.model : this.#options.model, maker: this.#options.maker,
-                  modelVersion: candidate.success ? candidate.data.model : this.#options.model,
+                  model: candidate.data.model, maker: this.#options.maker, modelVersion: candidate.data.model,
                   thinkingLevel: thinkingLevelUsed, reasoningTokens }));
             }
             break;

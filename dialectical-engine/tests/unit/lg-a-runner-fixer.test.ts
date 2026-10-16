@@ -1,9 +1,11 @@
 // tests/unit/lg-a-runner-fixer.test.ts
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { replyFailureClassOf } from "@debateai/providers";
+import { CONTENT_FOLLOW_UP_SENTENCES, buildFramedPrompt, readPromptFrame, replyFailureClassOf } from "@debateai/providers";
 import type { SynthesisDigest } from "@debateai/serve";
-import { classifyComposedContent, classifyEvaluatorContent, parseComposerOutput, parseEvaluatorOutput } from "../../apps/runner/src/index.js";
+import {
+  buildComposedRepairPacket, classifyComposedContent, classifyEvaluatorContent, parseComposerOutput, parseEvaluatorOutput
+} from "../../apps/runner/src/index.js";
 
 const STOP = { finishReason: "stop" } as const;
 const NODE = "3f2a9c1e-7b4d-4e8f-9a01-5c6d7e8f9a0b";
@@ -95,5 +97,23 @@ describe("LG-A: the answer writer and checker read every reply through the fixer
     const strict = JSON.stringify({ segments: [{ segment_id: "segment:verdict", text: "The answer holds.", node_refs: [NODE],
       served_number_refs: ["slot:1"] }] });
     expect(classifyComposedContent(strict, citation, STOP)).toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
+  // Task 11 review, fix round 1: the writer's citation re-ask names the citation code, and on a routed call (a class on the
+  // rejection) it keeps the plain sentence, now for that code; without a class it is today's block.
+  it("the writer's citation re-ask keeps the plain-word reason on a routed call, and only there", () => {
+    const framed = buildFramedPrompt({ contract: { contractId: "test.lg-a.writer.v1", instruction: "Write the answer.",
+      answerForm: "Return only JSON {\"segments\": [...]}." }, material: [{ name: "question", content: "Is it so?" }] });
+    const rejected = { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify([{ path: ["segments", 0, "node_refs", 0], message: "COMPOSED_REF_NOT_IN_DIGEST" }]) };
+    const tail = (packet: Parameters<typeof readPromptFrame>[0]) => readPromptFrame(packet).fields.slice(-3);
+    expect(tail(buildComposedRepairPacket(framed, { ...rejected, failureClass: "CONTENT" }))).toEqual([
+      { name: "machine_rejection_code", content: "COMPOSED_REF_NOT_IN_DIGEST" },
+      { name: "machine_rejection_path", content: "segments.0.node_refs.0" },
+      { name: "machine_rejection_reason", content: CONTENT_FOLLOW_UP_SENTENCES.COMPOSED_REF_NOT_IN_DIGEST }
+    ]);
+    expect(tail(buildComposedRepairPacket(framed, rejected)).slice(-2)).toEqual([
+      { name: "machine_rejection_code", content: "COMPOSED_REF_NOT_IN_DIGEST" },
+      { name: "machine_rejection_path", content: "segments.0.node_refs.0" }
+    ]);
   });
 });
