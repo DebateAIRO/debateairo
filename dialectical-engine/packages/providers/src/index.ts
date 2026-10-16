@@ -70,6 +70,12 @@ export type ContentClassification =
       readonly failureClass?: ReplyFailureClass };
 
 /**
+ * Refused-repair salvage (2026-10-16, A1): a STRUCTURE reply A1 rescued in code (`structureSalvageFor`,
+ * ./structure-repair.ts): the content the step's own check accepted and that check's classification, A1's drops named on it.
+ */
+export type StructureSalvaged = Readonly<{ content: string; classification: ContentClassification }>;
+
+/**
  * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
  * `audits/token-budget-reasoning.md`): the OpenAI-compatible completion that
  * was cut off at `max_tokens` reports it, and until this row existed nobody
@@ -190,6 +196,13 @@ export interface ProviderCallRequest {
    * plain words what is missing (`machine_rejection_reason`). Absent: today's loop, byte for byte. Never sent.
    */
   readonly structureRepairRouted?: boolean;
+  /**
+   * Refused-repair salvage (2026-10-16, A1): set ONLY by `withStructureRepair` (./structure-repair.ts, `structureSalvageFor`),
+   * never by a step. On a routed call's first reply of class STRUCTURE, before its artifact is written, A1 reads the reply in
+   * code with no call; a reply it rescues is accepted as the original AI's own OK row (no structure-repair call). Null: no
+   * rescue, the routed rule goes on. Absent: today's loop, byte for byte. Never sent.
+   */
+  readonly structureSalvage?: (content: string, reply: ModelReplyFacts | undefined) => StructureSalvaged | null;
   /**
    * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
    * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
@@ -2319,6 +2332,25 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           attemptFailureClass = null;
           attemptRepairs = [];
         }
+        // Refused-repair salvage (2026-10-16, A1): a routed call's first reply of class STRUCTURE is read in code, with no
+        // call, before its artifact is written. A rescued reply is accepted here as the original AI's own reply: its artifact
+        // PARSED with A1's drops among its repairs, its OK row at the call's own key, no structure-repair call. A throw is
+        // no rescue (the reply goes on as it was refused), never a lost artifact.
+        if (routed && attempt === 1 && patchPlan === null && attemptFailureClass === "STRUCTURE" && content !== null
+          && request.structureSalvage !== undefined) {
+          let salvaged: StructureSalvaged | null = null;
+          try {
+            salvaged = request.structureSalvage(content, replyFacts);
+          } catch {
+            salvaged = null;
+          }
+          if (salvaged !== null) {
+            acceptedContent = salvaged.content;
+            classifiedContent = salvaged.classification;
+            attemptFailureClass = null;
+            attemptRepairs = contentRepairsOf(salvaged.classification);
+          }
+        }
         rawArtifactRef = await this.#options.persistRawArtifact({
           artifactId: randomUUID(),
           attemptId,
@@ -2942,7 +2974,7 @@ export {
   structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
   type StructureRepairTextsKept,
   // Refused-repair salvage (2026-10-16, A1): the verified subset of a STRUCTURE reply, read in code with no call.
-  salvageStructureReply, type StructureSalvage, type StructureSalvageRefusal
+  salvageStructureReply, structureSalvageFor, type StructureSalvage, type StructureSalvageRefusal
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.

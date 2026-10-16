@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
 import {
-  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS, buildFramedPrompt,
-  buildFramedRepairPrompt, previewStructureRepairCeiling, previewStructureRepairRoute, schemaFailureLocator, withStructureRepair,
-  type ProviderCallRequest, type ProviderGateway
+  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderCallFailedError, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS,
+  STRUCTURE_SALVAGE_REPAIRS, buildFramedPrompt, buildFramedRepairPrompt, previewStructureRepairCeiling, previewStructureRepairRoute,
+  schemaFailureLocator, structureSalvageFor, withStructureRepair, type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
 import { RUN_COST_ENVELOPE_ROOM_KEPT } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
@@ -16,7 +16,8 @@ import { providerCallSharedWall, storyCallScopeAgrees } from "../../apps/runner/
 import { createRunnerMapCaller, runMapStage } from "../../apps/runner/src/map-stage.js";
 import { laneGateway, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { CALL_LANE_STOPPED, createCallScheduler, slotsTakenWithin, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
-import { GLM, HAIKU_REF, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
+import { GLM, HAIKU_REF, STOP, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
+import { BASE, ECHO, ECHO_NOTES, KEYLESS, PANEL_KEY, panelRequest } from "../support/structure-salvage-shapes.js";
 
 const haikuGateway: ProviderGateway = { call: async () => { throw new Error("not called"); } };
 const SCHEMA = z.object({ answer: z.string().min(1), score: z.number() }).strict();
@@ -363,5 +364,50 @@ describe("LG-A: a waiting repair goes first", () => {
     releaseFirst();
     await Promise.all([first, next, glm]);
     expect(started).toEqual(["repair", "next Haiku call"]);
+  });
+});
+
+describe("A1 before the repair call", () => {
+  const panel = (): ProviderCallRequest => panelRequest(request());
+  const ROUTE_BOUND = { tokenCeiling: 32768, deadlineMs: 1_260_000 };
+
+  it.each([["echo", ECHO], ["echo with notes", ECHO_NOTES], ["keyless", KEYLESS]])(
+    "A's reply keeps the original AI as author: the original row OK, no REPAIR:STRUCTURE row (%s)", async (_name, broken) => {
+      const original = previewGlmHarness([{ content: broken }]);
+      const repair = scriptedRepairGateway(new Error("the repair model must not be asked"));
+      const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: ROUTE_BOUND })
+        .call(panel());
+      expect(repair.requests).toHaveLength(0);
+      expect(original.executions).toHaveLength(1);
+      expect(result.content).toBe(JSON.stringify(BASE));
+      expect(result).toMatchObject({ model: GLM, repairAttempts: 0, rawArtifactRef: original.artifacts[0]!.artifactId,
+        ledgerEntryRef: original.ledger[0]!.attemptId });
+      expect(result.repairForm).toBeUndefined();
+      expect(original.ledger.map((row) => [row.callSiteKey, row.outcome])).toEqual([[PANEL_KEY, "OK"]]);
+      expect(original.artifacts[0]).toMatchObject({ parseStatus: "PARSED", replyForm: "ORIGINAL", replyFailureClass: null });
+      // The artifact keeps the vendor's whole body (`index.ts:2182, 2331`); its message is the AI's own reply, byte for byte
+      // (pre-flight PF-S5).
+      expect((JSON.parse(original.artifacts[0]!.rawText) as { choices: { message: { content: string } }[] }).choices[0]!.message.content)
+        .toBe(broken);
+      expect(original.artifacts[0]!.replyRepairs!.some((name) => (STRUCTURE_SALVAGE_REPAIRS as readonly string[]).includes(name))).toBe(true);
+    });
+
+  it("A1 needs no Haiku: with the repair gateway throwing, the three shapes are still accepted", async () => {
+    for (const broken of [ECHO, ECHO_NOTES, KEYLESS]) {
+      const original = previewGlmHarness([{ content: broken }]);
+      const dead = scriptedRepairGateway(new ProviderCallFailedError(new Error("gate halted"), 1, "FAILED", "ledger:haiku"));
+      const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: dead.gateway, bound: ROUTE_BOUND })
+        .call(panel());
+      expect(result.content).toBe(JSON.stringify(BASE));
+    }
+  });
+
+  it("an unrouted call (no route) never runs A1, though a salvage exists for its request: today's loop, byte for byte", async () => {
+    // The salvage is real for this request (so the 2 POSTs below are the routing rule, never a shape A1 cannot read); this
+    // line also makes the test fail first, on `structureSalvageFor` (pre-flight PF-S18).
+    expect(structureSalvageFor(panel())?.(KEYLESS, STOP)?.content).toBe(JSON.stringify(BASE));
+    const original = previewGlmHarness([{ content: KEYLESS }, { content: JSON.stringify(BASE) }]);
+    await withStructureRepair(original.gateway, null).call(panel());
+    expect(original.executions).toHaveLength(2);
   });
 });

@@ -277,7 +277,7 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
     expect(structureRepairKeepsWords(BROKEN_PANEL, repaired, PANEL_ANSWER_FORM)).toBe(false);
   });
 
-  it("accepts it end to end through the wrapper, the panel's own classifier deciding", async () => {
+  it("is rescued by A1 before the repair call, equal to Haiku's copy", async () => {
     const panelFramed = buildFramedPrompt({ contract: PANEL_PROMPT_CONTRACT, material: [{ name: "statement", content: "The statement." }] });
     const original = previewGlmHarness([{ content: BROKEN_PANEL }]);
     const repair = route(HAIKU_PANEL);
@@ -285,8 +285,9 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
       callSiteKey: PANEL_KEY, packet: panelFramed.packet, modelRole: "JUDGE",
       classifyContent: (content, reply) => classifyStructuredArtifact(content, judgeAssessmentSchema, reply, { fixer: {} }),
       buildRepairPacket: (rejected) => buildFramedRepairPrompt(panelFramed, schemaFailureLocator(rejected)) }));
-    expect(repair.requests).toHaveLength(1);
-    expect(result).toMatchObject({ content: HAIKU_PANEL, repairForm: "STRUCTURE", model: GLM, rawArtifactRef: original.artifacts[0]!.artifactId });
+    expect(repair.requests).toHaveLength(0);
+    expect(result.repairForm).toBeUndefined();
+    expect(JSON.parse(result.content)).toEqual(JSON.parse(HAIKU_PANEL));
   });
 
   it("still refuses a repair that leaves out a text the form states at that place", () => {

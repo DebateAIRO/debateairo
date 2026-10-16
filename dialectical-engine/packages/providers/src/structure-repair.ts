@@ -10,6 +10,13 @@
  * artifact, its maker, its model). The repair call is its own ledger row and artifact (reply_form STRUCTURE), billed to the
  * repair model through that model's own gateway and gate.
  *
+ * Refused-repair salvage (2026-10-16, A1): before that call, the wrapper hands the gateway the step's own A1
+ * (`structureSalvageFor`). On a routed call's first reply of class STRUCTURE, code reads the reply with no call and leaves
+ * out only values the step never asked for (a sentence with no key, a repeat, an echo, a stray note); when the words are
+ * all kept and the step's own check accepts the result, the reply is accepted as the original AI's own OK row: no
+ * structure-repair call, no REPAIR:STRUCTURE row, its artifact PARSED with A1's drops among its repairs. Otherwise the
+ * call goes on exactly as above.
+ *
  * The contract is code-owned and test-pinned (tests/unit/prompt-text-pins.test.ts), never register-sealed; its instruction
  * is the owners' wording, shown to them at plan review.
  *
@@ -25,7 +32,8 @@ import {
 import { buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract } from "./prompt-frame.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
-  type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway
+  type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway,
+  type StructureSalvaged
 } from "./index.js";
 
 export const STRUCTURE_REPAIR_CONTRACT_ID = "repair.structure.v1" as const;
@@ -833,11 +841,34 @@ export function salvageStructureReply(input: Readonly<{ content: string; reply: 
     repairs: Object.freeze(drops) });
 }
 
-/** A request the wrapper routes: a structured step with its own check and a readable frame, not the evaluator lane, not routed yet. */
-function routable(request: ProviderCallRequest): boolean {
-  if (request.classifyContent === undefined || request.lane === "evaluator" || request.structureRepairRouted !== undefined
+/** A structured step with its own check and a readable frame, not the evaluator lane, not a structure-repair call. */
+function structuredStep(request: ProviderCallRequest): boolean {
+  if (request.classifyContent === undefined || request.lane === "evaluator"
     || request.callSiteKey.startsWith(STRUCTURE_REPAIR_CALL_SITE_PREFIX)) return false;
   try { return framedAnswerForm(request.packet).trim() !== ""; } catch { return false; }
+}
+
+/** A request the wrapper routes: a structured step (`structuredStep`), not routed yet. */
+function routable(request: ProviderCallRequest): boolean {
+  return request.structureRepairRouted === undefined && structuredStep(request);
+}
+
+/**
+ * Refused-repair salvage (2026-10-16, A1): the step's own A1, which the wrapper hands the gateway
+ * (`ProviderCallRequest.structureSalvage`): `salvageStructureReply` with the step's answer form, where it keeps texts and
+ * its own check, returning the content and classification only when A1 ACCEPTED the reply (else null). Null for a request
+ * the wrapper does not route (the routed test aside).
+ */
+export function structureSalvageFor(request: ProviderCallRequest):
+  ((content: string, reply: ModelReplyFacts | undefined) => StructureSalvaged | null) | null {
+  if (!structuredStep(request)) return null;
+  const answerForm = framedAnswerForm(request.packet);
+  const textsKept = structureRepairTextsKeptAt(request.callSiteKey, request.lane);
+  const classify = request.classifyContent!;
+  return (content, reply) => {
+    const salvage = salvageStructureReply({ content, reply, answerForm, textsKept, classify });
+    return salvage.kind === "ACCEPTED" ? Object.freeze({ content: salvage.content, classification: salvage.classification }) : null;
+  };
 }
 
 /**
@@ -953,8 +984,9 @@ export function withStructureRepair(gateway: ProviderGateway, route: StructureRe
   return Object.freeze({
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
       if (!routable(request)) return gateway.call(request);
+      const salvage = structureSalvageFor(request);
       try {
-        return await gateway.call({ ...request, structureRepairRouted: true });
+        return await gateway.call({ ...request, structureRepairRouted: true, ...(salvage === null ? {} : { structureSalvage: salvage }) });
       } catch (error) {
         if (!(error instanceof ProviderStructureUnrepairedError)) throw error;
         return repairStructure(request, error, route);
