@@ -271,10 +271,12 @@ describe("root 0's worst-case call", () => {
   });
 
   /**
-   * LG-A (Task 14 carry): on a routed run (the preview provider config with a Haiku target), root 0's retry after a reply
-   * whose structure the fixer cannot repair is the structure-repair call: Haiku's price, Haiku's whole answer cap (the
-   * route's 32,768-token ceiling), and a body the preview wire refuses above PREVIEW_REQUEST_BODY_MAX_BYTES (it carries
-   * root 0's whole broken reply, so no smaller bound holds). Root 0's own seat prices never price it.
+   * LG-A (Task 14 carry): on a routed run (the preview provider config with a Haiku target), root 0's room adds the
+   * structure-repair call (sent after a reply whose structure the fixer cannot repair) to its first attempt and its retry:
+   * the sum, since refused-repair salvage B is root 0's own second POST after it. The repair call is priced at Haiku's
+   * price, Haiku's whole answer cap (the route's 32,768-token ceiling), and a body the preview wire refuses above
+   * PREVIEW_REQUEST_BODY_MAX_BYTES (it carries root 0's whole broken reply, so no smaller bound holds). Root 0's own seat
+   * prices never price it.
    */
   const previewPrice = (model: string) => {
     const row = previewModelRow(model)!;
@@ -293,7 +295,7 @@ describe("root 0's worst-case call", () => {
       const price = previewPrice(model);
       const today = rootZeroKeepRoomMicros({ prices: [price], ...attempts });
       const first = projectedCallCeilingMicros(price, attempts.first);
-      // The under-count: at every preview seat, root 0's own retry is cheaper than the repair call it may be.
+      // The under-count: at every preview seat, root 0's own retry is cheaper than the repair call the room adds.
       expect(today, model).toBeLessThan(first + repair);
       expect(rootZeroKeepRoomMicros({ prices: [price], ...attempts, structureRepair: HAIKU_REPAIR }), model).toBe(today + repair);
     }

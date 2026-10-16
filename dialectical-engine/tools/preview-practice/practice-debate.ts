@@ -189,7 +189,10 @@ export type PracticeDebateResult = Readonly<{
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
   unrepaired?: readonly PracticeUnrepairedRow[];
-  /** Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask). */
+  /**
+   * Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask).
+   * Absent when every count is 0, so a run with no rescue reports exactly as before.
+   */
   structureRescues?: PracticeStructureRescues;
   /** Length guidance L27 (LG-B): tokens and words per AI and step, information only (practice-tokens.ts). */
   tokensByModelAndStep?: readonly PracticeTokenRow[];

@@ -485,7 +485,7 @@ describe("the debate shape in the runner (spec §3.3)", () => {
      * it, and adds it to root 0's first attempt and its own retry (the sum; refused-repair salvage B is root 0's own second
      * POST after the repair call). Without it: today's room (the PF-L38 case above).
      */
-    it("a routed run's room also prices root 0's retry as the structure-repair call, at the repair target's price (LG-A)", async () => {
+    it("a routed run's room adds the structure-repair call to root 0's first attempt and retry (the sum), at the repair target's price (LG-A)", async () => {
       const question = "debate-shape-hosted-repair-1234567890";
       const language = { tag: "ro", name: "Romanian" };
       const repairCeiling = Object.freeze({ providerRef: "preview:claude-haiku-5-5", requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,

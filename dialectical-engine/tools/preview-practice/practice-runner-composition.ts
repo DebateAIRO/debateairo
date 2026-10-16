@@ -452,7 +452,7 @@ export async function composePracticeRunner(input: Readonly<{
     synthesisRolePolicy: policy.synthesisRolePolicy,
     story: storyWriter,
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
-    // LG-A (Task 14 carry), as main.ts: root 0's room prices its retry as the structure-repair call too.
+    // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
     structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
     bodyCostFallback: envelopeBand !== null,
     serveDisclosure: { log: logServeDisclosure },
