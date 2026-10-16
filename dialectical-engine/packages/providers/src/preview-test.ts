@@ -348,8 +348,9 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
  * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
  * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling).
  * LG-B (L26, owner answer 7): when its gate offers the final-writer tier, a fast row (DeepSeek, Claude Haiku) asks its
- * own maximum (`finalWriterOutputBound`) and a slow row (MiMo, Qwen, GLM) 16,384, and the gate reserves it at the
- * final-writer bound (Task 5); when the gate does not, the call is STANDARD and asks this allowance held to the row's
+ * own maximum (`finalWriterOutputBound`) and a slow row (MiMo, Qwen, GLM) 16,384, as the slow row's other three final
+ * writers do since the final review (2026-10-16, Important 3), and the gate reserves a fast row's at the final-writer
+ * bound (Task 5); when the gate does not, the call is STANDARD and asks this allowance held to the row's
  * `outputBound`, reserved at that bound as today. A length retry still asks twice the allowance, held by the gateway to
  * the call's cap (previewStorytellerOutputCap on a final writer, `outputBound` otherwise). The sealed register row is
  * untouched; every other call keeps previewCallBound.
@@ -571,8 +572,9 @@ export function withPreviewProviderCallPolicy(
       throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's size caps itself");
     }
     const preview = previewCallBound(request.bound, config);
-    // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; a
-    // slow storyteller keeps its 16,384 and its retry today's clamp. Every other call keeps today's bound and caps.
+    // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; on
+    // a slow row all four keep the storyteller's 16,384 and its retry today's clamp (final review, Important 3, below).
+    // Every other call keeps today's bound and caps.
     // Pre-flight PF-B2.3 (controller ruling, 2026-10-16): a final writer gets that room only when its gate's `/remaining`
     // names the final-writer slots, asked once per call (the unbilled resend below reuses the answer); otherwise, and when
     // the read fails, it is today's STANDARD call, byte for byte, so an app that reaches a gate older than LG-B never sends
@@ -583,12 +585,19 @@ export function withPreviewProviderCallPolicy(
       : previewStorySite(request, "CHECKER")
         ? Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, previewStoryCheckerTokenCeiling(reviewed)) })
         : preview;
+    // Final review (2026-10-16, Important 3, provisional owner ruling): owner answer 7's slow-row rule covers EVERY final
+    // writer. On a slow row (deviation 8: its storyteller allowance is at most its `outputBound`: GLM, MiMo, Qwen) the
+    // answer writer, answer checker and story checker ask the slow storyteller's 16,384 first (never less than today's
+    // bound) and their length retry is held to `outputBound` (previewStorytellerOutputCap), exactly as the slow
+    // storyteller; a fast row (DeepSeek, Claude Haiku) asks its own maximum. The 1 MiB body room stays for all four.
+    const slowRow = reviewed.storytellerTokenCeiling <= reviewed.outputBound;
     const finalWriter = previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
       bound: storyteller
         ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
-        : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling, reviewed.finalWriterOutputBound) }),
+        : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling,
+          slowRow ? previewStorytellerTokenCeiling(reviewed) : reviewed.finalWriterOutputBound) }),
       caps: Object.freeze({ packetByteCap: PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes,
-        outputTokenCap: storyteller ? previewStorytellerOutputCap(reviewed) : reviewed.finalWriterOutputBound })
+        outputTokenCap: previewStorytellerOutputCap(reviewed) })
     }) : undefined;
     let tierDecision: Promise<typeof finalWriter> | undefined;
     const finalWriterCall = (): Promise<typeof finalWriter> => tierDecision ??= finalWriter === undefined

@@ -390,6 +390,10 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
  * the storyteller its row's allowance (a fast row's own maximum, a slow row's 16,384) and its length retry twice that,
  * held to previewStorytellerOutputCap. A register without a story prices no story output, as before. LG-A's
  * structure-repair call keeps its own ceiling (structureRepairNanoUsd, STANDARD tier: controller ruling PF-B4.15).
+ * Final review (2026-10-16, Important 3): on a slow row (GLM, MiMo, Qwen) the call policy now has the answer writer,
+ * answer checker and story checker ask 16,384 with their retry held to `outputBound`, as the slow storyteller; this
+ * estimate keeps pricing them at the row's own maximum on purpose, a safe over-count (it never prices a call below what
+ * it may send).
  */
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
   output: PreviewCallOutputTokens): PreviewCallPricer {

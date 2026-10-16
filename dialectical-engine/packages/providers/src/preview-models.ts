@@ -103,7 +103,9 @@ export type PreviewModelRow = Readonly<{
    * gate offers the final-writer tier. Length guidance L26 / owner answer 7 (2026-10-15): a fast row asks its own
    * maximum (`finalWriterOutputBound`, so above `outputBound`); a slow row keeps 16,384, and its length retry stays held
    * to `outputBound` (previewStorytellerOutputCap). When the gate does not offer the tier, the storyteller is a STANDARD
-   * call: it asks this, held to `outputBound`. Never below the generation floor (8,192).
+   * call: it asks this, held to `outputBound`. Never below the generation floor (8,192). Final review (2026-10-16,
+   * Important 3, provisional owner ruling): it also names the slow row (at most `outputBound`, deviation 8), whose
+   * answer writer, answer checker and story checker ask this same first ceiling, their retry held to `outputBound`.
    * Slow answer (owner ruling 2026-10-12): 16,384 on the slower rows (MiMo, Qwen, GLM), whose story at 17 tokens a
    * second could otherwise run past the gate's 1,200 s. App only: the gate checks a STANDARD max_tokens against
    * `outputBound` and a final writer's against its final-writer bound (Task 5), so the parity files do not carry it.

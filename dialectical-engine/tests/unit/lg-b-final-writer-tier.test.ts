@@ -1,7 +1,7 @@
 /**
  * Length guidance L26/L29 (owner answers 4 and 7, 2026-10-15), LG-B Task 4: the four final writers (answer writer, answer
- * checker, storyteller, story checker) ask each model's own maximum output and may send up to 1 MiB; a slow storyteller
- * keeps today's 16,384. Every other call keeps 256 KiB and the row's 32,768. The guarded fetch names the tier to the gate
+ * checker, storyteller, story checker) ask each model's own maximum output and may send up to 1 MiB; on a slow row all
+ * four keep the storyteller's 16,384 with the retry held to the row's 32,768 (final review 2026-10-16, Important 3). Every other call keeps 256 KiB and the row's 32,768. The guarded fetch names the tier to the gate
  * only for a body over the standard caps, and only the call policy can make a body that big. Pre-flight PF-B2.3: the
  * policy asks for the tier only when the row's gate says it serves it (its `/remaining` names its final-writer slots);
  * otherwise a final writer is today's STANDARD call.
@@ -14,10 +14,10 @@ import {
   parseProviderDiscoveryTargets, previewCallTierOf, previewCallTierOfBody, previewGateOffersFinalWriterTier, previewModelRow,
   previewNanoUsdText, previewReservationNanoUsd, previewStorytellerOutputCap, previewTargetGatewayControls, previewTargetJsonRow,
   previewTierOutputBound, providerTargetGatewayControls, withPreviewProviderCallPolicy, PreviewUnbilledRefusal,
-  previewFinalWriterTierUnreadLine, type PreviewBudgetExecution, type PreviewFinalWriterTierUnread, type PreviewGateRemaining, type ProviderCallRequest, type ProviderCallResult,
+  previewFinalWriterTierUnreadLine, buildFramedRepairPrompt, schemaFailureLocator, type PreviewBudgetExecution, type PreviewFinalWriterTierUnread, type PreviewGateRemaining, type ProviderCallRequest, type ProviderCallResult,
   type ProviderDiscoveryTarget, type ProviderGateway
 } from "@debateai/providers";
-import { framedFixturePacket } from "../support/framed-packet.js";
+import { framedFixture, framedFixturePacket } from "../support/framed-packet.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -124,14 +124,15 @@ const call = (callSiteKey: string, lane: ProviderCallRequest["lane"], role: Prov
   providerRef: "preview:fixture-a", packet });
 
 describe("the call policy gives the final writers their room, and only them", () => {
-  it("the answer writer, the answer checker and the story checker ask the row's own maximum and may send 1 MiB", async () => {
+  // Final review (2026-10-16, Important 3): re-pinned; GLM and MiMo are slow rows, so they ask 16,384 (was their own maximum).
+  it("the answer writer, the answer checker and the story checker ask the row's own maximum on a fast row, 16,384 on a slow one, and may send 1 MiB", async () => {
     for (const [key, lane, role] of [["COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER"], ["POST_COMPOSE_R9:EVALUATOR:1", "served", "EVALUATOR"],
       ["STORY:CHECKER:1", "story", "EVALUATOR"]] as const) {
-      for (const model of [GLM, MIMO, HAIKU]) {
+      for (const [model, expected] of [[GLM, [16_384, MIB, 32_768]], [MIMO, [16_384, MIB, 32_768]],
+        [HAIKU, [row(HAIKU).finalWriterOutputBound, MIB, row(HAIKU).finalWriterOutputBound]]] as const) {
         const { policy, seen } = spy(model);
         await policy.call(call(key, lane, role));
-        expect([seen[0]!.bound.tokenCeiling, seen[0]!.packetByteCap, seen[0]!.outputTokenCap], `${key} ${model}`)
-          .toEqual([row(model).finalWriterOutputBound, MIB, row(model).finalWriterOutputBound]);
+        expect([seen[0]!.bound.tokenCeiling, seen[0]!.packetByteCap, seen[0]!.outputTokenCap], `${key} ${model}`).toEqual(expected);
       }
     }
   });
@@ -143,6 +144,25 @@ describe("the call policy gives the final writers their room, and only them", ()
     const fast = spy(DEEPSEEK);
     await fast.policy.call(call("STORY:STORYTELLER:1", "story", "SYNTHESIZER"));
     expect([fast.seen[0]!.bound.tokenCeiling, fast.seen[0]!.outputTokenCap]).toEqual([131072, 131072]);
+  });
+
+  // Final review (2026-10-16, Important 3, provisional owner ruling): owner answer 7's slow-row rule covers EVERY final
+  // writer. A slow row (storytellerTokenCeiling at most outputBound: GLM, MiMo, Qwen) writes ~20k tokens within the gate's
+  // deadline, so its four final writers ask 16,384 first and their length retry is held to the row's 32,768.
+  it("a slow row's final writers ask 16,384 and retry at 32,768; a fast row's ask their own maximum", async () => {
+    for (const [key, lane, role] of [["COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER"], ["POST_COMPOSE_R9:EVALUATOR:1", "served", "EVALUATOR"],
+      ["STORY:STORYTELLER:1", "story", "SYNTHESIZER"], ["STORY:CHECKER:1", "story", "EVALUATOR"]] as const) {
+      for (const model of [GLM, MIMO, QWEN, DEEPSEEK, HAIKU]) {
+        const { policy, seen } = spy(model);
+        await policy.call(call(key, lane, role));
+        const own = row(model).finalWriterOutputBound;
+        const slow = row(model).storytellerTokenCeiling <= row(model).outputBound;
+        expect([seen[0]!.bound.tokenCeiling, seen[0]!.packetByteCap, seen[0]!.outputTokenCap], `${key} ${model}`)
+          .toEqual(slow ? [16_384, MIB, 32_768] : [own, MIB, own]);
+      }
+    }
+    expect([GLM, MIMO, QWEN, DEEPSEEK, HAIKU].map((model) => row(model).storytellerTokenCeiling <= row(model).outputBound))
+      .toEqual([true, true, true, false, false]);
   });
 
   it("every other call keeps today's bound and sets neither cap", async () => {
@@ -241,6 +261,34 @@ describe("through the guarded fetch", () => {
     expect(sent.callTier).toBe("FINAL_WRITER");
     expect(JSON.parse(sent.requestBody)).toMatchObject({ model: DEEPSEEK, max_tokens: 131072 });
     expect(sent.reservedUsd).toBe(previewNanoUsdText(BigInt(bytes + 2048) * 200n + 131_072n * 600n));
+  });
+
+  // Final review (2026-10-16, Important 3): through the real gateway, a slow row's answer writer cut off at 16,384 retries
+  // at 32,768 (twice the allowance, held to the row's outputBound); both bodies are under the standard caps, so the gate
+  // reads both as STANDARD calls reserved at the row's standard bound.
+  it("a slow row's answer writer is cut off at 16,384 and retries at 32,768, both STANDARD at the gate", async () => {
+    const target = TARGETS.find((candidate) => candidate.model === GLM)!;
+    const executions: PreviewBudgetExecution[] = [];
+    const port = { execute: async (input: PreviewBudgetExecution) => {
+      executions.push(input);
+      return { status: 200, body: JSON.stringify({ id: `fixture-${String(executions.length)}`, model: GLM,
+        choices: [{ message: { content: executions.length === 1 ? "{\"cut" : "{}" }, finish_reason: executions.length === 1 ? "length" : "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1 } }) };
+    } };
+    const native = new OpenAICompatibleProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
+      ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(CONFIG, target),
+      fetchImplementation: createPreviewGuardedFetch({ deepinfra: port, anthropic: port }),
+      persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+    const gateway = withPreviewProviderCallPolicy(native, CONFIG, target, { sleep: async () => undefined, gateRemaining: OFFERS });
+    const framed = framedFixture("lg-b slow writer");
+    await gateway.call({ ...call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER", framed.packet),
+      classifyContent: (content) => content === "{}" ? { parseStatus: "PARSED", parseError: null } : { parseStatus: "PARSE_FAILED", parseError: "synthetic" },
+      buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected)) });
+    expect(executions.map((sent) => (JSON.parse(sent.requestBody) as { max_tokens: number }).max_tokens)).toEqual([16_384, 32_768]);
+    expect(executions.map((sent) => sent.callTier)).toEqual([undefined, undefined]);
+    expect(executions.map((sent) => sent.reservedUsd)).toEqual(executions.map((sent) =>
+      previewNanoUsdText(previewReservationNanoUsd(row(GLM), Buffer.byteLength(sent.requestBody, "utf8")))));
   });
 
   // Pre-flight PF-B2.16: the port gets four keys; the RPC port adds scope_id, so the gate sees five (six with callTier).
