@@ -108,7 +108,7 @@ import {
 import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
-import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames } from "../../apps/runner/src/call-lane-gateway.js";
+import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { readDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -355,10 +355,12 @@ export async function composePracticeRunner(input: Readonly<{
    * LG-A (spec 2026-10-15, L32; ruling R10), as main.ts: every target's gateway first, so the structure-repair route can
    * name the repair model's own (Haiku's, through its own gate); then every target's gateway is wrapped by
    * withStructureRepair. The practice always has the preview provider config, so the route is built whenever Haiku is a
-   * target (the practice proof exercises it); without a Haiku target it is null and nothing is wrapped.
+   * target (the practice proof exercises it); without a Haiku target it is null and nothing is wrapped. Its repair calls
+   * ask the debate's lane for the repair model's slots the original call does not hold (`structureRepairThroughLane`).
    */
   const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
-  const structureRepairRoute = previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef));
+  const structureRepairRoute = structureRepairThroughLane(
+    previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
   const providerTopology = createRunnerProviderTopology(providerTargets,
     (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
   const runRepository = new RunRepository(pool);

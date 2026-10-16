@@ -1,16 +1,18 @@
-import { AsyncResource } from "node:async_hooks";
+import { AsyncLocalStorage, AsyncResource } from "node:async_hooks";
 import {
   PREVIEW_PROVIDER_SOCKET_KEYS,
   createPreviewRemainingRpcPort,
   previewModelRowForRef,
   previewProviderSocket,
   providerCallGateUnsent,
+  structureRepairOriginalKey,
   type PreviewGateRemaining,
   type PreviewProviderName,
   type PreviewProviderTestConfig,
-  type ProviderGateway
+  type ProviderGateway,
+  type StructureRepairRoute
 } from "@debateai/providers";
-import { callPriorityOf, type CallScheduler, type CallSubject, type DebateCallLane } from "./call-scheduler.js";
+import { callPriorityOf, slotsTakenWithin, type CallScheduler, type CallSubject, type DebateCallLane } from "./call-scheduler.js";
 
 /**
  * Parallel AI calls (docs/superpowers/specs/2026-10-12-parallel-calls-design.md §3.2, §3.4) — a debate's calls go
@@ -111,11 +113,13 @@ export function laneGateway(input: Readonly<{
 }>): ProviderGateway {
   const { lane, scheduler, subject, provider, onFailed, beforeSlot } = input;
   const gate = subject.gate;
+  const held: HeldLaneSlot = Object.freeze({ lane, scheduler, subject, ...(beforeSlot === undefined ? {} : { beforeSlot }) });
   return Object.freeze({
     call(request) {
       const send = AsyncResource.bind(async () => {
         try {
-          const result = await provider.call(request);
+          // LG-A: a call this call's own gateway makes for it (the structure repair) finds the slot it holds.
+          const result = await heldLaneSlot.run(held, () => provider.call(request));
           if (gate !== null) scheduler.markGateHealthy(gate);
           return result;
         } catch (error) {
@@ -133,6 +137,62 @@ export function laneGateway(input: Readonly<{
       return waited.then(askForSlot);
     }
   } satisfies ProviderGateway);
+}
+
+/** LG-A: the lane slot a running call holds, seen by a call its own gateway makes for it (`structureRepairThroughLane`). */
+type HeldLaneSlot = Readonly<{
+  lane: DebateCallLane;
+  scheduler: CallScheduler;
+  subject: CallSubject;
+  beforeSlot?: (subject: CallSubject) => Promise<void>;
+}>;
+const heldLaneSlot = new AsyncLocalStorage<HeldLaneSlot>();
+
+/**
+ * LG-A (spec 2026-10-15, L32) under the owner's parallel-call limits (spec 2026-10-12 §3.2: 12 calls per debate, 3 per
+ * AI in a debate, each model's runner-wide slots, each gate's slots) — THE STRUCTURE-REPAIR ROUTE, THROUGH THE LANE.
+ *
+ * withStructureRepair sits inside each member's lane gateway, so the repair call is made while the original call holds
+ * its slot, after the original's own POST has ended. Its gateway is wrapped here so that, inside a lane, it asks that
+ * debate's lane for the repair model's slots the original call does not already hold (`DebateCallLane.runWithin`): never
+ * a debate slot (the original's is used), nothing more for a call of the repair model itself (Haiku's own repair), and
+ * otherwise one of the repair model's slots in the debate and across the runner and one of its gate's. So a repair is
+ * never a POST beyond the owner's limits, even when Haiku also argues in the debate. As any lane call it first waits on
+ * the busy coordinator (`beforeSlot`, ruling R31), here while the original keeps its slot, and its answer or unsent
+ * failure keeps the gate's health. Outside a lane (no scheduler) it is the route's gateway, as every call there is.
+ * Null stays null.
+ */
+export function structureRepairThroughLane(route: StructureRepairRoute | null, subjects: CallSubjectResolver): StructureRepairRoute | null {
+  if (route === null) return null;
+  const subject = subjects.subjectOf(route.providerRef);
+  const gateway = route.gateway;
+  return Object.freeze({ ...route, gateway: Object.freeze({
+    call(request) {
+      const held = heldLaneSlot.getStore();
+      if (held === undefined) return gateway.call(request);
+      const { lane, scheduler, beforeSlot, subject: heldSubject } = held;
+      // Haiku's own repair holds every slot it needs already: no wait, no slot (`runWithin` would run it at once too).
+      const takes = slotsTakenWithin(heldSubject, subject);
+      if (!takes.model && !takes.gate) return gateway.call(request);
+      const send = AsyncResource.bind(async () => {
+        try {
+          const result = await gateway.call(request);
+          if (subject.gate !== null) scheduler.markGateHealthy(subject.gate);
+          return result;
+        } catch (error) {
+          if (subject.gate !== null && providerCallGateUnsent(error)) scheduler.markGateUnhealthy(subject.gate);
+          throw error;
+        }
+      });
+      // The repair is the original call's: its kind (author, panel, review, other) orders it in the lane's queue.
+      const ticket = { ...subject, priority: callPriorityOf(structureRepairOriginalKey(request.callSiteKey)) };
+      const askForSlot = AsyncResource.bind(() => lane.runWithin(heldSubject, ticket, send));
+      if (beforeSlot === undefined) return askForSlot();
+      let waited: Promise<void>;
+      try { waited = beforeSlot(subject); } catch (error) { return Promise.reject(error); }
+      return waited.then(askForSlot);
+    }
+  } satisfies ProviderGateway) });
 }
 
 /** The preview gates this configuration names, each with a socket: the gate names `previewCallSubjects` reports. */

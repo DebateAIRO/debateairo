@@ -9,8 +9,8 @@ import {
   type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
 import { providerCallSharedWall, storyCallScopeAgrees } from "../../apps/runner/src/index.js";
-import { laneGateway } from "../../apps/runner/src/call-lane-gateway.js";
-import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { laneGateway, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
+import { createCallScheduler, slotsTakenWithin, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { GLM, HAIKU_REF, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
 
 const haikuGateway: ProviderGateway = { call: async () => { throw new Error("not called"); } };
@@ -115,5 +115,118 @@ describe("LG-A: where the structure repair sits", () => {
     expect(error).not.toBeInstanceOf(ProviderStructureUnrepairedError);
     expect(failures).toHaveLength(1);
     expect(failures[0]).not.toBeInstanceOf(ProviderStructureUnrepairedError);
+  });
+});
+
+/**
+ * Carried from Task 12: the repair call must never break the owner's parallel-call limits (spec 2026-10-12 §3.2: 12 per
+ * debate, 3 per AI in a debate, 150 DeepInfra / 50 Haiku across the runner, each gate's slots). It is made inside the
+ * original call's lane slot, so it asks the lane only for the repair model's slots the original does not hold.
+ */
+describe("LG-A: the repair call through the debate's lane", () => {
+  const GLM_SUBJECT: CallSubject = Object.freeze({ model: GLM, vendor: "deepinfra", gate: "deepinfra" });
+  const HAIKU_SUBJECT: CallSubject = Object.freeze({ model: "claude-haiku-5-5", vendor: "anthropic", gate: "anthropic" });
+  const SONNET_SUBJECT: CallSubject = Object.freeze({ model: "claude-sonnet", vendor: "anthropic", gate: "anthropic" });
+  const OWNER = Object.freeze({ perDebate: 12, perModelPerDebate: 3, perModelPerRunner: { default: 50, deepinfra: 150, anthropic: 50 } });
+  const deferred = () => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((res) => { resolve = res; });
+    return { promise, resolve };
+  };
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const ticket = (subject: CallSubject) => ({ ...subject, priority: "AUTHOR" as const });
+
+  it("takes only the slots the running call does not hold, never a debate slot", () => {
+    expect(slotsTakenWithin(GLM_SUBJECT, HAIKU_SUBJECT)).toEqual({ debate: false, model: true, gate: true });
+    expect(slotsTakenWithin(HAIKU_SUBJECT, HAIKU_SUBJECT)).toEqual({ debate: false, model: false, gate: false });
+    expect(slotsTakenWithin(SONNET_SUBJECT, HAIKU_SUBJECT)).toEqual({ debate: false, model: true, gate: false });
+    expect(slotsTakenWithin({ ...GLM_SUBJECT, gate: null }, { ...HAIKU_SUBJECT, gate: null })).toEqual({ debate: false, model: true, gate: false });
+  });
+
+  it("waits for one of Haiku's 3 slots in the debate when Haiku also argues, never for a debate slot", async () => {
+    const scheduler = createCallScheduler({ policy: { ...OWNER, perDebate: 4 } });
+    const lane = scheduler.openLane("run:limits");
+    const haikuCalls = [deferred(), deferred(), deferred()];
+    const running = haikuCalls.map((call) => lane.run(ticket(HAIKU_SUBJECT), () => call.promise));
+    let repaired = false;
+    const glm = lane.run(ticket(GLM_SUBJECT), () => lane.runWithin(GLM_SUBJECT, ticket(HAIKU_SUBJECT), async () => { repaired = true; }));
+    await flush();
+    // The debate's 4 slots are all taken (3 Haiku, 1 GLM) and Haiku has its 3: the repair waits for a Haiku slot only.
+    expect(lane.stats().running).toBe(4);
+    expect(repaired).toBe(false);
+    expect(scheduler.stats().peakByModel["claude-haiku-5-5"]).toBe(3);
+    haikuCalls[0]!.resolve();
+    await glm;
+    expect(repaired).toBe(true);
+    // Never 4 Haiku POSTs at once in the debate.
+    expect(lane.stats().peakByModel["claude-haiku-5-5"]).toBe(3);
+    haikuCalls.slice(1).forEach((call) => { call.resolve(); });
+    await Promise.all(running);
+    expect(lane.stats().running).toBe(0);
+  });
+
+  it("waits for the Anthropic gate's slot held by another debate, and is never held back by the start guard", async () => {
+    const scheduler = createCallScheduler({ policy: OWNER });
+    scheduler.setGateCapacity("anthropic", 1);
+    const other = scheduler.openLane("run:other");
+    const otherHaiku = deferred();
+    const busy = other.run(ticket(HAIKU_SUBJECT), () => otherHaiku.promise);
+    const lane = scheduler.openLane("run:gate");
+    let repaired = false;
+    const original = deferred();
+    // A call already running asks for its repair after the debate's start guard has closed (arguing stopped).
+    const glm = lane.run(ticket(GLM_SUBJECT), async () => {
+      await original.promise;
+      await lane.runWithin(GLM_SUBJECT, ticket(HAIKU_SUBJECT), async () => { repaired = true; });
+    });
+    await flush();
+    lane.guardStarts(() => false);
+    original.resolve();
+    await flush();
+    expect(repaired).toBe(false);
+    expect(scheduler.stats().peakByGate.anthropic).toBe(1);
+    otherHaiku.resolve();
+    await Promise.all([busy, glm]);
+    expect(repaired).toBe(true);
+    expect(scheduler.stats().peakByGate.anthropic).toBe(1);
+    expect(lane.stats().heldBack).toBe(0);
+  });
+
+  it("a Haiku call's own repair takes nothing more, so Haiku at its limit never waits on itself", async () => {
+    const scheduler = createCallScheduler({ policy: { ...OWNER, perModelPerDebate: 1 } });
+    scheduler.setGateCapacity("anthropic", 1);
+    const lane = scheduler.openLane("run:self");
+    const done = await lane.run(ticket(HAIKU_SUBJECT), () => lane.runWithin(HAIKU_SUBJECT, ticket(HAIKU_SUBJECT), async () => "repaired"));
+    expect(done).toBe("repaired");
+    expect(scheduler.stats().peakByModel["claude-haiku-5-5"]).toBe(1);
+  });
+
+  it("the route's gateway asks the lane of the call it repairs; outside a lane it is the route's gateway", async () => {
+    const subjects = { subjectOf: (providerRef: string): CallSubject => (providerRef === HAIKU_REF ? HAIKU_SUBJECT : GLM_SUBJECT) };
+    const calls: string[] = [];
+    const haiku: ProviderGateway = { call: async (request) => { calls.push(request.callSiteKey); return { content: "{}" } as never; } };
+    const route = structureRepairThroughLane({ providerRef: HAIKU_REF, gateway: haiku, bound: { tokenCeiling: 32768, deadlineMs: 1_260_000 } }, subjects)!;
+    expect(structureRepairThroughLane(null, subjects)).toBeNull();
+    expect(route).toMatchObject({ providerRef: HAIKU_REF, bound: { tokenCeiling: 32768, deadlineMs: 1_260_000 } });
+    await route.gateway.call({ callSiteKey: "REPAIR:STRUCTURE:JUDGE" } as ProviderCallRequest);
+    expect(calls).toEqual(["REPAIR:STRUCTURE:JUDGE"]);
+
+    const scheduler = createCallScheduler({ policy: { ...OWNER, perModelPerDebate: 1 } });
+    const lane = scheduler.openLane("run:route");
+    const heldHaiku = deferred();
+    const haikuArgues = lane.run(ticket(HAIKU_SUBJECT), () => heldHaiku.promise);
+    const admitted: string[] = [];
+    const member = laneGateway({ lane, scheduler, subject: GLM_SUBJECT,
+      provider: { call: (request) => route.gateway.call({ ...request, callSiteKey: `REPAIR:STRUCTURE:${request.callSiteKey}` }) },
+      beforeSlot: async (subject) => { admitted.push(subject.model); } });
+    const repair = member.call({ callSiteKey: "JUDGE" } as ProviderCallRequest);
+    await flush();
+    // The debate's one Haiku slot is taken: the repair waits for it (after the busy coordinator admitted it).
+    expect(admitted).toEqual([GLM, "claude-haiku-5-5"]);
+    expect(calls).toEqual(["REPAIR:STRUCTURE:JUDGE"]);
+    heldHaiku.resolve();
+    await Promise.all([haikuArgues, repair]);
+    expect(calls).toEqual(["REPAIR:STRUCTURE:JUDGE", "REPAIR:STRUCTURE:JUDGE"]);
+    expect(lane.stats().peakByModel["claude-haiku-5-5"]).toBe(1);
   });
 });

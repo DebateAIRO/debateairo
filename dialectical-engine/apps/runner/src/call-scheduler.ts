@@ -56,6 +56,17 @@ export interface DebateCallLane {
   readonly callsAtOnce: number;
   /** Waits for a slot under every limit, runs `call`, always releases. Rejects with TypedDomainError CALL_LANE_STOPPED if the lane is stopped while waiting. */
   run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T>;
+  /**
+   * LG-A (the structure-repair call; the owner's parallel-call limits, spec 2026-10-12 §3.2): a call made FOR one of
+   * this lane's running calls, by that call's own gateway once its own POST has ended, while it keeps its slot (`held`:
+   * the running call's subject). It takes the slots `slotsTakenWithin` names: never a debate slot (the running call's
+   * is used), and of the model's and the gate's slots only those the running call does not already hold. So every POST
+   * in flight stays under every limit, and the call never waits for a slot its own running call holds (no deadlock: a
+   * call that holds the repair model's slots never waits for another). Taking nothing, it runs at once. It is never
+   * held back by the start guard: it stands in for a follow-up inside the running call, which no guard is asked about.
+   * Rejects with CALL_LANE_STOPPED as `run` does.
+   */
+  runWithin<T>(held: CallSubject, ticket: CallTicket, call: () => Promise<T>): Promise<T>;
   /** No new call starts; queued calls reject CALL_LANE_STOPPED; running calls are not touched. Idempotent. */
   stop(): void;
   /**
@@ -90,8 +101,22 @@ export function callPriorityOf(callSiteKey: string): CallPriority {
   return "OTHER";
 }
 
+/** Which of a call's slots it takes: every call through `run` takes all three; a call through `runWithin` fewer. */
+export type SlotsTaken = Readonly<{ debate: boolean; model: boolean; gate: boolean }>;
+const EVERY_SLOT: SlotsTaken = Object.freeze({ debate: true, model: true, gate: true });
+
+/** The slots a call made for a running call takes (`DebateCallLane.runWithin`): only those the running call does not hold. */
+export function slotsTakenWithin(held: CallSubject, subject: CallSubject): SlotsTaken {
+  return Object.freeze({
+    debate: false,
+    model: held.model !== subject.model,
+    gate: subject.gate !== null && held.gate !== subject.gate
+  });
+}
+
 type Waiting = Readonly<{
   ticket: CallTicket;
+  takes: SlotsTaken;
   rank: number;
   queuedAt: number;
   launch: (release: () => void) => void;
@@ -159,7 +184,8 @@ function holdBackRefused(lane: Lane): void {
   if (guard === null) return;
   for (let index = 0; index < lane.waiting.length;) {
     const entry = lane.waiting[index]!;
-    if (mayStart(guard, entry.ticket)) {
+    // A call made for a running call (`runWithin`) is never held back.
+    if (!entry.takes.debate || mayStart(guard, entry.ticket)) {
       index += 1;
       continue;
     }
@@ -191,19 +217,21 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     return gateCapacity.get(gate) ?? Number.POSITIVE_INFINITY;
   };
 
-  const admissible = (lane: Lane, ticket: CallTicket): boolean =>
-    lane.running < policy.perDebate
-    && (lane.runningByModel.get(ticket.model) ?? 0) < policy.perModelPerDebate
-    && (runnerRunningByModel.get(ticket.model) ?? 0) < runnerCapFor(ticket.vendor)
-    && (ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate));
+  const admissible = (lane: Lane, entry: Waiting): boolean => {
+    const { ticket, takes } = entry;
+    return (!takes.debate || lane.running < policy.perDebate)
+      && (!takes.model || ((lane.runningByModel.get(ticket.model) ?? 0) < policy.perModelPerDebate
+        && (runnerRunningByModel.get(ticket.model) ?? 0) < runnerCapFor(ticket.vendor)))
+      && (!takes.gate || ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate));
+  };
 
   type SharedSlot = Readonly<{ key: string; headroom: number }>;
-  const sharedSlotsOf = (ticket: CallTicket): SharedSlot[] => {
-    const slots: SharedSlot[] = [{
+  const sharedSlotsOf = (ticket: CallTicket, takes: SlotsTaken): SharedSlot[] => {
+    const slots: SharedSlot[] = takes.model ? [{
       key: `model:${ticket.model}`,
       headroom: runnerCapFor(ticket.vendor) - (runnerRunningByModel.get(ticket.model) ?? 0)
-    }];
-    if (ticket.gate !== null) {
+    }] : [];
+    if (takes.gate && ticket.gate !== null) {
       slots.push({ key: `gate:${ticket.gate}`, headroom: gateLimitFor(ticket.gate) - (gateRunning.get(ticket.gate) ?? 0) });
     }
     return slots;
@@ -213,8 +241,9 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
    * Whose turn it is: when this lane was last served on the shared slot its call is shortest of (the most recent such
    * serve when two are equally short). Never served = -1. Lower goes first.
    */
-  const turnOf = (lane: Lane, ticket: CallTicket): number => {
-    const slots = sharedSlotsOf(ticket);
+  const turnOf = (lane: Lane, entry: Waiting): number => {
+    const slots = sharedSlotsOf(entry.ticket, entry.takes);
+    if (slots.length === 0) return -1;
     const tightest = Math.min(...slots.map((slot) => slot.headroom));
     return Math.max(...slots.filter((slot) => slot.headroom === tightest).map((slot) => lane.lastServedOn.get(slot.key) ?? -1));
   };
@@ -222,26 +251,33 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
   const start = (lane: Lane, index: number): void => {
     const [entry] = lane.waiting.splice(index, 1);
     const { model, gate } = entry!.ticket;
+    const { takes } = entry!;
 
-    lane.running += 1;
-    lane.peakInFlight = Math.max(lane.peakInFlight, lane.running);
-    raisePeak(lane.peakByModel, model, bump(lane.runningByModel, model));
-    raisePeak(runnerPeakByModel, model, bump(runnerRunningByModel, model));
-    if (gate !== null) raisePeak(gatePeak, gate, bump(gateRunning, gate));
+    if (takes.debate) {
+      lane.running += 1;
+      lane.peakInFlight = Math.max(lane.peakInFlight, lane.running);
+    }
+    if (takes.model) {
+      raisePeak(lane.peakByModel, model, bump(lane.runningByModel, model));
+      raisePeak(runnerPeakByModel, model, bump(runnerRunningByModel, model));
+    }
+    if (takes.gate && gate !== null) raisePeak(gatePeak, gate, bump(gateRunning, gate));
     lane.calls += 1;
     serveTick += 1;
-    for (const slot of sharedSlotsOf(entry!.ticket)) lane.lastServedOn.set(slot.key, serveTick);
+    for (const slot of sharedSlotsOf(entry!.ticket, takes)) lane.lastServedOn.set(slot.key, serveTick);
     lane.waitedMsByModel.set(model, (lane.waitedMsByModel.get(model) ?? 0) + Math.max(0, now() - entry!.queuedAt));
 
     let released = false;
     const release = (): void => {
       if (released) return;
       released = true;
-      lane.running -= 1;
-      drop(lane.runningByModel, model);
-      drop(runnerRunningByModel, model);
-      if (gate !== null) drop(gateRunning, gate);
-      if (lane.running === 0) for (const resolve of lane.drainWaiters.splice(0)) resolve();
+      if (takes.debate) lane.running -= 1;
+      if (takes.model) {
+        drop(lane.runningByModel, model);
+        drop(runnerRunningByModel, model);
+      }
+      if (takes.gate && gate !== null) drop(gateRunning, gate);
+      if (takes.debate && lane.running === 0) for (const resolve of lane.drainWaiters.splice(0)) resolve();
       pump();
     };
     entry!.launch(release);
@@ -263,9 +299,9 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
           if (lane.stopped) continue;
           // Spec §2.3 (O6): the debate's start guard is asked before any of its waiting calls may start.
           holdBackRefused(lane);
-          const index = lane.waiting.findIndex((entry) => admissible(lane, entry.ticket));
+          const index = lane.waiting.findIndex((entry) => admissible(lane, entry));
           if (index < 0) continue;
-          const turn = turnOf(lane, lane.waiting[index]!.ticket);
+          const turn = turnOf(lane, lane.waiting[index]!);
           if (chosen === null || turn < chosen.turn) chosen = { lane, index, turn };
         }
         if (chosen === null) return;
@@ -301,34 +337,48 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
       pump();
     };
 
+    /** Queues a call that takes `takes` of its slots (every call: EVERY_SLOT; `runWithin`: fewer). */
+    const enqueue = <T>(ticket: CallTicket, takes: SlotsTaken, call: () => Promise<T>): Promise<T> => {
+      if (lane.stopped) return Promise.reject(laneStoppedError(lane.debateId));
+      return new Promise<T>((resolve, reject) => {
+        const entry: Waiting = Object.freeze({
+          ticket,
+          takes,
+          rank: PRIORITY_RANK[ticket.priority],
+          queuedAt: now(),
+          launch: (release: () => void) => {
+            let settled: Promise<T>;
+            try {
+              settled = Promise.resolve(call());
+            } catch (error) {
+              settled = Promise.reject(error);
+            }
+            settled.then(
+              (value) => { release(); resolve(value); },
+              (error: unknown) => { release(); reject(error); }
+            );
+          },
+          fail: reject
+        });
+        // Kept sorted by [priority, arrival]: a newcomer goes after every call of its own or a higher priority.
+        const at = lane.waiting.findIndex((other) => other.rank > entry.rank);
+        lane.waiting.splice(at < 0 ? lane.waiting.length : at, 0, entry);
+        pump();
+      });
+    };
+
     return Object.freeze({
       callsAtOnce: policy.perDebate,
       run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T> {
-        if (lane.stopped) return Promise.reject(laneStoppedError(lane.debateId));
-        return new Promise<T>((resolve, reject) => {
-          const entry: Waiting = Object.freeze({
-            ticket,
-            rank: PRIORITY_RANK[ticket.priority],
-            queuedAt: now(),
-            launch: (release: () => void) => {
-              let settled: Promise<T>;
-              try {
-                settled = Promise.resolve(call());
-              } catch (error) {
-                settled = Promise.reject(error);
-              }
-              settled.then(
-                (value) => { release(); resolve(value); },
-                (error: unknown) => { release(); reject(error); }
-              );
-            },
-            fail: reject
-          });
-          // Kept sorted by [priority, arrival]: a newcomer goes after every call of its own or a higher priority.
-          const at = lane.waiting.findIndex((other) => other.rank > entry.rank);
-          lane.waiting.splice(at < 0 ? lane.waiting.length : at, 0, entry);
-          pump();
-        });
+        return enqueue(ticket, EVERY_SLOT, call);
+      },
+      runWithin<T>(held: CallSubject, ticket: CallTicket, call: () => Promise<T>): Promise<T> {
+        const takes = slotsTakenWithin(held, ticket);
+        if (!takes.model && !takes.gate) {
+          if (lane.stopped) return Promise.reject(laneStoppedError(lane.debateId));
+          try { return Promise.resolve(call()); } catch (error) { return Promise.reject(error); }
+        }
+        return enqueue(ticket, takes, call);
       },
       stop,
       guardStarts(guard: CallStartGuard | null): void {
