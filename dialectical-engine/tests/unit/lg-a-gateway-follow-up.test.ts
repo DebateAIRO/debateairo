@@ -4,7 +4,7 @@ import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
 import {
   CONTENT_FOLLOW_UP_SENTENCES, OpenAICompatibleProviderGateway, PreviewVendorRefusedUnbilled, ProviderStructureUnrepairedError,
-  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
+  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, isContentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
   parsePreviewProviderTestConfig, previewTargetGatewayControls, readPromptFrame, schemaFailureLocator, withPreviewProviderCallPolicy,
   type ModelReplyFacts, type PreviewBudgetExecution, type ProviderCallRequest, type ProviderLedgerInput, type RawArtifactInput
 } from "@debateai/providers";
@@ -251,5 +251,13 @@ describe("LG-A: the door admits the reason only as one of the code-owned sentenc
     expect(contentFollowUpSentence("MAP_ANGLE_KINDS_WRONG", "CONTENT")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
     expect(() => buildFramedPatchPrompt(framed.packet, "{\"answer\": \"It is so\"}",
       { code: "MAP_UNKNOWN_KEY_POINT_ID", paths: ["answer"], reason: CONTENT_FOLLOW_UP_SENTENCES.MAP_UNKNOWN_KEY_POINT_ID })).not.toThrow();
+  });
+
+  it("a full re-ask after an unreadable reply says so in plain words; nothing else changes", () => {
+    expect(contentFollowUpSentence("PARSE_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
+    expect(contentFollowUpSentence("SCHEMA_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.SCHEMA_FAILED);
+    expect(contentFollowUpSentence("PARSE_FAILED", "CONTENT")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
+    expect(contentFollowUpSentence("STRUCTURE_UNREAD")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
+    expect(isContentFollowUpSentence(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD)).toBe(true);
   });
 });
