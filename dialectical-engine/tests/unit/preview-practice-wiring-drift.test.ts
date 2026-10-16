@@ -165,6 +165,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(code).toContain("callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model)");
       expect(code).toContain("onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); }");
       expect(code).toMatch(/gateRemaining: (previewGateRemaining|input\.remaining)/u);
+      // Task 4 review fix 1: both sides tell the operator when a final writer is sent as STANDARD.
+      expect(code).toMatch(/onFinalWriterTierUnread: (previewFinalWriterTierUnread|finalWriterTierUnread)/u);
     }
     for (const key of ["callScheduler", "callSubjects", "renewals"]) {
       expect(objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {").has(key), key).toBe(true);

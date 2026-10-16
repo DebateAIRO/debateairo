@@ -77,6 +77,7 @@ import {
   observeClaimTimeTarget,
   parseProviderDiscoveryTargets,
   PREVIEW_GLM_DEADLINE_MS,
+  previewFinalWriterTierUnreadLine,
   previewProbeControls,
   previewRunnerPolicy,
   previewRunResilience,
@@ -91,6 +92,7 @@ import {
   withPreviewProviderCallPolicy,
   withStructureRepair,
   type PreviewBudgetPorts,
+  type PreviewFinalWriterTierUnread,
   type PreviewGateRemaining,
   type PreviewProviderName,
   type PreviewProviderTestConfig,
@@ -316,6 +318,10 @@ export async function composePracticeRunner(input: Readonly<{
     log: (line) => { callStats.gateCapacityLog(line); console.warn(line); }
   });
   const previewBusy = callStats.observeBusy(createPreviewBusyCoordinator());
+  // Task 4 review fix 1, as main.ts: ONE notice for every target's policy (one line per gate and reason), codes only.
+  const finalWriterTierUnread = (event: PreviewFinalWriterTierUnread): void => {
+    console.warn(previewFinalWriterTierUnreadLine(event));
+  };
   // The preview declares no credential (the gates hold the keys); the resolver must then find nothing to read.
   const providerTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
@@ -350,6 +356,7 @@ export async function composePracticeRunner(input: Readonly<{
       busy: previewBusy,
       onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
       gateRemaining: input.remaining,
+      onFinalWriterTierUnread: finalWriterTierUnread,
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
   }

@@ -13,8 +13,8 @@ import {
   PREVIEW_REVIEWED_PROVIDER_REFS, createPreviewGuardedFetch, parsePreviewGateRemaining, parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets, previewCallTierOf, previewCallTierOfBody, previewGateOffersFinalWriterTier, previewModelRow,
   previewNanoUsdText, previewReservationNanoUsd, previewStorytellerOutputCap, previewTargetGatewayControls, previewTargetJsonRow,
-  previewTierOutputBound, providerTargetGatewayControls, withPreviewProviderCallPolicy,
-  type PreviewBudgetExecution, type PreviewGateRemaining, type ProviderCallRequest, type ProviderCallResult,
+  previewTierOutputBound, providerTargetGatewayControls, withPreviewProviderCallPolicy, PreviewUnbilledRefusal,
+  previewFinalWriterTierUnreadLine, type PreviewBudgetExecution, type PreviewFinalWriterTierUnread, type PreviewGateRemaining, type ProviderCallRequest, type ProviderCallResult,
   type ProviderDiscoveryTarget, type ProviderGateway
 } from "@debateai/providers";
 import { framedFixturePacket } from "../support/framed-packet.js";
@@ -277,5 +277,91 @@ describe("the gate's remaining answer, both forms", () => {
     expect(parsePreviewGateRemaining({ ...today, final_writer_max_in_flight: 1 })).toBeUndefined();
     expect(parsePreviewGateRemaining({ ...today, largest_final_writer_reservation_usd: "0.97664" })).toBeUndefined();
     expect(parsePreviewGateRemaining({ ...today, largest_final_writer_reservation_usd: "0.97664", final_writer_max_in_flight: 0 })).toBeUndefined();
+  });
+  // Task 4 review fix 3: deviation 4 names the slots 1..max_concurrent_calls.
+  it("refuses more final-writer slots than the gate's calls at once", () => {
+    const form = (slots: number) => ({ ...today, largest_final_writer_reservation_usd: "0.97664", final_writer_max_in_flight: slots });
+    expect(today.max_concurrent_calls).toBe(2);
+    expect(parsePreviewGateRemaining(form(3))).toBeUndefined();
+    expect(parsePreviewGateRemaining(form(2))).toMatchObject({ finalWriterMaxInFlight: 2, maxConcurrentCalls: 2 });
+  });
+});
+
+describe("Task 4 review fix round 1", () => {
+  const writer = () => call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER");
+  /** The policy over a recording gateway, with the notice hook; `gateRemaining` null: no reader at all. */
+  function noticed(gateRemaining: GateReaders | null) {
+    const events: PreviewFinalWriterTierUnread[] = [];
+    const seen: ProviderCallRequest[] = [];
+    const inner: ProviderGateway = { call: async (sent) => {
+      seen.push(sent);
+      return { rawArtifactRef: "artifact", ledgerEntryRef: "entry", content: "{}", provider: "openai-compatible-http",
+        model: DEEPSEEK, maker: "Synthetic", modelVersion: DEEPSEEK } satisfies ProviderCallResult;
+    } };
+    const onFinalWriterTierUnread = (event: PreviewFinalWriterTierUnread) => { events.push(event); };
+    const policy = withPreviewProviderCallPolicy(inner, CONFIG, { model: DEEPSEEK },
+      { ...(gateRemaining === null ? {} : { gateRemaining }), onFinalWriterTierUnread });
+    return { policy, events, seen };
+  }
+
+  it("a final writer sent as STANDARD is told once per gate and reason: NOT_OFFERED, and READ_FAILED for a failed or missing read", async () => {
+    const notOffered = noticed(gates(async () => NOT_OFFERED));
+    await notOffered.policy.call(writer());
+    await notOffered.policy.call(call("STORY:STORYTELLER:1", "story", "SYNTHESIZER"));
+    expect(notOffered.events).toEqual([{ gate: "deepinfra", reason: "NOT_OFFERED" }]);
+    expect(notOffered.seen.every((sent) => !("packetByteCap" in sent) && !("outputTokenCap" in sent))).toBe(true);
+    const failed = noticed(gates(async () => { throw new Error("gate unreachable"); }));
+    await failed.policy.call(writer());
+    await failed.policy.call(writer());
+    expect(failed.events).toEqual([{ gate: "deepinfra", reason: "READ_FAILED" }]);
+    const missing = noticed(null);
+    await missing.policy.call(writer());
+    await missing.policy.call(call("STORY:CHECKER:1", "story", "EVALUATOR"));
+    expect(missing.events).toEqual([{ gate: "deepinfra", reason: "READ_FAILED" }]);
+    // One line, codes only.
+    expect(JSON.parse(previewFinalWriterTierUnreadLine(failed.events[0]!))).toEqual({ kind: "DEBATEAI_PREVIEW_CALL_TIER",
+      event: "PREVIEW_FINAL_WRITER_TIER_UNREAD", gate: "deepinfra", reason: "READ_FAILED" });
+  });
+
+  it("the notice never fires for a debate step, nor when the tier is offered; a hook that throws changes nothing", async () => {
+    const step = noticed(gates(async () => NOT_OFFERED));
+    await step.policy.call(call("JUDGE:critic:node-1", "served", "JUDGE"));
+    expect(step.events).toEqual([]);
+    const offered = noticed(OFFERS);
+    await offered.policy.call(writer());
+    expect(offered.events).toEqual([]);
+    expect(offered.seen[0]!.packetByteCap).toBe(MIB);
+    const inner: ProviderGateway = { call: async () => ({ rawArtifactRef: "a", ledgerEntryRef: "e", content: "{}",
+      provider: "openai-compatible-http", model: DEEPSEEK, maker: "Synthetic", modelVersion: DEEPSEEK }) };
+    const throwing = withPreviewProviderCallPolicy(inner, CONFIG, { model: DEEPSEEK },
+      { gateRemaining: gates(async () => NOT_OFFERED), onFinalWriterTierUnread: () => { throw new Error("hook broke"); } });
+    await expect(throwing.call(writer())).resolves.toMatchObject({ content: "{}" });
+  });
+
+  it("a final writer through the guarded fetch, whose gate offers no tier, sends today's four-key execution and reservation", async () => {
+    const { gateway, executions } = previewTarget(DEEPSEEK, gates(async () => NOT_OFFERED));
+    await gateway.call(writer());
+    const sent = executions[0]!;
+    expect(Object.keys(sent).sort()).toEqual(["operationId", "requestBody", "requestSha256", "reservedUsd"]);
+    expect(JSON.parse(sent.requestBody)).toMatchObject({ model: DEEPSEEK, max_tokens: 8192 });
+    expect(sent.reservedUsd).toBe(previewNanoUsdText(previewReservationNanoUsd(row(DEEPSEEK), Buffer.byteLength(sent.requestBody, "utf8"))));
+  });
+
+  it("a final writer resent after an unbilled refusal reads its gate once (the per-call answer is reused)", async () => {
+    let reads = 0;
+    const seen: ProviderCallRequest[] = [];
+    const inner: ProviderGateway = { call: async (sent) => {
+      seen.push(sent);
+      if (seen.length === 1) throw new PreviewUnbilledRefusal();
+      return { rawArtifactRef: "artifact", ledgerEntryRef: "entry", content: "{}", provider: "openai-compatible-http",
+        model: DEEPSEEK, maker: "Synthetic", modelVersion: DEEPSEEK } satisfies ProviderCallResult;
+    } };
+    const policy = withPreviewProviderCallPolicy(inner, CONFIG, { model: DEEPSEEK },
+      { sleep: async () => undefined, gateRemaining: gates(async () => { reads += 1; return OFFERED; }) });
+    await policy.call(writer());
+    expect(seen).toHaveLength(2);
+    expect(reads).toBe(1);
+    expect(seen.map((sent) => [sent.bound.tokenCeiling, sent.packetByteCap, sent.outputTokenCap]))
+      .toEqual([[131_072, MIB, 131_072], [131_072, MIB, 131_072]]);
   });
 });

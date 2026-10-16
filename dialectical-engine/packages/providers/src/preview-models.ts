@@ -86,7 +86,11 @@ export type PreviewModelRow = Readonly<{
   /** The same prices in the engine's target unit: USD micro-units per million tokens. */
   inputPriceMicrosPerMillion: number;
   outputPriceMicrosPerMillion: number;
-  /** Largest max_tokens ever sent, and the output side of every reservation. */
+  /**
+   * A STANDARD call's largest max_tokens (every debate step, the map, health checks, LG-A's structure-repair call) and
+   * the output side of its reservation. LG-B (L26, L29): a final-writer call, only when the row's gate offers that tier,
+   * may ask up to `finalWriterOutputBound`, and the gate reserves it at that bound (Task 5).
+   */
   outputBound: number;
   /**
    * Length guidance L26: the model's own maximum output, as its vendor documents it: the largest max_tokens a final-writer
@@ -95,17 +99,20 @@ export type PreviewModelRow = Readonly<{
    */
   finalWriterOutputBound: number;
   /**
-   * The max_tokens the preview's storyteller asks for on its first attempt (previewStorytellerTokenCeiling). Length
-   * guidance L26 / owner answer 7 (2026-10-15): a fast row asks its own maximum (`finalWriterOutputBound`, so above
-   * `outputBound`); a slow row keeps 16,384, and its length retry stays held to `outputBound` (previewStorytellerOutputCap).
-   * Never below the generation floor (8,192). Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku); 16,384 on the slower
-   * ones (MiMo, Qwen, GLM), whose story at 17 tokens a second could otherwise run past the gate's 1,200 s. App only: the
-   * gate checks max_tokens against `outputBound` alone, so the gate's parity files do not carry it.
+   * The max_tokens the preview's storyteller asks for on its first attempt (previewStorytellerTokenCeiling) when its
+   * gate offers the final-writer tier. Length guidance L26 / owner answer 7 (2026-10-15): a fast row asks its own
+   * maximum (`finalWriterOutputBound`, so above `outputBound`); a slow row keeps 16,384, and its length retry stays held
+   * to `outputBound` (previewStorytellerOutputCap). When the gate does not offer the tier, the storyteller is a STANDARD
+   * call: it asks this, held to `outputBound`. Never below the generation floor (8,192).
+   * Slow answer (owner ruling 2026-10-12): 16,384 on the slower rows (MiMo, Qwen, GLM), whose story at 17 tokens a
+   * second could otherwise run past the gate's 1,200 s. App only: the gate checks a STANDARD max_tokens against
+   * `outputBound` and a final writer's against its final-writer bound (Task 5), so the parity files do not carry it.
    */
   storytellerTokenCeiling: number;
   /**
    * The max_tokens the preview's story checker asks for at least (previewStoryCheckerTokenCeiling): the generation
-   * floor (8,192) unless the row says more; its length retry asks twice it, held to `outputBound`. Story wording
+   * floor (8,192) unless the row says more; its length retry asks twice it, held to `outputBound` on a STANDARD call
+   * and to `finalWriterOutputBound` when the gate offers the final-writer tier (LG-B, L26). Story wording
    * (practice debate 2, 2026-10-12): at 8,192 MiMo's thinking stopped at exactly 4,916 reasoning tokens on both of its
    * story checks, and on the second its unfinished thinking ran on in the answer after the JSON verdict until
    * max_tokens; at 16,384 (its length retry) it finished. App only, like `storytellerTokenCeiling`.
@@ -145,9 +152,11 @@ export const PREVIEW_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/mess
 /** Claude Haiku 5.5's window (1M tokens). */
 export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 /**
- * Request bodies above this are refused before any reservation (contract A §2). Owner ruling
- * 2026-10-10 (evening): a HARD cap of 256 KiB for every row, because a story request at the "high"
- * story size reaches about 236 KiB (the largest ordinary request seen was about 51 KB).
+ * A STANDARD call's request body cap (contract A §2). Owner ruling 2026-10-10 (evening): a HARD cap of 256 KiB,
+ * because a story request at the "high" story size reaches about 236 KiB (the largest ordinary request seen was about
+ * 51 KB). LG-B (L29): every call but the four final writers keeps it (the gateway refuses a larger body before anything
+ * is sent); a final writer, only when its gate offers that tier, may send up to 1 MiB
+ * (PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER), reserved by the gate at the tier's bound (Task 5).
  */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /**
@@ -159,16 +168,17 @@ export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
  */
 export type PreviewCallTier = "STANDARD" | "FINAL_WRITER";
 export const PREVIEW_CALL_TIER_LIMITS = Object.freeze({
-  STANDARD: Object.freeze({ requestBodyMaxBytes: 256 * 1024,
+  STANDARD: Object.freeze({ requestBodyMaxBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
     perCallCapUsd: Object.freeze({ deepinfra: "0.25", anthropic: "0.25" }) }),
   FINAL_WRITER: Object.freeze({ requestBodyMaxBytes: 1024 * 1024,
     perCallCapUsd: Object.freeze({ deepinfra: "0.75", anthropic: "1.00" }) })
 });
 /**
- * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
- * of every reservation). Debate calls and health checks ask for 8,192; the storyteller asks for its row's story
- * allowance (storytellerTokenCeiling: this whole cap on the fast rows, PREVIEW_SLOW_STORY_TOKENS on the slower ones,
- * slow answer, owner ruling 2026-10-12), and its retry is held to this cap.
+ * Owner ruling 2026-10-10: every reviewed row's STANDARD answer cap (`outputBound`: a standard call's max_tokens ceiling
+ * and the output side of its reservation). Debate calls and health checks ask for 8,192. LG-B (L26): the four final
+ * writers, when the gate offers that tier, ask up to the row's own maximum (`finalWriterOutputBound`), reserved at that
+ * bound; a slow row's storyteller asks PREVIEW_SLOW_STORY_TOKENS (slow answer, owner ruling 2026-10-12) and its retry is
+ * held to this cap.
  */
 const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Slow answer (owner ruling 2026-10-12): the slower rows' story allowance, half the answer cap. */

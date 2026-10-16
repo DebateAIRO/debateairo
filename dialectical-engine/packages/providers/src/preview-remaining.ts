@@ -77,6 +77,8 @@ export function parsePreviewGateRemaining(value: unknown): PreviewGateRemaining 
   const maxConcurrentCalls = row.max_concurrent_calls;
   if (typeof remainingCalls !== "number" || !Number.isSafeInteger(remainingCalls) || remainingCalls < 0) return undefined;
   if (typeof maxConcurrentCalls !== "number" || !Number.isSafeInteger(maxConcurrentCalls) || maxConcurrentCalls < 1) return undefined;
+  // LG-B deviation 4: the gate's final-writer slots are 1..max_concurrent_calls; more is not the contract's answer.
+  if (finalWriter && (finalWriterMaxInFlight as number) > maxConcurrentCalls) return undefined;
   const models = row.enabled_models;
   if (!Array.isArray(models) || models.some((model) => typeof model !== "string" || model.length === 0)
     || new Set(models).size !== models.length) return undefined;

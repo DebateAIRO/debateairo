@@ -280,6 +280,18 @@ function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "C
     ? request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
     : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
 }
+/** Task 4 review fix 1: why a final writer was sent as a STANDARD call (withPreviewProviderCallPolicy's notice). */
+export type PreviewFinalWriterTierUnread = Readonly<{ gate: string; reason: "NOT_OFFERED" | "READ_FAILED" }>;
+/** Each notice hook's (gate, reason) pairs already told: one line per gate and reason for each hook function. */
+const FINAL_WRITER_TIER_UNREAD_TOLD = new WeakMap<(event: PreviewFinalWriterTierUnread) => void, Set<string>>();
+/**
+ * Task 4 review fix 1: the one warn line the runner and the practice log for that notice: the event name, the gate and
+ * the reason. Codes only: no reply text, no key, no model output.
+ */
+export function previewFinalWriterTierUnreadLine(event: PreviewFinalWriterTierUnread): string {
+  return JSON.stringify({ kind: "DEBATEAI_PREVIEW_CALL_TIER", event: "PREVIEW_FINAL_WRITER_TIER_UNREAD", gate: event.gate,
+    reason: event.reason });
+}
 /**
  * Length guidance L26/L29: the tier of a preview call: FINAL_WRITER for the answer writer and checker (served lane,
  * SYNTHESIZER / EVALUATOR) and the storyteller and story checker (story lane, the same roles); STANDARD for everything
@@ -333,11 +345,13 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
  * that thinking counts toward max_tokens (DeepInfra reports it as reasoning tokens inside the completion; Anthropic
  * counts thinking as output). DeepSeek spent 11,317 of the sealed 12,000 thinking and its story was cut off. On the
- * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling,
- * never above the row's answer cap, which the gate already reserves for every call: previewReservationNanoUsd).
- * Slow answer (owner ruling 2026-10-12): the whole cap on the fast rows (DeepSeek, Claude Haiku), 16,384 on the slower
- * ones (MiMo, Qwen, GLM). A length retry still asks twice the allowance, held to the row's cap by the gateway. The
- * sealed register row is untouched; every other call keeps previewCallBound.
+ * preview only, the storyteller's call asks for its row's story allowance (PreviewModelRow.storytellerTokenCeiling).
+ * LG-B (L26, owner answer 7): when its gate offers the final-writer tier, a fast row (DeepSeek, Claude Haiku) asks its
+ * own maximum (`finalWriterOutputBound`) and a slow row (MiMo, Qwen, GLM) 16,384, and the gate reserves it at the
+ * final-writer bound (Task 5); when the gate does not, the call is STANDARD and asks this allowance held to the row's
+ * `outputBound`, reserved at that bound as today. A length retry still asks twice the allowance, held by the gateway to
+ * the call's cap (previewStorytellerOutputCap on a final writer, `outputBound` otherwise). The sealed register row is
+ * untouched; every other call keeps previewCallBound.
  */
 export function previewStorytellerTokenCeiling(reviewed: Readonly<{ storytellerTokenCeiling: number }>): number {
   return reviewed.storytellerTokenCeiling;
@@ -509,12 +523,31 @@ export function withPreviewProviderCallPolicy(
      * (previewGateOffersFinalWriterTier). Absent, or a read that fails: today's STANDARD call, byte for byte.
      */
     gateRemaining?: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
+    /**
+     * Task 4 review fix 1 (controller ruling, 2026-10-16): told, content-free, when a final writer falls back to STANDARD
+     * because its gate's answer names no final-writer slots (NOT_OFFERED) or no answer could be read (READ_FAILED: no
+     * reader, or the read failed). Called at most once per gate and reason for one hook function (the composer passes one
+     * function to every target's policy, so: once per process). Never for a debate step, never when the tier is
+     * offered. A hook that throws changes nothing.
+     */
+    onFinalWriterTierUnread?: (event: PreviewFinalWriterTierUnread) => void;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
   const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => { setTimeout(resolve, milliseconds); }));
   const busy = options.busy ?? NO_BUSY_COORDINATION;
   const gateRemaining = options.gateRemaining?.[reviewed.provider];
+  const tierUnread = (reason: PreviewFinalWriterTierUnread["reason"]): undefined => {
+    const hook = options.onFinalWriterTierUnread;
+    if (hook === undefined) return undefined;
+    const told = FINAL_WRITER_TIER_UNREAD_TOLD.get(hook) ?? new Set<string>();
+    FINAL_WRITER_TIER_UNREAD_TOLD.set(hook, told);
+    const key = `${reviewed.provider}:${reason}`;
+    if (told.has(key)) return undefined;
+    told.add(key);
+    try { hook(Object.freeze({ gate: reviewed.provider, reason })); } catch { /* the hook never changes the call */ }
+    return undefined;
+  };
   return Object.freeze({ call(request: ProviderCallRequest) {
     // A row with no effort switch runs at the vendor default, so "DEFAULT_ONLY" asks for exactly that.
     const asksNoLevel = request.thinkingLevel === undefined
@@ -557,9 +590,12 @@ export function withPreviewProviderCallPolicy(
         outputTokenCap: storyteller ? previewStorytellerOutputCap(reviewed) : reviewed.finalWriterOutputBound })
     }) : undefined;
     let tierDecision: Promise<typeof finalWriter> | undefined;
-    const finalWriterCall = (): Promise<typeof finalWriter> => tierDecision ??= finalWriter === undefined || gateRemaining === undefined
+    const finalWriterCall = (): Promise<typeof finalWriter> => tierDecision ??= finalWriter === undefined
       ? Promise.resolve(undefined)
-      : gateRemaining().then((remaining) => previewGateOffersFinalWriterTier(remaining) ? finalWriter : undefined, () => undefined);
+      : gateRemaining === undefined
+        ? Promise.resolve(tierUnread("READ_FAILED"))
+        : gateRemaining().then((remaining) => previewGateOffersFinalWriterTier(remaining) ? finalWriter : tierUnread("NOT_OFFERED"),
+          () => tierUnread("READ_FAILED"));
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
