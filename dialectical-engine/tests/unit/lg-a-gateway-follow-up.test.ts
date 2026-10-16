@@ -253,11 +253,15 @@ describe("LG-A: the door admits the reason only as one of the code-owned sentenc
       { code: "MAP_UNKNOWN_KEY_POINT_ID", paths: ["answer"], reason: CONTENT_FOLLOW_UP_SENTENCES.MAP_UNKNOWN_KEY_POINT_ID })).not.toThrow();
   });
 
-  it("a full re-ask after an unreadable reply says so in plain words; nothing else changes", () => {
-    expect(contentFollowUpSentence("PARSE_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
+  it("the unreadable-reply sentence is selected by no code or class; it is named only by the full re-ask, and the door admits it", () => {
+    expect(contentFollowUpSentence("PARSE_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
     expect(contentFollowUpSentence("SCHEMA_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.SCHEMA_FAILED);
     expect(contentFollowUpSentence("PARSE_FAILED", "CONTENT")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
-    expect(contentFollowUpSentence("STRUCTURE_UNREAD")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
+    for (const code of Object.keys(CONTENT_FOLLOW_UP_SENTENCES)) {
+      for (const failureClass of [undefined, "STRUCTURE", "CONTENT", "CUT_OFF", "EMPTY"] as const) {
+        expect(contentFollowUpSentence(code, failureClass)).not.toBe(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
+      }
+    }
     expect(isContentFollowUpSentence(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD)).toBe(true);
   });
 });

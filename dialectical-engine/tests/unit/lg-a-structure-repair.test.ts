@@ -6,7 +6,7 @@ import { JUDGE_ANSWER_FORM, Judge, PANEL_ANSWER_FORM, PANEL_PROMPT_CONTRACT, cla
 import { STORYTELLER_ANSWER_FORM, STORY_CHECKER_ANSWER_FORM } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
+  CONTENT_FOLLOW_UP_SENTENCES, ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
   previewThinkingStepOf, readPromptFrame, schemaFailureLocator, structureRepairKeepsWords, structureRepairTextsKeptAt, withStructureRepair,
   type ProviderCallRequest
 } from "@debateai/providers";
@@ -525,6 +525,16 @@ describe("LG-A withStructureRepair (L32)", () => {
     const money = previewGlmHarness([{ content: BROKEN }]);
     await expect(withStructureRepair(money.gateway, route(new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "spent")).route)
       .call(request())).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("the repair packet for an unreadable reply carries its code and never the full re-ask's sentence (fix round 1)", async () => {
+    const unreadable = previewGlmHarness([{ content: "It is so, by the city's own figures." }]);
+    const repair = route(COPY);
+    await withStructureRepair(unreadable.gateway, repair.route).call(request()).catch(() => undefined);
+    expect(repair.requests).toHaveLength(1);
+    const sent = repair.requests[0]!;
+    expect(readPromptFrame(sent.packet).fields.find((field) => field.name === "machine_rejection_code")!.content).toBe("PARSE_FAILED");
+    expect(JSON.stringify(sent.packet)).not.toContain(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
   });
 
   // Ruling R9 (pre-flight PF-A48): the run's attempt ceiling, raised unwrapped by the repair gateway's `assertAttemptAllowed`
