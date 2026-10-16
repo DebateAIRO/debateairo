@@ -151,21 +151,28 @@ export function lengthStartWordsOf(step: LengthCallStep): number | null {
   return LENGTH_GUIDANCE_START.standardWords[step];
 }
 
+// Kana is matched by Script, not Script_Extensions: the ideographic marks (、。) carry Hiragana in Script_Extensions.
+// The katakana long-vowel mark U+30FC is Script=Common, so it is named here.
 const HAN = /\p{Script=Han}/gu;
-const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}\u30FC]/gu;
 const THAI = /\p{Script=Thai}/gu;
-const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/gu;
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC\p{Script=Thai}]/gu;
+const HAS_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 
 function countMatches(text: string, pattern: RegExp): number {
   return text.match(pattern)?.length ?? 0;
 }
 
-/** One string's words: 0 unless it is prose (3+ space-separated words, or 6+ Han/Kana/Thai characters). */
+/**
+ * One string's words: 0 unless it is prose (3+ space-separated words, or 6+ Han/Kana/Thai characters). A space-separated
+ * token counts only with a letter or a digit in it, so the full-width punctuation alone is no word.
+ */
 function stringWords(text: string, factors: CharactersPerWord): number {
   const han = countMatches(text, HAN);
   const kana = countMatches(text, KANA);
   const thai = countMatches(text, THAI);
-  const spaced = text.replace(UNSPACED, " ").split(/\s+/u).filter((token) => token.length > 0).length;
+  const spaced = text.replace(UNSPACED, " ").split(/\s+/u)
+    .filter((token) => HAS_LETTER_OR_DIGIT.test(token)).length;
   if (spaced < 3 && han + kana + thai < 6) return 0;
   const cjk = han + kana === 0 ? 0 : (han + kana) / (kana > 0 ? factors.ja : factors.zh);
   return spaced + cjk + thai / factors.th;
@@ -186,8 +193,12 @@ export function proseWordCount(value: unknown,
   while (stack.length > 0) {
     const item = stack.pop();
     if (typeof item === "string") total += stringWords(item, charactersPerWord);
-    else if (Array.isArray(item)) stack.push(...item);
-    else if (typeof item === "object" && item !== null) stack.push(...Object.values(item));
+    else if (Array.isArray(item)) {
+      // A loop, not a spread: a spread of a very long array overflows the call's argument list.
+      for (const child of item) stack.push(child);
+    } else if (typeof item === "object" && item !== null) {
+      for (const child of Object.values(item)) stack.push(child);
+    }
   }
   return Math.round(total);
 }

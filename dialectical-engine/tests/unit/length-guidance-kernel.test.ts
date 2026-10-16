@@ -93,9 +93,13 @@ describe("the answer room (L14, L25)", () => {
     expect(storytellerAnswerRoomTokens(805, 3000, 3)).toBe(11415);
   });
 
-  it("refuses a non-positive or non-finite input", () => {
+  it("refuses a non-positive or non-finite input in every argument position", () => {
     for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => answerRoomTokens(bad, 4, 3)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
+      expect(() => answerRoomTokens(250, bad, 3)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
+      expect(() => answerRoomTokens(250, 4, bad)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
+      expect(() => storytellerAnswerRoomTokens(bad, 3000, 3)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
+      expect(() => storytellerAnswerRoomTokens(805, bad, 3)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
       expect(() => storytellerAnswerRoomTokens(805, 3000, bad)).toThrow("LENGTH_ANSWER_ROOM_INVALID");
     }
   });
@@ -118,14 +122,41 @@ describe("proseWordCount (spec §3.6)", () => {
     expect(proseWordCount({ text: "这是一个关于城市电车扩建的长句子" })).toBe(10);
     // 10 Han + Kana characters with Kana present / 2.0 = 5 words.
     expect(proseWordCount({ text: "電車の延長は良いです" })).toBe(5);
-    // 10 Thai letters / 5.0 = 2 words.
-    expect(proseWordCount({ text: "สวัสดีครับผม" }, { zh: 1.6, ja: 2.0, th: 5.0 })).toBe(Math.round([..."สวัสดีครับผม"].length / 5));
+    // 12 Thai code points (vowel and tone marks included) / 5.0 = 2.4, rounded: 2 words.
+    expect(proseWordCount({ text: "สวัสดีครับผม" }, { zh: 1.6, ja: 2.0, th: 5.0 })).toBe(2);
     // Fewer than 6 such characters and fewer than 3 words: not prose.
     expect(proseWordCount({ text: "电车" })).toBe(0);
   });
 
+  it("counts Chinese characters over the factor, and neither the commas nor the full stops", () => {
+    // 16 Han characters / 1.6 = 10 words; the full-width commas and the full stop are not words.
+    expect(proseWordCount({ text: "这是一个关于城市，电车扩建的，长句子。" })).toBe(10);
+    // 11 Han characters / 1.6 = 6.875, rounded: 7 words; the four full-width marks add nothing.
+    expect(proseWordCount({ text: "电车扩建，城市，长句子，好的。" })).toBe(7);
+  });
+
+  it("counts a katakana long-vowel mark as Kana, so a loanword is not padded", () => {
+    // 8 Kana characters (the two long-vowel marks of コーヒー and ケーキ included) / 2.0 = 4 words.
+    expect(proseWordCount({ text: "コーヒーとケーキ。" })).toBe(4);
+  });
+
   it("uses the factors it is given", () => {
     expect(proseWordCount({ text: "这是一个关于城市电车扩建的长句子" }, { zh: 2, ja: 2, th: 5 })).toBe(8);
+  });
+
+  it("refuses a factor that is not a positive finite number, in every position", () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => proseWordCount({ text: "a b c" }, { zh: bad, ja: 2, th: 5 })).toThrow("LENGTH_CHARACTERS_PER_WORD_INVALID");
+      expect(() => proseWordCount({ text: "a b c" }, { zh: 1.6, ja: bad, th: 5 })).toThrow("LENGTH_CHARACTERS_PER_WORD_INVALID");
+      expect(() => proseWordCount({ text: "a b c" }, { zh: 1.6, ja: 2, th: bad })).toThrow("LENGTH_CHARACTERS_PER_WORD_INVALID");
+    }
+  });
+
+  it("counts a very long array without a stack overflow", () => {
+    const numbers = Array.from({ length: 200000 }, (_, index) => index);
+    expect(proseWordCount(numbers)).toBe(0);
+    const phrases = Array.from({ length: 200000 }, () => "one two three");
+    expect(proseWordCount(phrases)).toBe(600000);
   });
 
   it("is 0 for a value with no prose, and never throws on odd input", () => {
