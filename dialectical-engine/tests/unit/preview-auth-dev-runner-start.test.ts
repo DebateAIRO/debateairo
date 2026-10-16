@@ -2,9 +2,10 @@
 // its content-free startup event, the runner's narrowed environment and its unit template.
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
 import { validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 import { RUNNER_READY_PROCESS_EVENT, announceRunnerReady } from '../../apps/runner/src/runner-ready.js';
@@ -219,17 +220,13 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     expect(check).toBeGreaterThan(start.indexOf("narrowEnvironment('runner'"));
     expect(check).toBeLessThan(start.indexOf('assertSelectedRunnerConnection'));
   });
-  it('every end of a started runner prints one fixed code and exits 1', () => {
+  it('every failure of a started runner prints one fixed code and exits 1', () => {
     const events: Record<string, (value?: unknown) => void> = {}, written: string[] = [], exits: number[] = [];
     const target = { on: (name: string, handler: () => void) => { events[name] = handler; }, stderr: { write: (text: string) => written.push(text) }, exit: (code: number) => exits.push(code) };
     const stop = launcher.installRunnerFailureCodes(target);
     events.uncaughtException!(new Error('secret text')); events.unhandledRejection!(new Error('secret text')); stop();
     expect(written).toEqual(Array(3).fill('PREVIEW_RUNNER_STOPPED_ON_FAILURE\n'));
     expect(exits).toEqual([1, 1, 1]);
-    return readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8').then(code => {
-      expect(code.indexOf('const stop=installRunnerFailureCodes();')).toBeLessThan(code.indexOf('started=await launchRunner('));
-      expect(code).toContain('await started.running.then(stop,stop);');
-    });
   });
 
   it.each([
@@ -238,6 +235,73 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
   ])('the executable prints only a code on refusal (%j)', async (argv, expected) => {
     const result = await execute(process.execPath, [resolve(OPERATOR, 'launch-runner.mjs'), ...argv], { cwd: process.cwd(), env: { PATH: process.env.PATH ?? '' } }).then(() => null, (error: { code: number; stdout: string; stderr: string }) => error);
     expect(result).toMatchObject({ code: 1, stdout: '', stderr: expected });
+  });
+});
+
+// 2026-10-16: every planned `systemctl stop debateai-preview-runner` since 2026-10-10 ended with
+// PREVIEW_RUNNER_STOPPED_ON_FAILURE and status 1, so OnFailure= emailed the owner "runner failed".
+// These run the real start mode (startRunner) in a child process with real signals; only the
+// worker is a stand-in. Like the Hatchet worker (worker-internal.js: process.on('SIGTERM'|'SIGINT')
+// -> exitGracefully -> the listener ends and start() returns), it ends main shortly after a signal.
+const CHILD = `
+const { startRunner } = await import(process.env.LAUNCHER_URL);
+const worker = JSON.parse(process.env.FAKE_WORKER);
+setInterval(() => {}, 1000); // the worker's open connection keeps a real runner alive
+await startRunner([], async () => {
+  if (worker.uncaughtWhileStarting) { setTimeout(() => { throw new Error('secret text'); }, 1); return new Promise(() => {}); }
+  let end, fail;
+  const running = new Promise((resolveRun, rejectRun) => { end = resolveRun; fail = rejectRun; });
+  const finish = () => setTimeout(() => worker.end === 'fails' ? fail(new Error('secret text')) : end(), 5);
+  if (worker.listensForSignals) { process.on('SIGTERM', finish); process.on('SIGINT', finish); }
+  if (worker.endsAlone) finish();
+  // Like PREVIEW_RUNNER_STARTED, printed before startRunner listens. With no listener at all the OS
+  // ends the process at once, so a worker that does not listen announces after startRunner does.
+  if (worker.listensForSignals) process.stdout.write('READY\\n');
+  else setImmediate(() => process.stdout.write('READY\\n'));
+  return { event: {}, running };
+});
+`;
+type FakeWorker = { listensForSignals?: boolean; endsAlone?: boolean; end?: 'returns' | 'fails'; uncaughtWhileStarting?: boolean };
+function startFakeRunner(worker: FakeWorker, signal: NodeJS.Signals | null) {
+  return new Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string }>((resolveRun, rejectRun) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', CHILD], {
+      env: { PATH: process.env.PATH ?? '', LAUNCHER_URL: pathToFileURL(resolve(OPERATOR, 'launch-runner.mjs')).href, FAKE_WORKER: JSON.stringify(worker) }
+    });
+    let stdout = '', stderr = '', pending = signal;
+    const guard = setTimeout(() => child.kill('SIGKILL'), 15_000);
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+      if (pending && stdout.includes('READY\n')) { child.kill(pending); pending = null; }
+    });
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.on('error', rejectRun);
+    child.on('close', (code, closedBy) => { clearTimeout(guard); resolveRun({ code, signal: closedBy, stdout, stderr }); });
+  });
+}
+
+describe('how a started runner ends (startRunner, real process and signals)', () => {
+  it.each([
+    ['systemctl stop (SIGTERM)', 'SIGTERM'],
+    ['Ctrl-C (SIGINT)', 'SIGINT']
+  ] as const)('a stop someone asked for, %s, prints PREVIEW_RUNNER_STOPPED and exits 0', async (_name, signal) => {
+    const result = await startFakeRunner({ listensForSignals: true, end: 'returns' }, signal);
+    expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_STOPPED\n', stderr: '' });
+  });
+  it('an asked stop with no worker listening for the signal still ends at once, exit 0', async () => {
+    const result = await startFakeRunner({ listensForSignals: false }, 'SIGTERM');
+    expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_STOPPED\n', stderr: '' });
+  });
+  it.each([
+    ['main returns with no stop asked (the listener ended on its own)', { listensForSignals: true, endsAlone: true, end: 'returns' }, null],
+    ['main fails with no stop asked (Hatchet refused)', { listensForSignals: true, endsAlone: true, end: 'fails' }, null],
+    ['main fails during an asked stop', { listensForSignals: true, end: 'fails' }, 'SIGTERM']
+  ] as const)('%s: prints only PREVIEW_RUNNER_STOPPED_ON_FAILURE and exits 1', async (_name, worker, signal) => {
+    const result = await startFakeRunner(worker, signal);
+    expect(result).toEqual({ code: 1, signal: null, stdout: 'READY\n', stderr: 'PREVIEW_RUNNER_STOPPED_ON_FAILURE\n' });
+  });
+  it('an uncaught error while starting prints only PREVIEW_RUNNER_STOPPED_ON_FAILURE and exits 1', async () => {
+    const result = await startFakeRunner({ uncaughtWhileStarting: true }, null);
+    expect(result).toEqual({ code: 1, signal: null, stdout: '', stderr: 'PREVIEW_RUNNER_STOPPED_ON_FAILURE\n' });
   });
 });
 
