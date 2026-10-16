@@ -26,6 +26,7 @@ import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-obs
 import {
   callFamilyOf,
   issueListFromParseError,
+  PRACTICE_ISSUE_LIST,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
@@ -242,8 +243,46 @@ export function practiceRepairRows(tries: readonly PracticeTryRecord[]): readonl
 }
 
 const FOLLOW_UPS: ReadonlySet<string> = new Set(["STRUCTURE", "PATCH", "FULL", "LENGTH_RETRY"]);
-/** An issue written as `code@path` (`issueListFromParseError`): a machine code before the `@`. */
-const ISSUE_CODE = /^[A-Za-z_]+@/u;
+
+/** One ledger row as the call join reads it (`practiceTryJoiner`). */
+export type PracticeLedgerTry = Readonly<{
+  actorRef: string; model: string; callSiteKey: string; outcome: string;
+  /** The reply its step refused (PARSE_FAILED, SCHEMA_FAILED or UNPARSED). */
+  formatFailed: boolean;
+  /** The artifact's own `reply_form` (migration 0120); null for an older row or a try with no reply. */
+  recordedForm: string | null;
+}>;
+
+/**
+ * Where one try belongs: `callKey`, the call it is a try of; `callModel`, that call's AI (its first try's); `recordModel`,
+ * the AI the report's two tables name for this try (an accepted try's own writer, a refused try's call); `replyForm`.
+ */
+export type PracticeJoinedTry = Readonly<{ callKey: string; callModel: string; recordModel: string; replyForm: PracticeReplyForm | null }>;
+
+/**
+ * LG-A (L32, Review Focus 5): the call join, fed ledger rows in ledger order. A call is one step on one maker (its
+ * call-site key and actor) with all its tries; a structure-repair try (`REPAIR:STRUCTURE:<key>`, the repair model's row)
+ * joins the last REFUSED call of the key it names, so the slip rule counts the original AI's one call (fixed: a warning)
+ * and never the repair model's. With no refused call of that key it stays a call of its own. Only a refused try of a
+ * plain key marks its call as the one a later repair joins. The form is the artifact's record; else a structure-repair
+ * try's is STRUCTURE (its prompt's `machine_rejection_code` block would read as FULL); else `promptForm` reads it from
+ * the try's recorded prompt.
+ */
+export function practiceTryJoiner(): (attempt: PracticeLedgerTry, promptForm: () => Promise<PracticeReplyForm | null>) => Promise<PracticeJoinedTry> {
+  const lastRefusedCall = new Map<string, string>();
+  const callModels = new Map<string, string>();
+  return async (attempt, promptForm) => {
+    const original = structureRepairOriginalKey(attempt.callSiteKey);
+    const repair = original !== attempt.callSiteKey;
+    const ownKey = `${attempt.actorRef}\u0000${attempt.callSiteKey}`;
+    const callKey = repair ? lastRefusedCall.get(original) ?? ownKey : ownKey;
+    const callModel = callModels.get(callKey) ?? attempt.model;
+    callModels.set(callKey, callModel);
+    if (attempt.formatFailed && !repair) lastRefusedCall.set(attempt.callSiteKey, callKey);
+    const replyForm = (attempt.recordedForm as PracticeReplyForm | null) ?? (repair ? "STRUCTURE" : await promptForm());
+    return Object.freeze({ callKey, callModel, recordModel: attempt.outcome === "OK" ? attempt.model : callModel, replyForm });
+  };
+}
 
 /**
  * Every reply its step refused that code could not repair, with its class, the follow-up the same call sent next (the
@@ -260,7 +299,7 @@ export function practiceUnrepairedRows(tries: readonly PracticeTryRecord[]): rea
     const followUp = next?.replyForm !== undefined && next.replyForm !== null && FOLLOW_UPS.has(next.replyForm)
       ? next.replyForm as PracticeUnrepairedRow["followUp"] : "NONE";
     // Only a `code@path` issue is split (a free-text parse error, which may quote the reply, is never a code here).
-    const at = attempt.issue !== null && ISSUE_CODE.test(attempt.issue) ? attempt.issue.indexOf("@") : -1;
+    const at = attempt.issue !== null && PRACTICE_ISSUE_LIST.test(attempt.issue) ? attempt.issue.indexOf("@") : -1;
     rows.push(Object.freeze({
       model: attempt.model, step: practiceStepOf(attempt.callSiteKey), failureClass: attempt.failureClass,
       code: at > 0 ? attempt.issue!.slice(0, at) : attempt.parseStatus ?? "UNKNOWN",
@@ -346,8 +385,8 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const messages = await promptMessagesOf(attemptId);
     return messages === null ? null : practiceMapKeyPointIdsOf(messages);
   };
-  // LG-A (L32): a structure-repair try joins the call it repairs: the last refused call of the key it names.
-  const lastRefusedCall = new Map<string, string>();
+  // LG-A (L32): a structure-repair try joins the call it repairs (`practiceTryJoiner`).
+  const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
   for (const entry of entries) {
     const model = modelOfRef(entry.actor_ref);
@@ -373,17 +412,11 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const formatFailed = parseStatus === "PARSE_FAILED" || parseStatus === "SCHEMA_FAILED" || parseStatus === "UNPARSED";
     if (entry.outcome === "REFUSED") refusedCalls += 1;
     else if (entry.outcome !== "OK" && !formatFailed) failedCalls += 1;
-    const original = structureRepairOriginalKey(entry.call_site_key);
-    const ownKey = `${entry.actor_ref}\u0000${entry.call_site_key}`;
-    const callKey = original !== entry.call_site_key ? lastRefusedCall.get(original) ?? ownKey : ownKey;
-    const call = calls.get(callKey) ?? { model, tries: [] };
+    const { callKey, callModel, recordModel, replyForm } = await joinTry({ actorRef: entry.actor_ref, model,
+      callSiteKey: entry.call_site_key, outcome: entry.outcome, formatFailed, recordedForm: artifact?.reply_form ?? null },
+    () => replyFormOf(entry.attempt_id));
+    const call = calls.get(callKey) ?? { model: callModel, tries: [] };
     calls.set(callKey, call);
-    // LG-A: the attempt's own record of what it sent (migration 0120), else what its prompt shows (older rows). A
-    // structure-repair try with no recorded form (refused before a reply) is the structure call all the same: its
-    // prompt's `machine_rejection_code` block would read as a full re-ask.
-    const recordedForm = (artifact?.reply_form ?? null) as PracticeReplyForm | null;
-    const replyForm = recordedForm ?? (original !== entry.call_site_key ? "STRUCTURE" : await replyFormOf(entry.attempt_id));
-    if (formatFailed && original === entry.call_site_key) lastRefusedCall.set(entry.call_site_key, callKey);
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
@@ -406,7 +439,6 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     }
     // A refused try is the call's (the original AI's); an accepted one is its writer's own (a structure-repair try: the
     // repair model's copy, whose own code repairs are counted under that model).
-    const recordModel = entry.outcome === "OK" ? model : call.model;
     records.push(Object.freeze({ callKey, model: recordModel, callSiteKey: entry.call_site_key, outcome: entry.outcome,
       parseStatus: artifact === undefined ? null : parseStatus, replyForm, repairs: artifact?.reply_repairs ?? null,
       failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, replyText: refused?.replyText ?? null }));

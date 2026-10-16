@@ -81,6 +81,7 @@ import {
 } from "@debateai/serve";
 import {
   STORY_CHECKER_CONTRACT_ID,
+  STORY_FIXER_OPTIONS,
   STORYTELLER_CONTRACT_ID,
   StoryWriter,
   classifyCheckerContent,
@@ -103,10 +104,17 @@ export type PracticeLane = typeof PRACTICE_LANES[number];
 
 /* ------------------------------------------------------------------ diagnosis */
 
+/** A list of `code@path` issues (one or more, comma-joined): machine codes and paths only, never free text. */
+export const PRACTICE_ISSUE_LIST = /^[A-Za-z_]+@[^,\s]*(?:,[A-Za-z_]+@[^,\s]*)*$/u;
+/** A message that is itself a machine code (`STRUCTURE_REPAIR_NOT_VERBATIM`). */
+const MACHINE_CODE = /^[A-Z][A-Z0-9_]*$/u;
+
 /**
  * A format check's error text as `code@path` entries. Two forms exist in the engine: the judge's tolerant parser
  * already writes `code@path,code@path` ($ for the root); the runner's and the story's checks write zod's issue list
- * as JSON (`[{"code":..,"path":[..],..}]`). Anything else (a plain parse error) is returned as one entry.
+ * as JSON (`[{"code":..,"path":[..],..}]`). Anything else (a plain parse error) is returned as one entry. A `custom`
+ * issue whose message is a machine code (`STRUCTURE_REPAIR_NOT_VERBATIM`, LG-A) is named by that code; any other message
+ * stays out (`custom`), so no free text becomes a code.
  */
 export function issueListFromParseError(parseError: string | null | undefined): readonly string[] {
   if (parseError === null || parseError === undefined || parseError.trim() === "") return Object.freeze([]);
@@ -117,14 +125,15 @@ export function issueListFromParseError(parseError: string | null | undefined): 
       if (Array.isArray(issues)) {
         return Object.freeze(issues.map((issue) => {
           const row = (typeof issue === "object" && issue !== null ? issue : {}) as Record<string, unknown>;
-          const code = typeof row.code === "string" ? row.code : typeof row.message === "string" ? row.message : "issue";
+          const coded = row.code === "custom" && typeof row.message === "string" && MACHINE_CODE.test(row.message);
+          const code = typeof row.code === "string" && !coded ? row.code : typeof row.message === "string" ? row.message : "issue";
           const path = Array.isArray(row.path) && row.path.length > 0 ? row.path.map(String).join(".") : "$";
           return `${code}@${path}`;
         }));
       }
     } catch { /* fall through: not the JSON form */ }
   }
-  if (/^[A-Za-z_]+@[^,\s]*(?:,[A-Za-z_]+@[^,\s]*)*$/u.test(text)) return Object.freeze(text.split(","));
+  if (PRACTICE_ISSUE_LIST.test(text)) return Object.freeze(text.split(","));
   return Object.freeze([text.length > 300 ? `${text.slice(0, 300)}...` : text]);
 }
 
@@ -363,12 +372,6 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
 }
 
 /**
- * LG-A Task 7 review: the options the live story reader hands the reply fixer (packages/story validate.ts
- * `STORY_FIXER_OPTIONS`, not exported): a stray text under a name the story declares is kept, never dropped.
- */
-const PRACTICE_STORY_FIXER_OPTIONS = Object.freeze({ keepDeclaredTexts: true });
-
-/**
  * Re-runs the job's own format check on a stored reply. The story's storyteller check needs the run's material
  * index (which refs exist), which is not stored: the reply is checked against the story's schema only (after the reply
  * fixer, as the live reader reads it). A structure-repair try is checked as the step it repairs. The review
@@ -400,7 +403,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       // the reply fixer with the story's own options, then the schema again. A refusal lists the schema's own first reading.
       const read = StoryBodySchema.safeParse(parsed);
       if (read.success) return { family, issues: Object.freeze([]) };
-      const fixed = fixReplyStructure(parsed, StoryBodySchema, PRACTICE_STORY_FIXER_OPTIONS);
+      const fixed = fixReplyStructure(parsed, StoryBodySchema, STORY_FIXER_OPTIONS);
       if (fixed !== null && StoryBodySchema.safeParse(fixed.value).success) return { family, issues: Object.freeze([]) };
       return { family, issues: fromZod(read) };
     }

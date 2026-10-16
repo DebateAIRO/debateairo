@@ -25,6 +25,7 @@ export {
 export {
   STORY_BODY_PROSE,
   STORY_CHECKER_PROSE,
+  STORY_FIXER_OPTIONS,
   StoryCheckerVerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,

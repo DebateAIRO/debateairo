@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { callFamilyOf, practiceJsonRepairOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
-import { practiceRepairRows, practiceUnrepairedRows, type PracticeTryRecord } from "../../tools/preview-practice/practice-debate.js";
+import { callFamilyOf, issueListFromParseError, practiceJsonRepairOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
+import {
+  practiceRepairRows, practiceTryJoiner, practiceUnrepairedRows, type PracticeJoinedTry, type PracticeLedgerTry, type PracticeTryRecord
+} from "../../tools/preview-practice/practice-debate.js";
+import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { practiceModelCalls } from "../../tools/preview-practice/practice-verdict.js";
 import { buildTranscriptAttempts, type TranscriptArtifact, type TranscriptLedgerRow } from "../../tools/preview-practice/practice-transcript.js";
 
@@ -175,5 +178,111 @@ describe("LG-A practice: a failed structure-repair try, a free-text refusal, and
     expect(recorded).toMatchObject({ replyForm: "STRUCTURE", parse: { jsonRepairs: ["TRAILING_COMMA", "RAW_LINE_BREAK"], failureClass: null } });
     expect(worked).toMatchObject({ replyForm: null, parse: { jsonRepair: "CODE_FENCE", jsonRepairs: ["CODE_FENCE"], failureClass: null } });
     expect(repair).toMatchObject({ family: "STRUCTURE_REPAIR", replyForm: "STRUCTURE", parse: { jsonRepairs: [], failureClass: null } });
+  });
+});
+
+/** Review round 1 (Review Focus 5): the ledger rows of a debate, joined into calls exactly as `collect` joins them. */
+async function joined(rows: readonly (Omit<PracticeLedgerTry, "recordedForm"> & { recordedForm?: string | null })[]) {
+  const join = practiceTryJoiner();
+  const promptReads: string[] = [];
+  const out: PracticeJoinedTry[] = [];
+  for (const row of rows) {
+    out.push(await join({ recordedForm: null, ...row }, async () => { promptReads.push(row.callSiteKey); return "ORIGINAL"; }));
+  }
+  return { out, promptReads };
+}
+/** The slip rule over joined tries: each call's tries, under its call's AI. */
+function slipRule(rows: readonly Pick<PracticeLedgerTry, "outcome" | "formatFailed">[], joins: readonly PracticeJoinedTry[]) {
+  const calls = new Map<string, { model: string; tries: { outcome: string; parseStatus: string | null; replyForm: string | null }[] }>();
+  rows.forEach((row, index) => {
+    const join = joins[index]!;
+    const call = calls.get(join.callKey) ?? { model: join.callModel, tries: [] };
+    call.tries.push({ outcome: row.outcome, parseStatus: row.formatFailed ? "SCHEMA_FAILED" : row.outcome === "OK" ? "PARSED" : null, replyForm: join.replyForm });
+    calls.set(join.callKey, call);
+  });
+  return practiceModelCalls([...calls.values()] as never);
+}
+const GLM_REF = "deepinfra:glm";
+const HAIKU_REF = "anthropic:haiku";
+const MIMO = "XiaomiMiMo/MiMo";
+const MIMO_REF = "deepinfra:mimo";
+const K = "PANEL:JUDGE:critic:root2:r1:p12";
+const K2 = "JUDGE:review:8d823b58";
+const glmRefused = { actorRef: GLM_REF, model: GLM, callSiteKey: K, outcome: "FAILED", formatFailed: true, recordedForm: "ORIGINAL" };
+
+describe("LG-A practice: the call join (practiceTryJoiner, review round 1, Review Focus 5)", () => {
+  it("(a) GLM refused, then Haiku's accepted structure repair: one GLM call, answered and repaired; Haiku has no call", async () => {
+    const rows = [glmRefused, { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K}`, outcome: "OK", formatFailed: false }];
+    const { out, promptReads } = await joined(rows);
+    expect(out).toEqual([
+      { callKey: `${GLM_REF}\u0000${K}`, callModel: GLM, recordModel: GLM, replyForm: "ORIGINAL" },
+      { callKey: `${GLM_REF}\u0000${K}`, callModel: GLM, recordModel: HAIKU, replyForm: "STRUCTURE" }
+    ]);
+    expect(promptReads).toEqual([]);
+    expect(slipRule(rows, out)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
+  });
+
+  it("(b) a refused structure repair, then GLM's final retry: one GLM call; the refused repair is the call's, never Haiku's slip", async () => {
+    const rows = [glmRefused,
+      { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K}`, outcome: "FAILED", formatFailed: true, recordedForm: "STRUCTURE" },
+      { actorRef: GLM_REF, model: GLM, callSiteKey: K, outcome: "OK", formatFailed: false, recordedForm: "ORIGINAL" }];
+    const { out } = await joined(rows);
+    expect(out.map((join) => join.callKey)).toEqual(Array(3).fill(`${GLM_REF}\u0000${K}`));
+    expect(out.map((join) => join.recordModel)).toEqual([GLM, GLM, GLM]);
+    expect(out.map((join) => join.replyForm)).toEqual(["ORIGINAL", "STRUCTURE", "ORIGINAL"]);
+    expect(slipRule(rows, out)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
+  });
+
+  it("(c) another key's rows between a refusal and its repair: each repair joins the call of the key it names", async () => {
+    const rows = [glmRefused,
+      { actorRef: MIMO_REF, model: MIMO, callSiteKey: K2, outcome: "FAILED", formatFailed: true },
+      { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K2}`, outcome: "OK", formatFailed: false },
+      { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K}`, outcome: "OK", formatFailed: false }];
+    const { out, promptReads } = await joined(rows);
+    expect(out.map((join) => join.callKey)).toEqual([`${GLM_REF}\u0000${K}`, `${MIMO_REF}\u0000${K2}`, `${MIMO_REF}\u0000${K2}`, `${GLM_REF}\u0000${K}`]);
+    expect(out.map((join) => join.callModel)).toEqual([GLM, MIMO, MIMO, GLM]);
+    // Only the plain row with no recorded form reads its prompt.
+    expect(promptReads).toEqual([K2]);
+    expect(slipRule(rows, out)).toEqual({ [GLM]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 },
+      [MIMO]: { answered: 1, slips: 1, repaired: 1, unrecovered: 0 } });
+  });
+
+  it("(d) an accepted try never marks its call as the one a repair joins", async () => {
+    const accepted = { actorRef: MIMO_REF, model: MIMO, callSiteKey: K, outcome: "OK", formatFailed: false, recordedForm: "ORIGINAL" };
+    const repair = { actorRef: HAIKU_REF, model: HAIKU, callSiteKey: `REPAIR:STRUCTURE:${K}`, outcome: "OK", formatFailed: false };
+    // With no refused call of the key, the repair stays a call of its own.
+    const alone = await joined([accepted, repair]);
+    expect(alone.out[1]).toEqual({ callKey: `${HAIKU_REF}\u0000REPAIR:STRUCTURE:${K}`, callModel: HAIKU, recordModel: HAIKU, replyForm: "STRUCTURE" });
+    // An accepted try of the same key between the refusal and its repair leaves the repair with the refused call.
+    const between = await joined([glmRefused, accepted, repair]);
+    expect(between.out.map((join) => join.callKey)).toEqual([`${GLM_REF}\u0000${K}`, `${MIMO_REF}\u0000${K}`, `${GLM_REF}\u0000${K}`]);
+  });
+});
+
+describe("LG-A practice: review round 1 (codes in report.md, the story fixer's options)", () => {
+  const record = (issue: string, parseStatus = "SCHEMA_FAILED"): PracticeTryRecord => ({ callKey: "k", model: GLM, callSiteKey: K,
+    outcome: "FAILED", parseStatus, replyForm: "STRUCTURE", repairs: null, failureClass: "CONTENT", issue, replyText: "Write me now" });
+
+  it("names a non-verbatim structure repair by its code, never by free text, in report.json and report.md", () => {
+    expect(issueListFromParseError(JSON.stringify([{ code: "custom", path: [], message: "STRUCTURE_REPAIR_NOT_VERBATIM" }])))
+      .toEqual(["STRUCTURE_REPAIR_NOT_VERBATIM@$"]);
+    expect(issueListFromParseError(JSON.stringify([{ code: "custom", path: ["short"], message: "Write me now" }]))).toEqual(["custom@short"]);
+    const [row] = practiceUnrepairedRows([record("STRUCTURE_REPAIR_NOT_VERBATIM@$")]);
+    expect(row).toMatchObject({ code: "STRUCTURE_REPAIR_NOT_VERBATIM", path: "$", sample: "Write me now" });
+    const markdown = reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f",
+      unrepaired: [row] } as never);
+    expect(markdown).toContain("STRUCTURE_REPAIR_NOT_VERBATIM@$ · next: NONE · not recovered");
+    expect(markdown).not.toContain("Write me");
+  });
+
+  it("splits an issue only when the whole of it is a `code@path` list: words after the path never become a path", () => {
+    const [row] = practiceUnrepairedRows([record("invalid_type@$ Write me now")]);
+    expect(row).toMatchObject({ code: "SCHEMA_FAILED", path: "$" });
+  });
+
+  it("re-checks a storyteller's stray text under a name the story declares as the live reader does: kept, so still refused", () => {
+    const stray = JSON.stringify(story((body) => { body.short.line = "A stray position line"; }));
+    expect(recheckReply("STORY:STORYTELLER:1", stray).issues.length).toBeGreaterThan(0);
+    expect(recheckReply("REPAIR:STRUCTURE:STORY:STORYTELLER:1", stray).issues.length).toBeGreaterThan(0);
   });
 });

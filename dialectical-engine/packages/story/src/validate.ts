@@ -304,7 +304,7 @@ export type StoryLanguageCheck = (value: unknown) => readonly unknown[];
  * LG-A Task 7 review (L31): every text name of the story and its check holds words a reader meets, so a stray text under
  * such a name is kept (the reply goes on to the structure-repair call), never dropped. Unknown names are still dropped.
  */
-const STORY_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
+export const STORY_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
 
 type StoryRead<T> = Readonly<{ ok: true; value: T; repairs: readonly ModelJsonRepair[] }> | Readonly<{ ok: false; message: string }>;
 

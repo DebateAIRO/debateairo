@@ -258,7 +258,7 @@ when it answered more than 10: FAIL when slips > max(1, floor(answered / 10)). T
 when it reads a reply (a code fence, prose around the answer, a straight quote inside a text, a missing closing bracket
 at the very end of a reply that finished normally) are counted in the report as information, never as slips.
 
-`repairsByKind` (LG-A): every repair code made in code on an accepted reply, counted per AI and step (`opening`,
+`repairsByKind` (LG-A): every repair made in code on an accepted reply, counted per AI and step (`opening`,
 `pros_cons`, `cross_exchange`, `judge_panel`, `reviewer`, `answer_writer`, `answer_checker`, `story_writer`,
 `story_checker`, `map`, `structure_repair`). `unrepaired`: every reply code could not repair, with its class
 (STRUCTURE, CONTENT, CUT_OFF, EMPTY), its first issue, the follow-up the same call sent next (STRUCTURE = the cheap
