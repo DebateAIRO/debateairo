@@ -18,7 +18,10 @@
  */
 import { createHash } from "node:crypto";
 import { RUN_LEVEL_SPEND_STOP_CODES, STRUCTURE_REPAIR_CALL_SITE_PREFIX, TypedDomainError, lengthCallStepOf } from "@debateai/kernel";
-import { contentRepairsOf, decodeModelJson } from "./model-json.js";
+import {
+  STRUCTURE_SALVAGE_REPAIRS, contentRepairsOf, decodeModelJson, modelJsonFenceBody, parsedWithRepairs,
+  type ModelReplyFacts, type StructureSalvageRepair
+} from "./model-json.js";
 import { buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract } from "./prompt-frame.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
@@ -119,23 +122,32 @@ const FORM_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 /** Whitespace the form may put between a key and its colon (read by a plain loop: CodeQL #67, no regex on a run). */
 const FORM_SPACE = /\s/u;
 
-/** The places a form states, and which of them hold a list (`"key": [` or `"key": … string[]`). */
-type FormShape = Readonly<{ places: ReadonlySet<string>; lists: ReadonlySet<string> }>;
-const NO_FORM_SHAPE: FormShape = Object.freeze({ places: new Set<string>(), lists: new Set<string>() });
+/**
+ * The places a form states, and which of them hold a list (`"key": [` or `"key": … string[]`). Refused-repair salvage
+ * (A1, pre-flight PF-S4): which hold a TEXT (`"key": non-empty string`, no list or object in its value) and which an enum
+ * LABEL list (`"key": "REAL_ATTACK" | …`). `structureRepairKeepsWords` reads neither.
+ */
+type FormShape = Readonly<{ places: ReadonlySet<string>; lists: ReadonlySet<string>; texts: ReadonlySet<string>;
+  labels: ReadonlySet<string> }>;
+const NO_FORM_SHAPE: FormShape = Object.freeze({ places: new Set<string>(), lists: new Set<string>(), texts: new Set<string>(),
+  labels: new Set<string>() });
 
 /**
  * Task 12b: the PLACES `answerForm` states, read from its own nesting: each quoted key followed by `:`, with the quoted keys
  * of the objects around it (list brackets add nothing, as list positions add nothing to a value's path), dotted
  * (`fallacy.fatalFlags.description`). Prose around the form's skeleton holds no quoted key followed by `:`, and its
  * brackets (`number [0,1]`, `string[]`) close where they open. Task 12b round 2: a place holds a LIST when its value
- * opens with `[` or, before the next `,` `}` or line end, says `[]` (`"ambiguityFlags": non-empty string[]`). Every loop
- * moves forward only, so the reading is linear in the form's length.
+ * opens with `[` or, before the next `,` `}` or line end, says `[]` (`"ambiguityFlags": non-empty string[]`). A1 (pre-flight
+ * PF-S4): from that same value span, a place holds a TEXT when it says `string` with no `[` and no `{`, and an enum LABEL
+ * list when it opens with `"`. Every loop moves forward only, so the reading is linear in the form's length.
  */
 function formShape(answerForm: string): FormShape {
   type Frame = { object: boolean; key: string | null };
   const stack: Frame[] = [];
   const places = new Set<string>();
   const lists = new Set<string>();
+  const texts = new Set<string>();
+  const labels = new Set<string>();
   for (let index = 0; index < answerForm.length; index += 1) {
     const character = answerForm[index]!;
     if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null }); continue; }
@@ -155,11 +167,14 @@ function formShape(answerForm: string): FormShape {
       while (value < answerForm.length && FORM_SPACE.test(answerForm[value]!)) value += 1;
       let stop = value;
       while (stop < answerForm.length && !",}\n".includes(answerForm[stop]!)) stop += 1;
-      if (answerForm[value] === "[" || answerForm.slice(value, stop).includes("[]")) lists.add(place);
+      const span = answerForm.slice(value, stop);
+      if (answerForm[value] === "[" || span.includes("[]")) lists.add(place);
+      if (span.includes("string") && !span.includes("[") && !span.includes("{")) texts.add(place);
+      if (answerForm[value] === "\"") labels.add(place);
     }
     index = end;
   }
-  return Object.freeze({ places, lists });
+  return Object.freeze({ places, lists, texts, labels });
 }
 
 /**
@@ -495,6 +510,316 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
     return typeof entry.value !== "string" || !belongs(entry) || entry.path.length === 0 || !asked(entry) || text === ""
       || keptTexts.some((kept) => kept.includes(` ${text} `));
   });
+}
+
+/* ------------------------------------------------------------------------------------------------------------------------
+ * Refused-repair salvage (2026-10-16, A1): THE VERIFIED SUBSET, read in code with no call, before the structure-repair call.
+ *
+ * Plain words: a reply broken only in its JSON form is often whole once a few values the step never asked for are left
+ * out: a sentence written with no key, a key written twice with the same value, a copy of a value under a second name, a
+ * stray note. A1 reads the reply as a tree, leaves out exactly those, and nothing else: it never moves, changes or fills a
+ * value. Its result counts only when the word-for-word check (`structureRepairKeepsWords`) still holds and the step's own
+ * check accepts it with no repair that changes a value. When the step still refuses it, the object A1 built is handed on
+ * (PARTIAL) for the follow-up to the original AI to finish.
+ * ---------------------------------------------------------------------------------------------------------------------- */
+
+/** Why A1 left a reply as it was (each its own guard). */
+export type StructureSalvageRefusal = "KEYLESS_KEPT" | "KEYLESS_LIST_ENTRY" | "DUPLICATE_DIFFERS" | "DOTTED_KEY" | "NOT_DROPPABLE"
+  | "WORDS_NOT_KEPT" | "VALUE_CHANGING_REPAIR" | "NOTHING_TO_DROP";
+
+/**
+ * A1's result: ACCEPTED (the step accepts `content`, A1's drops named on `classification`), PARTIAL (A1 built an object the
+ * step still refuses, with that refusal), REFUSED (A1 may not drop what the reply would need), NO_OBJECT (no object read).
+ */
+export type StructureSalvage =
+  | Readonly<{ kind: "ACCEPTED"; content: string; classification: ContentClassification; repairs: readonly StructureSalvageRepair[] }>
+  | Readonly<{ kind: "PARTIAL"; base: Readonly<Record<string, unknown>>;
+      classification: Extract<ContentClassification, { parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED" }> }>
+  | Readonly<{ kind: "REFUSED"; reason: StructureSalvageRefusal }>
+  | Readonly<{ kind: "NO_OBJECT" }>;
+
+type ReplyTree =
+  | Readonly<{ kind: "object"; members: readonly ReplyTreeMember[] }>
+  | Readonly<{ kind: "list"; entries: readonly ReplyTree[] }>
+  | Readonly<{ kind: "scalar"; value: string | number | boolean | null }>;
+/** `key` null: a value written where `"key":` was expected (keyless); `afterText`: the member before it held a bare text. */
+type ReplyTreeMember = Readonly<{ key: string | null; value: ReplyTree; afterText: boolean }>;
+
+/** One JSON number token (read sticky at one position: no regex over a run). */
+const JSON_NUMBER_TOKEN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
+const JSON_BLANKS = " \t\n\r";
+const JSON_WORDS: readonly (readonly [string, boolean | null])[] = Object.freeze([["true", true], ["false", false], ["null", null]]);
+
+const isTextNode = (node: ReplyTree): boolean => node.kind === "scalar" && typeof node.value === "string";
+
+/**
+ * The reply as a tree: the text, trimmed, is one object, or one object inside one code fence; else null. Strict JSON
+ * grammar (strings read by JSON.parse of their own token) with exactly two tolerances, which the tree keeps for A1 to
+ * judge: a value inside an object where `"key":` was expected, followed by `,` or `}` (a member with no key), and a key
+ * written again in one object (both members kept, in order). Forward-only: every position is read once.
+ */
+function readReplyTree(text: string): ReplyTree | null {
+  const trimmed = text.trim();
+  const body = (modelJsonFenceBody(trimmed) ?? trimmed).trim();
+  if (!body.startsWith("{")) return null;
+  let at = 0;
+  const blank = (): void => { while (at < body.length && JSON_BLANKS.includes(body[at]!)) at += 1; };
+  const readString = (): string | null => {
+    let end = at + 1;
+    while (end < body.length && body[end] !== "\"") end += body[end] === "\\" ? 2 : 1;
+    if (end >= body.length) return null;
+    try {
+      const read: unknown = JSON.parse(body.slice(at, end + 1));
+      at = end + 1;
+      return typeof read === "string" ? read : null;
+    } catch { return null; }
+  };
+  const scalar = (value: string | number | boolean | null): ReplyTree => Object.freeze({ kind: "scalar" as const, value });
+  const readValue = (): ReplyTree | null => {
+    blank();
+    const character = body[at];
+    if (character === "{") return readObject();
+    if (character === "[") return readList();
+    if (character === "\"") { const read = readString(); return read === null ? null : scalar(read); }
+    const word = JSON_WORDS.find(([spelling]) => body.startsWith(spelling, at));
+    if (word !== undefined) { at += word[0].length; return scalar(word[1]); }
+    JSON_NUMBER_TOKEN.lastIndex = at;
+    const number = JSON_NUMBER_TOKEN.exec(body);
+    if (number === null) return null;
+    at += number[0].length;
+    return scalar(Number(number[0]));
+  };
+  const readObject = (): ReplyTree | null => {
+    at += 1;
+    const members: ReplyTreeMember[] = [];
+    const done = (): ReplyTree => Object.freeze({ kind: "object" as const, members: Object.freeze(members) });
+    blank();
+    if (body[at] === "}") { at += 1; return done(); }
+    for (;;) {
+      blank();
+      let key: string | null = null;
+      let value: ReplyTree | null;
+      if (body[at] === "\"") {
+        const read = readString();
+        if (read === null) return null;
+        blank();
+        if (body[at] === ":") { at += 1; key = read; value = readValue(); } else value = scalar(read);
+      } else value = readValue();
+      if (value === null) return null;
+      const before = members.at(-1);
+      members.push(Object.freeze({ key, value, afterText: key === null && before !== undefined && isTextNode(before.value) }));
+      blank();
+      if (body[at] === ",") { at += 1; continue; }
+      if (body[at] === "}") { at += 1; return done(); }
+      return null;
+    }
+  };
+  const readList = (): ReplyTree | null => {
+    at += 1;
+    const entries: ReplyTree[] = [];
+    const done = (): ReplyTree => Object.freeze({ kind: "list" as const, entries: Object.freeze(entries) });
+    blank();
+    if (body[at] === "]") { at += 1; return done(); }
+    for (;;) {
+      const entry = readValue();
+      if (entry === null) return null;
+      entries.push(entry);
+      blank();
+      if (body[at] === ",") { at += 1; continue; }
+      if (body[at] === "]") { at += 1; return done(); }
+      return null;
+    }
+  };
+  try {
+    const root = readObject();
+    blank();
+    return root !== null && at === body.length ? root : null;
+  } catch {
+    // A reply nested past the engine's call stack is no tree A1 reads.
+    return null;
+  }
+}
+
+/** Whether any key of the tree names a place by its parts (`"evidence.quality"`). */
+function hasDottedKey(node: ReplyTree): boolean {
+  if (node.kind === "list") return node.entries.some(hasDottedKey);
+  if (node.kind === "scalar") return false;
+  return node.members.some((member) => (member.key?.includes(".") ?? false) || hasDottedKey(member.value));
+}
+
+/** Two members written the same way (order, keys and values), so one of them is a plain repeat. */
+function sameTree(left: ReplyTree, right: ReplyTree): boolean {
+  if (left.kind === "scalar" || right.kind === "scalar") return left.kind === "scalar" && right.kind === "scalar" && left.value === right.value;
+  if (left.kind === "list" || right.kind === "list") {
+    return left.kind === "list" && right.kind === "list" && left.entries.length === right.entries.length
+      && left.entries.every((entry, at) => sameTree(entry, right.entries[at]!));
+  }
+  return left.members.length === right.members.length && left.members.every((member, at) => {
+    const other = right.members[at]!;
+    return member.key === other.key && sameTree(member.value, other.value);
+  });
+}
+
+const isPlainObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Deep equality of decoded JSON values (an object's key order does not count). */
+function sameJson(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((entry, at) => sameJson(entry, right[at]));
+  }
+  if (isPlainObject(left) && isPlainObject(right)) {
+    const keys = Object.keys(left);
+    return keys.length === Object.keys(right).length && keys.every((key) => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
+  }
+  return left === right;
+}
+
+/** The value kept at a dotted place of `base` (none when the path is missing or passes through a list). */
+const NOT_KEPT = Symbol("NOT_KEPT");
+function keptAt(base: unknown, place: string): unknown {
+  let node: unknown = base;
+  for (const key of place.split(".")) {
+    if (!isPlainObject(node) || !Object.hasOwn(node, key)) return NOT_KEPT;
+    node = node[key];
+  }
+  return node;
+}
+
+/**
+ * An echo matches the value kept at its stated place: equal (a scalar, a list), or an object whose every member equals the
+ * kept object's member of the same name.
+ */
+function echoMatches(echo: unknown, kept: unknown): boolean {
+  if (kept === NOT_KEPT) return false;
+  if (isPlainObject(echo) && isPlainObject(kept)) return Object.keys(echo).every((key) => Object.hasOwn(kept, key) && sameJson(echo[key], kept[key]));
+  return sameJson(echo, kept);
+}
+
+type SalvageEvent = Readonly<{ refusal: StructureSalvageRefusal }> | { readonly place: string; value: unknown };
+
+/**
+ * A1's shaping of a tree against the step's answer form (`formShape`, `formNames`): each member, from the root down, read
+ * at its place (its key path from the root; list positions add nothing), in document order. It records every drop and,
+ * in document order, every refusal and every echo to check once the whole base is built (an echo may sit inside the
+ * very object whose value it echoes).
+ */
+function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string, textsKept: StructureRepairTextsKept): Readonly<{
+  base: Record<string, unknown>; drops: ReadonlySet<StructureSalvageRepair>; events: readonly SalvageEvent[] }> {
+  const form = formShape(answerForm);
+  const names = new Set(formNames(answerForm));
+  const drops = new Set<StructureSalvageRepair>();
+  const events: SalvageEvent[] = [];
+  const refuse = (refusal: StructureSalvageRefusal): void => { events.push(Object.freeze({ refusal })); };
+  const placeOf = (parent: string | null, key: string): string => parent === null ? key : `${parent}.${key}`;
+  const lastName = (place: string): string => place.slice(place.lastIndexOf(".") + 1);
+  const statedBelow = (place: string): boolean => [...form.places].some((stated) => stated.startsWith(`${place}.`));
+  // Pre-flight PF-S4: a name the form states as a text somewhere and nowhere as an enum label list.
+  const statedAsText = (name: string): boolean =>
+    [...form.texts].some((place) => lastName(place) === name) && ![...form.labels].some((place) => lastName(place) === name);
+  const textDroppable = (name: string): boolean => !names.has(name) || (textsKept === "place" && statedAsText(name));
+  const emptyValue = (node: ReplyTree): boolean => (node.kind === "scalar" && node.value === null)
+    || (node.kind === "object" && node.members.length === 0) || (node.kind === "list" && node.entries.length === 0);
+
+  /** A value kept exactly as written; only the two tolerances are judged inside it (pre-flight PF-S1). */
+  const keep = (node: ReplyTree, place: string): unknown => node.kind === "object" ? shapeObject(node, place, true)
+    : node.kind === "list" ? node.entries.map((entry) => keep(entry, place)) : node.value;
+  /** A value at a place the form states: walked into only when the form states a place below it. */
+  const stated = (node: ReplyTree, place: string): unknown => {
+    if (!statedBelow(place)) return keep(node, place);
+    if (node.kind === "object") return shapeObject(node, place, false);
+    if (node.kind === "list") return node.entries.map((entry) => entry.kind === "object" ? shapeObject(entry, place, false) : keep(entry, place));
+    return node.value;
+  };
+  const echo = (node: ReplyTree, name: string): void => {
+    const targets = [...form.places].filter((place) => lastName(place) === name);
+    if (targets.length !== 1) { refuse("NOT_DROPPABLE"); return; }
+    const event = { place: targets[0]!, value: undefined as unknown };
+    events.push(event);
+    event.value = stated(node, event.place);
+    drops.add("ECHO_DROPPED");
+  };
+  function shapeObject(node: ReplyTree & { kind: "object" }, parent: string | null, asWritten: boolean): Record<string, unknown> {
+    const kept = new Map<string, unknown>();
+    const seen = new Map<string, ReplyTree>();
+    let lastKey: string | null = null;
+    for (const member of node.members) {
+      if (member.key === null) {
+        if (textsKept === "anywhere") refuse("KEYLESS_KEPT");
+        else if (member.afterText && lastKey !== null && form.lists.has(placeOf(parent, lastKey))) refuse("KEYLESS_LIST_ENTRY");
+        else drops.add("KEYLESS_VALUE_DROPPED");
+        continue;
+      }
+      const key = member.key;
+      lastKey = key;
+      const earlier = seen.get(key);
+      if (earlier !== undefined) {
+        if (sameTree(earlier, member.value)) drops.add("DUPLICATE_KEY_DROPPED"); else refuse("DUPLICATE_DIFFERS");
+        continue;
+      }
+      seen.set(key, member.value);
+      const place = placeOf(parent, key);
+      if (asWritten) { kept.set(key, keep(member.value, place)); continue; }
+      if (form.places.has(place)) { kept.set(key, stated(member.value, place)); continue; }
+      if (isTextNode(member.value)) {
+        if (textDroppable(key)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
+        continue;
+      }
+      if (emptyValue(member.value)) {
+        if (textsKept === "place" || !names.has(key)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
+        continue;
+      }
+      echo(member.value, key);
+    }
+    return Object.fromEntries(kept);
+  }
+  const base = shapeObject(tree, null, false);
+  return Object.freeze({ base, drops, events });
+}
+
+/**
+ * A1 (refused-repair salvage, 2026-10-16): the verified subset of a STRUCTURE reply, read in code with no call. It DROPS
+ * only: a value written with no key (only where `textsKept` is "place", the judge steps; and never right after a text
+ * under a key the form states as a list, where it is a list's lost `[`); a repeat of a key with the SAME value; a text,
+ * null, `{}` or `[]` under a name not stated at its place, as the step's own fixer drops it (on a "place" step a text only
+ * under a name the form never states or states as a text, never under a number, true/false or enum label list name); and
+ * an exact echo of the value kept at the one stated place of that name. A value at a place the form states as a scalar is
+ * kept exactly as written, a wrapper and all. A dotted key, any other drop and a key written twice with two values refuse.
+ *
+ * With no tree, an object the tolerant decode reads is the base, with no drop. The base counts only when
+ * `structureRepairKeepsWords` holds and then the step's own `classify` (run LAST, on the exact string returned) accepts it
+ * with no value-changing repair: ACCEPTED, its drops named after the step's own repairs, the first drop the headline. A
+ * step refusal hands the base on (PARTIAL) with that refusal; nothing readable is NO_OBJECT.
+ */
+export function salvageStructureReply(input: Readonly<{ content: string; reply: ModelReplyFacts | undefined; answerForm: string;
+  textsKept: StructureRepairTextsKept; classify: (content: string, reply?: ModelReplyFacts) => ContentClassification }>): StructureSalvage {
+  const refused = (reason: StructureSalvageRefusal): StructureSalvage => Object.freeze({ kind: "REFUSED", reason });
+  const tree = readReplyTree(input.content);
+  let base: Readonly<Record<string, unknown>>;
+  let drops: readonly StructureSalvageRepair[] = [];
+  if (tree === null || tree.kind !== "object") {
+    const decoded = decodeModelJson(input.content, input.reply);
+    if (!decoded.ok || !isPlainObject(decoded.value)) return Object.freeze({ kind: "NO_OBJECT" });
+    base = decoded.value;
+  } else {
+    if (hasDottedKey(tree)) return refused("DOTTED_KEY");
+    const shaped = shapeReplyTree(tree, input.answerForm, input.textsKept);
+    for (const event of shaped.events) {
+      if ("refusal" in event) return refused(event.refusal);
+      if (!echoMatches(event.value, keptAt(shaped.base, event.place))) return refused("NOT_DROPPABLE");
+    }
+    base = shaped.base;
+    drops = STRUCTURE_SALVAGE_REPAIRS.filter((repair) => shaped.drops.has(repair));
+  }
+  if (!structureRepairKeepsWords(input.content, base, input.answerForm, { textsKept: input.textsKept })) return refused("WORDS_NOT_KEPT");
+  const content = JSON.stringify(base);
+  const classification = input.classify(content, input.reply);
+  if (classification.parseStatus !== "PARSED") return Object.freeze({ kind: "PARTIAL", base, classification });
+  const stepRepairs = contentRepairsOf(classification);
+  if (stepRepairs.some((repair) => VALUE_CHANGING_REPAIRS.has(repair))) return refused("VALUE_CHANGING_REPAIR");
+  if (drops.length === 0) return refused("NOTHING_TO_DROP");
+  return Object.freeze({ kind: "ACCEPTED", content, classification: parsedWithRepairs([...stepRepairs, ...drops], drops[0]!),
+    repairs: Object.freeze(drops) });
 }
 
 /** A request the wrapper routes: a structured step with its own check and a readable frame, not the evaluator lane, not routed yet. */

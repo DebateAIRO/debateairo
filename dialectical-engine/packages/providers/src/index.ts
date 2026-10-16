@@ -2915,6 +2915,7 @@ export {
   modelJsonSyntaxRepair,
   parsedWithRepairs,
   rememberingAcceptedReply,
+  STRUCTURE_SALVAGE_REPAIRS,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
   type ModelJsonDecodeRepair,
@@ -2922,7 +2923,8 @@ export {
   type ModelJsonSyntaxRepair,
   type MapReplySalvageRepair,
   type ModelJsonRepair,
-  type ModelReplyFacts
+  type ModelReplyFacts,
+  type StructureSalvageRepair
 } from "./model-json.js";
 // Length guidance L27: the words of a reply (information only).
 export { replyWordCount } from "./reply-words.js";
@@ -2938,7 +2940,9 @@ export {
   STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
   STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PASSED_STOPS, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
   structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
-  type StructureRepairTextsKept
+  type StructureRepairTextsKept,
+  // Refused-repair salvage (2026-10-16, A1): the verified subset of a STRUCTURE reply, read in code with no call.
+  salvageStructureReply, type StructureSalvage, type StructureSalvageRefusal
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
