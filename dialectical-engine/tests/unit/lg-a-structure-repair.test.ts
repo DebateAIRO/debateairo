@@ -2,8 +2,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { Judge, classifyStructuredArtifact } from "@debateai/judgement";
-import { STORYTELLER_ANSWER_FORM } from "@debateai/story";
+import { JUDGE_ANSWER_FORM, Judge, classifyStructuredArtifact } from "@debateai/judgement";
+import { STORYTELLER_ANSWER_FORM, STORY_CHECKER_ANSWER_FORM } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, framedAnswerForm,
@@ -69,6 +69,96 @@ describe("LG-A structureRepairKeepsWords (deviation 4)", () => {
   });
 });
 
+/**
+ * Task 12 review, fix round 1: the reviewer's probes, each pinned. Important 1: a repair that keeps only part of a text
+ * (the rest moved to a key the step's fixer then drops) or makes a misspelt key's sentence shorter. Important 2: values
+ * moved between fields (texts, scores, verdicts swapped), true/false read from prose, an enum label read from prose.
+ * Minors: a key's name is never a text, and two fields' texts are never run together.
+ */
+describe("LG-A structureRepairKeepsWords: the reviewer's probes (fix round 1)", () => {
+  const fixture = (name: string) => readFileSync(new URL(`../support/fixtures/judge-format-replies/${name}`, import.meta.url), "utf8");
+  const unfence = (text: string) => text.replace(/^```json\n/u, "").replace(/\n```\s*$/u, "");
+
+  it("refuses a text kept only in part (Important 1)", () => {
+    expect(structureRepairKeepsWords("{\"answer\": \"It is so, but not by the city's own figures\" \"score\": 0.5}",
+      { answer: "It is so, but", x: "It is so, but not by the city's own figures", score: 0.5 })).toBe(false);
+    expect(structureRepairKeepsWords("{\"statment\": \"The plan holds because fares cover costs\", \"score\": 0.5}",
+      { statement: "The plan holds", score: 0.5 })).toBe(false);
+    // The misspelt key's whole sentence under the right name is the repair's job.
+    expect(structureRepairKeepsWords("{\"statment\": \"The plan holds because fares cover costs\", \"score\": 0.5}",
+      { statement: "The plan holds because fares cover costs", score: 0.5 })).toBe(true);
+  });
+
+  it("refuses a text the answer form states that the repair left out (Important 1 c)", () => {
+    const broken = "{\"answer\": \"It is so\" \"note\": \"Only for the central lines\", \"score\": 0.5}";
+    expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, "{\"answer\": string, \"note\": string, \"score\": number}")).toBe(false);
+    expect(structureRepairKeepsWords(broken, { answer: "It is so", score: 0.5 }, "{\"answer\": string, \"score\": number}")).toBe(true);
+  });
+
+  it("the flattened judge reply: nesting is kept; swapped texts or swapped scores are refused (Important 2)", () => {
+    const broken = fixture("mimo-judge-position-en-flattened-nested.txt");
+    const raw = JSON.parse(broken) as Record<string, unknown>;
+    const { steelman, fidelity, critic, counterargumentStrength, basis, ...rest } = raw;
+    const nested = (s: unknown, f: unknown, c: unknown, k: unknown) => ({ ...rest,
+      steelman: { summary: s, fidelity: f }, critic: { summary: c, counterargumentStrength: k, basis } });
+    expect(structureRepairKeepsWords(broken, nested(steelman, fidelity, critic, counterargumentStrength), JUDGE_ANSWER_FORM)).toBe(true);
+    expect(structureRepairKeepsWords(broken, nested(critic, fidelity, steelman, counterargumentStrength), JUDGE_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(broken, nested(steelman, counterargumentStrength, critic, fidelity), JUDGE_ANSWER_FORM)).toBe(false);
+  });
+
+  it("the nested judge reply: swapped summaries are refused (Important 2)", () => {
+    const raw = JSON.parse(unfence(fixture("mimo-judge-position-ro-no-value-laden.txt"))) as Record<string, Record<string, unknown>>;
+    const whole = JSON.stringify({ ...raw, value_laden: false });
+    const broken = whole.replace("},\"critic\"", "} \"critic\"");
+    expect(structureRepairKeepsWords(broken, JSON.parse(whole), JUDGE_ANSWER_FORM)).toBe(true);
+    const swapped = { ...raw, value_laden: false, steelman: { ...raw.steelman, summary: raw.critic!.summary },
+      critic: { ...raw.critic, summary: raw.steelman!.summary } };
+    expect(structureRepairKeepsWords(broken, swapped, JUDGE_ANSWER_FORM)).toBe(false);
+  });
+
+  it("the story checker: a moved criterion and a flipped verdict are refused, prose 'true' is no value (Important 2)", () => {
+    const criteria = { faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: false,
+      citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true };
+    const objection = "It is true that fares fell, and true that riders rose, but the summary says the plan saved the budget, which P7 does not show.";
+    const broken = `{"satisfied": false "objection": ${JSON.stringify(objection)}, "criteria": ${JSON.stringify(criteria)}}`;
+    expect(structureRepairKeepsWords(broken, { satisfied: false, objection, criteria }, STORY_CHECKER_ANSWER_FORM)).toBe(true);
+    expect(structureRepairKeepsWords(broken, { satisfied: false, objection,
+      criteria: { ...criteria, no_overstatement: true, citations_correct: false } }, STORY_CHECKER_ANSWER_FORM)).toBe(false);
+    expect(structureRepairKeepsWords(broken, { satisfied: true, objection,
+      criteria: { ...criteria, no_overstatement: true } }, STORY_CHECKER_ANSWER_FORM)).toBe(false);
+  });
+
+  it("true/false values are never swapped between fields (Important 2)", () => {
+    expect(structureRepairKeepsWords("{\"satisfied\": false \"value_laden\": true}", { satisfied: true, value_laden: false })).toBe(false);
+    expect(structureRepairKeepsWords("{\"satisfied\": false \"value_laden\": true}", { satisfied: false, value_laden: true })).toBe(true);
+  });
+
+  it("an enum label is a whole value of the broken reply, never a word of its prose (Important 2)", () => {
+    const broken = "{\"summary\": \"The claim is supported by nothing the material gives\" \"basis\": \"unsupported\"}";
+    expect(structureRepairKeepsWords(broken, { summary: "The claim is supported by nothing the material gives", basis: "supported" })).toBe(false);
+    expect(structureRepairKeepsWords(broken, { summary: "The claim is supported by nothing the material gives", basis: "unsupported" })).toBe(true);
+  });
+
+  it("a key's name is never a text, and two fields' texts are never run together (minors)", () => {
+    expect(structureRepairKeepsWords("{\"a\":\"fares rise\" \"b\":\"costs fall\"}", { a: "fares rise b costs fall" })).toBe(false);
+    expect(structureRepairKeepsWords("{\"a\":\"fares rise\" \"b\":\"costs fall\"}", { a: "fares rise costs fall" })).toBe(false);
+    expect(structureRepairKeepsWords("{\"strong\":\"x\" \"fit\":\"weak\"}", { fit: "strong" })).toBe(false);
+    // A number is a JSON value, never a digit of an id or of prose.
+    expect(structureRepairKeepsWords("{\"refs\": [\"node-1\"], \"why\": \"fares rose 7 percent\" \"x\": 1}", { refs: ["node-1"], why: "fares rose 7 percent", score: 7 })).toBe(false);
+  });
+
+  it("still keeps every form-only move: a lifted member, a dropped wrapper, a new wrapper, a straight quote inside a text", () => {
+    const note = { text: "The reviewer found the second section thin.", node_refs: ["P2"] };
+    const sections = [{ title: "Fares", paragraphs: [{ text: "Fares fell.", node_refs: ["P1"] }] }];
+    expect(structureRepairKeepsWords(`{"long": {"sections": ${JSON.stringify(sections)}, "reviewer_note": ${JSON.stringify(note)}} "reviewer_note": null}`,
+      { long: { sections }, reviewer_note: note }, STORYTELLER_ANSWER_FORM)).toBe(true);
+    expect(structureRepairKeepsWords("{\"response\": {\"answer\": \"It is so\" \"score\": 0.5}}", { answer: "It is so", score: 0.5 })).toBe(true);
+    expect(structureRepairKeepsWords("{\"headline\": \"Free buses help\" \"summary\": \"They help riders most.\"}",
+      { short: { headline: "Free buses help", summary: "They help riders most." } })).toBe(true);
+    expect(structureRepairKeepsWords("{\"answer\": \"He said \"no\" today\" \"score\": 0.5}", { answer: "He said \"no\" today", score: 0.5 })).toBe(true);
+  });
+});
+
 describe("LG-A withStructureRepair (L32)", () => {
   it("is the gateway itself with no route, and refuses a route it cannot use", () => {
     const { gateway } = previewGlmHarness([]);
@@ -116,6 +206,15 @@ describe("LG-A withStructureRepair (L32)", () => {
     expect(repair.requests).toHaveLength(1);
     expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 1, lastRawArtifactRef: original.artifacts[0]!.artifactId });
     expect(original.executions).toHaveLength(1);
+  });
+
+  it("refuses a repair the step's fixer would cut down: a part kept, the rest under a key it drops (Important 1)", async () => {
+    const broken = "{\"answer\": \"It is so, but not by the city's own figures\" \"score\": 0.5}";
+    const original = previewGlmHarness([{ content: broken }]);
+    const repair = route("{\"answer\": \"It is so, but\", \"x\": \"It is so, but not by the city's own figures\", \"score\": 0.5}");
+    const error = await withStructureRepair(original.gateway, repair.route).call(request()).catch((caught: unknown) => caught);
+    expect(repair.requests).toHaveLength(1);
+    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 1, lastRawArtifactRef: original.artifacts[0]!.artifactId });
   });
 
   it("a repair call that fails leaves today's refusal; a money stop passes through as itself", async () => {
