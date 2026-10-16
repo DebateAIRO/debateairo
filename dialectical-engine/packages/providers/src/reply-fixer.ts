@@ -23,7 +23,9 @@
  *  · STRUCTURE: a reply that ended normally, has visible text and holds no readable JSON (prose with no object
  *    included: pre-flight PF-A14, ruling R4, INTERFACE §2.3), or a schema refusal whose every readable issue is about form
  *    (an unknown key; a member there in another container, a text where an object or list is asked, or a container
- *    where a scalar is asked that holds a value of that scalar's kind, `fidelity: {value: 0.7}`);
+ *    where a scalar is asked that holds a value of that scalar's kind, `fidelity: {value: 0.7}`; and, when the caller
+ *    hands over the step's schema or fix guide, an absent member it admits exactly one value for, the writer's
+ *    `served_number_refs` pinned to [] — LG-A Task 7b review, I-1);
  *  · CONTENT: a refusal that needs words or values only the AI can give (a missing score or text, an empty or
  *    scalar-less container where a scalar is asked, an enum, an out-of-range number, a content check: language, ids,
  *    coverage, wording), a cut judge list with no whole entry, and a PATCH_ refusal;
@@ -49,9 +51,11 @@ export type ReplyFixerRepair = ModelJsonStructureRepair | "UNASKED_KEYS";
  * narrowed at the Task 5 review).
  * `keepDeclaredTexts: true` (LG-A Task 7 review; default false) KEEPS a plain text under a name the schema declares
  * somewhere as a text instead of dropping it, so the reply stays refused and the structure-repair call keeps its words: a
- * step whose every such name holds reader-facing prose (the story: a stray `long.sections[0].text`, `short.line`) turns
- * it on. Names the schema never declares (`long.style`) are still dropped, and null, an empty object and an empty list
- * still are too.
+ * step whose stray texts may be reader-facing prose (the story: a stray `long.sections[0].text`, `short.line`; the
+ * writer: a root `text`) turns it on. It keeps EVERY text under such a name, identifier-like texts included (the
+ * writer's stray root `segment_id`, declared as a text inside a segment): that reply is refused too and goes to the
+ * structure-repair call, an accepted cost of one cheap call (LG-A Task 7b review, M-1). Names the schema never declares
+ * (`long.style`) are still dropped, and null, an empty object and an empty list still are too.
  */
 export type ReplyFixerOptions = Readonly<{
   innerUnaskedKeys?: boolean; unnest?: boolean; wrap?: boolean; textForms?: boolean; paragraphs?: boolean; onlyValues?: boolean;
@@ -406,12 +410,19 @@ function holdsScalar(container: unknown, kind: ScalarKind | null): boolean {
  * A form issue: an unknown key; a list or an object where another container is asked; a text where an object or list is
  * asked; or a list or an object where a scalar is asked that holds, at any level, a value of that scalar's kind
  * (`fidelity: {value: 0.7}`). An empty or scalar-less container where a scalar is asked (`fidelity: []`, `headline: {}`)
- * is missing content: CONTENT (Task 4 review).
+ * is missing content: CONTENT (Task 4 review). An ABSENT member is missing content too, except one that `schema` (the
+ * step's schema or fix guide, when the caller hands it over) admits exactly one value for, which ONLY_VALUE_FILLED would
+ * fill (the writer's `served_number_refs`, pinned to [] by its fix guide): the AI owes nothing there (LG-A Task 7b
+ * review, I-1).
  */
-function formIssue(issue: RefusalIssue, decoded: unknown): boolean {
+function formIssue(issue: RefusalIssue, decoded: unknown, schema: z.ZodType | undefined): boolean {
   if (issue.code === "unrecognized_keys") return true;
   if (issue.code !== "invalid_type") return false;
   const found = valueAt(decoded, issue.path);
+  if (found === undefined) {
+    const expected = schema === undefined ? null : schemaAt(schema, issue.path);
+    return expected !== null && onlyValueOf(expected) !== null;
+  }
   if (Array.isArray(found) || isRecord(found)) {
     if (issue.expected === undefined) return holdsScalar(found, null);
     if (CONTAINER_EXPECTED.has(issue.expected)) return true;
@@ -421,9 +432,15 @@ function formIssue(issue: RefusalIssue, decoded: unknown): boolean {
   return typeof found === "string" && (issue.expected === "object" || issue.expected === "array");
 }
 
-/** THE CLASS of a reply the fixer could not repair (see the file's head). Pure; reads the reply's own text, never sends anything. */
+/**
+ * THE CLASS of a reply the fixer could not repair (see the file's head). Pure; reads the reply's own text, never sends
+ * anything. `schema` (optional): the schema the step's fixer read the reply against (its fix guide when it has one), so
+ * an absent member with exactly one possible value counts as form (LG-A Task 7b review, I-1). The gateway cannot see a
+ * step's schema, so a step that has one sets the class on its own refusal (`ContentClassification.failureClass`; the
+ * runner's writer and checker readers do), and the gateway's own call (no schema) is used only when it did not.
+ */
 export function replyFailureClassOf(rejected: Pick<RejectedProviderContent, "rawText" | "parseStatus" | "parseError">,
-  reply: ModelReplyFacts | undefined): ReplyFailureClass {
+  reply: ModelReplyFacts | undefined, schema?: z.ZodType): ReplyFailureClass {
   if (rejected.parseStatus === "LENGTH_EXCEEDED" || reply?.finishReason === "length") return "CUT_OFF";
   if (rejected.rawText.trim() === "") return "EMPTY";
   if (rejected.parseError.startsWith("PATCH_")) return "CONTENT";
@@ -437,5 +454,5 @@ export function replyFailureClassOf(rejected: Pick<RejectedProviderContent, "raw
   const decoded = decodeModelJson(rejected.rawText, reply, { trailingObjectAccepted: () => true });
   // No readable JSON to look into (pre-flight PF-A14): an issue whose code is about form counts as form.
   if (!decoded.ok) return issues.every((issue) => issue.code === "unrecognized_keys" || issue.code === "invalid_type") ? "STRUCTURE" : "CONTENT";
-  return issues.every((issue) => formIssue(issue, decoded.value)) ? "STRUCTURE" : "CONTENT";
+  return issues.every((issue) => formIssue(issue, decoded.value, schema)) ? "STRUCTURE" : "CONTENT";
 }

@@ -97,8 +97,10 @@ import {
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  contentFollowUpSentence,
   fixReplyStructure,
   parsedWithRepairs,
+  replyFailureClassOf,
   promptContractFingerprintText,
   schemaFailureLocator,
   type FramedPrompt,
@@ -120,7 +122,8 @@ import {
   type ProviderCallResult,
   type ProviderCostEnvelopeSeam,
   type ProviderDiscoveryTarget,
-  type ProviderGateway
+  type ProviderGateway,
+  type ReplyFailureClass
 } from "@debateai/providers";
 import { RoleAssignmentSchema, canonicalPromptFingerprint, type RoleAssignment, type SeatCandidate } from "@debateai/scorecard";
 import {
@@ -2602,16 +2605,20 @@ const RUNNER_READER_FIX_OPTIONS = Object.freeze({ keepDeclaredTexts: true });
  */
 function readStructuredValue<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts, guide?: z.ZodType):
   | { readonly ok: true; readonly value: T; readonly repairs: readonly ModelJsonRepair[] }
-  | { readonly ok: false; readonly parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED"; readonly message: string } {
+  | { readonly ok: false; readonly parseStatus: "PARSE_FAILED"; readonly message: string }
+  | { readonly ok: false; readonly parseStatus: "SCHEMA_FAILED"; readonly message: string; readonly failureClass: ReplyFailureClass } {
   const reply = decodeStructuredReply(content, ending);
   if (!reply.decoded) return { ok: false, parseStatus: "PARSE_FAILED", message: reply.message };
   const parsed = schema.safeParse(reply.value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: reply.repairs };
   const fixed = fixReplyStructure(reply.value, guide ?? schema, RUNNER_READER_FIX_OPTIONS);
   const refixed = fixed === null ? null : schema.safeParse(fixed.value);
-  return refixed !== null && refixed.success
-    ? { ok: true, value: refixed.data, repairs: [...reply.repairs, ...fixed!.repairs] }
-    : { ok: false, parseStatus: "SCHEMA_FAILED", message: parsed.error.message };
+  if (refixed !== null && refixed.success) return { ok: true, value: refixed.data, repairs: [...reply.repairs, ...fixed!.repairs] };
+  // LG-A Task 7b review, I-1: the class is decided here, where the fixer's schema is known, so an absent member with one
+  // possible value (the writer's served_number_refs) counts as form; the gateway, which cannot see the schema, reads it.
+  const message = parsed.error.message;
+  return { ok: false, parseStatus: "SCHEMA_FAILED", message,
+    failureClass: replyFailureClassOf({ rawText: content, parseStatus: "SCHEMA_FAILED", parseError: message }, ending, guide ?? schema) };
 }
 
 function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, ending?: ModelReplyFacts, guide?: z.ZodType): T {
@@ -2622,7 +2629,10 @@ function parseContent<T>(content: string, schema: z.ZodType<T>, code: string, en
 
 function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>, ending?: ModelReplyFacts, guide?: z.ZodType): ContentClassification {
   const read = readStructuredValue(content, schema, ending, guide);
-  return read.ok ? parsedWithRepairs(read.repairs) : { parseStatus: read.parseStatus, parseError: read.message };
+  if (read.ok) return parsedWithRepairs(read.repairs);
+  return read.parseStatus === "SCHEMA_FAILED"
+    ? { parseStatus: read.parseStatus, parseError: read.message, failureClass: read.failureClass }
+    : { parseStatus: read.parseStatus, parseError: read.message };
 }
 
 /**
@@ -2797,10 +2807,13 @@ export function composedCitationRejectionOf(parseError: string): ComposedCitatio
 export function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
+  /** LG-A (L33): set only on a routed call's rejection (RejectedProviderContent.failureClass). */
+  readonly failureClass?: ReplyFailureClass;
 }): PromptPacket {
   const locator = schemaFailureLocator(rejected);
   const citation = rejected.parseStatus === "SCHEMA_FAILED" ? composedCitationRejectionOf(rejected.parseError) : null;
-  return buildFramedRepairPrompt(framed, citation === null ? locator : { code: citation, path: locator.path });
+  return buildFramedRepairPrompt(framed, citation === null ? locator
+    : { code: citation, path: locator.path, ...(locator.reason === undefined ? {} : { reason: contentFollowUpSentence(citation) }) });
 }
 
 /**

@@ -1,5 +1,7 @@
 // tests/unit/lg-a-runner-fixer.test.ts
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { replyFailureClassOf } from "@debateai/providers";
 import type { SynthesisDigest } from "@debateai/serve";
 import { classifyComposedContent, classifyEvaluatorContent, parseComposerOutput, parseEvaluatorOutput } from "../../apps/runner/src/index.js";
 
@@ -52,7 +54,9 @@ describe("LG-A: the answer writer and checker read every reply through the fixer
       .toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "INNER_UNASKED_KEYS" });
   });
 
-  it("the checker's stray objection is never dropped: refused when the verdict's own objection is taken (Task 7b)", () => {
+  // Pins EXISTING behaviour (Task 7b review, M-2): the checker's `objection` always has a declaring ancestor (the root), so
+  // the ancestor rule (pre-flight PF-A12) moves or keeps it whatever `keepDeclaredTexts` says; the option changes nothing here.
+  it("the checker's stray objection is never dropped, with or without keepDeclaredTexts: refused when the verdict's own objection is taken", () => {
     const stray = JSON.stringify({ satisfied: false, objection: "The answer overstates the savings.",
       criteria: { ...VERDICT.criteria, no_overstatement: false, objection: "It also cites nothing." } });
     expect(classifyEvaluatorContent(stray, STOP).parseStatus).toBe("SCHEMA_FAILED");
@@ -60,6 +64,29 @@ describe("LG-A: the answer writer and checker read every reply through the fixer
     // A name the checker's form never declares is still dropped.
     const notes = JSON.stringify({ ...VERDICT, notes: "all fine" });
     expect(classifyEvaluatorContent(notes, STOP)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+  });
+
+  // LG-A Task 7b review, I-1 (carried to Task 11): an absent member the fix guide admits ONE value for is form, not content,
+  // so a writer reply with a stray root text AND an omitted served_number_refs goes to the structure-repair call (which
+  // keeps the words), never to a content follow-up.
+  it("a stray root text with an omitted served_number_refs is a STRUCTURE refusal; an omitted node_refs stays CONTENT", () => {
+    const { served_number_refs: _none, ...leftOut } = { segment_id: "segment:verdict", text: "The answer holds.", node_refs: [NODE], served_number_refs: [] };
+    const both = JSON.stringify({ segments: [leftOut], text: "A sentence the writer meant for the answer." });
+    expect(classifyComposedContent(both, citation, STOP)).toMatchObject({ parseStatus: "SCHEMA_FAILED", failureClass: "STRUCTURE" });
+    const { node_refs: _refs, ...noRefs } = { segment_id: "segment:verdict", text: "The answer holds.", node_refs: [NODE], served_number_refs: [] };
+    const owed = JSON.stringify({ segments: [noRefs], text: "A sentence the writer meant for the answer." });
+    expect(classifyComposedContent(owed, citation, STOP)).toMatchObject({ parseStatus: "SCHEMA_FAILED", failureClass: "CONTENT" });
+  });
+
+  it("replyFailureClassOf counts an absent one-value member as form only when it is handed the schema", () => {
+    const guide = z.object({ text: z.string(), refs: z.array(z.string()).max(0) }).strict();
+    const strict = z.object({ text: z.string(), refs: z.array(z.string()) }).strict();
+    const rawText = JSON.stringify({ text: "It holds.", note: "x" });
+    const refused = strict.safeParse(JSON.parse(rawText));
+    const rejected = { rawText, parseStatus: "SCHEMA_FAILED" as const, parseError: refused.success ? "" : refused.error.message };
+    expect(replyFailureClassOf(rejected, STOP)).toBe("CONTENT");
+    expect(replyFailureClassOf(rejected, STOP, strict)).toBe("CONTENT");
+    expect(replyFailureClassOf(rejected, STOP, guide)).toBe("STRUCTURE");
   });
 
   it("a verdict missing a criterion is still refused, and so is a writer's list that holds a value", () => {

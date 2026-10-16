@@ -2,6 +2,8 @@ import { randomBytes as cryptoRandomBytes } from "node:crypto";
 import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError } from "@debateai/kernel";
 import type { PromptPacket } from "./index.js";
 import { CONTENT_RULE_HEADING, CONTENT_RULE_TEXT } from "./content-rule.js";
+import { contentFollowUpSentence, isContentFollowUpSentence } from "./content-follow-up.js";
+import type { ReplyFailureClass } from "./reply-fixer.js";
 
 /**
  * V-11 ADDENDUM (owner ruling 2026-09-22) — THE ONE FRAME EVERY HAND-OFF USES.
@@ -115,6 +117,8 @@ export interface FramedRepairLocator {
   readonly path: string;
   /** The size limit the value at `path` broke, when the refusal was one (practice 2026-10-14). */
   readonly limit?: FramedSizeLimit;
+  /** LG-A (L33): one of CONTENT_FOLLOW_UP_SENTENCES, on a routed call's follow-up only; absent = today's block, byte for byte. */
+  readonly reason?: string;
 }
 
 /**
@@ -501,7 +505,8 @@ export function buildFramedRepairPrompt(framed: FramedPrompt, locator: FramedRep
 export function appendFramedRejection(packet: PromptPacket, locator: FramedRepairLocator): PromptPacket {
   // Practice 2026-10-14: a size limit may ride along, only the value's own (its path is the locator's).
   if (!REPAIR_CODE.test(locator.code) || !REPAIR_PATH.test(locator.path)
-    || (locator.limit !== undefined && !(sizeLimitValid(locator.limit) && locator.limit.path === locator.path))) {
+    || (locator.limit !== undefined && !(sizeLimitValid(locator.limit) && locator.limit.path === locator.path))
+    || (locator.reason !== undefined && !isContentFollowUpSentence(locator.reason))) {
     throw new TypedDomainError(
       "PROMPT_REPAIR_NOT_A_LOCATOR",
       `A repair packet carries a typed code and a machine path only (${locator.code.slice(0, 48)})`
@@ -516,7 +521,8 @@ export function appendFramedRejection(packet: PromptPacket, locator: FramedRepai
         content: renderMaterialBlock(frame.fence, [
           { name: "machine_rejection_code", content: locator.code },
           { name: "machine_rejection_path", content: locator.path },
-          ...(locator.limit === undefined ? [] : [{ name: "machine_rejection_limit", content: renderSizeLimit(locator.limit) }])
+          ...(locator.limit === undefined ? [] : [{ name: "machine_rejection_limit", content: renderSizeLimit(locator.limit) }]),
+          ...(locator.reason === undefined ? [] : [{ name: "machine_rejection_reason", content: locator.reason }])
         ])
       })
     ])
@@ -550,6 +556,7 @@ function judgeIssueListPath(parseError: string): readonly string[] {
 export function schemaFailureLocator(rejected: {
   readonly parseStatus: string;
   readonly parseError: string;
+  readonly failureClass?: ReplyFailureClass;
 }): FramedRepairLocator {
   let code = REPAIR_CODE.test(rejected.parseStatus) ? rejected.parseStatus : "CONTENT_REJECTED";
   let segments: readonly unknown[];
@@ -573,7 +580,9 @@ export function schemaFailureLocator(rejected: {
     .slice(0, 8)
     .join(".");
   // Only at the very path the block names: a path the whitelist above shortened is not the limit's value.
-  return Object.freeze(limit !== null && limit.path === path ? { code, path, limit } : { code, path });
+  const located = limit !== null && limit.path === path ? { code, path, limit } : { code, path };
+  // LG-A (L33): a routed call's rejection names its class, and its full re-ask says in plain words what is missing.
+  return Object.freeze(rejected.failureClass === undefined ? located : { ...located, reason: contentFollowUpSentence(code, rejected.failureClass) });
 }
 
 /**
@@ -611,6 +620,8 @@ export interface FramedPatchLocator {
   readonly paths: readonly string[];
   /** The size limits those values broke (practice 2026-10-14): absent when none did, else 1..8, each at a listed path or under one. */
   readonly limits?: readonly FramedSizeLimit[];
+  /** LG-A (L33): one of CONTENT_FOLLOW_UP_SENTENCES, on a routed call's follow-up only; absent = today's block, byte for byte. */
+  readonly reason?: string;
 }
 
 /** True for the path list one patch request may carry: 1..8 distinct patch paths. */
@@ -622,7 +633,8 @@ export function isPatchPathList(paths: readonly string[]): boolean {
 
 function patchLocatorValid(locator: FramedPatchLocator): boolean {
   return REPAIR_CODE.test(locator.code) && isPatchPathList(locator.paths)
-    && (locator.limits === undefined || sizeLimitListValid(locator.limits, locator.paths));
+    && (locator.limits === undefined || sizeLimitListValid(locator.limits, locator.paths))
+    && (locator.reason === undefined || isContentFollowUpSentence(locator.reason));
 }
 
 /** The limits a `machine_rejection_limits` field states, each read back to the letter, or null. */
@@ -632,15 +644,32 @@ function readSizeLimitField(field: FramedMaterialField): readonly FramedSizeLimi
   return limits.every((limit) => limit !== null) ? limits as readonly FramedSizeLimit[] : null;
 }
 
-/** The machine fields of a patch request, exactly, in this order (the limits only when stated), or false. */
+/**
+ * The machine fields of a patch request, exactly, in this order: code, paths, the limits when stated, the reason when
+ * stated (LG-A, one of CONTENT_FOLLOW_UP_SENTENCES), then the reply form. Anything else is false.
+ */
 function isPatchRequestBlock(fields: readonly FramedMaterialField[]): boolean {
-  if (fields.length !== 3 && fields.length !== 4) return false;
+  if (fields.length < 3 || fields.length > 5) return false;
   const [code, paths] = fields;
   const form = fields[fields.length - 1]!;
-  const limits = fields.length === 4 ? readSizeLimitField(fields[2]!) : undefined;
+  const middle = fields.slice(2, -1);
+  let limits: readonly FramedSizeLimit[] | undefined;
+  let reason: string | undefined;
+  for (const [index, field] of middle.entries()) {
+    if (index === 0 && field.name === "machine_rejection_limits") {
+      const read = readSizeLimitField(field);
+      if (read === null) return false;
+      limits = read;
+    } else if (index === middle.length - 1 && field.name === "machine_rejection_reason" && isContentFollowUpSentence(field.content)) {
+      reason = field.content;
+    } else {
+      return false;
+    }
+  }
   return code!.name === "machine_rejection_code" && REPAIR_CODE.test(code!.content)
-    && paths!.name === "machine_rejection_paths" && limits !== null
-    && patchLocatorValid({ code: code!.content, paths: paths!.content.split(","), ...(limits === undefined ? {} : { limits }) })
+    && paths!.name === "machine_rejection_paths"
+    && patchLocatorValid({ code: code!.content, paths: paths!.content.split(","), ...(limits === undefined ? {} : { limits }),
+      ...(reason === undefined ? {} : { reason }) })
     && form.name === "machine_reply_form" && form.content === PATCH_REPLY_FORM;
 }
 
@@ -674,6 +703,7 @@ export function buildFramedPatchPrompt(packet: PromptPacket, ownReply: string, l
           ...(locator.limits === undefined ? [] : [{
             name: "machine_rejection_limits", content: locator.limits.map(renderSizeLimit).join(SIZE_LIMIT_SEPARATOR)
           }]),
+          ...(locator.reason === undefined ? [] : [{ name: "machine_rejection_reason", content: locator.reason }]),
           { name: "machine_reply_form", content: PATCH_REPLY_FORM }
         ])
       })
