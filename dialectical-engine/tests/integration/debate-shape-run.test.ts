@@ -14,7 +14,7 @@ import {
 import type { DebateShapeSettings } from "@debateai/contract";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { MAP_CONTRACT_IDS, mapPromptContractHash } from "@debateai/map";
-import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
+import { PREVIEW_REQUEST_BODY_MAX_BYTES, type ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { debateShapeSiteCounts, type DebateShapeCeilingInput } from "@debateai/register";
 import { readFramedMaterial, wirePacket, type FramedMaterial } from "../support/framed-packet.js";
 import {
@@ -477,6 +477,31 @@ describe("the debate shape in the runner (spec §3.3)", () => {
       const locked = await roomOf("hosted-lock-ro", { tag: "ro", name: "Romanian" });
       const unlocked = await roomOf("hosted-lock-und", { tag: "und", name: "the same language as the question" });
       expect(locked).toBeGreaterThan(unlocked);
+    }, 600_000);
+
+    /**
+     * LG-A (Task 14 carry): with the structure-repair route wired (main.ts passes `structureRepairCeiling`), root 0's retry
+     * may be the repair call: the runner's room prices it at the repair target's price and at the most the seam can project
+     * for it, the larger of that and root 0's own retry. Without it: today's room (the PF-L38 case above).
+     */
+    it("a routed run's room also prices root 0's retry as the structure-repair call, at the repair target's price (LG-A)", async () => {
+      const question = "debate-shape-hosted-repair-1234567890";
+      const language = { tag: "ro", name: "Romanian" };
+      const repairCeiling = Object.freeze({ providerRef: "preview:claude-haiku-5-5", requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
+        completionTokenCeiling: 32_768 });
+      const probe = hostedMoney(1_000_000_000, () => CHEAP);
+      const run = await argue("hosted-repair-room", "free", STANDARD, 1, {}, false,
+        { money: { ...probe.money, structureRepairCeiling: repairCeiling }, question, language });
+      expect(run.result.kind).toBe("COMPLETED");
+      const rooms = [...new Set(probe.seamLog.filter((entry) => entry.phase === "BODY" && entry.room > 0).map((entry) => entry.room))];
+      expect(rooms).toHaveLength(1);
+      const attempts = rootZeroRoomAttempts({ questionLine: question, argumentLanguageName: language.name,
+        tokenCeiling: POLICY.bounds.JUDGE.tokenCeiling, questionLanguage: questionLanguageFromRun(language.tag, language.name) });
+      expect(rooms[0]).toBe(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts,
+        structureRepair: { price: CHEAP, attempt: repairCeiling } }));
+      // At one micro-unit per token: ceil(262,144 / 2) + 32,768 = 163,840 for the repair, above root 0's own retry.
+      expect(rooms[0]).toBe(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts, retries: [] }) + 163_840);
+      expect(rooms[0]).toBeGreaterThan(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts }));
     }, 600_000);
 
     /**

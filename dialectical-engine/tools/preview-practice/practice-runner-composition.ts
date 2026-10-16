@@ -81,6 +81,7 @@ import {
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
+  previewStructureRepairCeiling,
   previewStructureRepairRoute,
   previewTargetGatewayControls,
   providerTargetGatewayControls,
@@ -443,6 +444,8 @@ export async function composePracticeRunner(input: Readonly<{
     synthesisRolePolicy: policy.synthesisRolePolicy,
     story: storyWriter,
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+    // LG-A (Task 14 carry), as main.ts: root 0's room prices its retry as the structure-repair call too.
+    structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
     bodyCostFallback: envelopeBand !== null,
     serveDisclosure: { log: logServeDisclosure },
     costSubstitutions: { log: logBodyCostFallback },

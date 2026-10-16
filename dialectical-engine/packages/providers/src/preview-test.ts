@@ -576,6 +576,18 @@ export function previewStructureRepairRoute(targets: readonly Readonly<{ provide
   return Object.freeze({ providerRef: target.providerRef, gateway,
     bound: Object.freeze({ tokenCeiling: row.outputBound, deadlineMs: PREVIEW_GLM_DEADLINE_MS }) });
 }
+/**
+ * LG-A (Task 14 carry) — THE MOST THE MONEY SEAM CAN PROJECT FOR ONE STRUCTURE-REPAIR CALL on `route`: a body of
+ * PREVIEW_REQUEST_BODY_MAX_BYTES (the repair carries the original's whole broken reply, so no smaller bound holds, and the
+ * preview's guarded fetch refuses a larger body, so no larger one is ever answered) and the route's token ceiling, on the
+ * repair target. Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
+ * `rootZeroKeepRoomMicros`). Null for no route.
+ */
+export function previewStructureRepairCeiling(route: StructureRepairRoute | null):
+  Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }> | null {
+  return route === null ? null : Object.freeze({ providerRef: route.providerRef, requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
+    completionTokenCeiling: route.bound.tokenCeiling });
+}
 export interface PreviewBudgetExecution {
   readonly operationId: string;
   readonly requestBody: string;

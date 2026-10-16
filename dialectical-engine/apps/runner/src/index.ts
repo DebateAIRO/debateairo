@@ -2369,6 +2369,13 @@ export interface WalkingSkeletonSettings {
    */
   readonly providerPrices?: ProviderPriceMap;
   /**
+   * LG-A (Task 14 carry): the most one structure-repair call can be projected at, on the repair target
+   * (`previewStructureRepairCeiling`), when the route is wired; absent or null: no route. Root 0's room prices its retry
+   * as that call too, at the target's price in `providerPrices` (`rootZeroKeepRoomMicros`), so a routed run's room never
+   * under-counts root 0's retry. No price for the target (local mode) adds nothing.
+   */
+  readonly structureRepairCeiling?: Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }> | null;
+  /**
    * ENGINE MONEY RULE (spec §14.4.5), TASK M3: where the owner-side disclosure
    * row goes (default: `ServeDisclosureRepository` on the runner's pool) and
    * where a failure to write it is logged (default: one code-only JSON line).
@@ -6865,9 +6872,14 @@ export class WalkingSkeletonRunner {
         const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
         const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
           .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
+        // LG-A (Task 14 carry): on a routed run the retry may be the structure-repair call, at the repair target's price.
+        const repairCeiling = this.settings.structureRepairCeiling ?? null;
+        const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: this.settings.judgeBound.tokenCeiling }) });
+          tokenCeiling: this.settings.judgeBound.tokenCeiling }),
+          structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
+            attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: this.settings.judgeBound,

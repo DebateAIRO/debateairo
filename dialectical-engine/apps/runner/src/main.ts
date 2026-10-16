@@ -41,7 +41,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, withStructureRepair, type ProviderGateway } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -529,6 +529,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // LG-A (Task 14 carry): root 0's room prices its retry as the structure-repair call too, when the route is wired.
+  structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
   // B9 (budget spec §2.9, §2.4): a call while arguing refused for money moves
   // to a cheaper claim-eligible maker — hosted, and only with the
   // costEnvelopePolicy row's three band members: the same `envelopeBand` that

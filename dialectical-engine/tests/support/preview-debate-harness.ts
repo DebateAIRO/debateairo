@@ -181,6 +181,8 @@ export type PreviewRunnerMoney = Readonly<{
   buildCostEnvelopeSeam: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>;
   buildStoryCostEnvelopeSeam?: (providerRef: string) => NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildStoryCostEnvelopeSeam"]>;
   providerPrices: ProviderPriceMap;
+  /** LG-A (Task 14 carry): the runner's `structureRepairCeiling`, as main.ts passes it when the route is wired; absent: none. */
+  structureRepairCeiling?: Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }>;
 }>;
 
 export type ComposedPreviewRunner = ReturnType<ReturnType<typeof previewDebateHarness>["previewRunner"]>;
@@ -426,6 +428,7 @@ export function previewDebateHarness(input: Readonly<{
       callScheduler,
       ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
       ...(options.money === undefined ? {} : { providerPrices: options.money.providerPrices }),
+      ...(options.money?.structureRepairCeiling === undefined ? {} : { structureRepairCeiling: options.money.structureRepairCeiling }),
       callSubjects: previewCallSubjects(PREVIEW),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,

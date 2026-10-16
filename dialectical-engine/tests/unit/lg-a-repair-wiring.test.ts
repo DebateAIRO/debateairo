@@ -5,7 +5,7 @@ import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
 import {
   PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS, buildFramedPrompt,
-  buildFramedRepairPrompt, previewStructureRepairRoute, schemaFailureLocator, withStructureRepair,
+  buildFramedRepairPrompt, previewStructureRepairCeiling, previewStructureRepairRoute, schemaFailureLocator, withStructureRepair,
   type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
 import { RUN_COST_ENVELOPE_ROOM_KEPT } from "@debateai/budget";
@@ -50,7 +50,15 @@ describe("LG-A: the preview's structure-repair route", () => {
       const source = readFileSync(path, "utf8");
       expect(source, path).toContain("previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef))");
       expect(source, path).toContain("withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute)");
+      // Task 14 carry: root 0's room prices its retry as the repair call too, at the most the money seam can project for it.
+      expect(source, path).toContain("structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),");
     }
+  });
+
+  it("Task 14 carry: the most one repair call can be projected at is the preview's whole body and the route's token ceiling", () => {
+    const route = previewStructureRepairRoute([{ providerRef: "preview:claude-haiku-5-5", model: "claude-haiku-5-5" }], () => haikuGateway);
+    expect(previewStructureRepairCeiling(route)).toEqual({ providerRef: "preview:claude-haiku-5-5", requestBytes: 256 * 1024, completionTokenCeiling: 32768 });
+    expect(previewStructureRepairCeiling(null)).toBeNull();
   });
 });
 
