@@ -232,7 +232,9 @@ async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38, as main.ts: with the debate-shape row in force a run may be shaped, and its first call carries
     // the locked language: priced at the longest lock too. Row absent (or switched off): today's price.
-    questionLanguageLocked: input.questionLanguageLocked
+    questionLanguageLocked: input.questionLanguageLocked,
+    // Length guidance (spec 2026-10-15 §3.2), as main.ts: with the row the first call is the lengthed variant.
+    lengthed: input.lengthGuidancePolicy !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,

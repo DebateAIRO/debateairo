@@ -193,6 +193,7 @@ import {
   lengthGuidanceText,
   type CharactersPerWord,
   type LengthCallStep,
+  type LengthGuide,
   type LengthGuidanceStep,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
@@ -1864,6 +1865,9 @@ export async function runReviewCatchUp(input: {
   const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
   // Length guidance: a catch-up review is sized like the run's own reviews, from the same receipt (never the row).
   const catchUpLength = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis).length ?? null;
+  const catchUpGuide = catchUpLength === null ? {}
+    : { length: Object.freeze({ words: catchUpLength.steps.reviewer, languageCode: input.argumentLanguageTag ?? null,
+      charactersPerWord: catchUpLength.charactersPerWord }) };
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -1918,6 +1922,7 @@ export async function runReviewCatchUp(input: {
         questionLine: input.questionLine,
         argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         ...catchUpLanguageInput,
+        ...catchUpGuide,
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
@@ -5874,6 +5879,13 @@ export class WalkingSkeletonRunner {
         : Object.freeze({ answerWords: shapeRun.shape.answerWords, ownWords: null, languageCode: null,
           charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
     /**
+     * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call of this run, spread into
+     * the call's input; nothing without the receipt's `length` (today's request, byte for byte).
+     */
+    const lengthGuideOf = (step: LengthGuidanceStep): Readonly<{ length?: LengthGuide }> => lengthGuidance === null ? {}
+      : { length: Object.freeze({ words: lengthGuidance.steps[step], languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord }) };
+    /**
      * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
      * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a
      * shape is never locked, whatever tag it stored, so every one of its calls keeps today's directive, fields and
@@ -6342,6 +6354,7 @@ export class WalkingSkeletonRunner {
               questionLine: input.questionLine,
               argumentLanguageName: run.argumentLanguageName,
               ...shapeLanguageInput,
+              ...lengthGuideOf("judge_panel"),
               statement: input.statement,
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
@@ -6930,7 +6943,8 @@ export class WalkingSkeletonRunner {
         const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling }),
+          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+          lengthed: lengthGuidance !== null }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -7232,6 +7246,7 @@ export class WalkingSkeletonRunner {
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
+            ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7463,6 +7478,7 @@ export class WalkingSkeletonRunner {
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
+            ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7749,6 +7765,7 @@ export class WalkingSkeletonRunner {
               questionLine: run.questionLine,
               argumentLanguageName: run.argumentLanguageName,
               ...shapeLanguageInput,
+              ...lengthGuideOf("reviewer"),
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,

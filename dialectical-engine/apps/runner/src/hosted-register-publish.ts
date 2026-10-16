@@ -1196,7 +1196,9 @@ export async function planHostedRegisterPublication(
       questionMaxBytes: askQuestionMaxBytes(),
       // Ruling L-B9R (P2L Task 17): the runner's boot prices the longest lock whenever the version carries ANY
       // debateShapePolicy row (enabled false too), so the plan asks the same.
-      questionLanguageLocked: debateShape !== null
+      questionLanguageLocked: debateShape !== null,
+      // Length guidance (spec 2026-10-15 §3.2): with the member a first call is the lengthed variant, framed at the bound target.
+      lengthed: lengthGuidance !== null
     });
     assertRunCeilingCoversOneCall({
       bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,

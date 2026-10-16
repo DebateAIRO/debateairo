@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, decideRunCostEnvelope, projectedCallCeilingMicros, type ModelSpendStore } from "@debateai/budget";
 import { framedJudgePromptForTest, rootPositionRepairRequestBytesBound, rootPositionRequestBytesBound } from "@debateai/judgement";
-import { TypedDomainError, questionLanguageForBounds } from "@debateai/kernel";
+import { LENGTH_GUIDANCE_START, TypedDomainError, lengthGuideForBounds, questionLanguageForBounds } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
 import {
   CONTENT_FOLLOW_UP_SENTENCES,
@@ -357,6 +357,51 @@ describe("root 0's worst-case call", () => {
       rootZeroRepairRequestBytes({ ...input, completionTokenCeiling: CEILING, questionLanguage: RO })
     ]);
     expect(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING, questionLanguage: null }))
+      .toEqual(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING }));
+  });
+
+  it("LG-C Task 12: a lengthed root 0's room frames the lengthed variant at the bound target (first, retry and repair); not lengthed is today's room", () => {
+    const RO = { code: "ro", name: "Romanian" };
+    const input = { questionLine: QUESTION, argumentLanguageName: "Romanian", completionTokenCeiling: CEILING };
+    const material = { assignedMaterialChars: rootZeroMapMaterialChars };
+    for (const [measure, bodyBound] of [[rootZeroRequestBytes, rootPositionRequestBytesBound],
+      [rootZeroRepairRequestBytes, rootPositionRepairRequestBytesBound]] as const) {
+      const today = measure(input);
+      expect(measure({ ...input, lengthed: false })).toBe(today);
+      const lengthed = measure({ ...input, lengthed: true });
+      expect(lengthed).toBeGreaterThan(today);
+      // Framed at the bound target (5,000 words at a factor of 10, the longest field any row can make).
+      expect(lengthed).toBe(bodyBound({ ...input, ...material, length: lengthGuideForBounds() }) + 256);
+      // A locked AND lengthed run frames both: the bound lock and the bound target.
+      expect(measure({ ...input, questionLanguage: RO, lengthed: true }))
+        .toBe(bodyBound({ ...input, ...material, questionLanguage: questionLanguageForBounds(), length: lengthGuideForBounds() }) + 256);
+    }
+    // Real lengthed root 0 requests (the start opening words, a Detailed opening in Thai characters, the row's largest
+    // words), today's primary root and an assigned root at the map's limits, locked or not, never frame above the
+    // locked and lengthed room's first attempt.
+    const lengthedFirst = rootZeroRequestBytes({ ...input, questionLanguage: RO, lengthed: true }) - 256;
+    const assigned = { kind: "assigned-root" as const, assignedAnswer: "\u0001".repeat(rootZeroMapMaterialChars.answer),
+      mapPoints: "\u0001".repeat(rootZeroMapMaterialChars.points) };
+    const factors = LENGTH_GUIDANCE_START.charactersPerWord;
+    for (const guide of [{ words: 300, languageCode: "ro", charactersPerWord: factors },
+      { words: 450, languageCode: "th", charactersPerWord: factors },
+      { words: 5000, languageCode: "en", charactersPerWord: factors }]) {
+      for (const lock of [null, RO]) {
+        for (const leg of [{ kind: "primary-root" as const }, assigned]) {
+          for (const claim of ["unknown", "resolved"] as const) {
+            expect(bodyBytes(framedJudgePromptForTest(leg, QUESTION, "Romanian", claim, lock, guide).packet)).toBeLessThanOrEqual(lengthedFirst);
+          }
+        }
+      }
+    }
+    // The room's attempts forward `lengthed` to every bound (T12-R3: the first, the length retry and the repair).
+    const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING, lengthed: true });
+    expect(attempts.first.requestBytes).toBe(rootZeroRequestBytes({ ...input, completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 0), lengthed: true }));
+    expect(attempts.retries.map((retry) => retry.requestBytes)).toEqual([
+      rootZeroRequestBytes({ ...input, completionTokenCeiling: lengthRetryTokenCeiling(CEILING, 1), lengthed: true }),
+      rootZeroRepairRequestBytes({ ...input, completionTokenCeiling: CEILING, lengthed: true })
+    ]);
+    expect(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING, lengthed: false }))
       .toEqual(rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "Romanian", tokenCeiling: CEILING }));
   });
 });
