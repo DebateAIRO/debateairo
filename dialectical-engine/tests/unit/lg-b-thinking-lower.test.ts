@@ -172,4 +172,20 @@ describe("the preview call policy sets lengthRetry, and only it", () => {
       .toEqual({ answerRoomTokens: 1800, lowerThinkingLevel: "low" });
     expect(previewLengthRetryOf({ callSiteKey: "HEALTH:probe", lane: "served" }, previewModelRow(GLM)!, "high")).toBeUndefined();
   });
+
+  // LG-C, owner Q-C5 (pre-flight PF-C3.8): a call that names its guided words gets its answer room from them, with the
+  // start factors 4 and 3; a call without them keeps today's room (the start words at Standard).
+  it("LG-C (Q-C5): the answer room comes from the request's guided words when it names them", async () => {
+    const glm = previewModelRow(GLM)!;
+    const writer = { callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", lane: "served" } as const;
+    expect(previewLengthRetryOf({ ...writer, guidedWords: 1000 }, glm, "high")).toEqual({ answerRoomTokens: 12000, lowerThinkingLevel: "low" });
+    expect(previewLengthRetryOf({ ...writer, guidedWords: 200 }, glm, "high")).toEqual({ answerRoomTokens: 2400, lowerThinkingLevel: "low" });
+    expect(previewLengthRetryOf(writer, glm, "high")).toEqual({ answerRoomTokens: 4200, lowerThinkingLevel: "low" });
+    const story = { callSiteKey: "STORY:STORYTELLER:1", lane: "story" } as const;
+    expect(previewLengthRetryOf({ ...story, guidedWords: 500 }, glm, "high")).toEqual(previewLengthRetryOf(story, glm, "high"));
+    const deepseek = spy(DEEPSEEK);
+    await deepseek.policy.call({ ...call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER"), guidedWords: 1000 });
+    expect(deepseek.seen[0]!.lengthRetry).toEqual({ answerRoomTokens: 12000, lowerThinkingLevel: "low" });
+    expect(deepseek.seen[0]!.guidedWords).toBe(1000);
+  });
 });

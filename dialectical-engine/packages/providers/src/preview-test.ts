@@ -464,16 +464,17 @@ function retryAfterOf(error: unknown): number | undefined {
 }
 /**
  * Length guidance L14/L25 (spec 2026-10-15 §3.3, INTERFACE §3.3): what a call's length retry needs to know: the room its
- * answer may take (from the start values at Standard while no length row exists: LG-C hands the row's words here) and the
- * level one below the call's own on its row. Undefined for a call with no step (health checks) and for LG-A's
- * structure-repair call.
+ * answer may take and the level one below the call's own on its row. The room is the request's own guided words
+ * (`guidedWords`, set by the runner from the run's frozen numbers, LG-C) x the start values' runaway factor and tokens per
+ * word (owner Q-C5: 4 and 3); a call that names none keeps the start words at Standard. The storyteller keeps its own sum
+ * (LG-D). Undefined for a call with no step (health checks) and for LG-A's structure-repair call.
  */
-export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string }>, reviewed: PreviewModelRow,
-  effort: PreviewEffort): Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }> | undefined {
+export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string; guidedWords?: number }>,
+  reviewed: PreviewModelRow, effort: PreviewEffort): Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }> | undefined {
   const step = lengthCallStepOf(request.callSiteKey, request.lane);
   if (step === null || step === "structure_repair") return undefined;
   const start = LENGTH_GUIDANCE_START;
-  const words = lengthStartWordsOf(step);
+  const words = step === "story_writer" ? null : request.guidedWords ?? lengthStartWordsOf(step);
   const room = words === null
     ? storytellerAnswerRoomTokens(storyShortWordsSum(start.story), start.storyLongReferenceWords, start.tokensPerWord)
     : answerRoomTokens(words, start.runawayMultiplier, start.tokensPerWord);

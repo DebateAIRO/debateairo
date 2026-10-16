@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { LENGTH_GUIDANCE_START } from "@debateai/kernel";
 import { promptContractFingerprintText, readPromptFrame } from "@debateai/providers";
 import {
   SYNTHESIZER_ANSWER_FORM,
@@ -93,7 +94,8 @@ describe("answer writer v4: the provisional answer in plain words of the questio
 
   it.each([
     ["the writer without a length", () => buildSynthesisRolePrompt(synthesisRequestFixture(), "Romanian").packet, "serve.synthesizer.v4"],
-    ["the writer with a length", () => buildSynthesisRolePrompt(synthesisRequestFixture(), "Romanian", undefined, 700).packet,
+    ["the writer with a length", () => buildSynthesisRolePrompt(synthesisRequestFixture(), "Romanian", undefined, { answerWords: 700,
+      ownWords: null, languageCode: null, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }).packet,
       "serve.synthesizer.length.v2"],
     ["the runner's writer packet", () => buildSynthesizerPromptPacket(synthesisRequestFixture(), "Romanian"), "serve.synthesizer.v4"]
   ] as const)("%s is SENT the new sentences and never v3's words", (_name, build, contractId) => {

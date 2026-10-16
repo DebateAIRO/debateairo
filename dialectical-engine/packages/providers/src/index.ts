@@ -257,6 +257,14 @@ export interface ProviderCallRequest {
   /** Model scorecard §2.3: the scorecard version the seat's assignment came from. Recorded, never sent. */
   readonly scorecardVersion?: number | null;
   /**
+   * Length guidance (spec 2026-10-15 §3.6; INTERFACE §3.1): the words this call's AI was told to aim at (the sum of the
+   * parts for a call told several). Recorded on every attempt's artifact (`raw_artifact.guided_words`) and NEVER sent.
+   * Read by one thing only: the preview wrapper's length retry (`previewLengthRetryOf`, owner Q-C5), which sizes the
+   * call's L25 answer room from it; nothing checks a reply against it. Absent = no target told (every call without the
+   * length row).
+   */
+  readonly guidedWords?: number;
+  /**
    * Length guidance L27 (spec 2026-10-15 §3.6, INTERFACE §3.2): counts the words of this call's replies when only a part
    * of the answer is to be counted (LG-D: the storyteller's short version). Absent: `replyWordCount` over the whole reply.
    * Information only: a counter that throws or answers anything but a whole number records null. Never sent.
@@ -1580,10 +1588,13 @@ function assertProviderCallRecord(request: ProviderCallRequest): void {
   const role = request.modelRole;
   const candidate = request.candidateId;
   const version = request.scorecardVersion;
+  const guided = request.guidedWords;
   if ((role !== undefined && !isDebateRole(role))
     || (candidate !== undefined && candidate !== null && !CANDIDATE_ID_TOKEN.test(candidate))
     || (version !== undefined && version !== null
-      && (!Number.isSafeInteger(version) || version < 1 || version > MAX_USAGE_COUNTER))) {
+      && (!Number.isSafeInteger(version) || version < 1 || version > MAX_USAGE_COUNTER))
+    || (guided !== undefined
+      && (!Number.isSafeInteger(guided) || guided < 1 || guided > MAX_USAGE_COUNTER))) {
     throw new TypeError("PROVIDER_CALL_RECORD_INVALID");
   }
 }
@@ -2357,6 +2368,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           thinkingTokens: reasoningTokens,
           cachedInputTokens,
           actualWords: attemptWords,
+          guidedWords: request.guidedWords ?? null,
           replyForm: attemptReplyForm,
           replyRepairs: attemptRepairs.length === 0 ? null : attemptRepairs,
           replyFailureClass: attemptFailureClass

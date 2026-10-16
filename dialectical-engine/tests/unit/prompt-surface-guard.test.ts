@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
 import { Judge } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
-import { argumentLanguageDirective } from "@debateai/kernel";
+import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
   ProviderContentUnacceptedError,
   type PromptPacket,
@@ -437,7 +437,8 @@ const SYNTHESIS_PAYLOADS = [
       digest: guardDigest(),
       codeLabel: SYNTHESIS_CODE_LABEL,
       prior: null
-    }), ARGUMENT_LANGUAGE_NAME, undefined, ANSWER_WORDS).packet.messages[1]!.content
+    }), ARGUMENT_LANGUAGE_NAME, undefined, { answerWords: ANSWER_WORDS, ownWords: null, languageCode: null, charactersPerWord:
+      LENGTH_GUIDANCE_START.charactersPerWord }).packet.messages[1]!.content
   },
   {
     name: "EVALUATOR",
@@ -511,16 +512,19 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // Debate shape (Task 14): the WRITER's site passes the row's answer length as a fourth argument (null on today's
     // run), so the count reads the shared head of both calls. Question language (P2L Task 17): both pass the run's lock
     // as the fifth (null on a run without a shape: today's packet); the checker's packet is never lengthed (null).
+    // Length guidance (LG-C Task 7): the fourth argument is now the run's `synthesisLength` (a RoleLength: the length
+    // row's words, else the shape's, else null), and the length field is built by `answerLengthField(length)`; this test
+    // keeps guarding the moved text (tests-that-are-not-testing control 1).
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage)")).toBe(1);
     expect(occurrences(runner,
-      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, shapeRun === null ? null : shapeRun.shape.answerWords,\n          shapeLanguage)")).toBe(1);
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage)")).toBe(1);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
     // wrapper returns the same array without a lock, so today's material is that one projection still.
     expect(runner).toContain(
-      "material: withQuestionLanguageField(lengthed ? [...material, synthesizerAnswerLengthField(answerWords)] : material, questionLanguage),"
+      "material: withQuestionLanguageField(lengthed ? [...material, answerLengthField(length)] : material, questionLanguage),"
     );
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.
