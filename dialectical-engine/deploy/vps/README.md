@@ -1027,6 +1027,10 @@ Do these in this order, with the new checkout in place:
 and the same wait for `unfinished` at 0 before the restart. The migration's tables stay; the older code never reads
 them.
 
+### Upgrading to length guidance LG-A (reply measures)
+
+This release adds one migration, `migrations/0120_reply_measures.sql` (after the reclaim resume's `migrations/0119_reclaim_resume.sql`; `pnpm db:migrate` applies 0119 first if the host does not have it yet). Apply it BEFORE the new code runs: the new code writes six new columns of `ledger.raw_artifact` (`reply_repairs`, `reply_failure_class`, `reply_form`, `cached_input_tokens`, `guided_words`, `actual_words`) with every model call it records, so on a database without them every model call fails. The migration also redefines the terminal facts function `core.read_terminal_recorded_facts` (same signature, owner and grants), so that a step whose answer was put into its form by the structure-repair call counts like that step; the older code never writes such rows, so it reads the same counts as before. Apply it as step 1 of the debate-shape upgrade above does (open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API and the runner. No register version and no new environment key. The structure-repair call itself is wired only where the preview provider config is set; a hosted production host keeps today's follow-ups. Rolling back the code needs no database step: the six columns and the function stay, and the older code never writes the columns.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
