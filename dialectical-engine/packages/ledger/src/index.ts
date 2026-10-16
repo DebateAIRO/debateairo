@@ -10,6 +10,7 @@ import {
   withWriteTransaction
 } from "@debateai/db";
 import {
+  STRUCTURE_REPAIR_CALL_SITE_PREFIX,
   TypedDomainError,
   classifyLedgerActionKind,
   type DebateRole,
@@ -91,6 +92,32 @@ function replyRepairsColumn(repairs: readonly string[] | null | undefined): stri
   if (repairs === undefined || repairs === null) return null;
   const distinct = [...new Set(repairs)].slice(0, 16);
   return distinct.length === 0 ? null : distinct;
+}
+
+/**
+ * LG-A (final review C-1): the SQL condition "this FAILED try was answered by its structure repair", over the
+ * `ledger.ledger_entry` row aliased `entry` (a plain SQL identifier). A routed call whose reply had a structure the code
+ * could not mend keeps the ORIGINAL try's artifact and ledger row, and that row stays FAILED (one OK row per call, so the
+ * terminal facts count the call once); the repair model's own row is the OK one, under
+ * `REPAIR:STRUCTURE:<original key>` (contract deviation 7). A reader that requires an OK row for a step's
+ * (call site, artifact) reads such a pair as answered with this condition: the try is FAILED, and a later OK MODEL_CALL row
+ * of the same run and subject sits at `REPAIR:STRUCTURE:` + its key with no other try at its key in between (the repair
+ * follows the try it repairs at once; a later try at the key was answered by nothing earlier). A FAILED row without such
+ * a repair is refused exactly as before; the repair row itself is never read as the step's.
+ */
+export function structureRepairAnsweredSql(entry: string): string {
+  if (!/^[a-z_][a-z0-9_]*$/u.test(entry)) throw new TypeError("STRUCTURE_REPAIR_ANSWERED_ALIAS_INVALID");
+  return `(${entry}.outcome = 'FAILED' AND EXISTS (
+    SELECT 1 FROM ledger.ledger_entry AS repair_answer
+     WHERE repair_answer.run_id = ${entry}.run_id AND repair_answer.subject_item_id = ${entry}.subject_item_id
+       AND repair_answer.action_kind = 'MODEL_CALL' AND repair_answer.outcome = 'OK'
+       AND repair_answer.call_site_key = '${STRUCTURE_REPAIR_CALL_SITE_PREFIX}' || ${entry}.call_site_key
+       AND repair_answer.sequence > ${entry}.sequence
+       AND NOT EXISTS (
+         SELECT 1 FROM ledger.ledger_entry AS between_try
+          WHERE between_try.run_id = ${entry}.run_id AND between_try.subject_item_id = ${entry}.subject_item_id
+            AND between_try.action_kind = 'MODEL_CALL' AND between_try.call_site_key = ${entry}.call_site_key
+            AND between_try.sequence > ${entry}.sequence AND between_try.sequence < repair_answer.sequence)))`;
 }
 
 interface ScheduledArtifactRow {
@@ -578,7 +605,11 @@ export class LedgerRepository {
    * Run resilience (spec 2026-10-12, fix (b)): with `byActor`, the preview's allowance is each MAKER's own, so the
    * rows are grouped by call site AND by the maker that made them (`actor_ref`): three makers that each failed once
    * at one site, as the serve fallback's hops do, never read as that site used up. Absent (hosted and local), the
-   * query is today's, byte for byte.
+   * rows are grouped by call site alone, as before.
+   *
+   * LG-A (final review C-1): a last try that its structure repair answered (`structureRepairAnsweredSql`) reads OK, as
+   * the PATCH or FULL row that answered it before LG-A did, so a reclaim never ends an answered site. Without a
+   * structure-repair row (hosted and local never route one) every row reads as written.
    */
   async findExhaustedModelAttempt(input: {
     readonly runId: string;
@@ -602,7 +633,7 @@ export class LedgerRepository {
       outcome: "OK" | "FAILED" | "TIMED_OUT";
     }>(
       `SELECT entry.attempt_id, entry.raw_artifact_ref, entry.ledger_entry_id, entry.call_site_key,
-              entry.outcome, grouped.attempt_count
+              CASE WHEN ${structureRepairAnsweredSql("entry")} THEN 'OK' ELSE entry.outcome END AS outcome, grouped.attempt_count
        FROM ledger.ledger_entry AS entry
        JOIN (
          SELECT call_site_key, count(*)::text AS attempt_count, max(sequence) AS last_sequence
@@ -640,6 +671,11 @@ export class LedgerRepository {
    * Preview retry fix, option B (spec 2026-10-11 §1.2 (d)): REFUSED rows are left out, as from every
    * attempt count. A free refusal spent nothing of a seat key, and a halt may cite only a TIMED_OUT or
    * FAILED row (`migrations/0021_dr174_cooldown_prune.sql:34-38`).
+   *
+   * LG-A (final review C-1): a try its structure repair answered (`structureRepairAnsweredSql`) reads OK, with its own
+   * artifact (the one the step kept): the seat that answered a root is restored on a resumed pass, and the writer and
+   * checker that answered are found by their artifacts (A16c). The repair's own row is the repair contract's, never read
+   * here. Every other row reads as written.
    */
   async readSeatMarkedModelCalls(input: {
     readonly runId: string;
@@ -675,12 +711,14 @@ export class LedgerRepository {
       actor_ref: string;
       candidate_id: string | null;
     }>(
-      `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref, actor_ref, candidate_id
-       FROM ledger.ledger_entry
-       WHERE run_id = $1 AND subject_item_id = $2
-         AND action_kind = 'MODEL_CALL' AND contract_hash = $3 AND outcome <> 'REFUSED'
-         AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
-       ORDER BY sequence`,
+      `SELECT entry.call_site_key,
+              CASE WHEN ${structureRepairAnsweredSql("entry")} THEN 'OK' ELSE entry.outcome END AS outcome,
+              entry.ledger_entry_id, entry.attempt_id, entry.raw_artifact_ref, entry.actor_ref, entry.candidate_id
+       FROM ledger.ledger_entry AS entry
+       WHERE entry.run_id = $1 AND entry.subject_item_id = $2
+         AND entry.action_kind = 'MODEL_CALL' AND entry.contract_hash = $3 AND entry.outcome <> 'REFUSED'
+         AND (entry.call_site_key LIKE '%:seat:main' OR entry.call_site_key LIKE '%:seat:runnerUp')
+       ORDER BY entry.sequence`,
       [input.runId, input.workItemId, input.contractHash]
     );
     return Object.freeze(result.rows.map((row) => Object.freeze({

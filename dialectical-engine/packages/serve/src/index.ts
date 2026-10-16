@@ -25,6 +25,7 @@ import {
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   MemoryRepository,
@@ -2336,6 +2337,10 @@ export class ServeRepository {
               `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected[0]!} or its seat forms`
             );
           }
+          // LG-A (final review C-1): a structure-repaired writer or checker reply keeps the ORIGINAL try's artifact,
+          // whose row stays FAILED while the repair model's OK row sits at REPAIR:STRUCTURE:<this key> (contract
+          // deviation 7). That pair is this call site's answer too (`structureRepairAnsweredSql`); a FAILED row without
+          // its repair, another key's artifact or another run's is refused as before.
           const producer = await client.query<{ raw_artifact_ref: string }>(
             `SELECT entry.raw_artifact_ref::text
                FROM ledger.ledger_entry AS entry
@@ -2343,7 +2348,7 @@ export class ServeRepository {
                  ON artifact.raw_artifact_id = entry.raw_artifact_ref
                 AND artifact.run_id = entry.run_id
               WHERE entry.run_id=$1 AND entry.subject_item_id=$2
-                AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
+                AND entry.action_kind='MODEL_CALL' AND (entry.outcome='OK' OR ${structureRepairAnsweredSql("entry")})
                 AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
             [input.runId, input.workItemId, bound.callSiteKey, bound.ref]
           );
