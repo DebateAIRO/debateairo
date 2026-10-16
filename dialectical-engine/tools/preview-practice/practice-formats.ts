@@ -95,6 +95,13 @@ export type PracticeAttempt = Readonly<{
    * before it was sent); absent in older logs.
    */
   replyForm?: PracticeReplyForm | null;
+  /**
+   * Length guidance LG-B (pre-flight PF-B4.3): the bound this try asked for (its stored metadata's token_ceiling) and the
+   * thinking level it ran at (its ledger row's; DEFAULT_ONLY for a model's own default); null when not recorded; absent
+   * in older logs. The LG-B proof reads them (a final writer's first try asks its row's own maximum).
+   */
+  tokenCeiling?: number | null;
+  thinkingLevel?: string | null;
 }>;
 
 export type PracticeSample = Readonly<{
@@ -209,17 +216,22 @@ export function practiceJobGateway(input: Readonly<{
 export function practiceAttemptsOf(sink: PracticeSink): readonly PracticeAttempt[] {
   return Object.freeze(sink.ledger.map((entry): PracticeAttempt => {
     const artifact = sink.artifacts.find((candidate) => candidate.attemptId === entry.attemptId) ?? null;
+    const ceiling = artifact?.metadata.token_ceiling;
     return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
       latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
       jsonRepair: artifact === null || entry.outcome !== "OK" ? null
         : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata), entry.callSiteKey),
-      replyForm: sink.forms.get(entry.attemptId) ?? null });
+      replyForm: sink.forms.get(entry.attemptId) ?? null,
+      tokenCeiling: typeof ceiling === "number" && Number.isSafeInteger(ceiling) ? ceiling : null,
+      thinkingLevel: entry.thinkingLevel ?? null });
   }));
 }
 
 /**
  * A job's tokens, summed over its own model's gate calls (`wire`: the gate watch's events since the job began, for that
- * model only), and their cost at the model's preview price. Each count is null when no call reported it.
+ * model only), and their cost at the model's preview price. Each count is null when no call reported it. The cost is
+ * priced POST by POST at each POST's own tier, then summed: a final writer's output is not clamped at the standard
+ * bound, and several POSTs' output is never clamped together (Task 6 review, Minor 1).
  */
 export function practiceWireUsage(model: string, wire: readonly PracticeWireEvent[]): Readonly<{
   inputTokens: number | null; outputTokens: number | null; reasoningTokens: number | null; cachedInputTokens: number | null;
@@ -235,7 +247,8 @@ export function practiceWireUsage(model: string, wire: readonly PracticeWireEven
   return Object.freeze({ inputTokens, outputTokens, reasoningTokens: total((event) => event.reasoningTokens),
     cachedInputTokens: total((event) => event.cachedInputTokens),
     costNanoUsd: row === undefined || inputTokens === null || outputTokens === null ? null
-      : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens)) });
+      : String(wire.reduce((sum, event) => sum + previewCallNanoUsd(row, BigInt(event.inputTokens ?? 0), event.outputTokens ?? 0,
+        event.callTier ?? "STANDARD"), 0n)) });
 }
 
 /** A model's budget of busy waits as used so far: the time, the waits, the waits in a row. */

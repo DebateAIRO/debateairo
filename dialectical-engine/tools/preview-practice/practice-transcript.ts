@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
-import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, structureRepairOriginalKey } from "@debateai/providers";
+import { answerTokensOf, PREVIEW_PROVIDER_REF_MODELS, previewModelRow, replyWordCount, structureRepairOriginalKey } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -33,6 +33,7 @@ import {
   replyContentOf
 } from "./practice-lanes.js";
 import { redactNamedKeyShapes } from "./practice-redaction.js";
+import { practiceTryTier } from "./practice-tokens.js";
 
 export const PRACTICE_TRANSCRIPT_SCHEMA = "preview-practice-transcript-v1";
 export const PRACTICE_TRANSCRIPT_FILE = "transcript.json";
@@ -75,6 +76,10 @@ export type TranscriptArtifact = Readonly<{
   replyRepairs?: readonly string[] | null;
   replyFailureClass?: string | null;
   replyForm?: string | null;
+  /** LG-B (L27, migration 0120): the vendor's cached input tokens, the reply's words, the words it was guided to; null on older rows. */
+  cachedInputTokens?: number | null;
+  actualWords?: number | null;
+  guidedWords?: number | null;
 }>;
 
 /** One attempt's prompt (ledger.call_prompt), decrypted. */
@@ -127,6 +132,8 @@ export type TranscriptAttempt = Readonly<{
     inputTokens: number | null;
     outputTokens: number | null;
     reasoningTokens: number | null;
+    /** Length guidance L27: the output tokens that were the answer, not thinking (answerTokensOf). */
+    answerTokens: number | null;
     cachedInputTokens: number | null;
     /** The usage block the gateway recorded beside the reply (metadata_json.usage). */
     recorded: unknown;
@@ -156,6 +163,10 @@ export type TranscriptAttempt = Readonly<{
    * from the prompt; null without either.
    */
   replyForm: string | null;
+  /** Length guidance L27: the words the call was guided to (LG-C writes them; null without a length row). */
+  guidedWords: number | null;
+  /** The words the reply wrote: the record's own count, else counted here from the reply (replyWordCount). */
+  actualWords: number | null;
   /** The metadata the gateway stored beside the reply (status, attempt, usage, finish reason, token ceiling, tripwires). */
   metadata: unknown;
   prompt: Readonly<{ fingerprint: string; messages: readonly unknown[] | null; text: string | null }> | null;
@@ -247,8 +258,11 @@ export function buildTranscriptAttempts(input: Readonly<{
     const charges = entry.attemptId === null ? undefined : input.spend.get(entry.attemptId);
     const charged = charges === undefined || charges.length === 0 ? null
       : String(charges.reduce((sum, charge) => sum + BigInt(charge.chargeMicros), 0n));
+    // Priced at the try's own tier: a final writer's output is not clamped at the standard bound (Task 6 review, Minor 1).
+    const ceiling = typeof artifact?.metadata === "object" && artifact.metadata !== null
+      ? (artifact.metadata as { token_ceiling?: unknown }).token_ceiling : undefined;
     const estimated = row === undefined || inputTokens === null || outputTokens === null ? null
-      : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens));
+      : String(previewCallNanoUsd(row, BigInt(inputTokens), outputTokens, practiceTryTier(row, ceiling)));
     const content = artifact === undefined ? null : replyContentOf(artifact.rawText);
     const body = artifact === undefined ? undefined : parsedJson(artifact.rawText);
     const vendorBody = typeof body === "object" && body !== null && content !== artifact?.rawText ? body : null;
@@ -275,7 +289,8 @@ export function buildTranscriptAttempts(input: Readonly<{
       startedAt: entry.startedAt.toISOString(),
       finishedAt: entry.finishedAt.toISOString(),
       durationMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
-      usage: Object.freeze({ inputTokens, outputTokens, reasoningTokens, cachedInputTokens: fromVendor?.cachedInputTokens ?? null, recorded }),
+      usage: Object.freeze({ inputTokens, outputTokens, reasoningTokens, answerTokens: answerTokensOf(outputTokens, reasoningTokens),
+        cachedInputTokens: artifact?.cachedInputTokens ?? fromVendor?.cachedInputTokens ?? null, recorded }),
       cost: Object.freeze({ chargedMicros: charged, estimatedNanoUsd: estimated }),
       parse: Object.freeze({
         status: artifact?.parseStatus ?? null,
@@ -289,6 +304,8 @@ export function buildTranscriptAttempts(input: Readonly<{
         finishReason
       }),
       replyForm: artifact?.replyForm ?? replyForm,
+      guidedWords: artifact?.guidedWords ?? null,
+      actualWords: artifact?.actualWords ?? (content === null ? null : replyWordCount(content, { finishReason })),
       metadata: artifact?.metadata ?? null,
       prompt: prompt === undefined ? null : Object.freeze({
         fingerprint: prompt.promptFingerprint,
@@ -316,9 +333,11 @@ export async function readTranscriptAttempts(pool: Pool, runId: string, makers: 
   const artifactRows = (await pool.query<{ raw_artifact_id: string; provider: string; provider_ref: string; model_id: string;
     maker: string; model_version: string | null; parse_status: string; parse_error: string | null; metadata_json: unknown;
     thinking_tokens: number | null; raw_text: string; content_ciphertext: unknown; reply_repairs: string[] | null;
-    reply_failure_class: string | null; reply_form: string | null }>(
+    reply_failure_class: string | null; reply_form: string | null; cached_input_tokens: number | null; actual_words: number | null;
+    guided_words: number | null }>(
     `SELECT raw_artifact_id::text, provider, provider_ref, model_id, maker, model_version, parse_status, parse_error,
-            metadata_json, thinking_tokens, raw_text, content_ciphertext, reply_repairs, reply_failure_class, reply_form
+            metadata_json, thinking_tokens, raw_text, content_ciphertext, reply_repairs, reply_failure_class, reply_form,
+            cached_input_tokens, actual_words, guided_words
        FROM ledger.raw_artifact WHERE run_id=$1`, [runId])).rows;
   const artifacts = new Map<string, TranscriptArtifact>();
   for (const row of artifactRows) {
@@ -329,7 +348,8 @@ export async function readTranscriptAttempts(pool: Pool, runId: string, makers: 
       maker: row.maker, modelVersion: row.model_version, parseStatus: row.parse_status, parseErrorCode: row.parse_error,
       metadata: row.metadata_json, thinkingTokens: row.thinking_tokens, rawText: stored.rawText,
       parseErrorDetail: stored.parseErrorDetail ?? null,
-      replyRepairs: row.reply_repairs, replyFailureClass: row.reply_failure_class, replyForm: row.reply_form
+      replyRepairs: row.reply_repairs, replyFailureClass: row.reply_failure_class, replyForm: row.reply_form,
+      cachedInputTokens: row.cached_input_tokens, actualWords: row.actual_words, guidedWords: row.guided_words
     }));
   }
   const prompts = new Map<string, TranscriptPrompt>();

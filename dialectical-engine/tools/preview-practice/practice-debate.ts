@@ -71,6 +71,14 @@ import {
   type PracticeShapeSource
 } from "./practice-shape.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
+import {
+  practiceLengthRows,
+  practiceTokenRows,
+  practiceTryTier,
+  type PracticeLengthRow,
+  type PracticeMeasuredAttempt,
+  type PracticeTokenRow
+} from "./practice-tokens.js";
 import { recordPracticeTranscript } from "./practice-transcript.js";
 import {
   latencySummary,
@@ -176,6 +184,9 @@ export type PracticeDebateResult = Readonly<{
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
   unrepaired?: readonly PracticeUnrepairedRow[];
+  /** Length guidance L27 (LG-B): tokens and words per AI and step, information only (practice-tokens.ts). */
+  tokensByModelAndStep?: readonly PracticeTokenRow[];
+  lengthByModelAndStep?: readonly PracticeLengthRow[];
   failedCalls: number;
   refusedCalls: number;
   remaining: Readonly<Record<PracticeGateName, Readonly<{ before: PreviewGateRemaining | null; after: PreviewGateRemaining | null }>>>;
@@ -330,15 +341,17 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures"
   | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls" | "repairsByKind"
-  | "unrepaired">> {
+  | "unrepaired" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
-    started_at: Date; finished_at: Date; raw_artifact_ref: string | null }>(
-    `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text
+    started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
+    `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text, thinking_level
        FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`, [runId])).rows;
   const artifacts = new Map((await pool.query<{ raw_artifact_id: string; parse_status: string; metadata_json: unknown;
     raw_text: string; content_ciphertext: unknown; reply_repairs: string[] | null; reply_failure_class: string | null;
-    reply_form: string | null }>(
-    `SELECT raw_artifact_id::text, parse_status, metadata_json, raw_text, content_ciphertext, reply_repairs, reply_failure_class, reply_form
+    reply_form: string | null; thinking_tokens: number | null; cached_input_tokens: number | null; actual_words: number | null;
+    guided_words: number | null }>(
+    `SELECT raw_artifact_id::text, parse_status, metadata_json, raw_text, content_ciphertext, reply_repairs, reply_failure_class, reply_form,
+            thinking_tokens, cached_input_tokens, actual_words, guided_words
        FROM ledger.raw_artifact WHERE run_id=$1`, [runId])).rows.map((row) => [row.raw_artifact_id, row]));
   type Bucket = { model: string; providerRef: string; site: string; calls: number; outcomes: Record<string, number>;
     parse: Record<string, number>; latencies: number[]; input: number; output: number; cost: bigint };
@@ -350,6 +363,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
   // with all its tries, in ledger order: its format repair, its one resend after an unbilled refusal, the final retry.
   const calls = new Map<string, { model: string; tries: PracticeCallTry[] }>();
   const jsonRepairs: { model: string; repair: string }[] = [];
+  const measured: PracticeMeasuredAttempt[] = [];
   /** Each failure's call (`calls` key), in `failures` order: a structure-repair try's failure is its original call's. */
   const failureCallKeys: string[] = [];
   const readContent = async (rawArtifactRef: string, artifact: { raw_text: string; content_ciphertext: unknown }) => {
@@ -407,7 +421,11 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
       bucket.input += usage.input;
       bucket.output += usage.output;
       const row = previewModelRow(model);
-      if (row !== undefined) bucket.cost += previewCallNanoUsd(row, BigInt(usage.input), usage.output);
+      // Measured usage is priced at the try's own tier (a final writer's output is not clamped at the standard bound).
+      if (row !== undefined) {
+        const ceiling = (artifact.metadata_json as { token_ceiling?: unknown } | null)?.token_ceiling;
+        bucket.cost += previewCallNanoUsd(row, BigInt(usage.input), usage.output, practiceTryTier(row, ceiling));
+      }
     }
     const formatFailed = parseStatus === "PARSE_FAILED" || parseStatus === "SCHEMA_FAILED" || parseStatus === "UNPARSED";
     if (entry.outcome === "REFUSED") refusedCalls += 1;
@@ -415,6 +433,18 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const { callKey, callModel, recordModel, replyForm } = await joinTry({ actorRef: entry.actor_ref, model,
       callSiteKey: entry.call_site_key, outcome: entry.outcome, formatFailed, recordedForm: artifact?.reply_form ?? null },
     () => replyFormOf(entry.attempt_id));
+    // Length guidance L27 (LG-B): this try's measures. A structure-repair try's words count for its call's AI (callModel).
+    if (artifact !== undefined) {
+      const recorded = typeof artifact.metadata_json === "object" && artifact.metadata_json !== null
+        ? artifact.metadata_json as { usage?: Record<string, unknown> | null; token_ceiling?: unknown } : {};
+      const count = (value: unknown): number | null => typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+      measured.push(Object.freeze({ model, wordsModel: callModel, actorRef: entry.actor_ref, callSiteKey: entry.call_site_key,
+        outcome: entry.outcome, thinkingLevel: entry.thinking_level, replyForm, parseStatus: artifact.parse_status,
+        finishReason: practiceFinishReasonOf(artifact.metadata_json), tokenCeiling: count(recorded.token_ceiling),
+        promptTokens: count(recorded.usage?.prompt_tokens), completionTokens: count(recorded.usage?.completion_tokens),
+        thinkingTokens: artifact.thinking_tokens, cachedInputTokens: artifact.cached_input_tokens, actualWords: artifact.actual_words,
+        guidedWords: artifact.guided_words }));
+    }
     const call = calls.get(callKey) ?? { model: callModel, tries: [] };
     calls.set(callKey, call);
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
@@ -468,7 +498,8 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
-    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records) };
+    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
+    tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured) };
 }
 
 function codeOf(error: unknown): string {
