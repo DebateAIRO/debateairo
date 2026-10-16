@@ -257,9 +257,14 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual(len(go_line), 1)
         self.assertIn('daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,', go_line[0])
         self.assertIn('max_concurrent_calls:10,max_final_writer_calls:1,', go_line[0])  # LG-B: a first install names the slot too.
-        # LG-B: the live GO is edited by four named fields only, and only DeepInfra's GO (fix round 1 of Task 11).
-        self.assertIn('.max_final_writer_calls=1 | .daily_budget_usd="12.00"', readme)
-        self.assertIn('del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)', readme)
+        # LG-B: the live GO is edited by named fields only, and only DeepInfra's GO (fix round 1 of Task 11). Final review
+        # (2026-10-16, Important 1): in two phases, the hashes and M1's budget first, the final-writer slot right before
+        # the proof (the R17 app reads exactly seven /remaining members); an app-only way back removes the slot again.
+        self.assertIn('.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd="12.00"', readme)
+        self.assertIn('del(.bridge_sha256,.helper_sha256,.daily_budget_usd)', readme)
+        self.assertIn("jq '.max_final_writer_calls=1' \"$GO\"", readme)
+        self.assertIn("del(.max_final_writer_calls)", readme)
+        self.assertIn('SLOTS_REMOVED', readme)
         self.assertIn("""jq -e '.provider=="deepinfra"' "$GO" """, readme)
         # LG-B: the way back is one two-gate block, never one gate alone.
         self.assertIn('BOTH_GATES_BACK', readme)

@@ -316,7 +316,7 @@ story_writer, story_checker, map, structure_repair, and UNMAPPED for a call of n
 - tokens: how many tries (each try whose reply was stored; a call's retries count apart); thinking and answer tokens
   (p50 / p90 / max); the share of the input the vendor read from its cache; how many length retries thought one level
   lower because thinking had used up the answer's room; how many tries asked for more than the standard 32,768 tokens
-  (the final writers' own maximum; a slow storyteller keeps 16,384 and is not counted here). Haiku's structure-repair
+  (the final writers' own maximum; a slow row's final writers keep 16,384 and are not counted here). Haiku's structure-repair
   tries are Haiku's own row (`structure_repair`): Haiku spent those tokens;
 - words: the words each step was guided to (empty until a length row exists), how many replies were accepted, the
   words they wrote (median / p90 / max), the share longer than guided, how many replies were stopped at their allowance,
@@ -862,13 +862,16 @@ together (a slip fixed by the second try is a warning; a step failed for good, o
 model's answered calls, fails). Each run's own bar is shown, for the comparison only, in the levels table's "over
 bar" column; its "answered / jobs" column shows the jobs a busy model skipped.
 
-### S-6c, Mac: the LG-B proof (between the LG-B gates and the LG-B app upload)
+### S-6c, Mac: the LG-B proof (between the LG-B gates' phase 2 and the LG-B app upload)
 
-Length guidance LG-B: the final writers now ask each model's own maximum, so the proof makes sure Haiku writes a story
-at least once, measures the storyteller's thinking one level lower (OVERVIEW B-1), then runs one whole debate with every
-AI. It needs the LG-B gates on the server first: with an older gate the app keeps its final writers at the standard
-caps, and the proof proves nothing (the practice then prints `PREVIEW_FINAL_WRITER_TIER_UNREAD` for that gate). Same
-`D` and `P` as in S-5.
+Length guidance LG-B: the final writers now ask each model's own maximum (16,384 first on the slow rows GLM, MiMo and
+Qwen), so the proof makes sure Haiku writes a story at least once, measures the storyteller's thinking one level lower
+(OVERVIEW B-1), then runs one whole debate with every AI. It needs the LG-B gates on the server first, with their phase
+2 done (`deploy/preview-gate/v3/README.md`, "Length guidance LG-B (2026-10-15): installing this change": both GOs name
+`max_final_writer_calls`): with an older gate, or one without that slot, the app keeps its final writers at the
+standard caps, and the proof proves nothing (the practice then prints `PREVIEW_FINAL_WRITER_TIER_UNREAD` for that
+gate). From phase 2 until the app upload the live site refuses new debates, so run the proof right after phase 2 and
+upload right after the proof. Same `D` and `P` as in S-5.
 
 1. B-1 on the LOCAL copy only (the server's api.env and runner.env are not touched): after S-5's copy (`scp` brings
    `settings.env` down to `$P`; it exists on the Mac only then), merge the storyteller's one-level-lower levels into

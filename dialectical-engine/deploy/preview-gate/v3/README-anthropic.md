@@ -497,39 +497,67 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 
 ## Length guidance LG-B (2026-10-15): installing this change
 
-As README.md's section of the same name (the order, the checks, the way back), for this gate:
+As README.md's section of the same name (the two phases, the order, the checks, the ways back), for this gate:
 `G=/opt/debateai-v3-preview/operator/anthropic-budget-v1`, `GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json`,
 its service `debateai-preview-anthropic-budget.service`, this README's install step 1 for the files (with the hash
 check that step names), and the day budget `"4.00"` (owner answer M1, 2026-10-15). Never re-run install step 5's
-`jq -n` for this: it writes the first-install GO with its own limits. The GO edit changes only the two hashes,
-`max_final_writer_calls` and `daily_budget_usd`. The alert script is refreshed once, by README.md's section (its
-step 1), not again here. Install this gate in the same sitting as the DeepInfra gate, right after it (README.md's
-section, "Both gates in ONE sitting": between the two installs, the gate still on the old code cannot be opened
-again). Write down this gate's archive folder `$B` too. The block sets `G` and `GO` itself (in the same root shell
-they may still name the DeepInfra gate) and first checks that the GO is Anthropic's (else `WRONG_GO: stop here`):
+`jq -n` for this: it writes the first-install GO with its own limits.
+
+Two phases (final review, 2026-10-16), as README.md's section says: the app running on the server today (R17) reads
+`/remaining` as exactly seven members, and a gate whose GO names `max_final_writer_calls` answers nine, which the R17
+app reads as `PREVIEW_GATE_UNREACHABLE` (the live site refuses every new debate). So phase 1 brings the new files and
+`"4.00"` WITHOUT `max_final_writer_calls`, and phase 2, right before the practice proof, adds it.
+
+Phase 1, in the same sitting as the DeepInfra gate, right after it (README.md's section, "Both gates in ONE sitting":
+between the two installs, the gate still on the old code cannot be opened again). "Redeploy (2026-10-12)" steps 1-3 of
+README.md with this gate's `G` and `GO`; write down this gate's archive folder `$B` too (the two-gate
+way back needs it). The alert script is refreshed once, by README.md's section
+(its phase 1, step 1), not again here. The GO edit changes only the two hashes and `daily_budget_usd`. The block sets
+`G` and `GO` itself (in the same root shell they may still name the DeepInfra gate) and first checks that the GO is
+Anthropic's (else `WRONG_GO: stop here`):
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
 jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
 umask 077
-jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .max_final_writer_calls=1 | .daily_budget_usd="4.00"' "$GO" > "$GO.new"
+jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd="4.00"' "$GO" > "$GO.new"
 diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
-cmp <(jq -S 'del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256,.max_final_writer_calls,.daily_budget_usd)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+cmp <(jq -S 'del(.bridge_sha256,.helper_sha256,.daily_budget_usd)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256,.daily_budget_usd)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
 ```
 
-The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `1`. `activate` then checks 1 x $0.24704 +
-1 x $0.97664 = $1.22368, inside $4.00, and the team total with DeepInfra's GO: $12.00 + $4.00 = $16.00 (with
+The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `null`. Restart the service, then `activate`
+checks 2 x $0.24704 = $0.49408, inside $4.00, and the team total with DeepInfra's GO: $12.00 + $4.00 = $16.00 (with
 DeepInfra's GO still at $10.00, $14.00). Before the first `activate` on $4.00, the owner raises the workspace's
-monthly spend limit in the Anthropic Console (install step 0, item 2: about $130).
+monthly spend limit in the Anthropic Console (install step 0, item 2: about $130). Restart the runner after both gates
+are `active`; the R17 app keeps reading seven members.
 
-To go back: only together with the DeepInfra gate, by README.md's two-gate block in its section of the same name
-(both gates stopped, both gates' old files and old GOs back, both services restarted, then `activate` each). Never
-this gate alone: its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`).
+Phase 2, right before the practice proof, in the same sitting as the DeepInfra gate's phase 2: `stop`, then add
+`max_final_writer_calls` (`1`) and nothing else:
+
+```sh
+G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
+umask 077
+jq '.max_final_writer_calls=1' "$GO" > "$GO.new"
+diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
+cmp <(jq -S 'del(.max_final_writer_calls)' "$GO") <(jq -S 'del(.max_final_writer_calls)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+```
+
+The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `1`. Restart the service, then `activate` checks
+1 x $0.24704 + 1 x $0.97664 = $1.22368, inside $4.00. Do NOT restart the R17 runner. From here until the app upload the
+live R17 site refuses every new debate (no real users today); the practice proof follows, and the app upload right
+after it.
+
+Ways back, as README.md's section "Ways back": the app-only block (both gates: `stop`, `max_final_writer_calls` removed
+from both GOs, both services restarted, then `activate` each) takes away phase 2's slots and gives the R17 app its seven
+members back. The gate files go back only together with the DeepInfra gate, by README.md's two-gate block (both gates
+stopped, both gates' old files and old GOs back, both services restarted, then `activate` each). Never this gate alone:
+its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`).
 
 This gate matters most for the order: an older Anthropic gate refuses a Haiku message whose first part carries the
 cache mark of this release (`REQUEST_PARAMETERS_INVALID`), and the app has no way around that. So this gate gets the
-new files and its GO before the app of the same release goes up, and the runner restarts only after both gates are
-`active` (README.md's section, step 5).
+new files (phase 1) and its slot (phase 2) before the app of the same release goes up, and the runner of this release
+starts only after both gates are `active` with their slots (README.md's section, phase 2, step 5).
 
 ## Daily operations
 
