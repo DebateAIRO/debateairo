@@ -8,7 +8,7 @@
 import { mkdirSync, realpathSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import type { PracticeDebateResult, PracticeRepairRow, PracticeUnrepairedRow } from "./practice-debate.js";
+import type { PracticeDebateResult, PracticeRepairRow, PracticeStructureRescues, PracticeUnrepairedRow } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import {
@@ -436,6 +436,8 @@ export function debateReport(input: Readonly<{
     // LG-A (L34): repairs by kind (counts) and the replies code could not repair (each with a short sample, json only).
     repairsByKind: r.repairsByKind ?? [],
     unrepaired: r.unrepaired ?? [],
+    // Refused-repair salvage: the structure rescues (counts only); absent when the result has none.
+    ...(r.structureRescues === undefined ? {} : { structureRescues: r.structureRescues }),
     // Length guidance L27 (LG-B): tokens and words per AI and step (information only).
     tokensByModelAndStep: r.tokensByModelAndStep ?? [],
     lengthByModelAndStep: r.lengthByModelAndStep ?? []
@@ -534,6 +536,11 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("Repairs made in code (LG-A; information only, never a slip):", "", "| model | step | repair | count |", "|---|---|---|---|");
     for (const row of repairs) lines.push(`| ${row.model} | ${row.step} | ${row.kind} | ${String(row.count)} |`);
     lines.push("");
+  }
+  const rescues = report.structureRescues as PracticeStructureRescues | undefined;
+  if (rescues !== undefined) {
+    lines.push(`Structure rescues: in code ${String(rescues.inCode)}, by short follow-up ${String(rescues.byPatch)}, `
+      + `by full re-ask ${String(rescues.byFullAsk)}`, "");
   }
   const unrepaired = report.unrepaired as readonly PracticeUnrepairedRow[] | undefined;
   if (unrepaired !== undefined && unrepaired.length > 0) {

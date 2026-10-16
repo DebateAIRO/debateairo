@@ -16,7 +16,10 @@ import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyRe
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
 import type { Session } from "@debateai/contract";
 import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapeInForce, readDebateShapePolicy, type CallConcurrencyPolicy } from "@debateai/register";
-import { PREVIEW_PROVIDER_REF_MODELS, previewModelRow, structureRepairOriginalKey, type PreviewBudgetPorts, type PreviewGateRemaining } from "@debateai/providers";
+import {
+  PREVIEW_PROVIDER_REF_MODELS, previewModelRow, STRUCTURE_SALVAGE_REPAIRS, structureRepairOriginalKey, type PreviewBudgetPorts,
+  type PreviewGateRemaining
+} from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
@@ -184,6 +187,8 @@ export type PracticeDebateResult = Readonly<{
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
   unrepaired?: readonly PracticeUnrepairedRow[];
+  /** Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask). */
+  structureRescues?: PracticeStructureRescues;
   /** Length guidance L27 (LG-B): tokens and words per AI and step, information only (practice-tokens.ts). */
   tokensByModelAndStep?: readonly PracticeTokenRow[];
   lengthByModelAndStep?: readonly PracticeLengthRow[];
@@ -254,6 +259,40 @@ export function practiceRepairRows(tries: readonly PracticeTryRecord[]): readonl
 }
 
 const FOLLOW_UPS: ReadonlySet<string> = new Set(["STRUCTURE", "PATCH", "FULL", "LENGTH_RETRY"]);
+
+const STRUCTURE_SALVAGE: ReadonlySet<string> = new Set(STRUCTURE_SALVAGE_REPAIRS);
+
+export type PracticeStructureRescues = Readonly<{ inCode: number; byPatch: number; byFullAsk: number }>;
+
+/**
+ * Refused-repair salvage, information only: `inCode`, the accepted replies whose recorded repairs name one of A1's drops
+ * (`STRUCTURE_SALVAGE_REPAIRS`); `byPatch` / `byFullAsk`, the calls (tries grouped by call, in ledger order) whose first
+ * try with a reply was refused for its STRUCTURE and whose first accepted try came back as a PATCH / FULL follow-up (B).
+ */
+export function practiceStructureRescues(tries: readonly PracticeTryRecord[]): PracticeStructureRescues {
+  const inCode = tries.filter((attempt) => attempt.outcome === "OK"
+    && (attempt.repairs ?? []).some((repair) => STRUCTURE_SALVAGE.has(repair))).length;
+  const byCall = new Map<string, PracticeTryRecord[]>();
+  for (const attempt of tries) byCall.set(attempt.callKey, [...(byCall.get(attempt.callKey) ?? []), attempt]);
+  let byPatch = 0;
+  let byFullAsk = 0;
+  for (const call of byCall.values()) {
+    if (call.find((attempt) => attempt.parseStatus !== null)?.failureClass !== "STRUCTURE") continue;
+    const accepted = call.find((attempt) => attempt.outcome === "OK");
+    if (accepted?.replyForm === "PATCH") byPatch += 1;
+    else if (accepted?.replyForm === "FULL") byFullAsk += 1;
+  }
+  return Object.freeze({ inCode, byPatch, byFullAsk });
+}
+
+/**
+ * A1's drops as the tolerant-repairs list names them: the artifact's recorded repair names joined by "+" when one of them
+ * is an A1 drop, else null (re-reading the raw reply would miss them: the drops are only on the artifact).
+ */
+export function recordedSalvageRepairs(replyRepairs: readonly string[] | null): string | null {
+  if (replyRepairs === null || !replyRepairs.some((repair) => STRUCTURE_SALVAGE.has(repair))) return null;
+  return replyRepairs.join("+");
+}
 
 /** One ledger row as the call join reads it (`practiceTryJoiner`). */
 export type PracticeLedgerTry = Readonly<{
@@ -341,7 +380,7 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateResult, "byModelAndSite" | "failures" | "formatFailures"
   | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "failedCalls" | "refusedCalls" | "repairsByKind"
-  | "unrepaired" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
+  | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
     `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text, thinking_level
@@ -450,8 +489,9 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
-      const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key,
-        await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key));
+      // Refused-repair salvage: A1's drops are recorded on the artifact only (re-reading the raw reply would miss them).
+      const repair = recordedSalvageRepairs(artifact.reply_repairs) ?? practiceJsonRepairOf(replyContentOf(stored.rawText),
+        practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key, await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key));
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;
@@ -498,7 +538,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
-    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
+    repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records), structureRescues: practiceStructureRescues(records),
     tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured) };
 }
 

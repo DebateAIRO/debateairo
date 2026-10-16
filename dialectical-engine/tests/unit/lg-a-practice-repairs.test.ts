@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { callFamilyOf, issueListFromParseError, practiceJsonRepairOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import {
-  practiceRepairRows, practiceTryJoiner, practiceUnrepairedRows, type PracticeJoinedTry, type PracticeLedgerTry, type PracticeTryRecord
+  practiceRepairRows, practiceStructureRescues, practiceTryJoiner, practiceUnrepairedRows, recordedSalvageRepairs, type PracticeJoinedTry,
+  type PracticeLedgerTry, type PracticeTryRecord
 } from "../../tools/preview-practice/practice-debate.js";
 import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
-import { practiceModelCalls } from "../../tools/preview-practice/practice-verdict.js";
+import { practiceModelCalls, practiceRepairKindsByModel } from "../../tools/preview-practice/practice-verdict.js";
 import { buildTranscriptAttempts, type TranscriptArtifact, type TranscriptLedgerRow } from "../../tools/preview-practice/practice-transcript.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -284,5 +285,49 @@ describe("LG-A practice: review round 1 (codes in report.md, the story fixer's o
     const stray = JSON.stringify(story((body) => { body.short.line = "A stray position line"; }));
     expect(recheckReply("STORY:STORYTELLER:1", stray).issues.length).toBeGreaterThan(0);
     expect(recheckReply("REPAIR:STRUCTURE:STORY:STORYTELLER:1", stray).issues.length).toBeGreaterThan(0);
+  });
+});
+
+const RESCUES: readonly PracticeTryRecord[] = [
+  { callKey: "glm|PANEL:a", model: GLM, callSiteKey: "PANEL:JUDGE:cross-root:3->2", outcome: "OK", parseStatus: "PARSED", replyForm: "ORIGINAL",
+    repairs: ["ECHO_DROPPED"], failureClass: null, issue: null, replyText: null },
+  { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "PANEL:JUDGE:cross-root:2->3", outcome: "FAILED", parseStatus: "PARSE_FAILED",
+    replyForm: "ORIGINAL", repairs: null, failureClass: "STRUCTURE", issue: "PARSE_FAILED@$", replyText: "{" },
+  // The joiner records a refused Haiku try under the call's model (practice-debate.ts:289-294; pre-flight PF-S19).
+  { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "REPAIR:STRUCTURE:PANEL:JUDGE:cross-root:2->3", outcome: "FAILED",
+    parseStatus: "SCHEMA_FAILED", replyForm: "STRUCTURE", repairs: null, failureClass: "CONTENT", issue: "STRUCTURE_REPAIR_NOT_VERBATIM@$", replyText: "{}" },
+  { callKey: "glm|PANEL:b", model: GLM, callSiteKey: "PANEL:JUDGE:cross-root:2->3", outcome: "OK", parseStatus: "PARSED", replyForm: "PATCH",
+    repairs: null, failureClass: null, issue: null, replyText: null }
+];
+
+describe("refused-repair salvage in the practice report", () => {
+  it("A1 is a code repair: no slip, counted by kind and as a rescue in code", () => {
+    expect(practiceRepairRows(RESCUES.slice(0, 1))).toEqual([{ model: GLM, step: "judge_panel", kind: "ECHO_DROPPED", count: 1 }]);
+    expect(practiceModelCalls([{ model: GLM, tries: [RESCUES[0]!] }] as never)).toEqual({ [GLM]: { answered: 1, slips: 0, repaired: 0, unrecovered: 0 } });
+    expect(practiceStructureRescues(RESCUES.slice(0, 1))).toEqual({ inCode: 1, byPatch: 0, byFullAsk: 0 });
+  });
+
+  it("B after a refused Haiku copy is the original AI's call fixed by a patch: a warning, never a failure", () => {
+    const tries = RESCUES.slice(1).map((attempt) => ({ outcome: attempt.outcome, parseStatus: attempt.parseStatus, replyForm: attempt.replyForm }));
+    expect(practiceRepairKindsByModel([{ model: GLM, tries }] as never)).toEqual({ [GLM]: { repairedByPatch: 1, repairedByFullAsk: 0, repairedOtherwise: 0 } });
+    expect(practiceUnrepairedRows(RESCUES).every((row) => row.recovered)).toBe(true);
+    expect(practiceStructureRescues(RESCUES.slice(1))).toEqual({ inCode: 0, byPatch: 1, byFullAsk: 0 });
+  });
+
+  it("counts the rescues and prints one line", () => {
+    expect(practiceStructureRescues(RESCUES)).toEqual({ inCode: 1, byPatch: 1, byFullAsk: 0 });
+    // The file's own report literal (as at :272-273; pre-flight PF-S17: no `debateReportFixture` exists).
+    expect(reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f",
+      structureRescues: { inCode: 1, byPatch: 1, byFullAsk: 0 } } as never))
+      .toContain("Structure rescues: in code 1, by short follow-up 1, by full re-ask 0");
+    expect(reportMarkdown({ mode: "debate", verdict: "PASS", exitCode: 0, reasons: [], startedAt: "s", finishedAt: "f" } as never))
+      .not.toContain("Structure rescues");
+  });
+
+  it("the tolerant-repairs list reads A1's recorded names, not the raw reply", () => {
+    expect(recordedSalvageRepairs(["UNASKED_KEYS", "ECHO_DROPPED"])).toBe("UNASKED_KEYS+ECHO_DROPPED");
+    expect(recordedSalvageRepairs(["CODE_FENCE"])).toBeNull();
+    expect(recordedSalvageRepairs([])).toBeNull();
+    expect(recordedSalvageRepairs(null)).toBeNull();
   });
 });
