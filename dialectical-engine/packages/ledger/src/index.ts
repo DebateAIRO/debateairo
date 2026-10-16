@@ -82,6 +82,17 @@ export interface AppendRawArtifactInput {
   readonly actualWords?: number | null;
 }
 
+/**
+ * The value written to 0120's `reply_repairs`, whose CHECK holds one to sixteen codes. A refused INSERT would lose a reply
+ * the vendor already billed, so the list is made to fit: no repair is written as null, a code named twice is kept once
+ * (its first place), and a longer list keeps its first sixteen codes, in order.
+ */
+function replyRepairsColumn(repairs: readonly string[] | null | undefined): string[] | null {
+  if (repairs === undefined || repairs === null) return null;
+  const distinct = [...new Set(repairs)].slice(0, 16);
+  return distinct.length === 0 ? null : distinct;
+}
+
 interface ScheduledArtifactRow {
   readonly subject_item_id: string;
   readonly raw_artifact_id: string | null;
@@ -282,7 +293,7 @@ export class LedgerRepository {
           content === null ? 1 : 2,content === null ? 1 : 2,
           content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null,
           input.thinkingTokens ?? null,
-          input.replyRepairs === undefined || input.replyRepairs === null ? null : [...input.replyRepairs],
+          replyRepairsColumn(input.replyRepairs),
           input.replyFailureClass ?? null, input.replyForm ?? null,
           input.cachedInputTokens ?? null, input.guidedWords ?? null, input.actualWords ?? null
         ]

@@ -16,7 +16,7 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
 const NAME='0120_reply_measures.sql';
 const VERSION='reply-measures-forward0120-v1';
 const MANIFEST_PATH='lineage/reply-measures-forward0120.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0120 adds no billing relation or billing function, so it names the verifier in force (0111's, which 0112 to 0119 keep)
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0120 adds no billing relation or billing function, so it names the verifier in force (0111's, which 0112 to 0120 keep)
 const PREVIOUS='0119_reclaim_resume.sql';
 const COLUMNS=['actual_words','cached_input_tokens','guided_words','reply_failure_class','reply_form','reply_repairs'] as const;
 const CONSTRAINTS=['raw_artifact_actual_words_non_negative','raw_artifact_cached_input_tokens_non_negative','raw_artifact_guided_words_non_negative',

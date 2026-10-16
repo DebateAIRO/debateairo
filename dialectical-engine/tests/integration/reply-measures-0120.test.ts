@@ -47,10 +47,26 @@ describe("migration 0120 — the reply measures", () => {
     ]);
   });
 
+  // (Task 10 review) The ledger fits the list to the CHECK, so a billed reply is never refused for its repair codes.
+  it("writes an empty repair list as null, a repeated code once, and the first sixteen of a longer list, in order", async () => {
+    const runId = await run();
+    const ledger = new LedgerRepository(database.pool);
+    const twenty = Array.from({ length: 20 }, (_, index) => `CODE_${index}`);
+    const ids = [
+      await ledger.appendRawArtifact(artifact(runId, { replyRepairs: [] })),
+      await ledger.appendRawArtifact(artifact(runId, { replyRepairs: twenty })),
+      await ledger.appendRawArtifact(artifact(runId, { replyRepairs: ["CODE_FENCE", "INNER_UNASKED_KEYS", "CODE_FENCE"] })),
+      await ledger.appendRawArtifact(artifact(runId, { replyRepairs: Array.from({ length: 17 }, () => "CODE_FENCE") }))
+    ];
+    const rows = (await database.pool.query(
+      "SELECT reply_repairs FROM ledger.raw_artifact WHERE raw_artifact_id = ANY($1::uuid[]) ORDER BY at_seq", [ids])).rows;
+    expect(rows.map((row) => row.reply_repairs)).toEqual([
+      null, twenty.slice(0, 16), ["CODE_FENCE", "INNER_UNASKED_KEYS"], ["CODE_FENCE"]
+    ]);
+  });
+
   it.each([
     ["a repair that is not a code", { replyRepairs: ["code_fence"] }, "raw_artifact_reply_repairs_code_shaped"],
-    ["an empty repair list", { replyRepairs: [] }, "raw_artifact_reply_repairs_code_shaped"],
-    ["seventeen repairs", { replyRepairs: Array.from({ length: 17 }, () => "CODE_FENCE") }, "raw_artifact_reply_repairs_code_shaped"],
     ["an unknown class", { replyFailureClass: "BROKEN" }, "raw_artifact_reply_failure_class_known"],
     ["an unknown form", { replyForm: "RETRY" }, "raw_artifact_reply_form_known"],
     ["a negative cached count", { cachedInputTokens: -1 }, "raw_artifact_cached_input_tokens_non_negative"],
