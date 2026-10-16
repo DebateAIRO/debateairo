@@ -1116,6 +1116,9 @@ export function selectProviderAdapter(
   return Object.freeze({ ...selected });
 }
 
+/** LG-A (INTERFACE §4): what one attempt sent — the step's own packet, the short follow-up, the full re-ask, the structure-repair call, or a cut-off reply's resend. */
+export type ReplyForm = "ORIGINAL" | "PATCH" | "FULL" | "STRUCTURE" | "LENGTH_RETRY";
+
 export interface RawArtifactInput {
   readonly artifactId: string;
   readonly attemptId: string;
@@ -1134,6 +1137,18 @@ export interface RawArtifactInput {
   readonly contentHash: string;
   /** Model scorecard §2.3: the vendor-reported thinking tokens of this attempt; null when not reported. */
   readonly thinkingTokens?: number | null;
+  /** LG-A (INTERFACE §4, migration 0120): every repair the accepted reply needed, in order; null when none. Codes only. */
+  readonly replyRepairs?: readonly ModelJsonRepair[] | null;
+  /** LG-A: the class of a refused reply (`replyFailureClassOf`); null for an accepted one. */
+  readonly replyFailureClass?: ReplyFailureClass | null;
+  /** LG-A: what this attempt sent. */
+  readonly replyForm?: ReplyForm | null;
+  /** LG-B writes it (the vendor's cached input count). */
+  readonly cachedInputTokens?: number | null;
+  /** LG-C writes it (the words the AI was guided to). */
+  readonly guidedWords?: number | null;
+  /** LG-B writes it (the words the AI wrote). */
+  readonly actualWords?: number | null;
 }
 
 export interface ProviderLedgerInput {

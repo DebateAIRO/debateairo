@@ -71,6 +71,15 @@ export interface AppendRawArtifactInput {
   readonly contentHash: string;
   /** Model scorecard §2.3 (migration 0090): the vendor-reported thinking tokens; null when not reported. */
   readonly thinkingTokens?: number | null;
+  /** Reply measures (migration 0120, length guidance): repair codes in order; null when none. */
+  readonly replyRepairs?: readonly string[] | null;
+  /** 0120: STRUCTURE, CONTENT, CUT_OFF or EMPTY for a refused reply; null otherwise. */
+  readonly replyFailureClass?: string | null;
+  /** 0120: ORIGINAL, PATCH, FULL, STRUCTURE or LENGTH_RETRY. */
+  readonly replyForm?: string | null;
+  readonly cachedInputTokens?: number | null;
+  readonly guidedWords?: number | null;
+  readonly actualWords?: number | null;
 }
 
 interface ScheduledArtifactRow {
@@ -260,8 +269,8 @@ export class LedgerRepository {
           model_id, maker, model_version, raw_text, metadata_json,
           parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq,
           input_hash_version,content_hash_version,
-          content_ciphertext,content_attestation,thinking_tokens
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21)
+          content_ciphertext,content_attestation,thinking_tokens,reply_repairs,reply_failure_class,reply_form,cached_input_tokens,guided_words,actual_words
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21,$22::text[],$23,$24,$25,$26,$27)
         RETURNING raw_artifact_id`,
         [
           input.artifactId, input.attemptId, input.runId, input.providerRef, input.provider,
@@ -272,7 +281,10 @@ export class LedgerRepository {
           content === null ? input.contentHash : null,sequence,
           content === null ? 1 : 2,content === null ? 1 : 2,
           content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null,
-          input.thinkingTokens ?? null
+          input.thinkingTokens ?? null,
+          input.replyRepairs === undefined || input.replyRepairs === null ? null : [...input.replyRepairs],
+          input.replyFailureClass ?? null, input.replyForm ?? null,
+          input.cachedInputTokens ?? null, input.guidedWords ?? null, input.actualWords ?? null
         ]
       );
       return result.rows[0]!.raw_artifact_id;

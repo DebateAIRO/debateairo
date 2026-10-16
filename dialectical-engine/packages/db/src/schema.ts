@@ -327,7 +327,14 @@ export const rawArtifact = ledger.table("raw_artifact", {
   contentCiphertext: jsonb("content_ciphertext"),
   contentAttestation: bytea("content_attestation"),
   // Model scorecard (0090): the vendor-reported thinking tokens of this attempt.
-  thinkingTokens: integer("thinking_tokens")
+  thinkingTokens: integer("thinking_tokens"),
+  // Reply measures (0120, length guidance LG-A): codes and counts per attempt, written once at insert.
+  replyRepairs: text("reply_repairs").array(),
+  replyFailureClass: text("reply_failure_class"),
+  replyForm: text("reply_form"),
+  cachedInputTokens: integer("cached_input_tokens"),
+  guidedWords: integer("guided_words"),
+  actualWords: integer("actual_words")
 });
 
 // Model scorecard (0090): the exact prompt of ONE model-call attempt. A content
