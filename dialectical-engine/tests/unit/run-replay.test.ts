@@ -105,6 +105,20 @@ describe("the content a recorded call handed back", () => {
     expect(rebuildRecordedCallContent({ accepted: reply(whole), answered: reply(first), classifyContent: classify })).toBe(whole);
   });
 
+  // Task 6 review Minor 3: as the gateway reads it live, a class that cannot be read is no class: never STRUCTURE, so the
+  // first reply gets today's patch rebuild and B's plan is never asked.
+  it("a class read that throws is not STRUCTURE: today's patch is merged, as the gateway merged it", () => {
+    const first = '{"verdict":"maybe","value_laden":false}';
+    const unreadClass = (text: string): ContentClassification => {
+      const classified = classify(text);
+      if (classified.parseStatus === "PARSED") return classified;
+      return Object.defineProperty({ ...classified }, "failureClass", { enumerable: true, get: () => { throw new Error("class unread"); } });
+    };
+    expect(rebuildRecordedCallContent({ accepted: reply('{"verdict":"no"}'), answered: reply(first), classifyContent: unreadClass,
+      structureFollowUpPlan: () => { throw new Error("B's plan is never asked for a reply of no class"); } }))
+      .toBe('{"verdict":"no","value_laden":false}');
+  });
+
   it("nothing is rebuilt from a reply the step would refuse, from a cut-off first reply, or from no content", () => {
     expect(rebuildRecordedCallContent({ accepted: reply('{"verdict":"maybe"}'), answered: null, classifyContent: classify })).toBeNull();
     expect(rebuildRecordedCallContent({
@@ -332,6 +346,44 @@ describe("structure salvage on replay", () => {
     expect(result.content).toBe(JSON.stringify(BASE)); // merged into A's base, as the live B was: the echo A dropped stays dropped
     expect(result.repairAttempts).toBe(1);
     expect(inner.sent).toBe(0);
+  });
+
+  // Final review Minor 1: the preview's one unbilled resend of B is sent at the same place in its call (attempt 2), so its
+  // REFUSED row holds no place: the call's start is found without it, and the call is replayed from the recorded rows.
+  it("replays a B resent after an unbilled refusal from the first reply and the resent follow-up, with no POST", async () => {
+    const refused = attempt({ callSiteKey: PANEL_KEY, outcome: "REFUSED", promptFingerprint: "patch", rawArtifactRef: null });
+    const rows = [failedAttempt(PANEL_KEY, WRAPPED_ECHO, 1), refused, okAttempt(PANEL_KEY, PATCH_REPLY, 2, "patch")];
+    const replay = replayOf(recordedCalls(rows)[0]!, PANEL_FP);
+    expect(replay).toMatchObject({ accepted: rows[2], answered: rows[0], repairAttempts: 1 });
+    // The same rows without the REFUSED one replay exactly as today.
+    expect(replayOf(recordedCalls([rows[0]!, rows[2]!])[0]!, PANEL_FP)).toEqual(replay);
+    const inner = noPost();
+    const result = await replayingGateway(bookOf(rows), inner, () => undefined, true).call(panelCall());
+    expect(result.content).toBe(JSON.stringify(BASE)); // the bytes the first copy's gateway accepted
+    expect(result).toMatchObject({ rawArtifactRef: rows[2]!.rawArtifactRef, ledgerEntryRef: rows[2]!.ledgerEntryRef, repairAttempts: 1 });
+    expect(inner.sent).toBe(0);
+  });
+
+  // Task 6 review Minor 4: what the readers must NOT rebuild.
+  it("a STRUCTURE-class record whose follow-up does not merge is not rebuilt", () => {
+    const readers = structureReplayReaders(panelCall())!;
+    // B's reply rewrites a member A kept (`steelman.fidelity` was never asked): the merge is refused, and the reply alone
+    // is no answer, so the call is made again.
+    const rewritten = "{\"evidence.quality\": 0.5, \"steelman.fidelity\": 0.1}";
+    expect(rebuildRecordedCallContent({ accepted: recorded(rewritten), answered: recorded(WRAPPED_ECHO), classifyContent: classifyPanel,
+      ...readers })).toBeNull();
+    // The control: B's own follow-up merges.
+    expect(rebuildRecordedCallContent({ accepted: recorded(PATCH_REPLY), answered: recorded(WRAPPED_ECHO), classifyContent: classifyPanel,
+      ...readers })).toBe(JSON.stringify(BASE));
+  });
+
+  it("an OK reply A1 refuses on a step that keeps every text is not rebuilt", () => {
+    // The keyless sentence A1 drops on a judge step is kept on the answer writer's (owner answer 3): no rescue to replay.
+    const writer = structureReplayReaders({ ...panelCall(), callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1" })!;
+    expect(rebuildRecordedCallContent({ accepted: recorded(KEYLESS), answered: null, classifyContent: classifyPanel, ...writer })).toBeNull();
+    const judge = structureReplayReaders(panelCall())!;
+    expect(rebuildRecordedCallContent({ accepted: recorded(KEYLESS), answered: null, classifyContent: classifyPanel, ...judge }))
+      .toBe(JSON.stringify(BASE));
   });
 
   it("the readers: null for a request that is not routable; without them today's rebuild stands, with them A's", () => {

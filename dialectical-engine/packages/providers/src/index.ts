@@ -1770,11 +1770,17 @@ export function rebuildRecordedCallContent(input: Readonly<{
   if (classifyContent === undefined) return accepted.content;
   if (answered !== null && answered.content !== null && answered.reply.finishReason !== PROVIDER_FINISH_REASON_LENGTH) {
     const first = classifyContent(answered.content, answered.reply);
-    const structureClass = structureFollowUpPlan !== undefined
-      && (first.parseStatus === "PARSE_FAILED" || first.parseStatus === "SCHEMA_FAILED")
-      && (first.failureClass ?? replyFailureClassOf({ rawText: answered.content, parseStatus: first.parseStatus,
-        parseError: first.parseError }, answered.reply)) === "STRUCTURE";
-    const plan = structureClass
+    // As the gateway reads it live: a class that cannot be read is no class (never STRUCTURE), so today's patch rebuild.
+    let structureClass = false;
+    try {
+      structureClass = structureFollowUpPlan !== undefined
+        && (first.parseStatus === "PARSE_FAILED" || first.parseStatus === "SCHEMA_FAILED")
+        && (first.failureClass ?? replyFailureClassOf({ rawText: answered.content, parseStatus: first.parseStatus,
+          parseError: first.parseError }, answered.reply)) === "STRUCTURE";
+    } catch {
+      structureClass = false;
+    }
+    const plan = structureClass && structureFollowUpPlan !== undefined
       ? structureFollowUpPlan(answered.content, answered.reply)
       : first.parseStatus === "SCHEMA_FAILED"
         ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
@@ -2444,8 +2450,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // in code, with no call, before its artifact is written. A rescued reply is accepted here as the original AI's own
         // reply: its artifact PARSED with A1's drops among its repairs and its words counted on what was accepted, its OK
         // row at the call's own key, no structure-repair call. A1 sends nothing, so the routed call's POSTs stay as they
-        // were. A throw is no rescue (the reply goes on as it was refused), never a lost artifact.
-        if (routed && patchPlan === null && attemptPacket === request.packet && attemptFailureClass === "STRUCTURE"
+        // were. A throw is no rescue (the reply goes on as it was refused), never a lost artifact. Never a reply to a full
+        // re-ask (`repairForm` set), even one whose builder handed back the original packet object.
+        if (routed && patchPlan === null && repairForm === undefined && attemptPacket === request.packet && attemptFailureClass === "STRUCTURE"
           && !truncatedReply && content !== null && request.structureSalvage !== undefined) {
           let salvaged: StructureSalvaged | null = null;
           try {

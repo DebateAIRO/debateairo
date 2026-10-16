@@ -121,6 +121,18 @@ describe("A1 refuses (each with its own reason, so removing that guard turns the
     expect((result as { content: string }).content).toBe(JSON.stringify(BASE));
   });
 
+  // Task 1 re-review: on a step that keeps every text, an object that shapes to nothing under a name the form states
+  // elsewhere refuses, as a `{}` written there does; on a judge step both are dropped as unasked.
+  it("an object that shapes to nothing under a name the form states elsewhere refuses on a step that keeps every text", () => {
+    const shapesEmpty = pretty({ ...BASE, fallacy: { ...BASE.fallacy, context: { extra: null } } });
+    const writtenEmpty = pretty({ ...BASE, fallacy: { ...BASE.fallacy, context: {} } });
+    const withNote = pretty({ ...BASE, fallacy: { ...BASE.fallacy, context: { note: NOTE } } });
+    for (const broken of [shapesEmpty, writtenEmpty, withNote]) {
+      expect(panel(broken, "anywhere")).toEqual({ kind: "REFUSED", reason: "NOT_DROPPABLE" });
+      expect(panel(broken)).toMatchObject({ kind: "ACCEPTED", repairs: ["UNASKED_VALUE_DROPPED"], content: JSON.stringify(BASE) });
+    }
+  });
+
   it("a keyless value right after a key the form states as a list (a lost '[' needs a move)", () => {
     const broken = pretty(BASE).replace("\"ambiguityFlags\": [\n      \"free for whom is unclear\",\n      \"central lines undefined\"\n    ]",
       "\"ambiguityFlags\": \"free for whom is unclear\", \"central lines undefined\"");

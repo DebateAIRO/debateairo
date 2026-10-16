@@ -757,10 +757,11 @@ function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string
     const at = events.push(event) - 1;
     event.value = stated(node, event.place);
     // Fix round 1: an object every member of which was dropped echoes nothing; its drops were each allowed, so it is an
-    // unasked value left out (any refusal inside it is still an event of its own).
+    // unasked value left out (any refusal inside it is still an event of its own). Final review: it is left out by the
+    // rule a `{}` written there meets — on a step that keeps every text, a name the form states refuses.
     if (isPlainObject(event.value) && Object.keys(event.value).length === 0) {
       events.splice(at, 1);
-      drops.add("UNASKED_VALUE_DROPPED");
+      if (textsKept === "place" || !names.has(name)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
       return;
     }
     drops.add("ECHO_DROPPED");

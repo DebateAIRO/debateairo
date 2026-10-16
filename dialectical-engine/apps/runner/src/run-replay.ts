@@ -86,22 +86,29 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
  * an earlier, failed call at the site may have asked something else). `answered` is the call's last reply to its
  * original packet when the OK attempt answered a repair; the repairs counted are those after the original packet was
  * last sent. A reply whose place in its call was not recorded is never replayed.
+ *
+ * A REFUSED row (the preview's provably unbilled refusal) holds no place: its one resend is sent at the same place in the
+ * call, so the call's attempts are counted, and its start found, without it (final review Minor 1: a follow-up B resent
+ * after an unbilled refusal is replayed, not bought again). A call with no REFUSED row is read exactly as before.
  */
 export function replayOf(call: RecordedCall, fingerprint: string): Replay | null {
   const acceptedIndex = call.attempts.length - 1;
   const accepted = call.attempts[acceptedIndex];
   if (accepted === undefined || accepted.outcome !== "OK" || accepted.rawArtifactRef === null || accepted.artifact === null) return null;
   const place = accepted.artifact.attempt;
-  if (place === null || !Number.isSafeInteger(place) || place < 1 || place > call.attempts.length) return null;
-  const start = acceptedIndex - (place - 1);
-  if (call.attempts[start]?.promptFingerprint !== fingerprint) return null;
-  const lastOriginal = call.attempts.findLastIndex((attempt, index) => index >= start && attempt.promptFingerprint === fingerprint);
+  const placed = call.attempts.flatMap((attempt, index) => attempt.outcome === "REFUSED" ? [] : [index]);
+  if (place === null || !Number.isSafeInteger(place) || place < 1 || place > placed.length) return null;
+  const start = placed[placed.length - place]!;
+  if (call.attempts[start]!.promptFingerprint !== fingerprint) return null;
+  const lastOriginal = call.attempts.findLastIndex((attempt, index) => index >= start && attempt.outcome !== "REFUSED"
+    && attempt.promptFingerprint === fingerprint);
   const answered = lastOriginal === acceptedIndex ? null
-    : call.attempts.slice(start, acceptedIndex).findLast((attempt) => attempt.promptFingerprint === fingerprint && attempt.artifact !== null) ?? null;
+    : call.attempts.slice(start, acceptedIndex).findLast((attempt) => attempt.outcome !== "REFUSED"
+      && attempt.promptFingerprint === fingerprint && attempt.artifact !== null) ?? null;
   return Object.freeze({
     accepted: accepted as Replay["accepted"],
     answered,
-    repairAttempts: acceptedIndex - lastOriginal
+    repairAttempts: call.attempts.slice(lastOriginal + 1).filter((attempt) => attempt.outcome !== "REFUSED").length
   });
 }
 

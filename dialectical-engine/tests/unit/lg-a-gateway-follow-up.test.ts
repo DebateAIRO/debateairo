@@ -423,4 +423,16 @@ describe("B: the routed call's second POST, sent alone", () => {
       expect(salvageCalls).toBe(0);
     }
   });
+
+  // Task 2 re-review: "A1 never reads a FULL follow-up reply" is stated in the hook, not left to the builder returning a new
+  // packet. Here the builder hands back the ORIGINAL packet object itself.
+  it("A1 is never called on a FULL reply, even when the builder returned the original packet object", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: WRAPPED_QUALITY }]);
+    let salvageCalls = 0;
+    const structureSalvage = () => { salvageCalls += 1; return { content: JSON.stringify(BASE), classification: classifyPanel(JSON.stringify(BASE)) }; };
+    await expect(harness.gateway.call({ ...request, buildRepairPacket: () => request.packet, structureRepairRouted: true, structureSalvage,
+      structureFollowUp: { form: "FULL", first: firstOf(error) } })).rejects.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(harness.executions).toHaveLength(2);
+    expect(salvageCalls).toBe(0);
+  });
 });
