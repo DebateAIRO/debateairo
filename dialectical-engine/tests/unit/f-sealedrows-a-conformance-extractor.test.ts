@@ -98,9 +98,10 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   it("pins the judge and composer fingerprints as sealed VALUES, not derivations", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
-    // Debate shape (Phase 2b Task 4): the judge seal grew from e7f7e4b0…1365 (frozen V1, history) by six contracts.
+    // Debate shape (Phase 2b Task 4): the judge seal grew from e7f7e4b0…1365 (frozen V1, history) by six contracts to
+    // aac53407…2612 (frozen V2, history); length guidance (LG-C2 Task 11) appended the 18 length variants.
     expect(acceptance.judgeContractHash)
-      .toBe("aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612");
+      .toBe("810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee");
     // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
     // d96e7cc9…c866, and serve.synthesizer.v3 (2026-10-12, practice debate 3)
     // superseded v2's 340e11a6…8b70 (register versions sealed before each keep

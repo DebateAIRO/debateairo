@@ -42,8 +42,9 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   return {
-    // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts; e7f7e4b0… is history.
-    judgeContractHash: "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612",
+    // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts (aac53407…2612, history since LG-C2);
+    // length guidance (LG-C2 Task 11): V2 plus the 18 length variants.
+    judgeContractHash: "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee",
     // serve.synthesizer.v4 (2026-10-15, owner-approved plain-words wording) + its
     // answer-length variant length.v2; v1's d96e7cc9…c866, v2's 340e11a6…8b70,
     // v3's 4b141d3a…f90f and v3 + length.v1's 9a46af29…5662 (debate shape,

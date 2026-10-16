@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { PROMPT_FRAME_VERSION, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
 import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
-  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2
 } from "../../packages/judgement/src/prompts.js";
 import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT,
@@ -71,7 +72,11 @@ describe("S01 seals the content rule", () => {
     // Debate shape (Phase 2b Task 4): the judge text R7-a sealed is now frozen as V1; the current text appends the
     // shape's six contracts to it, so the judge family moves once more, from e7f7e4b0... to its debate-shape seal.
     ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
-    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    // Length guidance (LG-C2 Task 11): the debate shape's text is now frozen as V2 (this row, its seal unchanged), and the
+    // current text appends the 18 length variants to it, so the judge family moves once more, from aac53407... to its
+    // length-guidance seal (measured by this row's first run, LG-C2 Task 11: 810d611a...).
+    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    ["judgeContractHash (length guidance)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612", "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee"],
     // Debate shape (Phase 2b Task 5): the composer row now seals v3 then its answer-length variant; v3's own seal
     // (the base here, register 12's value) stays pinned below as history.
     // Answer writer v4 (owner-approved wording, 2026-10-15): v4 + length.v2 supersede v3 + length.v1, so this row now

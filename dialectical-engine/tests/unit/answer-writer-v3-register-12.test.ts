@@ -46,8 +46,13 @@ const LIVE_11 = Object.freeze({
   composer: "340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70",
   conformance: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"
 });
-/** The judge seal this code sends after the debate shape (Task 4): V1 + six contracts. */
+/** The judge seal this code sent after the debate shape (Task 4): V1 + six contracts (history since LG-C2 Task 11). */
 const JUDGE_P2B = "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612";
+/**
+ * The judge seal this code sends since length guidance LG-C2 Task 11: V2 (JUDGE_P2B's text, frozen) + the 18 length
+ * variants. It supersedes JUDGE_P2B in every check below; JUDGE_P2B stays as sealed history.
+ */
+const JUDGE_LG_C = "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee";
 
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-11T10:42:25.561Z" };
@@ -82,14 +87,14 @@ function exportOf(base: readonly Row[]): PracticeRegisterExport {
 
 describe("register 12: the new prompt seals reach the register as a new version", () => {
   it("the code's prompt fingerprints are the current seals", () => {
-    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_P2B, composer: COMPOSER_V4, conformance: V2_CONFORMANCE });
+    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_LG_C, composer: COMPOSER_V4, conformance: V2_CONFORMANCE });
   });
 
   it("the development register's builder seals the same values the code sends", async () => {
     const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((row) => [row.rowKey, row.value]));
     expect(rows.composerContractHash).toBe(COMPOSER_V4);
     expect(rows.conformanceContractHash).toBe(V2_CONFORMANCE);
-    expect(rows.judgeContractHash).toBe(JUDGE_P2B);
+    expect(rows.judgeContractHash).toBe(JUDGE_LG_C);
   });
 
   it("the preview publish kit, on a version-11-shaped base, changes exactly the judge's and the two synthesis fingerprints", async () => {
@@ -105,7 +110,7 @@ describe("register 12: the new prompt seals reach the register as a new version"
     expect([entry("conformanceContractHash").oldValueJsonText, entry("conformanceContractHash").newValueJsonText])
       .toEqual([`"${LIVE_11.conformance}"`, `"${V2_CONFORMANCE}"`]);
     expect([entry("judgeContractHash").oldValueJsonText, entry("judgeContractHash").newValueJsonText])
-      .toEqual([`"${LIVE_11.judge}"`, `"${JUDGE_P2B}"`]);
+      .toEqual([`"${LIVE_11.judge}"`, `"${JUDGE_LG_C}"`]);
     // The base is not edited: version 11 keeps its values; the new rows are a new snapshot.
     expect(base.find((row) => row.rowKey === "composerContractHash")!.valueJsonText).toBe(`"${LIVE_11.composer}"`);
     expect(plan.snapshotSha256).not.toBe(computeRegisterSnapshotSha256(base as never));
@@ -125,7 +130,7 @@ describe("the runner refuses a register that does not carry the code's prompt fi
     expect(message).toContain("Register version 11");
     expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${COMPOSER_V4}`);
     expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${V2_CONFORMANCE}`);
-    expect(message).toContain(`judgeContractHash is ${LIVE_11.judge}, the code's is ${JUDGE_P2B}`);
+    expect(message).toContain(`judgeContractHash is ${LIVE_11.judge}, the code's is ${JUDGE_LG_C}`);
   });
 
   it("refuses a single differing row, the judge's included", () => {
@@ -187,7 +192,7 @@ describe("the practice can practise register 12 before it is published (--regist
 
   it("refuses when the code changes no row, or when the base cannot be read back", async () => {
     const unchanged = await live11Base({
-      judgeContractHash: canonical(JUDGE_P2B), composerContractHash: canonical(COMPOSER_V4), conformanceContractHash: canonical(V2_CONFORMANCE)
+      judgeContractHash: canonical(JUDGE_LG_C), composerContractHash: canonical(COMPOSER_V4), conformanceContractHash: canonical(V2_CONFORMANCE)
     });
     await expect(composePracticeNextRegisterVersion(exportOf(unchanged)))
       .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
