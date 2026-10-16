@@ -227,6 +227,17 @@ describe("LG-A structureRepairKeepsWords: the reviewer's second probes (fix roun
     expect(structureRepairKeepsWords(broken, { note: { text: "First text here.\n\nFirst text here.", node_refs: [] } })).toBe(false);
   });
 
+  // Fix round 3: a story's node_refs all sit under one path (list positions are left out), and repeated refs are normal.
+  // The join search remembers what failed, so 40 equal entries and a word that never matches stay quick.
+  it("a join over many equal entries that cannot match ends quickly (fix round 3)", () => {
+    const entries = 40;
+    const broken = JSON.stringify({ refs: Array.from({ length: entries }, () => "ok") });
+    const wanted = `${Array.from({ length: entries / 2 }, () => "ok").join(" ")} no`;
+    const started = performance.now();
+    expect(structureRepairKeepsWords(broken, { refs: [wanted] })).toBe(false);
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it("the names a form states are its quoted keys and its {a,b,c} lists, not its prose (minor)", () => {
     const stray = `{"x": 1 "headline": "${H}", "the": "A stray remark from the model"}`;
     expect(structureRepairKeepsWords(stray, { short: { headline: H } }, STORYTELLER_ANSWER_FORM)).toBe(true);

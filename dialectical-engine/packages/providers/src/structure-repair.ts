@@ -244,9 +244,17 @@ function mayComeFrom(source: readonly string[], target: readonly string[], repai
 /**
  * The broken texts (indices into `texts`) that, each whole, in their own order, joined by single spaces, make `wanted`;
  * null when none do. Every candidate sat under the same keys (a list's paragraphs).
+ *
+ * Fix round 3: the search remembers each (place in `wanted`, next candidate) it has already found hopeless, so it visits
+ * each pair once: at most (length of `wanted`) × (candidates) states, each trying every candidate once. Without it, many
+ * equal entries (a story's repeated node refs, which all sit under one path) made the search exponential, and it runs
+ * inside the repair's classifier on the runner's event loop.
  */
 function joinedFrom(wanted: string, candidates: readonly number[], texts: readonly string[]): readonly number[] | null {
+  const hopeless = new Set<number>();
   const search = (at: number, from: number): readonly number[] | null => {
+    const state = at * (candidates.length + 1) + from;
+    if (hopeless.has(state)) return null;
     for (let next = from; next < candidates.length; next += 1) {
       const part = texts[candidates[next]!]!;
       if (part === "" || !wanted.startsWith(part, at)) continue;
@@ -256,6 +264,7 @@ function joinedFrom(wanted: string, candidates: readonly number[], texts: readon
       const rest = search(end + 1, next + 1);
       if (rest !== null) return [candidates[next]!, ...rest];
     }
+    hopeless.add(state);
     return null;
   };
   return search(0, 0);
