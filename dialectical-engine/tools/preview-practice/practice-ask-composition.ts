@@ -88,6 +88,7 @@ import {
   readEngineVersion,
   readEnvelopeFormulaInputs,
   readJudgeTokenCeiling,
+  readLengthGuidancePolicy,
   readModelScorecard,
   readPanelDiscoveryPolicy,
   readQuestionLanguagePolicy,
@@ -313,6 +314,8 @@ export async function composePracticeAsk(input: Readonly<{
   const debateShapePolicy = await readDebateShapePolicy(pool, version);
   // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
   const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+  // Length guidance (spec 2026-10-15 §3.1): as main.ts reads it.
+  const lengthGuidancePolicy = await readLengthGuidancePolicy(pool, version);
   // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
   // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
   // blind-index key here, so the check reference key is per process. The same in hosted mode: the hosted preview still
@@ -369,6 +372,7 @@ export async function composePracticeAsk(input: Readonly<{
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
     ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+    ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
@@ -383,7 +387,8 @@ export async function composePracticeAsk(input: Readonly<{
       evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
       maxDepth: envelopeFormulaInputs.maxDepth,
       backupSequencesProvisioned: basis.backupSequencesProvisioned,
-      ...(basis.shape === null ? {} : { shape: basis.shape })
+      ...(basis.shape === null ? {} : { shape: basis.shape }),
+      ...(basis.length === null ? {} : { length: basis.length })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

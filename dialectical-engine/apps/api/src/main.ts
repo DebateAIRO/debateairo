@@ -94,6 +94,7 @@ import {
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
   debateShapeInForce,
+  readLengthGuidancePolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -636,6 +637,9 @@ const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTo
 const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 // The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
 const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+// Length guidance (spec 2026-10-15 §3.1): the optional row; absent = today's asks byte for byte, a malformed row refuses
+// the boot (LENGTH_GUIDANCE_POLICY_INVALID). Only the ask side reads it; the runner reads each run's receipt.
+const lengthGuidancePolicy = await boot.run("length-guidance-policy", () => readLengthGuidancePolicy(pool, environment.REGISTER_VERSION));
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
 // the debate targets take above. Hosted refuses a relay target here exactly as
 // it refuses one there; local keeps today's relay path. Parsed HERE, above the
@@ -1065,6 +1069,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
   // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Length guidance (spec 2026-10-15 §3.1): admission freezes the numbers on the receipt only with the row.
+  ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
   // Question language (spec 2026-10-13): the decider, composed above only with the shape row in force.
   ...(questionLanguage === undefined ? {} : { questionLanguage }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
@@ -1082,7 +1088,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
     backupSequencesProvisioned: input.backupSequencesProvisioned,
     // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
-    ...(input.shape === null ? {} : { shape: input.shape })
+    ...(input.shape === null ? {} : { shape: input.shape }),
+    // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
+    ...(input.length === null ? {} : { length: input.length })
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
