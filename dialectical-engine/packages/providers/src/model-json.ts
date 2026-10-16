@@ -37,19 +37,25 @@ export interface ModelReplyFacts {
  *  · RAW_LINE_BREAK — a raw line break inside a string value;
  *  · MODEL_TOKEN_DROPPED — a leaked model control token written into the answer;
  *  · KEY_COLON_MOVED — a colon written inside a key;
- *  · BRACKET_INSERTED — one missing bracket, where only one place fits.
+ *  · BRACKET_INSERTED — one missing bracket, where only one place fits;
+ *  · QUOTE_DELIMITERS_STRAIGHTENED — (practice debate 2026-10-16, GLM-5.3-Flash on a cross-exchange judge leg) a text
+ *    VALUE written between typographic double quotes (“…”, „…“, „…”) instead of straight ones, its two delimiters read
+ *    as straight quotes (`typographicValueEnd`).
  */
 const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT",
   // LG-A (spec 2026-10-15, L31): made by the syntax pass, tried after the repairs above.
-  "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED"] as const);
+  "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED",
+  // Practice debate 2026-10-16: made by the syntax pass too, appended so no earlier name moves.
+  "QUOTE_DELIMITERS_STRAIGHTENED"] as const);
 /** A repair the tolerant decode can make (no schema known). */
 export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
 /**
- * The five repairs only the syntax pass makes (the decode list's last five). `modelJsonSyntaxRepair` may name CODE_FENCE
+ * The six repairs only the syntax pass makes (the decode list's last six). `modelJsonSyntaxRepair` may name CODE_FENCE
  * and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
  */
 export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
-  "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED">;
+  "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED"
+  | "QUOTE_DELIMITERS_STRAIGHTENED">;
 /**
  * The judge's SHAPE repairs (`packages/judgement/src/s04.ts`), each made only after a decoded object failed its step's
  * schema, and each accepted only when the repaired object then passes that full schema:
@@ -486,6 +492,28 @@ function onlyClosersToEnd(text: string, from: number): boolean {
 }
 
 /**
+ * QUOTE_DELIMITERS_STRAIGHTENED (practice debate 2026-10-16): the typographic double quotes that may OPEN a text value,
+ * each with the closing quotes that may end it: “ (U+201C) closes with ” (U+201D); „ (U+201E) closes with “ (U+201C,
+ * the German „…“) or ” (U+201D).
+ */
+const TYPOGRAPHIC_VALUE_CLOSERS: ReadonlyMap<string, string> = new Map([["\u201C", "\u201D"], ["\u201E", "\u201C\u201D"]]);
+
+/**
+ * The index of the quote that closes the typographic text value opened at `open`: the first of its opener's closing
+ * quotes (`TYPOGRAPHIC_VALUE_CLOSERS`) that is followed, blanks skipped, by `,`, `}` or `]`. Null when none is, up to
+ * the end of the text. Linear from `open`.
+ */
+function typographicValueEnd(text: string, open: number): number | null {
+  const closers = TYPOGRAPHIC_VALUE_CLOSERS.get(text[open]!) ?? "";
+  for (let index = open + 1; index < text.length; index += 1) {
+    if (!closers.includes(text[index]!)) continue;
+    const next = text[nextSignificant(text, index + 1)];
+    if (next === "," || next === "}" || next === "]") return index;
+  }
+  return null;
+}
+
+/**
  * One string the scan read, ended at its first unescaped quote. `inObject` / `inArray`: whether INNER_QUOTE would end a
  * string VALUE at that quote, in the reply itself, inside an object / inside a list (`innerQuoteEnd`). `scanKey`: the
  * scan read it as a key (a key is read strictly, to its first quote, by INNER_QUOTE as by the pass). `scanInArray`: the
@@ -505,7 +533,11 @@ function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" |
   if (text[at] === "," && (text[closer] === "}" || text[closer] === "]") && onlyClosersToEnd(text, closer + 1)) {
     return { inObject: true, inArray: true };
   }
-  return { inObject: closesValue(text, from, "object"), inArray: closesValue(text, from, "array") };
+  // QUOTE_DELIMITERS_STRAIGHTENED: in a list, a `,` and then a typographic opening quote is the next item (`["a", “b”]`).
+  // It counts only when that quote is straightened: an opening quote left as it is stands outside every text, and then
+  // nothing decodes.
+  const typographicItem = text[at] === "," && TYPOGRAPHIC_VALUE_CLOSERS.has(text[nextSignificant(text, at + 1)] ?? "");
+  return { inObject: closesValue(text, from, "object"), inArray: typographicItem || closesValue(text, from, "array") };
 }
 
 /**
@@ -513,7 +545,14 @@ function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" |
  *  · RAW_LINE_BREAK — a raw line break, carriage return or tab inside a string, escaped;
  *  · MODEL_TOKEN_DROPPED — a leaked `<|name|>` model token OUTSIDE strings, dropped (inside a text it is the text);
  *  · TRAILING_COMMA — a comma right before `}` or `]` (blanks and leaked model tokens between), dropped;
- *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`.
+ *  · KEY_COLON_MOVED — a key written `"name:"` with no colon after it, read as `"name":`;
+ *  · QUOTE_DELIMITERS_STRAIGHTENED — outside every straight-quoted string, a typographic opening quote “ or „ at a VALUE's
+ *    place (right after an object's `:`, or right after a list's `[` or item-separating `,`, blanks only between) opens a
+ *    text that ends at its closing quote (`typographicValueEnd`); both become straight quotes, every straight quote and
+ *    backslash inside is escaped and a raw line break, carriage return or tab inside is escaped as RAW_LINE_BREAK
+ *    escapes it (and named so). No other character changes. With no such closing quote the opening quote is left as it
+ *    is (and nothing decodes). A key's place is never repaired, and a typographic quote inside a straight-quoted string
+ *    is that string's own.
  * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). A string ends at its first
  * unescaped quote; `ends` holds, for each string in order, whether INNER_QUOTE would end it there (`innerQuoteEnd`).
  */
@@ -524,9 +563,40 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
   const stack: Container[] = [];
   let out = "";
   let index = 0;
+  /** A value may start here: after an object's `:`, a list's `[` or a list's item-separating `,`, blanks only since. */
+  let valueSlot = false;
+  /** The opening quotes already found without a closing quote: none can close later either (linear, CI-1b). */
+  const unclosed = new Set<string>();
   while (index < text.length) {
     const character = text[index]!;
     const top = stack.at(-1);
+    if (valueSlot && TYPOGRAPHIC_VALUE_CLOSERS.has(character) && !unclosed.has(character)) {
+      const close = typographicValueEnd(text, index);
+      if (close === null) {
+        unclosed.add(character);
+      } else {
+        let body = "";
+        for (let cursor = index + 1; cursor < close; cursor += 1) {
+          const inner = text[cursor]!;
+          if (inner === "\"" || inner === "\\") body += `\\${inner}`;
+          else if (inner === "\n" || inner === "\r" || inner === "\t") {
+            body += inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t";
+            made.add("RAW_LINE_BREAK");
+          } else body += inner;
+        }
+        out += `"${body}"`;
+        made.add("QUOTE_DELIMITERS_STRAIGHTENED");
+        // Its end is the rule's own (a closing quote followed by `,` `}` or `]`), so it passes the word check.
+        ends.push({ inObject: true, inArray: true, scanKey: false, scanInArray: top?.kind === "array" });
+        valueSlot = false;
+        index = close + 1;
+        continue;
+      }
+    }
+    if (!isBlank(character)) {
+      valueSlot = (character === ":" && top?.kind === "object") || character === "["
+        || (character === "," && top?.kind === "array");
+    }
     if (character === "\"") {
       const isKey = top?.kind === "object" && top.expectKey;
       let body = "";
