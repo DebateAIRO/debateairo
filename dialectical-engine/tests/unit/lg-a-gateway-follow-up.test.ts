@@ -385,9 +385,20 @@ describe("B: the routed call's second POST, sent alone", () => {
     expect(bodies.map((body) => body.reasoning_effort)).toEqual(["high", "low"]);
   });
 
-  it("refuses a follow-up on a call that is not routed, before anything is sent", async () => {
+  const NOT_ROUTED = "ProviderCallRequest.structureFollowUp needs a routed structured call";
+  it("a follow-up on a call that is not routed throws a TypeError; nothing more is sent", async () => {
     const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
-    await expect(harness.native.call({ ...request, structureFollowUp: { form: "FULL", first: firstOf(error) } })).rejects.toThrow(TypeError);
+    await expect(harness.native.call({ ...request, structureFollowUp: { form: "FULL", first: firstOf(error) } }))
+      .rejects.toThrow(new TypeError(NOT_ROUTED));
+    expect(harness.executions).toHaveLength(1);
+  });
+
+  // Task 4 review: the check's second branch — routed, but no content check to read B's reply with.
+  it("a follow-up on a routed call with no content check throws a TypeError; nothing more is sent", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
+    const { classifyContent: _none, ...unchecked } = request;
+    await expect(harness.native.call({ ...unchecked, structureRepairRouted: true, structureFollowUp: { form: "FULL", first: firstOf(error) } }))
+      .rejects.toThrow(new TypeError(NOT_ROUTED));
     expect(harness.executions).toHaveLength(1);
   });
 

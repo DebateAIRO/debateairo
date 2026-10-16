@@ -6,7 +6,7 @@ import { JUDGE_ANSWER_FORM, Judge, PANEL_ANSWER_FORM, PANEL_PROMPT_CONTRACT, cla
 import { STORYTELLER_ANSWER_FORM, STORY_CHECKER_ANSWER_FORM } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  CONTENT_FOLLOW_UP_SENTENCES, ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
+  ProviderCallFailedError, STRUCTURE_REPAIR_CONTRACT_HASH, buildFramedPrompt, buildFramedRepairPrompt, decodeModelJson, framedAnswerForm,
   previewThinkingStepOf, readPromptFrame, schemaFailureLocator, structureRepairKeepsWords, structureRepairTextsKeptAt, withStructureRepair,
   type ProviderCallRequest
 } from "@debateai/providers";
@@ -288,6 +288,9 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
     expect(repair.requests).toHaveLength(0);
     expect(result.repairForm).toBeUndefined();
     expect(JSON.parse(result.content)).toEqual(JSON.parse(HAIKU_PANEL));
+    // Task 2 review: the rescued reply is the original AI's own, recorded once, at its own artifact.
+    expect(original.artifacts).toHaveLength(1);
+    expect(result.rawArtifactRef).toBe(original.artifacts[0]!.artifactId);
   });
 
   it("still refuses a repair that leaves out a text the form states at that place", () => {
@@ -534,11 +537,14 @@ describe("LG-A withStructureRepair (L32)", () => {
   it("the repair packet for an unreadable reply carries its code and never the full re-ask's sentence (fix round 1)", async () => {
     const unreadable = previewGlmHarness([{ content: "It is so, by the city's own figures." }]);
     const repair = route(COPY);
-    await withStructureRepair(unreadable.gateway, repair.route).call(request()).catch(() => undefined);
+    const error = await withStructureRepair(unreadable.gateway, repair.route).call(request()).catch((caught: unknown) => caught);
     expect(repair.requests).toHaveLength(1);
     const sent = repair.requests[0]!;
     expect(readPromptFrame(sent.packet).fields.find((field) => field.name === "machine_rejection_code")!.content).toBe("PARSE_FAILED");
-    expect(JSON.stringify(sent.packet)).not.toContain(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
+    // Task 3 review: the repair packet's fields are exactly these four (no reason field, so no sentence of any kind).
+    expect(readPromptFrame(sent.packet).fields.map((f) => f.name)).toEqual(["answer_form", "broken_reply", "machine_rejection_code", "machine_rejection_path"]);
+    // Haiku's copy invents a score, so it is refused; a judge step gets no B for an unreadable reply: today's refusal.
+    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED" });
   });
 
   // Ruling R9 (pre-flight PF-A48): the run's attempt ceiling, raised unwrapped by the repair gateway's `assertAttemptAllowed`
