@@ -1751,24 +1751,40 @@ export function readRecordedProviderReply(rawText: string, provider: string): Re
  * and the merge is the content (`mergePatchReply`); otherwise the OK reply itself, when the step's classifier accepts
  * it. Null when neither holds: the call cannot be replayed and is made again. The classifier runs on the returned
  * content last, as the gateway runs it, so a step that remembers its reading (`rememberingAcceptedReply`) has it.
+ *
+ * Refused-repair salvage (2026-10-16; pre-flight PF-S2): with the structure readers (`structureReplayReaders`, passed only on
+ * a run whose structure-repair route is wired), a call the first copy's gateway rescued or followed up is rebuilt as that
+ * gateway decided it. An `answered` reply of class STRUCTURE (measured as the gateway measures it) never got today's
+ * patch live: its second POST was B, built from A's base, so the plan is B's (`structureFollowUpPlan`) only. An OK reply
+ * with no `answered` that the step refuses was A1's rescue (`structureSalvage`). Without the readers: today's rebuild.
  */
 export function rebuildRecordedCallContent(input: Readonly<{
   accepted: RecordedProviderReply;
   answered: RecordedProviderReply | null;
   classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
+  structureSalvage?: (content: string, reply: ModelReplyFacts) => StructureSalvaged | null;
+  structureFollowUpPlan?: (content: string, reply: ModelReplyFacts) => PatchFollowUpPlan | null;
 }>): string | null {
-  const { accepted, answered, classifyContent } = input;
+  const { accepted, answered, classifyContent, structureSalvage, structureFollowUpPlan } = input;
   if (accepted.content === null) return null;
   if (classifyContent === undefined) return accepted.content;
   if (answered !== null && answered.content !== null && answered.reply.finishReason !== PROVIDER_FINISH_REASON_LENGTH) {
     const first = classifyContent(answered.content, answered.reply);
-    const plan = first.parseStatus === "SCHEMA_FAILED"
-      ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
-      : null;
+    const structureClass = structureFollowUpPlan !== undefined
+      && (first.parseStatus === "PARSE_FAILED" || first.parseStatus === "SCHEMA_FAILED")
+      && (first.failureClass ?? replyFailureClassOf({ rawText: answered.content, parseStatus: first.parseStatus,
+        parseError: first.parseError }, answered.reply)) === "STRUCTURE";
+    const plan = structureClass
+      ? structureFollowUpPlan(answered.content, answered.reply)
+      : first.parseStatus === "SCHEMA_FAILED"
+        ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
+        : null;
     const merged = plan === null ? null : mergePatchReply(plan, accepted.content, accepted.reply);
     if (merged !== null && merged.ok && classifyContent(merged.content, accepted.reply).parseStatus === "PARSED") return merged.content;
   }
-  return classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED" ? accepted.content : null;
+  if (classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED") return accepted.content;
+  // A1's rescue: its salvage runs the step's classifier last, on the content it returns.
+  return answered === null && structureSalvage !== undefined ? structureSalvage(accepted.content, accepted.reply)?.content ?? null : null;
 }
 
 /**
@@ -3071,7 +3087,9 @@ export {
   // Refused-repair salvage (2026-10-16, A1): the verified subset of a STRUCTURE reply, read in code with no call.
   salvageStructureReply, structureSalvageFor, type StructureSalvage, type StructureSalvageRefusal,
   // Refused-repair salvage (2026-10-16, B): the one follow-up to the original AI after a structure-repair call that did not do.
-  structureFollowUpFor
+  structureFollowUpFor,
+  // Refused-repair salvage (2026-10-16): a reclaim replays an A1-rescued or B-answered call from its recorded rows.
+  structureReplayReaders
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.

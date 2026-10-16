@@ -40,7 +40,7 @@ import {
   appendFramedRejection, buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract
 } from "./prompt-frame.js";
 import { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence } from "./content-follow-up.js";
-import { planPatchFollowUp } from "./patch-follow-up.js";
+import { planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
   type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway,
@@ -912,6 +912,42 @@ export function structureFollowUpFor(request: ProviderCallRequest, first: Struct
     return Object.freeze({ form: "FULL" as const, first });
   }
   return null;
+}
+
+/**
+ * Refused-repair salvage (2026-10-16): the two readers a reclaim's replay hands `rebuildRecordedCallContent` so a call the
+ * first copy's gateway rescued (A1) or followed up (B's PATCH) is rebuilt from its recorded rows exactly as that gateway
+ * accepted it, with no POST. `structureSalvage` is A1 (`structureSalvageFor`); `structureFollowUpPlan` is B's patch plan,
+ * built from A's base (`structureFollowUpFor`): null for an accepted reply, a FULL or no follow-up, or a throw. As in the
+ * gateway, a throw is no rescue and no plan (null): the call is rebuilt from its OK reply alone, or made again. Null for a
+ * request the wrapper does not route. The runner passes them only on a run whose structure-repair route is wired.
+ */
+export function structureReplayReaders(request: ProviderCallRequest): Readonly<{
+  structureSalvage: (content: string, reply: ModelReplyFacts) => StructureSalvaged | null;
+  structureFollowUpPlan: (content: string, reply: ModelReplyFacts) => PatchFollowUpPlan | null;
+}> | null {
+  const salvage = structureSalvageFor(request);
+  if (salvage === null) return null;
+  const classify = request.classifyContent!;
+  const structureSalvage = (content: string, reply: ModelReplyFacts): StructureSalvaged | null => {
+    try {
+      return salvage(content, reply);
+    } catch {
+      return null;
+    }
+  };
+  const structureFollowUpPlan = (content: string, reply: ModelReplyFacts): PatchFollowUpPlan | null => {
+    try {
+      const classified = classify(content, reply);
+      if (classified.parseStatus === "PARSED") return null;
+      const planned = structureFollowUpFor(request, { rejected: { rawText: content, parseStatus: classified.parseStatus,
+        parseError: classified.parseError, failureClass: "STRUCTURE" }, rawArtifactRef: "", ledgerEntryRef: "", materialMarked: false });
+      return planned !== null && planned.form === "PATCH" ? planned.plan : null;
+    } catch {
+      return null;
+    }
+  };
+  return Object.freeze({ structureSalvage, structureFollowUpPlan });
 }
 
 /**

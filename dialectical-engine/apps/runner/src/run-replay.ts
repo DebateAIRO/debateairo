@@ -11,6 +11,7 @@ import {
 import {
   readRecordedProviderReply,
   rebuildRecordedCallContent,
+  structureReplayReaders,
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderGateway,
@@ -176,12 +177,19 @@ export function createReplayBook(input: Readonly<{
  * unchanged. The content is rebuilt as the gateway decided it (`rebuildRecordedCallContent`); a recorded call whose
  * content cannot be rebuilt is made again. Nothing is reserved, spent, counted or written for a replayed call; the
  * debate's keep-alive is asked first (`mayCall`), as before a real call, so a copy that lost the run replays nothing.
+ *
+ * Refused-repair salvage (2026-10-16): with `structureReplay` (the runner sets it only on a run whose structure-repair
+ * route is wired), the step's structure readers (`structureReplayReaders`) are handed to the rebuild too, so a call the
+ * first copy's gateway rescued in code (A1) or answered with its follow-up (B) is replayed, not bought again. Without it
+ * (hosted, local: no route) the rebuild is today's.
  */
 export function replayingGateway(
   book: ReplayBook,
   inner: ProviderGateway,
   /** Asked before an answer is replayed: a copy that must make no further call (its claim lost, its time up) stops. */
-  mayCall: () => void = () => undefined
+  mayCall: () => void = () => undefined,
+  /** The run's structure-repair route is wired: replay A1-rescued and B-answered calls too. */
+  structureReplay = false
 ): ProviderGateway {
   return Object.freeze({
     call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
@@ -197,7 +205,8 @@ export function replayingGateway(
       const content = rebuildRecordedCallContent({
         accepted: readRecordedProviderReply(accepted.artifact.rawText, accepted.artifact.provider),
         answered: answered?.artifact == null ? null : readRecordedProviderReply(answered.artifact.rawText, answered.artifact.provider),
-        ...(request.classifyContent === undefined ? {} : { classifyContent: request.classifyContent })
+        ...(request.classifyContent === undefined ? {} : { classifyContent: request.classifyContent }),
+        ...(structureReplay ? structureReplayReaders(request) ?? {} : {})
       });
       if (content === null) return inner.call(request);
       return Object.freeze({

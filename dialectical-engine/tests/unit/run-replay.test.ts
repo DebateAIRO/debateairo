@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
   buildFramedPrompt,
+  planPatchFollowUp,
   readRecordedProviderReply,
   rebuildRecordedCallContent,
+  structureReplayReaders,
   type ContentClassification,
   type PromptContract,
   type ProviderCallRequest,
@@ -18,6 +20,9 @@ import {
   replayingGateway,
   type RecordedAttempt
 } from "../../apps/runner/src/run-replay.js";
+import {
+  BASE, KEYLESS, PANEL_KEY, PATCH_REPLY, WRAPPED_ECHO, classifyPanel, panelFramed, panelRequest
+} from "../support/structure-salvage-shapes.js";
 
 /**
  * RECLAIM RESUME (docs/superpowers/specs/2026-10-14-reclaim-resume-design.md): a copy that claims a run an earlier
@@ -278,5 +283,63 @@ describe("the replay book and the replaying gateway", () => {
     const { sent, inner } = vendor();
     await replayingGateway(book, inner).call(request("JUDGE", "question"));
     expect(sent).toEqual(["JUDGE"]);
+  });
+});
+
+describe("structure salvage on replay", () => {
+  const PANEL_FP = canonicalPromptFingerprint(panelFramed.packet.messages);
+  /** The panel request as the runner makes it (member "preview:vendor", the file's actor). */
+  const panelCall = (): ProviderCallRequest => panelRequest({ runId: "00000000-0000-4000-8000-000000000001", subjectItemId: "item",
+    callSiteKey: PANEL_KEY, role: "JUDGE", lane: "served", bound: { maxAttempts: 3, deadlineMs: 1000, tokenCeiling: 100 },
+    contractHash: "contract", providerRef: "preview:vendor", packet: panelFramed.packet });
+  const okAttempt = (key: string, content: string, place: number, fingerprint = PANEL_FP) =>
+    attempt({ callSiteKey: key, outcome: "OK", promptFingerprint: fingerprint, artifact: artifact(content, place) });
+  const failedAttempt = (key: string, content: string, place: number, fingerprint = PANEL_FP) =>
+    attempt({ callSiteKey: key, outcome: "FAILED", promptFingerprint: fingerprint, artifact: artifact(content, place) });
+  const bookOf = (attempts: readonly RecordedAttempt[]) => createReplayBook({ calls: recordedCalls(attempts), earlierNodes: [] });
+  const recorded = (content: string) => readRecordedProviderReply(openAiReply(content), "openai-compatible-http");
+  const noPost = (): ProviderGateway & { sent: number } => {
+    const gateway = { sent: 0, call: async (): Promise<ProviderCallResult> => { gateway.sent += 1; throw new Error("no POST on a replay"); } };
+    return gateway;
+  };
+
+  it("replays an A1-rescued call from its OK row without a POST", async () => {
+    // One recorded OK attempt at PANEL_KEY whose raw content is KEYLESS (Task 2's shape), attempt 1.
+    const inner = noPost();
+    const result = await replayingGateway(bookOf([okAttempt(PANEL_KEY, KEYLESS, 1)]), inner, () => undefined, true).call(panelCall());
+    expect(result.content).toBe(JSON.stringify(BASE)); // the bytes the first copy's gateway accepted
+    expect(inner.sent).toBe(0);
+    // A run with no route (structureReplay false, the default): today's rebuild, the call is bought again.
+    const hosted = noPost();
+    await expect(replayingGateway(bookOf([okAttempt(PANEL_KEY, KEYLESS, 1)]), hosted).call(panelCall())).rejects.toThrow("no POST on a replay");
+    expect(hosted.sent).toBe(1);
+  });
+
+  it("replays a B-answered call from the first reply and the follow-up", async () => {
+    // The shape this test needs (pre-flight PF-S2): today's patch plan for the first reply is NOT null (it names
+    // evidence.quality and fallacy), but merging B's reply into it is refused (the echo stays), so today's rebuild is null.
+    const first = classifyPanel(WRAPPED_ECHO, STOP);
+    expect(first.parseStatus).toBe("SCHEMA_FAILED");
+    expect(planPatchFollowUp({ content: WRAPPED_ECHO, reply: STOP, parseStatus: first.parseStatus,
+      parseError: (first as { parseError: string }).parseError })).not.toBeNull();
+    expect(rebuildRecordedCallContent({ accepted: recorded(PATCH_REPLY), answered: recorded(WRAPPED_ECHO), classifyContent: classifyPanel }))
+      .toBeNull();
+    // FAILED attempt 1 with WRAPPED_ECHO at the request's own fingerprint, then B's OK attempt 2 at the patch packet's
+    // (a different fingerprint: else `answered` is null and `repairAttempts` 0).
+    const inner = noPost();
+    const result = await replayingGateway(bookOf([failedAttempt(PANEL_KEY, WRAPPED_ECHO, 1), okAttempt(PANEL_KEY, PATCH_REPLY, 2, "patch")]),
+      inner, () => undefined, true).call(panelCall());
+    expect(result.content).toBe(JSON.stringify(BASE)); // merged into A's base, as the live B was: the echo A dropped stays dropped
+    expect(result.repairAttempts).toBe(1);
+    expect(inner.sent).toBe(0);
+  });
+
+  it("the readers: null for a request that is not routable; without them today's rebuild stands, with them A's", () => {
+    const { classifyContent: _none, ...unchecked } = panelCall();
+    expect(structureReplayReaders(unchecked)).toBeNull();
+    const readers = structureReplayReaders(panelCall())!;
+    expect(rebuildRecordedCallContent({ accepted: recorded(KEYLESS), answered: null, classifyContent: classifyPanel })).toBeNull();
+    expect(rebuildRecordedCallContent({ accepted: recorded(KEYLESS), answered: null, classifyContent: classifyPanel, ...readers }))
+      .toBe(JSON.stringify(BASE));
   });
 });
