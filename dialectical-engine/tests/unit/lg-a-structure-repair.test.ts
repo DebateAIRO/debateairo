@@ -323,6 +323,82 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
   });
 });
 
+/**
+ * Task 12b round 2 (the reviewer's probes 12n-12q, each pinned): an outer wrapper is no new place on a "place" step; a
+ * keyless value right after a key the form states as a list is that list's entry (a missing `[`); a fatal flag written
+ * flat in `fallacy` must survive while GLM's lone `fallacy.description` may go; the form is read in linear time.
+ */
+describe("LG-A Task 12b round 2: wrappers, a missing [, a flat fatal flag", () => {
+  const SM = "The strongest form says fares cover costs on the central lines";
+  const CS = "A plausible counter is that riders on the outer lines pay for it";
+  const base = { steelman: { summary: SM, fidelity: 0.8 }, critic: { summary: CS, counterargumentStrength: 0.6, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.5, relevance: 0.7 }, context: { fit: 0.6, ambiguityFlags: ["free for whom is unclear", "central lines undefined"] },
+    fallacy: { severity: 0.9, fatalFlags: [{ type: "strawman", severity: 0.9, description: "It attacks a fare rise no one proposed" }] } };
+  type Panel = typeof base;
+  const edit = (change: (copy: Panel) => void): Panel => { const copy = structuredClone(base); change(copy); return copy; };
+  const lossy = edit((copy) => { copy.context.ambiguityFlags = []; copy.fallacy.fatalFlags = []; });
+  const both = (broken: string, repaired: unknown) => [
+    structureRepairKeepsWords(broken, repaired, PANEL_ANSWER_FORM, { textsKept: "place" }),
+    structureRepairKeepsWords(broken, repaired, PANEL_ANSWER_FORM, { textsKept: "anywhere" })];
+
+  it("an outer wrapper is read at the places it wraps (Important 1)", () => {
+    const wrapped = JSON.stringify({ response: base });
+    expect(both(wrapped, base)).toEqual([true, true]);
+    expect(both(wrapped, lossy)).toEqual([false, false]);
+    expect(both(wrapped.replace("\"fidelity\":0.8,", "\"fidelity\":0.8 "), lossy)).toEqual([false, false]);
+    expect(both(JSON.stringify(base), lossy)).toEqual([false, false]);
+    // The practice run's slip inside a wrapper (PARSE_FAILED, class STRUCTURE): the keyless sentence may go, the flags may not.
+    const slip = wrapped.replace("\"quality\":0.5,", "\"quality\":0.5, \"the sources are mostly local news\",");
+    expect(both(slip, base)).toEqual([true, true]);
+    expect(both(slip, lossy)).toEqual([false, false]);
+  });
+
+  it("a value after a list key that lost its [ is that list's entry (Important 2)", () => {
+    const noBracket = JSON.stringify(base).replace("\"ambiguityFlags\":[\"free for whom is unclear\",\"central lines undefined\"]",
+      "\"ambiguityFlags\":\"free for whom is unclear\",\"central lines undefined\"");
+    expect(both(noBracket, base)).toEqual([true, true]);
+    expect(both(noBracket, edit((copy) => { copy.context.ambiguityFlags = ["free for whom is unclear"]; }))).toEqual([false, false]);
+    const flags = JSON.stringify(base).replace("\"fatalFlags\":[{\"type\":\"strawman\",\"severity\":0.9,\"description\":\"It attacks a fare rise no one proposed\"}]",
+      "\"fatalFlags\":{\"type\":\"strawman\",\"severity\":0.9,\"description\":\"It attacks a fare rise no one proposed\"},{\"type\":\"ad_hominem\",\"severity\":0.8,\"description\":\"It calls the planners lazy\"}");
+    const two = edit((copy) => { copy.fallacy.fatalFlags.push({ type: "ad_hominem", severity: 0.8, description: "It calls the planners lazy" }); });
+    expect(both(flags, two)).toEqual([true, true]);
+    expect(both(flags, base)).toEqual([false, false]);
+    // The practice case stays droppable: a sentence after `quality`, a number, is no list's entry.
+    const keyless = JSON.stringify(base).replace(`"summary":"${CS}",`, `"summary":"${CS}", "and the city budget is small",`);
+    expect(both(keyless, base)).toEqual([true, true]);
+    expect(both(keyless, edit((copy) => { copy.critic.summary = `${CS} and the city budget is small`; }))).toEqual([false, false]);
+  });
+
+  it("a fatal flag written flat in fallacy must survive; a lone fallacy.description may go (minor)", () => {
+    const flat = JSON.stringify(edit((copy) => {
+      (copy as { fallacy: unknown }).fallacy = { severity: 0.9, type: "strawman", description: "It attacks a fare rise no one proposed" };
+    }));
+    expect(both(flat, edit((copy) => { copy.fallacy.fatalFlags = []; }))).toEqual([false, false]);
+    const lone = JSON.stringify(edit((copy) => {
+      (copy as { fallacy: unknown }).fallacy = { severity: 0.9, fatalFlags: [], description: "No fatal fallacy, only a vague hedge" };
+    }));
+    expect(both(lone, edit((copy) => { copy.fallacy.fatalFlags = []; }))).toEqual([true, false]);
+  });
+
+  it("reads a form with long runs of tabs in linear time (CodeQL #67)", () => {
+    const form = `{${`"k"${"\t".repeat(50000)}x, `.repeat(8)}"answer": string}`;
+    const started = performance.now();
+    expect(structureRepairKeepsWords("{\"answer\": \"It is so\"}", { answer: "It is so" }, form, { textsKept: "place" })).toBe(true);
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
+  it("maps every call-site family to its rule (probes 12o, 12p)", () => {
+    for (const key of ["JUDGE", "JUDGE:root:0", "JUDGE:root:1:seat:main", "JUDGE:defender:root1:r1:p0", "JUDGE:critic:root0:r2:p0",
+      "JUDGE:cross-root:0->1", "PANEL:root", "PANEL:root:preview:mimo-v2-6-pro:seat:runnerUp", "JUDGE:review:node-1",
+      "JUDGE:review:catch-up:node-1", "REPAIR:STRUCTURE:PANEL:root", "REPAIR:STRUCTURE:JUDGE:review:node-1", "JUDGE:root:0:close-call",
+      "PANEL:JUDGE:root:0", "PANEL:root:close-call"]) expect(structureRepairTextsKeptAt(key, "served"), key).toBe("place");
+    for (const [key, lane] of [["COMPOSER:SYNTHESIZER:RETRY:2:seat:main", "served"], ["STORY:STORYTELLER:1", "served"], ["MAP:list:0", "served"],
+      ["MAP:merge", "served"], ["MAP:gap:1", "served"], ["MAP:choose", "served"], ["VERDICT:investigate:1", "served"],
+      ["evaluator.grade-judge-output.v1", "served"], ["SOMETHING:new", "served"], ["JUDGE:consideration:root:0", "served"], ["PANEL", "served"],
+      ["JUDGE:review", "served"], ["STOPPING:round:2", "served"]] as const) expect(structureRepairTextsKeptAt(key, lane), key).toBe("anywhere");
+  });
+});
+
 describe("LG-A withStructureRepair (L32)", () => {
   it("is the gateway itself with no route, and refuses a route it cannot use", () => {
     const { gateway } = previewGlmHarness([]);

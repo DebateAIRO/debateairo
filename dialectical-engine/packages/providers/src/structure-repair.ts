@@ -116,18 +116,26 @@ function formNames(answerForm: string): readonly string[] {
 
 /** A quoted form key: a name, then a colon after it. */
 const FORM_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
-const FORM_KEY_COLON = /\s*:/uy;
+/** Whitespace the form may put between a key and its colon (read by a plain loop: CodeQL #67, no regex on a run). */
+const FORM_SPACE = /\s/u;
+
+/** The places a form states, and which of them hold a list (`"key": [` or `"key": … string[]`). */
+type FormShape = Readonly<{ places: ReadonlySet<string>; lists: ReadonlySet<string> }>;
+const NO_FORM_SHAPE: FormShape = Object.freeze({ places: new Set<string>(), lists: new Set<string>() });
 
 /**
  * Task 12b: the PLACES `answerForm` states, read from its own nesting: each quoted key followed by `:`, with the quoted keys
  * of the objects around it (list brackets add nothing, as list positions add nothing to a value's path), dotted
  * (`fallacy.fatalFlags.description`). Prose around the form's skeleton holds no quoted key followed by `:`, and its
- * brackets (`number [0,1]`, `string[]`) close where they open.
+ * brackets (`number [0,1]`, `string[]`) close where they open. Task 12b round 2: a place holds a LIST when its value
+ * opens with `[` or, before the next `,` `}` or line end, says `[]` (`"ambiguityFlags": non-empty string[]`). Every loop
+ * moves forward only, so the reading is linear in the form's length.
  */
-function formPlaces(answerForm: string): ReadonlySet<string> {
+function formShape(answerForm: string): FormShape {
   type Frame = { object: boolean; key: string | null };
   const stack: Frame[] = [];
   const places = new Set<string>();
+  const lists = new Set<string>();
   for (let index = 0; index < answerForm.length; index += 1) {
     const character = answerForm[index]!;
     if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null }); continue; }
@@ -137,14 +145,21 @@ function formPlaces(answerForm: string): ReadonlySet<string> {
     if (end < 0) break;
     const name = answerForm.slice(index + 1, end);
     const top = stack.at(-1);
-    FORM_KEY_COLON.lastIndex = end + 1;
-    if (top?.object === true && FORM_KEY_COLON.test(answerForm) && FORM_KEY_NAME.test(name)) {
+    let after = end + 1;
+    while (after < answerForm.length && FORM_SPACE.test(answerForm[after]!)) after += 1;
+    if (top?.object === true && answerForm[after] === ":" && FORM_KEY_NAME.test(name)) {
       top.key = name;
-      places.add([...stack.flatMap((frame) => frame.object && frame.key !== null ? [frame.key] : [])].join("."));
+      const place = [...stack.flatMap((frame) => frame.object && frame.key !== null ? [frame.key] : [])].join(".");
+      places.add(place);
+      let value = after + 1;
+      while (value < answerForm.length && FORM_SPACE.test(answerForm[value]!)) value += 1;
+      let stop = value;
+      while (stop < answerForm.length && !",}\n".includes(answerForm[stop]!)) stop += 1;
+      if (answerForm[value] === "[" || answerForm.slice(value, stop).includes("[]")) lists.add(place);
     }
     index = end;
   }
-  return places;
+  return Object.freeze({ places, lists });
 }
 
 /**
@@ -381,21 +396,36 @@ function joinedFrom(wanted: string, candidates: readonly number[], texts: readon
  *    whole, in a text of the repair. A text written with no key name, and one under a name the form states only
  *    elsewhere on a "place" step (GLM's `fallacy.description`), may be dropped, as that step's fixer drops it. The names
  *    a form states are its quoted keys and its `{a,b,c}` lists, its places its quoted keys within its own nesting
- *    (`formPlaces`); the repair's own keys and places count too (all there is without `answerForm`). Texts under names the
- *    form never states may be dropped, as the step's own fixer drops them.
+ *    (`formShape`); the repair's own keys and places count too (all there is without `answerForm`). Texts under names the
+ *    form never states may be dropped, as the step's own fixer drops them. Task 12b round 2: on a "place" step a path is
+ *    read from its first root key (an outer wrapper is no new place), a flat item's stray keys that make up two or more
+ *    keys of one listed item are asked, and on every step a keyless value right after a key the form states as a list is
+ *    that list's own entry (a missing `[`): a source, and kept.
  * Null and empty texts are never checked: they carry no words (a lost text is caught by the last rule).
  */
 export function structureRepairKeepsWords(brokenReply: string, repaired: unknown, answerForm?: string,
   options: Readonly<{ textsKept?: StructureRepairTextsKept }> = {}): boolean {
   const broken = readBroken(brokenReply);
   const repair = readValues(repaired);
+  const shape = answerForm === undefined ? NO_FORM_SHAPE : formShape(answerForm);
+  const repairPlaces = keyPlaces(repaired);
+  // Task 12b round 2: a broken path read from its first ROOT key (a key the form or the repair has at the top), so an
+  // outer wrapper (`response.context.ambiguityFlags`) is compared at the place it wraps (`context.ambiguityFlags`).
+  const roots = new Set([...shape.places, ...repairPlaces].filter((place) => !place.includes(".")));
+  const rooted = (path: readonly string[]): string => {
+    const at = path.findIndex((key) => roots.has(key));
+    return (at <= 0 ? path : path.slice(at)).join(".");
+  };
+  // Task 12b round 2: a value with no key of its own right after a key the form states as a LIST is that list's next
+  // entry, written without its `[` (`"ambiguityFlags": "a", "b"`): it is the AI's own and counts as keyed.
+  const belongs = (entry: ReplyValue): boolean => entry.keyed !== false || shape.lists.has(rooted(entry.path));
   const fits = (source: ReplyValue, target: ReplyValue): boolean => mayComeFrom(source.path, target.path, repair.keys, broken.keys);
   const samePath = (source: ReplyValue, target: ReplyValue): boolean =>
     source.path.length === target.path.length && source.path.every((key, at) => key === target.path[at]);
   const normal = broken.values.map((entry) => typeof entry.value === "string" ? normalText(entry.value) : "");
   // Task 12b: a value written with no key name of its own is never a source: placing it under a key is the repair's
   // guess, not the AI's words where it put them. It may only be left out.
-  const used = new Set<number>(broken.values.flatMap((entry, index) => entry.keyed === false ? [index] : []));
+  const used = new Set<number>(broken.values.flatMap((entry, index) => belongs(entry) ? [] : [index]));
   const free = (index: number): boolean => !used.has(index);
   const leaves = repair.values.filter((leaf) => typeof leaf.value !== "string" || normalText(leaf.value) !== "");
   const same = (entry: ReplyValue, index: number, leaf: ReplyValue): boolean => typeof leaf.value === "string"
@@ -425,13 +455,28 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
     for (const index of parts) used.add(index);
   }
   const stated = new Set<string>([...repair.keys, ...(answerForm === undefined ? [] : formNames(answerForm))]);
-  const places = new Set<string>([...keyPlaces(repaired), ...(answerForm === undefined ? [] : formPlaces(answerForm))]);
+  const places = new Set<string>([...repairPlaces, ...shape.places]);
+  // Task 12b round 2: on a "place" step a stray key is still asked when its stray siblings in the same object make up
+  // two or more keys of one item the form states in a list (a fatal flag written flat in `fallacy`: `type` and
+  // `description` of a `fatalFlags` item); a lone stray key (GLM's `fallacy.description`) is not.
+  const itemKeys = [...shape.lists].map((list) => new Set([...shape.places].flatMap((place) =>
+    place.startsWith(`${list}.`) && !place.slice(list.length + 1).includes(".") ? [place.slice(list.length + 1)] : [])));
+  const strayAt = (entry: ReplyValue): boolean => {
+    const path = rooted(entry.path).split(".");
+    const parent = path.slice(0, -1).join(".");
+    const strays = new Set(broken.values.flatMap((other) => {
+      if (!belongs(other)) return [];
+      const at = rooted(other.path).split(".");
+      return at.length === path.length && at.slice(0, -1).join(".") === parent && !places.has(at.join(".")) ? [at.at(-1)!] : [];
+    }));
+    return itemKeys.some((keys) => keys.has(path.at(-1)!) && [...strays].filter((key) => keys.has(key)).length >= 2);
+  };
   const asked = (entry: ReplyValue): boolean => options.textsKept === "place"
-    ? places.has(entry.path.join(".")) : stated.has(entry.path.at(-1)!);
+    ? places.has(rooted(entry.path)) || strayAt(entry) : stated.has(entry.path.at(-1)!);
   const keptTexts = repair.values.flatMap((leaf) => typeof leaf.value === "string" ? [` ${normalText(leaf.value)} `] : []);
   return broken.values.every((entry, index) => {
     const text = normal[index]!;
-    return typeof entry.value !== "string" || entry.keyed === false || entry.path.length === 0 || !asked(entry) || text === ""
+    return typeof entry.value !== "string" || !belongs(entry) || entry.path.length === 0 || !asked(entry) || text === ""
       || keptTexts.some((kept) => kept.includes(` ${text} `));
   });
 }
