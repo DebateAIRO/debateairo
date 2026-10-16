@@ -446,8 +446,10 @@ def whole_count(value):
 # probe sends. A menu change is a reviewed row change. json_object says whether JSON mode may be asked for. sampling
 # (reviewed 2026-10-12) is None (the request must carry none of the profile's sampling_keys) or a tuple
 # of (name, number) pairs: the request must carry exactly those members with exactly those values.
-ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling',
-                      defaults=(None,))
+# final_writer_output_bound (length guidance LG-B, L26, 2026-10-15) is the model's own maximum output: a final-writer
+# request (callTier FINAL_WRITER) may ask up to it and reserves at it. None: the row has no final-writer tier.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound efforts json_object sampling '
+                      'final_writer_output_bound', defaults=(None, None))
 
 
 PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
@@ -467,6 +469,9 @@ class DeepInfraProfile:
       name, host                         the GO's `provider` value; the HTTPS host (port 443)
       per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
       max_request_bytes (int)            the largest request body accepted (and priced)
+      final_writer_max_request_bytes (int)  OPTIONAL (LG-B): the largest final-writer request body (callTier FINAL_WRITER)
+      final_writer_per_call_cap_usd (Decimal)  OPTIONAL (LG-B): no row may reserve more for one full-size final-writer
+                                         request; a profile without both has no final-writer tier
       redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
       key_pattern (str, optional)        the shape this vendor's key must have (re.fullmatch); the
                                          gate refuses any other key before a reservation, so a
@@ -515,15 +520,21 @@ class DeepInfraProfile:
     host = 'api.deepinfra.com'
     path = '/v1/openai/chat/completions'
     per_call_cap_usd = Decimal('0.25')
-    # Per-call caps (owner rulings 2026-10-10), the same for every row: a hard 256 KiB request body
-    # cap here, and output_bound 32768 (the max_tokens ceiling and the reservation's output term)
-    # in each row below. The 256 KiB is kept because story requests reach about 236 KiB at the
-    # "high" story size (the largest ordinary request seen was about 51 KB). No call the app makes
-    # asks for more than 24,000 answer tokens (debate 8,192, health checks 8,192, storyteller
-    # 12,000 then 24,000 on retry). Full-size worst cases ((262,144 + 2,048) x input + 32,768 x
-    # output): GLM $0.0560128, DeepSeek $0.0724992, MiMo $0.14211072, Qwen $0.042371072
+    # Per-call caps (owner rulings 2026-10-10), the same for every row: a hard 256 KiB request body cap here, and
+    # output_bound 32768 (the max_tokens ceiling and the reservation's output term) in each row below, for every call but
+    # a final writer's. The 256 KiB is kept because story requests reach about 236 KiB at the "high" story size (the
+    # largest ordinary request seen was about 51 KB). Debate calls and health checks ask for 8,192 tokens; a slow
+    # storyteller for 16,384, then 32,768 on its length retry. Full-size standard worst cases ((262,144 + 2,048) x input
+    # + 32,768 x output): GLM $0.0560128, DeepSeek $0.0724992, MiMo $0.14211072, Qwen $0.042371072
     # (tests/unit/fixtures/preview-model-rows.json).
     max_request_bytes = 256 * 1024
+    # Length guidance LG-B (L26, L29, 2026-10-15): the four final writers (answer writer, answer checker, storyteller,
+    # story checker) may send up to 1 MiB and ask up to each row's final_writer_output_bound (the vendor's own maximum),
+    # reserved at that bound under their own cap of $0.75, when the GO names max_final_writer_calls. Full-size final-writer
+    # worst cases ((1,048,576 + 2,048) x input + bound x output): GLM $0.2231296, DeepSeek $0.288768, MiMo $0.50878464,
+    # Qwen $0.168790016 (the parity file's final_writer member).
+    final_writer_max_request_bytes = 1024 * 1024
+    final_writer_per_call_cap_usd = Decimal('0.75')
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
     key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
@@ -532,12 +543,15 @@ class DeepInfraProfile:
     # Spec 2026-10-12 section 4.1: the words a row's menu may hold. None is no reasoning_effort member at all (the
     # vendor's default); 'none' asks DeepInfra to switch thinking off.
     effort_words = (None, 'none', 'low', 'medium', 'high')
+    # LG-B (L26): final_writer_output_bound is each model's own maximum output (DeepInfra's max_output_tokens, read
+    # 2026-10-15; MiMo lists none, so 65536, its max_new_tokens default ceiling).
     rows = {row.model: row for row in (
         # Thinking levels (spec 2026-10-12 section 2): Z.AI documents low, high and max only; thinking cannot be off.
-        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, ('high', 'low'), True),
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, ('high', 'low'), True,
+                 final_writer_output_bound=131072),
         # Thinking levels: DeepSeek documents none, low, high and max ('medium' is treated as high).
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768,
-                 ('high', 'low', 'none'), False),
+                 ('high', 'low', 'none'), False, final_writer_output_bound=131072),
         # Owner approval 2026-10-12: MiMo closed Romanian quotation marks with a straight double quote inside its JSON
         # in a live practice run. Its DeepInfra page recommends temperature 1.0 and top_p 0.95; owner ruling 2026-10-12
         # (reply language): temperature 0.7, after MiMo wrote 10 of its 71 practice replies at 1.0 in another language
@@ -545,7 +559,7 @@ class DeepInfraProfile:
         # turned that slip into garbage, which the app's reader repairs when JSON mode is off.
         # Thinking levels: Xiaomi documents thinking on or off only, no levels.
         ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, (None, 'none'), False,
-                 (('temperature', 0.7), ('top_p', 0.95))),
+                 (('temperature', 0.7), ('top_p', 0.95)), final_writer_output_bound=65536),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
         # Reviewed sampling 2026-10-12: at DeepInfra's defaults (temperature 1, top_p 1, top_k off) it slid
@@ -554,7 +568,7 @@ class DeepInfraProfile:
         # Thinking levels: Alibaba documents low, medium and xhigh (its default); 'high' is not a Qwen value.
         ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768,
                  (None, 'low', 'medium', 'none'), False,
-                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20))))}
+                 (('temperature', 0.6), ('top_p', 0.95), ('top_k', 20)), final_writer_output_bound=131072))}
 
     def path_for(self, row):
         return self.path
@@ -844,6 +858,11 @@ class AnthropicProfile:
     used), usage or token counts outside `usage`, or a content block other than text or thinking is
     invalid too. An invalid reply's ledger entry names the check it failed and keeps an outline of
     the reply (field names and kinds only: reply_outline).
+
+    Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): with a GO that names max_final_writer_calls, a
+    final-writer request (callTier FINAL_WRITER) may send up to 1 MiB and ask up to 128,000 tokens (Haiku 5.5's
+    documented maximum); a full-size cached one reserves (1,050,624 x 0.625 + 128,000 x 2.50) / 1e6 = $0.97664, under
+    this profile's own final-writer cap of $1.00.
     """
     name = 'anthropic'
     host = 'api.anthropic.com'
@@ -851,6 +870,8 @@ class AnthropicProfile:
     api_version = '2023-06-01'
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
+    final_writer_max_request_bytes = 1024 * 1024
+    final_writer_per_call_cap_usd = Decimal('1.00')  # Owner answer 4 (2026-10-15): Haiku as a final writer, $1.00.
     redaction_patterns = (r'sk-ant-[A-Za-z0-9_-]+',)
     # Only the ordinary API form (sk-ant-api + two digits + '-', e.g. api03): an Admin form
     # (sk-ant-admin...) or any other Anthropic credential is refused (platform.claude.com, Admin API
@@ -862,7 +883,8 @@ class AnthropicProfile:
     rows = {row.model: row for row in (
         # The row holds the lower step's prices (the estimate's and a small call's); see reservation_prices.
         # Thinking levels (spec 2026-10-12 section 2): Anthropic documents low, medium, high, xhigh and max for Haiku 5.5.
-        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, ('high', 'medium', 'low'), False),)}
+        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, ('high', 'medium', 'low'), False,
+                 final_writer_output_bound=128000),)}
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))

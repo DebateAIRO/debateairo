@@ -431,6 +431,186 @@ class ModelCallTests(GateTest):
                 self.assertEqual(bridge.validate_request(request, go)[1], Decimal(typescript))
 
 
+# Length guidance LG-B (L26, L29, 2026-10-15): the final-writer tier, written out independently of the gate.
+MIB = 1024 * 1024
+FW_BOUNDS = {MODEL: 131072, DEEPSEEK: 131072, MIMO: 65536, QWEN: 131072}
+FW_WORST = {MODEL: Decimal('0.2231296'), DEEPSEEK: Decimal('0.288768'), MIMO: Decimal('0.50878464'), QWEN: Decimal('0.168790016')}
+
+
+def fw_reservation_of(raw, model):
+    _maker, price_in, price_out, _bound, _efforts, _json = ROWS[model]
+    return (Decimal(len(raw.encode()) + 2048) * Decimal(price_in) + Decimal(FW_BOUNDS[model]) * Decimal(price_out)) / Decimal(1000000)
+
+
+def fw_envelope(value, operation_id='fw-1', tier='FINAL_WRITER'):
+    raw = json.dumps(value)
+    return {**envelope(value, operation_id), 'reservedUsd': str(fw_reservation_of(raw, value['model'])), 'callTier': tier}
+
+
+def fw_sized(model, size):
+    value = body(model=model, max_tokens=FW_BOUNDS[model], messages=[{'role': 'user', 'content': ''}])
+    value['messages'][0]['content'] = 'x' * (size - len(json.dumps(value).encode()))
+    assert len(json.dumps(value).encode()) == size
+    return value
+
+
+class FinalWriterTierTests(GateTest):
+    def fw_gate(self, **changes):
+        gate = self.gate(**{'enabled_models': ALL, 'max_final_writer_calls': 1, **changes}).ready()
+        gate.slots = bridge.CallSlots(gate.go['max_concurrent_calls'], 1)
+        return gate
+
+    def options(self, gate):
+        return {'peer_uid': PEER, 'slots': gate.slots, 'key_loader': lambda _private: KEY, 'host': HOST,
+                'platform': 'linux', 'now': gate.clock, 'slot_wait': 0.2}
+
+    def test_each_row_has_its_final_writer_bound_and_a_full_size_final_writer_request_fits_its_cap(self):
+        parity = json.loads(PARITY.read_text())['final_writer']
+        self.assertEqual((DEEPINFRA.final_writer_max_request_bytes, DEEPINFRA.final_writer_per_call_cap_usd), (MIB, Decimal('0.75')))
+        self.assertEqual((parity['request_bytes'], Decimal(parity['per_call_cap_usd'])),
+                         (DEEPINFRA.final_writer_max_request_bytes, DEEPINFRA.final_writer_per_call_cap_usd))
+        self.assertEqual([(r['model'], r['output_bound'], r['worst_case_reservation_usd']) for r in parity['rows']],
+                         [(m, row.final_writer_output_bound, '%.9f' % bridge.worst_case_reservation(DEEPINFRA, row, 'FINAL_WRITER'))
+                          for m, row in DEEPINFRA.rows.items()])
+        for model in ALL:
+            with self.subTest(model=model):
+                row = DEEPINFRA.rows[model]
+                self.assertEqual(row.final_writer_output_bound, FW_BOUNDS[model])
+                self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row, 'FINAL_WRITER'), FW_WORST[model])
+                self.assertLessEqual(FW_WORST[model], DEEPINFRA.final_writer_per_call_cap_usd)
+                # The standard worst case stays today's figure.
+                self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row),
+                                 bridge.reservation_for(DEEPINFRA.max_request_bytes, row, DEEPINFRA.ceiling_prices(row)))
+                self.assertTrue(bridge.row_reviewed(DEEPINFRA, model, row))
+
+    def test_a_1_mib_final_writer_request_is_reserved_at_the_final_writer_bound_and_one_byte_more_is_refused(self):
+        go = bridge.read_go(self.fw_gate().go_path)
+        for model in ALL:
+            with self.subTest(model=model):
+                outgoing, reserved, row, _prices = bridge.validate_request(fw_envelope(fw_sized(model, MIB)), go)
+                self.assertEqual((reserved, row.output_bound, row.model), (FW_WORST[model], FW_BOUNDS[model], model))
+                self.assertEqual(json.loads(outgoing)['max_tokens'], FW_BOUNDS[model])
+                with self.refused('REQUEST_SCOPE_INVALID'):
+                    bridge.validate_request(fw_envelope(fw_sized(model, MIB + 1)), go)
+
+    def test_the_final_writer_tier_is_refused_where_it_does_not_apply(self):
+        plain = bridge.read_go(self.gate(enabled_models=ALL).go_path)  # A GO that names no final-writer calls.
+        with self.refused('PREVIEW_CALL_TIER_INVALID'):
+            bridge.validate_request(fw_envelope(body(model=DEEPSEEK, max_tokens=131072)), plain)
+        go = bridge.read_go(self.fw_gate().go_path)
+        with self.refused('PREVIEW_CALL_TIER_INVALID'):
+            bridge.validate_request(fw_envelope(body(model=DEEPSEEK), tier='BIG'), go)
+        with self.refused('PREVIEW_CALL_TIER_INVALID'):
+            bridge.validate_request(fw_envelope(body(model=DEEPSEEK)), go, probe=True)
+        with self.refused('REQUEST_PARAMETERS_INVALID'):  # Over the row's own maximum.
+            bridge.validate_request(fw_envelope(body(model=DEEPSEEK, max_tokens=131073)), go)
+        with self.refused('REQUEST_PARAMETERS_INVALID'):  # A final writer's ask without the tier.
+            bridge.validate_request(envelope(body(model=DEEPSEEK, max_tokens=131072)), go)
+        standard = json.dumps(body(model=DEEPSEEK))
+        with self.refused('RESERVATION_MISMATCH'):  # Priced as a standard call while declaring the tier.
+            bridge.validate_request({**fw_envelope(body(model=DEEPSEEK)), 'reservedUsd': str(reservation_of(standard, DEEPSEEK))}, go)
+        with self.refused('REQUEST_SCOPE_INVALID'):
+            bridge.validate_request({**fw_envelope(body(model=DEEPSEEK)), 'other': 1}, go)
+
+    def test_a_standard_request_is_the_same_with_or_without_the_tier_key(self):
+        go = bridge.read_go(self.fw_gate().go_path)
+        value = body(model=MIMO)
+        self.assertEqual(bridge.validate_request(envelope(value), go),
+                         bridge.validate_request({**envelope(value), 'callTier': 'STANDARD'}, go))
+        self.assertEqual(bridge.request_tier(envelope(value)), 'STANDARD')
+        with self.refused('REQUEST_SCOPE_INVALID'):
+            bridge.validate_request({**envelope(sized_body(MIMO, DEEPINFRA.max_request_bytes + 1)), 'callTier': 'STANDARD'}, go)
+
+    def test_one_final_writer_call_at_a_time_and_its_entry_names_the_tier(self):
+        gate = self.fw_gate()
+        options = self.options(gate)
+        answered = lambda _sent, _key: (200, provider_response(model=DEEPSEEK))  # noqa: E731
+
+        def first(_sent, _key):
+            with self.refused('CONCURRENCY_LIMIT_REACHED'):
+                bridge.execute_request(gate.private, gate.go_path, fw_envelope(body(model=DEEPSEEK, max_tokens=131072), 'fw-2'),
+                                       dispatch=no_network, **options)
+            # A standard call still goes through beside it.
+            bridge.execute_request(gate.private, gate.go_path, envelope(body(model=DEEPSEEK), 'std-1'), dispatch=answered, **options)
+            return answered(_sent, _key)
+        bridge.execute_request(gate.private, gate.go_path, fw_envelope(body(model=DEEPSEEK, max_tokens=131072), 'fw-1'),
+                               dispatch=first, **options)
+        entry = entry_of(gate, 'fw-1')
+        self.assertEqual((entry['call_tier'], entry['output_bound'], entry['state']), ('FINAL_WRITER', 131072, 'settled'))
+        self.assertNotIn('call_tier', entry_of(gate, 'std-1'))
+        self.assertNotIn('preview-test:' + SCOPE + ':fw-2', gate.day('2026-10-08')['entries'])
+        # Its slot is free again once it settled.
+        bridge.execute_request(gate.private, gate.go_path, fw_envelope(body(model=DEEPSEEK, max_tokens=131072), 'fw-3'),
+                               dispatch=answered, **options)
+        self.assertEqual(entry_of(gate, 'fw-3')['state'], 'settled')
+        with self.subTest('an unreported charge is booked at the final-writer hold (Task 4b, M3)'):
+            # No usage, a reported cost above this body's standard hold but within its final-writer hold: booked at the
+            # hold the call took, the tier's (at the standard hold the hook would see a cost above it and halt).
+            value = body(model=DEEPSEEK, max_tokens=131072)
+            hold = fw_reservation_of(json.dumps(value), DEEPSEEK)
+            standard_hold = reservation_of(json.dumps(body(model=DEEPSEEK, max_tokens=131072)), DEEPSEEK)
+            self.assertLess(standard_hold, Decimal('0.05'))
+            self.assertLess(Decimal('0.05'), hold)
+            with self.refused('PROVIDER_CHARGE_BOOKED_MAX'):
+                bridge.execute_request(gate.private, gate.go_path, fw_envelope(value, 'fw-4'),
+                                       dispatch=lambda _sent, _key: (200, {'model': DEEPSEEK, 'usage': {'estimated_cost': '0.05'}}),
+                                       **options)
+            entry = entry_of(gate, 'fw-4')
+            self.assertEqual((entry['state'], entry['reason'], entry['call_tier'], Decimal(entry['held_usd']),
+                              Decimal(entry['reserved_usd'])), ('settled_reserved_max', 'charge_unreported', 'FINAL_WRITER', hold, hold))
+            self.assertEqual(gate.status()['state'], 'active')
+            # Its final-writer slot is free again too.
+            bridge.execute_request(gate.private, gate.go_path, fw_envelope(value, 'fw-5'), dispatch=answered, **options)
+            self.assertEqual(entry_of(gate, 'fw-5')['state'], 'settled')
+        # A server started before the GO named the member must restart first.
+        with self.refused('SERVE_RESTART_REQUIRED'):
+            bridge.execute_request(gate.private, gate.go_path, envelope(body(model=DEEPSEEK), 'std-2'), dispatch=answered,
+                                   **{**options, 'slots': bridge.CallSlots(gate.go['max_concurrent_calls'])})
+
+    def test_the_go_names_its_final_writer_calls_and_activate_and_remaining_count_them(self):
+        gate = self.gate()
+        for count in (1, 4):
+            with self.subTest(count=count):
+                self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', max_final_writer_calls=count))['max_final_writer_calls'], count)
+        for count in (0, 5, True, 1.0, '1', None):
+            with self.subTest(count=count), self.refused('ROOT_GO_INVALID'):
+                bridge.read_go(gate.write_go(name='bad.json', max_final_writer_calls=count))
+        # All four rows, 10 at once, one of them a final writer: 9 x 0.14211072 + 0.50878464 = 1.78778112.
+        for budget, ok in (('1.78', False), ('1.79', True)):
+            with self.subTest(budget=budget):
+                gate = self.gate(enabled_models=ALL, daily_budget_usd=budget, max_concurrent_calls=10, max_final_writer_calls=1)
+                gate.init()
+                if ok:
+                    self.assertEqual(gate.activate()['state'], 'active')
+                else:
+                    with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
+                        gate.activate()
+        # Without the member: today's check exactly (10 x 0.14211072 = 1.4211072 fits 1.43).
+        gate = self.gate(enabled_models=ALL, daily_budget_usd='1.43', max_concurrent_calls=10)
+        gate.init()
+        self.assertEqual(gate.activate()['state'], 'active')
+        self.assertEqual(bridge.in_flight_worst_case(DEEPINFRA, ALL, 10, 0), Decimal('1.4211072'))
+        self.assertEqual(bridge.in_flight_worst_case(DEEPINFRA, ALL, 10, 1), Decimal('1.78778112'))
+        # /remaining: today's seven members without the GO member, nine with it.
+        plain = self.gate().ready()
+        self.assertEqual(len(bridge.remaining_report(plain.private, plain.go_path, {'scope_id': SCOPE}, now=plain.clock)), 7)
+        fw = self.fw_gate()
+        report = bridge.remaining_report(fw.private, fw.go_path, {'scope_id': SCOPE}, slots=fw.slots, now=fw.clock)
+        self.assertEqual((report['final_writer_max_in_flight'], Decimal(report['largest_final_writer_reservation_usd']),
+                          Decimal(report['largest_reservation_usd']), report['window_open']),
+                         (1, Decimal('0.50878464'), Decimal('0.14211072'), True))
+
+    def test_the_message_limit_holds_a_1_mib_body_in_its_json_envelope(self):
+        self.assertEqual(bridge.MAX_IPC_BYTES, 3 * MIB)
+        # The worst case for escaping: every character of the body a quote, escaped once in the body and again in the message.
+        value = body(model=MODEL, max_tokens=131072, messages=[{'role': 'user', 'content': ''}])
+        value['messages'][0]['content'] = '"' * ((MIB - len(json.dumps(value).encode())) // 2)
+        self.assertLessEqual(len(json.dumps(value).encode()), MIB)
+        message = json.dumps(fw_envelope(value)).encode()
+        self.assertGreater(len(message), MIB)
+        self.assertLessEqual(len(message), bridge.MAX_IPC_BYTES)
+
+
 class RemainingTests(GateTest):
     def report(self, gate, data=Ellipsis, **kwargs):
         return bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE} if data is Ellipsis else data,

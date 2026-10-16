@@ -291,6 +291,40 @@ class ParityAndReservationTests(AnthropicTest):
             bridge.validate_request({**sent, 'reservedUsd': '0.016607299'}, go)
 
 
+class FinalWriterTierTests(AnthropicTest):
+    """Length guidance LG-B (L26, L29, owner answer 4, 2026-10-15): Claude Haiku as a final writer may send 1 MiB and ask
+    its own maximum (128,000), under its own per-call cap of $1.00."""
+
+    def test_haiku_final_writer_tier_reserves_at_most_one_dollar(self):
+        parity = json.loads(PARITY.read_text())['final_writer']
+        row = ANTHROPIC.rows[HAIKU]
+        self.assertEqual((ANTHROPIC.final_writer_max_request_bytes, ANTHROPIC.final_writer_per_call_cap_usd, row.final_writer_output_bound),
+                         (1024 * 1024, Decimal('1.00'), 128000))
+        self.assertEqual((parity['request_bytes'], Decimal(parity['per_call_cap_usd'])), (1024 * 1024, Decimal('1.00')))
+        worst = bridge.worst_case_reservation(ANTHROPIC, row, 'FINAL_WRITER')
+        # (1,050,624 x 0.625 + 128,000 x 2.50) / 1e6: a cached full-size request at the upper step.
+        self.assertEqual(worst, Decimal('0.97664'))
+        uncached = bridge.reservation_for(1024 * 1024, bridge.tier_row(ANTHROPIC, row, 'FINAL_WRITER'),
+                                          ANTHROPIC.reservation_prices(row, None, 1024 * 1024))
+        self.assertEqual(parity['rows'], [{'model': HAIKU, 'output_bound': 128000, 'worst_case_reservation_usd': '%.9f' % worst,
+                                           'worst_case_uncached_reservation_usd': '%.9f' % uncached}])
+        self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
+        self.assertLessEqual(worst, bridge.MAX_PROFILE_CALL_CAP_USD)
+
+    def test_a_cached_1_mib_final_writer_request_reserves_at_the_upper_write_price(self):
+        go = bridge.read_go(self.gate(max_final_writer_calls=1).go_path)
+        value = cached_request(max_tokens=128000, messages=[{'role': 'user', 'content': ''}])
+        value['messages'][0]['content'] = 'x' * (1024 * 1024 - len(json.dumps(value).encode()))
+        raw = json.dumps(value)
+        reserved = (Decimal(len(raw.encode()) + 2048) * UPPER_WRITE_IN + Decimal(128000) * CEIL_OUT) / Decimal(1000000)
+        self.assertEqual(reserved, Decimal('0.97664'))
+        _outgoing, got, row, prices = bridge.validate_request({**envelope_text(raw), 'reservedUsd': str(reserved),
+                                                               'callTier': 'FINAL_WRITER'}, go)
+        self.assertEqual((got, row.output_bound, prices), (reserved, 128000, CEILING))
+        with self.refused('REQUEST_SCOPE_INVALID'):  # Without the tier the same body is over the standard 256 KiB.
+            bridge.validate_request(envelope_text(raw), go)
+
+
 class GoAndActivateTests(AnthropicTest):
     def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
         # Owner answer M1 (2026-10-15): Anthropic $4.00 (this GO) + DeepInfra $12.00 = the $16.00 team total. Each GO

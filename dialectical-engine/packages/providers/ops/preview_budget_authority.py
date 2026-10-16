@@ -221,7 +221,9 @@ REPLY_TIMEOUT_SECONDS = 1290
 DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds the stop's first step).
-MAX_IPC_BYTES = 1024 * 1024
+# LG-B: a final writer's 1 MiB body travels JSON-escaped inside the message (a quote becomes 4 bytes there), so the
+# message may be up to 3 MiB.
+MAX_IPC_BYTES = 3 * 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
 # Provably unsent calls (PROVIDER_NOT_REACHED) and not-busy unbilled errors (PROVIDER_ERROR_UNBILLED)
@@ -258,7 +260,7 @@ PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REAC
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})
-GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
+GO_OPTIONAL = frozenset({'predecessor_ledger_sha256', 'max_final_writer_calls'})
 DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
 SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
 # v1's and v2's names: a client still configured for an older gate must never reach this one.
@@ -435,10 +437,57 @@ def cache_write_of(profile, body):
     return asks is not None and asks(body) is True
 
 
-def worst_case_reservation(profile, row):
-    """A full-size request at the highest prices the row can ever reserve at (ceiling_prices):
-    one figure for the per-call cap, the activate check and /remaining, whatever the date."""
-    return reservation_for(profile.max_request_bytes, row, profile.ceiling_prices(row))
+# Length guidance LG-B (L26, L29): the two kinds of request the app declares. No callTier key is STANDARD: every request
+# before LG-B, and the probe's.
+CALL_TIERS = ('STANDARD', 'FINAL_WRITER')
+
+
+def request_tier(input):
+    """The tier an app request declares (callTier), STANDARD when it names none; anything else refuses."""
+    if isinstance(input, dict) and 'callTier' in input:
+        if input['callTier'] not in CALL_TIERS:
+            raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+        return input['callTier']
+    return 'STANDARD'
+
+
+def final_writer_tier_of(profile):
+    """(largest request bytes, per-call cap) of the profile's final-writer tier, or None when it has none."""
+    size = getattr(profile, 'final_writer_max_request_bytes', None)
+    cap = getattr(profile, 'final_writer_per_call_cap_usd', None)
+    return None if size is None or cap is None else (size, cap)
+
+
+def final_writer_slots(go):
+    """How many final-writer calls the GO lets through at once: its max_final_writer_calls, 0 without it (no tier)."""
+    return go.get('max_final_writer_calls', 0)
+
+
+def tier_limits(profile, tier):
+    """(largest request bytes, per-call cap) of one tier."""
+    if tier == 'STANDARD':
+        return profile.max_request_bytes, profile.per_call_cap_usd
+    limits = final_writer_tier_of(profile)
+    if tier != 'FINAL_WRITER' or limits is None:
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    return limits
+
+
+def tier_row(profile, row, tier):
+    """The row as a request of this tier is checked and reserved: a final writer's carries the row's own maximum as its
+    output bound."""
+    if tier == 'STANDARD':
+        return row
+    bound = getattr(row, 'final_writer_output_bound', None)
+    if tier != 'FINAL_WRITER' or final_writer_tier_of(profile) is None or bound is None:
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    return row._replace(output_bound=bound)
+
+
+def worst_case_reservation(profile, row, tier='STANDARD'):
+    """A full-size request of the tier at the highest prices the row can ever reserve at (ceiling_prices): one figure for
+    the per-call cap, the activate check and /remaining, whatever the date."""
+    return reservation_for(tier_limits(profile, tier)[0], tier_row(profile, row, tier), profile.ceiling_prices(row))
 
 
 def _price_ok(value):
@@ -485,7 +534,31 @@ def row_reviewed(profile, model, row):
                 and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
                 and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
-                and worst_case_reservation(profile, row) <= profile.per_call_cap_usd)
+                and worst_case_reservation(profile, row) <= profile.per_call_cap_usd
+                and final_writer_row_reviewed(profile, row))
+
+
+def final_writer_row_reviewed(profile, row):
+    """LG-B: a row without its own maximum, or on a profile without the tier, has no final-writer tier (it is refused for
+    one). Otherwise its maximum is between its standard bound and MAX_OUTPUT_BOUND, and a full-size final-writer request
+    reserves no more than the tier's cap."""
+    bound = getattr(row, 'final_writer_output_bound', None)
+    limits = final_writer_tier_of(profile)
+    if bound is None or limits is None:
+        return True
+    return (_int_in(bound, row.output_bound, MAX_OUTPUT_BOUND)
+            and worst_case_reservation(profile, row, 'FINAL_WRITER') <= limits[1])
+
+
+def final_writer_profile_reviewed(profile):
+    """LG-B: a profile's final-writer tier, when it has one: a cap above 0 and at most MAX_PROFILE_CALL_CAP_USD, and a
+    request size from its standard size up to MAX_PROFILE_REQUEST_BYTES."""
+    limits = final_writer_tier_of(profile)
+    if limits is None:
+        return True
+    size, cap = limits
+    return (type(cap) is Decimal and Decimal(0) < cap <= MAX_PROFILE_CALL_CAP_USD
+            and _int_in(size, profile.max_request_bytes, MAX_PROFILE_REQUEST_BYTES))
 
 
 def profile_of(provider):
@@ -497,6 +570,7 @@ def profile_of(provider):
             profile is not None and getattr(profile, 'name', None) == provider and profile.rows
             and type(profile.per_call_cap_usd) is Decimal and Decimal(0) < profile.per_call_cap_usd <= MAX_PROFILE_CALL_CAP_USD
             and _int_in(profile.max_request_bytes, 1024, MAX_PROFILE_REQUEST_BYTES)
+            and final_writer_profile_reviewed(profile)
             and all(row_reviewed(profile, m, r) for m, r in profile.rows.items()))
     except Exception:  # noqa: BLE001 - a profile that cannot even be checked is not reviewed
         reviewed = False
@@ -511,6 +585,26 @@ def enabled_models_valid(models, profile):
 
 def largest_reservation(profile, models):
     return max(worst_case_reservation(profile, profile.rows[model]) for model in models)
+
+
+def largest_final_writer_reservation(profile, models):
+    """LG-B: the largest full-size final-writer hold among these models (0 when none has the tier)."""
+    worst = [worst_case_reservation(profile, profile.rows[model], 'FINAL_WRITER') for model in models
+             if final_writer_tier_of(profile) is not None
+             and getattr(profile.rows[model], 'final_writer_output_bound', None) is not None]
+    return max(worst) if worst else Decimal(0)
+
+
+def in_flight_worst_case(profile, models, max_concurrent, final_writer_calls):
+    """What every call slot may hold at once: up to final_writer_calls of them at the largest final-writer worst case,
+    the rest at the largest standard one. With no final-writer calls (every GO before LG-B): max_concurrent x the
+    largest standard worst case, exactly as before."""
+    standard = largest_reservation(profile, models)
+    final_writer = min(final_writer_calls, max_concurrent)
+    if final_writer == 0:
+        return max_concurrent * standard
+    return ((max_concurrent - final_writer) * standard
+            + final_writer * max(standard, largest_final_writer_reservation(profile, models)))
 
 
 def valid_go(go):
@@ -529,6 +623,7 @@ def valid_go(go):
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
         and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
+        and ('max_final_writer_calls' not in go or _int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls']))
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
 
@@ -550,7 +645,11 @@ def read_go(path):
 
 
 def limits_of(go):
-    return {name: go[name] for name in ('daily_budget_usd', 'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days')}
+    limits = {name: go[name] for name in ('daily_budget_usd', 'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days')}
+    # LG-B: only a GO that names it carries it, so older states read exactly as before.
+    if 'max_final_writer_calls' in go:
+        limits['max_final_writer_calls'] = go['max_final_writer_calls']
+    return limits
 
 
 def day_ledger_name(day):
@@ -887,9 +986,11 @@ def activate(private, go_path, host=None, platform=None, now=None, gate_go_paths
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host']:
         raise SafetyError('ACTIVATION_REFUSED')
-    # Every slot holding the largest enabled worst case at once must still fit the day's pot.
+    # Every slot holding the largest enabled worst case it may hold at once must still fit the day's pot (LG-B: the GO's
+    # final-writer slots at the final-writer worst case).
     profile = profile_of(go['provider'])
-    if go['max_concurrent_calls'] * largest_reservation(profile, go['enabled_models']) > Decimal(go['daily_budget_usd']):
+    if in_flight_worst_case(profile, go['enabled_models'], go['max_concurrent_calls'], final_writer_slots(go)) \
+            > Decimal(go['daily_budget_usd']):
         raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
     # Root runs activate in a shell, outside the units that hide the gates' GOs from each other.
     if team_total(go, gate_go_paths, owner_uid) > TEAM_TOTAL_BUDGET_USD:
@@ -944,11 +1045,19 @@ def validate_request(input, go, probe=False, moment=None):
     profile = profile_of(go['provider'])
     if profile is None:
         raise SafetyError('ROOT_GO_INVALID')
-    if not isinstance(input, dict) or set(input) != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
+    if not isinstance(input, dict) \
+            or set(input) - {'callTier'} != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
             or input['scope_id'] != go['scope_id'] or not isinstance(input['operationId'], str) \
             or not re.fullmatch(r'[A-Za-z0-9-]{1,96}', input['operationId']) or not isinstance(input['requestBody'], str) \
-            or len(input['requestBody'].encode()) > profile.max_request_bytes \
             or hashlib.sha256(input['requestBody'].encode()).hexdigest() != input['requestSha256']:
+        raise SafetyError('REQUEST_SCOPE_INVALID')
+    # Length guidance LG-B (controller ruling 5): the tier is the app's declaration; the gate cannot see the step. A
+    # final-writer request needs a GO that names max_final_writer_calls; the probe never sends one.
+    tier = request_tier(input)
+    if tier == 'FINAL_WRITER' and (probe or final_writer_slots(go) == 0):
+        raise SafetyError('PREVIEW_CALL_TIER_INVALID')
+    max_bytes, cap = tier_limits(profile, tier)
+    if len(input['requestBody'].encode()) > max_bytes:
         raise SafetyError('REQUEST_SCOPE_INVALID')
     try:
         body = json.loads(input['requestBody'])
@@ -960,7 +1069,8 @@ def validate_request(input, go, probe=False, moment=None):
     row = profile.rows.get(model)
     if row is None or not (probe or model in go['enabled_models']):
         raise SafetyError('MODEL_NOT_ALLOWED')
-    if not profile.body_valid(body, row):
+    checked = tier_row(profile, row, tier)  # The tier's own output bound (a final writer's: the row's own maximum).
+    if not profile.body_valid(body, checked):
         raise SafetyError('REQUEST_PARAMETERS_INVALID')
     raw = input['requestBody'].encode()
     # The exact bytes that will go upstream, fixed before any reservation: a body that cannot be
@@ -980,12 +1090,12 @@ def validate_request(input, go, probe=False, moment=None):
     if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
-    reserved = reservation_for(len(raw), row, prices)
-    if reserved > profile.per_call_cap_usd:
+    reserved = reservation_for(len(raw), checked, prices)
+    if reserved > cap:
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed row; checked anyway.
     if helper.decimal_amount(input['reservedUsd']) != reserved:
         raise SafetyError('RESERVATION_MISMATCH')
-    return outgoing, reserved, row, prices
+    return outgoing, reserved, checked, prices
 
 
 def probe_running(store):
@@ -1069,6 +1179,8 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
+                                       # LG-B (controller ruling 5): logged per tier; a standard entry is unchanged.
+                                       **({'call_tier': 'FINAL_WRITER'} if request_tier(input) == 'FINAL_WRITER' else {}),
                                        'requested_effort': requested_effort, 'peer_uid': peer_uid,
                                        **({'cache_write_requested': '5m'} if cache_write else {}),
                                        **({'probe': True} if probe else {})}
@@ -1306,11 +1418,14 @@ def bounded_accounting(accounting):
 class CallSlots:
     """One server's call slots, plus its trip: after a failed settlement or a failed halt this
     process reserves nothing more until it is restarted (restart recovery then halts on the
-    interrupted entry)."""
+    interrupted entry). LG-B: final_writer_limit of the slots (the GO's max_final_writer_calls, 0: none) may hold a
+    final-writer call at once."""
 
-    def __init__(self, limit):
+    def __init__(self, limit, final_writer_limit=0):
         self.limit = limit
+        self.final_writer_limit = final_writer_limit
         self._semaphore = threading.BoundedSemaphore(limit)
+        self._final_writer = threading.BoundedSemaphore(final_writer_limit) if final_writer_limit > 0 else None
         self.tripped = False
 
     def trip(self):
@@ -1321,6 +1436,12 @@ class CallSlots:
 
     def release(self):
         self._semaphore.release()
+
+    def acquire_final_writer(self, wait):
+        return self._final_writer is not None and self._final_writer.acquire(timeout=wait)
+
+    def release_final_writer(self):
+        self._final_writer.release()
 
 
 def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None,
@@ -1339,11 +1460,17 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
             or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
         raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
-    if slots.limit != go['max_concurrent_calls']:
+    if slots.limit != go['max_concurrent_calls'] or getattr(slots, 'final_writer_limit', 0) != final_writer_slots(go):
         raise SafetyError('SERVE_RESTART_REQUIRED')
     if not slots.acquire(slot_wait):
         raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+    final_writer_held = False
     try:
+        # LG-B: a final writer also takes one of the GO's final-writer slots, or is refused unbilled, like a full gate.
+        if request_tier(input) == 'FINAL_WRITER':
+            if not slots.acquire_final_writer(slot_wait):
+                raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+            final_writer_held = True
         if cancelled is not None and cancelled():
             raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
         key = (key_loader or helper.read_key)(private)
@@ -1472,6 +1599,8 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             raise SafetyError('SETTLED_INTO_HALT')
         return reply
     finally:
+        if final_writer_held:
+            slots.release_final_writer()
         slots.release()
 
 
@@ -1544,7 +1673,8 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
     except SafetyError:
         go_current, allowed = False, frozenset()
     limits = control['limits']
-    serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls'])
+    serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls']
+                                and getattr(slots, 'final_writer_limit', 0) == limits.get('max_final_writer_calls', 0))
     # A probe id in flight (running, or left by a probe that died) makes the next reservation wait
     # or halt (interrupted_probe): say the window is shut, so no debate starts into that.
     serving = serving and not any(entry_id.startswith(PROBE_ENTRY_PREFIX) for entry_id in control['in_flight'])
@@ -1552,7 +1682,7 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
     profile = profile_of(control['provider'])
     if profile is None or not all(model in profile.rows for model in control['enabled_models']):
         raise SafetyError('REMAINING_UNAVAILABLE')  # The state names a row this code no longer reviews.
-    return control['scope_id'], allowed, {
+    reply = {
             'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
             # The app reads amounts as exact nano-USD (at most 9 decimals). A provider's reported cost
             # can carry more, so what is left is rounded DOWN and the largest hold UP: never in the
@@ -1562,6 +1692,12 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
             'max_concurrent_calls': limits['max_concurrent_calls'],
             'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
             'enabled_models': list(control['enabled_models'])}
+    # LG-B: only a state activated with a GO that names max_final_writer_calls answers its final-writer room.
+    if limits.get('max_final_writer_calls', 0) > 0:
+        reply['largest_final_writer_reservation_usd'] = nano_text(
+            largest_final_writer_reservation(profile, control['enabled_models']), ROUND_CEILING)
+        reply['final_writer_max_in_flight'] = limits['max_final_writer_calls']
+    return control['scope_id'], allowed, reply
 
 
 def remaining_answer(snapshot, input, uid):
@@ -1759,7 +1895,8 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
     # next reservation (a probe that died or could not settle).
     lock_fd = hold_probe_lock(private)
     try:
-        execute_request(private, go_path, request, peer_uid=0, slots=CallSlots(go['max_concurrent_calls']),
+        execute_request(private, go_path, request, peer_uid=0,
+                        slots=CallSlots(go['max_concurrent_calls'], final_writer_slots(go)),
                         dispatch=dispatch, key_loader=key_loader, host=host, platform=platform, now=now, probe=True,
                         on_settled=observed.update)
     except SafetyError:
@@ -2087,7 +2224,7 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # Under the serve lock: no other serve on this state can be clearing or binding meanwhile.
         stale_removed = clear_stale_socket(socket_path, owner_uid=owner_uid)
         recovered = recover_interrupted(private)
-        slots = CallSlots(go['max_concurrent_calls'])
+        slots = CallSlots(go['max_concurrent_calls'], final_writer_slots(go))
 
         def execute(data, uid, cancelled, on_reserved):
             return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
