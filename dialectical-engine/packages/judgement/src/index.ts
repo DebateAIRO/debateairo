@@ -19,6 +19,7 @@ import {
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
+  CONTENT_FOLLOW_UP_SENTENCES,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   lengthRetryTokenCeiling,
@@ -556,6 +557,11 @@ export function rootPositionRequestBytesBound(input: RootPositionBoundInput): nu
  * the rejection's code and machine path). The code and the path are the longest the frame lets a repair carry
  * (`appendFramedRejection` refuses longer ones), made of characters that do not grow on the way, so no real repair of
  * the same root frames longer. Measured as `rootPositionRequestBytesBound` measures the first packet.
+ *
+ * LG-A (spec 2026-10-15, L33; Task 13): with the structure-repair route wired (the preview provider config), a routed
+ * call's full re-ask also carries `machine_rejection_reason`, one of CONTENT_FOLLOW_UP_SENTENCES, so the bound carries
+ * the longest of them too. Today's unrouted re-ask never carries one: there the bound is a few hundred bytes above it,
+ * never below (the room never under-counts).
  */
 export function rootPositionRepairRequestBytesBound(input: RootPositionBoundInput): number {
   return rootPositionBodyBytesBound(input, (framed) => buildFramedRepairPrompt(framed, LONGEST_REPAIR_LOCATOR));
@@ -569,8 +575,16 @@ type RootPositionBoundInput = Readonly<{
   questionLanguage?: QuestionLanguage | null;
 }>;
 
-/** The longest typed code (`[A-Z][A-Z0-9_]{0,63}`) and machine path (200 characters) a repair packet may carry. */
-const LONGEST_REPAIR_LOCATOR = Object.freeze({ code: "A".repeat(64), path: "a".repeat(200) });
+/**
+ * The longest typed code (`[A-Z][A-Z0-9_]{0,63}`) and machine path (200 characters) a repair packet may carry, and
+ * (LG-A) the longest plain-word reason, by its bytes once escaped twice (the block, then the body).
+ */
+const LONGEST_REPAIR_LOCATOR = Object.freeze({ code: "A".repeat(64), path: "a".repeat(200),
+  reason: Object.values(CONTENT_FOLLOW_UP_SENTENCES).reduce((longest, sentence) =>
+    (escapedBytes(sentence) > escapedBytes(longest) ? sentence : longest)) });
+function escapedBytes(text: string): number {
+  return Buffer.byteLength(JSON.stringify(JSON.stringify(text)), "utf8");
+}
 
 function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (framed: FramedPrompt) => PromptPacket): number {
   const { answer, points } = input.assignedMaterialChars;

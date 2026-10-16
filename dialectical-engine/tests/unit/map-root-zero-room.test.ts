@@ -4,6 +4,7 @@ import { framedJudgePromptForTest, rootPositionRepairRequestBytesBound, rootPosi
 import { TypedDomainError, questionLanguageForBounds } from "@debateai/kernel";
 import { MAP_LIMITS, mapPromptContractHash } from "@debateai/map";
 import {
+  CONTENT_FOLLOW_UP_SENTENCES,
   buildFramedRepairPrompt,
   lengthRetryTokenCeiling,
   OpenAICompatibleProviderGateway,
@@ -188,6 +189,26 @@ describe("root 0's worst-case call", () => {
         for (const locator of locators) {
           const repair = buildFramedRepairPrompt(framedJudgePromptForTest(leg, QUESTION, "English", claim), locator);
           expect(repairBound).toBeGreaterThanOrEqual(bodyBytes(repair) + 256);
+        }
+      }
+    }
+  });
+
+  it("LG-A (Task 13): a routed full re-ask, which also says in words what is missing, never frames above the repair room", () => {
+    // With the structure-repair route wired (the preview provider config), root 0's full re-ask carries one of the
+    // plain-word sentences (`machine_rejection_reason`, L33) after the longest code and path; locked and unlocked.
+    const assigned = { kind: "assigned-root" as const, assignedAnswer: "\u0001".repeat(rootZeroMapMaterialChars.answer),
+      mapPoints: "\u0001".repeat(rootZeroMapMaterialChars.points) };
+    const longest = { code: `Z${"9".repeat(63)}`, path: "-".repeat(200) };
+    for (const [language, lock] of [["English", null], ["Romanian", { code: "sr-Cyrl", name: "\u0416".repeat(32) }]] as const) {
+      const repairBound = rootZeroRepairRequestBytes({ questionLine: QUESTION, argumentLanguageName: language, completionTokenCeiling: CEILING,
+        questionLanguage: lock });
+      for (const reason of Object.values(CONTENT_FOLLOW_UP_SENTENCES)) {
+        for (const leg of [{ kind: "primary-root" as const }, assigned]) {
+          for (const claim of ["unknown", "resolved"] as const) {
+            const repair = buildFramedRepairPrompt(framedJudgePromptForTest(leg, QUESTION, language, claim, lock), { ...longest, reason });
+            expect(repairBound, `${language} ${leg.kind} ${claim} ${reason}`).toBeGreaterThanOrEqual(bodyBytes(repair) + 256);
+          }
         }
       }
     }
