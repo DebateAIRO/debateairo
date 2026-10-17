@@ -34,7 +34,9 @@ describe("engine 2's vocabulary", () => {
     expect(ENGINE_CALL_SITE_INDEX.max).toBe(ENGINE_VERSION_LIMITS.judgesMax);
     expect(ENGINE_CALL_SITE_INDEX.max).toBe(ENGINE_VERSION_LIMITS.investigationsMax);
     for (const bad of [0, 6, 1.5, Number.NaN, -1]) {
+      expect(() => comparingJudgeCallSiteKey(bad)).toThrow(RangeError);
       expect(() => comparingJudgeCallSiteKey(bad)).toThrow(`ENGINE_CALL_SITE_INDEX_INVALID:${String(bad)}`);
+      expect(() => pointInvestigationCallSiteKey(bad)).toThrow(RangeError);
       expect(() => pointInvestigationCallSiteKey(bad)).toThrow(`ENGINE_CALL_SITE_INDEX_INVALID:${String(bad)}`);
     }
   });
@@ -63,8 +65,14 @@ describe("engine 2's vocabulary", () => {
   });
 
   it("runs the new calls as standard-tier calls with the scheduler's OTHER priority", () => {
+    // FINAL_WRITER needs a final-writer step AND the SYNTHESIZER / EVALUATOR role on its lane, so every such pair is
+    // tried: a new key wrongly read as the answer writer, the checker or a story step would turn FINAL_WRITER here.
     for (const callSiteKey of ["VERDICT:judge:1", "VERDICT:investigate:1", "MAP:check"]) {
-      expect(previewCallTierOf({ callSiteKey, lane: "served", role: "JUDGE" })).toBe("STANDARD");
+      for (const role of ["JUDGE", "SYNTHESIZER", "EVALUATOR"]) {
+        for (const lane of ["served", "story"]) {
+          expect(previewCallTierOf({ callSiteKey, lane, role }), `${callSiteKey} ${role} ${lane}`).toBe("STANDARD");
+        }
+      }
     }
     expect(callPriorityOf("VERDICT:judge:1")).toBe("OTHER");
     expect(callPriorityOf("VERDICT:investigate:1")).toBe("OTHER");

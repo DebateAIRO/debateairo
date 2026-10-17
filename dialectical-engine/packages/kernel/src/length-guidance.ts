@@ -14,7 +14,9 @@
  * back into its form. Health checks, the dormant evaluator lane and the STOPPING row have no step. `lengthCallStepOf`
  * reads which, from the call-site key.
  */
-import { debateRoleFromCallSiteKey, type DebateRole } from "./debate-roles.js";
+import {
+  COMPARING_JUDGE_KEY, POINT_INVESTIGATION_KEY, SEAT_SUFFIX, debateRoleFromCallSiteKey, type DebateRole
+} from "./debate-roles.js";
 
 export const LENGTH_GUIDANCE_STEPS = Object.freeze([
   "opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
@@ -52,9 +54,6 @@ export type LengthCallStep = LengthGuidanceStep | "story_writer" | "map" | "stru
 export const STRUCTURE_REPAIR_CALL_SITE_PREFIX = "REPAIR:STRUCTURE:" as const;
 const STORYTELLER_KEY = /^STORY:STORYTELLER:[1-8]$/u;
 const STORY_CHECKER_KEY = /^STORY:CHECKER:[1-8]$/u;
-/** Engine redesign (engine INTERFACE §4.2): the comparing judges' and the investigator's call-site keys, seats 1-5. */
-const COMPARING_JUDGE_KEY = /^VERDICT:judge:[1-5]$/u;
-const INVESTIGATOR_KEY = /^VERDICT:investigate:[1-5]$/u;
 
 /** The debate role of a call (its call-site key) → its step: one lookup, no branch to forget. */
 const STEP_OF_ROLE: Readonly<Record<DebateRole, LengthGuidanceStep>> = Object.freeze({
@@ -80,9 +79,11 @@ export function lengthCallStepOf(callSiteKey: string, lane?: string): LengthCall
   if (STORYTELLER_KEY.test(callSiteKey)) return storyLane ? "story_writer" : null;
   if (STORY_CHECKER_KEY.test(callSiteKey)) return storyLane ? "story_checker" : null;
   if (callSiteKey.startsWith("MAP:")) return "map";
-  const seatless = callSiteKey.replace(/:seat:(?:main|runnerUp)$/u, "");
+  // Engine redesign (engine INTERFACE §4.2; R2 A2): the comparing judges' and the investigator's keys, 1-5, with the
+  // patterns debate-roles.ts defines once.
+  const seatless = callSiteKey.replace(SEAT_SUFFIX, "");
   if (COMPARING_JUDGE_KEY.test(seatless)) return "comparing_judge";
-  if (INVESTIGATOR_KEY.test(seatless)) return "investigator";
+  if (POINT_INVESTIGATION_KEY.test(seatless)) return "investigator";
   const role = debateRoleFromCallSiteKey(callSiteKey);
   return role === null ? null : STEP_OF_ROLE[role];
 }

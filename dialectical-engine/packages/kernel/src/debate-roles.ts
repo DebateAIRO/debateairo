@@ -37,21 +37,28 @@ export const THINKING_LEVEL_DEFAULT_ONLY = "DEFAULT_ONLY" as const;
 export const MODEL_STRENGTHS = ["ECONOMY", "BALANCED", "BEST"] as const;
 export type ModelStrength = typeof MODEL_STRENGTHS[number];
 
-/** Task P4's seat-aware keys end in this suffix; the role never depends on it. */
-const SEAT_SUFFIX = /:seat:(?:main|runnerUp)$/u;
+/**
+ * Task P4's seat-aware keys end in this suffix; the role never depends on it. Exported so the kernel's other key readers
+ * (length-guidance.ts) strip the same suffix; serve's `seatBaseCallSiteKey` builds and reads the marker itself.
+ */
+export const SEAT_SUFFIX = /:seat:(?:main|runnerUp)$/u;
 /**
  * Engine redesign R2 (spec 2026-10-15 §4.9): a comparing judge (`VERDICT:judge:<1-5>`) and a point investigation
  * (`VERDICT:investigate:<1-5>`; the kernel's engine.ts mints both). Exact keys, so any other `VERDICT:` text stays no role.
+ * Read on the key without its seat suffix; the one definition length-guidance.ts also reads.
  */
-const COMPARING_JUDGE_KEY = /^VERDICT:judge:[1-5]$/u;
-const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-5]$/u;
+export const COMPARING_JUDGE_KEY = /^VERDICT:judge:[1-5]$/u;
+export const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-5]$/u;
 
 /**
- * The role of a LEGACY call, read from its call_site_key (rows written before migration 0090
- * gave the role its own column). The key builders live in apps/runner/src/index.ts and
- * packages/serve/src/synthesis.ts; tests/unit/debate-roles.test.ts lists every shape they
- * build. Anything else — the STOPPING row, lifecycle values, the dormant evaluator lane — is
- * not a debate call and reads as null. PANEL is tested first: a panel key embeds its author's key.
+ * The role of a call, read from its call_site_key (the only source for LEGACY rows written before
+ * migration 0090 gave the role its own column). The key builders live in apps/runner/src/index.ts,
+ * packages/serve/src/synthesis.ts and packages/kernel/src/engine.ts (the comparing judges' and the
+ * point investigations' keys); tests/unit/debate-roles.test.ts lists every shape they build.
+ * Anything else — the STOPPING row, lifecycle values, the dormant evaluator lane — is not a debate
+ * call and reads as null. The two exact VERDICT patterns are tested first (anchored at `VERDICT:`,
+ * they can never match a PANEL key); then PANEL, before the JUDGE prefixes, because a panel key
+ * embeds its author's key.
  */
 export function debateRoleFromCallSiteKey(key: string): DebateRole | null {
   const base = key.replace(SEAT_SUFFIX, "");
