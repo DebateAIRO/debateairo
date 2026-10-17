@@ -38,6 +38,7 @@ import {
   practiceFinishReasonOf,
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
+  practiceMapLengthedOf,
   practiceReplyFormOf,
   practiceReviewEdgeCountOf,
   practiceStepOf,
@@ -413,6 +414,12 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     const messages = await promptMessagesOf(attemptId);
     return messages === null ? null : practiceMapKeyPointIdsOf(messages);
   };
+  /** Length guidance (spec 2026-10-15 §3.9): a map call asked under a length variant, from its own prompt (every MAP: call). */
+  const mapLengthedOf = async (attemptId: string | null, callSiteKey: string): Promise<boolean> => {
+    if (!callSiteKey.startsWith("MAP:")) return false;
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? false : practiceMapLengthedOf(messages);
+  };
   // LG-A (L32): a structure-repair try joins the call it repairs (`practiceTryJoiner`).
   const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
@@ -465,7 +472,7 @@ async function collect(pool: Pool, runId: string): Promise<Pick<PracticeDebateRe
     if (entry.outcome === "OK" && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
       const repair = practiceJsonRepairOf(replyContentOf(stored.rawText), practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key,
-        await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key));
+        await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key), await mapLengthedOf(entry.attempt_id, entry.call_site_key));
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;

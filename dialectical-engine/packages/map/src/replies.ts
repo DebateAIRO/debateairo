@@ -5,7 +5,7 @@ import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs
 import type { MapReplySalvage } from "./salvage.js";
 import { mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
-import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS } from "./types.js";
+import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, mapLimitsFor, type MapLimits } from "./types.js";
 
 /**
  * The map's strict reply schemas and checks. A refusal is the gateway's own repair format: a JSON list of issues, each
@@ -31,64 +31,63 @@ const PATH_MOVING_FIXER_REPAIRS: ReadonlySet<ModelJsonRepair> = new Set<ModelJso
  * the follow-up (or the structure-repair call) keeps it. A name the schema never declares is still dropped.
  */
 const MAP_FIXER_OPTIONS: ReplyFixerOptions = Object.freeze({ keepDeclaredTexts: true });
-const mapText = (max: number) => z.string().trim().min(1).max(max);
-const mapPoint = z.object({
-  claim: mapText(L.claimMaxChars),
-  why_it_matters: mapText(L.whyMaxChars),
-  leans: z.enum(MAP_LEANS)
-}).strict();
-
-export const mapAnglesReplySchema = z.object({
-  // Question-language spec 2026-10-13 (L7, deviation 5): REQUIRED in the answer form, OPTIONAL here. A missing one
-  // records nothing and costs no re-ask. It is a code, never prose: mapAnglesCheck never reads it. Final review M3: it
-  // is measured only, so an unusable one (null, "", an object, more than 35 characters) reads as missing, never as a
-  // schema failure (no patch, no re-ask, no fallback angles). The rest of the reply stays strict.
-  question_language: z.string().trim().min(1).max(35).optional().catch(undefined),
-  angles: z.array(z.object({
-    angle_id: mapId,
-    kind: z.enum(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC"]),
-    label: mapText(L.angleLabelMaxChars),
-    focus: mapText(L.angleFocusMaxChars)
-  }).strict()).min(L.anglesMin).max(L.anglesMax)
-}).strict();
-
-export const mapListReplySchema = z.object({
-  points: z.array(mapPoint).min(L.listPointsMin).max(L.listPointsMax),
-  candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).min(L.listAnswersMin).max(L.listAnswersMax)
-}).strict();
-
-export const mapSnowballReplySchema = z.object({
-  points: z.array(mapPoint).max(L.snowballPointsMax),
-  candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).max(L.snowballAnswersMax)
-}).strict();
-
-export const mapMergeReplySchema = z.object({
-  key_points: z.array(z.object({
-    key_point_id: mapId,
-    claim: mapText(L.claimMaxChars),
-    member_item_ids: z.array(mapId).min(1)
-  }).strict()),
-  answers: z.array(z.object({
-    answer_id: mapId,
-    answer: mapText(L.candidateAnswerMaxChars),
-    member_item_ids: z.array(mapId).min(1)
-  }).strict())
-}).strict();
-
-export const mapGapReplySchema = z.object({
-  new_points: z.array(mapPoint).max(L.gapPointsMax),
-  framing_challenges: z.array(mapText(L.claimMaxChars)).max(L.framingChallengesMax)
-}).strict();
-
-export const mapChooseReplySchema = z.object({
-  answers: z.array(z.object({
-    answer_id: mapId,
-    statement: mapText(L.claimMaxChars),
-    for: z.array(mapId).max(L.choosePointsPerSideMax),
-    against: z.array(mapId).max(L.choosePointsPerSideMax),
-    strongest_rival: mapId.nullable()
-  }).strict()).min(L.chooseAnswersMin).max(L.chooseAnswersMax)
-}).strict();
+/** The map's six strict reply schemas under one set of limits (today's, or the length row's runaway ones). */
+export function mapReplySchemasFor(L: MapLimits) {
+  const mapText = (max: number) => z.string().trim().min(1).max(max);
+  const mapPoint = z.object({ claim: mapText(L.claimMaxChars), why_it_matters: mapText(L.whyMaxChars), leans: z.enum(MAP_LEANS) }).strict();
+  return Object.freeze({
+    angles: z.object({
+      // Question-language spec 2026-10-13 (L7, deviation 5): REQUIRED in the answer form, OPTIONAL here. A missing one
+      // records nothing and costs no re-ask. It is a code, never prose: mapAnglesCheck never reads it. Final review M3: it
+      // is measured only, so an unusable one (null, "", an object, more than 35 characters) reads as missing, never as a
+      // schema failure (no patch, no re-ask, no fallback angles). The rest of the reply stays strict.
+      question_language: z.string().trim().min(1).max(35).optional().catch(undefined),
+      angles: z.array(z.object({
+        angle_id: mapId,
+        kind: z.enum(["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC"]),
+        label: mapText(L.angleLabelMaxChars),
+        focus: mapText(L.angleFocusMaxChars)
+      }).strict()).min(L.anglesMin).max(L.anglesMax)
+    }).strict(),
+    list: z.object({
+      points: z.array(mapPoint).min(L.listPointsMin).max(L.listPointsMax),
+      candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).min(L.listAnswersMin).max(L.listAnswersMax)
+    }).strict(),
+    snowball: z.object({
+      points: z.array(mapPoint).max(L.snowballPointsMax),
+      candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).max(L.snowballAnswersMax)
+    }).strict(),
+    merge: z.object({
+      key_points: z.array(z.object({ key_point_id: mapId, claim: mapText(L.claimMaxChars), member_item_ids: z.array(mapId).min(1) }).strict()),
+      answers: z.array(z.object({ answer_id: mapId, answer: mapText(L.candidateAnswerMaxChars), member_item_ids: z.array(mapId).min(1) }).strict())
+    }).strict(),
+    gap: z.object({
+      new_points: z.array(mapPoint).max(L.gapPointsMax),
+      framing_challenges: z.array(mapText(L.claimMaxChars)).max(L.framingChallengesMax)
+    }).strict(),
+    choose: z.object({
+      answers: z.array(z.object({
+        answer_id: mapId,
+        statement: mapText(L.claimMaxChars),
+        for: z.array(mapId).max(L.choosePointsPerSideMax),
+        against: z.array(mapId).max(L.choosePointsPerSideMax),
+        strongest_rival: mapId.nullable()
+      }).strict()).min(L.chooseAnswersMin).max(L.chooseAnswersMax)
+    }).strict()
+  });
+}
+const TODAYS_SCHEMAS = mapReplySchemasFor(MAP_LIMITS);
+export const mapAnglesReplySchema = TODAYS_SCHEMAS.angles;
+export const mapListReplySchema = TODAYS_SCHEMAS.list;
+export const mapSnowballReplySchema = TODAYS_SCHEMAS.snowball;
+export const mapMergeReplySchema = TODAYS_SCHEMAS.merge;
+export const mapGapReplySchema = TODAYS_SCHEMAS.gap;
+export const mapChooseReplySchema = TODAYS_SCHEMAS.choose;
+/**
+ * Length guidance (spec 2026-10-15 §3.9): the six schemas under the runaway limits, built ONCE (pre-flight PF-C5.13), so every
+ * lengthed spec and the practice re-check read the same objects and the fixer's schema walk sees one identity per step.
+ */
+export const MAP_LENGTHED_REPLY_SCHEMAS = mapReplySchemasFor(mapLimitsFor(true));
 
 export type MapAnglesReply = z.infer<typeof mapAnglesReplySchema>;
 export type MapListReply = z.infer<typeof mapListReplySchema>;

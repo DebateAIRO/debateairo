@@ -19,12 +19,12 @@ import {
  * Code-owned text in every site locale (`MAP_OPPOSITE_TEMPLATES`), read by the tag's primary subtag ("ro-RO" → "ro");
  * a language the site does not serve gets English.
  */
-export function mapOppositeTemplate(statement: string, languageTag: string): string {
+export function mapOppositeTemplate(statement: string, languageTag: string, claimMaxChars: number = MAP_LIMITS.claimMaxChars): string {
   // Own keys only: a tag such as "constructor" must not read the object's prototype.
   const subtag = mapPrimarySubtag(languageTag);
   const template = Object.hasOwn(MAP_OPPOSITE_TEMPLATES, subtag) ? MAP_OPPOSITE_TEMPLATES[subtag]! : MAP_OPPOSITE_TEMPLATES.en!;
   const separator = Object.hasOwn(MAP_OPPOSITE_SEPARATORS, subtag) ? MAP_OPPOSITE_SEPARATORS[subtag]! : ": ";
-  return (statement.trim() === "" ? template.empty : `${template.lead}${separator}${statement.trim()}`).slice(0, MAP_LIMITS.claimMaxChars);
+  return (statement.trim() === "" ? template.empty : `${template.lead}${separator}${statement.trim()}`).slice(0, claimMaxChars);
 }
 
 /**
@@ -60,6 +60,8 @@ export type MapFinishChoiceInput = Readonly<{
   maxAnswers: number;
   /** K: points per answer, used when the code chooses (the fallback). */
   pointsPerAnswer: number;
+  /** Length guidance: a filled answer's limit (today's, or the runaway one with the row). */
+  claimMaxChars?: number;
 }>;
 
 type MapAnswerDraft = {
@@ -181,7 +183,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     const first = drafts[0];
     const [statement, source]: readonly [string, string] = fromMap !== undefined ? [fromMap.answer, "MAP_CANDIDATE"]
       : fromOpposite !== undefined ? [fromOpposite.answer, "OPPOSITE_CASE_LIST"]
-        : [mapOppositeTemplate(first?.statement ?? "", input.languageTag), "TEMPLATE"];
+        : [mapOppositeTemplate(first?.statement ?? "", input.languageTag, input.claimMaxChars ?? MAP_LIMITS.claimMaxChars), "TEMPLATE"];
     drafts.push({ answerId: mintFilledId(), statement, forIds: [], againstIds: [], rival: first?.answerId ?? null, filled: true,
       opposite: source === "OPPOSITE_CASE_LIST" || isOpposite(statement) });
     marks.push(Object.freeze({ mark: "ANSWERS_FILLED", step: "CHOOSE", detail: source }));

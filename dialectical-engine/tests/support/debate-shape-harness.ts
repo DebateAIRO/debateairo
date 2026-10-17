@@ -4,7 +4,7 @@
 // completed (`runShapeDebate`, pre-flight PF-B53: P2L Task 17 calls it too). Plan Task 15 Step 1, written in Task 13.
 import { createHash } from "node:crypto";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { MAP_CONTRACT_IDS, mapPromptContractHash } from "@debateai/map";
+import { mapContractNameOf, mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import { debateShapePolicyStartValues, resolveDebateShape, type DebateShapeCeilingInput, type DebateShapePlanKey } from "@debateai/register";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
@@ -96,9 +96,11 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
   return (request: GateRequest, chat: string): GateOverride | null => {
     if (request.kind === "MAP") {
       const contractId = readFramedMaterial(wirePacket(chat)).contractId;
+      // LG-C Task 14: today's map contract or its length variant, by name (Task 17's lengthed shaped run).
+      const mapName = mapContractNameOf(contractId);
       const prose = mapProseOf(chat);
       const why = prose.why;
-      if (contractId === MAP_CONTRACT_IDS.angles) {
+      if (mapName === "angles") {
         // P2L Task 17: the planner names the question's language first, as its answer form asks (the reader accepts it).
         const code = lockedCodeOf(chat);
         const angle = (angle_id: keyof typeof prose.angles, kind: string) =>
@@ -107,7 +109,7 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
           ...(code === null ? {} : { question_language: code.split("-")[0]!.toLowerCase() }),
           angles: [angle("opp", "OPPOSITE_CASE"), angle("worry", "ASKER_WORRY"), angle("do", "PRACTICAL"), angle("cost", "SPECIFIC")] }) };
       }
-      if (contractId === MAP_CONTRACT_IDS.listAngle || contractId === MAP_CONTRACT_IDS.listOpen || contractId === MAP_CONTRACT_IDS.listSnowball) {
+      if (mapName === "listAngle" || mapName === "listOpen" || mapName === "listSnowball") {
         const label = field(chat, "angle_label") || "open";
         const otherSide = prose.angles.opp[0];
         if (fail.has("LISTS_BUT_ONE") && label !== otherSide) return { content: "not json" };
@@ -118,7 +120,7 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
           { claim: prose.shared, why_it_matters: why, leans: "context" }],
           candidate_answers: [label === otherSide ? prose.keep : prose.first(label)] }) };
       }
-      if (contractId === MAP_CONTRACT_IDS.merge) {
+      if (mapName === "merge") {
         if (options.stopAt === "MERGE") return { gateRefuses: "PREVIEW_TEST_AUTHORITY_STOPPED" };
         if (fail.has("MERGE")) return { content: "not json" };
         const points = JSON.parse(field(chat, "points")) as { item_id: string; claim: string }[];
@@ -128,10 +130,10 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
           key_points: group(points, (row) => row.claim).map(([claim, rows], index) => ({ key_point_id: `k${String(index + 1)}`, claim, member_item_ids: rows.map((row) => row.item_id) })),
           answers: group(answers, (row) => row.answer).map(([answer, rows], index) => ({ answer_id: `a${String(index + 1)}`, answer, member_item_ids: rows.map((row) => row.item_id) })) }) };
       }
-      if (contractId === MAP_CONTRACT_IDS.gap) {
+      if (mapName === "gap") {
         return { content: JSON.stringify({ new_points: [{ claim: prose.missing(digestOf(field(chat, "key_points"))), why_it_matters: why, leans: "context" }], framing_challenges: [] }) };
       }
-      if (contractId === MAP_CONTRACT_IDS.choose) {
+      if (mapName === "choose") {
         if (fail.has("CHOOSE")) return { content: "not json" };
         const keyPoints = (JSON.parse(field(chat, "key_points")) as { key_point_id: string }[]).map((row) => row.key_point_id);
         const answers = JSON.parse(field(chat, "answers")) as { answer_id: string; answer: string }[];

@@ -180,7 +180,7 @@ import {
   type VerdictLabelDerivation
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
-import { MapChoiceRepository, mapAnswersArgued, type MapResult } from "@debateai/map";
+import { MapChoiceRepository, mapAnswersArgued, mapLimitsFor, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
   questionLanguageFromRun,
@@ -241,8 +241,8 @@ import {
   type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRoomAttempts,
-  rootZeroRoomRefs, runMapStage, shapeRootMaterial
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroMapMaterialCharsFor,
+  rootZeroRoomAttempts, rootZeroRoomRefs, runMapStage, shapeRootMaterial
 } from "./map-stage.js";
 import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
@@ -6974,7 +6974,9 @@ export class WalkingSkeletonRunner {
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
           tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
-          lengthed: lengthGuidance !== null }),
+          lengthed: lengthGuidance !== null,
+          // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+          materialChars: rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null)) }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -7001,7 +7003,9 @@ export class WalkingSkeletonRunner {
           serial: !callsRunTogether,
           keepRoomMicros,
           // T12-R1: a refusal only because of root 0's room stops the map, never the arguing.
-          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT
+          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT,
+          // Length guidance (spec 2026-10-15 §3.3): the receipt's numbers size each map call's allowance.
+          lengthGuidance
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
@@ -7009,7 +7013,10 @@ export class WalkingSkeletonRunner {
           const result = await runMapStage({ opening: shapeRun.shape.opening, map: {
             questionLine: run.questionLine, languageName: run.argumentLanguageName, languageTag: run.argumentLanguageTag,
             seats: mapStageSeats(rootSeats, shapeRun.shape.mapAIs), caller: mapCaller, abandon: keepAliveStop, seed: run.runId,
-            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer
+            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer,
+            // Length guidance (spec 2026-10-15 §3.2): the receipt's map targets; absent = today's map.
+            ...(lengthGuidance === null ? {} : { length: Object.freeze({ targets: lengthGuidance.map,
+              charactersPerWord: lengthGuidance.charactersPerWord }) })
           } });
           return Object.freeze({ result, spendStop: mapCaller.spendStop() });
         } catch (error) {
@@ -7251,7 +7258,8 @@ export class WalkingSkeletonRunner {
       if (position === undefined || position.statement === null || position.mapPoints === null) {
         return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
       }
-      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints });
+      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints },
+        rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null)));
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
     };
     const openFirstPosition = async (primarySeat: RunSeat, leg: JudgeLeg = { kind: "primary-root" }) => {

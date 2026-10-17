@@ -467,14 +467,18 @@ function retryAfterOf(error: unknown): number | undefined {
  * answer may take and the level one below the call's own on its row. The room is the request's own guided words
  * (`guidedWords`, set by the runner from the run's frozen numbers, LG-C) x the start values' runaway factor and tokens per
  * word (owner Q-C5: 4 and 3); a call that names none keeps the start words at Standard. The storyteller keeps its own sum
- * (LG-D). Undefined for a call with no step (health checks) and for LG-A's structure-repair call.
+ * (LG-D). A map call's room is its reply's ceiling (`replyWordsCeiling`), never its one-item guided words; a map call with no
+ * ceiling keeps the start sum (pre-flight PF-C5.11). Undefined for a call with no step (health checks) and for LG-A's
+ * structure-repair call.
  */
-export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string; guidedWords?: number }>,
+export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; lane: string; guidedWords?: number; replyWordsCeiling?: number }>,
   reviewed: PreviewModelRow, effort: PreviewEffort): Readonly<{ answerRoomTokens: number; lowerThinkingLevel: string | null }> | undefined {
   const step = lengthCallStepOf(request.callSiteKey, request.lane);
   if (step === null || step === "structure_repair") return undefined;
   const start = LENGTH_GUIDANCE_START;
-  const words = step === "story_writer" ? null : request.guidedWords ?? lengthStartWordsOf(step);
+  const words = step === "story_writer" ? null
+    : step === "map" ? request.replyWordsCeiling ?? lengthStartWordsOf(step)
+      : request.guidedWords ?? lengthStartWordsOf(step);
   const room = words === null
     ? storytellerAnswerRoomTokens(storyShortWordsSum(start.story), start.storyLongReferenceWords, start.tokensPerWord)
     : answerRoomTokens(words, start.runawayMultiplier, start.tokensPerWord);

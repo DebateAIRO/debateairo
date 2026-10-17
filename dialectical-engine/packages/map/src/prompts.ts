@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { languageDirectiveFor, type QuestionLanguage } from "@debateai/kernel";
+import { LENGTH_SENTENCE_PARTS, languageDirectiveFor, type QuestionLanguage } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { MAP_LIMITS } from "./types.js";
 
@@ -112,24 +112,57 @@ export const MAP_ANSWER_FORMS: Readonly<Record<MapContractName, string>> = Objec
   choose: `${STRICT}\n{ "answers": [{ "answer_id": ${ID_FORM}, "statement": non-empty string of at most ${String(L.claimMaxChars)} characters, "for": [key_point_id, ...], "against": [key_point_id, ...], "strongest_rival": answer_id of another answer, or null }, ...] }\nanswers has ${String(L.chooseAnswersMin)} to ${String(L.chooseAnswersMax)} entries (at least ${String(L.chooseDistinctAnswersMin)} when the question allows it); for and against each have at most ${String(L.choosePointsPerSideMax)} entries and use only key_point_id values given in key_points; every answer_id is different.`
 });
 
-/** The seven contracts from the given instruction texts (default: the shipped text). */
-export function mapPromptContracts(texts: MapInstructionTexts = MAP_DEFAULT_INSTRUCTIONS): MapPromptContractSet {
-  const entries = MAP_CONTRACT_NAMES.map((name) => [name, Object.freeze({
-    contractId: MAP_CONTRACT_IDS[name],
-    instruction: texts[name],
-    answerForm: MAP_ANSWER_FORMS[name]
-  })] as const);
+/** Length guidance (spec 2026-10-15 §3.2): the map's seven variants, one per contract, sealed after today's seven. */
+export const MAP_LENGTH_CONTRACT_IDS: Readonly<Record<MapContractName, string>> = Object.freeze({
+  angles: "map.angles.length.v1",
+  listAngle: "map.list.angle.length.v1",
+  listOpen: "map.list.open.length.v1",
+  listSnowball: "map.list.snowball.length.v1",
+  merge: "map.merge.length.v1",
+  gap: "map.gap.length.v1",
+  choose: "map.choose.length.v1"
+});
+
+/** A text a variant's form asks for: no character number, the part's target named in `length` instead (spec §3.2). */
+const LENGTHED = (key: string): string => `non-empty string of about the length named for ${key} in length`;
+const POINT_FORM_LENGTHED = `{ "claim": ${LENGTHED("claim")}, "why_it_matters": ${LENGTHED("why_it_matters")}, "leans": "for_some_answer" | "against_some_answer" | "context" }`;
+const LIST_FORM_LENGTHED = `${STRICT}\n{ "points": [${POINT_FORM_LENGTHED}, ...], "candidate_answers": [${LENGTHED("candidate_answers")}, ...] }\npoints has ${String(L.listPointsMin)} to ${String(L.listPointsMax)} entries; candidate_answers has ${String(L.listAnswersMin)} to ${String(L.listAnswersMax)} entries.`;
+
+/** The variants' answer forms: today's forms with every text limit replaced by its `length` target; ids and counts as today. */
+export const MAP_LENGTH_ANSWER_FORMS: Readonly<Record<MapContractName, string>> = Object.freeze({
+  angles: `${STRICT}\n{ "question_language": FIRST, the two-letter ISO 639-1 code of the language the question in question_line is written in, in lower case, "angles": [{ "angle_id": ${ID_FORM}, "kind": "OPPOSITE_CASE" | "ASKER_WORRY" | "PRACTICAL" | "SPECIFIC", "label": ${LENGTHED("label")}, "focus": ${LENGTHED("focus")} }, ...] }\nangles has ${String(L.anglesMin)} to ${String(L.anglesMax)} entries: exactly one each of OPPOSITE_CASE, ASKER_WORRY and PRACTICAL, and ${String(L.specificAnglesMin)} to ${String(L.specificAnglesMax)} of SPECIFIC; every angle_id is different.`,
+  listAngle: LIST_FORM_LENGTHED,
+  listOpen: LIST_FORM_LENGTHED,
+  listSnowball: `${STRICT}\n{ "points": [${POINT_FORM_LENGTHED}, ...], "candidate_answers": [${LENGTHED("candidate_answers")}, ...] }\npoints has 0 to ${String(L.snowballPointsMax)} entries; candidate_answers has 0 to ${String(L.snowballAnswersMax)} entries.`,
+  merge: `${STRICT}\n{ "key_points": [{ "key_point_id": ${ID_FORM}, "claim": ${LENGTHED("claim")}, "member_item_ids": [item_id, ...] }, ...], "answers": [{ "answer_id": ${ID_FORM}, "answer": ${LENGTHED("answer")}, "member_item_ids": [item_id, ...] }, ...] }\nEvery member_item_ids list has at least one item_id; every item_id appears in exactly one list; every key_point_id and answer_id is different.`,
+  gap: `${STRICT}\n{ "new_points": [${POINT_FORM_LENGTHED}, ...], "framing_challenges": [${LENGTHED("framing_challenges")}, ...] }\nnew_points has 0 to ${String(L.gapPointsMax)} entries; framing_challenges has 0 to ${String(L.framingChallengesMax)} entries.`,
+  choose: `${STRICT}\n{ "answers": [{ "answer_id": ${ID_FORM}, "statement": ${LENGTHED("statement")}, "for": [key_point_id, ...], "against": [key_point_id, ...], "strongest_rival": answer_id of another answer, or null }, ...] }\nanswers has ${String(L.chooseAnswersMin)} to ${String(L.chooseAnswersMax)} entries (at least ${String(L.chooseDistinctAnswersMin)} when the question allows it); for and against each have at most ${String(L.choosePointsPerSideMax)} entries and use only key_point_id values given in key_points; every answer_id is different.`
+});
+
+/** The contract a recorded map call was asked under, by its id: today's or its variant; null for any other id. */
+export function mapContractNameOf(contractId: string): MapContractName | null {
+  return MAP_CONTRACT_NAMES.find((name) => MAP_CONTRACT_IDS[name] === contractId || MAP_LENGTH_CONTRACT_IDS[name] === contractId) ?? null;
+}
+
+/** The seven contracts from the given instruction texts (default: the shipped text); `lengthed`: their length variants. */
+export function mapPromptContracts(texts: MapInstructionTexts = MAP_DEFAULT_INSTRUCTIONS, lengthed = false): MapPromptContractSet {
+  const entries = MAP_CONTRACT_NAMES.map((name) => [name, Object.freeze(lengthed
+    ? { contractId: MAP_LENGTH_CONTRACT_IDS[name], instruction: `${texts[name]} ${LENGTH_SENTENCE_PARTS}`, answerForm: MAP_LENGTH_ANSWER_FORMS[name] }
+    : { contractId: MAP_CONTRACT_IDS[name], instruction: texts[name], answerForm: MAP_ANSWER_FORMS[name] })] as const);
   return Object.freeze(Object.fromEntries(entries) as Record<MapContractName, PromptContract>);
 }
 
-/** The one fingerprint text over all seven (frame version included, via promptContractFingerprintText). */
-export function mapPromptFingerprintText(contracts: MapPromptContractSet = mapPromptContracts()): string {
-  return MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(contracts[name])).join("\n---\n");
+/** The one fingerprint text: today's seven, then the seven length variants (spec 2026-10-15 §3.2), frame version included. */
+export function mapPromptFingerprintText(contracts: MapPromptContractSet = mapPromptContracts(),
+  lengthContracts: MapPromptContractSet = mapPromptContracts(MAP_DEFAULT_INSTRUCTIONS, true)): string {
+  return [...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(contracts[name])),
+    ...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(lengthContracts[name]))].join("\n---\n");
 }
 
-/** The map's contract hash: what Phase 2 seals in the register, and what each map call carries as `contractHash`. */
-export function mapPromptContractHash(contracts: MapPromptContractSet = mapPromptContracts()): string {
-  return createHash("sha256").update(mapPromptFingerprintText(contracts)).digest("hex");
+/** The map's contract hash: what the register seals as mapContractHash, and what each map call carries. */
+export function mapPromptContractHash(contracts: MapPromptContractSet = mapPromptContracts(),
+  lengthContracts: MapPromptContractSet = mapPromptContracts(MAP_DEFAULT_INSTRUCTIONS, true)): string {
+  return createHash("sha256").update(mapPromptFingerprintText(contracts, lengthContracts)).digest("hex");
 }
 
 /** The contract a call sends: the instruction, then the locked language's one sentence (today's directive only for "und"). */

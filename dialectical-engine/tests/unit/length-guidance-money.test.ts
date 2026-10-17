@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PREVIEW_MODEL_ROWS } from "@debateai/providers";
 import {
   answerJobTokenCeilings, computeStructuralCeilingBasis, debateShapePolicyStartValues, lengthGuidanceAllowanceTokens,
-  lengthGuidancePolicyStartValues, lengthGuidedFirstCallCeiling, resolveLengthGuidance
+  lengthGuidancePolicyStartValues, lengthGuidedFirstCallCeiling, resolveDebateShape, resolveLengthGuidance
 } from "@debateai/register";
 import { admittedLengthOf, answerTokenCeilingsForBasis } from "../../apps/api/src/ask-model-picker.js";
 import {
@@ -88,5 +88,35 @@ describe("the hosted picker and the boot checks (spec §3.10)", () => {
     expect(answerJobTokenCeilings(sealed, debateShapePolicyStartValues(), POLICY)).toEqual({ ANSWER_WRITER: 28384, ANSWER_CHECKER: 3848 });
     expect(lengthGuidedFirstCallCeiling(2048, null)).toBe(2048);
     expect(lengthGuidedFirstCallCeiling(2048, POLICY)).toBe(9496);
+  });
+});
+
+/**
+ * LG-C Task 14 (spec 2026-10-15 §3.3, §3.10): a map runs only with the shape, and with the length member each map call asks
+ * the map's thinking room + its reply's runaway answer room (`guidedMapBound`). The largest reply is the gap's: 8 x (35 + 35)
+ * + 3 x 35 = 665 words, so a map call may ask 8,192 + 4 x 665 x 3 = 16,172 tokens. The shaped basis is built as
+ * tests/unit/debate-shape-preview-estimate.test.ts builds its own, with `length:` added.
+ */
+describe("a shaped run with the length member prices the map's allowance (Task 14)", () => {
+  const SHAPE = resolveDebateShape({ policy: debateShapePolicyStartValues(), plan: "pro", makers: 2,
+    settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } })!;
+  const shaped = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, shape: SHAPE });
+  const shapedLengthed = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, shape: SHAPE, length: guidanceAt("standard") });
+
+  it("the preview estimate prices every debate call at least at a map call's allowance, 16,172", () => {
+    expect(previewOutputTokensForBasis(OUTPUT, shapedLengthed).debate).toBe(16172);
+    // Without the shape there is no map: the debate steps' own largest allowance, as before.
+    expect(previewOutputTokensForBasis(OUTPUT, basisAt("standard")).debate).toBe(9144);
+    // Without the length member: today's shaped pricing (the debate output untouched).
+    expect(previewOutputTokensForBasis(OUTPUT, shaped).debate).toBe(OUTPUT.debate);
+  });
+
+  it("the hosted picker seats debaters (POSITION) at least at a map call's allowance", () => {
+    const ceilings = answerTokenCeilingsForBasis(SEALED, shapedLengthed);
+    expect(ceilings.POSITION).toBeGreaterThanOrEqual(16172);
+    expect(ceilings.POSITION).toBe(Math.max(16172, SHAPE.mapMergeBound, SHAPE.mapChooseBound,
+      lengthGuidanceAllowanceTokens(guidanceAt("standard"), "opening", SEALED.POSITION)));
+    // Only POSITION carries the map; every other role is as without the shape (the writer keeps its shape bound).
+    expect(ceilings.SUPPORT_ATTACK).toBe(answerTokenCeilingsForBasis(SEALED, basisAt("standard")).SUPPORT_ATTACK);
   });
 });

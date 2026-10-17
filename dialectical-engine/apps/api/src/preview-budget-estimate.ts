@@ -63,7 +63,7 @@ import {
   type DebateShapeCeilingInput
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
-import { admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
+import { admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
 
 /**
  * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
@@ -1280,7 +1280,7 @@ export function previewShapeWriterBound(basis: Readonly<Record<string, unknown>>
 
 /**
  * The debate steps priced as DEBATE calls (the answer writer and checker are final writers, priced at the row's own
- * maximum since LG-B; the map's allowance is Task 14's; the story's LG-D's).
+ * maximum since LG-B; the map's allowance is priced beside them on a shaped run, `mapLengthAllowanceTokens`; the story's LG-D's).
  */
 const PREVIEW_LENGTH_DEBATE_STEPS = Object.freeze(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer"] as const);
 
@@ -1288,8 +1288,8 @@ const PREVIEW_LENGTH_DEBATE_STEPS = Object.freeze(["opening", "pros_cons", "cros
  * The output tokens one debate is priced at: the gate's, with the answer writer raised to the run's own writer bound
  * and the map's merge and choose to its map step bounds (X1), never below a debate call's. Length guidance (spec
  * 2026-10-15 §3.3, §3.10): with the receipt's `length`, every debate call at the largest guided allowance of its steps, as
- * the runner sends them (the writer and checker need no raise: LG-B prices them at the row's own maximum). Today's
- * receipt: `output` itself.
+ * the runner sends them (the writer and checker need no raise: LG-B prices them at the row's own maximum), and on a
+ * shaped run at least a map call's guided allowance (a map runs only with the shape). Today's receipt: `output` itself.
  */
 export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, basis: Readonly<Record<string, unknown>>): PreviewCallOutputTokens {
   const shape = previewShapeOf(basis);
@@ -1298,8 +1298,9 @@ export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, bas
     mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
   const length = admittedLengthOf(basis);
   if (length === null) return shaped;
+  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate)];
   return Object.freeze({ ...shaped,
-    debate: Math.max(...PREVIEW_LENGTH_DEBATE_STEPS.map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate))) });
+    debate: Math.max(...PREVIEW_LENGTH_DEBATE_STEPS.map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate)), ...mapTokens) });
 }
 
 /** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */

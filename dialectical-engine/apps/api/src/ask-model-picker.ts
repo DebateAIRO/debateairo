@@ -3,7 +3,11 @@ import { z } from "zod";
 import { mostOneRunMaySpendMicros, parseCostEnvelopeBasis, type CostEnvelopeBasis } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
-import { TypedDomainError, type DebateRole, type LengthGuidanceStep, type ModelStrength } from "@debateai/kernel";
+import {
+  LENGTH_ALLOWANCE_LIMITS, TypedDomainError, answerRoomTokens, guidedAllowanceTokens, type DebateRole, type LengthGuidanceStep,
+  type ModelStrength
+} from "@debateai/kernel";
+import { mapLargestReplyWordsCeiling } from "@debateai/map";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   answerJobTokenCeilings,
@@ -155,8 +159,24 @@ export function answerTokenCeilingsForBasis(
   };
   // Length guidance (spec 2026-10-15 §3.3): each role at the allowance the runner sends it (never below the row above).
   if (length === null) return Object.freeze({ ...withShape });
-  return Object.freeze(Object.fromEntries((Object.keys(ROLE_LENGTH_STEPS) as DebateRole[]).map((role) =>
-    [role, lengthGuidanceAllowanceTokens(length, ROLE_LENGTH_STEPS[role], withShape[role])])) as Record<DebateRole, number>);
+  const guided = Object.fromEntries((Object.keys(ROLE_LENGTH_STEPS) as DebateRole[]).map((role) =>
+    [role, lengthGuidanceAllowanceTokens(length, ROLE_LENGTH_STEPS[role], withShape[role])])) as Record<DebateRole, number>;
+  // A shaped run's map calls are made by debaters (POSITION): they ask the map's own allowance (Task 14, `guidedMapBound`).
+  return Object.freeze(shaped === null ? guided
+    : { ...guided, POSITION: Math.max(guided.POSITION, mapLengthAllowanceTokens(length, withShape.POSITION)) });
+}
+
+/**
+ * Length guidance (spec 2026-10-15 §3.3, §3.10): the most a map call asks with the row, from `todayTokens` (the bound it
+ * is raised from): the map's thinking room + the runaway answer room of the largest reply any map contract can hold
+ * (`mapLargestReplyWordsCeiling`), never below `todayTokens`, as the runner's `guidedMapBound` raises each map call. Shared
+ * by the picker and the preview estimate.
+ */
+export function mapLengthAllowanceTokens(length: LengthGuidance, todayTokens: number): number {
+  return guidedAllowanceTokens({ todayTokens, thinkingRoomTokens: length.thinkingRoom.map,
+    answerRoomTokens: answerRoomTokens(mapLargestReplyWordsCeiling({ targets: length.map, charactersPerWord: length.charactersPerWord }),
+      length.runawayMultiplier, length.tokensPerWord),
+    capTokens: LENGTH_ALLOWANCE_LIMITS.capTokens });
 }
 
 /** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */
