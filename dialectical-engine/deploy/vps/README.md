@@ -1034,6 +1034,13 @@ This release adds one migration, `migrations/0120_reply_measures.sql` (after the
 ### Upgrading to length guidance LG-C (the length row)
 
 The length row is OFF until a register version carries the `lengthGuidancePolicy` member (`deploy/vps/register/README.md`).
+
+This release changes three sealed prompt fingerprints (the judges', the answer checker's and the map's), so the runner
+refuses to start on a register version that does not carry this code's fingerprints
+(`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`; and `MAP_CONTRACT_HASH_MISMATCH` when the version carries the debate-shape
+row), with or without the length member. Publish the new version from this release first, whether or not it carries the
+member.
+
 In this order, with no debate running across the switch: let running debates finish and admit none; publish the new version from this release
 (`pnpm register:publish-hosted`, with the member to switch length guidance on, without it to keep today's requests) and
 pin it in `REGISTER_VERSION`; restart the API, then the runner. Rollback: publish a version without the member and restart

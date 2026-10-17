@@ -344,8 +344,9 @@ preview has no such row, so a practice debate runs today's shape unless you ask 
   - The practice asks and argues on that version: both the ask path and the runner read the row from it.
   - The export file is only read. The live register is never reached; the practice has no connection to the live
     database at all.
-- Until the owners publish a register version that carries this code's prompt fingerprints (map `25b4c106…`, judge
-  `aac53407…`, composer `879d2c5d…`; it was `9a46af29…` until answer writer v4, 2026-10-15), every practice debate of this branch runs with `--register-next`, in either
+- Until the owners publish a register version that carries this code's prompt fingerprints (map `d46c0c12…`, judge
+  `810d611a…`, answer checker `108f1b29…`, composer `879d2c5d…`; before length guidance LG-C the map was `25b4c106…`,
+  the judge `aac53407…` and the checker `660ec7cb…`; the composer was `9a46af29…` until answer writer v4, 2026-10-15), every practice debate of this branch runs with `--register-next`, in either
   shape. Without it, a debate in today's shape is refused before it starts (HARNESS_ERROR
   `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`: the live register holds the older fingerprints), and the two shapes would
   not run on the same register rows.

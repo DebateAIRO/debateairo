@@ -233,6 +233,12 @@ those debates would wait with nobody to run them.
   beside a debate-shape row);
 - `nodeRuntimeVersion` keeps its value with a new source reference, as at every publication.
 
+**Length guidance (LG-C) moves three of these seals again.** A register version for this code carries
+`judgeContractHash` `810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee` (was `aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612`),
+`conformanceContractHash` `108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6` (was `660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f`)
+and `mapContractHash` `d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71` (was `25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392`); the
+composer seal is unchanged. It needs them whether or not it carries the `lengthGuidancePolicy` row (`--length-guidance`).
+
 There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
 changed row: stop and ask.
 

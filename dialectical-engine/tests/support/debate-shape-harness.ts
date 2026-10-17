@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import type { DebateShapeSettings } from "@debateai/contract";
 import { mapContractNameOf, mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
-import { debateShapePolicyStartValues, resolveDebateShape, type DebateShapeCeilingInput, type DebateShapePlanKey } from "@debateai/register";
+import { debateShapePolicyStartValues, resolveDebateShape, type DebateShapeCeilingInput, type DebateShapePlanKey, type LengthGuidance } from "@debateai/register";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import {
   OWNER_CALL_CONCURRENCY, PANEL_REFS, RUN_RESILIENCE, type AdmittedRun, type PreviewGates, type PreviewRunnerMoney,
@@ -192,6 +192,8 @@ export type ShapeDebateOptions = Readonly<{
   before?: (request: GateRequest, chat: string) => GateOverride | null;
   /** Plan Task 15 (T12-R0): a hosted runner's money seam and prices. */
   money?: PreviewRunnerMoney;
+  /** LG-C Task 17: the length row's numbers frozen on the receipt; absent, today's receipt. */
+  length?: LengthGuidance;
 }>;
 /** One captured framed packet: its system message and its fenced material fields (P2L Task 17). */
 export type ShapePrompt = Readonly<{ system: string; fields: readonly FramedMaterialField[] }>;
@@ -253,7 +255,8 @@ export async function runShapeDebate(harness: ShapeDebateHarness, options: Shape
   const debate = await harness.admittedRun(options.label ?? "shape", {
     panelRefs: PANEL_REFS, depth, shape, settings,
     ...(options.language === undefined ? {} : { language: options.language }),
-    ...(options.question === undefined ? {} : { question: options.question })
+    ...(options.question === undefined ? {} : { question: options.question }),
+    ...(options.length === undefined ? {} : { length: options.length })
   });
   const scripted = scriptedShapeAnswers(debate.question, options.script ?? {});
   const before = options.before;
