@@ -3,9 +3,9 @@ import type { ReplyLanguageExpectation } from "@debateai/kernel";
 import { decodeModelJson, decodedRepairsOf, fixReplyStructure, parsedWithRepairs, type ContentClassification, type ModelJsonRepair,
   type ModelReplyFacts, type ReplyFixerOptions } from "@debateai/providers";
 import type { MapReplySalvage } from "./salvage.js";
-import { mapNamesInternalWord } from "./internal-words.js";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES, MAP_INTERNAL_FIELD_NAMES, mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText, mapWrongLanguage } from "./text.js";
-import { MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, mapLimitsFor, type MapLimits } from "./types.js";
+import { MAP_ENGINE_LIMITS, MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_RESTS_ON, mapLimitsFor, type MapLimits } from "./types.js";
 
 /**
  * The map's strict reply schemas and checks. A refusal is the gateway's own repair format: a JSON list of issues, each
@@ -96,8 +96,103 @@ export type MapMergeReply = z.infer<typeof mapMergeReplySchema>;
 export type MapGapReply = z.infer<typeof mapGapReplySchema>;
 export type MapChooseReply = z.infer<typeof mapChooseReplySchema>;
 
+/**
+ * ENGINE 2 (spec 2026-10-15 §5.2, INTERFACE §10.2): the v2 twins. A point carries `rests_on` (required); a merged key
+ * point carries the merger's `rests_on`; choose's answers carry 0..3 assumptions and the reply 0..2 reserve answers
+ * (both optional: a missing list is none); the check's reply is one entry per id shown, each with the REQUIRED nullable
+ * `cost_can_be_named` (D4b's third question; null only for a premise challenge; FINAL Ruling D4(b) encoding, deviation
+ * 12). Read with LG-C's runaway limits.
+ */
+export function mapReplySchemasV2For(L: MapLimits) {
+  const today = mapReplySchemasFor(L);
+  const mapText = (max: number) => z.string().trim().min(1).max(max);
+  const restsOn = z.enum(MAP_RESTS_ON);
+  const point = z.object({ claim: mapText(L.claimMaxChars), why_it_matters: mapText(L.whyMaxChars), leans: z.enum(MAP_LEANS),
+    rests_on: restsOn }).strict();
+  const sides = { for: z.array(mapId).max(L.choosePointsPerSideMax), against: z.array(mapId).max(L.choosePointsPerSideMax) };
+  const assumptions = z.array(mapText(L.claimMaxChars)).max(MAP_ENGINE_LIMITS.assumptionsMax).optional();
+  return Object.freeze({
+    angles: today.angles,
+    list: z.object({
+      points: z.array(point).min(L.listPointsMin).max(L.listPointsMax),
+      candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).min(L.listAnswersMin).max(L.listAnswersMax)
+    }).strict(),
+    snowball: z.object({
+      points: z.array(point).max(L.snowballPointsMax),
+      candidate_answers: z.array(mapText(L.candidateAnswerMaxChars)).max(L.snowballAnswersMax)
+    }).strict(),
+    merge: z.object({
+      key_points: z.array(z.object({ key_point_id: mapId, claim: mapText(L.claimMaxChars), rests_on: restsOn,
+        member_item_ids: z.array(mapId).min(1) }).strict()),
+      answers: z.array(z.object({ answer_id: mapId, answer: mapText(L.candidateAnswerMaxChars), member_item_ids: z.array(mapId).min(1) }).strict())
+    }).strict(),
+    gap: z.object({
+      new_points: z.array(point).max(L.gapPointsMax),
+      framing_challenges: z.array(mapText(L.claimMaxChars)).max(L.framingChallengesMax)
+    }).strict(),
+    choose: z.object({
+      answers: z.array(z.object({ answer_id: mapId, statement: mapText(L.claimMaxChars), ...sides, strongest_rival: mapId.nullable(),
+        assumptions }).strict()).min(L.chooseAnswersMin).max(L.chooseAnswersMax),
+      reserve_answers: z.array(z.object({ statement: mapText(L.claimMaxChars), ...sides, assumptions }).strict())
+        .max(MAP_ENGINE_LIMITS.reservesMax).optional()
+    }).strict(),
+    check: z.object({
+      checks: z.array(z.object({
+        check_id: z.string().regex(/^(a[1-4]|c[1-4])$/u),
+        answers_question: z.boolean(),
+        adds_unstated_fact: z.boolean(),
+        // (pre-flight PF-R3-2.2, FINAL Ruling D4(b) encoding) REQUIRED, nullable: never `.optional()`.
+        cost_can_be_named: z.boolean().nullable(),
+        reason: mapText(L.claimMaxChars).nullable()
+      }).strict()).min(1).max(MAP_ENGINE_LIMITS.checkIdsMax)
+    }).strict()
+  });
+}
+/**
+ * (pre-flight PF-R3-2.10) Built ONCE, like LG-C's MAP_LENGTHED_REPLY_SCHEMAS (pre-flight PF-C5.13): every engine-2 spec
+ * (Task 6) and the practice re-check (Task 17) read these same objects, so the fixer's schema walk sees one identity per step.
+ */
+export const MAP_ENGINE_REPLY_SCHEMAS = mapReplySchemasV2For(mapLimitsFor(true));
+/** INTERFACE §10.2's names for the v2 twins. */
+export const mapListReplySchemaV2 = MAP_ENGINE_REPLY_SCHEMAS.list;
+export const mapSnowballReplySchemaV2 = MAP_ENGINE_REPLY_SCHEMAS.snowball;
+export const mapMergeReplySchemaV2 = MAP_ENGINE_REPLY_SCHEMAS.merge;
+export const mapGapReplySchemaV2 = MAP_ENGINE_REPLY_SCHEMAS.gap;
+export const mapChooseReplySchemaV2 = MAP_ENGINE_REPLY_SCHEMAS.choose;
+export const mapCheckReplySchema = MAP_ENGINE_REPLY_SCHEMAS.check;
+export type MapListReplyV2 = z.infer<typeof mapListReplySchemaV2>;
+export type MapSnowballReplyV2 = z.infer<typeof mapSnowballReplySchemaV2>;
+export type MapMergeReplyV2 = z.infer<typeof mapMergeReplySchemaV2>;
+export type MapGapReplyV2 = z.infer<typeof mapGapReplySchemaV2>;
+export type MapChooseReplyV2 = z.infer<typeof mapChooseReplySchemaV2>;
+export type MapCheckReply = z.infer<typeof mapCheckReplySchema>;
+
 export type MapReplyIssue = Readonly<{ path: readonly (string | number)[]; code: string }>;
 export type MapReplyCheck<T> = (value: T) => readonly MapReplyIssue[];
+
+/** Engine 2 (P2.3, INTERFACE §10.5): `exactLimits` keeps zod's limit members, so the follow-up states the exact limit. */
+export type MapClassifyOptions = Readonly<{ exactLimits?: boolean }>;
+
+/** zod's members `issueSizeLimit` (packages/providers/src/prompt-frame.ts) reads to state a limit. */
+const LIMIT_MEMBERS = Object.freeze(["maximum", "minimum", "origin", "inclusive", "exact"] as const);
+
+/**
+ * One refusal entry per zod issue. Without `exactLimits`: today's `{ code, path, message: "SCHEMA_FAILED" }`, byte for
+ * byte. With it: the same plus zod's limit members; and an id that fails its form (a regex) becomes the content code
+ * MAP_ID_FORM (its plain sentence states the id rule), or MAP_CHECK_UNKNOWN_ID for a check id.
+ */
+function mapSchemaIssues(issues: readonly z.core.$ZodIssue[], options: MapClassifyOptions): readonly Record<string, unknown>[] {
+  return issues.map((issue) => {
+    const path = issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment)));
+    if (options.exactLimits !== true) return { code: issue.code, path, message: "SCHEMA_FAILED" };
+    const last = path.at(-1);
+    if (issue.code === "invalid_format" && (issue as { format?: unknown }).format === "regex") {
+      return { code: "custom", path, message: last === "check_id" ? "MAP_CHECK_UNKNOWN_ID" : "MAP_ID_FORM" };
+    }
+    const limits = Object.fromEntries(LIMIT_MEMBERS.flatMap((member) => (member in issue ? [[member, (issue as unknown as Record<string, unknown>)[member]]] : [])));
+    return { code: issue.code, path, message: "SCHEMA_FAILED", ...limits };
+  });
+}
 
 /**
  * Reads one reply: the shared tolerant decode (code fence, outermost object, inner straight quote, closing brackets on
@@ -117,17 +212,16 @@ export type MapReplyCheck<T> = (value: T) => readonly MapReplyIssue[];
  * merges into (pre-flight PF-A30, ruling R5).
  */
 export function mapClassifyReply<T>(content: string, reply: ModelReplyFacts | undefined, schema: z.ZodType<T>,
-  check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): Readonly<{ classification: ContentClassification; value: T | null;
+  check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}, options: MapClassifyOptions = {}): Readonly<{ classification: ContentClassification; value: T | null;
   repairs: readonly ModelJsonRepair[] }> {
   const refused = (classification: ContentClassification) => Object.freeze({ classification, value: null, repairs: Object.freeze([]) });
   const decoded = decodeModelJson(content, reply);
   if (!decoded.ok) return refused({ parseStatus: "PARSE_FAILED", parseError: "MAP_REPLY_NOT_JSON" });
   const before = salvage.decoded?.(decoded.value) ?? { value: decoded.value, repairs: [] };
   const first = schema.safeParse(before.value);
-  /** One reading's schema refusal in the gateway's repair format: `{ code, path, message: "SCHEMA_FAILED" }` per issue. */
+  /** One reading's schema refusal in the gateway's repair format (engine 2 with `exactLimits`: zod's limit members kept). */
   const schemaRefusal = (result: typeof first) => refused({ parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(
-    result.success ? [] : result.error.issues.map((issue) => ({ code: issue.code,
-      path: issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment))), message: "SCHEMA_FAILED" }))) });
+    result.success ? [] : mapSchemaIssues(result.error.issues, options)) });
   // LG-A (spec 2026-10-15, L31): the reply fixer, after the step's own salvage, on what the schema refused.
   let parsed = first;
   let fixerRepairs: readonly ModelJsonRepair[] = [];
@@ -181,14 +275,17 @@ export const mapAnglesCheck: MapReplyCheck<MapAnglesReply> = (value) => {
 };
 
 /** Points and candidate answers are read apart, each field judged on all its texts joined, at the field's path. */
-export function mapListCheck(expected: ReplyLanguageExpectation): MapReplyCheck<MapListReply | MapSnowballReply> {
+export function mapListCheck(expected: ReplyLanguageExpectation): MapReplyCheck<Readonly<{ points: readonly Readonly<{ claim: string;
+  why_it_matters: string }>[]; candidate_answers: readonly string[] }>> {
   return (value) => [
     ...mapLanguageIssues(value.points.flatMap((point) => [point.claim, point.why_it_matters]), expected, ["points"]),
     ...mapLanguageIssues(value.candidate_answers, expected, ["candidate_answers"])
   ];
 }
 
-export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<MapMergeReply> {
+export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<Readonly<{
+  key_points: readonly Readonly<{ key_point_id: string; claim: string; member_item_ids: readonly string[] }>[];
+  answers: readonly Readonly<{ answer_id: string; answer: string; member_item_ids: readonly string[] }>[] }>> {
   return (value) => {
     const issues: MapReplyIssue[] = [];
     const usedItems = new Set<string>();
@@ -217,41 +314,116 @@ export function mapMergeCheck(pointIds: ReadonlySet<string>, answerIds: Readonly
   };
 }
 
-export function mapGapCheck(expected: ReplyLanguageExpectation): MapReplyCheck<MapGapReply> {
+export function mapGapCheck(expected: ReplyLanguageExpectation): MapReplyCheck<Readonly<{ new_points: readonly Readonly<{ claim: string;
+  why_it_matters: string }>[] }>> {
   return (value) => mapLanguageIssues(value.new_points.flatMap((point) => [point.claim, point.why_it_matters]), expected, ["new_points"]);
 }
 
+/**
+ * Today's per-answer rules (ids, sides, rival, words, duplicates, internal words), for any field-name list: the body of
+ * today's `mapChooseCheck` (`replies.ts:224-257`, R1c part 2) moved as it is, its loop `:229-253` byte for byte except
+ * `mapNamesInternalWord(answer.statement, names)` (pre-flight PF-R3-2.5: the complete body, no placeholder).
+ */
+function mapChooseAnswerIssues(answers: readonly Readonly<{ answer_id: string; statement: string; for: readonly string[];
+  against: readonly string[]; strongest_rival: string | null }>[], keyPointIds: ReadonlySet<string>, names: readonly string[]): MapReplyIssue[] {
+  const issues: MapReplyIssue[] = [];
+  const ids = answers.map((answer) => answer.answer_id);
+  const statements = new Set<string>();
+  answers.forEach((answer, index) => {
+    if (ids.indexOf(answer.answer_id) !== index) issues.push({ path: ["answers", index, "answer_id"], code: "MAP_ANSWER_ID_REUSED" });
+    const seen = new Set<string>();
+    for (const side of ["for", "against"] as const) {
+      answer[side].forEach((id, at) => {
+        if (!keyPointIds.has(id)) issues.push({ path: ["answers", index, side, at], code: "MAP_UNKNOWN_KEY_POINT_ID" });
+        else if (seen.has(id)) issues.push({ path: ["answers", index, side, at], code: "MAP_KEY_POINT_REPEATED" });
+        seen.add(id);
+      });
+    }
+    const rival = answer.strongest_rival;
+    if (rival !== null && (rival === answer.answer_id || !ids.includes(rival))) {
+      issues.push({ path: ["answers", index, "strongest_rival"], code: "MAP_UNKNOWN_RIVAL" });
+    }
+    // A statement that normalises to nothing (only signs: no letter or digit) duplicates nothing, and is no answer at
+    // all (final review M-3): refused at its own statement, so the repair re-asks that member.
+    const statement = mapNormaliseText(answer.statement);
+    if (statement === "") issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NO_WORDS" });
+    if (statement !== "" && statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
+    // Practice 2026-10-15: a statement that talks about the prompt's own fields (angle_focus, key_point_id …) or an item id
+    // is about the engine, not the question, and a chosen statement is shown as it is: refused at its own statement,
+    // like MAP_ANSWER_NO_WORDS, so the repair re-asks that member. Never edited.
+    if (mapNamesInternalWord(answer.statement, names)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NAMES_FIELD" });
+    if (statement !== "") statements.add(statement);
+  });
+  return issues;
+}
+
 export function mapChooseCheck(keyPointIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<MapChooseReply> {
+  return (value) => [
+    ...mapChooseAnswerIssues(value.answers, keyPointIds, MAP_INTERNAL_FIELD_NAMES),
+    ...mapLanguageIssues(value.answers.map((answer) => answer.statement), expected, ["answers"])
+  ];
+}
+
+/**
+ * ENGINE 2 (spec §5.2 items 2-3): today's rules for the answers, with engine 2's internal words, plus the assumptions
+ * (words, no internal word) and the reserves (words, no internal word, no repeat of a chosen answer or of each other,
+ * known key points each once). The language check reads each field's texts together (ruling R-3).
+ */
+export function mapChooseCheckV2(keyPointIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplyCheck<MapChooseReplyV2> {
+  const names = MAP_ENGINE_INTERNAL_FIELD_NAMES;
   return (value) => {
-    const issues: MapReplyIssue[] = [];
-    const ids = value.answers.map((answer) => answer.answer_id);
-    const statements = new Set<string>();
-    value.answers.forEach((answer, index) => {
-      if (ids.indexOf(answer.answer_id) !== index) issues.push({ path: ["answers", index, "answer_id"], code: "MAP_ANSWER_ID_REUSED" });
+    const issues: MapReplyIssue[] = [...mapChooseAnswerIssues(value.answers, keyPointIds, names)];
+    const textIssues = (text: string, path: readonly (string | number)[]): void => {
+      if (mapNormaliseText(text) === "") issues.push({ path, code: "MAP_ANSWER_NO_WORDS" });
+      else if (mapNamesInternalWord(text, names)) issues.push({ path, code: "MAP_ANSWER_NAMES_FIELD" });
+    };
+    value.answers.forEach((answer, index) => (answer.assumptions ?? []).forEach((text, at) => textIssues(text, ["answers", index, "assumptions", at])));
+    const taken = new Set(value.answers.map((answer) => mapNormaliseText(answer.statement)).filter((key) => key !== ""));
+    (value.reserve_answers ?? []).forEach((reserve, index) => {
+      const key = mapNormaliseText(reserve.statement);
+      textIssues(reserve.statement, ["reserve_answers", index, "statement"]);
+      if (key !== "" && taken.has(key)) issues.push({ path: ["reserve_answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
+      if (key !== "") taken.add(key);
       const seen = new Set<string>();
       for (const side of ["for", "against"] as const) {
-        answer[side].forEach((id, at) => {
-          if (!keyPointIds.has(id)) issues.push({ path: ["answers", index, side, at], code: "MAP_UNKNOWN_KEY_POINT_ID" });
-          else if (seen.has(id)) issues.push({ path: ["answers", index, side, at], code: "MAP_KEY_POINT_REPEATED" });
+        reserve[side].forEach((id, at) => {
+          if (!keyPointIds.has(id)) issues.push({ path: ["reserve_answers", index, side, at], code: "MAP_UNKNOWN_KEY_POINT_ID" });
+          else if (seen.has(id)) issues.push({ path: ["reserve_answers", index, side, at], code: "MAP_KEY_POINT_REPEATED" });
           seen.add(id);
         });
       }
-      const rival = answer.strongest_rival;
-      if (rival !== null && (rival === answer.answer_id || !ids.includes(rival))) {
-        issues.push({ path: ["answers", index, "strongest_rival"], code: "MAP_UNKNOWN_RIVAL" });
-      }
-      // A statement that normalises to nothing (only signs: no letter or digit) duplicates nothing, and is no answer at
-      // all (final review M-3): refused at its own statement, so the repair re-asks that member.
-      const statement = mapNormaliseText(answer.statement);
-      if (statement === "") issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NO_WORDS" });
-      if (statement !== "" && statements.has(statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_DUPLICATE" });
-      // Practice 2026-10-15: a statement that talks about the prompt's own fields (angle_focus, key_point_id …) or an item id
-      // is about the engine, not the question, and a chosen statement is shown as it is: refused at its own statement,
-      // like MAP_ANSWER_NO_WORDS, so the repair re-asks that member. Never edited.
-      if (mapNamesInternalWord(answer.statement)) issues.push({ path: ["answers", index, "statement"], code: "MAP_ANSWER_NAMES_FIELD" });
-      if (statement !== "") statements.add(statement);
+      (reserve.assumptions ?? []).forEach((text, at) => textIssues(text, ["reserve_answers", index, "assumptions", at]));
     });
-    issues.push(...mapLanguageIssues(value.answers.map((answer) => answer.statement), expected, ["answers"]));
+    issues.push(...mapLanguageIssues([...value.answers.flatMap((answer) => [answer.statement, ...(answer.assumptions ?? [])])], expected, ["answers"]));
+    issues.push(...mapLanguageIssues((value.reserve_answers ?? []).flatMap((reserve) => [reserve.statement, ...(reserve.assumptions ?? [])]),
+      expected, ["reserve_answers"]));
+    return issues;
+  };
+}
+
+/**
+ * ENGINE 2 (spec §5.2 item 5, INTERFACE §10.4 as superseded by the FINAL D4(b) ruling, deviation 12): one entry per id
+ * shown, each once (MAP_CHECK_UNKNOWN_ID, MAP_CHECK_ID_REPEATED, MAP_CHECK_ID_MISSING), and a reason for every answer
+ * that fails ANY of the three tests (MAP_CHECK_REASON_MISSING): it does not answer, it adds an unstated fact, or no cost
+ * of following it can be named (`cost_can_be_named === false`; null is the checker's own premise exemption, no failure).
+ * The reasons' language is checked together. Code never decides a pass or a fail (G1): it only checks the reply's form.
+ */
+export function mapCheckCheck(shownIds: readonly string[], expected: ReplyLanguageExpectation): MapReplyCheck<MapCheckReply> {
+  return (value) => {
+    const issues: MapReplyIssue[] = [];
+    const seen = new Set<string>();
+    value.checks.forEach((entry, index) => {
+      if (!shownIds.includes(entry.check_id)) issues.push({ path: ["checks", index, "check_id"], code: "MAP_CHECK_UNKNOWN_ID" });
+      else if (seen.has(entry.check_id)) issues.push({ path: ["checks", index, "check_id"], code: "MAP_CHECK_ID_REPEATED" });
+      seen.add(entry.check_id);
+      // (pre-flight PF-R3-2.2, FINAL Ruling D4(b) encoding) any failed test, the third included.
+      const fails = !entry.answers_question || entry.adds_unstated_fact || entry.cost_can_be_named === false;
+      if (fails && (entry.reason === null || mapNormaliseText(entry.reason) === "")) {
+        issues.push({ path: ["checks", index, "reason"], code: "MAP_CHECK_REASON_MISSING" });
+      }
+    });
+    if (shownIds.some((id) => !seen.has(id))) issues.push({ path: ["checks"], code: "MAP_CHECK_ID_MISSING" });
+    issues.push(...mapLanguageIssues(value.checks.flatMap((entry) => (entry.reason === null ? [] : [entry.reason])), expected, ["checks"]));
     return issues;
   };
 }

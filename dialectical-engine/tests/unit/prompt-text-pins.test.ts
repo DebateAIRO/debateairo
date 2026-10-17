@@ -880,8 +880,14 @@ describe("LG-A — the structure-repair contract and the follow-up sentences", (
       MAP_UNKNOWN_ITEM_ID: "The earlier answer lists an item id that is not in the material.",
       MAP_UNKNOWN_KEY_POINT_ID: "The earlier answer cites a key point id that is not in the material.",
       MAP_UNKNOWN_RIVAL: "The earlier answer names as its strongest rival an answer that is not one of its other answers.",
+      // R3: the engine-2 map's five
+      MAP_ID_FORM: "The earlier answer gives an id the form does not allow: an id is 1 to 24 characters, lowercase letters, digits and hyphens.",
+      MAP_CHECK_UNKNOWN_ID: "The earlier answer checks an answer id that was not shown.",
+      MAP_CHECK_ID_REPEATED: "The earlier answer checks the same answer id more than once.",
+      MAP_CHECK_ID_MISSING: "The earlier answer leaves out an answer that was shown, so not every answer was checked.",
+      MAP_CHECK_REASON_MISSING: "The earlier answer says an answer fails a check but gives no reason for it.",
       DEFAULT: "The earlier answer did not meet the answer form at the listed place."
     });
-    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(15);
+    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(20);
   });
 });
