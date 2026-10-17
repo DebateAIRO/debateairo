@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -11,12 +12,14 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
 
 /**
  * Every engine-2 sealed contract, append-only in phase order, never reordered (INTERFACE §2.2, §2.5). R1d: none, so the
- * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2 appends
- * verdict.judge.v1 and verdict.investigate.v1; R3 the map v2 contracts and the assigned-root v2 pair; R4 the writer's
- * and checker's engine pair. A phase that appends moves tests/unit/engine-contract-hash.test.ts's two pins.
+ * fingerprint text is the header alone (deviation 2: the story v4 contracts are test-pinned, not sealed). R2a appends
+ * verdict.investigate.v1 and R2b verdict.judge.v1 (R2 plan deviation 1); R3 the map v2 contracts and the assigned-root
+ * v2 pair; R4 the writer's and checker's engine pair. A phase that appends moves ENGINE_SEALED_IDS and
+ * ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
-  return Object.freeze([]);
+  // Append-only, in phase order: R2a seals the investigation (spec §4.2b); R2b appends verdict.judge.v1 (B1).
+  return Object.freeze([POINT_INVESTIGATION_PROMPT_CONTRACT]);
 }
 
 /** The ids of engineSealedContracts(), in order (pinned by tests/unit/engine-contract-hash.test.ts). */

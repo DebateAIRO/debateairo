@@ -1088,6 +1088,13 @@ runner (which keeps its engine settings on that version) finishes the engine-2 d
 running, publish a version without the member if you want the row gone: a runner on a version without the member refuses an
 engine-2 debate (`ENGINE_RUNNER_UNCONFIGURED`).
 
+### Upgrading to the engine redesign R2a (the engine seal and migration 0121)
+
+A register version for this code carries the code-owned `engineContractHash` row with `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` (was
+`b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`): R2a seals the investigation's prompt contract.
+Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version
+from this release as for any release.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,

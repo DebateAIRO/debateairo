@@ -950,6 +950,7 @@ packages/invoice-smartbill/src/index.ts
 packages/judgement/src/engine-repository.ts
 packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
+packages/judgement/src/investigation.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
