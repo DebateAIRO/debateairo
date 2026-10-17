@@ -49,11 +49,14 @@ import {
   readEngineVersion,
   readStoryPolicy,
   debateShapePolicyStartValues,
+  engineVersionPolicyRow,
+  engineVersionPolicyStartValues,
   lengthGuidancePolicyStartValues,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
+import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
 
 const EXAMPLE_PATH = new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url);
@@ -1732,5 +1735,85 @@ describe("I4 · the readiness check reads the sealed questionLanguagePolicy row"
     const languageAt = body.indexOf("assertHostedQuestionLanguageBootReady(pool, version)");
     expect(shapeAt).toBeGreaterThan(0);
     expect(languageAt).toBeGreaterThan(shapeAt);
+  });
+});
+
+describe("engine redesign R1d: the optional engineVersionPolicy member (INTERFACE §1.6)", () => {
+  /** The members as an operator writes them: each row's start values without `kind`. */
+  const engineMember = (): Record<string, unknown> => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(engineVersionPolicyStartValues())) as Record<string, unknown>;
+    return member;
+  };
+  const lengthMember = (): Record<string, unknown> => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) as Record<string, unknown>;
+    return member;
+  };
+  const codeOf = (file: Record<string, unknown>) => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)))
+    .then(() => "NO_REFUSAL", (error: unknown) => (error as { code?: string }).code);
+
+  it("no member: no row and no line; the seal is a code-owned row of every plan, the code's own", async () => {
+    const without = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    expect(without.rows.map((row) => row.rowKey)).not.toContain("engineVersionPolicy");
+    expect(without.rows.filter((row) => row.rowKey === "engineContractHash").map((row) => JSON.parse(row.valueJsonText) as unknown))
+      .toEqual([engineContractHash()]);
+    expect(renderHostedRegisterPlan(without)).not.toMatch(/^engine_version/mu);
+  });
+
+  it("with the length member: one ADDITIVE row, the publishers' own, and the plan says so; everything else as the length-only plan", async () => {
+    const parsed = parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: lengthMember(), engineVersionPolicy: engineMember() }));
+    const plan = await planHostedRegisterPublication(parsed);
+    const expected = engineVersionPolicyRow(engineVersionPolicyStartValues(), parsed.sourceRef);
+    expect(plan.rows.filter((row) => row.rowKey === "engineVersionPolicy"))
+      .toEqual([{ rowKey: expected.rowKey, valueJsonText: expected.valueJsonText, sourceRef: expected.sourceRef }]);
+    const lengthOnly = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: lengthMember() })));
+    expect(plan.rows.filter((row) => row.rowKey !== "engineVersionPolicy")).toEqual(lengthOnly.rows);
+    const text = renderHostedRegisterPlan(plan);
+    expect(text).toMatch(/^engine_version=present \(also needs lengthGuidancePolicy; engineContractHash is code-owned\)$/mu);
+    const strip = (lines: string) => lines.split("\n").filter((line) => !/^(engine_version=|row_keys=|row_count=|snapshot_sha256=|publication_id=)/u.test(line));
+    expect(strip(text)).toEqual(strip(renderHostedRegisterPlan(lengthOnly)));
+    // Switched off without dropping the row: the member's own `enabled: false` (debates admitted before still finish).
+    const off = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: lengthMember(),
+      engineVersionPolicy: { ...engineMember(), enabled: false } })));
+    expect((JSON.parse(off.rows.find((row) => row.rowKey === "engineVersionPolicy")!.valueJsonText) as { enabled?: boolean }).enabled).toBe(false);
+  });
+
+  it.each([
+    ["a member carrying the row's kind", () => ({ ...engineMember(), kind: "ENGINE_VERSION_POLICY" })],
+    ["a member present as JSON null", () => null],
+    ["a member that is an array", () => []],
+    ["a member the register's parser refuses (six comparing judges)", () => ({ ...engineMember(), judges: { ...(engineMember().judges as object), count: 6 } })],
+    ["an unknown field", () => ({ ...engineMember(), notes: "x" })]
+  ])("refuses an engineVersionPolicy member with %s before anything is sealed", async (_name, member) => {
+    expect(await codeOf({ ...validFile(), lengthGuidancePolicy: lengthMember(), engineVersionPolicy: member() })).toBe("HOSTED_REGISTER_ENGINE_VERSION_INVALID");
+  });
+
+  it("refuses the member without the file's lengthGuidancePolicy, enabled or not (the runner would refuse to boot)", async () => {
+    expect(await codeOf({ ...validFile(), engineVersionPolicy: engineMember() })).toBe("HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH");
+    expect(await codeOf({ ...validFile(), engineVersionPolicy: { ...engineMember(), enabled: false } })).toBe("HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH");
+  });
+
+  it("the boot readiness asks the runner's engine boot read, after the length row's read", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
+    const body = source.slice(source.indexOf("export async function verifyHostedRegisterBootReadiness("),
+      source.indexOf("export function createPostgresHostedRegisterOperations("));
+    const lengthAt = body.indexOf("await readLengthGuidancePolicy(pool, version);");
+    const engineAt = body.indexOf("await readEngineRunnerSettings(pool, version);");
+    expect(lengthAt).toBeGreaterThan(0);
+    expect(engineAt).toBeGreaterThan(lengthAt);
+  });
+
+  it("both runbooks name the member without its kind; the register's names its refusals and the plan line", async () => {
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const lines = [registerReadme, runbook].flatMap((text) => text.split("\n").filter((line) => line.includes("`engineVersionPolicy`")));
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    for (const line of lines) expect(line).not.toContain("\"kind\"");
+    expect(registerReadme).toContain("the plan prints `engine_version=present`");
+    expect(registerReadme).toContain("`HOSTED_REGISTER_ENGINE_VERSION_INVALID`");
+    expect(registerReadme).toContain("`HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH`");
+    expect(runbook).toContain("### Upgrading to the engine row");
+    for (const code of ["ENGINE_REQUIRES_LENGTH_POLICY", "ENGINE_CONTRACT_HASH_UNSEALED", "ENGINE_CONTRACT_HASH_MISMATCH", "ENGINE_RUNNER_UNCONFIGURED"]) {
+      expect(runbook, code).toContain(`\`${code}\``);
+    }
   });
 });

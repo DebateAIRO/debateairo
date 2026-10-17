@@ -49,9 +49,13 @@ import {
   DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy, debateShapeInForce, type DebateShapePolicy,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyRow, parseQuestionLanguagePolicy, type QuestionLanguagePolicy,
   LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, parseLengthGuidancePolicy, type LengthGuidancePolicy,
+  ENGINE_CONTRACT_HASH_ROW_KEY, parseEngineContractHash, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyRow,
+  engineVersionPolicyStartValues, parseEngineVersionPolicy, type EngineVersionPolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
+import { resolveEngineRunnerSettings } from '../../../apps/runner/src/engine-boot.js';
+import { engineContractHash } from '../../../apps/runner/src/engine-contracts.js';
 import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
 import { parseProviderDiscoveryTargets } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
@@ -96,7 +100,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
  * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key that the source leaves out is
  * carried from the base unchanged (R19: a plan that does not name the value keeps the current one); it is never dropped.
  */
-export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY] as const);
+export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY] as const);
 
 /** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
@@ -146,11 +150,14 @@ const sourceKeysReviewed = (keys:readonly string[]) => {
  * a time); `debateShape` the operator's optional debate shape policy (default null: no row, today's shape; 'off': the
  * row published disabled, the start values with enabled false — P2b Task 6); `questionLanguage` the operator's optional
  * question-language policy (default null: no row, the code's start values; the owners switch the fast check off with
- * `fastCheck: null`, P2L Task 12); `lengthGuidance` the owners' optional length guidance (default null: no row; LG-C).
+ * `fastCheck: null`, P2L Task 12); `lengthGuidance` the owners' optional length guidance (default null: no row; LG-C);
+ * `engineVersion` the operator's optional engine row (default null: no row, engine 1; 'off': the start
+ * values with enabled false, so the row stays and a runner still finishes the engine-2 debates admitted before; engine redesign
+ * R1d), checked by the register's own parser (ENGINE_VERSION_POLICY_INVALID).
  * All are checked before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID,
  * DEBATE_SHAPE_POLICY_INVALID, QUESTION_LANGUAGE_POLICY_INVALID or LENGTH_GUIDANCE_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
@@ -162,6 +169,10 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const languageRows=questionLanguage===null?[]:[questionLanguagePolicyRow(questionLanguage,'question-language spec 2026-10-13 (owner rulings L1-L8); owner 2026-10-13')];
   // Length guidance (LG-C): the register's own parser refuses a malformed policy here, before any row is built.
   const lengthRows=lengthGuidance===null?[]:[lengthGuidancePolicyRow(lengthGuidance,'length guidance spec 2026-10-15 (owner rulings L1-L36); owner 2026-10-15')];
+  // Engine redesign (R1d; INTERFACE §1.6): 'off' = the START VALUES with enabled false (this function never sees the base),
+  // so the row stays present, disabled: the API admits engine 1 and a runner still finishes the engine-2 debates admitted
+  // before. The register's own parser refuses a malformed policy here, before any row is built.
+  const engineRows=engineVersion===null?[]:[engineVersionPolicyRow(engineVersion==='off'?{...engineVersionPolicyStartValues(),enabled:false}:engineVersion,'docs/superpowers/specs/2026-10-15-engine-redesign-design.md; owner 2026-10-15')];
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -187,7 +198,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     // Question language (spec 2026-10-13): only when the operator supplied a policy.
     ...languageRows,
     // Length guidance (LG-C, spec 2026-10-15 §3.1): only when the operator supplied a policy.
-    ...lengthRows];
+    ...lengthRows,
+    // Engine redesign (spec 2026-10-15 §3): only when the operator supplied a policy (or 'off').
+    ...engineRows];
   if(!sourceKeysReviewed(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
@@ -258,6 +271,23 @@ function assertQuestionLanguageBootableV2(rows:readonly RegisterPublicationRow[]
     {kind:'PREVIEW',fetch:(async()=>fail('question-language-boot-check-never-calls')) as typeof fetch});
 }
 
+/**
+ * Engine redesign (R1d; INTERFACE §1.5, §2.3): the runner's own engine boot read, asked of composed rows (source and
+ * carried alike) before anything is sealed. No engineVersionPolicy row = engine 1: neither the length row nor the seal is
+ * read. A row, enabled or not, needs the length row and this code's engineContractHash, or it refuses by the runner's own
+ * code (ENGINE_REQUIRES_LENGTH_POLICY / ENGINE_CONTRACT_HASH_UNSEALED / ENGINE_CONTRACT_HASH_MISMATCH). Kit v3 asks it too.
+ */
+export function assertPreviewEngineBootRows(rows:readonly RegisterPublicationRow[]):void {
+  const map=new Map(rows.map(row=>[row.rowKey,row]));
+  const engine=map.get(ENGINE_VERSION_POLICY_ROW_KEY);
+  if(engine===undefined)return;
+  const seal=map.get(ENGINE_CONTRACT_HASH_ROW_KEY);
+  resolveEngineRunnerSettings({policy:parseEngineVersionPolicy(JSON.parse(engine.valueJsonText)),
+    lengthPolicyPresent:map.has(LENGTH_GUIDANCE_POLICY_ROW_KEY),
+    engineContractHash:seal===undefined?null:parseEngineContractHash(JSON.parse(seal.valueJsonText)),
+    codeEngineContractHash:engineContractHash()});
+}
+
 export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
   const source=canonicalRows(input.sourceRows),base=canonicalRows(input.baseRows);
   const baseRegisterVersion=parseRegisterVersionText(input.baseRegisterVersion);
@@ -277,6 +307,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
   }
   // Any other base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
@@ -287,6 +318,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
   internalAllowancePolicyFromValue(JSON.parse(internal.valueJsonText),internal.sourceRef);
   const rows=canonicalRows([...source,...owned.map(key=>baseMap.get(key)!),...carried]);
   assertQuestionLanguageBootableV2(rows);
+  assertPreviewEngineBootRows(rows);
   const delta:SnapshotDeltaV2[]=[];
   for(const row of source){
     const old=baseMap.get(row.rowKey);

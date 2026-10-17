@@ -34,6 +34,8 @@ import {
   callConcurrencyPolicyRow,
   debateShapePolicyRow,
   debateShapePolicyStartValues,
+  engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
   readQuestionLanguagePolicy,
@@ -631,6 +633,23 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
     expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED" });
     // The error carries the sealed version's result (the CLI prints it as HOSTED_REGISTER_NOT_BOOT_READY).
+    expect((failure as HostedRegisterBootCheckFailedError).result.outcome).toBe("CREATED");
+    expect(await versionCount()).toBe(before + 1);
+  }, 120_000);
+
+  it("a version sealing engineVersionPolicy without its lengthGuidancePolicy (a hand-made plan) is sealed, then refused ENGINE_REQUIRES_LENGTH_POLICY", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    // A first publication imports the historical bootstrap, so the count below measures the hand-made version alone.
+    expect((await publishHostedRegister({ plan: await planOf(hostedFile()), operations })).outcome).toBe("CREATED");
+    const { kind: _engineKind, ...engine } = JSON.parse(JSON.stringify(engineVersionPolicyStartValues())) as Record<string, unknown>;
+    const { kind: _lengthKind, ...length } = JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planOf({ ...hostedFile(), lengthGuidancePolicy: length, engineVersionPolicy: engine });
+    expect(plan.rows.some((row) => row.rowKey === "engineVersionPolicy")).toBe(true);
+    const handMade = { ...plan, publicationId: randomUUID(), rows: plan.rows.filter((row) => row.rowKey !== "lengthGuidancePolicy") };
+    const before = await versionCount();
+    const failure = await publishHostedRegister({ plan: handMade, operations }).then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
+    expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:ENGINE_REQUIRES_LENGTH_POLICY" });
     expect((failure as HostedRegisterBootCheckFailedError).result.outcome).toBe("CREATED");
     expect(await versionCount()).toBe(before + 1);
   }, 120_000);

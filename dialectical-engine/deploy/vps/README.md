@@ -1066,6 +1066,28 @@ numbers finish with them. To roll the CODE back to the release before this one (
 runs, then re-pin `REGISTER_VERSION` to the version published before the three new seals (on the preview: 14) as well,
 and restart both: the older runner refuses this release's seals the other way (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`).
 
+### Upgrading to the engine row
+
+Not before the program's switch-on release: engine 2's AI wording (the story v4 texts) awaits the owners' approval, and the
+comparing judges, investigations and answer check arrive in R2-R3. Until then publish no version with this member.
+
+The engine row (`engineVersionPolicy`, engine redesign spec 2026-10-15 §3) switches new debates to engine 2. It stays OFF
+until a register version carries the member (`deploy/vps/register/README.md`), and that version must carry the length row
+(`lengthGuidancePolicy`) too. Every version this release publishes already seals `engineContractHash`, the code's engine
+seal (the runner reads it only beside the engine row), so there is no separate step for it. In this order, with no debate
+running across the switch:
+
+1. Let running debates finish and admit none.
+2. Publish the new version from this release (`pnpm register:publish-hosted`) with BOTH members, `lengthGuidancePolicy` and
+   `engineVersionPolicy`: the plan prints `length_guidance=present` and `engine_version=present`. A file with the engine member
+   and without the length member is refused (`HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH`). Pin the version in `REGISTER_VERSION`.
+3. Restart the API, then the runner.
+
+Rollback: publish a version whose member carries `"enabled": false` and restart the API: every new debate is engine 1, and the
+runner (which keeps its engine settings on that version) finishes the engine-2 debates admitted before. Only once none is
+running, publish a version without the member if you want the row gone: a runner on a version without the member refuses an
+engine-2 debate (`ENGINE_RUNNER_UNCONFIGURED`).
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
@@ -1923,6 +1945,7 @@ version must carry, besides the algorithm's own rows:
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
+| `engineVersionPolicy` | optional, only with `lengthGuidancePolicy`: without it every debate is engine 1; the API reads it at start-up (`ENGINE_VERSION_POLICY_INVALID:<path>`, `ENGINE_REQUIRES_LENGTH_POLICY`), the runner reads it raw with `engineContractHash`. Not before the program's switch-on release ("Upgrading to the engine row" above) |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
@@ -1994,6 +2017,10 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `DEBATE_SHAPE_MAP_HASH_UNSEALED` | the version seals a `debateShapePolicy` row without its `mapContractHash` row (a hand-made version, or one sealed by an older publisher): the runner refuses to start on it, and the publish's boot check refuses it as `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED` after sealing (`HOSTED_REGISTER_NOT_BOOT_READY`): pin nothing; publish again from this code, whose plan seals `mapContractHash`. |
 | `MAP_CONTRACT_HASH_MISMATCH` / `MAP_CONTRACT_HASH_INVALID` | the version's sealed `mapContractHash` is not this runner's map prompts (a version published from other code), or is not a 64-character hex hash: the runner refuses to start, and the publish's boot check says so as `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`: pin nothing; deploy the runner that matches the version, or publish again from the deployed code. |
 | `DEBATE_SHAPE_RUNNER_UNCONFIGURED` | a run admitted with the debate shape was claimed by a runner without the shape settings (no sealed map hash, or no call scheduler): the run is refused. Restart the runner on the register version that seals the `debateShapePolicy` row (with `mapContractHash`), then ask again. |
+| `HOSTED_REGISTER_ENGINE_VERSION_INVALID` / `HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH` | the file's optional `engineVersionPolicy` is not an object, carries `kind`, or the register's own parser refuses it; or the file carries it without `lengthGuidancePolicy`. Nothing was sealed. |
+| `ENGINE_REQUIRES_LENGTH_POLICY` | the version's engine row has no length row beside it (a hand-made version): the API refuses to start when the row is in force, the runner whenever the row is there, and the publish's boot check refuses it as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ENGINE_REQUIRES_LENGTH_POLICY` after sealing: pin nothing; publish again with both members. |
+| `ENGINE_CONTRACT_HASH_UNSEALED` / `ENGINE_CONTRACT_HASH_MISMATCH` / `ENGINE_CONTRACT_HASH_INVALID` | the version seals the engine row without its `engineContractHash` row, with one that is not this runner's engine contracts (a version published from other code), or with one that is not a 64-character hex hash: the runner refuses to start, and the publish's boot check says so as `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`: pin nothing; deploy the runner that matches the version, or publish again from the deployed code. |
+| `ENGINE_RUNNER_UNCONFIGURED` | a debate admitted with engine 2 was claimed by a runner without the engine settings (its version has no engine row): the debate is refused. Restart the runner on the version that seals the `engineVersionPolicy` row (enabled or `"enabled": false`), then ask again. |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
