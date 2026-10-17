@@ -62,7 +62,7 @@ describe("--length-policy (spec §3.7, ruling L22)", () => {
       try { parsePracticeLengthPolicyText(text); expect.unreachable(); } catch (error) {
         expect(error).toMatchObject({ code: "PRACTICE_LENGTH_POLICY_INVALID" });
         // Task 9 review 8: the whole message is the code and the path, nothing else.
-        expect(String((error as Error).message)).toMatch(new RegExp(`^PRACTICE_LENGTH_POLICY_INVALID: ${detail.replace("$", "\\$")}$`, "u"));
+        expect(String((error as Error).message)).toMatch(new RegExp(`^PRACTICE_LENGTH_POLICY_INVALID: ${detail.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}$`, "u"));
         expect(String((error as Error).message)).not.toContain("99");
       }
     }
