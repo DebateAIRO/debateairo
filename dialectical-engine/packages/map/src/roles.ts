@@ -85,6 +85,17 @@ export function mapPickChooser(order: readonly MapSeat[], out: ReadonlySet<strin
 }
 
 /**
+ * Engine redesign (spec 2026-10-15 §5.2 item 5, INTERFACE §10.4): the answer checker — an available seat of a maker other
+ * than the chooser's, the cyclic order from the chooser's seat (the same rotation the other picks use). With no chooser
+ * (no seat could choose) the planner's seat, as for any first pick. Null when only the chooser's maker is left: the check
+ * is then unavailable (MAP_CHECK_UNAVAILABLE), never made by the chooser's own maker.
+ */
+export function mapPickChecker(order: readonly MapSeat[], out: ReadonlySet<string>, chooser: MapSeat | null): MapSeat | null {
+  if (chooser === null) return mapPickPlanner(order, out);
+  return mapRotateSeats(order, mapIndexOf(order, chooser) + 1).find((seat) => !out.has(seat.aiRef) && seat.maker !== chooser.maker) ?? null;
+}
+
+/**
  * Round `round` (1-based) of the gap AI (spec §1.1): a maker that did not merge, rotating. A maker that wrote no list is
  * preferred when one exists (fix round 1: a maker, not a seat). Three tiers, each in the cyclic order from the merger:
  * a seat whose maker wrote no list; then a seat that wrote no list; then the rest. Never the merger's maker.

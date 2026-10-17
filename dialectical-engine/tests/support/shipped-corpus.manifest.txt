@@ -985,6 +985,7 @@ packages/mail-templates/src/locales.ts
 packages/mail-templates/src/order-text.ts
 packages/mail-templates/src/render.ts
 packages/mail-templates/src/templates.ts
+packages/map/src/check.ts
 packages/map/src/choose.ts
 packages/map/src/index.ts
 packages/map/src/internal-words.ts
