@@ -1,9 +1,10 @@
-import { mapNamesInternalWord } from "./internal-words.js";
+import { MAP_INTERNAL_FIELD_NAMES, mapNamesInternalWord } from "./internal-words.js";
 import { mapRankKeyPoints, mapRankMergedAnswers } from "./items.js";
 import { MAP_OPPOSITE_SEPARATORS, MAP_OPPOSITE_TEMPLATES } from "./opposite-templates.js";
-import type { MapChooseReply } from "./replies.js";
+import type { MapChooseReply, MapChooseReplyV2 } from "./replies.js";
 import { mapNormaliseText, mapPrimarySubtag } from "./text.js";
 import {
+  MAP_ENGINE_LIMITS,
   MAP_LIMITS,
   type MapAnswerItem,
   type MapChoice,
@@ -11,7 +12,8 @@ import {
   type MapKeyPoint,
   type MapMarkRecord,
   type MapMergedAnswer,
-  type MapNoteRecord
+  type MapNoteRecord,
+  type MapReserveAnswer
 } from "./types.js";
 
 /**
@@ -51,7 +53,7 @@ export function mapAnswersArgued(answerCount: number): boolean {
 
 export type MapFinishChoiceInput = Readonly<{
   /** The choose AI's checked reply, or null when the step failed (MAP_CHOOSE_FALLBACK). */
-  reply: MapChooseReply | null;
+  reply: MapChooseReply | MapChooseReplyV2 | null;
   keyPoints: readonly MapKeyPoint[];
   mergedAnswers: readonly MapMergedAnswer[];
   items: readonly MapItem[];
@@ -62,7 +64,21 @@ export type MapFinishChoiceInput = Readonly<{
   pointsPerAnswer: number;
   /** Length guidance: a filled answer's limit (today's, or the runaway one with the row). */
   claimMaxChars?: number;
+  /**
+   * Engine redesign (spec 2026-10-15 §5.2 rule 4; deviation 5): "NONE" never puts a point on a side by code — a code-
+   * chosen answer, a code-filled answer and a quota fill get UNSIDED points raised instead. Absent = "LEAN" (engine 1).
+   */
+  siding?: "LEAN" | "NONE";
+  /**
+   * Engine 2: the internal words the skip reads (MAP_ENGINE_INTERNAL_FIELD_NAMES); absent = engine 1's. Pass the frozen
+   * constant itself, never a copy: Task 3's pattern cache is keyed by the array, so a fresh array compiles and caches a
+   * new pattern on every call (pre-flight PF-R33.12).
+   */
+  internalNames?: readonly string[];
 }>;
+
+/** One chosen answer of either choose reply (engine 1's, or engine 2's with its optional assumptions). */
+type MapChooseReplyAnswer = (MapChooseReply | MapChooseReplyV2)["answers"][number];
 
 type MapAnswerDraft = {
   /**
@@ -77,6 +93,10 @@ type MapAnswerDraft = {
   filled: boolean;
   /** The answer came from the opposite case: a merged answer with fromOppositeCase, an OPPOSITE_CASE candidate, or the OPPOSITE_CASE_LIST fill. */
   opposite: boolean;
+  /** Engine 2: the chooser's assumptions for this answer ([] for a code-made answer, and always under engine 1). */
+  assumptions: string[];
+  /** Engine 2: key point ids dealt to this answer UNSIDED ("points raised"); always [] under engine 1. */
+  raised: string[];
 };
 
 const mapSideOf = (keyPoint: MapKeyPoint): "for" | "against" =>
@@ -102,28 +122,28 @@ function mapFirstOfEachStatement<T>(entries: readonly T[], statement: (entry: T)
 const hasWords = (text: string): boolean => mapNormaliseText(text) !== "";
 
 /**
- * Practice 2026-10-15: a text a person may read as a chosen answer or a point: it has words and names no internal field
- * or item id (`mapNamesInternalWord`). Anything else is skipped whole, never edited.
- */
-const readable = (text: string): boolean => hasWords(text) && !mapNamesInternalWord(text);
-
-/**
  * The operator-only note for what the choice left out because it names an internal field or item id: how many key points
  * (never dealt, never "also raised") and merged answers (never chosen, never filled). Null when there were none.
  */
-export function mapInternalWordsSkipped(keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[]): MapNoteRecord | null {
-  const points = keyPoints.filter((keyPoint) => mapNamesInternalWord(keyPoint.claim)).length;
-  const answers = mergedAnswers.filter((answer) => mapNamesInternalWord(answer.answer)).length;
+export function mapInternalWordsSkipped(keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[],
+  names: readonly string[] = MAP_INTERNAL_FIELD_NAMES): MapNoteRecord | null {
+  const points = keyPoints.filter((keyPoint) => mapNamesInternalWord(keyPoint.claim, names)).length;
+  const answers = mergedAnswers.filter((answer) => mapNamesInternalWord(answer.answer, names)).length;
   if (points + answers === 0) return null;
   return Object.freeze({ note: "INTERNAL_WORDS_SKIPPED", step: "CHOOSE", detail: `key points ${String(points)}, answers ${String(answers)}` });
 }
 
 export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice: MapChoice; marks: readonly MapMarkRecord[] }> {
   const marks: MapMarkRecord[] = [];
+  const noSiding = input.siding === "NONE";
+  const names = input.internalNames ?? MAP_INTERNAL_FIELD_NAMES;
+  const named = (text: string): boolean => mapNamesInternalWord(text, names);
+  /** Final review M-3 and practice 2026-10-15: words, and no internal field or item id (engine 2: engine 2's words). */
+  const readable = (text: string): boolean => hasWords(text) && !named(text);
   // Practice 2026-10-15: a key point whose claim names an internal field or item id is never dealt to an answer (its claim
   // would be a debater's consideration) nor listed as also raised: as if it were not shown, the rule below for any id the
   // chooser was not shown. A merged answer or list answer that names one is never chosen or filled, like one with no words.
-  const keyPoints = input.keyPoints.filter((keyPoint) => !mapNamesInternalWord(keyPoint.claim));
+  const keyPoints = input.keyPoints.filter((keyPoint) => !named(keyPoint.claim));
   const ranked = mapRankKeyPoints(keyPoints);
   const byId = new Map(keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
   // The answer ids are a1..aN with N at most chooseAnswersMax (0117's CHECK), whatever the caller's P says.
@@ -142,9 +162,12 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   const isOpposite = (statement: string) => oppositeTexts.has(mapNormaliseText(statement));
   // F-I3: a chooser that reworded an opposite-case merged answer but reused its answer_id still names that answer.
   const oppositeAnswerIds = new Set(input.mergedAnswers.filter((answer) => answer.fromOppositeCase).map((answer) => answer.answerId));
-  const place = (draft: MapAnswerDraft, keyPoint: MapKeyPoint) =>
+  // Spec §5.2 rule 4: under "NONE" code never sides a point; what it would have dealt is raised to the writer unsided.
+  const place = (draft: MapAnswerDraft, keyPoint: MapKeyPoint) => {
+    if (noSiding) { draft.raised.push(keyPoint.keyPointId); return; }
     (mapSideOf(keyPoint) === "against" ? draft.againstIds : draft.forIds).push(keyPoint.keyPointId);
-  const countOf = (draft: MapAnswerDraft) => draft.forIds.length + draft.againstIds.length;
+  };
+  const countOf = (draft: MapAnswerDraft) => draft.forIds.length + draft.againstIds.length + draft.raised.length;
   const drafts: MapAnswerDraft[] = [];
 
   if (input.reply === null) {
@@ -154,14 +177,16 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       (answer) => answer.answer).slice(0, Math.max(1, maxAnswers));
     candidates.forEach((answer, index) => {
       drafts.push({ answerId: `a${String(index + 1)}`, statement: answer.answer, forIds: [], againstIds: [], rival: null, filled: false,
-        opposite: isOpposite(answer.answer) });
+        opposite: isOpposite(answer.answer), assumptions: [], raised: [] });
     });
   } else {
     // The choose check refuses such a statement (MAP_ANSWER_NAMES_FIELD); one that reached here anyway is dropped, never shown.
-    const replyAnswers = input.reply.answers.filter((answer) => !mapNamesInternalWord(answer.statement));
+    // Typed as either reply's answer, so the engine-2 `assumptions` member below is read by narrowing, never by a cast.
+    const replyAnswers: readonly MapChooseReplyAnswer[] = input.reply.answers.filter((answer) => !named(answer.statement));
     for (const answer of mapFirstOfEachStatement(replyAnswers, (entry) => entry.statement).slice(0, maxAnswers)) {
       drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: shownKeyPoints(answer.for), againstIds: shownKeyPoints(answer.against),
-        rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement) });
+        rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement),
+        assumptions: noSiding && "assumptions" in answer ? (answer.assumptions ?? []).filter(readable) : [], raised: [] });
     }
   }
 
@@ -185,7 +210,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       : fromOpposite !== undefined ? [fromOpposite.answer, "OPPOSITE_CASE_LIST"]
         : [mapOppositeTemplate(first?.statement ?? "", input.languageTag, input.claimMaxChars ?? MAP_LIMITS.claimMaxChars), "TEMPLATE"];
     drafts.push({ answerId: mintFilledId(), statement, forIds: [], againstIds: [], rival: first?.answerId ?? null, filled: true,
-      opposite: source === "OPPOSITE_CASE_LIST" || isOpposite(statement) });
+      opposite: source === "OPPOSITE_CASE_LIST" || isOpposite(statement), assumptions: [], raised: [] });
     marks.push(Object.freeze({ mark: "ANSWERS_FILLED", step: "CHOOSE", detail: source }));
   }
 
@@ -198,7 +223,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   }
 
   // Quotas over the whole chosen set (spec §1.1, as ruled 2026-10-12).
-  const chosenIds = () => new Set(drafts.flatMap((draft) => [...draft.forIds, ...draft.againstIds]));
+  const chosenIds = () => new Set(drafts.flatMap((draft) => [...draft.forIds, ...draft.againstIds, ...draft.raised]));
   const quota = (name: string, eligible: (keyPoint: MapKeyPoint) => boolean, toOppositeAnswer: boolean) => {
     const chosen = chosenIds();
     if ([...chosen].some((id) => { const keyPoint = byId.get(id); return keyPoint !== undefined && eligible(keyPoint); })) return;
@@ -210,7 +235,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     const onOppositeAnswer = toOppositeAnswer && opposite.length > 0;
     const pool = onOppositeAnswer ? opposite : drafts;
     const target = [...pool].sort((a, b) => countOf(a) - countOf(b))[0]!;
-    if (onOppositeAnswer) target.forIds.push(pick.keyPointId);
+    if (onOppositeAnswer) { if (noSiding) target.raised.push(pick.keyPointId); else target.forIds.push(pick.keyPointId); }
     else place(target, pick);
     marks.push(Object.freeze({ mark: "CHOOSE_QUOTA_FILLED", step: "CHOOSE", detail: `${name}:${pick.keyPointId}` }));
   };
@@ -219,6 +244,17 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   quota("SINGLE_AI", (keyPoint) => keyPoint.makers.length === 1, false);
   quota("OPPOSITE_CASE", (keyPoint) => keyPoint.fixedAngleKinds.includes("OPPOSITE_CASE"), true);
   quota("ASKER_WORRY", (keyPoint) => keyPoint.fixedAngleKinds.includes("ASKER_WORRY"), false);
+
+  // Engine 2 (spec §5.2 item 3): choose's reserve answers, in its order, renamed r1/r2; one that repeats a chosen answer
+  // or names an internal word is left out (the check refuses both; this holds for any reply).
+  const chosenKeys = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
+  const reserveReplies = noSiding && input.reply !== null && "reserve_answers" in input.reply ? input.reply.reserve_answers ?? [] : [];
+  const reserves: MapReserveAnswer[] = reserveReplies
+    .filter((reserve) => readable(reserve.statement) && !chosenKeys.has(mapNormaliseText(reserve.statement)))
+    .slice(0, MAP_ENGINE_LIMITS.reservesMax)
+    .map((reserve, index) => Object.freeze({ reserveId: index === 0 ? "r1" as const : "r2" as const, statement: reserve.statement,
+      forKeyPointIds: Object.freeze(shownKeyPoints(reserve.for)), againstKeyPointIds: Object.freeze(shownKeyPoints(reserve.against)),
+      assumptions: Object.freeze((reserve.assumptions ?? []).filter(readable)) }));
 
   // Ruling T7-PRIV: the answers are renamed a1..aN in choice order (filled ones too), and each strongest rival with them.
   // A rival that names no chosen answer (or the answer itself) becomes the next answer, as before.
@@ -232,15 +268,46 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       forKeyPointIds: Object.freeze([...draft.forIds]),
       againstKeyPointIds: Object.freeze([...draft.againstIds]),
       strongestRival: mapChosenAnswerCodeId(rival),
-      filled: draft.filled
+      filled: draft.filled,
+      ...(noSiding ? { assumptions: Object.freeze([...draft.assumptions]), pointsRaised: Object.freeze([...draft.raised]) } : {})
     });
   });
   const finalChosen = chosenIds();
+  const choice: MapChoice = Object.freeze({
+    answers: Object.freeze(answers),
+    alsoRaised: Object.freeze(ranked.filter((keyPoint) => !finalChosen.has(keyPoint.keyPointId)).map((keyPoint) => keyPoint.keyPointId)),
+    ...(noSiding ? { reserves: Object.freeze(reserves) } : {})
+  });
   return Object.freeze({
-    choice: Object.freeze({
-      answers: Object.freeze(answers),
-      alsoRaised: Object.freeze(ranked.filter((keyPoint) => !finalChosen.has(keyPoint.keyPointId)).map((keyPoint) => keyPoint.keyPointId))
-    }),
+    // Engine 2: an answer with no sided points (code-chosen, code-filled) gets the most-raised points still free, unsided.
+    choice: noSiding ? mapFillPointsRaised({ choice, keyPoints, pointsPerAnswer: input.pointsPerAnswer, internalNames: names }) : choice,
     marks: Object.freeze(marks)
+  });
+}
+
+/**
+ * ENGINE 2 (spec 2026-10-15 §5.2 rule 4): each answer with NO sided points gets the most-raised key points nobody holds
+ * yet, UNSIDED ("points raised"), dealt round-robin in answer order up to K each; then "also raised" is what is left.
+ * Pure. Never puts a point for or against an answer. Used by choose and by the answer check after a replacement.
+ */
+export function mapFillPointsRaised(input: Readonly<{ choice: MapChoice; keyPoints: readonly MapKeyPoint[]; pointsPerAnswer: number;
+  internalNames: readonly string[] }>): MapChoice {
+  const ranked = mapRankKeyPoints(input.keyPoints.filter((keyPoint) => !mapNamesInternalWord(keyPoint.claim, input.internalNames)));
+  const raised = input.choice.answers.map((answer) => [...(answer.pointsRaised ?? [])]);
+  const held = new Set(input.choice.answers.flatMap((answer, index) => [...answer.forKeyPointIds, ...answer.againstKeyPointIds, ...raised[index]!]));
+  const open = input.choice.answers.flatMap((answer, index) => (answer.forKeyPointIds.length + answer.againstKeyPointIds.length === 0 ? [index] : []));
+  let turn = 0;
+  for (const keyPoint of ranked) {
+    if (held.has(keyPoint.keyPointId)) continue;
+    const withRoom = open.filter((index) => raised[index]!.length < input.pointsPerAnswer);
+    if (withRoom.length === 0) break;
+    raised[withRoom[turn % withRoom.length]!]!.push(keyPoint.keyPointId);
+    held.add(keyPoint.keyPointId);
+    turn += 1;
+  }
+  return Object.freeze({
+    ...input.choice,
+    answers: Object.freeze(input.choice.answers.map((answer, index) => Object.freeze({ ...answer, pointsRaised: Object.freeze(raised[index]!) }))),
+    alsoRaised: Object.freeze(ranked.filter((keyPoint) => !held.has(keyPoint.keyPointId)).map((keyPoint) => keyPoint.keyPointId))
   });
 }
