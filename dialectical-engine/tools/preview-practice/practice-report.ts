@@ -22,7 +22,7 @@ import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-l
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
-import { practiceStoryLengthLines, type PracticeStoryJsonBreakRow, type PracticeStoryLengthRow } from "./practice-story-length.js";
+import { practiceStoryLengthFromSamples, practiceStoryLengthLines, type PracticeStoryJsonBreakRow, type PracticeStoryLengthRow } from "./practice-story-length.js";
 import { practiceStoryEngineLines, type PracticeStoryBackupRow, type PracticeStoryReadyRate, type PracticeStoryRoundRow } from "./practice-story-rounds.js";
 import { practiceLengthLines, practiceTokenLines, type PracticeLengthRow, type PracticeTokenRow } from "./practice-tokens.js";
 import {
@@ -364,6 +364,8 @@ export function formatsReport(input: Readonly<{
       ...repairTotals(repairKinds),
       jsonRepairs: jsonRepairs.length
     }),
+    // Length guidance (LG-D): the story jobs' words per field and unreadable replies (absent without a story job).
+    ...(practiceStoryLengthFromSamples(samples) ?? {}),
     failures: samples.filter((sample) => formatStatuses.has(sample.status) || sample.status === "CALL_FAILED"
       || sample.status === "VENDOR_ERROR_UNBILLED"
       || sample.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED"))

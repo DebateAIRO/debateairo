@@ -76,6 +76,7 @@ import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openi
 import { practiceDebateLanguageFromArgs, practiceLanguageDryPorts, practiceLanguagePolicy, runPracticeLanguageMode } from "./practice-language.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
+import { practiceStoryLengthFromArgs } from "./practice-story-length.js";
 import {
   composePracticeHostedNextRegisterVersion,
   composePracticeNextRegisterVersion,
@@ -140,7 +141,7 @@ const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-d
   "--answer-length", "--site-language", "--language-choice", "--length-policy", "--engine-policy",
   "--answer-writer-model", "--storyteller-model",
   ...REGISTER_NEXT_INPUT_FLAGS]);
-const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
+const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next", "--story-length"]);
 
 /**
  * The flags openings reads; every other flag is refused there, so a typo (--question for --questions) can never start
@@ -428,6 +429,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.flags.has("--levels") && args.mode !== "formats") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--levels (formats mode only)");
     }
+    // Length guidance and engine 2's story (LG-D, R1d): checked before anything starts, so a misplaced switch never
+    // starts a paid run.
+    const storyLength = practiceStoryLengthFromArgs(args.mode, args.switches);
     if (args.flags.has("--side-by-side") && args.mode !== "report") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--side-by-side (report mode only)");
     }
@@ -648,6 +652,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       for (const [model, runs] of Object.entries(levels ?? {})) {
         log(`levels: ${model}: ${runs.map((run) => run.run).join(", ")} (each job once per run, the runs taking turns)`);
       }
+      if (storyLength !== null) log("formats: the story jobs are asked as engine 2's story (v4), with the owners' start values (--story-length)");
       await runPracticeFormats({
         config: settings.previewConfig,
         targets,
@@ -665,6 +670,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         pack: loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url })),
         bounds: { judge: policy.bounds.JUDGE, synthesizer: policy.synthesisRolePolicy.synthesizerBound,
           evaluator: policy.synthesisRolePolicy.evaluatorBound },
+        ...(storyLength === null ? {} : { storyLength }),
         ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
         ...(options.random === undefined ? {} : { random: options.random }),
         progress: log,

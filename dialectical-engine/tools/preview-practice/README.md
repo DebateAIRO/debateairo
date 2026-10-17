@@ -583,6 +583,26 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
+### The story in words (formats `--story-length`, and the story tables)
+
+A debate run with `--length-policy` AND `--engine-policy` asks engine 2's story (v4): the storyteller and the story
+checker are asked with story contracts v4; each short text of the story (the headline, the summary, the confidence
+sentence, each path line, the "what would change it" text and each reason) gets a target length in words, the long
+PDF version gets none, and the long version comes last after an empty example of the exact nesting. The story checker
+is told the same targets. With `--length-policy` alone the story keeps today's v3, with no targets, except that the
+also-raised claims are sent whole (LG-C part 2, Task 15).
+
+- `formats --story-length` asks the formats mode's story jobs (`STORYTELLER`, `STORY_CHECKER`) as engine 2's story (v4),
+  with the owners' start values (the length row's, for the premium plan at Standard, and the engine row's). It is the
+  cheapest way to have every AI write and check one v4 story: `--lanes STORYTELLER,STORY_CHECKER --samples 2` gives each
+  AI one English and one Romanian story and check. It is refused in every other mode.
+- Every report with a story call has two more blocks, counts only: "Story length per AI and field" (the words each
+  accepted story wrote in each short field and in the long version, beside its target; `-` without one) and
+  "Storyteller replies that were not readable JSON" (by where they broke: after the long version began, before it, or
+  unknown). `report.json` holds them as `storyLengthByField` and `storyJsonBreaks`.
+- A story try sent as the short follow-up (its recorded form is PATCH: it holds only the parts the AI was asked to fix,
+  not a whole story) is left out of both blocks: its words are not counted and it is not counted as a reply.
+
 ## Safety rules built in
 
 - It refuses to start unless `PRACTICE_ACK=spends-real-money` is set and both forwarded sockets exist.
@@ -998,6 +1018,15 @@ owner's bar (practice-pass-bar); in every report no gate stop and no gate refusa
 Haiku's STORYTELLER sample answered, its first try asking 128,000 tokens at `medium`; no reply with zero visible words
 after a "lower" retry; and the two tables filled for every AI that answered. The A/B has no pass bar of its own: it is
 what the owner reads before the server's `story_writer` levels change.
+
+### S-6d, Mac: engine 2's story in words (formats `--story-length`)
+
+For the end-of-program practice (R1d Task 26, deferred); it spends real money.
+
+From the worktree's `dialectical-engine` folder, with `D` and `P` as in S-5, after a fresh S-3:
+
+    PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes STORYTELLER,STORY_CHECKER --samples 2 --story-length --out "$P/story-length-formats"
+    echo "exit: $?"
 
 ### S-8, Mac: the whole-debate comparison (today's shape and the new shape)
 

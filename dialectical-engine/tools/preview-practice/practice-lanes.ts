@@ -101,6 +101,7 @@ import { TypedDomainError, exhaustive, lengthCallStepOf, type LengthCallStep, ty
 import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";
 import { REVISION_REPLY_FORM, readPromptFrame, type PromptPacket } from "@debateai/providers";
 import type { PracticeQuestion } from "./practice-questions.js";
+import type { PracticeStoryV4Settings } from "./practice-story-length.js";
 import type { PracticeReplyForm } from "./practice-verdict.js";
 
 export const PRACTICE_LANES = [
@@ -494,6 +495,11 @@ export type PracticeLaneContext = Readonly<{
   /** Which sample of the job this is (1-based): the review job varies its edges by sample. Default 1. */
   sample?: number;
   workItemId: string;
+  /**
+   * Formats `--story-length` (LG-D, R1d): the story jobs are asked as engine 2's story (contracts v4), with the length
+   * row's targets and engine 2's start values. Absent: today's story v3.
+   */
+  storyLength?: PracticeStoryV4Settings;
 }>;
 
 /** What one job reports beyond the gateway's own record: a failure of the check that runs AFTER the gateway accepted. */
@@ -728,7 +734,10 @@ async function runStoryLane(context: PracticeLaneContext): Promise<PracticeLaneO
     repository: { insert: async (record) => { records.push(record); return "INSERTED" as const; } },
     readEnrichment: async () => new Map()
   });
-  await writer.writeAfterSettle(practiceStorySnapshot({ question: context.question, runId: context.runId, workItemId: context.workItemId }));
+  const snapshot = practiceStorySnapshot({ question: context.question, runId: context.runId, workItemId: context.workItemId });
+  // R1d: story v4 is told exactly when the writer has engine 2 AND the length targets (Task 17's switch).
+  await writer.writeAfterSettle(context.storyLength === undefined ? snapshot
+    : { ...snapshot, lengthGuidance: context.storyLength.lengthGuidance, engine: context.storyLength.engine });
   const record = records.at(-1);
   if (record === undefined) return { postCheckError: "STORY_NOT_RECORDED", detail: logs.join(",") };
   return { postCheckError: null, detail: `${record.outcome}${record.failureCode === null ? "" : `:${record.failureCode}`}` };

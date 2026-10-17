@@ -9,8 +9,16 @@ import {
   type StoryWordTargetField
 } from "@debateai/kernel";
 import { PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, structureRepairOriginalKey } from "@debateai/providers";
-import type { EngineSettings, LengthGuidance } from "@debateai/register";
+import {
+  engineSettingsOf,
+  engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues,
+  resolveLengthGuidance,
+  type EngineSettings,
+  type LengthGuidance
+} from "@debateai/register";
 import { replyContentOf } from "./practice-lanes.js";
+import { PracticeRefusal } from "./practice-settings.js";
 
 /**
  * LENGTH GUIDANCE, THE STORY IN THE PRACTICE REPORT (spec 2026-10-15 §3.7; OVERVIEW §2 LG-D; engine redesign R1d).
@@ -237,4 +245,67 @@ export async function collectPracticeStoryLength(pool: Pool, runId: string): Pro
     }));
   }
   return practiceStoryLengthBlockOf(rows, targets);
+}
+
+/** One formats story job's story facts: the accepted reply's fields, how many replies, where the unreadable ones broke. */
+export type PracticeStorySample = Readonly<{
+  fields: readonly PracticeStoryFieldSample[] | null;
+  replies: number;
+  breaks: readonly PracticeStoryJsonBreak[];
+}>;
+
+/**
+ * Formats: from the real model's own artifacts of a STORYTELLER job (the stand-in records none). A PATCH try (the short
+ * follow-up, its recorded form PATCH: only the asked members) is skipped, as the debate tables skip it (PF-D8.12).
+ */
+export function practiceStorySampleOf(artifacts: readonly Readonly<{ rawText: string; parseStatus: string; replyForm?: string | null }>[],
+  guidance: LengthGuidance | null): PracticeStorySample {
+  const targets: StoryTargets | null = guidance === null ? null : { story: guidance.story, charactersPerWord: guidance.charactersPerWord };
+  const tries = artifacts.filter((artifact) => artifact.replyForm !== "PATCH");
+  const accepted = [...tries].reverse().find((artifact) => artifact.parseStatus === "PARSED");
+  return Object.freeze({
+    fields: accepted === undefined ? null : practiceStoryFieldSamples(replyContentOf(accepted.rawText), targets),
+    replies: tries.length,
+    breaks: Object.freeze(tries.filter((artifact) => artifact.parseStatus === "PARSE_FAILED")
+      .map((artifact) => practiceStoryJsonBreakOf(replyContentOf(artifact.rawText))))
+  });
+}
+
+/** Formats: the report's story block from the story jobs' samples; null when the run had no story job. */
+export function practiceStoryLengthFromSamples(
+  samples: readonly Readonly<{ model: string; story?: PracticeStorySample | undefined }>[]
+): PracticeStoryLengthBlock | null {
+  const story = samples.flatMap((sample) => sample.story === undefined ? [] : [{ model: sample.model, story: sample.story }]);
+  if (story.length === 0) return null;
+  return Object.freeze({
+    storyLengthByField: practiceStoryLengthRows(story.flatMap((entry) =>
+      entry.story.fields === null ? [] : [{ model: entry.model, samples: entry.story.fields }])),
+    storyJsonBreaks: practiceStoryJsonBreakRows(story.flatMap((entry) => [
+      ...entry.story.breaks.map((jsonBreak) => ({ model: entry.model, jsonBreak })),
+      ...Array.from({ length: entry.story.replies - entry.story.breaks.length }, () => ({ model: entry.model, jsonBreak: null }))
+    ]))
+  });
+}
+
+/** Formats `--story-length` (R1d): engine 2's story needs both the length targets and the engine's own settings. */
+export type PracticeStoryV4Settings = Readonly<{ lengthGuidance: LengthGuidance; engine: EngineSettings }>;
+
+/** The owners' start values for the premium plan at Standard length. */
+export function practiceStoryLengthGuidance(): LengthGuidance {
+  return resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });
+}
+
+/** Both start values a formats story job is told with: the length row's and engine 2's (two makers, no map opening). */
+export function practiceStoryV4Settings(): PracticeStoryV4Settings {
+  return Object.freeze({
+    lengthGuidance: practiceStoryLengthGuidance(),
+    engine: engineSettingsOf(engineVersionPolicyStartValues(), { makers: 2, mapOpening: false })
+  });
+}
+
+/** `--story-length` is formats-only; checked before anything starts. */
+export function practiceStoryLengthFromArgs(mode: string, switches: ReadonlySet<string>): PracticeStoryV4Settings | null {
+  if (!switches.has("--story-length")) return null;
+  if (mode !== "formats") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--story-length (formats mode only)");
+  return practiceStoryV4Settings();
 }

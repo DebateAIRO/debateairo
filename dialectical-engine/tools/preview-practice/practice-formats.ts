@@ -72,6 +72,7 @@ import {
 import { practiceLevelConfig, practiceLevelJobs, practiceRunOfJob, type PracticeLevelJob, type PracticeLevelPlan } from "./practice-levels.js";
 import { PRACTICE_QUESTIONS } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
+import { practiceStorySampleOf, type PracticeStorySample, type PracticeStoryV4Settings } from "./practice-story-length.js";
 import { practiceCallFacts, practiceRepairKindOf, type PracticeRepairKind, type PracticeReplyForm } from "./practice-verdict.js";
 
 /**
@@ -129,6 +130,8 @@ export type PracticeSample = Readonly<{
    * null otherwise, and for a repaired call whose accepted try's form is not known; absent in older logs.
    */
   repairKind?: PracticeRepairKind | null;
+  /** Length guidance (LG-D): a STORYTELLER job's story facts (counts only); absent on every other job and in older logs. */
+  story?: PracticeStorySample;
   /** For a reply that failed its format check: what the check said, as `code@path`, and the re-check of the stored text. */
   issues: readonly string[];
   recheckIssues: readonly string[];
@@ -379,6 +382,8 @@ export async function runPracticeFormats(input: Readonly<{
   gapMs: number;
   pack: StoryPack;
   bounds: PracticeLaneBounds;
+  /** `--story-length` (LG-D, R1d): the story jobs are asked as engine 2's story, with these targets and settings. */
+  storyLength?: PracticeStoryV4Settings;
   /** Test seam for the gap and the preview policy's resend wait. */
   sleep?: (milliseconds: number) => Promise<void>;
   /** One content-free progress line per job. */
@@ -479,7 +484,8 @@ export async function runPracticeFormats(input: Readonly<{
       let detail: string | null = null;
       try {
         const outcome = await runPracticeLane({ lane, question, gateway, providerRef: target.providerRef, maker: target.maker,
-          bounds: input.bounds, pack: input.pack, runId: randomUUID(), workItemId: randomUUID(), sample });
+          bounds: input.bounds, pack: input.pack, runId: randomUUID(), workItemId: randomUUID(), sample,
+          ...(input.storyLength === undefined ? {} : { storyLength: input.storyLength }) });
         postCheckError = outcome.postCheckError;
         detail = outcome.detail;
       } catch (error) {
@@ -495,6 +501,12 @@ export async function runPracticeFormats(input: Readonly<{
       // The real model's artifacts only (the story jobs' local stand-in records none).
       const failed = [...sink.artifacts].reverse().find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const last = sink.artifacts.at(-1) ?? null;
+      // Length guidance (LG-D): a story job's own words per field and its unreadable replies (the real model's only); a
+      // PATCH try is told by its recorded form and skipped (PF-D8.12).
+      const story = lane === "STORYTELLER"
+        ? practiceStorySampleOf(sink.artifacts.map((artifact) => ({ rawText: artifact.rawText, parseStatus: artifact.parseStatus,
+          replyForm: sink.forms.get(artifact.attemptId) ?? null })), input.storyLength?.lengthGuidance ?? null)
+        : undefined;
       // Owner ruling 2026-10-12 ("Fixed slips = warning"): a slip the same call's second try fixed is REPAIRED; a call
       // that never got an accepted reply keeps the refused reply's status.
       const triesOfJob = [...new Set(attempts.map((attempt) => attempt.callSiteKey))]
@@ -541,7 +553,8 @@ export async function runPracticeFormats(input: Readonly<{
         errorCode: postCheckError ?? errorCode,
         replyText: content === null ? null : reportableReplyText(content),
         detail,
-        ...(run === undefined ? {} : levelFacts(wire, sink))
+        ...(run === undefined ? {} : levelFacts(wire, sink)),
+        ...(story === undefined ? {} : { story })
       }));
       if (markedBusy) {
         input.onBusy?.(target.model);

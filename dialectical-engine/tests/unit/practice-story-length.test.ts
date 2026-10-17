@@ -11,10 +11,14 @@ import {
   practiceStoryLengthBlockOf,
   practiceStoryJsonBreakOf,
   practiceStoryJsonBreakRows,
+  practiceStoryLengthFromArgs,
+  practiceStoryLengthFromSamples,
   practiceStoryLengthLines,
   practiceStoryLengthRows,
+  practiceStorySampleOf,
   practiceStoryTargetsOf
 } from "../../tools/preview-practice/practice-story-length.js";
+import { PracticeRefusal } from "../../tools/preview-practice/practice-settings.js";
 
 /**
  * Length guidance (spec 2026-10-15 §3.7; OVERVIEW §2 LG-D): the practice report's story table, per AI and per short
@@ -164,5 +168,60 @@ describe("practice: the story tables skip the patch follow-up by its recorded fo
     ]);
     expect(block.storyLengthByField.find((entry) => entry.field === "headline")).toEqual(
       { model: "m", field: "headline", guidedWords: 15, texts: 1, actualWords: { median: words(STORY.short.headline), max: words(STORY.short.headline) } });
+  });
+});
+
+describe("practice: formats --story-length asks engine 2's story (v4) (LG-D, R1d)", () => {
+  const vendor = (content: string): string => JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] });
+  const whole = JSON.stringify(STORY);
+
+  it("is formats-only, and gives the length start values (premium, Standard) with engine 2's start values", () => {
+    expect(practiceStoryLengthFromArgs("formats", new Set())).toBeNull();
+    const v4 = practiceStoryLengthFromArgs("formats", new Set(["--story-length"]))!;
+    expect(v4.lengthGuidance.story).toEqual(LENGTH_GUIDANCE_START.story);
+    expect(v4.engine).toEqual(engineSettingsOf(engineVersionPolicyStartValues(), { makers: 2, mapOpening: false }));
+    expect(v4.engine.engine).toBe(2);
+    expect(() => practiceStoryLengthFromArgs("debate", new Set(["--story-length"]))).toThrow(PracticeRefusal);
+    expect(() => practiceStoryLengthFromArgs("debate", new Set(["--story-length"]))).toThrow(/--story-length \(formats mode only\)/u);
+  });
+
+  it("a story job's sample: the accepted reply's fields, every reply counted, the unreadable ones by where they broke", () => {
+    const guidance = practiceStoryLengthFromArgs("formats", new Set(["--story-length"]))!.lengthGuidance;
+    const sample = practiceStorySampleOf([
+      { rawText: vendor(whole.slice(0, whole.length - 20)), parseStatus: "PARSE_FAILED" },
+      { rawText: vendor(whole), parseStatus: "PARSED" }
+    ], guidance);
+    expect(sample.replies).toBe(2);
+    expect(sample.breaks).toEqual(["AFTER_LONG_STARTED"]);
+    expect(sample.fields?.[0]).toEqual({ field: "headline", words: words(STORY.short.headline), guided: 15 });
+  });
+
+  it("the formats report's block: per model, from the story jobs only; nothing when there was no story job", () => {
+    const sample = practiceStorySampleOf([{ rawText: vendor(whole), parseStatus: "PARSED" }], null);
+    const block = practiceStoryLengthFromSamples([{ model: "m", story: sample }, { model: "n" }])!;
+    expect(block.storyJsonBreaks).toEqual([{ model: "m", replies: 1, parseFailed: 0, afterLongStarted: 0, beforeLong: 0, positionUnknown: 0 }]);
+    expect(block.storyLengthByField.every((row) => row.model === "m" && row.guidedWords === null)).toBe(true);
+    expect(practiceStoryLengthFromSamples([{ model: "n" }])).toBeNull();
+  });
+
+  it("the story lane hands the writer both the targets and engine 2 (the writer's v4 switch needs both)", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile(new URL("../../tools/preview-practice/practice-lanes.ts", import.meta.url), "utf8");
+    expect(source).toContain("{ ...snapshot, lengthGuidance: context.storyLength.lengthGuidance, engine: context.storyLength.engine }");
+  });
+
+  it("a PATCH try counts neither its words nor as a reply, as in the debate tables (PF-D8.12)", () => {
+    const patch = JSON.stringify({ short: { headline: "A patched headline only." } });
+    const sample = practiceStorySampleOf([
+      { rawText: vendor(whole.slice(0, whole.length - 20)), parseStatus: "PARSE_FAILED", replyForm: "ORIGINAL" },
+      { rawText: vendor(patch), parseStatus: "PARSED", replyForm: "PATCH" }
+    ], null);
+    expect(sample).toEqual({ fields: null, replies: 1, breaks: ["AFTER_LONG_STARTED"] });
+    const accepted = practiceStorySampleOf([
+      { rawText: vendor(whole), parseStatus: "PARSED", replyForm: null },
+      { rawText: vendor(patch), parseStatus: "PARSED", replyForm: "PATCH" }
+    ], null);
+    expect(accepted.replies).toBe(1);
+    expect(accepted.fields?.[0]).toEqual({ field: "headline", words: words(STORY.short.headline), guided: null });
   });
 });
