@@ -49,17 +49,17 @@ export default async function CheckoutPage({
   const billingCatalog = await loadNamespace(locale, "billing");
   if (planId === null) {
     return (
-      <main className="screen scroll billingPage">
+      <div className="screen scroll billingPage">
         <div className="billingInner narrow">
           <p className="billingError" role="alert">{t(billingCatalog, "billing.checkout.unknownPlan")}</p>
           <p><a className="btn" href="/pricing">{t(billingCatalog, "billing.checkout.pricingLink")}</a></p>
         </div>
         <SiteFooter variant="full" billing={billingPageFooter()} />
-      </main>
+      </div>
     );
   }
   return (
-    <main className="screen scroll billingPage">
+    <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <CheckoutFlow
           planId={planId}
@@ -70,6 +70,6 @@ export default async function CheckoutPage({
         />
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
-    </main>
+    </div>
   );
 }

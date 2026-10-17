@@ -7,7 +7,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
  */
 export function AgeRefusal({ catalog }: Readonly<{ catalog: MessageCatalog }>) {
   return (
-    <main className="authScreen scroll" aria-labelledby="age-refusal-title" data-screen="age-refusal">
+    <section className="authScreen scroll" aria-labelledby="age-refusal-title" data-screen="age-refusal">
       <div className="authCard">
         <div className="authCardInner">
           <div className="authBrand">
@@ -27,6 +27,6 @@ export function AgeRefusal({ catalog }: Readonly<{ catalog: MessageCatalog }>) {
           </div>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

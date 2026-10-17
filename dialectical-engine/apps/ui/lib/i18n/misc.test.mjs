@@ -140,7 +140,11 @@ test("safe English fallbacks and existing component behavior remain intact", () 
   assert.match(boundary, /role="status" aria-live="polite"/);
 
   const toast = source("components/Toast.tsx");
-  assert.match(toast, /className="toast" role="status"/);
+  // The toast is spoken through the layout's always-mounted live region, not by a region that
+  // mounts already holding its text (which several screen readers skip).
+  assert.match(toast, /className="toast" aria-hidden="true"/);
+  assert.match(toast, /announce\(message\)/);
+  assert.match(source("app/layout.tsx"), /id="app-announcer" className="srOnly" role="status" aria-live="polite"/);
   assert.match(toast, /className="toastDot"/);
   assert.match(toast, /\{message\}/);
 });

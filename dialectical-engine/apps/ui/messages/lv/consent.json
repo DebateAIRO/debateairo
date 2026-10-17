@@ -16,5 +16,6 @@
   "consent.policy.close": "Aizvērt",
   "consent.policy.questions": "Jautājumi:",
   "consent.policy.gateHint": "Lai turpinātu, ritiniet līdz politikas beigām.",
+  "consent.policy.gateOpened": "Beigas sasniegtas. Tagad varat turpināt.",
   "consent.policy.acknowledge": "Esmu izlasījis(-usi)"
 }

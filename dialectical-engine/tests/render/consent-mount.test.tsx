@@ -219,12 +219,14 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     const source = layoutSource();
 
     expect(source, "the mount sits immediately after {children}").toMatch(
-      /\{children\}<\/AuthCatalogProvider>\s*<CookieConsent \/>/
+      // The page content sits in the layout's one <main>; the mount follows it, outside <main>.
+      /\{children\}<\/AuthCatalogProvider>\s*<\/main>\s*<CookieConsent \/>/
     );
     expect(source.split("<CookieConsent").length - 1, "exactly one mount").toBe(1);
     expect(source.split("import { CookieConsent }").length - 1, "exactly one import").toBe(1);
-    expect(source, "TopBar is still the first child of appShell").toMatch(
-      /<div className="appShell">\s*<TopBar \/>/
+    // Only the skip link (first in the Tab order) may precede it: the consent mount never does.
+    expect(source, "TopBar is still the first child of appShell after the skip link").toMatch(
+      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<a className="skipLink" href="#main-content">[^<]*<\/a>\s*<TopBar \/>/
     );
 
     // `t3-library.test.tsx:244` and `t9-landing.test.tsx:121-125` assert on the

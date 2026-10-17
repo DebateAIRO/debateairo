@@ -228,7 +228,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>
- <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
                         const typed = readSixDigitCode(e.target.value);
                         const shown = typed.valid ? typed.digits : e.target.value;
                         if (shown !== code)

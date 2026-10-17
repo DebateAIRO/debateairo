@@ -61,6 +61,7 @@
   "done.hint": "Uw wachtwoord voor de website blijft hetzelfde. Wacht op de volgende nieuwe code van de vervangende authenticator-app voordat u aanmeldt.",
   "login": "Terug naar aanmelden",
   "deadline": "Afronden vóór",
+  "deadline.warning": "Dit herstel verloopt over ongeveer een minuut. Daarna moet u een nieuwe link aanvragen.",
   "restart.hint": "Het instellen is onderbroken. U kunt deze stap herhalen tot de tijd hieronder; die tijd verandert niet.",
   "cancel": "Herstel annuleren",
   "cancel.title": "Dit herstel annuleren?",

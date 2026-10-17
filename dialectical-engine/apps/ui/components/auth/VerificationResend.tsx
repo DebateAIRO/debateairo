@@ -46,7 +46,7 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
       context={{ eyebrow: t(catalog, "auth.login.welcomeBack"), title: t(catalog, "auth.pending.resendTitle"), action: t(catalog, "auth.pending.sendEmail"), sent: t(catalog, "auth.pending.resendSent") }} onDifferentEmail={() => setSubmitted(null)} />;
   return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={t(catalog, "auth.pending.resend")} description={t(catalog, "auth.login.resendHint")} footer={null}>
     <form className="authForm" noValidate method="post" action="/login" onSubmit={submit}>
-      <div className="authField"><label htmlFor="resend-email">{t(catalog, "auth.email")}</label><input ref={field} id="resend-email" name="email" type="email" autoComplete="email" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={event => { setEmail(event.target.value); setError(null); }} required aria-invalid={!!error || undefined} aria-describedby={error ? "resend-email-error" : undefined} /><InlineFieldMessage id="resend-email-error" message={error} /></div>
+      <div className="authField"><label htmlFor="resend-email">{t(catalog, "auth.email")}</label><input ref={field} id="resend-email" name="email" type="email" autoComplete="email" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={event => { setEmail(event.target.value); setError(null); }} required aria-invalid={!!error} aria-describedby={error ? "resend-email-error" : undefined} /><InlineFieldMessage id="resend-email-error" message={error} /></div>
       <button className="authPrimary" type="submit">{t(catalog, "auth.continue")}</button>
       {announcer.region}
     </form>

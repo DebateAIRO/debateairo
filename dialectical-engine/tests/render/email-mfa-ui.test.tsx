@@ -284,7 +284,7 @@ describe("the 24-hour wait and the finish link", () => {
   // Owner requirement 2026-10-09: the wait screens are "clear plain screens in all 35 locales".
   it("shows the wait in the reader's language and date format (ja)", async () => {
     const f = finishFixture([{ status: "waiting", not_before }]); await open(f, ja, "ja");
-    expect(host.querySelector("main")?.getAttribute("lang")).toBe("ja");
+    expect(host.querySelector(".authScreen")?.getAttribute("lang")).toBe("ja");
     expect(host.textContent).toContain(ja["finishWait.title"]); expect(ja["finishWait.title"]).not.toBe(en["finishWait.title"]);
     expect(host.querySelector("time")?.textContent).toBe(new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "short" }).format(new Date(not_before)));
   });

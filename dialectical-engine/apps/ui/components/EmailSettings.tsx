@@ -269,7 +269,7 @@ export function ChangeEmailScreen({
                   autoComplete="email"
                   spellCheck={false}
                   value={newEmail}
-                  aria-invalid={newCheck === "invalid" || newCheck === "same" ? true : undefined}
+                  aria-invalid={newCheck === "invalid" || newCheck === "same"}
                   aria-describedby={newMessage === null ? undefined : "email-change-new-check"}
                   data-check={newCheck}
                   onChange={(event) => setNewEmail(event.target.value)}
@@ -290,7 +290,7 @@ export function ChangeEmailScreen({
                   autoComplete="off"
                   spellCheck={false}
                   value={confirmEmail}
-                  aria-invalid={confirmCheck === "mismatch" ? true : undefined}
+                  aria-invalid={confirmCheck === "mismatch"}
                   aria-describedby={confirmMessage === null ? undefined : "email-change-confirm-check"}
                   data-check={confirmCheck}
                   onChange={(event) => setConfirmEmail(event.target.value)}

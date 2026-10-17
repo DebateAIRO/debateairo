@@ -61,6 +61,7 @@
   "done.hint": "Hasło do strony pozostaje takie samo. Przed zalogowaniem poczekaj na kolejny nowy kod z zamiennej aplikacji uwierzytelniającej.",
   "login": "Wróć do logowania",
   "deadline": "Zakończ przed",
+  "deadline.warning": "To odzyskiwanie wygaśnie za około minutę. Potem trzeba będzie poprosić o nowy link.",
   "restart.hint": "Konfiguracja została przerwana. Możesz powtórzyć ten krok do czasu podanego poniżej; ten czas się nie zmienia.",
   "cancel": "Anuluj odzyskiwanie",
   "cancel.title": "Anulować to odzyskiwanie?",

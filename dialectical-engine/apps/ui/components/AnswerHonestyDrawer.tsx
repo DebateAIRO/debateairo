@@ -23,6 +23,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 /**
  * UI-01 honesty surface (additive, V2 drawer vocabulary). V2's workspace has
@@ -160,6 +161,7 @@ export function AnswerHonestyDrawer({
    */
   floorShown?: boolean;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const { locale } = useChromeI18n();
   const freshness = summarizeFreshness(
     answer.nodes.map((node) => ({ subjectRef: node.node_id, state: node.staleness_state }))
@@ -170,7 +172,7 @@ export function AnswerHonestyDrawer({
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "misc.answerHonesty.honestyAndProvenance")}>
+      <aside ref={dialogRef} tabIndex={-1} className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "misc.answerHonesty.honestyAndProvenance")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <div className="nodeEyebrow">{t(catalog, "misc.answerHonesty.howToReadThis")}</div>

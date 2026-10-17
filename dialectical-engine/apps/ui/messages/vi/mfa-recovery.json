@@ -61,6 +61,7 @@
   "done.hint": "Mật khẩu trang web của bạn không thay đổi. Hãy chờ mã mới tiếp theo từ ứng dụng xác thực thay thế trước khi đăng nhập.",
   "login": "Quay lại đăng nhập",
   "deadline": "Hoàn tất trước",
+  "deadline.warning": "Lần khôi phục này sẽ hết hạn sau khoảng một phút. Sau đó, bạn sẽ cần yêu cầu liên kết mới.",
   "restart.hint": "Thiết lập đã bị gián đoạn. Bạn có thể lặp lại bước này cho đến thời điểm hiển thị bên dưới; thời điểm đó không thay đổi.",
   "cancel": "Hủy khôi phục",
   "cancel.title": "Hủy lần khôi phục này?",

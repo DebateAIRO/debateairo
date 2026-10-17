@@ -61,6 +61,7 @@
   "done.hint": "Heslo k stránke zostáva rovnaké. Pred prihlásením počkajte na ďalší nový kód z náhradnej overovacej aplikácie.",
   "login": "Späť na prihlásenie",
   "deadline": "Dokončite pred",
+  "deadline.warning": "Platnosť tohto obnovenia vyprší približne o minútu. Potom si budete musieť vyžiadať nový odkaz.",
   "restart.hint": "Nastavovanie sa prerušilo. Tento krok môžete opakovať do času uvedeného nižšie; tento čas sa nemení.",
   "cancel": "Zrušiť obnovenie",
   "cancel.title": "Zrušiť toto obnovenie?",

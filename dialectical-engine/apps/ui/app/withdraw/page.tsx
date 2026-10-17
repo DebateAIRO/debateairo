@@ -19,7 +19,7 @@ export default async function WithdrawPage() {
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const billingCatalog = await loadNamespace(locale, "billing");
   return (
-    <main className="screen scroll billingPage">
+    <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <h1 className="setTitle">{t(billingCatalog, "billing.withdrawPage.title")}</h1>
         <p>{t(billingCatalog, "billing.withdrawPage.who")}</p>
@@ -32,6 +32,6 @@ export default async function WithdrawPage() {
         <p data-withdraw-by-email>{t(billingCatalog, "billing.withdrawPage.byEmail", { email: COMPANY.emails.general })}</p>
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
-    </main>
+    </div>
   );
 }

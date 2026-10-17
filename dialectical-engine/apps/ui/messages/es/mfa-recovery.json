@@ -61,6 +61,7 @@
   "done.hint": "Su contraseña del sitio web no cambia. Espere al siguiente código nuevo de la nueva aplicación de autenticación antes de iniciar sesión.",
   "login": "Volver al inicio de sesión",
   "deadline": "Terminar antes de",
+  "deadline.warning": "Esta recuperación caduca en aproximadamente un minuto. Después tendrá que solicitar un enlace nuevo.",
   "restart.hint": "La configuración se interrumpió. Puede repetir este paso hasta la hora indicada abajo; esa hora no cambia.",
   "cancel": "Cancelar la recuperación",
   "cancel.title": "¿Cancelar esta recuperación?",

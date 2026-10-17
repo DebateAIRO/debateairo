@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AiTransparencyPage() {
   const catalog = await settingsCatalog();
   return (
-    <main className="screen scroll aiTransparencyPage">
+    <div className="screen scroll aiTransparencyPage">
       <article>
         <p className="libEyebrow">{t(catalog, "settings.transparency.eyebrow")}</p>
         <h1>{t(catalog, "settings.transparency.title")}</h1>
@@ -60,6 +60,6 @@ export default async function AiTransparencyPage() {
           {t(catalog, "settings.transparency.back", { brand: DEBATEAI_BRAND })}
         </a>
       </article>
-    </main>
+    </div>
   );
 }

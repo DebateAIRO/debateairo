@@ -6,6 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivacyPolicyModal } from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
 import { POLICY_JUMP, POLICY_SECTIONS } from "../../apps/ui/lib/privacyPolicy.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -135,7 +142,7 @@ describe("privacy policy modal — behaviour", () => {
 
     await dispatchOn(scrollRegion(), "scroll");
 
-    expect(acknowledgeButton().disabled).toBe(true);
+    expect(isLocked(acknowledgeButton())).toBe(true);
   });
 
   it("opens the gate at exactly scrollHeight - 8", async () => {
@@ -143,12 +150,12 @@ describe("privacy policy modal — behaviour", () => {
     await render(
       <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
     );
-    expect(acknowledgeButton().disabled).toBe(true);
+    expect(isLocked(acknowledgeButton())).toBe(true);
 
     metrics.scrollTop = 292;
     await dispatchOn(scrollRegion(), "scroll");
 
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
   });
 
   // S02-S41 — the gate latches: scrolling back to the top leaves it enabled.
@@ -159,12 +166,12 @@ describe("privacy policy modal — behaviour", () => {
     );
     metrics.scrollTop = 292;
     await dispatchOn(scrollRegion(), "scroll");
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
 
     metrics.scrollTop = 0;
     await dispatchOn(scrollRegion(), "scroll");
 
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
   });
 
   // S02-S42 — a policy short enough to need no scrolling enables the button at mount.
@@ -177,7 +184,7 @@ describe("privacy policy modal — behaviour", () => {
 
     // No event of any kind is dispatched: the criterion is evaluated once at mount and no
     // special case is written for a short policy.
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
   });
 
   // S02-S43 — the criterion is re-evaluated on `resize`.
@@ -186,13 +193,13 @@ describe("privacy policy modal — behaviour", () => {
     await render(
       <PrivacyPolicyModal open mode="consent" onClose={vi.fn()} onAcknowledge={vi.fn()} />
     );
-    expect(acknowledgeButton().disabled).toBe(true);
+    expect(isLocked(acknowledgeButton())).toBe(true);
 
     // A wider window shows more of the policy at once: the same scrollTop now reaches the end.
     metrics.clientHeight = 300;
     await dispatchOn(window, "resize");
 
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
   });
 
   // S02-S44 — while disabled the button is announced as disabled and says why; no tooltip.
@@ -203,7 +210,7 @@ describe("privacy policy modal — behaviour", () => {
     );
 
     const button = acknowledgeButton();
-    expect(button.disabled).toBe(true);
+    expect(isLocked(button)).toBe(true);
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.hasAttribute("title")).toBe(false);
 
@@ -261,7 +268,7 @@ describe("privacy policy modal — behaviour", () => {
     expect(keydownRegistrations()).toBe(1);
 
     const last = acknowledgeButton();
-    expect(last.disabled).toBe(false);
+    expect(isLocked(last)).toBe(false);
     await act(async () => {
       last.focus();
       document.dispatchEvent(
@@ -285,7 +292,7 @@ describe("privacy policy modal — behaviour", () => {
     await render(
       <PrivacyPolicyModal open mode="consent" onClose={onClose} onAcknowledge={onAcknowledge} />
     );
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
 
     await act(async () => {
       acknowledgeButton().click();

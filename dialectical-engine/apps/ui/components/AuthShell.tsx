@@ -55,7 +55,7 @@ export function AuthShell({
     if (focusTitle) headline.current?.focus();
   }, [focusTitle]);
   return (
-    <main lang={lang} className="authScreen scroll" aria-labelledby="auth-title">
+    <section lang={lang} className="authScreen scroll" aria-labelledby="auth-title">
       <div className="authCard">
         <div className="authCardInner">
           <div className="authBrand">
@@ -75,6 +75,6 @@ export function AuthShell({
           {footer === null ? null : <footer className="authFooter">{footer}</footer>}
         </div>
       </div>
-    </main>
+    </section>
   );
 }

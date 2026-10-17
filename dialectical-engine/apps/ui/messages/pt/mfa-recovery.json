@@ -61,6 +61,7 @@
   "done.hint": "A palavra-passe do site mantém-se igual. Aguarde pelo próximo código novo da nova aplicação de autenticação antes de iniciar sessão.",
   "login": "Voltar ao início de sessão",
   "deadline": "Concluir antes de",
+  "deadline.warning": "Esta recuperação expira dentro de cerca de um minuto. Depois disso, terá de pedir uma nova ligação.",
   "restart.hint": "A configuração foi interrompida. Pode repetir este passo até à hora indicada abaixo; essa hora não muda.",
   "cancel": "Cancelar a recuperação",
   "cancel.title": "Cancelar esta recuperação?",

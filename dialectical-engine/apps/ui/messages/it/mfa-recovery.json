@@ -61,6 +61,7 @@
   "done.hint": "La password del sito resta la stessa. Prima di accedere, aspetta il codice successivo della nuova app di autenticazione.",
   "login": "Torna all’accesso",
   "deadline": "Completa entro",
+  "deadline.warning": "Questo recupero scade tra circa un minuto. Dopo dovrai richiedere un nuovo link.",
   "restart.hint": "La configurazione è stata interrotta. Puoi ripetere questo passaggio fino all’orario indicato qui sotto; quell’orario non cambia.",
   "cancel": "Annulla il recupero",
   "cancel.title": "Vuoi annullare questo recupero?",

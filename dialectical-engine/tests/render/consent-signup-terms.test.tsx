@@ -24,6 +24,13 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 import { pickRegion } from "../support/signupRegion.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
 const TERMS_ROW_TEXT = "I have read and agree to the Terms of Service.";
 
@@ -128,9 +135,9 @@ async function acknowledgeTerms(): Promise<void> {
   metrics.scrollTop = TOP.scrollTop;
   await clickElement(field("terms-accepted"));
   expectTermsOpen();
-  expect(dialogButton("I have read it").disabled, "disabled before the end is reached").toBe(true);
+  expect(isLocked(dialogButton("I have read it")), "disabled before the end is reached").toBe(true);
   await driveScrollToEnd();
-  expect(dialogButton("I have read it").disabled, "enabled once the end is reached").toBe(false);
+  expect(isLocked(dialogButton("I have read it")), "enabled once the end is reached").toBe(false);
   await clickElement(dialogButton("I have read it"));
   expect(field("terms-accepted").checked, "acknowledging must tick the terms box").toBe(true);
   expect(dialog(), "acknowledging must close the Terms").toBeNull();
@@ -220,7 +227,7 @@ describe("sign-up — the Terms of Service row", () => {
 
     expect(terms.type).toBe("checkbox");
     expect(terms.required).toBe(true);
-    expect(terms.disabled).toBe(false);
+    expect(isLocked(terms)).toBe(false);
     expect(terms.checked).toBe(false);
     expect(document.querySelectorAll("form")).toHaveLength(1);
   });
@@ -261,7 +268,7 @@ describe("sign-up — the Terms of Service row", () => {
     expectTermsOpen();
     expect(field("terms-accepted").checked, "the box must stay unticked").toBe(false);
     expect(field("privacy-accepted").checked, "the privacy box is untouched").toBe(false);
-    expect(createAccountButton().disabled).toBe(true);
+    expect(isLocked(createAccountButton())).toBe(true);
   });
 
   // The terms row is now the second row: the age gate replaced the 18+ row (Turn 8).
@@ -324,14 +331,14 @@ describe("sign-up — the Terms of Service row", () => {
     await mount();
     await clickElement(field("terms-accepted"));
     await driveScrollToEnd();
-    expect(dialogButton("I have read it").disabled).toBe(false);
+    expect(isLocked(dialogButton("I have read it"))).toBe(false);
     await clickElement(dialogButton("×"));
 
     metrics.scrollTop = TOP.scrollTop;
     await clickElement(field("terms-accepted"));
 
     expectTermsOpen();
-    expect(dialogButton("I have read it").disabled, "disabled again on a fresh read").toBe(true);
+    expect(isLocked(dialogButton("I have read it")), "disabled again on a fresh read").toBe(true);
     expect(field("terms-accepted").checked).toBe(false);
   });
 
@@ -343,14 +350,14 @@ describe("sign-up — the Terms of Service row", () => {
 
     await acknowledgePolicy();
     expect(field("privacy-accepted").checked).toBe(true);
-    expect(createAccountButton().disabled, "one of two boxes: still disabled").toBe(true);
+    expect(isLocked(createAccountButton()), "one of two boxes: still disabled").toBe(true);
 
     await acknowledgeTerms();
-    expect(createAccountButton().disabled, "both boxes: enabled").toBe(false);
+    expect(isLocked(createAccountButton()), "both boxes: enabled").toBe(false);
 
     await clickElement(rows()[1]!.querySelector<HTMLElement>(".consentText")!);
     expect(field("terms-accepted").checked).toBe(false);
-    expect(createAccountButton().disabled, "unticking the Terms disables it again").toBe(true);
+    expect(isLocked(createAccountButton()), "unticking the Terms disables it again").toBe(true);
   });
 
   // Rewritten to both boxes plus an adult date of birth: the age gate replaced the 18+ box (Turn 8).

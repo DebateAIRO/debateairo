@@ -27,6 +27,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { pickRegion } from "../support/signupRegion.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 let root: Root | null = null;
 
 function field(name: string): HTMLInputElement {
@@ -86,7 +93,7 @@ describe("create-account gate on both consent boxes", () => {
 
   /* S02-S25 — R17 case 1. */
   it("keeps Create account disabled with neither box ticked", () => {
-    expect(createAccountButton().disabled).toBe(true);
+    expect(isLocked(createAccountButton())).toBe(true);
   });
 
   /* S02-S26 — R17 case 2. Rewritten: the age gate replaced the 18+ box (Turn 8), so the
@@ -96,7 +103,7 @@ describe("create-account gate on both consent boxes", () => {
 
     expect(document.querySelector('input[name="adult-affirmed"]'), "the 18+ box is gone").toBeNull();
     expect(field("dob-y").value).toBe("1990");
-    expect(createAccountButton().disabled).toBe(true);
+    expect(isLocked(createAccountButton())).toBe(true);
   });
 
   /* S02-S27 — R17 case 3. The untouched-sibling check moved from the 18+ box (replaced by the
@@ -110,7 +117,7 @@ describe("create-account gate on both consent boxes", () => {
 
     expect(field("privacy-accepted").checked).toBe(true);
     expect(field("terms-accepted").checked).toBe(false);
-    expect(createAccountButton().disabled).toBe(true);
+    expect(isLocked(createAccountButton())).toBe(true);
   });
 
   /* S02-S30 — R17 case 6: the pin that goes RED if a seat makes the inputs
@@ -122,7 +129,7 @@ describe("create-account gate on both consent boxes", () => {
 
     await act(async () => { field("privacy-accepted").click(); });
 
-    expect(createAccountButton().disabled).toBe(true);
+    expect(isLocked(createAccountButton())).toBe(true);
     expect(field("terms-accepted").checked).toBe(true);
   });
 });

@@ -14,13 +14,13 @@ export function LandingPage({
   footerBilling
 }: { catalog: MessageCatalog; lowestPaidPrice: string | null; footerBilling: SiteFooterBilling }): JSX.Element {
   return (
-    <main className="lpRoot">
+    <div className="lpRoot">
       <LandingChrome catalog={catalog} />
       <LandingHero catalog={catalog} />
       <LandingSample catalog={catalog} />
       <LandingMethod catalog={catalog} />
       <LandingPricing catalog={catalog} lowestPaidPrice={lowestPaidPrice} />
       <SiteFooter variant="full" billing={footerBilling} />
-    </main>
+    </div>
   );
 }

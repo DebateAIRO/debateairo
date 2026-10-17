@@ -7,6 +7,13 @@ import { CheckoutFlow, type CheckoutClient } from "../../apps/ui/components/bill
 import { formatMoney } from "../../apps/ui/lib/billing/format.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 /** Every English sentence is read from the catalogue, so N20's rewording changes no expectation here. */
@@ -105,10 +112,10 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(text()).toContain(EN["billing.checkout.billingNote"]);
     // The phone field offers the connection country's calling code.
     expect(input("checkout-phone").value).toBe("+49 ");
-    expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.continueToCard")!)).toBe(true);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(true);
     await fillDetails();
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
     await click(button("billing.checkout.showPrice")!);
     expect(client.createBillingQuote).toHaveBeenLastCalledWith({
       plan_id: "PLUS", country: "DE", first_name: "Anna", last_name: "Schmidt", phone: "+49 151 1234 5678",
@@ -124,9 +131,9 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(text()).toContain(EN["billing.checkout.cardNote"]);
     const next = button("billing.checkout.continueToCard")!;
     await click(checkbox(0));
-    expect(next.disabled).toBe(true);
+    expect(isLocked(next)).toBe(true);
     await click(checkbox(1));
-    expect(next.disabled).toBe(false);
+    expect(isLocked(next)).toBe(false);
     await click(next);
     expect(client.startBillingCheckout).toHaveBeenCalledWith({
       quote_ref: "11111111-1111-4111-8111-111111111111", locale: "en",
@@ -151,7 +158,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await choose(county, "Bucuresti");
     const sector = select("checkout-city");
     expect([...sector.options].map((option) => option.value)).toEqual(["", ...BUCHAREST_SECTORS]);
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(true);
     await choose(sector, "Sector 3");
     await click(button("billing.checkout.showPrice")!);
     expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -189,14 +196,14 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await fillDetails();
     await choose(select("checkout-country"), "US");
     expect(input("checkout-phone").value).toBe("+49 151 1234 5678");
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(true);
     await fill(input("checkout-region"), "NY");
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
     await choose(select("checkout-country"), "IE");
     expect(container.querySelector("#checkout-region")).toBeNull();
     await fill(input("checkout-postalCode"), "");
     expect(container.querySelector("label[for='checkout-postalCode']")?.textContent).toBe(EN["billing.checkout.postalCodeOptional"]);
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
     await click(button("billing.checkout.showPrice")!);
     expect(client.createBillingQuote.mock.calls.at(-1)![0]).not.toHaveProperty("postal_code");
   });
@@ -213,10 +220,32 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(text()).toContain("Your connection looks like it's from Italy. Do you live in Germany?");
     await click(checkbox(0));
     await click(checkbox(1));
-    expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.continueToCard")!)).toBe(true);
     await click(button("billing.checkout.confirmCountryYes")!);
     await click(button("billing.checkout.continueToCard")!);
     expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
+  });
+
+  it("keeps Continue to payment focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await render();
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    const next = button("billing.checkout.continueToCard")!;
+    expect(next.disabled).toBe(false);
+    expect(next.getAttribute("aria-disabled")).toBe("true");
+    const reason = (): string | null | undefined =>
+      next.hasAttribute("aria-describedby") ? container.querySelector(`#${next.getAttribute("aria-describedby")}`)?.textContent : null;
+    expect(reason()).toBe(EN["billing.checkout.consentsRequired"]);
+    await click(next);
+    expect(document.activeElement).toBe(checkbox(0));
+    await click(checkbox(0));
+    await click(next);
+    expect(document.activeElement).toBe(checkbox(1));
+    expect(client.startBillingCheckout).not.toHaveBeenCalled();
+    await click(checkbox(1));
+    expect(isLocked(next)).toBe(false);
+    expect(reason()).toBeNull();
   });
 
   it("keeps the price disabled while the phone holds only its calling code", async () => {
@@ -229,9 +258,9 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await fill(input("checkout-postalCode"), "10115");
     // The quote's schema refuses "+49" before any request leaves, so the page never asks with it.
     expect(input("checkout-phone").value).toBe("+49 ");
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(true);
     await fill(input("checkout-phone"), "+49 151 1234 5678");
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
   });
 
   it("takes the price away after any edit, so the next price carries the corrected details", async () => {
@@ -279,7 +308,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await act(async () => { answer(quote()); });
     await settle();
     expect(button("billing.checkout.continueToCard")).toBeUndefined();
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
   });
 
   it("refuses to price a half-filled company block", async () => {
@@ -288,7 +317,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await fillDetails();
     await click(button("billing.checkout.companyToggle")!);
     await fill(input("checkout-company-name"), "Acme GmbH");
-    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(isLocked(button("billing.checkout.showPrice")!)).toBe(true);
     expect(text()).toContain(EN["billing.checkout.companyIncomplete"]);
     await fill(input("checkout-company-vat"), "DE123456789");
     await fill(input("checkout-company-address"), "1 Hauptstraße, Berlin");
@@ -341,14 +370,14 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       expect(text()).toContain(EN[key]);
       // The used price is gone: nothing to continue with until the price is asked again.
       expect(button("billing.checkout.continueToCard")).toBeUndefined();
-      expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+      expect(isLocked(button("billing.checkout.showPrice")!)).toBe(false);
       const asked = client.createBillingQuote.mock.calls.length;
       await click(button("billing.checkout.showPrice")!);
       expect(client.createBillingQuote).toHaveBeenCalledTimes(asked + 1);
       // The fresh price is accepted afresh: both confirmations start unticked.
       expect(checkbox(0).checked).toBe(false);
       expect(checkbox(1).checked).toBe(false);
-      expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+      expect(isLocked(button("billing.checkout.continueToCard")!)).toBe(true);
       await consentAndContinue();
       expect(client.startBillingCheckout).toHaveBeenCalledTimes(2);
       expect(client.startBillingCheckout).toHaveBeenLastCalledWith(expect.objectContaining({ quote_ref: fresh }));

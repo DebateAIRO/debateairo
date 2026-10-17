@@ -93,7 +93,7 @@ export function LockoutPrompt({ catalog, client = contractClient, onDone }: {
         {error ? <p className="authFieldError" role="alert">{error}</p> : null}
         {codes ? <EphemeralCodes catalog={catalog} codes={codes}/> : null}
         {choice && grant && !complete ? <>
-            <SecurityEnrollment authority={{ kind: 'grant', token: grant.token }} availableMethods={['passkey']} catalog={catalog} client={client} onEnrolled={() => setAdded(true)} onExpired={expired}/>
+            <SecurityEnrollment authority={{ kind: 'grant', token: grant.token }} deadline={grant.expiresAt} availableMethods={['passkey']} catalog={catalog} client={client} onEnrolled={() => setAdded(true)} onExpired={expired}/>
             <div className="authLockoutActions">
                 <button type="button" className="authSecondary" onClick={back}>{t(catalog, 'auth.lockout.back')}</button>
                 <button type="button" className="authTextButton" onClick={finish}>{t(catalog, 'auth.lockout.later')}</button>

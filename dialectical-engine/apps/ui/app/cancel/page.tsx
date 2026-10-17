@@ -13,11 +13,11 @@ export default async function CancelPage() {
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const billingCatalog = await loadNamespace(locale, "billing");
   return (
-    <main className="screen scroll billingPage">
+    <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <CancelFlow catalog={billingCatalog} />
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
-    </main>
+    </div>
   );
 }
