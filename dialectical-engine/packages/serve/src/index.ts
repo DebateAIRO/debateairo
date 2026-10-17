@@ -24,11 +24,11 @@ import {
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
-import { judgesComparisonOf } from "./judges-comparison.js";
+import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
-  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
+  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
   type RootCallSite
 } from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
@@ -2885,17 +2885,6 @@ export class ServeRepository {
       this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
       this.readEdgesForRun(row.run_id)
     ]);
-    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
-    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
-    // vote row). (pre-flight PF-R2b4.5)
-    const judgesComparison = judgesComparisonOf(
-      row.verdict_votes.map((vote) => ({
-        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
-        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
-      })),
-      nodes, edges,
-      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key }))
-    );
     const numbers = await this.pool.query<{
       value: number;
       number_kind: string;
@@ -2922,6 +2911,21 @@ export class ServeRepository {
                 number.producer, number.replay_handle, number.provenance_ref
        ORDER BY number.served_number_id`,
       [row.answer_id, row.answer_version]
+    );
+    // Follow-up N1: the served answer as recorded (the position the served number's source_ref names), so the panel
+    // leads with it even after a review catch-up refreshed the strengths; null for an answer with no served number.
+    const servedRootNodeId = servedPositionOf(nodes, edges, numbers.rows.map((number) => number.source_ref));
+    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
+    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
+    // vote row). (pre-flight PF-R2b4.5)
+    const judgesComparison = judgesComparisonOf(
+      row.verdict_votes.map((vote) => ({
+        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
+        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
+      })),
+      nodes, edges,
+      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
+      servedRootNodeId
     );
     const currentRead = version === undefined;
     const eventStreams = numbers.rows.map((number) => number.events.map((event) => ({

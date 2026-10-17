@@ -20,8 +20,9 @@ import { seatBaseCallSiteKey } from "./synthesis.js";
  *
  * Groups (ruling W1, whole-branch review I1): the count decides on a group's combined choices, so each position names
  * the others of its group (`same_answer_as`) and the list follows the count: groups by their combined counted choices,
- * the count's winner's group first, then the group whose strongest case is stronger, then the node id; inside a group
- * the winner first, then the most counted choices, the stronger case, the node id.
+ * the served answer's group first (the recorded one; the count's winner only when none is recorded, follow-up N1),
+ * then the group whose strongest case is stronger, then the node id; inside a group the served answer first, then the
+ * most counted choices, the stronger case, the node id.
  *
  * Letters (ruling R2b-B6.1): a letter is the root's place in the debate's PLAN, as the judges' material gives it
  * (`ENGINE_ANSWER_LETTERS[rootIndex]`), never its count among the saved roots: a root that sat out leaves a gap (roots
@@ -158,7 +159,11 @@ export type JudgesRecount = Readonly<{
   counted: ReturnType<typeof deriveJudgesVerdict>["counted"];
   /** The groups a majority of the seated judges named (rule 2), letters in answer order. */
   groups: ReturnType<typeof deriveJudgesVerdict>["groups"];
-  /** The count's winner (rule 3), over the positions' latest final strengths: the served answer's group leads the panel. */
+  /**
+   * The count's winner (rule 3), over the positions' latest final strengths. A review catch-up can refresh those
+   * strengths after the answer was served, so at a tie this need not be the served answer: the panel leads with the
+   * RECORDED served answer and reads this only when none is recorded (follow-up N1).
+   */
   winnerRootNodeId: string;
 }>;
 
@@ -192,7 +197,9 @@ export function recountJudgesVotes(
         rootNodeId: position.nodeId,
         arguedByMaker: position.maker
       })),
-      // The tie-break of the winner only, which no reader of the recount uses; a position without a strength sorts last.
+      // The tie-break of the winner only (a position without a strength sorts last). `judgesComparisonOf` reads that
+      // winner only when no served answer is recorded (follow-up N1); the practice report reads only the counts and
+      // the letters.
       honestFinalStrength: new Map(lettered.map((position) => [position.nodeId, position.strength ?? -1] as const)),
       label: RECOUNT_LABEL
     });
@@ -204,19 +211,40 @@ export function recountJudgesVotes(
   }
 }
 
-export function judgesComparisonOf(
-  votes: readonly ComparisonVote[],
-  nodes: Answer["nodes"],
-  edges: Answer["edges"],
-  rootSites: readonly RootCallSite[]
-): JudgesComparison | undefined {
-  if (votes.length === 0) return undefined;
+/** The debate's positions: every node that argues about no other node (the story's and the page's own rule). */
+function positionsOf(nodes: Answer["nodes"], edges: Answer["edges"]): Answer["nodes"] {
   const arguing = new Set<string>();
   for (const edge of edges) {
     if (edge.target_kind === "NODE" && edge.target_ref === edge.from_node_ref) continue;
     arguing.add(edge.from_node_ref);
   }
-  const positions = nodes.filter((node) => !arguing.has(node.node_id));
+  return nodes.filter((node) => !arguing.has(node.node_id));
+}
+
+/**
+ * Follow-up N1: the recorded served answer, read from the served number: the one position whose provenance its
+ * `source_ref` names (the served node's provenance, as the review catch-up's source read joins them). Null when the
+ * answer has no served number (components only) or the numbers name no single position.
+ */
+export function servedPositionOf(nodes: Answer["nodes"], edges: Answer["edges"], sourceRefs: readonly string[]): string | null {
+  const sources = new Set(sourceRefs);
+  const named = [...new Set(positionsOf(nodes, edges).filter((node) => sources.has(node.provenance_ref)).map((node) => node.node_id))];
+  return named.length === 1 ? named[0]! : null;
+}
+
+export function judgesComparisonOf(
+  votes: readonly ComparisonVote[],
+  nodes: Answer["nodes"],
+  edges: Answer["edges"],
+  rootSites: readonly RootCallSite[],
+  /**
+   * The answer the run served, as recorded (the answer read takes it from the served number's `source_ref`, the served
+   * node's provenance). Its group leads the list; null or absent, or not a listed answer: the recount's winner leads.
+   */
+  servedRootNodeId: string | null = null
+): JudgesComparison | undefined {
+  if (votes.length === 0) return undefined;
+  const positions = positionsOf(nodes, edges);
   if (positions.length === 0) return undefined;
   const strengthOf = (node: Answer["nodes"][number]): number | null =>
     node.final_strength === null ? null : Math.min(1, Math.max(0, node.final_strength.value));
@@ -246,7 +274,10 @@ export function judgesComparisonOf(
     same_answer_as: (groupOfRoot.get(node.node_id) ?? []).filter((root) => root !== node.node_id)
   }));
   const codeUnits = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
-  const winner = recount.winnerRootNodeId;
+  // Follow-up N1 (scoped re-review): the served answer and its label stand as stored after a review catch-up, while the
+  // strengths the recount reads are the latest; so the recorded served answer leads, never a recount over new strengths.
+  const winner = servedRootNodeId !== null && entries.some((entry) => entry.root_node_id === servedRootNodeId)
+    ? servedRootNodeId : recount.winnerRootNodeId;
   const firstOf = (entry: Entry): number => (entry.root_node_id === winner ? 0 : 1);
   const stronger = (left: Entry, right: Entry): number =>
     (right.honest_score ?? -1) - (left.honest_score ?? -1) || codeUnits(left.root_node_id, right.root_node_id);

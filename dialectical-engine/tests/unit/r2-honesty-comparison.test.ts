@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerSchema, type Answer } from "@debateai/contract";
 import {
-  deriveJudgesVerdict, judgesComparisonOf, type ComparingJudgeVote, type ComparisonVote, type RootCallSite
+  deriveJudgesVerdict, judgesComparisonOf, servedPositionOf, type ComparingJudgeVote, type ComparisonVote, type RootCallSite
 } from "@debateai/serve"; // pre-flight PF-R2b4.4: not A10's StoredVerdictVote
 import type { EngineAnswerLetter } from "@debateai/kernel";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
@@ -333,6 +333,69 @@ describe("R2 honesty panel: answers counted as the same (ruling W1)", () => {
       [[LETTER_ROOTS.A, LETTER_ROOTS.B], 2],
       [[LETTER_ROOTS.C], 1]
     ]);
+  });
+
+  // Follow-up N1 (scoped re-review): a review catch-up refreshes the strengths the panel reads, while the served answer
+  // and its label stay as stored. The panel lists the RECORDED served answer's group first; the recount's winner (over
+  // the latest strengths) only when no served answer is recorded. Counts never move.
+  describe("the recorded served answer first, when the strengths moved after it was served (follow-up N1)", () => {
+    const servedAt = { A: 0.5, B: 0.3, C: 0.4 } as const;
+    const later = { A: 0.5, B: 0.3, C: 0.6 } as const;
+    const verdictOf = (replies: readonly Reply[], makers: readonly string[]) => deriveJudgesVerdict({
+      votes: replies.map((reply, index) => counting(index + 1, makers[index]!, reply)),
+      answers: (["A", "B", "C"] as const).map((letter) => ({ letter, rootNodeId: LETTER_ROOTS[letter], arguedByMaker: ARGUED_BY[letter] })),
+      honestFinalStrength: new Map((["A", "B", "C"] as const).map((letter) => [LETTER_ROOTS[letter], servedAt[letter]] as const)),
+      label: LABEL
+    });
+    const panelOf = (replies: readonly Reply[], makers: readonly string[], served?: string | null) => {
+      const answer = threePositions(later);
+      return judgesComparisonOf(replies.map((reply, index) => stored(index + 1, makers[index]!, reply)),
+        answer.nodes, answer.edges, SITES_3, served)!;
+    };
+
+    it("a vote tie: A served (SPLIT) at the time; C's case rose later; A's group still comes first", () => {
+      const replies: Reply[] = [{ best: "A", sameAs: [] }, { best: "C", sameAs: [] }];
+      const makers = ["Mistral", "DeepSeek"];
+      const verdict = verdictOf(replies, makers);
+      expect([verdict.winnerRootNodeId, verdict.label, verdict.trigger]).toEqual([LETTER_ROOTS.A, "SPLIT", "JUDGES_NO_MAJORITY"]);
+      const panel = panelOf(replies, makers, verdict.winnerRootNodeId);
+      expect(panel.answers.map((entry) => [entry.root_node_id, entry.judges_chose])).toEqual([
+        [LETTER_ROOTS.A, 1], [LETTER_ROOTS.C, 1], [LETTER_ROOTS.B, 0]]);
+      expect([panel.judges_seated, panel.judges_counted]).toEqual([2, 2]);
+      // With no served answer recorded, the recount's winner over the latest strengths (C) leads: the fallback.
+      expect(panelOf(replies, makers, null).answers[0]!.root_node_id).toBe(LETTER_ROOTS.C);
+      expect(panelOf(replies, makers).answers[0]!.root_node_id).toBe(LETTER_ROOTS.C);
+    });
+
+    it("no choice counted: the answer served then comes first, beside the sentence that it was chosen", () => {
+      // Each judge chose its own maker's answer: OpenAI argued A, Google argued C.
+      const replies: Reply[] = [{ best: "A", sameAs: [] }, { best: "C", sameAs: [] }];
+      const makers = ["OpenAI", "Google"];
+      const verdict = verdictOf(replies, makers);
+      expect([verdict.winnerRootNodeId, verdict.trigger]).toEqual([LETTER_ROOTS.A, "JUDGES_VOTES_IGNORED"]);
+      const panel = panelOf(replies, makers, verdict.winnerRootNodeId);
+      expect(panel.judges_counted).toBe(0);
+      expect(panel.answers.map((entry) => entry.root_node_id)).toEqual([LETTER_ROOTS.A, LETTER_ROOTS.C, LETTER_ROOTS.B]);
+    });
+
+    // The answer read's source: the position the served number's source_ref (the served node's provenance) names.
+    it("reads the served answer as the one position the served number names, else none", () => {
+      const answer = threePositions(later);
+      const provenanceOf = (nodeId: string) => answer.nodes.find((node) => node.node_id === nodeId)!.provenance_ref;
+      const shared = threePositions(later);
+      expect(servedPositionOf(answer.nodes, answer.edges, [provenanceOf(LETTER_ROOTS.A)])).toBe(null);
+      // The fixture's positions share one provenance; give each its own, as each answer is its own call's reply.
+      const own = { ...shared, nodes: shared.nodes.map((node) => ({ ...node, provenance_ref: `prov:${node.node_id}` })) };
+      expect(servedPositionOf(own.nodes, own.edges, [`prov:${LETTER_ROOTS.C}`])).toBe(LETTER_ROOTS.C);
+      expect(servedPositionOf(own.nodes, own.edges, [])).toBeNull();
+      expect(servedPositionOf(own.nodes, own.edges, ["prov:node:defeater"])).toBeNull();   // a point that argues, no answer
+      expect(servedPositionOf(own.nodes, own.edges, [`prov:${LETTER_ROOTS.A}`, `prov:${LETTER_ROOTS.C}`])).toBeNull();
+    });
+
+    it("a recorded served answer that is not a listed answer falls back to the recount's winner", () => {
+      const replies: Reply[] = [{ best: "A", sameAs: [] }, { best: "C", sameAs: [] }];
+      expect(panelOf(replies, ["Mistral", "DeepSeek"], "node:defeater").answers[0]!.root_node_id).toBe(LETTER_ROOTS.C);
+    });
   });
 
   // A walk of 1-5 seated judges (makers that argued an answer seated too), every reply shape below, two sets of

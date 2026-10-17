@@ -539,7 +539,8 @@ function storyNamed(ref: string | null): string {
  *   JUDGES_MAJORITY and JUDGES_VOTES_IGNORED name that case;
  * - JUDGES_MAJORITY also covers every seated judge choosing this answer when fewer were seated than a clear answer needs;
  * - JUDGES_NO_MAJORITY stays true with one seated judge: a lone counted choice settles nothing when the row asks more
- *   than one agreeing judge for a close call (with a row asking one, it settles it: JUDGES_MAJORITY);
+ *   than one agreeing judge for a close call (with a row asking one, it settles it: JUDGES_UNANIMOUS when the row's
+ *   clear-answer number is also one, else JUDGES_MAJORITY);
  * - JUDGES_NO_MAJORITY's tie clause follows the count's tie-break (ruling R2b-B9.2): an even count goes to the answer
  *   whose strongest case, among it and the answers counted as the same, held up best, and an exact tie of that to the
  *   first in a fixed order (the node id), never to a claim that this answer's own case was the best.
