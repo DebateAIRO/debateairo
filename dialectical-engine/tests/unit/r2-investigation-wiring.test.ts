@@ -83,4 +83,23 @@ describe("engine 2: the investigation step's place in the runner", () => {
     expect(block).toContain("engineInvestigated.clear();");
     expect(block).toContain("for (const [nodeId, status] of recordedStatuses) engineInvestigated.set(nodeId, status);");
   });
+
+  // A14 fix round 1: every unavailable investigation call leaves one content-free line, and one rule reads the statuses.
+  it("logs each unavailable call by its code, and reads every investigation status through one helper", async () => {
+    const source = await readFile(RUNNER, "utf8");
+    const start = source.indexOf("const investigateCannotAssessPoints = async (");
+    const body = source.slice(start, source.indexOf("if (engine.engine === 2 && effectiveMakerCount > 1) {", start));
+    const lines = body.match(/logPointInvestigation\("INVESTIGATION_UNAVAILABLE", \{ runId: run\.runId, callSiteKey, code: [^}]*\}\);/gu) ?? [];
+    expect(lines).toEqual([
+      "logPointInvestigation(\"INVESTIGATION_UNAVAILABLE\", { runId: run.runId, callSiteKey, code: \"INVESTIGATOR_SEAT_UNPLANNED\" });",
+      "logPointInvestigation(\"INVESTIGATION_UNAVAILABLE\", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });"
+    ]);
+    expect(body).toContain("statuses: engineInvestigatedStatuses(investigated.rows),");
+    expect(source).toContain("const recordedStatuses = engineInvestigatedStatuses(recordedRows);");
+    expect(source).toContain("readPointInvestigationsForRun(runId))\n          .flatMap(investigatedStatusEntry))");
+    expect(source.match(/row\.result === "HOLDS"/gu)).toBeNull();
+    const tool = await readFile(new URL("../../tools/preview-practice/practice-engine-graph.ts", import.meta.url), "utf8");
+    expect(tool).toContain("investigated: engineInvestigatedStatuses(source.investigations.filter((row) => inGraph.has(row.nodeId)))");
+    expect(tool.match(/row\.result === "HOLDS"/gu)).toBeNull();
+  });
 });

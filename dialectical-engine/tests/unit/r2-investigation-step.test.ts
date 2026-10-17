@@ -17,6 +17,12 @@ import type { EvaluationSnapshot, SnapshotArrow } from "@debateai/propagation";
 import { engineFactsWithInvestigations, pointInvestigationRowOfStored } from "../../apps/runner/src/engine-investigations.js";
 import { engineLinkedGraph } from "../../apps/runner/src/engine-links.js";
 import { engineMaterialGraphOf, engineMaterialSourceOf } from "../../apps/runner/src/engine-material-reader.js";
+// A14 fix round 1: defects fail the step, every unavailable call leaves one content-free line, one status rule.
+import { POINT_INVESTIGATION_RESULTS } from "@debateai/judgement";
+import {
+  engineInvestigatedStatuses, investigatedStatusEntry, investigatedStatusOf
+} from "../../apps/runner/src/engine-investigations.js";
+import { logPointInvestigation, pointInvestigationFailureCode } from "../../apps/runner/src/index.js";
 
 const ENGINE: EngineSettings = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 4, mapOpening: false });
 const SEAL = "e".repeat(64);
@@ -395,5 +401,78 @@ describe("engine 2: the investigation step's controller carries (A14 dispatch)",
     expect(pointInvestigationRowOfStored({ runId: "run-1", nodeId: "p3", investigationOrder: 3, result: "INVESTIGATION_CAPPED",
       basis: null, investigator: null, rawArtifactRef: null, standings: null, content: null }))
       .toEqual({ nodeId: "p3", investigationOrder: 3, result: "INVESTIGATION_CAPPED", ...NOT_CALLED });
+  });
+});
+
+describe("engine 2: the investigation step, A14 fix round 1", () => {
+  it.each([
+    ["HOLDS", "AGREE"], ["FAILS", "DISPUTE"], ["DEAD_END", null], ["INVESTIGATION_UNAVAILABLE", null],
+    ["INVESTIGATION_SKIPPED", null], ["INVESTIGATION_CAPPED", null]
+  ] as const)("reads a recorded %s as the review status %s (null: the point stays cannot-assess)", (result, status) => {
+    expect(investigatedStatusOf(result)).toBe(status);
+  });
+
+  it("covers every recorded result, and the statuses map names only the settled points", () => {
+    expect([...POINT_INVESTIGATION_RESULTS].sort()).toEqual(["DEAD_END", "FAILS", "HOLDS", "INVESTIGATION_CAPPED",
+      "INVESTIGATION_SKIPPED", "INVESTIGATION_UNAVAILABLE"]);
+    expect(investigatedStatusOf("NOT_A_RESULT")).toBeNull();
+    const rows = POINT_INVESTIGATION_RESULTS.map((result, index) => ({ nodeId: `p${String(index + 1)}`, result }));
+    expect(Object.fromEntries(engineInvestigatedStatuses(rows))).toEqual({ p1: "AGREE", p2: "DISPUTE" });
+    expect(rows.flatMap(investigatedStatusEntry)).toEqual([["p1", "AGREE"], ["p2", "DISPUTE"]]);
+  });
+
+  it.each([
+    ["a named investigation defect", new TypeError("POINT_INVESTIGATION_CANDIDATE_INVALID"), "RETHROW"],
+    ["a length-field defect", new TypeError("LENGTH_FIELD_INVALID"), "RETHROW"],
+    ["a material defect", new TypeError("ENGINE_MATERIAL_INVALID:points.nodeId"), "RETHROW"],
+    ["a seat with no eligible member", new TypedDomainError("DEBATE_MAKER_UNRESOLVED", "x"), "RETHROW"],
+    ["fetch's network failure", new TypeError("fetch failed"), "UNAVAILABLE"],
+    ["a socket ended mid-reply", new TypeError("terminated"), "UNAVAILABLE"],
+    ["an unreadable reply", new TypedDomainError("POINT_INVESTIGATION_PARSE_FAILURE", "x"), "UNAVAILABLE"],
+    ["a reply refused after the repairs", new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", "x"), "UNAVAILABLE"]
+  ] as const)("reads %s as %s (by its code, never by its class alone)", (_name, error, outcome) => {
+    expect(pointInvestigationFailureOutcome(error)).toBe(outcome);
+  });
+
+  it("fails the step on a code defect inside the call, after every sent call settled", async () => {
+    const run = investigate({ replies: {
+      "VERDICT:investigate:1": new TypeError("LENGTH_FIELD_INVALID"), "VERDICT:investigate:2": reply("holds")
+    } });
+    await expect(run.result).rejects.toThrow("LENGTH_FIELD_INVALID");
+    expect(run.seen).toHaveLength(2);
+    expect(run.recorded).toEqual([]);
+  });
+
+  it("keeps a network failure unavailable: the debate goes on", async () => {
+    const run = investigate({ replies: { "VERDICT:investigate:1": new TypeError("fetch failed"), "VERDICT:investigate:2": reply("holds") } });
+    const { rows } = await run.result;
+    expect(rows.map((row) => [row.nodeId, row.result])).toEqual([
+      ["p2", "INVESTIGATION_UNAVAILABLE"], ["p1", "HOLDS"], ["p3", "INVESTIGATION_CAPPED"]
+    ]);
+  });
+
+  it("names a failure by its code, or its class when it has none, never by its message", () => {
+    expect(pointInvestigationFailureCode(new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", "the reply said: secret"))).toBe(
+      "POINT_INVESTIGATION_SCHEMA_FAILURE");
+    expect(pointInvestigationFailureCode(Object.assign(new Error("read ECONNRESET at the vendor"), { code: "ECONNRESET" }))).toBe("ECONNRESET");
+    expect(pointInvestigationFailureCode(Object.assign(new Error("x"), { code: "not a code, words" }))).toBe("Error");
+    expect(pointInvestigationFailureCode(new TypeError("fetch failed"))).toBe("TypeError");
+    expect(pointInvestigationFailureCode("a thrown string")).toBe("UNKNOWN");
+  });
+
+  it("writes one content-free line per unavailable call: kind, event, ids and the code, no message", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const error = new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", "Vendor text: the AI wrote this sentence.");
+      logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: "run-1", callSiteKey: "VERDICT:investigate:1",
+        code: pointInvestigationFailureCode(error) });
+      expect(warn).toHaveBeenCalledTimes(1);
+      const line = String(warn.mock.calls[0]?.[0]);
+      expect(JSON.parse(line)).toEqual({ runId: "run-1", callSiteKey: "VERDICT:investigate:1",
+        code: "POINT_INVESTIGATION_SCHEMA_FAILURE", kind: "DEBATEAI_POINT_INVESTIGATION", event: "INVESTIGATION_UNAVAILABLE" });
+      expect(line).not.toContain("AI wrote");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

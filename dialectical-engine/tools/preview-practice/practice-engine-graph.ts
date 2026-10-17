@@ -25,7 +25,6 @@ import {
   honestDisputeFactor,
   judgeArtifactSchema,
   judgeAssessmentSchema,
-  type EngineReviewStatus,
   type JudgeAssessment,
   type PointInvestigationResult
 } from "@debateai/judgement";
@@ -54,6 +53,7 @@ import { engineOfRun, type EngineScoring } from "@debateai/register";
 import { runQuestionLanguageLock } from "@debateai/runner";
 import { seatBaseCallSiteKey } from "@debateai/serve";
 import { engineNodeFactsOf, engineOwnReplyEdgeIdsOf } from "../../apps/runner/src/engine-links.js";
+import { engineInvestigatedStatuses } from "../../apps/runner/src/engine-investigations.js";
 import { callFamilyOf, practiceJudgeReadingOf, type PracticeJudgeReading } from "./practice-lanes.js";
 
 export type TranscriptEngineNode = Readonly<{
@@ -273,9 +273,7 @@ export function buildTranscriptEngineGraph(source: EngineGraphSource): Transcrip
     disputedNodeIds: counted.filter((review) => review.outcome === "dispute").map((review) => review.nodeId),
     cannotAssessNodeIds: counted.filter((review) => review.outcome === "cannot-assess").map((review) => review.nodeId),
     ownReplyEdgeIds: ownReplies,
-    investigated: new Map(source.investigations.flatMap((row): (readonly [string, EngineReviewStatus])[] => !inGraph.has(row.nodeId) ? []
-      : row.result === "HOLDS" ? [[row.nodeId, "AGREE"]]
-        : row.result === "FAILS" ? [[row.nodeId, "DISPUTE"]] : []))
+    investigated: engineInvestigatedStatuses(source.investigations.filter((row) => inGraph.has(row.nodeId)))
   });
   const disputeFactorAppliedTo = (nodeId: string): boolean => facts !== null && source.scoring !== null
     && honestDisputeFactor(facts.get(nodeId)?.status ?? "NONE", source.scoring) !== 1;

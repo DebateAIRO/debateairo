@@ -268,8 +268,8 @@ import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSu
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
-  engineFactsWithInvestigations, engineInvestigationCandidates, pointInvestigationRowOfStored, recordPointInvestigationRows,
-  runPointInvestigations, type PointInvestigationRow
+  engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates, investigatedStatusEntry,
+  pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations, type PointInvestigationRow
 } from "./engine-investigations.js";
 import { engineMaterialGraphOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
@@ -538,7 +538,36 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
 export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "UNAVAILABLE" {
   if (keepAliveStop(error)) return "RETHROW";
   if (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED) return "RETHROW";
+  // A14 fix round 1 (PF-R2a8.17): a code defect fails the debate, as a defect should. A seat with no eligible member,
+  // and a TypeError the code NAMED (its message is a code: POINT_INVESTIGATION_*, LENGTH_*, ENGINE_MATERIAL_INVALID:…)
+  // inside the call's builders. Decided by the code, never by the class: fetch's own network failure is a TypeError
+  // ("fetch failed") and stays unavailable.
+  if (error instanceof TypedDomainError && error.code === "DEBATE_MAKER_UNRESOLVED") return "RETHROW";
+  if (error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message)) return "RETHROW";
   return "UNAVAILABLE";
+}
+
+/** A TypeError the code raised by name: an upper-case code of two or more words, optionally `:<field path>`. */
+const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
+/** A content-free code (a domain code or a system one such as ECONNRESET). */
+const FAILURE_CODE_SHAPE = /^[A-Z][A-Z0-9_]{0,63}$/u;
+
+/**
+ * Engine 2 (A14 fix round 1): what an unavailable investigation call is named in the runner's line: its typed code, or
+ * a code-shaped `code` property (ECONNRESET), else its class name. Never its message: it may carry vendor or AI text.
+ */
+export function pointInvestigationFailureCode(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  if (typeof error !== "object" || error === null) return "UNKNOWN";
+  const code = (error as { readonly code?: unknown }).code;
+  if (typeof code === "string" && FAILURE_CODE_SHAPE.test(code)) return code;
+  const name: unknown = (error as { readonly constructor?: { readonly name?: unknown } }).constructor?.name;
+  return typeof name === "string" && /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(name) ? name : "UNKNOWN";
+}
+
+/** Engine 2 (A14 fix round 1): the runner's content-free investigation line. Codes and ids only, never debate or model text. */
+export function logPointInvestigation(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_POINT_INVESTIGATION", event }));
 }
 
 /**
@@ -2196,9 +2225,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         // A14: the run's investigation outcomes, read back (HOLDS = AGREE; FAILS = DISPUTE, its links still at the
         // cannot-assess weight; a dead end stays cannot-assess).
         investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationsForRun(runId))
-          .flatMap((row): (readonly [string, EngineReviewStatus])[] =>
-            row.result === "HOLDS" ? [[row.nodeId, "AGREE"] as const]
-              : row.result === "FAILS" ? [[row.nodeId, "DISPUTE"] as const] : []))
+          .flatMap(investigatedStatusEntry))
       });
       const standing = projectJudgedStanding(linked === null ? fullSnapshot : linked.snapshot,
         linked === null ? reviewedNodeIds : linked.reviewedNodeIds);
@@ -9238,6 +9265,7 @@ export class WalkingSkeletonRunner {
       const stored = (await this.#pointInvestigations.readPointInvestigationsForRun(run.runId))
         .find((entry) => entry.nodeId.toLowerCase() === row.nodeId.toLowerCase());
       // The stored row, under this copy's spelling of the node id (the ledger hands ids back lower-case).
+      // Unreachable today: a reclaim sets earlier copies' nodes aside, so a second record for one (run, node) cannot arise.
       return stored === undefined ? undefined : Object.freeze({ ...pointInvestigationRowOfStored(stored), nodeId: row.nodeId });
     };
     /**
@@ -9308,7 +9336,10 @@ export class WalkingSkeletonRunner {
         materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
         call: async ({ callSiteKey, investigator, candidate, material }) => {
           const seat = investigatorSeat.get(investigator);
-          if (seat === undefined) return Object.freeze({ kind: "UNAVAILABLE" as const });
+          if (seat === undefined) {
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
           const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
           // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
           movedCallBars.set(callSiteKey, fair);
@@ -9340,6 +9371,7 @@ export class WalkingSkeletonRunner {
             }) });
           } catch (error) {
             if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
             return Object.freeze({ kind: "UNAVAILABLE" as const });
           }
         }
@@ -9348,8 +9380,7 @@ export class WalkingSkeletonRunner {
       // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
       // weight on its score (pre-flight PF-R2a8.11).
       return Object.freeze({
-        statuses: new Map([...investigated.facts].flatMap(([nodeId, entry]) =>
-          cannotAssess.includes(nodeId) && entry.status !== "CANNOT_ASSESS" ? [[nodeId, entry.status] as const] : [])),
+        statuses: engineInvestigatedStatuses(investigated.rows),
         facts: investigated.facts,
         rows: investigated.rows
       });
@@ -9419,10 +9450,7 @@ export class WalkingSkeletonRunner {
         record: recordPointInvestigationRow
       });
       const recordedFacts = engineFactsWithInvestigations(investigation.facts, recordedRows);
-      const recordedStatuses = new Map(recordedRows.flatMap((row) => {
-        const status = recordedFacts.get(row.nodeId)?.status;
-        return status === undefined || status === "CANNOT_ASSESS" ? [] : [[row.nodeId, status] as const];
-      }));
+      const recordedStatuses = engineInvestigatedStatuses(recordedRows);
       engineInvestigation = Object.freeze({ statuses: recordedStatuses, facts: recordedFacts, rows: recordedRows });
       engineInvestigated.clear();
       for (const [nodeId, status] of recordedStatuses) engineInvestigated.set(nodeId, status);

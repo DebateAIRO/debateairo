@@ -15,7 +15,7 @@
 import { enginePointPlacement, pointInvestigationCallSiteKey, type EngineMaterialSource, type PointInvestigationMaterial } from "@debateai/kernel";
 import {
   orderPointInvestigations, pickPointInvestigator, pointInvestigationResultOf, pointInvestigationStatus,
-  type PointInvestigationBasis, type PointInvestigationCandidate, type PointInvestigationOutcome,
+  type EngineReviewStatus, type PointInvestigationBasis, type PointInvestigationCandidate,
   type PointInvestigationRecord, type PointInvestigationReply, type PointInvestigationResult, type PointInvestigationSeat
 } from "@debateai/judgement";
 import type { EngineSettings } from "@debateai/register";
@@ -99,9 +99,30 @@ const NOT_INVESTIGATED: Readonly<Record<"CAPPED" | "SKIPPED", PointInvestigation
 });
 /** The rows an investigator answered: the ones "standings moved" is computed for. */
 const ANSWERED: ReadonlySet<PointInvestigationResult> = new Set<PointInvestigationResult>(["HOLDS", "FAILS", "DEAD_END"]);
-/** An answered row's result read back as the investigator's outcome (A13's `pointInvestigationResultOf`, reversed). */
-const OUTCOME_OF_RESULT: Readonly<Partial<Record<PointInvestigationResult, PointInvestigationOutcome>>> =
-  Object.freeze({ HOLDS: "holds", FAILS: "fails", DEAD_END: "dead_end" });
+/** The two recorded results that settle a point (the review it lacked); every other result leaves it cannot-assess. */
+const SETTLED_STATUS_OF_RESULT: Readonly<Record<string, "AGREE" | "DISPUTE">> = Object.freeze({ HOLDS: "AGREE", FAILS: "DISPUTE" });
+
+/**
+ * The ONE rule for reading a recorded investigation as a review status (spec §4.2b, §17): HOLDS -> AGREE, FAILS ->
+ * DISPUTE; DEAD_END, INVESTIGATION_UNAVAILABLE, _SKIPPED and _CAPPED (or anything else) -> null, the point stays
+ * cannot-assess. The runner's step, its record, its review catch-up and the practice transcript all read it here.
+ */
+export function investigatedStatusOf(result: string): "AGREE" | "DISPUTE" | null {
+  return Object.hasOwn(SETTLED_STATUS_OF_RESULT, result) ? SETTLED_STATUS_OF_RESULT[result] ?? null : null;
+}
+
+/** One row as `investigated` map entries (A8's `EngineReviewFacts.investigated`): one entry when it settled the point, else none. */
+export function investigatedStatusEntry(row: Readonly<{ nodeId: string; result: string }>):
+  readonly (readonly [string, EngineReviewStatus])[] {
+  const status = investigatedStatusOf(row.result);
+  return status === null ? [] : [[row.nodeId, status] as const];
+}
+
+/** The `investigated` map (A8's `EngineReviewFacts.investigated`) of these rows: the settled points only. */
+export function engineInvestigatedStatuses(rows: readonly Readonly<{ nodeId: string; result: string }>[]):
+  ReadonlyMap<string, EngineReviewStatus> {
+  return new Map(rows.flatMap(investigatedStatusEntry));
+}
 
 /**
  * A code defect, never a debate's state: only a point whose own review said "cannot assess" is investigated, gets
@@ -227,7 +248,7 @@ export async function recordPointInvestigationRows(input: Readonly<{
   rows: readonly PointInvestigationRow[];
   facts: ReadonlyMap<string, EngineNodeFacts>;
   standingsOf: (nodeId: string, facts: ReadonlyMap<string, EngineNodeFacts>) => PointInvestigationStandingsRecord;
-  record: (row: PointInvestigationRow) => Promise<PointInvestigationRow | void>;
+  record: (row: PointInvestigationRow) => Promise<PointInvestigationRow | null | void>;
 }>): Promise<readonly PointInvestigationRow[]> {
   const rows = Object.freeze(input.rows.map((row): PointInvestigationRow => {
     if (!ANSWERED.has(row.result)) return row;
@@ -239,7 +260,7 @@ export async function recordPointInvestigationRows(input: Readonly<{
   const recorded: PointInvestigationRow[] = [];
   for (const row of rows) {
     const stored = await input.record(row);
-    recorded.push(typeof stored === "object" ? stored : row);
+    recorded.push(stored !== undefined && stored !== null ? stored : row);
   }
   return Object.freeze(recorded);
 }
@@ -275,10 +296,9 @@ export function engineFactsWithInvestigations(facts: ReadonlyMap<string, EngineN
   for (const row of rows) {
     const prior = facts.get(row.nodeId);
     assertCannotAssessReview(prior, false);
-    const outcome = OUTCOME_OF_RESULT[row.result];
     next.set(row.nodeId, Object.freeze({
       nodeId: row.nodeId, ownReplyEdgeIds: prior?.ownReplyEdgeIds ?? Object.freeze([]), cannotAssessReview: true,
-      status: outcome === undefined ? "CANNOT_ASSESS" : pointInvestigationStatus(outcome)
+      status: investigatedStatusOf(row.result) ?? "CANNOT_ASSESS"
     }));
   }
   return next;
