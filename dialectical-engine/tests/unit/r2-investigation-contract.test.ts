@@ -197,11 +197,28 @@ describe("engine 2: the investigation contract (spec §4.2b, INTERFACE §8)", ()
     expect(frame.contractId).toBe("verdict.investigate.v1");
     expect(frame.fields.map((field) => field.name)).toEqual(["question", "answer", "point", "target_point", "relation",
       "reviewer_reason", "length", "question_language"]);
-    // Spec G1 (controller carry): the investigator reads no score, weight, strength, distance or rank. The material and
-    // the serialized packet carry no number value, and no AI-written field carries a digit (only the length guide does).
+    // Spec G1 (controller carry): the investigator reads no score, weight, strength, distance or rank. The material
+    // fields carry no number value, and no AI-written field carries a digit (only the length guide does).
     expect(numbersIn(pointInvestigationMaterialFields(MATERIAL, GUIDE))).toEqual([]);
-    expect(numbersIn(JSON.parse(JSON.stringify(request!.packet)))).toEqual([]);
     expect(frame.fields.filter((field) => field.name !== "length" && /\d/u.test(field.content))).toEqual([]);
+    // R2a final wave B10 (Ruling (A13 Minors) 1): the same read off the wire. The user message is the fenced block; with
+    // the fence lines taken off, its envelope's fields carry no digit and no number word, except the length guide,
+    // which names only its own target. (Every packet value is a string, so a walk for number VALUES there proves nothing.)
+    const user = request!.packet.messages.find((message) => message.role === "user")!.content;
+    const lines = user.split("\n");
+    expect(lines[0]).toBe(frame.fence);
+    expect(lines.at(-1)).toBe(frame.fence);
+    const envelope = JSON.parse(lines.slice(1, -1).join("\n")) as { fields: { name: string; content: string }[] };
+    expect(envelope.fields.map((field) => field.name)).toEqual(frame.fields.map((field) => field.name));
+    const NUMBER_WORD = /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|hundred|thousand|half|percent|score|weight|strength|rank)\b/iu;
+    for (const field of envelope.fields) {
+      if (field.name === "length") {
+        expect(field.content).toBe(`about ${String(GUIDE.words)} words`);
+        continue;
+      }
+      expect(field.content, field.name).not.toMatch(/\d/u);
+      expect(field.content, field.name).not.toMatch(NUMBER_WORD);
+    }
   });
 
   it("turns a reply still refused after the gateway's repairs into POINT_INVESTIGATION_SCHEMA_FAILURE", async () => {

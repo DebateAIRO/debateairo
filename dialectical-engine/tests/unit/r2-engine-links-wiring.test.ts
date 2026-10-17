@@ -128,6 +128,17 @@ describe("engine 2: the runner's wiring (source pins; no pool-free harness for e
     expect(RUNNER.split("noteOwnReplyEdges(").length - 1).toBe(3);
     const note = RUNNER.indexOf("const noteOwnReplyEdges = (");
     expect(RUNNER.slice(note, note + 300)).toContain("if (engine.engine !== 2) return;");
+    // R2a final wave B6 (Ruling (A8 Minors) 2): WHERE each of the three sits, not only how many there are: inside the
+    // shape's cross leg and the cross chain, right after a saved node, and at the serial exchange's save.
+    const sliceOf = (start: string, end: string): string => {
+      const from = RUNNER.indexOf(start);
+      expect(from, start).toBeGreaterThan(0);
+      return RUNNER.slice(from, RUNNER.indexOf(end, from));
+    };
+    const savedThenNoted = "if (saved === null) return;\n        noteOwnReplyEdges(saved);";
+    expect(sliceOf("const argueShapeCross = async (", "const crossChain = async (")).toContain(savedThenNoted);
+    expect(sliceOf("const crossChain = async (", "\n      };\n")).toContain(savedThenNoted);
+    expect(RUNNER).toContain("if (authored.kind === \"HALTED\") haltedExpansionRecords.push(authored.record);\n        else noteOwnReplyEdges(authored.value);");
   });
 
   it("links the graph at the round boundary and at the serve decision, and returns nothing on engine 1", () => {

@@ -289,6 +289,22 @@ describe("PointInvestigationRepository and VerdictVoteRepository (0121)", () => 
     }
   });
 
+  // R2a final wave B7 (Ruling (A10 Minors) 1): a row the database admits but the repository's own rule does not (a letter
+  // in two groups) is refused on read, typed, naming the seat and the field, never a value.
+  it("refuses on read a stored vote whose same-as groups share a letter (ENGINE_ROW_INVALID)", async () => {
+    const runId = await newRun("legacy");
+    const rootA = await node(runId, "legacy");
+    const reply = await artifact(runId);
+    await database.pool.query(
+      `INSERT INTO ledger.verdict_vote (run_id, judge_seat, maker, provider_ref, model_id, raw_artifact_ref, chosen_letter, chosen_root_node_id,
+         conditional, counted, not_counted_reason, question_kind, same_as, content)
+       VALUES ($1,2,'maker-8','deepinfra:judge-8','vendor/judge-8',$2,'A',$3,false,true,NULL,'general',$4::jsonb,$5::jsonb)`,
+      [runId, reply, rootA, '[["A","B"],["B","C"]]', JSON.stringify({ reasons: "Answer A holds." })]);
+    await expect(new VerdictVoteRepository(database.pool).readVerdictVotesForRun(runId)).rejects.toMatchObject({
+      code: "ENGINE_ROW_INVALID", message: "ENGINE_ROW_INVALID: ledger.verdict_vote seat 2 choice.sameAs[1]"
+    });
+  });
+
   it("an erased run reads as empty and refuses new rows as RUN_ERASED", async () => {
     const runId = await newRun("encrypted");
     const [point, rootA, rootB] = [await node(runId, "encrypted"), await node(runId, "encrypted"), await node(runId, "encrypted")];

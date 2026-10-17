@@ -222,6 +222,9 @@ describe("R2 transcript: the engine graph (INTERFACE §15.3)", () => {
     // Engine 1 has no dispute factor, whatever the reviews say.
     expect(buildTranscriptEngineGraph(source({ investigations: [{ nodeId: P2, result: "FAILS" }] }))!.nodes
       .some((node) => node.disputeFactorApplied)).toBe(false);
+    // R2a final wave B11 (Ruling (A15 Minors) 2): not even with engine 2's scoring at hand: the engine decides, not the scoring.
+    expect(buildTranscriptEngineGraph(source({ engine: 1, scoring: START_SCORING, investigations: [{ nodeId: P2, result: "FAILS" }] }))!.nodes
+      .some((node) => node.disputeFactorApplied)).toBe(false);
   });
 
   it("is absent for a run that served no propagation", () => {

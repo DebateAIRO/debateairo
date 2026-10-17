@@ -164,10 +164,23 @@ describe("engine 2: whether one investigation moved the standings (spec §4.2b, 
 
   // pre-flight PF-R2a3.1: a failed point keeps the cannot-assess weight, so here it cannot move the leader.
   it("a point found to fail weighs less than at the cannot-assess weight, and here moves nothing", () => {
-    // point-p at 0.35 behind a 0.66 link: root-b 0.7 − 0.7·0.231 = 0.5383 > 0.45, as without the investigation (0.469).
+    // R2a final wave B4 (Ruling (A6 Minors) 6): bases picked so the OLD rule (a failed point's link at full weight)
+    // would move the leader. root-a 0.46; point-p's attack measured at 1.
+    // Ruled: point-p at 0.35 behind a 0.66 link: root-b 0.7 − 0.7·0.231 = 0.5383 > 0.46, as without the investigation
+    // (0.7 − 0.7·0.33 = 0.469). Old rule: 0.35 at full weight: root-b 0.7 − 0.7·0.35 = 0.455 < 0.46, root-a would lead.
+    const close = graph([
+      { nodeId: "root-a", baseStrength: 0.46, parentNodeId: null },
+      { nodeId: "root-b", baseStrength: 0.7, parentNodeId: null },
+      { nodeId: "point-p", baseStrength: 0.5, parentNodeId: "root-b" }
+    ], [arrow("p-b", "point-p", "root-b", "attack", 1)]);
     const facts = new Map([fact("point-p", "DISPUTE", { cannotAssessReview: true })]);
-    expect(pointInvestigationStandings({ snapshot: STANDINGS, facts, engine: ENGINE, nodeId: "point-p", servableRootIds: roots }))
+    expect(pointInvestigationStandings({ snapshot: close, facts, engine: ENGINE, nodeId: "point-p", servableRootIds: roots }))
       .toEqual({ leaderWithoutRootNodeId: "root-b", leaderWithRootNodeId: "root-b", moved: false });
+    expect(strengthOf(engineSnapshotOf(close, facts, ENGINE), "root-b")).toBeCloseTo(0.5383, 12);
+    // The old rule, for contrast: disputed, its link not held at the cannot-assess weight.
+    const oldRule = engineSnapshotOf(close, new Map([fact("point-p", "DISPUTE")]), ENGINE);
+    expect(strengthOf(oldRule, "root-b")).toBeCloseTo(0.455, 12);
+    expect(strengthOf(oldRule, "root-b")).toBeLessThan(0.46);
   });
 
   it("names the leader the runner's selection would name (same order, ties by node id)", () => {

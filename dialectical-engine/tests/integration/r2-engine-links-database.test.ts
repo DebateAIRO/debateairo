@@ -121,6 +121,38 @@ describe("R2 A8 · engine 2 reads the reviews from the ledger", () => {
     expect(linked.unassessedNodeIds).toEqual([ids.get("unassessed")]);
   });
 
+  // R2a final wave B6 (Ruling (A8 Minors) 3): review order, not node order; a set-aside (stale) node is not read.
+  it("reads the cannot-assess nodes in review order, two reviews written in reverse, without a set-aside node", async () => {
+    const runId = await createRun(`r2-a8-order-${randomUUID()}`);
+    const keys = ["root", "first", "second", "stale"] as const;
+    const authors = new Map<string, string>();
+    for (const key of keys) authors.set(key, await artifact(runId, "house-a"));
+    const ids = await new GraphRepository(database.pool).withGraphWrite(runId, async (writer) => {
+      const created = new Map<string, string>();
+      for (const [ordinal, key] of keys.entries()) {
+        const parentNodeId = key === "root" ? null : created.get("root")!;
+        created.set(key, await writer.addNode({
+          runId, claimType: "unknown", generationStatus: "complete", pathStatus: "active", explorationDecision: "continue",
+          wayOfKnowing: "REASONING", locator: null, valueLaden: false, statementText: `r2-b6: ${key}`, parentNodeId,
+          childKind: parentNodeId === null ? null : "support", siblingOrdinal: ordinal, provenanceRef: authors.get(key)!
+        }));
+      }
+      return created;
+    });
+    for (const key of keys) await recordTau(runId, ids.get(key)!, 0.6);
+    // Written in reverse of the nodes' own order: second, then stale, then first.
+    for (const key of ["second", "stale", "first"] as const) {
+      await recordNodeReviewAlone(database.pool, {
+        runId, nodeId: ids.get(key)!, authorRawArtifactRef: authors.get(key)!,
+        reviewRawArtifactRef: await artifact(runId, "house-b"), outcome: "cannot-assess", reasons: [`r2-b6: ${key} review`]
+      });
+    }
+    const judgements = new JudgementRepository(database.pool);
+    expect(await judgements.readCannotAssessNodeIds(runId)).toEqual([ids.get("second"), ids.get("stale"), ids.get("first")]);
+    await database.pool.query("UPDATE core.node SET generation_status = 'stale' WHERE run_id = $1 AND node_id = $2", [runId, ids.get("stale")]);
+    expect(await judgements.readCannotAssessNodeIds(runId)).toEqual([ids.get("second"), ids.get("first")]);
+  });
+
   // Pre-flight PF-R2a2.3: the review catch-up reads the rule the previous propagation version recorded.
   it("reads the run's latest propagation version's judgement-selection rule, and null before the first", async () => {
     const runId = await createRun(`r2-a8-rule-${randomUUID()}`);

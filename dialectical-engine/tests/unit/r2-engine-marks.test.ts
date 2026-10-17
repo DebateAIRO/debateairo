@@ -55,10 +55,13 @@ describe("R2: the four engine marks (spec §4.7, §4.2a; INTERFACE §13)", () =>
     expect(() => assertRequiredConditionMarkRecords([mark], [])).toThrowError(code("CONDITION_MARK_RECORD_REQUIRED"));
   });
 
-  it("accepts an answer-scope verdict record", () => {
-    const record: ConditionMarkRecord = { mark: "VERDICT-JUDGE-MISSING", scope: "answer", subjectRef: "root-a",
-      reason: "VERDICT_JUDGE_MISSING:1", liftPath: null, servedRootRule: null, affectedNodeIds: ["root-a"] };
-    expect(() => assertRequiredConditionMarkRecords(["VERDICT-JUDGE-MISSING"], [record])).not.toThrow();
+  // R2a final wave B5 (Ruling (A7 Minors) 2): each of the three verdict marks, not only the first.
+  it.each(["VERDICT-JUDGE-MISSING", "VERDICT-JUDGES-UNAVAILABLE", "VERDICT-VOTES-IGNORED"] as const)("accepts an answer-scope %s record", (mark) => {
+    const record: ConditionMarkRecord = { mark, scope: "answer", subjectRef: "root-a",
+      reason: `${mark.replaceAll("-", "_")}:1`, liftPath: null, servedRootRule: null, affectedNodeIds: ["root-a"] };
+    expect(() => assertRequiredConditionMarkRecords([mark], [record])).not.toThrow();
+    // The record is what satisfies the mark: without it the same mark is refused (the row above).
+    expect(() => assertRequiredConditionMarkRecords([mark], [])).toThrowError(code("CONDITION_MARK_RECORD_REQUIRED"));
   });
 
   it("binds the reduced-weight record to its cannot-assess review, and to nothing else", () => {

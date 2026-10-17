@@ -136,6 +136,8 @@ describe("R2 practice: a set-aside (stale) node is never counted", () => {
       expect(reads.length, file).toBe(2);
       for (const read of reads) {
         expect(read, file).toContain("JOIN core.node AS node ON node.run_id = ");
+        // R2a final wave B12 (A17 fix re-review Minor 2): the join keys on the node too, not the run alone.
+        expect(read, file).toMatch(/JOIN core\.node AS node ON node\.run_id = (review|investigation)\.run_id AND node\.node_id = \1\.node_id\b/u);
         expect(read, file).toContain(STALE_FILTER);
       }
     }

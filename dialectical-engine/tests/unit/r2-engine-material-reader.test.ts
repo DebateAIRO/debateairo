@@ -101,11 +101,23 @@ describe("engine 2: the runner's material reader (INTERFACE §11.2)", () => {
 
   it("keeps only the recorded findings an AI wrote (holds, fails, dead end)", () => {
     const content = { missing: "Rush-hour ridership.", found: "", reason: "A ridership count would decide it." };
+    // R2a final wave B9 (Ruling (A12 Minors) 1): HOLDS, FAILS and SKIPPED rows too, each read its own way.
+    const holds = { missing: "Rush-hour ridership.", found: "About two thousand riders an hour.", reason: "With that count the point stands." };
+    const fails = { missing: "The fare.", found: "Probably five euros a ride.", reason: "At that fare the saving fails." };
+    const P3 = "00000000-0000-4000-8000-0000000000c3";
+    const P4 = "00000000-0000-4000-8000-0000000000c4";
     expect([...engineMaterialInvestigationsOf([
       { nodeId: X1, result: "DEAD_END", basis: "none", content },
       { nodeId: P1, result: "INVESTIGATION_CAPPED", basis: null, content: null },
-      { nodeId: P2, result: "INVESTIGATION_UNAVAILABLE", basis: null, content: null }
-    ]).entries()]).toEqual([[X1, { ...content, basis: "none", outcome: "dead_end" }]]);
+      { nodeId: P2, result: "INVESTIGATION_UNAVAILABLE", basis: null, content: null },
+      { nodeId: P3, result: "HOLDS", basis: "established", content: holds },
+      { nodeId: P4, result: "FAILS", basis: "assumption", content: fails },
+      { nodeId: "00000000-0000-4000-8000-0000000000c5", result: "INVESTIGATION_SKIPPED", basis: null, content: null }
+    ]).entries()]).toEqual([
+      [X1, { ...content, basis: "none", outcome: "dead_end" }],
+      [P3, { ...holds, basis: "established", outcome: "holds" }],
+      [P4, { ...fails, basis: "assumption", outcome: "fails" }]
+    ]);
   });
 
   it("reads each review's makers and order from the ledger and its reasons through the story's leased reader", async () => {
@@ -127,6 +139,8 @@ describe("engine 2: the runner's material reader (INTERFACE §11.2)", () => {
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0]![1]).toEqual([RUN, [X1.toLowerCase(), P2.toLowerCase()]]);
     expect(String(query.mock.calls[0]![0])).toMatch(/WHERE review\.run_id = \$1 AND review\.node_id = ANY\(\$2::uuid\[\]\)/u);
+    // R2a final wave B9 (Ruling (A12 Minors) 2): the review order is spec §17's third tie-break.
+    expect(String(query.mock.calls[0]![0])).toMatch(/WHERE review\.run_id = \$1 AND review\.node_id = ANY\(\$2::uuid\[\]\)\s+ORDER BY review\.at_seq\s*$/u);
     expect(mocks.readStoryEnrichment).toHaveBeenCalledWith(pool, { runId: RUN,
       nodes: [{ nodeId: X1, judgeArtifactRef: null }, { nodeId: P2, judgeArtifactRef: null }] });
   });

@@ -39,7 +39,9 @@ describe("engine 2: the rival-reply ring (spec §4.2a rule 1, INTERFACE §7.1)",
     [[2, 2, null], [2, 0, 1]],
     [[1, 0, 1, 0], [1, 0, 3, 2]],
     [[null, null], [1, 0]],
-    [[1, 1], [1, 0]]                          // a self-name reads as none
+    [[1, 1], [1, 0]],                         // a self-name reads as none
+    // R2a final wave B3 (Task A5 review 1): an index out of range, negative or not whole reads as none.
+    [[7, -1, 1.5], [1, 2, 0]]
   ] as const)("builds %j into %j", (named, ring) => {
     expect(shapeRivalRing(named)).toEqual(ring);
   });
@@ -70,6 +72,10 @@ describe("engine 2: the rival-reply ring (spec §4.2a rule 1, INTERFACE §7.1)",
   it("from the map: ring on sets every rival from the ring; the cross-reply count stays one per position", () => {
     const positions = shapePositionsFromMap({ choice: choiceOf([1, 0, 0]), keyPoints: KEY_POINTS, answers: 3, pointsPerAnswer: 2, ring: true });
     expect(positions.map((position) => position.rivalIndex)).toEqual([1, 2, 0]);
+    // R2a final wave B3 (Task A5 review 2): the ring changes the rival only; every other member is today's.
+    const today = shapePositionsFromMap({ choice: choiceOf([1, 0, 0]), keyPoints: KEY_POINTS, answers: 3, pointsPerAnswer: 2 });
+    expect(today.map((position) => position.rivalIndex)).toEqual([1, 0, 0]);
+    expect(positions.map(({ rivalIndex: _ring, ...rest }) => rest)).toEqual(today.map(({ rivalIndex: _today, ...rest }) => rest));
     const plan = buildShapePlan({ positions, depth: 2, scrutiny: { roundsPerPoint: 1, pointsPerDebate: 1 } });
     const crosses = plan.legs.filter((leg) => leg.kind === "CROSS");
     expect(crosses).toHaveLength(3);

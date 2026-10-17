@@ -136,7 +136,13 @@ describe("engine 2: the shared material core (INTERFACE §11.2)", () => {
     ["a target nobody wrote", { ...SOURCE, points: [{ ...SOURCE.points[0]!, targetRef: "ghost" }] }, "points.0.targetRef"],
     ["a letter its chain does not reach", { ...SOURCE, points: [{ ...SOURCE.points[0]!, answerLetter: "B" as const }] }, "points.0.answerLetter"],
     ["a strength that is not a number", { ...SOURCE, points: [{ ...SOURCE.points[0]!, honestFinalStrength: Number.NaN }] }, "points.0.honestFinalStrength"],
-    ["a loop", { ...SOURCE, points: [{ ...SOURCE.points[0]!, nodeId: "q1", targetRef: "q2" }, { ...SOURCE.points[0]!, nodeId: "q2", targetRef: "q1" }] }, "points.0.targetRef"]
+    ["a loop", { ...SOURCE, points: [{ ...SOURCE.points[0]!, nodeId: "q1", targetRef: "q2" }, { ...SOURCE.points[0]!, nodeId: "q2", targetRef: "q1" }] }, "points.0.targetRef"],
+    // R2a final wave B8 (Ruling (A11 Minors) 6): one row per refusal no row reached before.
+    ["a rival reply from an answer that is not there", { ...SOURCE, points: [{ ...SOURCE.points[0]!, fromRivalReply: "C" as const }] }, "points.0.fromRivalReply"],
+    ["two answers on one root", { ...SOURCE, answers: [SOURCE.answers[0]!, { ...SOURCE.answers[1]!, rootNodeId: "root-a" }], points: [] }, "answers.1.rootNodeId"],
+    ["a blank question", { ...SOURCE, question: "  " }, "question"],
+    ["an answer with blank words", { ...SOURCE, answers: [{ ...SOURCE.answers[0]!, words: " " }, SOURCE.answers[1]!] }, "answers.0.words"],
+    ["a point with a blank text", { ...SOURCE, points: [{ ...SOURCE.points[0]!, text: "\t" }] }, "points.0.text"]
   ] as const)("refuses %s", (_name, source, field) => {
     expect(() => engineMaterialOf(source)).toThrow(`ENGINE_MATERIAL_INVALID:${field}`);
   });
@@ -167,5 +173,31 @@ describe("engine 2: the verdict material refuses what code could not have built 
     const source = { ...SOURCE, answers: [SOURCE.answers[0]!, { ...SOURCE.answers[1]!, caseText }] };
     expect(() => engineMaterialOf(source)).toThrow("ENGINE_MATERIAL_INVALID:answers.1.caseText");
     expect(() => pointInvestigationMaterialOf(source, "x1")).toThrow("ENGINE_MATERIAL_INVALID:answers.1.caseText");
+  });
+});
+
+describe("engine 2: the material's order and reasons (R2a final wave B8)", () => {
+  it("breaks a strength tie by node id, whichever comes first in the source", () => {
+    const tied = { ...SOURCE, points: [
+      { ...SOURCE.points[0]!, nodeId: "p9", honestFinalStrength: 0.5 },
+      { ...SOURCE.points[0]!, nodeId: "p1", honestFinalStrength: 0.5 }
+    ] };
+    expect(engineMaterialOf(tied).answers[0]!.supports.map((point) => point.pointRef)).toEqual(["p1", "p9"]);
+    const reversed = { ...tied, points: [...tied.points].reverse() };
+    expect(engineMaterialOf(reversed).answers[0]!.supports.map((point) => point.pointRef)).toEqual(["p1", "p9"]);
+  });
+
+  it("puts the answers in letter order when the source lists B before A", () => {
+    const material = engineMaterialOf({ ...SOURCE, answers: [SOURCE.answers[1]!, SOURCE.answers[0]!] });
+    expect(material.answers.map((answer) => answer.letter)).toEqual(["A", "B"]);
+    expect(material).toEqual(engineMaterialOf(SOURCE));
+  });
+
+  it("keeps every reason of a point with two, in order: disputed under the review's, investigated one per line", () => {
+    const reasons = ["The cost figure is not given anywhere.", "The budget year is not named."];
+    const two = { ...SOURCE, points: SOURCE.points.map((point) => point.nodeId === "p2" ? { ...point, reviewerReasons: reasons }
+      : point.nodeId === "x1" ? { ...point, reviewerReasons: reasons } : point) };
+    expect(engineMaterialOf(two).disputed.find((point) => point.pointRef === "p2")!.reviewerReasons).toEqual(reasons);
+    expect(pointInvestigationMaterialOf(two, "x1").reviewerReason).toBe(`${reasons[0]!}\n${reasons[1]!}`);
   });
 });

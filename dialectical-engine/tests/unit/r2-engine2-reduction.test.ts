@@ -91,8 +91,10 @@ describe("engine 2 reduces a node's panel by the honest median", () => {
   it("rests a one-maker debate on its author's honest grade (the last resort)", () => {
     const author = honestAuthorOnly({ authorJudgementRef: "author", authorMaker: "maker-0", authorAssessment: assessment(0.9),
       engine: FIDELITY_ONLY, rule: RULE });
-    expect(author).toMatchObject({ selectedJudgementRef: "author", tau: 0.9, selectionScore: 0.9, rule: RULE,
-      honest: { median: 0.9, source: "AUTHOR_LAST_RESORT", voices: [{ memberRole: "maker-0", grade: 0.9 }] } });
+    expect(author).toMatchObject({ selectedJudgementRef: "author", tau: 0.9, selectionScore: 0.9, rule: RULE });
+    // R2a final wave B2 (Task A4 review 3): the whole record, so an extra member (a number) on it turns this red.
+    expect(author.honest).toEqual({ voices: [{ memberRole: "maker-0", grade: 0.9, weighted: 0.9, caps: [] }],
+      median: 0.9, source: "AUTHOR_LAST_RESORT" });
   });
 
   it("refuses a panel with no voice at all", () => {
