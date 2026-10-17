@@ -199,3 +199,132 @@ describe("B1's reader and this count accept the same replies (A9's verdict_vote_
     }
   });
 });
+
+// Fix round 1 (B2 review; controller ruling R2b-B2.1, spec §4.3, §4.4, E9): the own-maker rule reads the voted GROUP.
+describe("a vote for a group holding the judge's own maker's answer is ignored (ruling R2b-B2.1)", () => {
+  it("3 makers all seated, A's and B's makers group {A,B} and vote each other's letter: never Clear answer", () => {
+    const verdict = derive([vote(1, "deepseek", "B", { sameAs: [["A", "B"]] }), vote(2, "zhipu", "A", { sameAs: [["A", "B"]] }),
+      vote(3, "moonshot", "A")]);
+    // Only C's maker's vote counts: one vote for {A,B}, below closeCallAgreeing, so no majority (SPLIT).
+    expect(verdict).toMatchObject({ groups: [["A", "B"]], winnerRootNodeId: ROOT.A, winnerVotes: 1, label: "SPLIT",
+      trigger: "JUDGES_NO_MAJORITY", marks: [] });
+    expect(verdict.counted.map((entry) => entry.notCountedReason)).toEqual(["OWN_MAKER", "OWN_MAKER", null]);
+  });
+
+  it("2 makers both group {A,B} and vote each other's letter: every vote ignored (SPLIT, JUDGES_VOTES_IGNORED)", () => {
+    const verdict = derive([vote(1, "deepseek", "B", { sameAs: [["A", "B"]] }), vote(2, "zhipu", "A", { sameAs: [["A", "B"]] })],
+      { answers: ANSWERS.slice(0, 2), honestFinalStrength: new Map([[ROOT.A, 0.5], [ROOT.B, 0.6]]) });
+    expect(verdict).toMatchObject({ groups: [["A", "B"]], winnerRootNodeId: ROOT.B, winnerVotes: 0, label: "SPLIT",
+      trigger: "JUDGES_VOTES_IGNORED", marks: ["VERDICT-VOTES-IGNORED"] });
+    expect(verdict.counted.map((entry) => entry.notCountedReason)).toEqual(["OWN_MAKER", "OWN_MAKER"]);
+  });
+});
+
+describe("a debate that was not judged records no counted vote (fix round 1, Minor 2)", () => {
+  it("one answer: every vote counted false; a failed or own-maker vote keeps its reason, any other has none", () => {
+    const verdict = derive([vote(1, "anthropic", "A"), vote(2, "deepseek", "A"), vote(3, "qwen", null)],
+      { answers: [ANSWERS[0]], honestFinalStrength: new Map([[ROOT.A, 0.5]]) });
+    expect(verdict).toMatchObject({ trigger: "JUDGES_UNAVAILABLE", winnerVotes: 0 });
+    expect(verdict.counted).toEqual([
+      { seat: 1, counted: false, notCountedReason: null }, { seat: 2, counted: false, notCountedReason: "OWN_MAKER" },
+      { seat: 3, counted: false, notCountedReason: "JUDGE_FAILED" }
+    ]);
+  });
+});
+
+describe("input checks and frozen members (fix round 1, Minors 3 and 4)", () => {
+  const refused = expect.objectContaining({ code: "JUDGES_VERDICT_INPUT_INVALID" });
+
+  it("refuses a NaN or infinite honest strength, and a seat below 1", () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => derive(judges("A", "A", "A"), { honestFinalStrength: new Map([[ROOT.A, 0.5], [ROOT.B, bad], [ROOT.C, 0.4]]) }))
+        .toThrowError(refused);
+    }
+    for (const seat of [0, -1]) expect(() => derive([vote(seat, "anthropic", "A")])).toThrowError(refused);
+  });
+
+  it("refuses an empty or non-string maker, on a vote or on an answer", () => {
+    expect(() => derive([vote(1, "", "A")])).toThrowError(refused);
+    expect(() => derive([vote(1, 7 as unknown as string, "A")])).toThrowError(refused);
+    expect(() => derive(judges("A", "A", "A"), { answers: [ANSWERS[0], { ...ANSWERS[1], arguedByMaker: "" }, ANSWERS[2]] }))
+      .toThrowError(refused);
+    expect(() => derive(judges("A", "A", "A"), { answers: [ANSWERS[0], { ...ANSWERS[1], arguedByMaker: 7 as unknown as string },
+      ANSWERS[2]] })).toThrowError(refused);
+    // An answer no maker is known to have argued stays allowed.
+    expect(derive(judges("A", "A", "A"), { answers: [ANSWERS[0], { ...ANSWERS[1], arguedByMaker: null }, ANSWERS[2]] }).label)
+      .toBe("SUPPORTED");
+  });
+
+  it("freezes groups, questionKinds and marks", () => {
+    const verdict = derive([vote(1, "anthropic", "A", { sameAs: [["A", "B"]] }), vote(2, "xiaomi", "B", { sameAs: [["A", "B"]] }),
+      vote(3, "qwen", null)]);
+    expect(verdict.groups).toEqual([["A", "B"]]);
+    expect(verdict.marks).toEqual(["VERDICT-JUDGE-MISSING"]);
+    for (const member of [verdict.groups, verdict.groups[0], verdict.questionKinds, verdict.marks]) {
+      expect(Object.isFrozen(member)).toBe(true);
+    }
+  });
+});
+
+/**
+ * Fix round 1, Minor 3: which label each maker count can reach in today's shape (every maker argues one answer; the
+ * seats are min(3, makers) arguing makers; start values 3 / 2). Every vote combination is tried: each seated judge fails
+ * or names any letter, conditional or not, with the same-answer groups the row lists (all pairs and A+B+C up to 3 makers,
+ * a cheap set beyond). The owner's decision 6 reads these lines.
+ */
+describe("what each maker count can reach (owner decision 6, after ruling R2b-B2.1)", () => {
+  const LETTERS = ["A", "B", "C", "D", "E"] as const;
+  type Option = Readonly<{ best: string; conditional: boolean; sameAs: readonly (readonly string[])[] }> | null;
+  const reach = (makers: number, groupings: readonly (readonly (readonly string[])[])[]) => {
+    const letters = LETTERS.slice(0, makers);
+    const answers = letters.map((letter, index) => ({ letter, rootNodeId: `root-${letter}`, arguedByMaker: `maker-${index}` }));
+    const strength = new Map(answers.map((answer, index) => [answer.rootNodeId, (index + 1) / 10] as const));
+    const seats = makers === 1 ? 0 : Math.min(3, makers);
+    const options: Option[] = [null];
+    for (const best of letters) for (const conditional of [false, true]) for (const sameAs of groupings) {
+      options.push({ best, conditional, sameAs });
+    }
+    const verdicts: ReturnType<typeof deriveJudgesVerdict>[] = [];
+    const walk = (seat: number, acc: ComparingJudgeVote[]): void => {
+      if (seat === seats) {
+        verdicts.push(deriveJudgesVerdict({ votes: acc, answers: answers as never, honestFinalStrength: strength, label: LABEL }));
+        return;
+      }
+      for (const option of options) walk(seat + 1, [...acc, { seat: seat + 1, maker: `maker-${seat}`, reply: option as never }]);
+    };
+    walk(0, []);
+    return verdicts;
+  };
+  const pairsOf = (letters: readonly string[]) =>
+    letters.flatMap((left, index) => letters.slice(index + 1).map((right) => [[left, right]] as const));
+
+  it("1 maker: Close call only", () => {
+    expect(new Set(reach(1, [[]]).map((verdict) => `${verdict.label}/${verdict.trigger}`))).toEqual(new Set(["CONTESTED/JUDGES_UNAVAILABLE"]));
+  });
+
+  it("2 makers: Contested whenever any judge answers; Close call only when both judges fail", () => {
+    for (const verdict of reach(2, [[], ...pairsOf(["A", "B"])])) {
+      if (verdict.judgesAnswered > 0) expect(verdict.label).toBe("SPLIT");
+      else expect(verdict).toMatchObject({ label: "CONTESTED", trigger: "JUDGES_UNAVAILABLE" });
+    }
+  });
+
+  it("3 makers: never Clear answer, whatever the votes and groups", () => {
+    const labels = new Set(reach(3, [[], ...pairsOf(["A", "B", "C"]), [["A", "B", "C"]]]).map((verdict) => verdict.label));
+    expect(labels).toEqual(new Set(["CONTESTED", "SPLIT"]));
+  });
+
+  it.each([4, 5])("%i makers: Clear answer only when the winning group holds only unseated makers' answers", (makers) => {
+    const seated = new Set(["A", "B", "C"]);
+    const groupings = makers === 4 ? [[], ...pairsOf(["A", "B", "C", "D"])] : [[], [["D", "E"]], [["A", "D"]], [["C", "E"]]];
+    let clear = 0;
+    for (const verdict of reach(makers, groupings)) {
+      if (verdict.label !== "SUPPORTED") continue;
+      clear += 1;
+      const winner = verdict.winnerRootNodeId.slice("root-".length) as "A";
+      const group = verdict.groups.find((entry) => entry.includes(winner)) ?? [winner];
+      expect(group.some((letter) => seated.has(letter)), group.join("")).toBe(false);
+    }
+    expect(clear).toBeGreaterThan(0);
+  });
+});
