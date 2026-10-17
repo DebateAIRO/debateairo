@@ -203,6 +203,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
       "packages/graph/src/index.ts",
+      // Engine verdict (0121): the investigation and vote repositories seal and read ledger.point_investigation /
+      // ledger.verdict_vote inside withRunContentLease, borrowed when the runner already holds it.
+      "packages/judgement/src/engine-repository.ts",
       "packages/judgement/src/index.ts",
       "packages/ledger/src/index.ts",
       "packages/liveness/src/index.ts",
