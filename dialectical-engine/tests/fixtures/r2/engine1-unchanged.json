@@ -1,0 +1,49 @@
+{
+  "contractRows": {
+    "judgeContractHash": "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee",
+    "composerContractHash": "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
+    "mapContractHash": "d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71",
+    "conformanceContractHash": "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6"
+  },
+  "fingerprints": {
+    "judge": "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee",
+    "composer": "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
+    "map": "d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71",
+    "conformance": "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6"
+  },
+  "deriveVerdictLabelSource": "export function deriveVerdictLabel(input: VerdictLabelBasis): VerdictLabelDerivation {\n  const { gamma, highCut, lowCut, disagreementThreshold } = input.controls;\n  for (const [value, label] of [\n    [gamma, \"gamma\"], [highCut, \"the high cut\"], [lowCut, \"the low cut\"],\n    [disagreementThreshold, \"the disagreement threshold\"]\n  ] as const) assertLabelNumber(value, label);\n  if (!(lowCut < highCut)) {\n    throw new TypedDomainError(\n      \"VERDICT_LABEL_CONTROLS_INVALID\",\n      \"The low cut must sit strictly below the high cut\"\n    );\n  }\n  const winner = assertLabelNumber(input.winner, \"the winning strength\");\n  const margin = input.margin;\n  const disagreement = input.disagreement;\n  if (margin.kind === \"MEASURED\") assertLabelNumber(margin.value, \"the margin\");\n  if (disagreement.kind === \"MEASURED\") assertLabelNumber(disagreement.value, \"the disagreement\");\n\n  // Rung 0 — the basis itself is incomplete.\n  if (margin.kind === \"ABSENT\" || disagreement.kind === \"ABSENT\") {\n    return Object.freeze({\n      label: \"CONTESTED\", rung: 0, trigger: \"BASIS_INCOMPLETE\",\n      basisAbsence: Object.freeze([\n        ...(margin.kind === \"ABSENT\" ? [\"MARGIN\" as const] : []),\n        ...(disagreement.kind === \"ABSENT\" ? [\"DISAGREEMENT\" as const] : [])\n      ]),\n      marks: Object.freeze([LABEL_BASIS_INCOMPLETE_MARK])\n    });\n  }\n  const noAbsence = Object.freeze([]) as readonly (\"MARGIN\" | \"DISAGREEMENT\")[];\n  const noMarks = Object.freeze([]) as readonly (typeof LABEL_BASIS_INCOMPLETE_MARK)[];\n\n  // Rung 1 — below the low cut.\n  if (winner < lowCut) {\n    return Object.freeze({\n      label: \"UNSUPPORTED\", rung: 1, trigger: \"BELOW_LOW_CUT\",\n      basisAbsence: noAbsence, marks: noMarks\n    });\n  }\n  // Rung 2 — a tie-adjacent margin, or a panel that disagreed at the threshold.\n  const marginWithinGamma = margin.value <= gamma;\n  if (marginWithinGamma || disagreement.value >= disagreementThreshold) {\n    return Object.freeze({\n      label: \"CONTESTED\", rung: 2,\n      trigger: marginWithinGamma ? \"MARGIN_WITHIN_GAMMA\" : \"DISAGREEMENT_AT_THRESHOLD\",\n      basisAbsence: noAbsence, marks: noMarks\n    });\n  }\n  // Rung 3 — at or above the high cut, with a clear margin and low disagreement.\n  if (winner >= highCut) {\n    return Object.freeze({\n      label: \"SUPPORTED\", rung: 3, trigger: \"AT_OR_ABOVE_HIGH_CUT\",\n      basisAbsence: noAbsence, marks: noMarks\n    });\n  }\n  // Rung 4 — the mid band: low <= winner < high.\n  return Object.freeze({\n    label: \"CONTESTED\", rung: 4, trigger: \"MID_BAND\",\n    basisAbsence: noAbsence, marks: noMarks\n  });\n}",
+  "todayReceipt": "{\"kind\":\"COMPUTED_STRUCTURAL_CEILING\",\"max_model_attempts\":396,\"panel_size\":3,\"depth\":2,\"per_site_attempts\":{\"judge\":3,\"organ\":3,\"panel_member\":3,\"cooldown_site\":4},\"call_sites\":{\"author\":27,\"panel\":54,\"reviewer\":27,\"serve\":6},\"serve_leg\":{\"synthesis_loop_sites\":6,\"selected\":\"SYNTHESIS_LOOP\"},\"serve_reserve_attempts\":18,\"hold_cap\":2,\"final_retry_attempts\":1,\"formula_version\":\"DR-184-v4\",\"bounds_source_ref\":\"engine-exports+register\"}",
+  "shapedReceipt": "{\"kind\":\"COMPUTED_STRUCTURAL_CEILING\",\"max_model_attempts\":352,\"panel_size\":3,\"depth\":2,\"per_site_attempts\":{\"judge\":3,\"organ\":3,\"panel_member\":3,\"cooldown_site\":4},\"call_sites\":{\"author\":31,\"panel\":42,\"reviewer\":21,\"serve\":6},\"serve_leg\":{\"synthesis_loop_sites\":6,\"selected\":\"SYNTHESIS_LOOP\"},\"serve_reserve_attempts\":18,\"hold_cap\":2,\"final_retry_attempts\":1,\"formula_version\":\"DR-185-shape-v1\",\"bounds_source_ref\":\"engine-exports+register\",\"shape\":{\"version\":1,\"plan\":\"free\",\"depth_mode\":\"adaptive\",\"scrutiny\":\"standard\",\"answer_length\":\"detailed\",\"map_ais\":3,\"answers\":3,\"graders\":2,\"points_per_answer\":3,\"deeper_top_points\":1,\"gap_rounds\":1,\"close_call_extra_graders\":0,\"scrutiny_rounds_per_point\":0,\"scrutiny_points_per_debate\":0,\"scrutiny_leverage_min\":0.05,\"scrutiny_weak_below\":0.5,\"opening\":\"ANGLE_MAP\",\"answer_words\":1000,\"writer_bound\":16384,\"map_sites\":10,\"nodes\":21,\"cross_nodes\":3,\"backup_sequences\":0,\"map_merge_bound\":32768,\"map_choose_bound\":32768}}",
+  "propagation": [
+    {
+      "nodeId": "root-a",
+      "strength": 0.824,
+      "supportedBy": [
+        "own-support"
+      ],
+      "attackedBy": [
+        "unassessed-attack"
+      ]
+    },
+    {
+      "nodeId": "root-b",
+      "strength": 0.185,
+      "supportedBy": [],
+      "attackedBy": [
+        "reply-attack"
+      ]
+    },
+    {
+      "nodeId": "reply-a",
+      "strength": 0.7,
+      "supportedBy": [],
+      "attackedBy": []
+    },
+    {
+      "nodeId": "point-b",
+      "strength": 0.4,
+      "supportedBy": [],
+      "attackedBy": []
+    }
+  ]
+}
