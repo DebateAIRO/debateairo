@@ -315,6 +315,26 @@ how long each model's calls waited for a free slot in all (`waitedMsByModel`, mi
 how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
 it (`busyProbesByModel`).
 
+### The free re-scoring (rescore mode, R2)
+
+`rescore` reads every `transcript.json` under a folder again and asks no AI, spends nothing and opens no database:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts rescore --transcripts "$P" --out "$P/rescore"
+```
+
+First it checks that the engine's own arithmetic gives back exactly the strengths each debate served (no more than
+0.000000001 apart); a debate where it does not is listed as `PRACTICE_RESCORE_ENGINE1_MISMATCH` and not used. Then it scores
+each debate with engine 2's honest scores and link rules, a "cannot assess" link counting at 0.5, 0.66, 0.75 and 1.0, each
+with the investigations' outcomes applied and not, and writes `rescore.json` (every row) and `rescore.md` (counts and
+letters only): which answer leads by honest final strength, the gaps, whether the lead differs from what engine 1 served
+and from the start setting, and per debate how many investigations held, failed or stayed a dead end (`holds/fails/dead
+end`: what the "applied" rows applied). The comparing judges are not asked (that needs AI calls). A transcript written before R2 has no
+engine graph: it is rebuilt from its answer and its calls when it can be, else listed as
+`PRACTICE_RESCORE_INPUT_INCOMPLETE <what>`. `--engine-policy FILE` picks the settings the sweep starts from (default
+`tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
+a debate's served numbers could not be given back, 30 when nothing could be rescored.
+
 ### Tokens and words per AI and step (every debate, length guidance LG-B)
 
 `report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
@@ -1211,6 +1231,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode (`practice-debate.ts` also builds the
   report's two LG-A tables, `repairsByKind` and `unrepaired`); `practice-transcript.ts`: its `--transcript` file.
+- `practice-engine-graph.ts`: the transcript's engine graph (A15, `structure.engineGraph`); `practice-rescore.ts`: the
+  rescore mode (`rescore.json`, `rescore.md`).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it

@@ -27,6 +27,7 @@ import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployme
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
 import type { TranscriptEngineGraph } from "../../tools/preview-practice/practice-engine-graph.js";
+import { reproduceServedPropagation } from "../../tools/preview-practice/practice-rescore.js";
 import { PRACTICE_LANGUAGE_DRY_REWRITES, practiceLanguageDryReading } from "../../tools/preview-practice/practice-language.js";
 import { PRACTICE_LANGUAGE_CASES, PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 import { startPreviewGateStubs, stubChatBody, stubMapContent, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
@@ -797,6 +798,8 @@ describe("preview practice: debate mode", () => {
     expect(graph.reviews.length).toBeGreaterThan(0);
     // Pre-flight PF-R2a2.9: engine 1 never applies the dispute factor.
     expect(graph.nodes.some((node) => node.disputeFactorApplied)).toBe(false);
+    // R2 (E12): the rescore gives back exactly what this run served (the engine's own arithmetic over its recorded inputs).
+    expect(reproduceServedPropagation(graph)).toMatchObject({ ok: true });
   }, 600_000);
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
