@@ -122,6 +122,21 @@ describe("honestMedian and honestPointScore (E10)", () => {
     expect(honestPointScore([voice("x", "m1", 0.5), voice("y", "m2", 0.5), voice("z", "m3", 0.1)])?.selectedJudgementRef).toBe("x");
     expect(honestPointScore([voice("x", "m1", 0.5), voice("y", "m2", 0.5)])?.selectedJudgementRef).toBe("x");
   });
+
+  // R2 A4 (A3 review carry, Minor 3): a grade outside [0,1], or not a number, can never scramble the sort.
+  it("refuses a grade that is not a number in [0,1]", () => {
+    for (const bad of [Number.NaN, -0.1, 1.1, Number.POSITIVE_INFINITY]) {
+      expect(() => honestMedian([0.4, bad, 0.6])).toThrowError(TypeError);
+    }
+  });
+
+  // R2 A4 (A3 review carry, Minor 1; spec §4.2's producer law): "other makers" are neither the author nor of its maker.
+  it("never counts a voice of the author's own maker as another maker's grade", () => {
+    expect(honestPointScore([voice("author", "m0", 0.95, true), voice("same", "m0", 0.1), voice("a", "m1", 0.4)]))
+      .toEqual({ score: 0.4, source: "OTHER_MAKERS", voices: 1, selectedJudgementRef: "a" });
+    expect(honestPointScore([voice("author", "m0", 0.95, true), voice("same", "m0", 0.1)]))
+      .toEqual({ score: 0.95, source: "AUTHOR_LAST_RESORT", voices: 1, selectedJudgementRef: "author" });
+  });
 });
 
 describe("the dispute factor, the selection rule and the record", () => {

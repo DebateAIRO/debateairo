@@ -60,17 +60,17 @@ export function honestGrade(assessment: JudgeAssessment, scoring: EngineScoring)
   return Object.freeze({ grade, weighted, caps: Object.freeze(caps), metrics });
 }
 
-/** The middle value, or the mean of the middle two. */
+/** The middle value, or the mean of the middle two. Each grade must be a number in [0,1], so none can scramble the sort. */
 export function honestMedian(values: readonly number[]): number {
   if (values.length === 0) throw new TypedDomainError("HONEST_MEDIAN_EMPTY", "A median needs at least one grade");
-  const sorted = [...values].sort((left, right) => left - right);
+  const sorted = values.map((value) => unitInterval(value, "grade")).sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
 export type HonestVoice = Readonly<{ judgementRef: string; maker: string; isAuthor: boolean; grade: HonestGrade }>;
 export type HonestPointScore = Readonly<{
-  /** The median of the non-author voices' grades; an even count: the mean of the middle two. */
+  /** The median of the other makers' grades; an even count: the mean of the middle two. */
   score: number;
   source: "OTHER_MAKERS" | "AUTHOR_LAST_RESORT";
   /** The voices counted. */
@@ -79,9 +79,14 @@ export type HonestPointScore = Readonly<{
   selectedJudgementRef: string;
 }>;
 
-/** Null when there is no voice at all. The author's voice counts only when no other maker's voice exists (E10). */
+/**
+ * Null when there is no voice at all. The author's voice counts only when no other maker's voice exists (E10). Another
+ * maker's voice is neither the author's nor of the author's maker (spec §4.2's producer law): a second voice of the
+ * author's own maker is kept on record by the caller, never counted here.
+ */
 export function honestPointScore(voices: readonly HonestVoice[]): HonestPointScore | null {
-  const others = voices.filter((voice) => !voice.isAuthor);
+  const authorMaker = voices.find((voice) => voice.isAuthor)?.maker;
+  const others = voices.filter((voice) => !(voice.isAuthor || voice.maker === authorMaker));
   if (others.length > 0) {
     // A stable sort: of two equal grades, the one heard first is the lower.
     const ordered = [...others].sort((left, right) => left.grade.grade - right.grade.grade);

@@ -48,6 +48,7 @@ import {
   type JudgeFamily,
   type JudgeLeg,
   type JudgementSelectionRule,
+  type HonestSelectionRule,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
@@ -198,6 +199,7 @@ import {
   type LengthCallStep,
   type LengthGuide,
   type LengthGuidanceStep,
+  ENGINE2_REDUCER_VERSION,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -260,6 +262,7 @@ import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
+import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -6284,7 +6287,7 @@ export class WalkingSkeletonRunner {
       readonly selectedJudgementRef: string;
       readonly tau: number;
       readonly selectionScore: number;
-      readonly rule: JudgementSelectionRule;
+      readonly rule: JudgementSelectionRule | HonestSelectionRule;
       readonly dispersion: number | null;
       readonly panelContractHashes: readonly string[];
       readonly disagreement: Readonly<Record<string, unknown>>;
@@ -6305,6 +6308,10 @@ export class WalkingSkeletonRunner {
       readonly closeCallAdded: number;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
+      // Engine redesign R2 (INTERFACE §6.2): engine 2's selection rule names the engine row, on the register version and
+      // source today's rule was read from (the receipt carries no register version). Null on engine 1. Built in
+      // engine-reduce.ts so this file never names the engine row (runner-engine-wiring.test.ts, R1d).
+      const honestRule = engine.engine === 2 ? engineHonestSelectionRule(judgementPolicy.selectionRule) : null;
       const authorOnlySelection = (): {
         readonly selectedJudgementRef: string;
         readonly tau: number;
@@ -6329,6 +6336,28 @@ export class WalkingSkeletonRunner {
 
       // S2-2: the walking-skeleton literal is reachable at M=1 ONLY.
       if (effectiveMakerCount <= 1) {
+        // Engine redesign R2 (spec §4.2 item 5): a one-maker debate rests on its author's honest grade, the last resort,
+        // disclosed as today's one-maker debate is (the single-lineage band cap), never as a degraded panel: there is no
+        // panel here, and no panel rows to step a band down with.
+        if (honestRule !== null && engine.engine === 2) {
+          const author = honestAuthorOnly({
+            authorJudgementRef: input.authorJudgementRef, authorMaker: input.authorMaker,
+            authorAssessment: input.authorAssessment, engine, rule: honestRule
+          });
+          return Object.freeze({
+            selectedJudgementRef: author.selectedJudgementRef,
+            tau: author.tau,
+            selectionScore: author.selectionScore,
+            rule: author.rule,
+            dispersion: null,
+            panelContractHashes: Object.freeze([judgeContractHash]),
+            disagreement: Object.freeze({ ...createUnmeasuredDisagreement(), honest: author.honest }),
+            marks: Object.freeze([]),
+            panelFailureReason: null,
+            spendStop: null,
+            closeCallAdded: 0
+          });
+        }
         return Object.freeze({
           ...authorOnlySelection(),
           dispersion: null,
@@ -6513,6 +6542,14 @@ export class WalkingSkeletonRunner {
       // Task 11: today's reduction, statement for statement, as one local function — the close-call extension
       // re-reduces every voice heard through it.
       const reduceHeard = (voices: typeof panel.judgements) => {
+        // Engine redesign R2 (spec §4.2, INTERFACE §6.2): engine 2 reduces the same voices by the honest median
+        // (engine-reduce.ts); the close-call extension below re-reduces through here, so its extras enter the median too.
+        if (honestRule !== null && engine.engine === 2) {
+          return reduceHonest({
+            voices, authorJudgementRef: input.authorJudgementRef, engine, panel: panelPolicy,
+            earnedWeight: judgementPolicy.earnedWeight, rule: honestRule
+          });
+        }
         // Each member's assessment is reduced through the SAME ratified
         // composition as the author's, so the taus are commensurable.
         const reducedMembers = voices.flatMap((entry) => {
@@ -6637,6 +6674,8 @@ export class WalkingSkeletonRunner {
       // Pre-flight PF-B32: the stop that cut this panel short — the base panel's, else its extension's.
       const panelStop = spendStop ?? closeCallStop;
       const { reducedMembers, dispersion, weighted, selection } = reduced;
+      /** Engine 2's honest grades, median and source (INTERFACE §6.2); null on engine 1. */
+      const honestRecord = "honest" in reduced ? reduced.honest : null;
 
       // confirm-item 5. The author is always judgement[0]; every other entry is
       // a non-author voice that actually parsed.
@@ -6697,7 +6736,9 @@ export class WalkingSkeletonRunner {
             notes: panelNoteRecords(notes),
             // Task M2: present only on a panel a spend stop cut short.
             ...(panelStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[panelStop] })
-          })
+          }),
+          // Engine redesign R2 (INTERFACE §6.2): present only on engine 2, after `panel`; engine 1's record keeps its bytes.
+          ...(honestRecord === null ? {} : { honest: honestRecord })
         }),
         spendStop: panelStop,
         closeCallAdded
@@ -7691,7 +7732,7 @@ export class WalkingSkeletonRunner {
         scoreCaps: childReduced.caps,
         holes: childReduced.holes,
         branchIdentifier: childReduced.branch,
-        reducerVersion: childReduced.reducerVersion,
+        reducerVersion: engine.engine === 2 ? ENGINE2_REDUCER_VERSION : childReduced.reducerVersion,
         judgeWeightVersion: judgementPolicy.judgeWeightVersion,
         selectedJudgementRef: childSelection.selectedJudgementRef,
         dispersion: childSelection.dispersion,
