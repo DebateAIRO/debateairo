@@ -1,7 +1,17 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONTENT_JSON_SENTINEL, decryptContentForRun, encryptAttestedContentForRun, migrate } from "@debateai/db";
-import { MapChoiceRepository, readMapChoiceForRun, readMapItemsForRun, type MapItem, type MapResult } from "@debateai/map";
+import {
+  MAP_ANSWER_CHECK_CODE,
+  MapChoiceRepository,
+  mapAnswerCheckCodes,
+  mapCheckFailedMergedAnswerIds,
+  mapKeptMergedAnswerIds,
+  readMapChoiceForRun,
+  readMapItemsForRun,
+  type MapItem,
+  type MapResult
+} from "@debateai/map";
 import {
   createEncryptedStoryRun,
   createLegacyStoryRun,
@@ -533,5 +543,164 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
     await insertRawItem({ runId, itemId: "pt01", content: POINT_CONTENT, envelope: null, attestation: null, angleId: "g7" });
     await insertRawPosition({ runId, answerId: "a4", rootIndex: 0, rootNodeId });
     expect(await rowCounts(runId)).toEqual({ items: 1, choices: 0, positions: 1 });
+  });
+});
+
+/** Engine redesign R3 (spec 2026-10-15 §5.7, plan Task 11): engine 2's map rows over 0122 and the encrypted choice. */
+const ENGINE_RESULT: MapResult = Object.freeze({
+  ...RESULT,
+  items: RESULT.items.map((item) => (item.kind === "POINT" ? { ...item, restsOn: item.itemId === "pt02" ? "assumption" : "question" } : item)),
+  keyPoints: RESULT.keyPoints.map((keyPoint) => ({ ...keyPoint, restsOn: keyPoint.keyPointId === "kp02" ? "assumption" : "question" })),
+  choice: { answers: [
+    { ...RESULT.choice!.answers[0]!, assumptions: ["Riders pay fares today."], pointsRaised: [] },
+    { ...RESULT.choice!.answers[1]!, statement: "Only at night.", filled: false, assumptions: [], pointsRaised: ["kp03"] }
+  ], alsoRaised: [], reserves: [{ reserveId: "r1", statement: "Only at night.", forKeyPointIds: [], againstKeyPointIds: [], assumptions: [] }] },
+  // Pre-flight PF-R34.1 (FINAL Ruling D4(b) encoding): a2 failed two of the three tests, and the stored code names both.
+  // (pre-flight consistency) a1 passed as a premise challenge the checker exempted from the third test (its own null).
+  answerCheck: { checker: seat(1), outcomes: { a1: "PASSED", a2: "NOT_AN_ANSWER+NO_COST", c1: "PASSED" }, reasons: { a2: "It only says it depends." },
+    premiseExempt: ["a1"], candidates: [{ checkId: "c1", statement: "Only at night.", source: "RESERVE" }],
+    replacements: [{ answerId: "a2", statement: "No.", replacedBy: "c1", action: "REPLACED" }] },
+  marks: [{ mark: "MAP_ANSWER_REPLACED", step: "CHECK", detail: "a2>c1" }]
+}) as MapResult;
+
+describe("MapChoiceRepository: engine 2's map (0122)", () => {
+  it("an engine-2 map reads back whole: rests_on, assumptions, reserves, the check (Review Focus 3)", async () => {
+    for (const mode of ["legacy", "encrypted"] as const) {
+      const runId = await newRun(mode);
+      const repository = new MapChoiceRepository(database.pool);
+      expect(await repository.writeMapRun({ runId, result: ENGINE_RESULT, answerCount: 2, unchosenAnswers: true })).toBe("INSERTED");
+      const back = await repository.readMapResultForRun(runId);
+      expect(back?.items.filter((item) => item.kind === "POINT").map((item) => [item.itemId, item.kind === "POINT" ? item.restsOn : null]))
+        .toEqual([["pt01", "question"], ["pt02", "assumption"], ["pt03", "question"]]);
+      expect(back?.answerCheck).toEqual(ENGINE_RESULT.answerCheck);
+      expect(back?.choice?.reserves).toEqual(ENGINE_RESULT.choice!.reserves);
+      expect((await repository.readMapChoiceForRun(runId))?.answers.map((answer) => [answer.statement, answer.assumptions]))
+        .toEqual([["Yes, with conditions.", ["Riders pay fares today."]], ["Only at night.", []]]);
+      expect(await repository.readMapAnswerCheckForRun(runId))
+        .toEqual({ codes: ["a1:PASSED", "a2:NOT_AN_ANSWER+NO_COST>c1", "c1:PASSED"], checkerMaker: "maker-1", premiseExempt: ["a1"] });
+      const rows = await database.pool.query("SELECT count(*)::int AS n FROM core.map_item_rests_on WHERE run_id = $1", [runId]);
+      expect(rows.rows[0]!.n).toBe(3);
+    }
+  });
+
+  it("an engine-1 map writes no rests_on or check row and reads back as written (Review Focus 4)", async () => {
+    const runId = await newRun("legacy");
+    const repository = new MapChoiceRepository(database.pool);
+    await repository.writeMapRun({ runId, result: RESULT, answerCount: 2 });
+    expect(await repository.readMapResultForRun(runId)).toEqual(READ_BACK);
+    expect(await repository.readMapAnswerCheckForRun(runId)).toBeNull();
+    for (const table of ["map_item_rests_on", "map_answer_check"]) {
+      expect((await database.pool.query(`SELECT count(*)::int AS n FROM core.${table} WHERE run_id = $1`, [runId])).rows[0]!.n).toBe(0);
+    }
+  });
+
+  it("refuses a basis or a code that is not code-shaped, typed and before anything is stored", async () => {
+    const runId = await newRun("legacy");
+    const repository = new MapChoiceRepository(database.pool);
+    const badBasis = { ...ENGINE_RESULT, items: ENGINE_RESULT.items.map((item, index) => (index === 0 ? { ...item, restsOn: "maybe" } : item)) } as MapResult;
+    await expect(repository.writeMapRun({ runId, result: badBasis, answerCount: 2 })).rejects.toMatchObject({ code: "MAP_RECORD_INVALID",
+      message: "MAP_RECORD_INVALID: items[0].restsOn" });
+    const badCode = { ...ENGINE_RESULT, answerCheck: { ...ENGINE_RESULT.answerCheck!, outcomes: { a9: "PASSED" } } } as MapResult;
+    await expect(repository.writeMapRun({ runId, result: badCode, answerCount: 2 })).rejects.toMatchObject({ message: "MAP_RECORD_INVALID: answerCheck.codes" });
+    // (pre-flight consistency) a premise-exempt id the checker never read is refused like a bad code.
+    const badExempt = { ...ENGINE_RESULT, answerCheck: { ...ENGINE_RESULT.answerCheck!, premiseExempt: ["c4"] } } as MapResult;
+    await expect(repository.writeMapRun({ runId, result: badExempt, answerCount: 2 })).rejects.toMatchObject({ message: "MAP_RECORD_INVALID: answerCheck.premiseExempt" });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+  });
+
+  it("0122 at the database level: closed sets, append-only, no row on an erased run", async () => {
+    const runId = await newRun("legacy");
+    await new MapChoiceRepository(database.pool).writeMapRun({ runId, result: ENGINE_RESULT, answerCount: 2, unchosenAnswers: true });
+    await expect(database.pool.query("INSERT INTO core.map_item_rests_on (run_id, item_id, rests_on) VALUES ($1,'pt09','maybe')", [runId]))
+      .rejects.toMatchObject({ code: "23514" });
+    const other = await newRun("legacy");
+    // Pre-flight PF-R34.1 (FINAL Ruling D4(b) encoding): the retired BOTH, an unknown outcome and the tests out of their
+    // fixed order are refused like a bad id, a NULL, nine codes or none.
+    for (const codes of [["a5:PASSED"], ["a1:PASSED", null], Array.from({ length: 9 }, () => "a1:PASSED"), [], ["a1:BOTH"], ["a1:NOT_REAL"],
+      ["a1:NO_COST+ADDED_FACT"], ["a1:ADDED_FACT+NOT_AN_ANSWER>DROPPED"]]) {
+      await expect(database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check) VALUES ($1,$2::text[])", [other, codes]))
+        .rejects.toMatchObject({ code: "23514" });
+    }
+    // Every outcome the check can name is stored.
+    // (pre-flight consistency) a premise-exempt list that names a reserve id, a NULL or nine ids is refused too.
+    for (const exempt of [["r1"], ["a1", null], Array.from({ length: 9 }, () => "a1")]) {
+      await expect(database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check, premise_exempt) VALUES ($1,ARRAY['a1:PASSED'],$2::text[])",
+        [other, exempt])).rejects.toMatchObject({ code: "23514" });
+    }
+    await database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check) VALUES ($1,$2::text[])", [other,
+      ["a1:NOT_AN_ANSWER+ADDED_FACT+NO_COST>DROPPED", "a2:ADDED_FACT+NO_COST>c1", "a3:NO_COST>KEPT", "a4:NOT_AN_ANSWER+ADDED_FACT>KEPT",
+        "c1:PASSED", "c2:UNCHECKED", "c3:NOT_AN_ANSWER+NO_COST", "c4:ADDED_FACT"]]);
+    for (const table of ["map_item_rests_on", "map_answer_check"]) {
+      await expect(database.pool.query(`DELETE FROM core.${table} WHERE run_id = $1`, [runId]))
+        .rejects.toThrowError(new RegExp(`^append-only or immutable table ${table} rejects DELETE$`, "u"));
+      await expect(database.pool.query(`TRUNCATE core.${table}`))
+        .rejects.toThrowError(new RegExp(`^TRUNCATE_REJECTED: append-only or immutable table core\\.${table} rejects TRUNCATE$`, "u"));
+    }
+    const erased = await newRun("encrypted");
+    await eraseRun(erased);
+    await expect(database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check) VALUES ($1, ARRAY['a1:PASSED'])", [erased]))
+      .rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
+  });
+
+  // Ruling R3-T10.1: 0122's CHECK takes any well-formed code; the repository's breach check also holds the fate rule (a
+  // `>…` fate only, and always, on a failed chosen answer), refused typed before any seal.
+  it("refuses a well-formed code whose fate is wrong, typed and before anything is stored (ruling R3-T10.1)", async () => {
+    const runId = await newRun("legacy");
+    const repository = new MapChoiceRepository(database.pool);
+    const check = ENGINE_RESULT.answerCheck!;
+    const withReplacements = (replacements: NonNullable<MapResult["answerCheck"]>["replacements"]): MapResult =>
+      ({ ...ENGINE_RESULT, answerCheck: { ...check, replacements } }) as MapResult;
+    const wrong = [
+      // a1 passed, yet a fate follows it.
+      { result: withReplacements([...check.replacements, { answerId: "a1", statement: "Yes, with conditions.", replacedBy: null, action: "KEPT_UNCHECKED" }]),
+        code: "a1:PASSED>KEPT" },
+      // a2 failed, and nothing says what became of it.
+      { result: withReplacements([]), code: "a2:NOT_AN_ANSWER+NO_COST" },
+      // A candidate never has a fate.
+      { result: withReplacements([...check.replacements, { answerId: "c1", statement: "Only at night.", replacedBy: null, action: "DROPPED" }]),
+        code: "c1:PASSED>DROPPED" }
+    ];
+    for (const { result, code } of wrong) {
+      const codes = mapAnswerCheckCodes(result.answerCheck!);
+      expect(codes).toContain(code);
+      expect(codes.every((each) => MAP_ANSWER_CHECK_CODE.test(each))).toBe(true);
+      await expect(repository.writeMapRun({ runId, result, answerCount: 2, unchosenAnswers: true })).rejects.toMatchObject({
+        code: "MAP_RECORD_INVALID", message: "MAP_RECORD_INVALID: answerCheck.codes" });
+    }
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    // The loose CHECK is kept as built: at the database level the same code is a row (so the rule lives in the code).
+    await database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check) VALUES ($1, ARRAY['a1:PASSED>KEPT'])", [runId]);
+  });
+
+  // Plan amendment A9-1 (ruling R3-T9.1) and ruling R3-T5.1: the merged-answer ids ride in the stored result, and the
+  // stored "also raised" is engine 2's: debated and failed answers left out by id, with each entry's kind and label.
+  it("an engine-2 map keeps both merged-answer id lists and every label, and stores engine 2's also raised (A9-1, R3-T5.1)", async () => {
+    const byId = Object.freeze({
+      ...ENGINE_RESULT,
+      mergedAnswers: [...ENGINE_RESULT.mergedAnswers,
+        // The chooser reused an02 in other words as a1: only its id leaves it out of "also raised".
+        { answerId: "an02", answer: "Yes, if it pays.", memberItemIds: [], blindMakers: ["maker-1"], makers: ["maker-1"], fromOppositeCase: false },
+        // Raised blind and never chosen: an answer raised, not debated.
+        { answerId: "an03", answer: "Only on weekdays.", memberItemIds: [], blindMakers: ["maker-2"], makers: ["maker-2"], fromOppositeCase: false }],
+      choice: { ...ENGINE_RESULT.choice!, alsoRaised: ["kp03"], answers: [{ ...ENGINE_RESULT.choice!.answers[0]!, mergedAnswerId: "an02" },
+        { ...ENGINE_RESULT.choice!.answers[1]!, pointsRaised: [] }] },
+      // The failed a2 reused an01 in other words: only its id leaves an01 out.
+      answerCheck: { ...ENGINE_RESULT.answerCheck!, replacements: [{ ...ENGINE_RESULT.answerCheck!.replacements[0]!, statement: "No, never.", mergedAnswerId: "an01" }] }
+    }) as MapResult;
+    for (const mode of ["legacy", "encrypted"] as const) {
+      const runId = await newRun(mode);
+      const repository = new MapChoiceRepository(database.pool);
+      expect(await repository.writeMapRun({ runId, result: byId, answerCount: 2, unchosenAnswers: true })).toBe("INSERTED");
+      const back = await repository.readMapResultForRun(runId);
+      expect(back).toEqual({ ...byId, items: [byId.items[3], ...byId.items.slice(0, 3)], calls: [] });
+      expect(mapKeptMergedAnswerIds(back!.choice!)).toEqual(["an02"]);
+      expect(mapCheckFailedMergedAnswerIds(back!.answerCheck)).toEqual(["an01"]);
+      expect(back!.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint.restsOn]))
+        .toEqual([["kp01", "question"], ["kp02", "assumption"], ["kp03", "question"]]);
+      expect((await repository.readMapChoiceForRun(runId))?.alsoRaised).toEqual([
+        { keyPointId: "an03", claim: "Only on weekdays.", makers: ["maker-2"], kind: "ANSWER" },
+        { keyPointId: "kp03", claim: "Night buses.", makers: ["maker-1"], restsOn: "question" }
+      ]);
+    }
   });
 });
