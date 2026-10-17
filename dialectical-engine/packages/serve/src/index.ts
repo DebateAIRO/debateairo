@@ -57,6 +57,7 @@ import {
 // T9's digest, roles and loop live in `./synthesis.ts`; the package publishes a
 // single entry point, so they are re-exported here.
 export * from "./synthesis.js";
+export * from "./engine-verdict.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.

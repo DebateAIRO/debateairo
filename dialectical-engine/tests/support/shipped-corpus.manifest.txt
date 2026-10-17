@@ -1097,6 +1097,7 @@ packages/scorecard/src/picker.ts
 packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/role-rotation.ts
 packages/scorecard/src/schema.ts
+packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
