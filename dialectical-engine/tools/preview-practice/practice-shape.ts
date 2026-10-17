@@ -5,8 +5,8 @@
  * Plain words: the shape is switched on by one register row, debateShapePolicy, and the live preview has none. So a
  * practice debate runs today's shape unless it is asked for the new one:
  *  - `--shape-policy FILE`: the row from FILE, checked by the register's own parser, is put into the practice's
- *    THROWAWAY register only (practice-register-import.ts publishPracticeShapeVersion); the export file is only read
- *    and the live register is never reached;
+ *    THROWAWAY register only (practice-register-import.ts publishPracticeOverrideVersion, one version with any
+ *    `--length-policy` row); the export file is only read and the live register is never reached;
  *  - `--depth-mode`, `--scrutiny`, `--answer-length`: the practice ask's settings, as the /new page sends them.
  * The four flags are debate-only; a refused value is never repeated, a refused file is named only by where it is wrong.
  */

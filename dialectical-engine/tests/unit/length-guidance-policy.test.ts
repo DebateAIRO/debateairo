@@ -112,6 +112,10 @@ describe("lengthGuidancePolicy: the parser refuses by path (spec §3.1)", () => 
     ["a story reference of 499", changed("storyLongReferenceWords", 499), "storyLongReferenceWords"],
     ["a factor for another language", changed("charactersPerWord.ko", 1.5), "charactersPerWord"],
     ["a factor of 0.4", changed("charactersPerWord.zh", 0.4), "charactersPerWord.zh"],
+    // Task 2 review 3: the edges one decimal place past the six allowed, and one above the map's room.
+    ["a factor with 7 decimals", changed("charactersPerWord.zh", 1.6000001), "charactersPerWord.zh"],
+    ["tokens per word just above 5", changed("tokensPerWord", 5.0000001), "tokensPerWord"],
+    ["the map's thinking room above 32768", changed("thinkingRoom.map", 32769), "thinkingRoom.map"],
     ["a judge-reasons switch that is a word", changed("answerWriterSeesJudgeReasons", "no"), "answerWriterSeesJudgeReasons"]
   ])("%s", (_name, value, path) => {
     expect(() => parseLengthGuidancePolicy(value)).toThrowError(refusal(path));

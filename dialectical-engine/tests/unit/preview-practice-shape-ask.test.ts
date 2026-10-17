@@ -6,6 +6,7 @@
 // (tests/integration/preview-practice-run.test.ts) runs the real ones.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
+import { TypedDomainError } from "@debateai/kernel";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
 import { practiceLengthBlockLines } from "../../tools/preview-practice/practice-length.js";
@@ -27,7 +28,9 @@ const seen = vi.hoisted(() => ({
   readVersions: [] as number[],
   askVersions: [] as number[],
   runnerVersions: [] as number[],
-  requests: [] as Record<string, unknown>[]
+  requests: [] as Record<string, unknown>[],
+  /** When set, the stand-in ask refuses the request with it (an admission refusal). */
+  submitError: null as Error | null
 }));
 
 vi.mock("@debateai/db", async (importOriginal) => ({
@@ -71,7 +74,11 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
     seen.askVersions.push(input.settings.runner.REGISTER_VERSION);
     // Admits nothing: the debate ends as an ask that was not dispatched, after the request was handed over.
     // Local mode, as the real composition returns it (hosted: null); submit answers QUEUED as the real ask does.
-    return { application: { submit: async (request: Record<string, unknown>) => { seen.requests.push(request); return { status: "QUEUED" }; } },
+    return { application: { submit: async (request: Record<string, unknown>) => {
+      seen.requests.push(request);
+      if (seen.submitError !== null) throw seen.submitError;
+      return { status: "QUEUED" };
+    } },
       hosted: null };
   })
 }));
@@ -111,6 +118,7 @@ beforeEach(() => {
   seen.rows.clear();
   seen.lengthRows.clear();
   seen.receipt = LIVE;
+  seen.submitError = null;
   for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests]) list.length = 0;
 });
 
@@ -219,6 +227,19 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
       startedAt: new Date(0), finishedAt: new Date(1_000) });
     expect(report.length).toEqual(block);
     expect(reportMarkdown(report)).toContain(practiceLengthBlockLines(result.length!).join("\n"));
+  });
+
+  // Task 9 re-review: an ask the admission REFUSES keeps the length block too, with its own refusal code.
+  it("--length-policy, the ask refused at admission: the result and report.json carry the length block and the refusal code", async () => {
+    seen.submitError = new TypedDomainError("RUN_CEILING_BELOW_ONE_CALL", "refused for the test");
+    const result = await debate({ length: lengthGuidancePolicyStartValues(), shape: { policy: null, ask: {} } });
+    expect(seen.requests).toHaveLength(1);
+    expect(result.admission).toMatchObject({ admitted: false, refusalCode: "RUN_CEILING_BELOW_ONE_CALL" });
+    const block = { source: "FLAG", registerVersion: "6", row: "ADDED", frozen: null, unreadable: null };
+    expect(result.length).toEqual(block);
+    const report = debateReport({ result: { ...result, parallel: undefined } as never, observer: new PracticeGateObserver(),
+      startedAt: new Date(0), finishedAt: new Date(1_000) });
+    expect(report.length).toEqual(block);
   });
 
   it("--shape-policy on a code's next version composed without it: refused before the ask is composed", async () => {

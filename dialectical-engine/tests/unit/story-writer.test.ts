@@ -8,7 +8,7 @@ import {
   type ProviderCallRequest,
   type ProviderGateway
 } from "@debateai/providers";
-import type { StoryPolicy } from "@debateai/register";
+import { lengthGuidancePolicyStartValues, resolveLengthGuidance, type StoryPolicy } from "@debateai/register";
 import {
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
   STORY_CHECKER_CONTRACT_ID,
@@ -1172,5 +1172,20 @@ describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () 
     expect(plain.calls[1]?.contractHash).toBe(
       storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK), "Romanian"))
     );
+  });
+
+  // Task 15 review (b): the writer's own pass-through, lengthGuidance -> alsoRaisedWhole, seen in the sent material.
+  it("length guidance (L19): on a lengthed run a 600-character also-raised claim reaches the storyteller whole; without it, today's clip", async () => {
+    const claim = `${"Ask the school whether a mid-year move would upset the class and the timetable. ".repeat(8)}`.slice(0, 600).trim();
+    expect(Array.from(claim).length).toBeGreaterThan(240);
+    const sentClaim = async (extra: Readonly<Record<string, unknown>>): Promise<string> => {
+      const { provider, calls } = scripted(byContract);
+      await harness(providing(provider)).writer.writeAfterSettle({ ...SNAPSHOT, alsoRaised: [{ claim, raisedBy: 2 }], ...extra });
+      const field = readPromptFrame(calls[0]!.packet).fields.find((entry) => entry.name === "also_raised");
+      return (JSON.parse(field!.content) as { claim: string }[])[0]!.claim;
+    };
+    const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "pro", answerLength: "standard" });
+    expect(await sentClaim({ lengthGuidance: guidance })).toBe(claim);
+    expect(Array.from(await sentClaim({})).length).toBeLessThanOrEqual(240);
   });
 });

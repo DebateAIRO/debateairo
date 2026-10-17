@@ -79,6 +79,16 @@ describe("the hosted picker and the boot checks (spec §3.10)", () => {
       CROSS_EXCHANGE: 9144, JUDGE: 6496, REVIEWER: 3488, ANSWER_WRITER: 20584, ANSWER_CHECKER: 3848 });
   });
 
+  // Task 6 review 3: the writer's row at the other two answer lengths (Standard is pinned above).
+  it("the writer's per-run ceiling at Short and Detailed: 18,784 and 28,384, each the runner's guided writer bound", () => {
+    expect(LENGTHS.map((answerLength) => answerTokenCeilingsForBasis(SEALED, basisAt(answerLength)).ANSWER_WRITER))
+      .toEqual([18784, 20584, 28384]);
+    for (const answerLength of LENGTHS) {
+      expect(answerTokenCeilingsForBasis(SEALED, basisAt(answerLength)).ANSWER_WRITER)
+        .toBe(lengthGuidanceAllowanceTokens(guidanceAt(answerLength), "answer_writer", SEALED.ANSWER_WRITER));
+    }
+  });
+
   it("the Free answer jobs and the first call are checked at the largest any plan can ask", () => {
     const sealed = { writer: 2048, checker: 2048 };
     expect(answerJobTokenCeilings(sealed, null, null)).toEqual({ ANSWER_WRITER: 2048, ANSWER_CHECKER: 2048 });
@@ -118,5 +128,19 @@ describe("a shaped run with the length member prices the map's allowance (Task 1
       lengthGuidanceAllowanceTokens(guidanceAt("standard"), "opening", SEALED.POSITION)));
     // Only POSITION carries the map; every other role is as without the shape (the writer keeps its shape bound).
     expect(ceilings.SUPPORT_ATTACK).toBe(answerTokenCeilingsForBasis(SEALED, basisAt("standard")).SUPPORT_ATTACK);
+  });
+
+  // Task 6 review 3: shape and length together, every role: the writer is guided from the shape's own writer bound.
+  it("shape and length together: the writer is guided from the shape's writer bound; the debate roles as without the shape", () => {
+    const ceilings = answerTokenCeilingsForBasis(SEALED, shapedLengthed);
+    const unshaped = answerTokenCeilingsForBasis(SEALED, basisAt("standard"));
+    expect(ceilings.ANSWER_WRITER).toBe(lengthGuidanceAllowanceTokens(guidanceAt("standard"), "answer_writer",
+      Math.max(SEALED.ANSWER_WRITER, SHAPE.writerBound)));
+    expect(ceilings.ANSWER_WRITER).toBeGreaterThanOrEqual(Math.max(SHAPE.writerBound, unshaped.ANSWER_WRITER));
+    for (const role of ["SUPPORT_ATTACK", "CROSS_EXCHANGE", "JUDGE", "REVIEWER", "ANSWER_CHECKER"] as const) {
+      expect(ceilings[role], role).toBe(unshaped[role]);
+    }
+    // Without the length member: the shape's raise only.
+    expect(answerTokenCeilingsForBasis(SEALED, shaped).ANSWER_WRITER).toBe(Math.max(SEALED.ANSWER_WRITER, SHAPE.writerBound));
   });
 });

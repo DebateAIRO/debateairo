@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, projectedCallCeilingMicros, type ModelSpendStore } from "@debateai/budget";
 import {
@@ -7,13 +8,13 @@ import {
 import {
   MAP_ANSWER_FORMS, MAP_CONTRACT_IDS, MAP_CONTRACT_NAMES, MAP_DEFAULT_INSTRUCTIONS, MAP_LENGTHED_REPLY_SCHEMAS, MAP_LENGTH_ANSWER_FORMS,
   MAP_LENGTH_CONTRACT_IDS, MAP_LIMITS, MAP_RUNAWAY_LIMITS, mapAnglesReplySchema, mapAnglesSalvage, mapAnglesSalvageLengthed,
-  mapAnglesSpec, mapClassifyReply, mapContractNameOf, mapGuidedWords, mapLengthContractsOf, mapListSalvage, mapListSalvageLengthed,
-  mapListSpec, mapLimitsFor, mapPromptContractHash, mapPromptContracts, mapPromptFingerprintText, mapReplySchemasFor,
+  mapAnglesSpec, mapChooseSpec, mapClassifyReply, mapContractNameOf, mapGuidedWords, mapGapSpec, mapLargestReplyWordsCeiling, mapLengthContractsOf, mapListSalvage, mapListSalvageLengthed,
+  mapListSpec, mapLimitsFor, mapMergeSpec, mapSnowballSpec, mapPromptContractHash, mapPromptContracts, mapPromptFingerprintText, mapReplySchemasFor,
   mapReplyWordsCeiling, type MapLength
 } from "@debateai/map";
 import {
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_REQUEST_BODY_MAX_BYTES, buildFramedPrompt, previewModelRow,
-  promptContractFingerprintText, readPromptFrame
+  promptContractFingerprintText, readPromptFrame, type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW, costEnvelopeCeilings,
@@ -21,8 +22,10 @@ import {
 } from "@debateai/register";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import {
-  guidedMapBound, rootZeroKeepRoomMicros, rootZeroMapMaterialChars, rootZeroMapMaterialCharsFor, rootZeroRoomAttempts
+  createRunnerMapCaller, guidedMapBound, rootZeroKeepRoomMicros, rootZeroMapMaterialChars, rootZeroMapMaterialCharsFor,
+  rootZeroRoomAttempts, type MapStageDeps
 } from "../../apps/runner/src/map-stage.js";
+import { mapLengthAllowanceTokens } from "../../apps/api/src/ask-model-picker.js";
 
 const LENGTH: MapLength = { targets: LENGTH_GUIDANCE_START.map, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord };
 const ctx = (length?: MapLength) => ({ questionLine: "Should cities price congestion?", languageName: "English", languageTag: "en",
@@ -257,5 +260,99 @@ describe("a lengthed map call", () => {
       expect(state.room + state.listCall).toBeGreaterThan(paid.body);
       expect(await seamDecision(state, paid)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
     });
+  });
+});
+
+/** Task 14 review 1, 2, 5, 6: the runner's map caller, the two map allowances, every spec builder, root 0's one material bound. */
+describe("the map's length wiring, end to end (R1c final wave B10)", () => {
+  const GUIDANCE = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "free", answerLength: "standard" });
+  const BOUND = Object.freeze({ maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 60_000 });
+  const recording = () => {
+    const seen: ProviderCallRequest[] = [];
+    const gateway = { call: async (call: ProviderCallRequest) => { seen.push(call); throw new TypedDomainError("STOP_FOR_TEST", "x"); } } as
+      ProviderGateway;
+    return { seen, gateway };
+  };
+  const deps = (gateway: ProviderGateway, lengthGuidance: typeof GUIDANCE | null): MapStageDeps => ({
+    runId: "run-1", subjectItemId: "wi-1", mapContractHash: mapPromptContractHash(), judgeBound: BOUND,
+    longBounds: { merge: 32 * 1024, choose: 32 * 1024 }, memberOf: () => ({ provider: gateway, providerRef: "ref-a" }), sitsOut: () => false,
+    satOutBy: () => false, spendStopOf: () => null, laneStopped: () => false, abandon: () => false, serial: false,
+    ...(lengthGuidance === null ? {} : { lengthGuidance }) });
+  const seat = { aiRef: "ref-a", maker: "a" };
+
+  it("the runner's map caller: a LIST call asks the guided bound, its guided words and its reply ceiling; MERGE has no ceiling", async () => {
+    const { seen, gateway } = recording();
+    const caller = createRunnerMapCaller(deps(gateway, GUIDANCE));
+    await caller.call({ step: "LIST", callSiteKey: "MAP:list:1", seat, order: 0, shown: "BLIND", spec: mapListSpec(ctx(LENGTH), null) as never });
+    expect(seen[0]!.bound).toEqual({ ...BOUND, tokenCeiling: 15_812 });
+    expect(seen[0]!.bound.tokenCeiling).toBe(guidedMapBound(BOUND, 635, GUIDANCE).tokenCeiling);
+    expect([seen[0]!.guidedWords, seen[0]!.replyWordsCeiling]).toEqual([95, 635]);
+    await caller.call({ step: "MERGE", callSiteKey: "MAP:merge", seat, order: 0, shown: "BLIND", spec: mapMergeSpec(ctx(LENGTH), []) as never });
+    expect(Object.hasOwn(seen[1]!, "replyWordsCeiling")).toBe(false);
+    expect(seen[1]!.bound.tokenCeiling).toBe(32 * 1024);
+  });
+
+  it("row absent: the same bound object, and no guidedWords or replyWordsCeiling key", async () => {
+    const { seen, gateway } = recording();
+    await createRunnerMapCaller(deps(gateway, null)).call({ step: "LIST", callSiteKey: "MAP:list:1", seat, order: 0, shown: "BLIND",
+      spec: mapListSpec(ctx(), null) as never });
+    expect(seen[0]!.bound).toBe(BOUND);
+    expect(Object.hasOwn(seen[0]!, "guidedWords")).toBe(false);
+    expect(Object.hasOwn(seen[0]!, "replyWordsCeiling")).toBe(false);
+  });
+
+  it("the runner's map bound and the pricers' map allowance are the same number for the largest reply, and cover every contract", () => {
+    for (const todayTokens of [2048, 8192, 16_384]) {
+      const bound = { ...BOUND, tokenCeiling: todayTokens };
+      const largest = guidedMapBound(bound, mapLargestReplyWordsCeiling(LENGTH), GUIDANCE).tokenCeiling;
+      expect(largest, String(todayTokens)).toBe(mapLengthAllowanceTokens(GUIDANCE, todayTokens));
+      for (const name of MAP_CONTRACT_NAMES) {
+        expect(guidedMapBound(bound, mapReplyWordsCeiling(name, LENGTH), GUIDANCE).tokenCeiling, name).toBeLessThanOrEqual(largest);
+      }
+    }
+  });
+
+  // A text past today's 240 characters, within the runaway limits, in plain English (the reply check reads its language).
+  const LONG = "Congestion pricing cuts traffic in the centre and pays for better buses for everyone who rides them daily. ".repeat(3).trim();
+  const point = (claim: string) => ({ claim, why_it_matters: "It changes who pays for the roads.", leans: "context" });
+  const item = (itemId: string, kind: "POINT" | "ANSWER") => (kind === "POINT"
+    ? { kind, itemId, claim: "Prices cut traffic.", whyItMatters: "Fewer cars.", leans: "context", seat, origin: "BLIND", angleId: null, angleKind: null, listIndex: 0 }
+    : { kind, itemId, answer: "Yes.", seat, origin: "BLIND", angleId: null, angleKind: null, listIndex: 0 }) as never;
+  const keyPoint = { keyPointId: "k1", claim: "Prices cut traffic.", memberItemIds: ["p1"], blindMakers: ["a"], gapMakers: [], makers: ["a"],
+    fixedAngleKinds: [], leansAgainst: false };
+  const answer = (answerId: string) => ({ answerId, answer: "Yes.", memberItemIds: ["c1"], blindMakers: ["a"], makers: ["a"], fromOppositeCase: false });
+  const angle = { angleId: "g1", kind: "OPPOSITE_CASE", label: "The other side", focus: "The case against." } as never;
+  const label = "word ".repeat(30).trim(); // 149 characters: over today's 80, within the runaway 650
+  it.each([
+    ["angles", (c = ctx(LENGTH)) => mapAnglesSpec(c), JSON.stringify({ question_language: "en", angles: [
+      { angle_id: "opposite", kind: "OPPOSITE_CASE", label, focus: "What if waiting is better?" },
+      { angle_id: "worry", kind: "ASKER_WORRY", label: "Your worry", focus: "Prices." },
+      { angle_id: "practical", kind: "PRACTICAL", label: "In practice", focus: "Timing." },
+      { angle_id: "specific", kind: "SPECIFIC", label: "The cost", focus: "Who pays." }] })],
+    ["list (open)", (c = ctx(LENGTH)) => mapListSpec(c, null), JSON.stringify({ points: [point(LONG), point(LONG), point(LONG)], candidate_answers: ["Yes."] })],
+    ["list (angle)", (c = ctx(LENGTH)) => mapListSpec(c, angle), JSON.stringify({ points: [point(LONG), point(LONG), point(LONG)], candidate_answers: ["Yes."] })],
+    ["snowball", (c = ctx(LENGTH)) => mapSnowballSpec(c, []), JSON.stringify({ points: [point(LONG)], candidate_answers: [] })],
+    ["merge", (c = ctx(LENGTH)) => mapMergeSpec(c, [item("p1", "POINT"), item("c1", "ANSWER")]), JSON.stringify({
+      key_points: [{ key_point_id: "k1", claim: LONG, member_item_ids: ["p1"] }], answers: [{ answer_id: "x1", answer: LONG, member_item_ids: ["c1"] }] })],
+    ["gap", (c = ctx(LENGTH)) => mapGapSpec(c, [keyPoint], [answer("x1")]), JSON.stringify({ new_points: [point(LONG)], framing_challenges: [LONG] })],
+    ["choose", (c = ctx(LENGTH)) => mapChooseSpec(c, [keyPoint], [answer("x1"), answer("x2")]), JSON.stringify({ answers: [
+      { answer_id: "x1", statement: LONG, for: ["k1"], against: [], strongest_rival: "x2" },
+      { answer_id: "x2", statement: "No, not yet.", for: [], against: ["k1"], strongest_rival: "x1" }] })]
+  ] as const)("every map spec builder reads a lengthed %s reply with the runaway limits, untrimmed", (_name, build, reply) => {
+    const spec = build();
+    expect(spec.classify(reply, { finishReason: "stop" }).parseStatus, JSON.stringify(spec.classify(reply).parseError)).toBe("PARSED");
+    const classified = spec.classify(reply, { finishReason: "stop" });
+    expect(JSON.stringify(classified)).not.toContain("MAP_TEXT_TRIMMED");
+    // The same reply under today's spec is trimmed or refused: the lengthed reading is what lets it through whole.
+    const today = build(ctx()).classify(reply, { finishReason: "stop" });
+    expect(today.parseStatus !== "PARSED" || JSON.stringify(today).includes("MAP_TEXT_TRIMMED"), JSON.stringify(today)).toBe(true);
+  });
+
+  it("root 0's map material bound is computed once in the runner and read by its room and every root's framing", () => {
+    const runner = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(runner.split("rootZeroMapMaterialCharsFor(").length - 1).toBe(1);
+    expect(runner).toContain("const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));");
+    expect(runner.split("materialChars: rootMaterialChars }").length - 1).toBe(1);
+    expect(runner.split("mapPoints: position.mapPoints }, rootMaterialChars)").length - 1).toBe(1);
   });
 });

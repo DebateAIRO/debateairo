@@ -5330,6 +5330,11 @@ export class WalkingSkeletonRunner {
      * reaches a running or re-claimed debate.
      */
     const lengthGuidance = envelopeBasis.length ?? null;
+    /**
+     * Ruling "PF-C5 root-0 bound" (a): root 0's map material bound, the runaway limits with the receipt's `length` (L19,
+     * no trims), today's limits without. Root 0's kept room and every root's framing read this one value (Task 14 review 6).
+     */
+    const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));
     if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
@@ -6993,7 +6998,7 @@ export class WalkingSkeletonRunner {
           tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
           lengthed: lengthGuidance !== null,
           // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
-          materialChars: rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null)) }),
+          materialChars: rootMaterialChars }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -7275,8 +7280,7 @@ export class WalkingSkeletonRunner {
       if (position === undefined || position.statement === null || position.mapPoints === null) {
         return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
       }
-      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints },
-        rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null)));
+      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
     };
     const openFirstPosition = async (primarySeat: RunSeat, leg: JudgeLeg = { kind: "primary-root" }) => {

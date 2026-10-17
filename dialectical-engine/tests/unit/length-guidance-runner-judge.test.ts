@@ -63,8 +63,10 @@ describe("a judge, panel or review call with and without a target (Task 11 revie
   });
 
   it("a locked and lengthed review and panel put length right before question_language, which stays last", async () => {
-    const reviewed = readPromptFrame((await firstRequest((gateway) =>
-      new Judge(gateway).review(reviewInput({ questionLanguage: RO, length: GUIDE })))).packet);
+    const reviewRequest = await firstRequest((gateway) => new Judge(gateway).review(reviewInput({ questionLanguage: RO, length: GUIDE })));
+    // Task 12 review 4: the review with a target records its guided words too.
+    expect(reviewRequest.guidedWords).toBe(GUIDE.words);
+    const reviewed = readPromptFrame(reviewRequest.packet);
     expect(reviewed.contractId).toBe("judge.review.length.v1");
     expect(reviewed.fields.map((field) => field.name))
       .toEqual(["question_line", "statement", "edges_sourced_by_this_node", "length", "question_language"]);

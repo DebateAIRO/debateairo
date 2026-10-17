@@ -3,7 +3,7 @@ import { LENGTH_GUIDANCE_STEPS, LENGTH_THINKING_ROOM_KEYS } from "@debateai/kern
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { publicCostEnvelopeBasis } from "@debateai/serve";
 import {
-  computeStructuralCeilingBasis, lengthGuidanceOfReceipt, lengthGuidancePolicyStartValues, lengthGuidanceReceipt,
+  computeStructuralCeilingBasis, debateShapePolicyStartValues, lengthGuidanceOfReceipt, resolveDebateShape, lengthGuidancePolicyStartValues, lengthGuidanceReceipt,
   lengthGuidanceReceiptSchema, resolveLengthGuidance, type LengthGuidance
 } from "@debateai/register";
 
@@ -89,6 +89,17 @@ describe("the receipt member envelope_basis.length (INTERFACE §5.5)", () => {
     expect(JSON.stringify(rest)).toBe(JSON.stringify(today));
     expect(member).toEqual(lengthGuidanceReceipt(GUIDANCE));
     expect(parseCostEnvelopeBasis(guided).length).toEqual(GUIDANCE);
+  });
+
+  // Task 3 review 2: with the shape member too, the length member still rides last and both read back.
+  it("shape and length together: the last two keys are shape then length, and both read back", () => {
+    const shape = resolveDebateShape({ policy: debateShapePolicyStartValues(), plan: "pro", makers: 3,
+      settings: { depthMode: "fixed", scrutiny: "deep", answerLength: "detailed" } })!;
+    const both = JSON.parse(JSON.stringify(computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, shape, length: GUIDANCE })));
+    expect(Object.keys(both).slice(-2)).toEqual(["shape", "length"]);
+    const parsed = parseCostEnvelopeBasis(both);
+    expect(parsed.shape).toEqual(shape);
+    expect(parsed.length).toEqual(GUIDANCE);
   });
 
   it("the strict parser refuses a malformed member", () => {

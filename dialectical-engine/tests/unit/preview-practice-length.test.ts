@@ -1,12 +1,20 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { lengthGuidancePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY } from "@debateai/register";
+import type { Pool } from "pg";
+import { buildFramedPrompt } from "@debateai/providers";
+import {
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY
+} from "@debateai/register";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import {
   parsePracticeLengthPolicyText, practiceGuidedWordsOfFields, practiceLengthBlock, practiceLengthBlockLines,
   practiceLengthOverrideFromArgs
 } from "../../tools/preview-practice/practice-length.js";
-import { parsePracticeRegisterExport, practiceOverrideVersionRows } from "../../tools/preview-practice/practice-register-import.js";
+import {
+  PRACTICE_LENGTH_SOURCE_REF, PRACTICE_SHAPE_SOURCE_REF, parsePracticeNextRegisterInputs, parsePracticeRegisterExport,
+  practiceOverrideVersionRows, publishPracticeLengthVersion, publishPracticeOverrideVersion
+} from "../../tools/preview-practice/practice-register-import.js";
+import { buildTranscriptAttempts, type TranscriptArtifact } from "../../tools/preview-practice/practice-transcript.js";
 import { recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import { MAP_LIMITS, MAP_RUNAWAY_LIMITS } from "@debateai/map";
 
@@ -53,7 +61,8 @@ describe("--length-policy (spec §3.7, ruling L22)", () => {
     for (const [text, detail] of [["{not json", "$"], [JSON.stringify(bad), "runawayMultiplier"]] as const) {
       try { parsePracticeLengthPolicyText(text); expect.unreachable(); } catch (error) {
         expect(error).toMatchObject({ code: "PRACTICE_LENGTH_POLICY_INVALID" });
-        expect(String((error as Error).message)).toContain(detail);
+        // Task 9 review 8: the whole message is the code and the path, nothing else.
+        expect(String((error as Error).message)).toMatch(new RegExp(`^PRACTICE_LENGTH_POLICY_INVALID: ${detail.replace("$", "\\$")}$`, "u"));
         expect(String((error as Error).message)).not.toContain("99");
       }
     }
@@ -71,6 +80,66 @@ describe("the throwaway version holds the overrides and this code's hashes", () 
     expect(built.rows.find((row) => row.rowKey === "judgeContractHash")!.valueJsonText).toBe("\"code-judge\"");
     expect([built.shapeRow, built.lengthRow]).toEqual([null, "ADDED"]);
   });
+
+  // Task 9 review 1: --shape-policy and --length-policy together make ONE version carrying both rows.
+  it("adds the shape row and the length row together, sorted, with the code's hashes", () => {
+    const built = practiceOverrideVersionRows(document, { shape: debateShapePolicyStartValues(), length: lengthGuidancePolicyStartValues() },
+      codeHashes as never);
+    expect(built.rows.map((row) => row.rowKey)).toEqual(["aRow", DEBATE_SHAPE_POLICY_ROW_KEY, "judgeContractHash", LENGTH_GUIDANCE_POLICY_ROW_KEY]);
+    expect([built.shapeRow, built.lengthRow]).toEqual(["ADDED", "ADDED"]);
+  });
+
+  /** A pool whose one publication call is captured, then stopped (nothing is written). */
+  function capturingPool() {
+    const calls: { sql: string; params: readonly unknown[] }[] = [];
+    const client = {
+      query: async (sql: string, params: readonly unknown[] = []) => {
+        calls.push({ sql, params });
+        if (sql.includes("register.publish_register_version")) throw new Error("captured");
+        return { rows: [] };
+      },
+      release: () => undefined
+    };
+    return { pool: { connect: async () => client } as unknown as Pool, calls };
+  }
+  const publication = (calls: readonly { sql: string; params: readonly unknown[] }[]) => {
+    const found = calls.filter((call) => call.sql.includes("register.publish_register_version"));
+    expect(found).toHaveLength(1);
+    const [, , base, envelope, sourceRef] = found[0]!.params as [unknown, unknown, string, string, string];
+    return { base, keys: (JSON.parse(envelope) as { row_key: string }[]).map((row) => row.row_key), sourceRef };
+  };
+
+  // Task 9 review 2: the length-only publisher.
+  it("publishPracticeLengthVersion publishes ONE general version on the export's last one: the length row alone, the length source line", async () => {
+    const { pool, calls } = capturingPool();
+    await expect(publishPracticeLengthVersion(pool, document, { registerVersion: "5", steps: [] }, lengthGuidancePolicyStartValues()))
+      .rejects.toThrow("captured");
+    const published = publication(calls);
+    expect(published.base).toBe("5");
+    expect(published.keys).toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    expect(published.keys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
+    expect(published.sourceRef).toBe(PRACTICE_LENGTH_SOURCE_REF);
+  });
+
+  it("both overrides: ONE publication with both rows, under the shape's source line", async () => {
+    const { pool, calls } = capturingPool();
+    await expect(publishPracticeOverrideVersion(pool, document, { registerVersion: "5", steps: [] },
+      { shape: debateShapePolicyStartValues(), length: lengthGuidancePolicyStartValues() })).rejects.toThrow("captured");
+    const published = publication(calls);
+    expect(published.keys).toEqual(expect.arrayContaining([DEBATE_SHAPE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY]));
+    expect(published.sourceRef).toBe(PRACTICE_SHAPE_SOURCE_REF);
+  });
+});
+
+// Task 9 review 3: with --register-next the policy goes into the code's next version, as the plan's --length-guidance.
+describe("--length-policy with --register-next", () => {
+  it("the next version's choices carry the policy; null or none adds nothing; it never chooses the kit", async () => {
+    const policy = lengthGuidancePolicyStartValues();
+    expect(await parsePracticeNextRegisterInputs({ lengthGuidance: policy })).toEqual({ kit: "v2", hostedBilling: null,
+      choices: { lengthGuidance: policy } });
+    expect(await parsePracticeNextRegisterInputs({ lengthGuidance: null })).toEqual({ kit: "v2", hostedBilling: null, choices: {} });
+    expect(await parsePracticeNextRegisterInputs({})).toEqual({ kit: "v2", hostedBilling: null, choices: {} });
+  });
 });
 
 describe("guided words read back from a recorded prompt (transcript fallback only, spec §3.7)", () => {
@@ -81,6 +150,27 @@ describe("guided words read back from a recorded prompt (transcript fallback onl
     expect(practiceGuidedWordsOfFields([{ name: "answer_length", content: "about 350 words" }])).toBe(350);
     expect(practiceGuidedWordsOfFields([{ name: "length", content: "claim: about 35 words\nwhy_it_matters: about 35 words" }])).toBe(70);
     expect(practiceGuidedWordsOfFields([{ name: "length", content: "about 1120 characters" }])).toBeNull();
+  });
+
+  // Task 9 review 4: the fallback through the transcript builder itself; the recorded column wins when there is one.
+  it("transcript.json: a try with no recorded guided words reads its prompt's target; a recorded number wins", () => {
+    const framed = buildFramedPrompt({ contract: { contractId: "serve.synthesizer.length.v2", instruction: "Write the answer.",
+      answerForm: "Plain text." }, material: [{ name: "question_line", content: "Q?" }, { name: "answer_length", content: "about 350 words" }] });
+    const at = new Date("2026-10-17T00:00:00.000Z");
+    const entry = (n: number) => ({ sequence: String(n), ledgerEntryId: `ledger-${String(n)}`, attemptId: `attempt-${String(n)}`,
+      callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1", subjectItemId: "item", stance: "NEUTRAL", actorRef: "preview:glm-5-3-flash",
+      outcome: "OK", modelRole: "SYNTHESIZER", thinkingLevel: "high", candidateId: null, startedAt: at, finishedAt: at,
+      rawArtifactRef: `artifact-${String(n)}` });
+    const artifact = (n: number, guidedWords: number | null): TranscriptArtifact => ({ rawArtifactId: `artifact-${String(n)}`,
+      provider: "deepinfra", providerRef: "preview:glm-5-3-flash", modelId: "zai-org/GLM-5.3-Flash", maker: "zai", modelVersion: null,
+      parseStatus: "PARSED", parseErrorCode: null, metadata: null, thinkingTokens: null, rawText: "An answer.", parseErrorDetail: null,
+      ...(guidedWords === null ? {} : { guidedWords }) });
+    const prompt = { promptText: JSON.stringify(framed.packet.messages), promptFingerprint: `sha256:${"b".repeat(64)}` };
+    const [fallback, recorded] = buildTranscriptAttempts({ entries: [entry(1), entry(2)],
+      artifacts: new Map([["artifact-1", artifact(1, null)], ["artifact-2", artifact(2, 120)]]),
+      prompts: new Map([["attempt-1", prompt], ["attempt-2", prompt]]), spend: new Map() });
+    expect(fallback!.guidedWords).toBe(350);
+    expect(recorded!.guidedWords).toBe(120);
   });
 });
 

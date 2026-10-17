@@ -924,7 +924,10 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     ['text that is not JSON', 'plan', ['--length-guidance', 'on']],
     ['a JSON array', 'plan', ['--length-guidance', '[1]']],
     ['JSON null', 'plan', ['--length-guidance', 'null']],
-    ['the option on verify', 'verify', ['--length-guidance', '{}']]
+    // Task 8 review 8: a JSON string (the "off" word does not exist) and the other operation that may not carry it.
+    ['a JSON string', 'plan', ['--length-guidance', '"off"']],
+    ['the option on verify', 'verify', ['--length-guidance', '{}']],
+    ['the option on apply-and-plan', 'apply-and-plan', ['--length-guidance', '{}']]
   ])('refuses --length-guidance with %s and writes nothing', async (_name, operation, extra) => {
     const t = await staged();
     const out = join(t.s.art, 'native-plan-refused.json');

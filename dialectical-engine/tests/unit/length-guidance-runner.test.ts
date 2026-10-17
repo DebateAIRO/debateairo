@@ -41,6 +41,9 @@ describe("guidedCallBound (spec §3.3)", () => {
     expect(judgeLegLengthStep({ kind: "assigned-root", assignedAnswer: "a", mapPoints: "{}" })).toBe("opening");
     expect(judgeLegLengthStep({ kind: "attack", positionUnderDebate: "p" })).toBe("pros_cons");
     expect(judgeLegLengthStep({ kind: "cross-root", ownPosition: "a", otherMakersPosition: "b" })).toBe("cross_exchange");
+    // Task 7 review 5: the two legs not named above.
+    expect(judgeLegLengthStep({ kind: "independent-root" })).toBe("opening");
+    expect(judgeLegLengthStep({ kind: "support", positionUnderDebate: "p" })).toBe("pros_cons");
   });
 });
 
@@ -66,6 +69,37 @@ describe("the answer writer is told its target (spec §3.2 notes)", () => {
   });
 });
 
+// Task 7 review 1: the runner's call sites, read off its source, so a site that stops sizing or telling its call fails here.
+describe("the runner's length call sites (source pins)", () => {
+  const RUNNER = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+  const count = (text: string): number => RUNNER.split(text).length - 1;
+
+  it("eight guided bounds beside the definition, one per sized call site", () => {
+    expect(count("guidedCallBound(")).toBe(9);
+    for (const site of [
+      "guidedCallBound(input.judgeBound, \"reviewer\", catchUpLength)",
+      "guidedCallBound(this.settings.judgeBound, \"judge_panel\", lengthGuidance)",
+      "guidedCallBound(this.settings.judgeBound, \"opening\", lengthGuidance).tokenCeiling",
+      "guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance)",
+      "guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance)",
+      "guidedCallBound(this.settings.judgeBound, \"reviewer\", lengthGuidance)",
+      "\"answer_writer\", lengthGuidance),",
+      "guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)"
+    ]) expect(count(site), site).toBe(1);
+  });
+
+  it("the writer and the checker record their guided words only with the receipt's length", () => {
+    expect(count("...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_writer }),")).toBe(1);
+    expect(count("...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_checker }),")).toBe(1);
+  });
+
+  it("every target names the run's own language tag", () => {
+    expect(count("languageCode: run.argumentLanguageTag")).toBe(2); // the writer's and the checker's RoleLength
+    expect(count("lengthGuideFrom(lengthGuidance, step, run.argumentLanguageTag)")).toBe(1); // judge, panel, review
+    expect(count("lengthGuideFrom(catchUpLength, \"reviewer\", catchUpTag)")).toBe(1);
+  });
+});
+
 describe("the runner never reads the row (Review Focus 2)", () => {
   // apps/runner/src is flat, so the scan also reads Task 8's hosted publisher, which reads the row for its boot-readiness
   // check only; it is exempt for both names (pre-flight PF-C3.4).
@@ -86,5 +120,11 @@ describe("the runner never reads the row (Review Focus 2)", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     const body = source.slice(start, source.indexOf("\n}\n", start));
     expect(body.split("readLengthGuidancePolicy(").length - 1).toBe(1);
+    // Task 8 review 2: the read is awaited (a malformed sealed row throws LENGTH_GUIDANCE_POLICY_INVALID and the version is
+    // never reported ready), in main.ts's order: after the question-language step, before the scorecard.
+    const read = body.indexOf("  await readLengthGuidancePolicy(pool, version);\n");
+    expect(read).toBeGreaterThan(body.indexOf("await assertHostedQuestionLanguageBootReady(pool, version);"));
+    expect(body.indexOf("await assertHostedQuestionLanguageBootReady(pool, version);")).toBeGreaterThanOrEqual(0);
+    expect(read).toBeLessThan(body.indexOf("await readModelScorecard(pool, version,"));
   });
 });
