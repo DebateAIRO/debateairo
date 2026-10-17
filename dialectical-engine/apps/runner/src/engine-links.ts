@@ -16,7 +16,8 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { honestDisputeFactor, type EngineReviewStatus } from "@debateai/judgement";
 import { evaluate, type EvaluationSnapshot, type SnapshotArrow, type SnapshotNode } from "@debateai/propagation";
-import type { EngineSettings } from "@debateai/register";
+import type { EngineOfRun, EngineSettings } from "@debateai/register";
+import type { ConditionMarkRecord } from "@debateai/serve";
 
 export type EngineNodeFacts = Readonly<{
   nodeId: string;
@@ -97,4 +98,126 @@ export function pointInvestigationStandings(input: Readonly<{ snapshot: Evaluati
   const leaderWithRootNodeId = leaderOf(engineSnapshotOf(input.snapshot, input.facts, input.engine), input.servableRootIds);
   const leaderWithoutRootNodeId = leaderOf(engineSnapshotOf(input.snapshot, without, input.engine), input.servableRootIds);
   return Object.freeze({ leaderWithoutRootNodeId, leaderWithRootNodeId, moved: leaderWithRootNodeId !== leaderWithoutRootNodeId });
+}
+
+/** One run's review outcomes as the ledger holds them, the cross-replies' own links, and (A14) investigation outcomes. */
+export type EngineReviewFacts = Readonly<{
+  /** `readReviewedNodeIds`: agree and dispute. */
+  reviewedNodeIds: readonly string[];
+  disputedNodeIds: readonly string[];
+  cannotAssessNodeIds: readonly string[];
+  ownReplyEdgeIds: ReadonlyMap<string, readonly string[]>;
+  /** A14: a cannot-assess point's investigation outcome as a review status (`pointInvestigationStatus`). */
+  investigated?: ReadonlyMap<string, EngineReviewStatus>;
+}>;
+
+const INVESTIGATED_STATUSES: ReadonlySet<EngineReviewStatus> = new Set(["AGREE", "DISPUTE", "CANNOT_ASSESS"]);
+
+/** The facts map engine 2's link rules read: one entry per reviewed node and per cross-reply. Pure. */
+export function engineNodeFactsOf(input: EngineReviewFacts): ReadonlyMap<string, EngineNodeFacts> {
+  const reviewed = new Set(input.reviewedNodeIds);
+  const disputed = new Set(input.disputedNodeIds);
+  const cannotAssess = new Set(input.cannotAssessNodeIds);
+  const investigated = input.investigated ?? new Map<string, EngineReviewStatus>();
+  const invalid = (why: string): never => { throw new TypedDomainError("ENGINE_FACTS_INVALID", why); };
+  for (const nodeId of cannotAssess) if (reviewed.has(nodeId)) invalid(`${nodeId} has two review outcomes`);
+  for (const nodeId of disputed) if (!reviewed.has(nodeId)) invalid(`${nodeId} is disputed but not reviewed`);
+  for (const [nodeId, status] of investigated) {
+    if (!cannotAssess.has(nodeId)) invalid(`${nodeId} was investigated but its review was not cannot-assess`);
+    if (!INVESTIGATED_STATUSES.has(status)) invalid(`${nodeId} has no investigation status`);
+  }
+  const nodeIds = [...new Set([...input.reviewedNodeIds, ...input.cannotAssessNodeIds, ...input.ownReplyEdgeIds.keys()])];
+  return new Map(nodeIds.map((nodeId) => [nodeId, Object.freeze({
+    nodeId,
+    status: cannotAssess.has(nodeId) ? investigated.get(nodeId) ?? "CANNOT_ASSESS"
+      : disputed.has(nodeId) ? "DISPUTE" : reviewed.has(nodeId) ? "AGREE" : "NONE",
+    cannotAssessReview: cannotAssess.has(nodeId),
+    ownReplyEdgeIds: Object.freeze([...(input.ownReplyEdgeIds.get(nodeId) ?? [])])
+  } satisfies EngineNodeFacts)] as const));
+}
+
+export type EngineLinkedGraph = Readonly<{
+  /** The graph engine 2 propagates (`engineSnapshotOf`). */
+  snapshot: EvaluationSnapshot;
+  /** The judged-standing seed: the reviewed nodes and the cannot-assess ones (`engineStandingNodeIds`). */
+  reviewedNodeIds: readonly string[];
+  facts: ReadonlyMap<string, EngineNodeFacts>;
+  /** Cannot-assess points no investigation settled, in review order: each is disclosed at its reduced weight. */
+  unassessedNodeIds: readonly string[];
+  cannotAssessWeight: number;
+}>;
+
+/** Engine 2's link rules on one materialised graph; null on engine 1 (nothing changes there). Pure. */
+export function engineLinkedGraph(input: EngineReviewFacts & Readonly<{ engine: EngineOfRun; snapshot: EvaluationSnapshot }>):
+  EngineLinkedGraph | null {
+  const engine = input.engine;
+  if (engine.engine !== 2) return null;
+  // An own reply is one of that cross-reply's OWN links (its source is the cross-reply); an id naming another node's
+  // link is a code defect. An id naming no link in this graph is skipped, as `engineSnapshotOf` skips it.
+  const sourceOf = new Map(input.snapshot.arrows.map((item) => [item.arrowId, item.sourceNodeId] as const));
+  for (const [nodeId, edgeIds] of input.ownReplyEdgeIds) {
+    for (const edgeId of edgeIds) {
+      const source = sourceOf.get(edgeId);
+      if (source !== undefined && source !== nodeId) {
+        throw new TypedDomainError("ENGINE_FACTS_INVALID", `Own reply ${edgeId} of ${nodeId} is ${source}'s link`);
+      }
+    }
+  }
+  const facts = engineNodeFactsOf(input);
+  return Object.freeze({
+    snapshot: engineSnapshotOf(input.snapshot, facts, engine),
+    reviewedNodeIds: engineStandingNodeIds(input.reviewedNodeIds, input.cannotAssessNodeIds),
+    facts,
+    unassessedNodeIds: Object.freeze(input.cannotAssessNodeIds.filter((nodeId) => facts.get(nodeId)?.status === "CANNOT_ASSESS")),
+    cannotAssessWeight: engine.links.cannotAssessWeight
+  });
+}
+
+/**
+ * The review catch-up's reading of the own-reply links (it runs later, without the save sites' record): a node whose
+ * parent is an answer (a parentless, non-folder node) and that attacks ANOTHER answer is a cross-reply
+ * (apps/runner/src/index.ts `argueShapeCross`, `crossChain`, the serial cross-exchange); its support link to its own
+ * answer is its own reply. No other leg links to anything but its parent.
+ */
+export function engineOwnReplyEdgeIdsOf(snapshot: EvaluationSnapshot): ReadonlyMap<string, readonly string[]> {
+  const byId = new Map(snapshot.nodes.map((node) => [node.nodeId, node] as const));
+  const isAnswer = (nodeId: string | null | undefined): boolean => {
+    const node = nodeId == null ? undefined : byId.get(nodeId);
+    return node !== undefined && (node.parentNodeId ?? null) === null && node.isFolder !== true;
+  };
+  const found = new Map<string, readonly string[]>();
+  for (const node of snapshot.nodes) {
+    const parent = node.parentNodeId ?? null;
+    if (parent === null || !isAnswer(parent)) continue;
+    const sourced = snapshot.arrows.filter((item) => item.sourceNodeId === node.nodeId && item.targetKind === "NODE");
+    if (!sourced.some((item) => item.polarity === "attack" && item.targetNodeId !== parent && isAnswer(item.targetNodeId))) continue;
+    const own = sourced.filter((item) => item.polarity === "support" && item.targetNodeId === parent).map((item) => item.arrowId);
+    if (own.length > 0) found.set(node.nodeId, Object.freeze(own));
+  }
+  return found;
+}
+
+/** One UNASSESSED-AT-REDUCED-WEIGHT record per unsettled cannot-assess point (INTERFACE §13); reason codes only. */
+export function engineUnassessedRecords(linked: EngineLinkedGraph): readonly ConditionMarkRecord[] {
+  return Object.freeze(linked.unassessedNodeIds.map((nodeId): ConditionMarkRecord => Object.freeze({
+    mark: "UNASSESSED-AT-REDUCED-WEIGHT", scope: "node", subjectRef: nodeId,
+    reason: `UNASSESSED_AT_REDUCED_WEIGHT:${String(linked.cannotAssessWeight)}`, liftPath: null, servedRootRule: null,
+    affectedNodeIds: Object.freeze([nodeId]), reviewOutcome: "cannot-assess"
+  })));
+}
+
+/**
+ * The judgement-selection rule a review-catch-up version records (OVERVIEW §4 item 1: the catch-up keeps the receipt's
+ * engine). Engine 1: the boot rule the catch-up was built with, the very same object, so its record keeps its bytes.
+ * Engine 2: the rule the run's previous propagation version recorded (the run's own honest-median rule), never the boot
+ * rule; no previous version on engine 2 is a broken record and stops loudly. Pure.
+ */
+export function engineCatchUpSelectionRule(input: Readonly<{ engine: EngineOfRun;
+  bootRule: Readonly<Record<string, unknown>>; previousRule: Readonly<Record<string, unknown>> | null }>):
+  Readonly<Record<string, unknown>> {
+  if (input.engine.engine !== 2) return input.bootRule;
+  if (input.previousRule === null) {
+    throw new TypedDomainError("ENGINE_CATCH_UP_RULE_MISSING", "An engine-2 review catch-up found no previous propagation version");
+  }
+  return input.previousRule;
 }

@@ -49,6 +49,7 @@ import {
   type JudgeLeg,
   type JudgementSelectionRule,
   type HonestSelectionRule,
+  type EngineReviewStatus,
   type WayOfKnowingDowngradeRecord
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
@@ -263,6 +264,9 @@ import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSu
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
+import {
+  engineCatchUpSelectionRule, engineLinkedGraph, engineOwnReplyEdgeIdsOf, engineUnassessedRecords, type EngineLinkedGraph
+} from "./engine-links.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -2157,8 +2161,25 @@ export function createPostgresReviewCatchUpDependencies(input: {
         throw new TypedDomainError("CATCH_UP_SOURCE_VERSION_CHANGED", `${answerId}@${fromVersion}`);
       }
       const fullSnapshot = await resolveSnapshot(runId);
-      const standing = projectJudgedStanding(fullSnapshot, await judgements.readReviewedNodeIds(runId));
+      const reviewedNodeIds = await judgements.readReviewedNodeIds(runId);
+      // Engine 2 (spec §4.2a; INTERFACE §7.2): the catch-up scores the graph with the link rules, as the run did; the
+      // own-reply links are read from the graph (the save sites' record died with the run). A14 adds `investigated`.
+      const engine = engineOfRun(await budget.readPinnedBasis(runId));
+      const linked = engine.engine !== 2 ? null : engineLinkedGraph({
+        engine, snapshot: fullSnapshot, reviewedNodeIds,
+        disputedNodeIds: await judgements.readDisputedNodeIds(runId),
+        cannotAssessNodeIds: await judgements.readCannotAssessNodeIds(runId),
+        ownReplyEdgeIds: engineOwnReplyEdgeIdsOf(fullSnapshot)
+      });
+      const standing = projectJudgedStanding(linked === null ? fullSnapshot : linked.snapshot,
+        linked === null ? reviewedNodeIds : linked.reviewedNodeIds);
       const propagation = evaluate(standing.snapshot);
+      // Engine 2 (OVERVIEW §4 item 1): this version keeps the run's own judgement-selection rule, read from the previous
+      // propagation version before this one is written; engine 1 records the boot rule, byte for byte, and reads nothing.
+      const catchUpSelectionRule = engineCatchUpSelectionRule({
+        engine, bootRule: input.judgementSelectionRule,
+        previousRule: engine.engine === 2 ? await ledger.readLatestJudgementSelectionRule(runId) : null
+      });
       const lineage = await judgements.readJudgementLineage(runId);
       const propagationRunId = await ledger.recordPropagation({
         runId,
@@ -2170,7 +2191,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         operatorResolutions: propagation.operatorResolutions,
         transmissionReductions: propagation.transmissionReductions,
         liftRecords: propagation.liftRecords,
-        judgementSelectionRule: input.judgementSelectionRule,
+        judgementSelectionRule: catchUpSelectionRule,
         sensitivityRecords: propagation.sensitivityRecords,
         strengths: propagation.strengths.map((strength) => {
           const own = lineage[strength.nodeId];
@@ -2195,7 +2216,9 @@ export function createPostgresReviewCatchUpDependencies(input: {
       // actually chosen. The preserved shape is the only one that may hold a
       // retired rule, and only a superseding persist accepts it.
       const preservedRecords: PreservedConditionMarkRecord[] = source.answer.condition_mark_records
-        .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED")
+        .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED"
+          // Engine 2: the reduced-weight records are rebuilt below from this propagation's own reading.
+          && (linked === null || record.mark !== "UNASSESSED-AT-REDUCED-WEIGHT"))
         .map((record) => ({
           mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope,
           subjectRef: record.subject_ref, reason: record.reason, liftPath: record.lift_path,
@@ -2251,14 +2274,18 @@ export function createPostgresReviewCatchUpDependencies(input: {
           servedRootRule: null,
           affectedNodeIds: Object.freeze([nodeId]), ...unjudgedDisclosure(nodeId, "derived"),
           excludedFromServedNumber: false, judgedBasisCount: standing.judgedBasisCounts[nodeId]!
-        }))
+        })),
+        // Engine 2: one record per cannot-assess point no investigation settled.
+        ...(linked === null ? [] : engineUnassessedRecords(linked))
       ];
       const records = Object.freeze([...preservedRecords, ...reviewRecords]);
       const conditionMarks = Object.freeze([...new Set([
         ...source.answer.condition_marks.filter((mark) =>
-          mark !== "HIDDEN-UNJUDGEABLE" && mark !== "DERIVED-STANDING-UNREVIEWED"),
+          mark !== "HIDDEN-UNJUDGEABLE" && mark !== "DERIVED-STANDING-UNREVIEWED"
+          && (linked === null || mark !== "UNASSESSED-AT-REDUCED-WEIGHT")),
         ...(standing.hiddenNodeIds.length === 0 ? [] : ["HIDDEN-UNJUDGEABLE"]),
-        ...(standing.derivedStandingNodeIds.length === 0 ? [] : ["DERIVED-STANDING-UNREVIEWED"])
+        ...(standing.derivedStandingNodeIds.length === 0 ? [] : ["DERIVED-STANDING-UNREVIEWED"]),
+        ...(linked === null || linked.unassessedNodeIds.length === 0 ? [] : ["UNASSESSED-AT-REDUCED-WEIGHT"])
       ])]);
       const currentNumber = source.servedNumber;
       const nextStrength = currentNumber === null ? null
@@ -7182,12 +7209,12 @@ export class WalkingSkeletonRunner {
       : shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut));
     const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
       : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
-        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
       : shapeMapArgued ? shapeMapPositions
-        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
     const shapePlan: ShapePlan | null = shapeRun === null || shapePositions === null ? null : buildShapePlan({
       positions: shapePositions, depth: expansionDepth,
       scrutiny: { roundsPerPoint: shapeRun.shape.scrutinyRoundsPerPoint, pointsPerDebate: shapeRun.shape.scrutinyPointsPerDebate }
@@ -7483,6 +7510,36 @@ export class WalkingSkeletonRunner {
       readonly callSiteKey: string;
       readonly outcome: "cannot-assess";
     }> = [];
+    /**
+     * Engine 2 (spec §4.2a rule 2; INTERFACE §7.2): each cross-reply's support link to its own answer, recorded where
+     * the cross-reply is saved (`argueShapeCross`, `crossChain`, the serial cross-exchange). It stays in the graph and
+     * on record; the link rules give it no weight. Empty on engine 1.
+     */
+    const ownReplyEdgeIds = new Map<string, readonly string[]>();
+    /**
+     * A14's investigation calls fill this (a cannot-assess point's investigation outcome as a review status) before
+     * `engineServeLinked` is read; A14 writes its investigation rows only after the serve decision, on the served graph.
+     */
+    const engineInvestigated = new Map<string, EngineReviewStatus>();
+    const noteOwnReplyEdges = (saved: AuthoredDebateNode): void => {
+      if (engine.engine !== 2) return;
+      ownReplyEdgeIds.set(saved.nodeId, Object.freeze(
+        saved.sourcedEdges.filter((edge) => edge.polarity === "support").map((edge) => edge.edgeId)));
+    };
+    /**
+     * Engine 2: the link rules on a materialised graph, read from the reviews recorded so far (a disputed point counts
+     * for less, an own reply is not support, a cannot-assess point keeps its links at the reduced weight and its
+     * standing). Null on engine 1: the caller keeps today's graph and seed.
+     */
+    const engineLinkedGraphNow = async (graph: EvaluationSnapshot, reviewedNodeIds: readonly string[]):
+      Promise<EngineLinkedGraph | null> => {
+      if (engine.engine !== 2) return null;
+      const [disputedNodeIds, cannotAssessNodeIds] = effectiveMakerCount <= 1
+        ? [[], []] as const
+        : await Promise.all([this.#judgements.readDisputedNodeIds(run.runId), this.#judgements.readCannotAssessNodeIds(run.runId)]);
+      return engineLinkedGraph({ engine, snapshot: graph, reviewedNodeIds, disputedNodeIds, cannotAssessNodeIds,
+        ownReplyEdgeIds, investigated: engineInvestigated });
+    };
 
     /** One authoring leg: the seat that writes it, what it is asked, and where its node goes. */
     interface AuthorPositionInput {
@@ -8348,9 +8405,12 @@ export class WalkingSkeletonRunner {
         return false;
       }
       const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
+      const roundReviewedNodeIds = await this.#judgements.readReviewedNodeIds(run.runId);
+      // Engine 2: the round's stopping reads the same link-weighted graph the answer is served from (null on engine 1).
+      const roundLinked = await engineLinkedGraphNow(roundSnapshot, roundReviewedNodeIds);
       const roundStanding = projectJudgedStanding(
-        roundSnapshot,
-        await this.#judgements.readReviewedNodeIds(run.runId)
+        roundLinked === null ? roundSnapshot : roundLinked.snapshot,
+        roundLinked === null ? roundReviewedNodeIds : roundLinked.reviewedNodeIds
       );
       const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
       // codex B1 / J15 ADDENDUM-2: the AUTHORITATIVE maker-root scope, NEVER
@@ -8723,6 +8783,7 @@ export class WalkingSkeletonRunner {
         });
         savedNodes[position]!.resolve(saved);
         if (saved === null) return;
+        noteOwnReplyEdges(saved);
         stage.rank = reviewRank(position);
         await reviewInChain(reviewSlot(position), saved);
       };
@@ -8785,6 +8846,7 @@ export class WalkingSkeletonRunner {
         });
         savedNodes[position]!.resolve(saved);
         if (saved === null) return;
+        noteOwnReplyEdges(saved);
         stage.rank = reviewRank(position);
         await reviewInChain(reviewSlot(position), saved);
       };
@@ -9037,6 +9099,7 @@ export class WalkingSkeletonRunner {
         }
         // A saved exchange is already in `authoredNodes`, at its plan position (after every expansion leg's).
         if (authored.kind === "HALTED") haltedExpansionRecords.push(authored.record);
+        else noteOwnReplyEdges(authored.value);
       }
       await reviewPendingAuthoredNodes();
     }
@@ -9116,14 +9179,23 @@ export class WalkingSkeletonRunner {
      * merged into the CRITIQUE-UNAVAILABLE record below); null on every other run.
      */
     const panelRevisedDuringRun = runPanelRevisedReason(sitOut, configuredMakers.map((maker) => maker.providerRef));
+    /**
+     * Engine 2 (spec §4.2a; INTERFACE §7.2): the link rules on the graph the answer is served from. Null on engine 1:
+     * the decision below reads today's graph and seed, value for value. R2a interim (practice registers only): the
+     * served root is `selectServedRootByStrength` over these honest final strengths and the label today's ladder; B5
+     * replaces both with the comparing judges.
+     */
+    const engineServeLinked = engine.engine === 2
+      ? await engineLinkedGraphNow(snapshot, effectiveMakerCount <= 1 ? [] : await this.#judgements.readReviewedNodeIds(run.runId))
+      : null;
     const makerPositionServe = decideMakerPositionServe({
       // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M.
       effectiveMakerCount: rootCount,
       runBodyBudgetStop,
       authoredMakerPositions,
-      snapshot,
+      snapshot: engineServeLinked === null ? snapshot : engineServeLinked.snapshot,
       materialisedNodeIds: materialised.nodes.map((node) => node.nodeId),
-      reviewedNodeIds: effectiveMakerCount <= 1
+      reviewedNodeIds: engineServeLinked !== null ? engineServeLinked.reviewedNodeIds : effectiveMakerCount <= 1
         ? []
         : await this.#judgements.readReviewedNodeIds(run.runId),
       unjudgedReviewNodeIds: [
@@ -9359,6 +9431,8 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...affected].filter((nodeId) => classHNodeIds.has(nodeId)));
     };
+    /** Engine 2: every cannot-assess point no investigation settled, disclosed at its reduced weight (never hidden). */
+    const engineLinkRecords: readonly ConditionMarkRecord[] = engineServeLinked === null ? [] : engineUnassessedRecords(engineServeLinked);
     const hiddenConditionMarks = Object.freeze([
       ...(absentAtClaim.length > 0 || panelRevisedDuringRun !== null ? ["CRITIQUE-UNAVAILABLE" as const] : []),
       ...(classHReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
@@ -9374,7 +9448,9 @@ export class WalkingSkeletonRunner {
       // the node's receipt is not disclosed to the reader of the answer.
       ...new Set(panelDegradations.map((record) => record.mark)),
       // Debate shape: the map's fallbacks and fills, and the two extensions — each mark with its record (below).
-      ...new Set(shapeRecords.map((record) => record.mark))
+      ...new Set(shapeRecords.map((record) => record.mark)),
+      // Engine 2: the reduced-weight mark with its records (below); none on engine 1.
+      ...new Set(engineLinkRecords.map((record) => record.mark))
     ]);
     /**
      * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
@@ -9456,6 +9532,8 @@ export class WalkingSkeletonRunner {
       ...branchFrozenRecords,
       // Debate shape: one record per shape mark (map, close call, scrutiny); none on today's run.
       ...shapeRecords,
+      // Engine 2: one UNASSESSED-AT-REDUCED-WEIGHT record per unsettled cannot-assess point; none on engine 1.
+      ...engineLinkRecords,
       // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
       // the ONE record; with none, the reason is today's to the byte.
       ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({

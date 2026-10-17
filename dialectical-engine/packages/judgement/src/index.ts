@@ -1239,6 +1239,24 @@ export class JudgementRepository {
     return Object.freeze(result.rows.map((row) => row.node_id));
   }
 
+  /**
+   * Engine 2 (spec 2026-10-15 §4.2a rule 3, ruling E6(3)) — the nodes whose cross-maker review came back
+   * `cannot-assess`. Engine 1 gives them no judged basis (`readReviewedNodeIds` leaves them out on purpose); engine 2
+   * keeps them in the graph at a reduced weight and discloses them, so it must name them. A separate read for the
+   * reason `readDisputedNodeIds` is one: each question gets its own positive predicate.
+   */
+  async readCannotAssessNodeIds(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT review.node_id::text
+       FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+       WHERE review.run_id=$1 AND review.outcome = 'cannot-assess'
+       ORDER BY review.at_seq`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
   /** DR-184 catch-up work is recomputed from append-only ground truth. */
   async readUnreviewedNodes(runId: string): Promise<readonly UnreviewedNode[]> {
     return withRunContentLease(this.pool, [runId], async () => {
