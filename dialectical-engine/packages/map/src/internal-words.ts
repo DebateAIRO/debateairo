@@ -1,5 +1,5 @@
 import { PATCH_REPLY_FORM_SENTENCE } from "@debateai/providers";
-import { MAP_ANSWER_FORMS, MAP_CONTRACT_NAMES, MAP_DEFAULT_INSTRUCTIONS } from "./prompts.js";
+import { MAP_ANSWER_FORMS, MAP_CONTRACT_NAMES, MAP_DEFAULT_INSTRUCTIONS, MAP_ENGINE_ANSWER_FORMS, MAP_ENGINE_CONTRACT_NAMES, MAP_ENGINE_INSTRUCTIONS } from "./prompts.js";
 
 /**
  * Engine words in map text (owner rule: no engine internals in anything a person reads; practice 2026-10-15, ro-strainatate:
@@ -21,6 +21,21 @@ export const MAP_INTERNAL_FIELD_NAMES: readonly string[] = Object.freeze([...new
     .flatMap((text) => text.match(SNAKE_NAME) ?? [])
     .map((name) => name.toLowerCase())
 )].sort());
+
+/**
+ * Engine 2 (INTERFACE §10.1, deviation 20): the v2 forms' keys and every material field a v2 packet names, beside engine
+ * 1's names. Used ONLY under engine 2, so engine 1's skip keeps its behaviour exactly.
+ */
+const MAP_ENGINE_MATERIAL_FIELD_NAMES = Object.freeze(["question_line", "angle_label", "angle_focus", "points_so_far",
+  "candidate_answers", "key_points", "framing_challenges", "question_language", "check_id", "raised_by", "angle_kind",
+  "rests_on", "answer_id", "key_point_id", "item_id"]);
+export const MAP_ENGINE_INTERNAL_FIELD_NAMES: readonly string[] = Object.freeze([...new Set([
+  ...MAP_INTERNAL_FIELD_NAMES,
+  ...[...MAP_ENGINE_CONTRACT_NAMES.flatMap((name) => [MAP_ENGINE_INSTRUCTIONS[name], MAP_ENGINE_ANSWER_FORMS[name]]),
+    MAP_ENGINE_MATERIAL_FIELD_NAMES.join(" ")]
+    .flatMap((text) => text.match(SNAKE_NAME) ?? [])
+    .map((name) => name.toLowerCase())
+])].sort());
 
 /**
  * A name whose words, written apart ("angle focus", "key point id"), are still not prose: it names an id, or it is one
@@ -45,12 +60,22 @@ function fieldPattern(name: string): string {
 
 const BEFORE = "(?<![\\p{L}\\p{N}_])";
 const AFTER = "(?![\\p{L}\\p{N}_])";
-const INTERNAL_FIELD = new RegExp(`${BEFORE}(?:${MAP_INTERNAL_FIELD_NAMES.map(fieldPattern).join("|")})${AFTER}`, "iu");
+const fieldRegex = (names: readonly string[]): RegExp => new RegExp(`${BEFORE}(?:${names.map(fieldPattern).join("|")})${AFTER}`, "iu");
+/** One compiled pattern per frozen name list (engine 1's and engine 2's), built once. */
+const FIELD_PATTERNS = new Map<readonly string[], RegExp>([[MAP_INTERNAL_FIELD_NAMES, fieldRegex(MAP_INTERNAL_FIELD_NAMES)]]);
+function internalFieldPattern(names: readonly string[]): RegExp {
+  const known = FIELD_PATTERNS.get(names);
+  if (known !== undefined) return known;
+  const built = fieldRegex(names);
+  FIELD_PATTERNS.set(names, built);
+  return built;
+}
+
 /** An item's opaque id exactly as mapAssignItemIds mints it (pt01.., ca01..: lower case, so "Ca12" or "PT04" is prose). */
 const ITEM_ID = new RegExp(`${BEFORE}(?:pt|ca)\\d{2,}${AFTER}`, "u");
 
-/** True when the text names one of the map's internal fields or an item's opaque id. */
-export function mapNamesInternalWord(text: string): boolean {
+/** True when the text names one of the map's internal fields (engine 1's by default) or an item's opaque id. */
+export function mapNamesInternalWord(text: string, names: readonly string[] = MAP_INTERNAL_FIELD_NAMES): boolean {
   const normal = text.normalize("NFKC");
-  return INTERNAL_FIELD.test(normal) || ITEM_ID.test(normal);
+  return internalFieldPattern(names).test(normal) || ITEM_ID.test(normal);
 }
