@@ -511,7 +511,7 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // projection is applied.
     // Debate shape (Task 14): the WRITER's site passes the row's answer length as a fourth argument (null on today's
     // run), so the count reads the shared head of both calls. Question language (P2L Task 17): both pass the run's lock
-    // as the fifth (null on a run without a shape: today's packet); the checker's packet is never lengthed (null).
+    // as the fifth (null on a run without a shape: today's packet).
     // Length guidance (LG-C Task 7): the fourth argument is now the run's `synthesisLength` (a RoleLength: the length
     // row's words, else the shape's, else null), and the length field is built by `answerLengthField(length)`; this test
     // keeps guarding the moved text (tests-that-are-not-testing control 1). Length guidance (LG-C Task 13): the checker's

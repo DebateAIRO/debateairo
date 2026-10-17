@@ -11,6 +11,7 @@ import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, res
 import { BLIND_JUDGE_GRADE_PROMPT_CONTRACT, DOMAIN_TAGGER_PROMPT_CONTRACT } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
 import {
+  SUPPORT_ANSWER_CONTRACT_ID, SUPPORT_DRAFT_ANSWER_CONTRACT_ID, SUPPORT_DRAFT_SUMMARY_CONTRACT_ID,
   buildSupportAnswerPrompt, buildSupportDraftAnswerPrompt, buildSupportDraftSummaryPrompt,
   supportAnswerPromptContract, supportDraftAnswerPromptContract, supportDraftSummaryPromptContract
 } from "../../apps/api/src/support/prompt.js";
@@ -98,13 +99,16 @@ describe("S01 placement and contract coverage", () => {
     { contractId: "story.pack-probe.v1", instruction: "pack text", answerForm: "Return nothing." }
   ];
   it.each(contracts)("R3 family $contractId carries the rule once", (contract) => {
-    const packet = contract.contractId === contracts[14]!.contractId
+    // Keyed on the contract ids, never on list positions, so a contract inserted above cannot shift a branch.
+    const packet = contract.contractId === SUPPORT_ANSWER_CONTRACT_ID
       ? buildSupportAnswerPrompt({ instruction: "bounded", visitorMessage: "help" }).packet
-      : contract.contractId === contracts[15]!.contractId
+      : contract.contractId === SUPPORT_DRAFT_ANSWER_CONTRACT_ID
         ? buildSupportDraftAnswerPrompt({ instruction: "bounded", visitorMessage: "help" }).packet
-        : contract.contractId === contracts[16]!.contractId
+        : contract.contractId === SUPPORT_DRAFT_SUMMARY_CONTRACT_ID
           ? buildSupportDraftSummaryPrompt({ instruction: "bounded", transcript: "help" }).packet
           : providers.buildFramedPrompt({ contract, material: [] }).packet;
+    // Each row frames ITS OWN contract (fix round 1, LG-C Task 13): a row must never build a sibling's packet.
+    expect(providers.readPromptFrame(packet).contractId).toBe(contract.contractId);
     expectRuleInFrame(packet);
     expect(contract.instruction).not.toContain(HEADING);
     expect(contract.answerForm).not.toContain(HEADING);

@@ -35,6 +35,8 @@ const SENTINEL = "SENTINEL evaluator contract text — not the shipped prompt.";
  * is unchanged and is asserted the same way: the fingerprint FOLLOWS the object
  * the runner sends, so replacing that object here must move both deployments'
  * hash. A source scan would be blind to this substitution, which is the point.
+ * Since length guidance (LG-C Task 13) the seal follows `EVALUATOR_CONTRACTS_FINGERPRINT_TEXT`, the exported text the
+ * runner builds from the contracts it sends (v2, then its length variant), so the sentinel below replaces that text.
  */
 const SENTINEL_CONTRACT = Object.freeze({
   contractId: "serve.evaluator.v1",

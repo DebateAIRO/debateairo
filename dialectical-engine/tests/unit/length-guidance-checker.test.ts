@@ -56,4 +56,19 @@ describe("serve.evaluator.length.v1 (spec §3.2)", () => {
     expect(readPromptFrame(buildSynthesisRolePrompt(request, "English", undefined,
       { answerWords: 350, ownWords: null, languageCode: null, charactersPerWord: CPW }).packet).contractId).toBe("serve.evaluator.v2");
   });
+
+  it("with a question-language lock, the lock's field rides last, after answer_length and length", () => {
+    const fields = readPromptFrame(buildSynthesisRolePrompt(checkerRequest(), "English", undefined,
+      { answerWords: 350, ownWords: 150, languageCode: "en", charactersPerWord: CPW }, { code: "en", name: "English" }).packet).fields;
+    expect(fields.slice(-3).map((field) => field.name)).toEqual(["answer_length", "length", "question_language"]);
+    expect(fields.slice(-3, -1)).toEqual([{ name: "answer_length", content: "about 350 words" }, { name: "length", content: "about 150 words" }]);
+  });
+
+  it("a zh run names both targets in characters (350 x 1.6 = 560, 150 x 1.6 = 240)", () => {
+    const lengthed = readPromptFrame(buildSynthesisRolePrompt(checkerRequest(), "Chinese", undefined,
+      { answerWords: 350, ownWords: 150, languageCode: "zh-Hant", charactersPerWord: CPW }).packet);
+    expect(lengthed.contractId).toBe("serve.evaluator.length.v1");
+    expect(lengthed.fields.slice(-2)).toEqual([{ name: "answer_length", content: "about 560 characters" },
+      { name: "length", content: "about 240 characters" }]);
+  });
 });

@@ -77,7 +77,8 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // Practice debate 3 (2026-10-12): serve.evaluator.v2 changed only the owners' instruction slot
     // (owner-approved wording), so the answer form above is still the sealed 2026-09-04 text and the
     // fingerprint moves again, to a NEW sealed value; serve.evaluator.v1's f205421c…9dcc stays history
-    // (register versions sealed before v2, the preview's 11 among them, carry it).
+    // (register versions sealed before v2, the preview's 11 among them, carry it). v2's 660ec7cb…e22f below is itself
+    // history since LG-C Task 13: the conformance row now seals v2 + length.v1 (108f1b29…22f6).
     expect(sha256(promptContractFingerprintText(EVALUATOR_V1_PROMPT_CONTRACT as PromptContract)))
       .toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
     expect(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)))

@@ -112,8 +112,9 @@ describe("S01 seals the content rule", () => {
     expect(v2).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
   });
   // Practice debate 3 (2026-10-12, owner-approved wording): serve.synthesizer.v3 supersedes v2 and
-  // serve.evaluator.v2 supersedes v1. The conformance row of every register version published from this
-  // code carries evaluator v2's seal below. v3 ALONE is the composer seal of the preview's version 12
+  // serve.evaluator.v2 supersedes v1. Evaluator v2's seal below is history since length guidance (LG-C Task 13): the
+  // conformance row of every register version published from this code carries v2 + length.v1 (108f1b29..., the R7-a
+  // row above). v3 ALONE is the composer seal of the preview's version 12
   // (history, checked here); from the debate shape (2026-10-13) the published composer row is v3 + its
   // answer-length variant (the R7-a row above). Answer writer v4 (2026-10-15) superseded v3, so v3 is now read from
   // its exported HISTORY contract (SYNTHESIZER_V3_PROMPT_CONTRACT); its seal is unchanged.
