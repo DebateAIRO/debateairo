@@ -42,8 +42,9 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   return {
-    // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts; e7f7e4b0… is history.
-    judgeContractHash: "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612",
+    // Debate shape (Phase 2b Task 4): V1's e7f7e4b0…1365 plus six contracts (aac53407…2612, history since LG-C2);
+    // length guidance (LG-C2 Task 11): V2 plus the 18 length variants.
+    judgeContractHash: "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee",
     // serve.synthesizer.v4 (2026-10-15, owner-approved plain-words wording) + its
     // answer-length variant length.v2; v1's d96e7cc9…c866, v2's 340e11a6…8b70,
     // v3's 4b141d3a…f90f and v3 + length.v1's 9a46af29…5662 (debate shape,
@@ -51,9 +52,9 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     composerContractHash: "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its answer form is still the 2026-09-04 text.
-    // serve.evaluator.v2 (2026-10-12) moved its instruction slot; v1's
-    // f205421c…9dcc is history.
-    conformanceContractHash: "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f",
+    // serve.evaluator.v2 + its length variant length.v1 (LG-C Task 13); v2 alone, 660ec7cb…e22f (2026-10-12), and v1's
+    // f205421c…9dcc are history.
+    conformanceContractHash: "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6",
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };

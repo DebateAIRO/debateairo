@@ -37,7 +37,10 @@ describe("guided words on the attempt row (spec §3.6; INTERFACE §4)", () => {
   it("records null when the call names none", async () => {
     const { gateway, artifacts } = recordingGateway();
     await gateway.call(request());
-    expect(artifacts.map((artifact) => artifact.guidedWords ?? null)).toEqual([null]);
+    // Task 7 review 5: the record's own member, exactly null (never undefined, never a stray number).
+    expect(artifacts).toHaveLength(1);
+    expect(Object.hasOwn(artifacts[0]!, "guidedWords")).toBe(true);
+    expect(artifacts[0]!.guidedWords).toBeNull();
   });
   it("refuses a malformed number before anything is sent", async () => {
     for (const guidedWords of [0, -1, 1.5]) {

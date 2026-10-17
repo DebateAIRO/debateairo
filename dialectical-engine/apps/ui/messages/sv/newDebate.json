@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Uttömmande",
   "newDebate.scrutinyExhaustiveHelp": "Flest extra omgångar, på fler av de punkter som ifrågasätts.",
   "newDebate.answerLength": "Svarslängd",
-  "newDebate.answerLengthHint": "Ungefär 300, 700 eller 1 500 ord: ett riktmärke, inte en strikt övre gräns.",
+  "newDebate.answerLengthHint": "Ungefär {short}, {standard} eller {detailed} ord: ett riktmärke, inte en strikt övre gräns.",
   "newDebate.answerLengthShort": "Kort",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Utförlig",

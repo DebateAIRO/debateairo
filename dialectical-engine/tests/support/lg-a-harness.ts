@@ -21,7 +21,8 @@ export const CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
   free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, HAIKU]
 }))!;
 
-export type HarnessStep = { content: string } | { refuse: true };
+/** `finishReason` (default "stop"): how the vendor says this reply ended ("length": cut off at the token ceiling). */
+export type HarnessStep = { content: string; finishReason?: string } | { refuse: true };
 
 export function previewGlmHarness(script: HarnessStep[]) {
   const executions: PreviewBudgetExecution[] = [];
@@ -33,7 +34,7 @@ export function previewGlmHarness(script: HarnessStep[]) {
     if (next === undefined) return { status: 599, body: JSON.stringify({ error: "script_exhausted" }) };
     if ("refuse" in next) throw new PreviewVendorRefusedUnbilled();
     return { status: 200, body: JSON.stringify({ id: `fixture-${String(executions.length)}`, model: GLM,
-      choices: [{ message: { content: next.content }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
+      choices: [{ message: { content: next.content }, finish_reason: next.finishReason ?? "stop" }], usage: { prompt_tokens: 10, completion_tokens: 20 } }) };
   } });
   const native = new OpenAICompatibleProviderGateway({
     endpoint: "https://api.deepinfra.com/v1/openai", model: GLM, maker: "Z.AI",

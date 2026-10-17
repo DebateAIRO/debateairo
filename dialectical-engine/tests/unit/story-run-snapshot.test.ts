@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
+import { lengthGuidancePolicyStartValues, resolveLengthGuidance } from "@debateai/register";
 import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
 import {
   buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
@@ -148,6 +149,14 @@ describe("buildStoryRunSnapshot", () => {
     // Today's run: no member at all, so the writer builds today's bytes.
     expect(Object.hasOwn(buildStoryRunSnapshot(source()), "languageLocked")).toBe(false);
     expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), languageLocked: false }), "languageLocked")).toBe(false);
+  });
+
+  // Task 15 review (a): the receipt's numbers pass to the story's input, and no key without them.
+  it("passes the run's length guidance through, and carries no lengthGuidance key without it", () => {
+    const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "pro", answerLength: "standard" });
+    expect(buildStoryRunSnapshot({ ...source(), lengthGuidance: guidance }).lengthGuidance).toBe(guidance);
+    expect(Object.hasOwn(buildStoryRunSnapshot(source()), "lengthGuidance")).toBe(false);
+    expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), lengthGuidance: undefined }), "lengthGuidance")).toBe(false);
   });
 
   it("drops an arrow onto an edge to a null target", () => {

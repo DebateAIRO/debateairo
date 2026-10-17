@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Esaustiva",
   "newDebate.scrutinyExhaustiveHelp": "Il maggior numero di round supplementari, su più punti incerti.",
   "newDebate.answerLength": "Lunghezza della risposta",
-  "newDebate.answerLengthHint": "Circa 300, 700 o 1.500 parole: un obiettivo, non un massimo rigido.",
+  "newDebate.answerLengthHint": "Circa {short}, {standard} o {detailed} parole: un obiettivo, non un massimo rigido.",
   "newDebate.answerLengthShort": "Breve",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Dettagliata",

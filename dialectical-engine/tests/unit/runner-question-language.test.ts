@@ -3,10 +3,14 @@ import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { Judge } from "@debateai/judgement";
 import { TEXT_NOT_IN_QUESTION_LANGUAGE, argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
 import { readPromptFrame, type ProviderCallRequest, type ProviderGateway } from "@debateai/providers";
-import { computeStructuralCeilingBasis, debateShapePolicyStartValues, resolveDebateShape } from "@debateai/register";
+import {
+  computeStructuralCeilingBasis, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, resolveDebateShape, resolveLengthGuidance
+} from "@debateai/register";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { stripLanguageDirectiveForTest } from "../support/preview-gate-stubs.js";
-import { runQuestionLanguageLock, runReviewCatchUp, type ReviewCatchUpDependencies } from "../../apps/runner/src/index.js";
+import {
+  guidedCallBound, runQuestionLanguageLock, runReviewCatchUp, type ReviewCatchUpDependencies
+} from "../../apps/runner/src/index.js";
 
 // Pre-flight PF-L51 (BLOCKER): the strip pattern is the WHOLE directive in each form, both sentences, because the second
 // sentence names "fatalFlags[].type" and would send every review and checker call to PANEL if it stayed. So the inputs
@@ -51,7 +55,7 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
 
   it("the writer, the checker, both readings and the story carry it", () => {
     expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage);");
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);");
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);");
     expect(source).toContain("questionLine: run.questionLine,\n          ...shapeLanguageInput\n        }, reply));");
     expect(source).toContain("classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage)");
     expect(source).toContain("languageLocked: shapeLanguage !== null,");
@@ -228,6 +232,39 @@ describe("the review catch-up takes the run's lock exactly as the runner's own r
     const today = (await requestOf(await catchUpReviewInput(
       { argumentLanguageName: "Romanian", argumentLanguageTag: "ro", envelopeBasis: LEGACY }))).classifyContent!(FRENCH_REVIEW, STOP);
     expect(today.parseStatus).toBe("PARSED");
+  });
+
+  // Task 12 review 2-4 (R1c final wave A7, B9): a catch-up review is sized and told like the run's own reviews, from the
+  // receipt's `length`, in the run's stored language tag (the one the lock reads), never a null tag.
+  const GUIDANCE = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "pro", answerLength: "standard" });
+  const LENGTHED: unknown = JSON.parse(JSON.stringify(computeStructuralCeilingBasis({ ...TERMS, maxDepth: CAP, panelSize: PANEL,
+    depth: 3, backupSequencesProvisioned: 0, length: GUIDANCE })));
+  const JUDGE_BOUND = { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 };
+
+  it("a lengthed receipt: the reviewer's words, the guided bound and guidedWords; a zh run reads the characters form", async () => {
+    const input = await catchUpReviewInput({ argumentLanguageName: "Chinese", argumentLanguageTag: "zh", envelopeBasis: LENGTHED });
+    expect(input.length).toEqual({ words: GUIDANCE.steps.reviewer, languageCode: "zh", charactersPerWord: GUIDANCE.charactersPerWord });
+    expect(input.bound).toEqual({ ...guidedCallBound(JUDGE_BOUND, "reviewer", GUIDANCE), maxAttempts: JUDGE_BOUND.maxAttempts });
+    expect((input.bound as { tokenCeiling: number }).tokenCeiling).toBeGreaterThan(JUDGE_BOUND.tokenCeiling);
+    const request = await requestOf(input);
+    expect(request.guidedWords).toBe(GUIDANCE.steps.reviewer);
+    const frame = readPromptFrame(request.packet);
+    expect(frame.contractId).toBe("judge.review.length.v1");
+    expect(frame.fields.at(-1)).toEqual({ name: "length",
+      content: `about ${String(Math.round(GUIDANCE.steps.reviewer * GUIDANCE.charactersPerWord.zh))} characters` });
+  });
+
+  it("a lengthed receipt with no stored tag uses the tag the lock reads (\"und\"), words form", async () => {
+    const input = await catchUpReviewInput({ argumentLanguageName: "Romanian", envelopeBasis: LENGTHED });
+    expect((input.length as { languageCode: unknown }).languageCode).toBe("und");
+    const frame = readPromptFrame((await requestOf(input)).packet);
+    expect(frame.fields.at(-1)).toEqual({ name: "length", content: `about ${String(GUIDANCE.steps.reviewer)} words` });
+  });
+
+  it("a receipt without length: no length key, today's bound", async () => {
+    const input = await catchUpReviewInput({ argumentLanguageName: "Romanian", argumentLanguageTag: "ro", envelopeBasis: LEGACY });
+    expect("length" in input).toBe(false);
+    expect(input.bound).toEqual(JUDGE_BOUND);
   });
 });
 

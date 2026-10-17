@@ -277,7 +277,7 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
     expect(structureRepairKeepsWords(BROKEN_PANEL, repaired, PANEL_ANSWER_FORM)).toBe(false);
   });
 
-  it("accepts it end to end through the wrapper, the panel's own classifier deciding", async () => {
+  it("is rescued by A1 before the repair call, equal to Haiku's copy", async () => {
     const panelFramed = buildFramedPrompt({ contract: PANEL_PROMPT_CONTRACT, material: [{ name: "statement", content: "The statement." }] });
     const original = previewGlmHarness([{ content: BROKEN_PANEL }]);
     const repair = route(HAIKU_PANEL);
@@ -285,8 +285,12 @@ describe("LG-A Task 12b: a text is kept where the step's own fixer keeps it", ()
       callSiteKey: PANEL_KEY, packet: panelFramed.packet, modelRole: "JUDGE",
       classifyContent: (content, reply) => classifyStructuredArtifact(content, judgeAssessmentSchema, reply, { fixer: {} }),
       buildRepairPacket: (rejected) => buildFramedRepairPrompt(panelFramed, schemaFailureLocator(rejected)) }));
-    expect(repair.requests).toHaveLength(1);
-    expect(result).toMatchObject({ content: HAIKU_PANEL, repairForm: "STRUCTURE", model: GLM, rawArtifactRef: original.artifacts[0]!.artifactId });
+    expect(repair.requests).toHaveLength(0);
+    expect(result.repairForm).toBeUndefined();
+    expect(JSON.parse(result.content)).toEqual(JSON.parse(HAIKU_PANEL));
+    // Task 2 review: the rescued reply is the original AI's own, recorded once, at its own artifact.
+    expect(original.artifacts).toHaveLength(1);
+    expect(result.rawArtifactRef).toBe(original.artifacts[0]!.artifactId);
   });
 
   it("still refuses a repair that leaves out a text the form states at that place", () => {
@@ -498,14 +502,18 @@ describe("LG-A withStructureRepair (L32)", () => {
     }
   });
 
-  it("refuses a repair that turns a wrapped non-number into an invented score (Task 4 carry)", async () => {
+  it("a refused invented score goes on to the original AI's own short follow-up", async () => {
     const wrapped = "{\"answer\": \"It is so, by the city's own figures\", \"score\": {\"value\": \"high\"}}";
-    const original = previewGlmHarness([{ content: wrapped }]);
+    const original = previewGlmHarness([{ content: wrapped }, { content: "{\"score\": 0.4}" }]);
     const repair = route("{\"answer\": \"It is so, by the city's own figures\", \"score\": 0.7}");
-    const error = await withStructureRepair(original.gateway, repair.route).call(request()).catch((caught: unknown) => caught);
+    const result = await withStructureRepair(original.gateway, repair.route).call(request());
     expect(repair.requests).toHaveLength(1);
-    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 1, lastRawArtifactRef: original.artifacts[0]!.artifactId });
-    expect(original.executions).toHaveLength(1);
+    expect(original.executions).toHaveLength(2);
+    const fields = readPromptFrame({ messages: (JSON.parse(original.executions[1]!.requestBody) as { messages: never }).messages }).fields;
+    expect(fields).toContainEqual({ name: "machine_rejection_paths", content: "score" });
+    // The original AI's own number (0.4), never Haiku's invented 0.7.
+    expect(result).toMatchObject({ repairForm: "PATCH", model: GLM });
+    expect(JSON.parse(result.content)).toEqual({ answer: "It is so, by the city's own figures", score: 0.4 });
   });
 
   it("refuses a repair the step's fixer would cut down: a part kept, the rest under a key it drops (Important 1)", async () => {
@@ -524,6 +532,19 @@ describe("LG-A withStructureRepair (L32)", () => {
     const money = previewGlmHarness([{ content: BROKEN }]);
     await expect(withStructureRepair(money.gateway, route(new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "spent")).route)
       .call(request())).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("the repair packet for an unreadable reply carries its code and never the full re-ask's sentence (fix round 1)", async () => {
+    const unreadable = previewGlmHarness([{ content: "It is so, by the city's own figures." }]);
+    const repair = route(COPY);
+    const error = await withStructureRepair(unreadable.gateway, repair.route).call(request()).catch((caught: unknown) => caught);
+    expect(repair.requests).toHaveLength(1);
+    const sent = repair.requests[0]!;
+    expect(readPromptFrame(sent.packet).fields.find((field) => field.name === "machine_rejection_code")!.content).toBe("PARSE_FAILED");
+    // Task 3 review: the repair packet's fields are exactly these four (no reason field, so no sentence of any kind).
+    expect(readPromptFrame(sent.packet).fields.map((f) => f.name)).toEqual(["answer_form", "broken_reply", "machine_rejection_code", "machine_rejection_path"]);
+    // Haiku's copy invents a score, so it is refused; a judge step gets no B for an unreadable reply: today's refusal.
+    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED" });
   });
 
   // Ruling R9 (pre-flight PF-A48): the run's attempt ceiling, raised unwrapped by the repair gateway's `assertAttemptAllowed`

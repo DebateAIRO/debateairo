@@ -5,7 +5,7 @@ import {
   buildFramedPrompt, readPromptFrame, type PromptContract, type PromptPacket, type ProviderCallRequest, type ProviderGateway
 } from "@debateai/providers";
 import {
-  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, Judge, PANEL_PROMPT_CONTRACT, framedJudgePromptForTest, judgePromptContract,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2, Judge, PANEL_PROMPT_CONTRACT, framedJudgePromptForTest, judgePromptContract,
   reviewPromptContract, rootPositionRequestBytesBound
 } from "@debateai/judgement";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
@@ -14,6 +14,8 @@ import { synthesisRequestFixture } from "../support/synthesisRequestFixture.js";
 
 /** The judge hash after P2b (P2L Task 0 Step 3 printed it): P2L must not move it. */
 const JUDGE_HASH_AFTER_P2B = "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612";
+/** The judge hash after LG-C2 Task 11 (V2 + the 18 length variants; hs-s01-seal measured it): the current seal. */
+const JUDGE_HASH_AFTER_LG_C2 = "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee";
 const RO = { code: "ro", name: "Romanian" };
 const fixed = () => Buffer.alloc(16, 7);
 const systemOf = (packet: { messages: readonly { role: string; content: string }[] }) => packet.messages.find((m) => m.role === "system")!.content;
@@ -54,7 +56,9 @@ const judgeInput = (lock: object) => ({ runId: null, subjectItemId: "s", callSit
 
 describe("judge-side and answer calls in the locked language (question-language spec 2026-10-13, L6)", () => {
   it("no sealed judge fingerprint moves", () => {
-    expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT).digest("hex")).toBe(JUDGE_HASH_AFTER_P2B);
+    // P2b's text is frozen as V2 and keeps its seal; the current text is V2 + LG-C2's 18 length variants.
+    expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2).digest("hex")).toBe(JUDGE_HASH_AFTER_P2B);
+    expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT).digest("hex")).toBe(JUDGE_HASH_AFTER_LG_C2);
     // The composer's fingerprint after P2b (9a46af29…), and since answer writer v4 + length.v2 (owner-approved
     // wording, 2026-10-15) 879d2c5d…: the named sentence is added at call time, never sealed.
     expect(createHash("sha256").update(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).digest("hex").slice(0, 8)).toBe("879d2c5d");

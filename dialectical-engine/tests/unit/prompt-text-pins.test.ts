@@ -26,7 +26,7 @@ import {
   SYNTHESIZER_V3_CONTRACT_ID,
   SYNTHESIZER_V3_PROMPT_CONTRACT
 } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_LENGTH_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import {
   BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
   DOMAIN_TAGGER_PROMPT_CONTRACT
@@ -751,6 +751,8 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["panel", PANEL_PROMPT_CONTRACT],
     ["synthesizer", SYNTHESIZER_PROMPT_CONTRACT],
     ["evaluator", EVALUATOR_PROMPT_CONTRACT],
+    // Length guidance (LG-C Task 13): the checker's length variant.
+    ["evaluator-length", EVALUATOR_LENGTH_PROMPT_CONTRACT],
     ["blind-judge-grade", BLIND_JUDGE_GRADE_PROMPT_CONTRACT],
     ["domain-tagger", DOMAIN_TAGGER_PROMPT_CONTRACT],
     ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT],
@@ -793,6 +795,7 @@ describe("LG-A — the structure-repair contract and the follow-up sentences", (
       EMPTY: "The earlier answer arrived empty: no answer text was received.",
       CUT_OFF: "The earlier answer stopped before it was finished, so its end is missing.",
       SCHEMA_FAILED: "The earlier answer left out a value the answer form requires, or gave a value the form does not allow, at the listed place.",
+      STRUCTURE_UNREAD: "The earlier answer could not be read as one JSON object in the answer form, so none of it could be used.",
       TEXT_NOT_IN_QUESTION_LANGUAGE: "Part of the earlier answer was written in a different language from the question.",
       COMPOSED_TEXT_NAMES_A_NODE: "The earlier answer's text names an internal point id, which a reader cannot use.",
       COMPOSED_REF_NOT_IN_DIGEST: "The earlier answer cites a point that is not in the material.",
@@ -806,6 +809,6 @@ describe("LG-A — the structure-repair contract and the follow-up sentences", (
       MAP_UNKNOWN_RIVAL: "The earlier answer names as its strongest rival an answer that is not one of its other answers.",
       DEFAULT: "The earlier answer did not meet the answer form at the listed place."
     });
-    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(14);
+    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(15);
   });
 });

@@ -11,6 +11,7 @@ import {
 import {
   readRecordedProviderReply,
   rebuildRecordedCallContent,
+  structureReplayReaders,
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderGateway,
@@ -85,22 +86,31 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
  * an earlier, failed call at the site may have asked something else). `answered` is the call's last reply to its
  * original packet when the OK attempt answered a repair; the repairs counted are those after the original packet was
  * last sent. A reply whose place in its call was not recorded is never replayed.
+ *
+ * A REFUSED row (the preview's provably unbilled refusal) holds no place: its one resend is sent at the same place in the
+ * call, so the call's attempts are counted, and its start found, without it (final review Minor 1: a follow-up B resent
+ * after an unbilled refusal is replayed, not bought again). A call with no REFUSED row is read exactly as before.
+ * The skip assumes the preview policy's whole-call resend; a call whose in-gateway loop goes on to attempt+1 after a
+ * REFUSED attempt (story calls) is not replayed (not reachable today: story calls run after the replay book closes).
  */
 export function replayOf(call: RecordedCall, fingerprint: string): Replay | null {
   const acceptedIndex = call.attempts.length - 1;
   const accepted = call.attempts[acceptedIndex];
   if (accepted === undefined || accepted.outcome !== "OK" || accepted.rawArtifactRef === null || accepted.artifact === null) return null;
   const place = accepted.artifact.attempt;
-  if (place === null || !Number.isSafeInteger(place) || place < 1 || place > call.attempts.length) return null;
-  const start = acceptedIndex - (place - 1);
-  if (call.attempts[start]?.promptFingerprint !== fingerprint) return null;
-  const lastOriginal = call.attempts.findLastIndex((attempt, index) => index >= start && attempt.promptFingerprint === fingerprint);
+  const placed = call.attempts.flatMap((attempt, index) => attempt.outcome === "REFUSED" ? [] : [index]);
+  if (place === null || !Number.isSafeInteger(place) || place < 1 || place > placed.length) return null;
+  const start = placed[placed.length - place]!;
+  if (call.attempts[start]!.promptFingerprint !== fingerprint) return null;
+  const lastOriginal = call.attempts.findLastIndex((attempt, index) => index >= start && attempt.outcome !== "REFUSED"
+    && attempt.promptFingerprint === fingerprint);
   const answered = lastOriginal === acceptedIndex ? null
-    : call.attempts.slice(start, acceptedIndex).findLast((attempt) => attempt.promptFingerprint === fingerprint && attempt.artifact !== null) ?? null;
+    : call.attempts.slice(start, acceptedIndex).findLast((attempt) => attempt.outcome !== "REFUSED"
+      && attempt.promptFingerprint === fingerprint && attempt.artifact !== null) ?? null;
   return Object.freeze({
     accepted: accepted as Replay["accepted"],
     answered,
-    repairAttempts: acceptedIndex - lastOriginal
+    repairAttempts: call.attempts.slice(lastOriginal + 1).filter((attempt) => attempt.outcome !== "REFUSED").length
   });
 }
 
@@ -176,12 +186,19 @@ export function createReplayBook(input: Readonly<{
  * unchanged. The content is rebuilt as the gateway decided it (`rebuildRecordedCallContent`); a recorded call whose
  * content cannot be rebuilt is made again. Nothing is reserved, spent, counted or written for a replayed call; the
  * debate's keep-alive is asked first (`mayCall`), as before a real call, so a copy that lost the run replays nothing.
+ *
+ * Refused-repair salvage (2026-10-16): with `structureReplay` (the runner sets it only on a run whose structure-repair
+ * route is wired), the step's structure readers (`structureReplayReaders`) are handed to the rebuild too, so a call the
+ * first copy's gateway rescued in code (A1) or answered with its follow-up (B) is replayed, not bought again. Without it
+ * (hosted, local: no route) the rebuild is today's.
  */
 export function replayingGateway(
   book: ReplayBook,
   inner: ProviderGateway,
   /** Asked before an answer is replayed: a copy that must make no further call (its claim lost, its time up) stops. */
-  mayCall: () => void = () => undefined
+  mayCall: () => void = () => undefined,
+  /** The run's structure-repair route is wired: replay A1-rescued and B-answered calls too. */
+  structureReplay = false
 ): ProviderGateway {
   return Object.freeze({
     call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
@@ -197,7 +214,8 @@ export function replayingGateway(
       const content = rebuildRecordedCallContent({
         accepted: readRecordedProviderReply(accepted.artifact.rawText, accepted.artifact.provider),
         answered: answered?.artifact == null ? null : readRecordedProviderReply(answered.artifact.rawText, answered.artifact.provider),
-        ...(request.classifyContent === undefined ? {} : { classifyContent: request.classifyContent })
+        ...(request.classifyContent === undefined ? {} : { classifyContent: request.classifyContent }),
+        ...(structureReplay ? structureReplayReaders(request) ?? {} : {})
       });
       if (content === null) return inner.call(request);
       return Object.freeze({

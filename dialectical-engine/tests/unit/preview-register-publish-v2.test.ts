@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
@@ -543,6 +543,32 @@ describe('publish kit v2: the optional lengthGuidancePolicy row (LG-C, spec 2026
     const bad = JSON.parse(JSON.stringify(policy));
     bad.tokensPerWord = 9;
     await expect(build(bad)).rejects.toThrow('LENGTH_GUIDANCE_POLICY_INVALID:tokensPerWord');
+  });
+  // Task 8 review 3: the added row's own content, not only its key.
+  it('the added row is the policy itself, in canonical JSON, with the owners\' source line, after every other row', async () => {
+    const given = await build(policy);
+    const row = given.find(entry => entry.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)!;
+    expect(given.at(-1)).toBe(row);
+    expect(JSON.parse(row.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
+    expect(row.valueJsonText).toBe(lengthGuidancePolicyRow(policy, row.sourceRef).valueJsonText);
+    expect(row.sourceRef).toBe('length guidance spec 2026-10-15 (owner rulings L1-L36); owner 2026-10-15');
+  });
+  // Task 8 review 4: the operator's check of the plan's lengthGuidance choice.
+  it('the native plan check takes a plain object only, on plan and publish only; the parser refuses a bad policy when the rows are built', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    const value = JSON.parse(JSON.stringify(policy));
+    expect(operator.validateLengthGuidanceChoice(value)).toBe(value);
+    for (const bad of ['off', 'on', null, [], [value], 7, true]) expect(() => operator.validateLengthGuidanceChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const plan = { schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+      sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9',
+      selectedBaseSnapshotSha256: 'd'.repeat(64), publicationId: id, approval: null };
+    for (const operation of ['plan', 'publish']) expect(operator.validateNativePlan({ ...plan, operation, lengthGuidance: value })).toBeTruthy();
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...plan, operation, lengthGuidance: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    expect(() => operator.validateNativePlan({ ...plan, lengthGuidance: 'off' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    expect(() => operator.validateNativePlan({ ...plan, lengthGuidance: [value] })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const bad = { ...value, runawayMultiplier: 1 };
+    expect(operator.validateNativePlan({ ...plan, lengthGuidance: bad })).toBeTruthy(); // shape only
+    await expect(build(bad)).rejects.toThrow('LENGTH_GUIDANCE_POLICY_INVALID:runawayMultiplier');
   });
 });
 

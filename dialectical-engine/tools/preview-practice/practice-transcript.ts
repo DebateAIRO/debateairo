@@ -37,6 +37,7 @@ import {
   practiceFinishReasonOf,
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
+  practiceMapLengthedOf,
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
@@ -277,7 +278,9 @@ export function buildTranscriptAttempts(input: Readonly<{
     const vendorBody = typeof body === "object" && body !== null && content !== artifact?.rawText ? body : null;
     const finishReason = artifact === undefined ? null : practiceFinishReasonOf(artifact.metadata);
     const jsonRepair = entry.outcome === "OK" && content !== null
-      ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds) : null;
+      ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds,
+        // Length guidance (spec 2026-10-15 §3.9): a map call asked under a length variant is re-read with the runaway limits.
+        messageList !== null && practiceMapLengthedOf(messageList as Parameters<typeof practiceMapLengthedOf>[0])) : null;
     return Object.freeze({
       sequence: Number(entry.sequence),
       ledgerEntryId: entry.ledgerEntryId,

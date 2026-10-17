@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Vyčerpávajúca",
   "newDebate.scrutinyExhaustiveHelp": "Najviac ďalších kôl, pri väčšom počte bodov, o ktorých sú pochybnosti.",
   "newDebate.answerLength": "Dĺžka odpovede",
-  "newDebate.answerLengthHint": "Približne 300, 700 alebo 1 500 slov: orientačná dĺžka, nie prísne maximum.",
+  "newDebate.answerLengthHint": "Počet slov: približne {short}, {standard} alebo {detailed}. Je to orientačná dĺžka, nie prísne maximum.",
   "newDebate.answerLengthShort": "Krátka",
   "newDebate.answerLengthStandard": "Štandardná",
   "newDebate.answerLengthDetailed": "Podrobná",

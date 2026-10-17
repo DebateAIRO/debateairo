@@ -7,11 +7,14 @@ import {
   TypedDomainError,
   exhaustive,
   isRunLevelSpendStop,
+  lengthGuidanceField,
+  lengthGuideForBounds,
   questionLanguageForBounds,
   questionLanguageSentence,
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type DebateRole,
+  type LengthGuide,
   type QuestionLanguage,
   type ReviewOutcome,
   type WayOfKnowing
@@ -36,8 +39,11 @@ import {
 import {
   JUDGE_WAYS_OF_KNOWING,
   JUDGE_CLAIM_TYPE_INSTRUCTIONS,
+  JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS,
   JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
+  JUDGE_LEG_LENGTH_MATERIAL_FIELDS,
   JUDGE_LEG_MATERIAL_FIELDS,
+  PANEL_LENGTH_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
   judgeConsiderationPromptContract,
   judgePromptContract,
@@ -296,6 +302,12 @@ export interface JudgeInput {
    * directive, fields and reply check, byte for byte.
    */
   readonly questionLanguage?: QuestionLanguage;
+  /**
+   * Length guidance (spec 2026-10-15 §3.2): this call's target (the run's frozen words for its step, its language tag and
+   * factors). Present: the step's `.length.v1` variant and the `length` field (before `question_language`), and the
+   * guided words recorded on the call. Absent: today's contract, fields and request, byte for byte.
+   */
+  readonly length?: LengthGuide;
   /** Which authoring leg this is. Selects the code-owned directive. */
   readonly leg: JudgeLeg;
   readonly providerRef: string;
@@ -332,6 +344,12 @@ export interface JudgeSubjectInput {
   readonly argumentLanguageName?: string;
   /** As `JudgeInput.questionLanguage`: the run's lock on a shaped run; absent, today's bytes. */
   readonly questionLanguage?: QuestionLanguage;
+  /**
+   * Length guidance (spec 2026-10-15 §3.2): this call's target (the run's frozen words for its step, its language tag and
+   * factors). Present: the step's `.length.v1` variant and the `length` field (before `question_language`), and the
+   * guided words recorded on the call. Absent: today's contract, fields and request, byte for byte.
+   */
+  readonly length?: LengthGuide;
   readonly statement: string;
   readonly authorMaker: string;
   readonly providerRef: string;
@@ -397,17 +415,18 @@ export interface ReviewedNode {
  */
 export function judgeLegFrameSpec(
   leg: JudgeLeg,
-  claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+  claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
+  lengthed = false
 ): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
   if ((leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined) {
     return Object.freeze({
-      contract: judgeConsiderationPromptContract(leg.kind, claim),
-      materialFields: JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS[leg.kind]
+      contract: judgeConsiderationPromptContract(leg.kind, claim, lengthed),
+      materialFields: (lengthed ? JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS : JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS)[leg.kind]
     });
   }
   return Object.freeze({
-    contract: judgePromptContract(leg.kind, claim),
-    materialFields: JUDGE_LEG_MATERIAL_FIELDS[leg.kind as JudgeLegKind]
+    contract: judgePromptContract(leg.kind, claim, lengthed),
+    materialFields: (lengthed ? JUDGE_LEG_LENGTH_MATERIAL_FIELDS : JUDGE_LEG_MATERIAL_FIELDS)[leg.kind as JudgeLegKind]
   });
 }
 
@@ -421,7 +440,8 @@ function judgeLegMaterial(
   leg: JudgeLeg,
   questionLine: string,
   declared: readonly string[],
-  questionLanguage: QuestionLanguage | null = null
+  questionLanguage: QuestionLanguage | null = null,
+  length: LengthGuide | null = null
 ): readonly { readonly name: string; readonly content: string }[] {
   const fields = leg.kind === "cross-root"
     ? [
@@ -442,7 +462,11 @@ function judgeLegMaterial(
             ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
           ]
         : [{ name: "question_line", content: questionLine }];
-  if (fields.length !== declared.length || fields.some((field, index) => field.name !== declared[index])) {
+  // Length guidance (spec 2026-10-15 §3.2): the variant's table ends with `length`, the call's target.
+  const all = length === null
+    ? fields
+    : [...fields, lengthGuidanceField(length.words, length.languageCode, length.charactersPerWord)];
+  if (all.length !== declared.length || all.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
       `Leg ${leg.kind} may send exactly ${declared.join(",")}`
@@ -450,7 +474,7 @@ function judgeLegMaterial(
   }
   // The code-owned language field rides LAST, outside the leg's closed table; it is the run's lock, never model or user
   // text. Without a lock the table's fields alone, as today.
-  return Object.freeze(withQuestionLanguageField(fields, questionLanguage));
+  return Object.freeze(withQuestionLanguageField(all, questionLanguage));
 }
 
 /**
@@ -463,12 +487,13 @@ function framedJudgePrompt(
   questionLine: string,
   argumentLanguageName: string | undefined,
   claim: "unknown" | "resolved",
-  questionLanguage: QuestionLanguage | null = null
+  questionLanguage: QuestionLanguage | null = null,
+  length: LengthGuide | null = null
 ): FramedPrompt {
-  const spec = judgeLegFrameSpec(leg, claim);
+  const spec = judgeLegFrameSpec(leg, claim, length !== null);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(spec.contract, argumentLanguageName, questionLanguage),
-    material: judgeLegMaterial(leg, questionLine, spec.materialFields, questionLanguage)
+    material: judgeLegMaterial(leg, questionLine, spec.materialFields, questionLanguage, length)
   });
 }
 
@@ -506,6 +531,7 @@ export function firstPositionCallProjections(input: Readonly<{
   judgeTokenCeiling: number;
   questionMaxBytes: number;
   questionLanguageLocked?: boolean;
+  lengthed?: boolean;
 }>): readonly Readonly<{
   providerRef: string;
   model: string;
@@ -522,8 +548,9 @@ export function firstPositionCallProjections(input: Readonly<{
   const locks: readonly (QuestionLanguage | null)[] = input.questionLanguageLocked === true
     ? [null, questionLanguageForBounds()]
     : [null];
-  const packets = locks.flatMap((lock) => (["unknown", "resolved"] as const)
-    .map((claim) => framedJudgePrompt(leg, question, undefined, claim, lock).packet));
+  const guides: readonly (LengthGuide | null)[] = input.lengthed === true ? [null, lengthGuideForBounds()] : [null];
+  const packets = locks.flatMap((lock) => guides.flatMap((guide) => (["unknown", "resolved"] as const)
+    .map((claim) => framedJudgePrompt(leg, question, undefined, claim, lock, guide).packet)));
   const completionTokenCeiling = lengthRetryTokenCeiling(input.judgeTokenCeiling, 0);
   return Object.freeze(input.targets.flatMap((target) => {
     const price = providerTargetPrice(target);
@@ -573,6 +600,8 @@ type RootPositionBoundInput = Readonly<{
   completionTokenCeiling: number;
   assignedMaterialChars: Readonly<{ answer: number; points: number }>;
   questionLanguage?: QuestionLanguage | null;
+  /** Length guidance (spec 2026-10-15 §3.2): frame the lengthed variant with this target; absent or null, today's bytes. */
+  length?: LengthGuide | null;
 }>;
 
 /**
@@ -599,7 +628,8 @@ function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (fr
   return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
     model: "",
     max_tokens: input.completionTokenCeiling,
-    messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim, input.questionLanguage ?? null)).messages
+    messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim, input.questionLanguage ?? null,
+      input.length ?? null)).messages
   }), "utf8"))));
 }
 
@@ -688,7 +718,8 @@ export class Judge {
       input.questionLine,
       input.argumentLanguageName,
       codeClaim.claimType === "unknown" ? "unknown" : "resolved",
-      input.questionLanguage ?? null
+      input.questionLanguage ?? null,
+      input.length ?? null
     );
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
@@ -711,6 +742,7 @@ export class Judge {
         contractHash: input.contractHash,
         providerRef: input.providerRef,
         packet,
+        ...(input.length === undefined ? {} : { guidedWords: input.length.words }),
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
         classifyContent: reading.classifyContent
       });
@@ -774,7 +806,7 @@ export class Judge {
     const schema = nodeReviewArtifactSchema(input.edges.length);
     const framed = buildFramedPrompt({
       contract: promptContractInArgumentLanguage(
-        reviewPromptContract(input.edges.length),
+        reviewPromptContract(input.edges.length, input.length !== undefined),
         input.argumentLanguageName,
         input.questionLanguage
       ),
@@ -789,7 +821,11 @@ export class Judge {
             relation: edge.polarity,
             target_statement: edge.targetStatement
           })))
-        }
+        },
+        // Length guidance (spec 2026-10-15 §3.2): the variant's target, right before the lock.
+        ...(input.length === undefined
+          ? []
+          : [lengthGuidanceField(input.length.words, input.length.languageCode, input.length.charactersPerWord)])
       ], input.questionLanguage)
     });
     const packet = framed.packet;
@@ -813,6 +849,7 @@ export class Judge {
         contractHash: input.contractHash,
         providerRef: input.providerRef,
         packet,
+        ...(input.length === undefined ? {} : { guidedWords: input.length.words }),
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
         classifyContent: reading.classifyContent
       });
@@ -861,11 +898,19 @@ export class Judge {
    */
   async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
     const framed = buildFramedPrompt({
-      contract: promptContractInArgumentLanguage(PANEL_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+      contract: promptContractInArgumentLanguage(
+        input.length === undefined ? PANEL_PROMPT_CONTRACT : PANEL_LENGTH_PROMPT_CONTRACT,
+        input.argumentLanguageName,
+        input.questionLanguage
+      ),
       // The run's lock rides LAST (code-owned, never model or user text); without one, today's two fields.
       material: withQuestionLanguageField([
         { name: "question_line", content: input.questionLine },
-        { name: "statement", content: input.statement }
+        { name: "statement", content: input.statement },
+        // Length guidance (spec 2026-10-15 §3.2): the variant's target, right before the lock.
+        ...(input.length === undefined
+          ? []
+          : [lengthGuidanceField(input.length.words, input.length.languageCode, input.length.charactersPerWord)])
       ], input.questionLanguage)
     });
     const packet = framed.packet;
@@ -889,6 +934,7 @@ export class Judge {
         contractHash: input.contractHash,
         providerRef: input.providerRef,
         packet,
+        ...(input.length === undefined ? {} : { guidedWords: input.length.words }),
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
         classifyContent: reading.classifyContent
       });

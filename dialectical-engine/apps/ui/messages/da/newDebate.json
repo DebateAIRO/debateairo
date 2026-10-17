@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Udtømmende",
   "newDebate.scrutinyExhaustiveHelp": "Flest ekstra runder, om flere af de punkter, der er tvivl om.",
   "newDebate.answerLength": "Svarlængde",
-  "newDebate.answerLengthHint": "Ca. 300, 700 eller 1.500 ord: et vejledende mål, ikke en fast øvre grænse.",
+  "newDebate.answerLengthHint": "Ca. {short}, {standard} eller {detailed} ord: et vejledende mål, ikke en fast øvre grænse.",
   "newDebate.answerLengthShort": "Kort",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Detaljeret",

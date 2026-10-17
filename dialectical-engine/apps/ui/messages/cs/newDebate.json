@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Vyčerpávající",
   "newDebate.scrutinyExhaustiveHelp": "Nejvíce dalších kol, u většího počtu bodů, o nichž panují pochybnosti.",
   "newDebate.answerLength": "Délka odpovědi",
-  "newDebate.answerLengthHint": "Přibližně 300, 700 nebo 1 500 slov: orientační délka, nikoli přísné maximum.",
+  "newDebate.answerLengthHint": "Počet slov: přibližně {short}, {standard} nebo {detailed}. Je to orientační délka, nikoli přísné maximum.",
   "newDebate.answerLengthShort": "Krátká",
   "newDebate.answerLengthStandard": "Standardní",
   "newDebate.answerLengthDetailed": "Podrobná",

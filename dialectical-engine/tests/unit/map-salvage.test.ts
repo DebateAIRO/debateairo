@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { replyLanguageExpectation } from "@debateai/kernel";
-import { planPatchFollowUp } from "@debateai/providers";
+import { planPatchFollowUp, promptContractFingerprintText } from "@debateai/providers";
 import {
+  MAP_CONTRACT_NAMES,
   MAP_LIMITS,
   mapAnglesCheck,
   mapAnglesReplySchema,
@@ -22,6 +24,7 @@ import {
   mapListSpec,
   mapMergeSpec,
   mapPromptContractHash,
+  mapPromptContracts,
   mapProviderPieces,
   MapSalvageLog,
   mapSnowballSpec,
@@ -290,7 +293,11 @@ describe("map salvage: choose ids that are unknown, repeated or on both sides ar
 
 describe("map salvage: no prompt text moved, and the practice tool reads replies the same way", () => {
   it("the sealed map contract hash is unchanged", () => {
-    expect(mapPromptContractHash()).toBe("25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392");
+    // LG-C Task 14: today's 7 contracts + the 7 length variants; 25b4c106…9392 is history (register 14's map seal).
+    expect(mapPromptContractHash()).toBe("d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71");
+    // Review Focus 1: today's seven are byte for byte unchanged (their own fingerprint is still register 14's seal).
+    expect(createHash("sha256").update(MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(mapPromptContracts()[name]))
+      .join("\n---\n")).digest("hex")).toBe("25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392");
   });
 
   it("the practice re-check does not flag a salvaged reply, and still flags what is left for the follow-up", () => {

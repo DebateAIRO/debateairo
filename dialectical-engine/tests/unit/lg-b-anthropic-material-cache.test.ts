@@ -6,9 +6,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  AnthropicMessagesProviderGateway, OpenAICompatibleProviderGateway, PREVIEW_ANTHROPIC_MESSAGES_URL, anthropicCacheableMessages,
-  anthropicMessagesRequestBody, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch, parsePreviewProviderTestConfig,
-  previewTargetGatewayControls, schemaFailureLocator, type PreviewBudgetExecution, type PromptPacket
+  AnthropicMessagesProviderGateway, OpenAICompatibleProviderGateway, PREVIEW_ANTHROPIC_MESSAGES_URL, ProviderStructureUnrepairedError,
+  anthropicCacheableMessages, anthropicMessagesRequestBody, buildFramedPrompt, buildFramedRepairPrompt, contentFollowUpSentence,
+  createPreviewGuardedFetch, parsePreviewProviderTestConfig, planPatchFollowUp, previewTargetGatewayControls, schemaFailureLocator,
+  type ContentClassification, type PreviewBudgetExecution, type PromptPacket
 } from "@debateai/providers";
 
 type Case = { name: string; body: string; reservedUsd?: string };
@@ -156,5 +157,50 @@ describe("the gateway", () => {
     const levelOnlyOnce = efforts();
     await levelOnlyOnce.call({});
     expect(levelOnlyOnce.marked()).toEqual([true, true]);
+  });
+
+  // Refused-repair salvage (B): the follow-up to the ORIGINAL AI is the routed call's second POST, sent alone, so it repeats
+  // the first POST's marks (`materialMarked`, the first POST's own decision) and the cache read can happen.
+  it("the original Haiku's B re-sends the marked material block and its follow-up turn is unmarked", async () => {
+    const sent: { messages: { role: string; content: unknown }[] }[] = [];
+    const replies = ["{\"ok\":{\"value\":true}}", "{\"ok\":true}"];
+    const fetchImplementation = (async (_url: string, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)) as { messages: { role: string; content: unknown }[] });
+      return new Response(JSON.stringify({ id: "msg", type: "message", role: "assistant", model: "claude-haiku-5-5",
+        content: [{ type: "text", text: replies.shift() ?? "{}" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }),
+        { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const gateway = new AnthropicMessagesProviderGateway({ endpoint: "https://api.anthropic.com/v1", model: "claude-haiku-5-5", maker: "Anthropic",
+      cacheFirstUserTurn: true, fetchImplementation, persistRawArtifact: async (artifact) => artifact.artifactId,
+      appendLedgerEntry: async (entry) => entry.attemptId, assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+    const framed = buildFramedPrompt({ contract: { contractId: "fixture.cache.v1", instruction: "Answer.", answerForm: "Return {ok}." },
+      material: [{ name: "question_line", content: "Synthetic question; no personal data." }] });
+    // A wrapped value at a place the form states as a true/false: a form-only fault (class STRUCTURE) at a named member.
+    const refusedAtOk = { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify([{ path: ["ok"], message: "invalid_type" }]),
+      failureClass: "STRUCTURE" } as const;
+    const classifyContent = (content: string): ContentClassification =>
+      content === "{\"ok\":true}" ? { parseStatus: "PARSED", parseError: null } : refusedAtOk;
+    const request = { runId: "run:synthetic", subjectItemId: "node", callSiteKey: "JUDGE:critic:n", role: "JUDGE", lane: "served",
+      bound: { maxAttempts: 2, tokenCeiling: 512, deadlineMs: 5000 }, contractHash: "c", providerRef: "preview:claude-haiku-5-5",
+      packet: framed.packet, classifyContent, buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected)),
+      structureRepairRouted: true } satisfies Parameters<typeof gateway.call>[0];
+    const error = await gateway.call(request).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProviderStructureUnrepairedError);
+    const unrepaired = error as ProviderStructureUnrepairedError;
+    expect(unrepaired.materialMarked).toBe(true);
+    const planned = planPatchFollowUp({ content: unrepaired.rejected.rawText, reply: { finishReason: "stop" },
+      parseStatus: refusedAtOk.parseStatus, parseError: refusedAtOk.parseError })!;
+    const plan = { ...planned, locator: { ...planned.locator, reason: contentFollowUpSentence(planned.locator.code, "STRUCTURE") } };
+    const result = await gateway.call({ ...request, structureFollowUp: { form: "PATCH", plan, first: { rejected: unrepaired.rejected,
+      rawArtifactRef: unrepaired.lastRawArtifactRef, ledgerEntryRef: unrepaired.lastLedgerEntryRef, materialMarked: unrepaired.materialMarked } } });
+    expect(result).toMatchObject({ content: "{\"ok\":true}", repairForm: "PATCH" });
+    expect(sent).toHaveLength(2);
+    const [first, second] = sent;
+    const firstTurn = first!.messages[0]!.content as { cache_control?: unknown }[];
+    expect(firstTurn.some((block) => block.cache_control !== undefined)).toBe(true);
+    expect(JSON.stringify(second!.messages[0])).toBe(JSON.stringify(first!.messages[0]));
+    const lastUser = second!.messages.at(-1)!;
+    expect(lastUser.role).toBe("user");
+    expect(JSON.stringify(lastUser.content)).not.toContain("cache_control");
   });
 });

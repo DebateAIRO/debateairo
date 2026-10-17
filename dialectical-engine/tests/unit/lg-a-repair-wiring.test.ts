@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
 import {
-  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS, buildFramedPrompt,
-  buildFramedRepairPrompt, previewStructureRepairCeiling, previewStructureRepairRoute, schemaFailureLocator, withStructureRepair,
-  type ProviderCallRequest, type ProviderGateway
+  PREVIEW_STRUCTURE_REPAIR_MODEL, ProviderCallFailedError, ProviderContentUnacceptedError, ProviderStructureUnrepairedError, STRUCTURE_REPAIR_PASSED_STOPS,
+  STRUCTURE_SALVAGE_REPAIRS, buildFramedPrompt, buildFramedRepairPrompt, previewStructureRepairCeiling, previewStructureRepairRoute,
+  replyWordCount, schemaFailureLocator, structureSalvageFor, withStructureRepair, type ContentClassification, type ProviderCallRequest,
+  type ProviderGateway
 } from "@debateai/providers";
 import { RUN_COST_ENVELOPE_ROOM_KEPT } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
@@ -16,7 +17,8 @@ import { providerCallSharedWall, storyCallScopeAgrees } from "../../apps/runner/
 import { createRunnerMapCaller, runMapStage } from "../../apps/runner/src/map-stage.js";
 import { laneGateway, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { CALL_LANE_STOPPED, createCallScheduler, slotsTakenWithin, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
-import { GLM, HAIKU_REF, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
+import { GLM, HAIKU_REF, STOP, previewGlmHarness, scriptedRepairGateway } from "../support/lg-a-harness.js";
+import { BASE, ECHO, ECHO_NOTES, KEYLESS, PANEL_KEY, panelRequest } from "../support/structure-salvage-shapes.js";
 
 const haikuGateway: ProviderGateway = { call: async () => { throw new Error("not called"); } };
 const SCHEMA = z.object({ answer: z.string().min(1), score: z.number() }).strict();
@@ -50,7 +52,7 @@ describe("LG-A: the preview's structure-repair route", () => {
       const source = readFileSync(path, "utf8");
       expect(source, path).toContain("previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef))");
       expect(source, path).toContain("withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute)");
-      // Task 14 carry: root 0's room prices its retry as the repair call too, at the most the money seam can project for it.
+      // Task 14 carry: root 0's room adds the repair call (the sum), at the most the money seam can project for it.
       expect(source, path).toContain("structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),");
     }
   });
@@ -363,5 +365,112 @@ describe("LG-A: a waiting repair goes first", () => {
     releaseFirst();
     await Promise.all([first, next, glm]);
     expect(started).toEqual(["repair", "next Haiku call"]);
+  });
+});
+
+describe("A1 before the repair call", () => {
+  const panel = (): ProviderCallRequest => panelRequest(request());
+  const ROUTE_BOUND = { tokenCeiling: 32768, deadlineMs: 1_260_000 };
+
+  it.each([["echo", ECHO], ["echo with notes", ECHO_NOTES], ["keyless", KEYLESS]])(
+    "A's reply keeps the original AI as author: the original row OK, no REPAIR:STRUCTURE row (%s)", async (_name, broken) => {
+      const original = previewGlmHarness([{ content: broken }]);
+      const repair = scriptedRepairGateway(new Error("the repair model must not be asked"));
+      const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: ROUTE_BOUND })
+        .call(panel());
+      expect(repair.requests).toHaveLength(0);
+      expect(original.executions).toHaveLength(1);
+      expect(result.content).toBe(JSON.stringify(BASE));
+      expect(result).toMatchObject({ model: GLM, repairAttempts: 0, rawArtifactRef: original.artifacts[0]!.artifactId,
+        ledgerEntryRef: original.ledger[0]!.attemptId });
+      expect(result.repairForm).toBeUndefined();
+      expect(original.ledger.map((row) => [row.callSiteKey, row.outcome])).toEqual([[PANEL_KEY, "OK"]]);
+      expect(original.artifacts[0]).toMatchObject({ parseStatus: "PARSED", replyForm: "ORIGINAL", replyFailureClass: null });
+      // The artifact keeps the vendor's whole body (`index.ts:2182, 2331`); its message is the AI's own reply, byte for byte
+      // (pre-flight PF-S5).
+      expect((JSON.parse(original.artifacts[0]!.rawText) as { choices: { message: { content: string } }[] }).choices[0]!.message.content)
+        .toBe(broken);
+      expect(original.artifacts[0]!.replyRepairs!.some((name) => (STRUCTURE_SALVAGE_REPAIRS as readonly string[]).includes(name))).toBe(true);
+      // Fix round 1 (Minor 2): the artifact's words are counted on what was accepted, never on the broken reply.
+      expect(original.artifacts[0]!.actualWords).toBe(replyWordCount(JSON.stringify(BASE), STOP));
+      expect(result.actualWords).toBe(replyWordCount(JSON.stringify(BASE), STOP));
+    });
+
+  it("A1 needs no Haiku: with the repair gateway throwing, the three shapes are still accepted", async () => {
+    for (const broken of [ECHO, ECHO_NOTES, KEYLESS]) {
+      const original = previewGlmHarness([{ content: broken }]);
+      const dead = scriptedRepairGateway(new ProviderCallFailedError(new Error("gate halted"), 1, "FAILED", "ledger:haiku"));
+      const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: dead.gateway, bound: ROUTE_BOUND })
+        .call(panel());
+      expect(result.content).toBe(JSON.stringify(BASE));
+    }
+  });
+
+  it("an unrouted call (no route) never runs A1, though a salvage exists for its request: today's loop, byte for byte", async () => {
+    // The salvage is real for this request (so the 2 POSTs below are the routing rule, never a shape A1 cannot read); this
+    // line also makes the test fail first, on `structureSalvageFor` (pre-flight PF-S18).
+    expect(structureSalvageFor(panel())?.(KEYLESS, STOP)?.content).toBe(JSON.stringify(BASE));
+    const original = previewGlmHarness([{ content: KEYLESS }, { content: JSON.stringify(BASE) }]);
+    await withStructureRepair(original.gateway, null).call(panel());
+    expect(original.executions).toHaveLength(2);
+  });
+});
+
+describe("A1 reads every reply to the original question, never a cut-off one (fix round 1)", () => {
+  const ROUTE_BOUND = { tokenCeiling: 32768, deadlineMs: 1_260_000 };
+  const WRITER_KEY = "COMPOSER:SYNTHESIZER:INITIAL:1";
+  const WRITER_FORM = "Return only JSON {\"answer\": string, \"basis\": {\"score\": number, \"source\": string}}.";
+  const WRITER_SCHEMA = z.object({ answer: z.string().min(1), basis: z.object({ score: z.number(), source: z.string() }).strict() }).strict();
+  const writerFramed = buildFramedPrompt({ contract: { contractId: "test.lg-a.writer.v1", instruction: "Write the answer in one sentence.",
+    answerForm: WRITER_FORM }, material: [{ name: "question", content: "Is it so?" }] });
+  /** An answer-writer-shaped call: its key, its frame (the step keeps every stated text: "anywhere") and its own strict check. */
+  const writer = (): ProviderCallRequest => ({ ...request(), callSiteKey: WRITER_KEY, modelRole: "ANSWER_WRITER", packet: writerFramed.packet,
+    classifyContent: (content, reply) => classifyStructuredArtifact(content, WRITER_SCHEMA, reply, { fixer: {} }),
+    buildRepairPacket: (rejected) => buildFramedRepairPrompt(writerFramed, schemaFailureLocator(rejected)) });
+  const ACCEPTED = "{\"answer\":\"It is so\",\"basis\":{\"score\":0.5,\"source\":\"the city's own figures\"}}";
+  /** An inner `basis` echoing the outer one's score: the step refuses it (class STRUCTURE), and A1 leaves the echo out. */
+  const ECHOED = "{\"answer\": \"It is so\", \"basis\": {\"score\": 0.5, \"source\": \"the city's own figures\", \"basis\": {\"score\": 0.5}}}";
+
+  it("a STRUCTURE reply to the length retry (the original question again) is rescued: its OK row at the original key", async () => {
+    // The step refuses the reply as written and A1 rescues it, so the one OK row below is A1's, never a reply accepted as is.
+    expect(writer().classifyContent!(ECHOED, STOP)).toMatchObject({ parseStatus: "SCHEMA_FAILED" });
+    expect(structureSalvageFor(writer())?.(ECHOED, STOP)?.content).toBe(ACCEPTED);
+    const original = previewGlmHarness([{ content: "{\"answer\": \"It is so\", \"basis\": {\"score\": 0.5, \"sour", finishReason: "length" },
+      { content: ECHOED }]);
+    const repair = scriptedRepairGateway(new Error("the repair model must not be asked"));
+    const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: ROUTE_BOUND })
+      .call(writer());
+    expect(repair.requests).toHaveLength(0);
+    expect(original.executions).toHaveLength(2);
+    expect(result.content).toBe(ACCEPTED);
+    expect(result).toMatchObject({ model: GLM, repairAttempts: 0, rawArtifactRef: original.artifacts[1]!.artifactId,
+      ledgerEntryRef: original.ledger[1]!.attemptId });
+    expect(result.repairForm).toBeUndefined();
+    expect(original.ledger.map((row) => [row.callSiteKey, row.outcome])).toEqual([[WRITER_KEY, "FAILED"], [WRITER_KEY, "OK"]]);
+    expect(original.artifacts.map((artifact) => artifact.replyFailureClass)).toEqual(["CUT_OFF", null]);
+    // The retry's own reply form stays the length retry's; A1 adds its drops to the repairs, nothing else.
+    expect(original.artifacts[1]).toMatchObject({ parseStatus: "PARSED", replyForm: "LENGTH_RETRY", replyRepairs: ["ECHO_DROPPED"] });
+    expect(original.artifacts[1]!.actualWords).toBe(replyWordCount(ACCEPTED, STOP));
+  });
+
+  it("a reply cut off at its token ceiling is never A1's, even when its step names its refusal STRUCTURE: today's length retry", async () => {
+    // A step that sets its own class wins over the gateway's reading (`classifiedContent.failureClass`), so only the hook's
+    // own cut-off test keeps a truncated reply from A1. This step says STRUCTURE for every refusal.
+    const own = panelRequest(request());
+    const saysStructure = (content: string, reply?: Parameters<NonNullable<ProviderCallRequest["classifyContent"]>>[1]): ContentClassification => {
+      const classified = own.classifyContent!(content, reply);
+      return classified.parseStatus === "PARSED" ? classified : { ...classified, failureClass: "STRUCTURE" };
+    };
+    const panel: ProviderCallRequest = { ...own, classifyContent: saysStructure };
+    expect(structureSalvageFor(panel)?.(KEYLESS, STOP)?.content).toBe(JSON.stringify(BASE));
+    const original = previewGlmHarness([{ content: KEYLESS, finishReason: "length" }, { content: JSON.stringify(BASE) }]);
+    const repair = scriptedRepairGateway(new Error("the repair model must not be asked"));
+    const result = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: ROUTE_BOUND })
+      .call(panel);
+    expect(repair.requests).toHaveLength(0);
+    expect(original.executions).toHaveLength(2);
+    expect(original.ledger.map((row) => [row.callSiteKey, row.outcome])).toEqual([[PANEL_KEY, "FAILED"], [PANEL_KEY, "OK"]]);
+    expect(original.artifacts[0]!.replyRepairs).toBeNull();
+    expect(result).toMatchObject({ content: JSON.stringify(BASE), rawArtifactRef: original.artifacts[1]!.artifactId });
   });
 });

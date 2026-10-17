@@ -103,12 +103,23 @@ export type ModelJsonStructureRepair = typeof MODEL_JSON_STRUCTURE_REPAIRS[numbe
 export const MAP_REPLY_SALVAGE_REPAIRS = Object.freeze(["MAP_TEXT_TRIMMED", "MAP_LEANS_DEFAULTED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"] as const);
 export type MapReplySalvageRepair = typeof MAP_REPLY_SALVAGE_REPAIRS[number];
 /**
+ * Refused-repair salvage (2026-10-16, A1): the DROPS `salvageStructureReply` (./structure-repair.ts) makes in code, with no
+ * call, on a STRUCTURE reply read as a tree, before the structure-repair call. It only ever drops a value, never moves,
+ * changes or fills one, and its result is accepted only when the step's own check then accepts it:
+ *  · KEYLESS_VALUE_DROPPED: a text written in an object with no key name of its own (judge steps only);
+ *  · DUPLICATE_KEY_DROPPED: a key written again in one object with the SAME value;
+ *  · ECHO_DROPPED: a value under a name the form states at one other place, equal to the value kept there;
+ *  · UNASKED_VALUE_DROPPED: a text, null, `{}` or `[]` under a name not stated at its place, as the step's fixer drops it.
+ */
+export const STRUCTURE_SALVAGE_REPAIRS = Object.freeze(["KEYLESS_VALUE_DROPPED", "DUPLICATE_KEY_DROPPED", "ECHO_DROPPED", "UNASKED_VALUE_DROPPED"] as const);
+export type StructureSalvageRepair = typeof STRUCTURE_SALVAGE_REPAIRS[number];
+/**
  * The repair codes a classification can name (`ContentClassification.jsonRepair`): the decode repairs (`ModelJsonDecodeRepair`),
- * the judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`), the fixer's structure repairs (`ModelJsonStructureRepair`) and the
- * map's salvage repairs (`MAP_REPLY_SALVAGE_REPAIRS`).
+ * the judge's shape repairs (`MODEL_JSON_SHAPE_REPAIRS`), the fixer's structure repairs (`ModelJsonStructureRepair`), the
+ * map's salvage repairs (`MAP_REPLY_SALVAGE_REPAIRS`) and A1's drops (`STRUCTURE_SALVAGE_REPAIRS`).
  */
 export type ModelJsonRepair = ModelJsonDecodeRepair | typeof MODEL_JSON_SHAPE_REPAIRS[number] | ModelJsonStructureRepair
-  | MapReplySalvageRepair;
+  | MapReplySalvageRepair | StructureSalvageRepair;
 
 /**
  * `repair` is the first repair the decode made (null for strict JSON). `repairs` (LG-A) is present only when the decode

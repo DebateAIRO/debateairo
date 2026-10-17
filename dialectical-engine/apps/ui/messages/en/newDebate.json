@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Exhaustive",
   "newDebate.scrutinyExhaustiveHelp": "The most extra rounds, on more of the points in doubt.",
   "newDebate.answerLength": "Answer length",
-  "newDebate.answerLengthHint": "About 300, 700 or 1,500 words: a target, not a hard limit.",
+  "newDebate.answerLengthHint": "About {short}, {standard} or {detailed} words: a target, not a hard limit.",
   "newDebate.answerLengthShort": "Short",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Detailed",

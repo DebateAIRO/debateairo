@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Wyczerpująca",
   "newDebate.scrutinyExhaustiveHelp": "Najwięcej dodatkowych rund, przy większej liczbie punktów budzących wątpliwości.",
   "newDebate.answerLength": "Długość odpowiedzi",
-  "newDebate.answerLengthHint": "Około 300, 700 lub 1500 słów: orientacyjna długość, a nie ścisłe maksimum.",
+  "newDebate.answerLengthHint": "Liczba słów: około {short}, {standard} lub {detailed}. To orientacyjna długość, a nie ścisłe maksimum.",
   "newDebate.answerLengthShort": "Krótka",
   "newDebate.answerLengthStandard": "Standardowa",
   "newDebate.answerLengthDetailed": "Szczegółowa",

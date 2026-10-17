@@ -745,7 +745,9 @@ await boot.run("run-ceiling-covers-one-call", async () => {
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38: with the debate-shape row in force a run may be shaped, and its first call carries the locked
     // language (the named sentence and the question_language field): priced at the longest lock too. Row absent: today's.
-    questionLanguageLocked: debateShapeInForcePolicy !== null
+    questionLanguageLocked: debateShapeInForcePolicy !== null,
+    // Length guidance (spec 2026-10-15 §3.2): with the row a first call is the lengthed variant: framed at the bound target.
+    lengthed: lengthGuidancePolicy !== null
   });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,

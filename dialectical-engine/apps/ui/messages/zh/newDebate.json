@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "穷尽",
   "newDebate.scrutinyExhaustiveHelp": "额外轮次最多，覆盖更多存疑论点。",
   "newDebate.answerLength": "回答长度",
-  "newDebate.answerLengthHint": "约 300、700 或 1,500 字：这是目标，而不是严格的字数上限。",
+  "newDebate.answerLengthHint": "约 {short}、{standard} 或 {detailed} 字：这是目标，而不是严格的字数上限。",
   "newDebate.answerLengthShort": "简短",
   "newDebate.answerLengthStandard": "标准",
   "newDebate.answerLengthDetailed": "详细",

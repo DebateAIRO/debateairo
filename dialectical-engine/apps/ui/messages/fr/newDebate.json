@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Exhaustif",
   "newDebate.scrutinyExhaustiveHelp": "Le plus grand nombre de tours supplémentaires, sur davantage de points incertains.",
   "newDebate.answerLength": "Longueur de la réponse",
-  "newDebate.answerLengthHint": "Environ 300, 700 ou 1 500 mots : un objectif, pas un maximum strict.",
+  "newDebate.answerLengthHint": "Environ {short}, {standard} ou {detailed} mots : un objectif, pas un maximum strict.",
   "newDebate.answerLengthShort": "Courte",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Détaillée",

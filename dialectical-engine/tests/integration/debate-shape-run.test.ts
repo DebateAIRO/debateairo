@@ -480,11 +480,12 @@ describe("the debate shape in the runner (spec §3.3)", () => {
     }, 600_000);
 
     /**
-     * LG-A (Task 14 carry): with the structure-repair route wired (main.ts passes `structureRepairCeiling`), root 0's retry
-     * may be the repair call: the runner's room prices it at the repair target's price and at the most the seam can project
-     * for it, the larger of that and root 0's own retry. Without it: today's room (the PF-L38 case above).
+     * LG-A (Task 14 carry): with the structure-repair route wired (main.ts passes `structureRepairCeiling`), root 0 may send
+     * the repair call: the runner's room prices it at the repair target's price and at the most the seam can project for
+     * it, and adds it to root 0's first attempt and its own retry (the sum; refused-repair salvage B is root 0's own second
+     * POST after the repair call). Without it: today's room (the PF-L38 case above).
      */
-    it("a routed run's room also prices root 0's retry as the structure-repair call, at the repair target's price (LG-A)", async () => {
+    it("a routed run's room adds the structure-repair call to root 0's first attempt and retry (the sum), at the repair target's price (LG-A)", async () => {
       const question = "debate-shape-hosted-repair-1234567890";
       const language = { tag: "ro", name: "Romanian" };
       const repairCeiling = Object.freeze({ providerRef: "preview:claude-haiku-5-5", requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
@@ -499,8 +500,8 @@ describe("the debate shape in the runner (spec §3.3)", () => {
         tokenCeiling: POLICY.bounds.JUDGE.tokenCeiling, questionLanguage: questionLanguageFromRun(language.tag, language.name) });
       expect(rooms[0]).toBe(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts,
         structureRepair: { price: CHEAP, attempt: repairCeiling } }));
-      // At one micro-unit per token: ceil(262,144 / 2) + 32,768 = 163,840 for the repair, above root 0's own retry.
-      expect(rooms[0]).toBe(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts, retries: [] }) + 163_840);
+      // At one micro-unit per token: ceil(262,144 / 2) + 32,768 = 163,840 for the repair, added to root 0's own two attempts.
+      expect(rooms[0]).toBe(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts }) + 163_840);
       expect(rooms[0]).toBeGreaterThan(rootZeroKeepRoomMicros({ prices: [CHEAP], ...attempts }));
     }, 600_000);
 

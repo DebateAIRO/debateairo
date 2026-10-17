@@ -10,6 +10,20 @@
  * artifact, its maker, its model). The repair call is its own ledger row and artifact (reply_form STRUCTURE), billed to the
  * repair model through that model's own gateway and gate.
  *
+ * Refused-repair salvage (2026-10-16, A1): before that call, the wrapper hands the gateway the step's own A1
+ * (`structureSalvageFor`). On a routed call's first reply of class STRUCTURE, code reads the reply with no call and leaves
+ * out only values the step never asked for (a sentence with no key, a repeat, an echo, a stray note); when the words are
+ * all kept and the step's own check accepts the result, the reply is accepted as the original AI's own OK row: no
+ * structure-repair call, no REPAIR:STRUCTURE row, its artifact PARSED with A1's drops among its repairs. Otherwise the
+ * call goes on exactly as above.
+ *
+ * Refused-repair salvage (2026-10-16, B; spec §6 option iii): when the repair call does not do (its copy refused, the repair
+ * model unavailable, its gate halted, a transport death), its failure never leaves the wrapper. The ORIGINAL AI gets one
+ * short follow-up (`structureFollowUpFor`), the same call's second POST on its own gateway: PATCH asks only the members the
+ * step still refuses on A1's object; FULL asks the answer writer or checker, whose reply could not be read at all, for the
+ * whole answer again. With no follow-up to send, or when it does not do, the call ends as today's refusal. Only the run's
+ * own stops (money, the lane stopped, root 0's room kept) pass through from the repair call, and then B is not sent.
+ *
  * The contract is code-owned and test-pinned (tests/unit/prompt-text-pins.test.ts), never register-sealed; its instruction
  * is the owners' wording, shown to them at plan review.
  *
@@ -18,11 +32,19 @@
  */
 import { createHash } from "node:crypto";
 import { RUN_LEVEL_SPEND_STOP_CODES, STRUCTURE_REPAIR_CALL_SITE_PREFIX, TypedDomainError, lengthCallStepOf } from "@debateai/kernel";
-import { contentRepairsOf, decodeModelJson } from "./model-json.js";
-import { buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract } from "./prompt-frame.js";
+import {
+  STRUCTURE_SALVAGE_REPAIRS, contentRepairsOf, decodeModelJson, modelJsonFenceBody, parsedWithRepairs,
+  type ModelReplyFacts, type StructureSalvageRepair
+} from "./model-json.js";
+import {
+  appendFramedRejection, buildFramedPrompt, framedAnswerForm, promptContractFingerprintText, schemaFailureLocator, type PromptContract
+} from "./prompt-frame.js";
+import { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence } from "./content-follow-up.js";
+import { planPatchFollowUp, type PatchFollowUpPlan } from "./patch-follow-up.js";
 import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
-  type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway
+  type ContentClassification, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway,
+  type RejectedProviderContent, type StructureFirstReply, type StructureFollowUp, type StructureSalvaged
 } from "./index.js";
 
 export const STRUCTURE_REPAIR_CONTRACT_ID = "repair.structure.v1" as const;
@@ -119,23 +141,32 @@ const FORM_KEY_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 /** Whitespace the form may put between a key and its colon (read by a plain loop: CodeQL #67, no regex on a run). */
 const FORM_SPACE = /\s/u;
 
-/** The places a form states, and which of them hold a list (`"key": [` or `"key": … string[]`). */
-type FormShape = Readonly<{ places: ReadonlySet<string>; lists: ReadonlySet<string> }>;
-const NO_FORM_SHAPE: FormShape = Object.freeze({ places: new Set<string>(), lists: new Set<string>() });
+/**
+ * The places a form states, and which of them hold a list (`"key": [` or `"key": … string[]`). Refused-repair salvage
+ * (A1, pre-flight PF-S4): which hold a TEXT (`"key": non-empty string`, no list or object in its value) and which an enum
+ * LABEL list (`"key": "REAL_ATTACK" | …`). `structureRepairKeepsWords` reads neither.
+ */
+type FormShape = Readonly<{ places: ReadonlySet<string>; lists: ReadonlySet<string>; texts: ReadonlySet<string>;
+  labels: ReadonlySet<string> }>;
+const NO_FORM_SHAPE: FormShape = Object.freeze({ places: new Set<string>(), lists: new Set<string>(), texts: new Set<string>(),
+  labels: new Set<string>() });
 
 /**
  * Task 12b: the PLACES `answerForm` states, read from its own nesting: each quoted key followed by `:`, with the quoted keys
  * of the objects around it (list brackets add nothing, as list positions add nothing to a value's path), dotted
  * (`fallacy.fatalFlags.description`). Prose around the form's skeleton holds no quoted key followed by `:`, and its
  * brackets (`number [0,1]`, `string[]`) close where they open. Task 12b round 2: a place holds a LIST when its value
- * opens with `[` or, before the next `,` `}` or line end, says `[]` (`"ambiguityFlags": non-empty string[]`). Every loop
- * moves forward only, so the reading is linear in the form's length.
+ * opens with `[` or, before the next `,` `}` or line end, says `[]` (`"ambiguityFlags": non-empty string[]`). A1 (pre-flight
+ * PF-S4): from that same value span, a place holds a TEXT when it says `string` with no `[` and no `{`, and an enum LABEL
+ * list when it opens with `"`. Every loop moves forward only, so the reading is linear in the form's length.
  */
 function formShape(answerForm: string): FormShape {
   type Frame = { object: boolean; key: string | null };
   const stack: Frame[] = [];
   const places = new Set<string>();
   const lists = new Set<string>();
+  const texts = new Set<string>();
+  const labels = new Set<string>();
   for (let index = 0; index < answerForm.length; index += 1) {
     const character = answerForm[index]!;
     if (character === "{" || character === "[") { stack.push({ object: character === "{", key: null }); continue; }
@@ -155,11 +186,14 @@ function formShape(answerForm: string): FormShape {
       while (value < answerForm.length && FORM_SPACE.test(answerForm[value]!)) value += 1;
       let stop = value;
       while (stop < answerForm.length && !",}\n".includes(answerForm[stop]!)) stop += 1;
-      if (answerForm[value] === "[" || answerForm.slice(value, stop).includes("[]")) lists.add(place);
+      const span = answerForm.slice(value, stop);
+      if (answerForm[value] === "[" || span.includes("[]")) lists.add(place);
+      if (span.includes("string") && !span.includes("[") && !span.includes("{")) texts.add(place);
+      if (answerForm[value] === "\"") labels.add(place);
     }
     index = end;
   }
-  return Object.freeze({ places, lists });
+  return Object.freeze({ places, lists, texts, labels });
 }
 
 /**
@@ -497,11 +531,434 @@ export function structureRepairKeepsWords(brokenReply: string, repaired: unknown
   });
 }
 
-/** A request the wrapper routes: a structured step with its own check and a readable frame, not the evaluator lane, not routed yet. */
-function routable(request: ProviderCallRequest): boolean {
-  if (request.classifyContent === undefined || request.lane === "evaluator" || request.structureRepairRouted !== undefined
+/* ------------------------------------------------------------------------------------------------------------------------
+ * Refused-repair salvage (2026-10-16, A1): THE VERIFIED SUBSET, read in code with no call, before the structure-repair call.
+ *
+ * Plain words: a reply broken only in its JSON form is often whole once a few values the step never asked for are left
+ * out: a sentence written with no key, a key written twice with the same value, a copy of a value under a second name, a
+ * stray note. A1 reads the reply as a tree, leaves out exactly those, and nothing else: it never moves, changes or fills a
+ * value. Its result counts only when the word-for-word check (`structureRepairKeepsWords`) still holds and the step's own
+ * check accepts it with no repair that changes a value. When the step still refuses it, the object A1 built is handed on
+ * (PARTIAL) for the follow-up to the original AI to finish.
+ * ---------------------------------------------------------------------------------------------------------------------- */
+
+/** Why A1 left a reply as it was (each its own guard). */
+export type StructureSalvageRefusal = "KEYLESS_KEPT" | "KEYLESS_LIST_ENTRY" | "DUPLICATE_DIFFERS" | "DOTTED_KEY" | "NOT_DROPPABLE"
+  | "WORDS_NOT_KEPT" | "VALUE_CHANGING_REPAIR" | "NOTHING_TO_DROP";
+
+/**
+ * A1's result: ACCEPTED (the step accepts `content`, A1's drops named on `classification`), PARTIAL (A1 built an object the
+ * step still refuses, with that refusal), REFUSED (A1 may not drop what the reply would need), NO_OBJECT (no object read).
+ */
+export type StructureSalvage =
+  | Readonly<{ kind: "ACCEPTED"; content: string; classification: ContentClassification; repairs: readonly StructureSalvageRepair[] }>
+  | Readonly<{ kind: "PARTIAL"; base: Readonly<Record<string, unknown>>;
+      classification: Extract<ContentClassification, { parseStatus: "PARSE_FAILED" | "SCHEMA_FAILED" }> }>
+  | Readonly<{ kind: "REFUSED"; reason: StructureSalvageRefusal }>
+  | Readonly<{ kind: "NO_OBJECT" }>;
+
+type ReplyTree =
+  | Readonly<{ kind: "object"; members: readonly ReplyTreeMember[] }>
+  | Readonly<{ kind: "list"; entries: readonly ReplyTree[] }>
+  | Readonly<{ kind: "scalar"; value: string | number | boolean | null }>;
+/** `key` null: a value written where `"key":` was expected (keyless); `afterText`: the member before it held a bare text. */
+type ReplyTreeMember = Readonly<{ key: string | null; value: ReplyTree; afterText: boolean }>;
+
+/** One JSON number token (read sticky at one position: no regex over a run). */
+const JSON_NUMBER_TOKEN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/uy;
+const JSON_BLANKS = " \t\n\r";
+const JSON_WORDS: readonly (readonly [string, boolean | null])[] = Object.freeze([["true", true], ["false", false], ["null", null]]);
+
+const isTextNode = (node: ReplyTree): boolean => node.kind === "scalar" && typeof node.value === "string";
+
+/**
+ * The reply as a tree: the text, trimmed, is one object, or one object inside one code fence; else null. Strict JSON
+ * grammar (strings read by JSON.parse of their own token) with exactly two tolerances, which the tree keeps for A1 to
+ * judge: a value inside an object where `"key":` was expected, followed by `,` or `}` (a member with no key), and a key
+ * written again in one object (both members kept, in order). Forward-only: every position is read once.
+ */
+function readReplyTree(text: string): ReplyTree | null {
+  const trimmed = text.trim();
+  const body = (modelJsonFenceBody(trimmed) ?? trimmed).trim();
+  if (!body.startsWith("{")) return null;
+  let at = 0;
+  const blank = (): void => { while (at < body.length && JSON_BLANKS.includes(body[at]!)) at += 1; };
+  const readString = (): string | null => {
+    let end = at + 1;
+    while (end < body.length && body[end] !== "\"") end += body[end] === "\\" ? 2 : 1;
+    if (end >= body.length) return null;
+    try {
+      const read: unknown = JSON.parse(body.slice(at, end + 1));
+      at = end + 1;
+      return typeof read === "string" ? read : null;
+    } catch { return null; }
+  };
+  const scalar = (value: string | number | boolean | null): ReplyTree => Object.freeze({ kind: "scalar" as const, value });
+  const readValue = (): ReplyTree | null => {
+    blank();
+    const character = body[at];
+    if (character === "{") return readObject();
+    if (character === "[") return readList();
+    if (character === "\"") { const read = readString(); return read === null ? null : scalar(read); }
+    const word = JSON_WORDS.find(([spelling]) => body.startsWith(spelling, at));
+    if (word !== undefined) { at += word[0].length; return scalar(word[1]); }
+    JSON_NUMBER_TOKEN.lastIndex = at;
+    const number = JSON_NUMBER_TOKEN.exec(body);
+    if (number === null) return null;
+    at += number[0].length;
+    return scalar(Number(number[0]));
+  };
+  const readObject = (): ReplyTree | null => {
+    at += 1;
+    const members: ReplyTreeMember[] = [];
+    const done = (): ReplyTree => Object.freeze({ kind: "object" as const, members: Object.freeze(members) });
+    blank();
+    if (body[at] === "}") { at += 1; return done(); }
+    for (;;) {
+      blank();
+      let key: string | null = null;
+      let value: ReplyTree | null;
+      if (body[at] === "\"") {
+        const read = readString();
+        if (read === null) return null;
+        blank();
+        if (body[at] === ":") { at += 1; key = read; value = readValue(); } else value = scalar(read);
+      } else value = readValue();
+      if (value === null) return null;
+      const before = members.at(-1);
+      members.push(Object.freeze({ key, value, afterText: key === null && before !== undefined && isTextNode(before.value) }));
+      blank();
+      if (body[at] === ",") { at += 1; continue; }
+      if (body[at] === "}") { at += 1; return done(); }
+      return null;
+    }
+  };
+  const readList = (): ReplyTree | null => {
+    at += 1;
+    const entries: ReplyTree[] = [];
+    const done = (): ReplyTree => Object.freeze({ kind: "list" as const, entries: Object.freeze(entries) });
+    blank();
+    if (body[at] === "]") { at += 1; return done(); }
+    for (;;) {
+      const entry = readValue();
+      if (entry === null) return null;
+      entries.push(entry);
+      blank();
+      if (body[at] === ",") { at += 1; continue; }
+      if (body[at] === "]") { at += 1; return done(); }
+      return null;
+    }
+  };
+  try {
+    const root = readObject();
+    blank();
+    return root !== null && at === body.length ? root : null;
+  } catch {
+    // A reply nested past the engine's call stack is no tree A1 reads.
+    return null;
+  }
+}
+
+/** Whether any key of the tree names a place by its parts (`"evidence.quality"`). */
+function hasDottedKey(node: ReplyTree): boolean {
+  if (node.kind === "list") return node.entries.some(hasDottedKey);
+  if (node.kind === "scalar") return false;
+  return node.members.some((member) => (member.key?.includes(".") ?? false) || hasDottedKey(member.value));
+}
+
+/** Two members written the same way (order, keys and values), so one of them is a plain repeat. */
+function sameTree(left: ReplyTree, right: ReplyTree): boolean {
+  if (left.kind === "scalar" || right.kind === "scalar") return left.kind === "scalar" && right.kind === "scalar" && left.value === right.value;
+  if (left.kind === "list" || right.kind === "list") {
+    return left.kind === "list" && right.kind === "list" && left.entries.length === right.entries.length
+      && left.entries.every((entry, at) => sameTree(entry, right.entries[at]!));
+  }
+  return left.members.length === right.members.length && left.members.every((member, at) => {
+    const other = right.members[at]!;
+    return member.key === other.key && sameTree(member.value, other.value);
+  });
+}
+
+const isPlainObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Deep equality of decoded JSON values (an object's key order does not count). */
+function sameJson(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((entry, at) => sameJson(entry, right[at]));
+  }
+  if (isPlainObject(left) && isPlainObject(right)) {
+    const keys = Object.keys(left);
+    return keys.length === Object.keys(right).length && keys.every((key) => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
+  }
+  return left === right;
+}
+
+/** The value kept at a dotted place of `base` (none when the path is missing or passes through a list). */
+const NOT_KEPT = Symbol("NOT_KEPT");
+function keptAt(base: unknown, place: string): unknown {
+  let node: unknown = base;
+  for (const key of place.split(".")) {
+    if (!isPlainObject(node) || !Object.hasOwn(node, key)) return NOT_KEPT;
+    node = node[key];
+  }
+  return node;
+}
+
+/**
+ * An echo matches the value kept at its stated place: equal (a scalar, a list), or an object whose every member equals the
+ * kept object's member of the same name.
+ */
+function echoMatches(echo: unknown, kept: unknown): boolean {
+  if (kept === NOT_KEPT) return false;
+  if (isPlainObject(echo) && isPlainObject(kept)) return Object.keys(echo).every((key) => Object.hasOwn(kept, key) && sameJson(echo[key], kept[key]));
+  return sameJson(echo, kept);
+}
+
+type SalvageEvent = Readonly<{ refusal: StructureSalvageRefusal }> | { readonly place: string; value: unknown };
+
+/**
+ * A1's shaping of a tree against the step's answer form (`formShape`, `formNames`): each member, from the root down, read
+ * at its place (its key path from the root; list positions add nothing), in document order. It records every drop and,
+ * in document order, every refusal and every echo to check once the whole base is built (an echo may sit inside the
+ * very object whose value it echoes).
+ */
+function shapeReplyTree(tree: ReplyTree & { kind: "object" }, answerForm: string, textsKept: StructureRepairTextsKept): Readonly<{
+  base: Record<string, unknown>; drops: ReadonlySet<StructureSalvageRepair>; events: readonly SalvageEvent[] }> {
+  const form = formShape(answerForm);
+  const names = new Set(formNames(answerForm));
+  const drops = new Set<StructureSalvageRepair>();
+  const events: SalvageEvent[] = [];
+  const refuse = (refusal: StructureSalvageRefusal): void => { events.push(Object.freeze({ refusal })); };
+  const placeOf = (parent: string | null, key: string): string => parent === null ? key : `${parent}.${key}`;
+  const lastName = (place: string): string => place.slice(place.lastIndexOf(".") + 1);
+  const statedBelow = (place: string): boolean => [...form.places].some((stated) => stated.startsWith(`${place}.`));
+  // Pre-flight PF-S4: a name the form states as a text somewhere and nowhere as an enum label list.
+  const statedAsText = (name: string): boolean =>
+    [...form.texts].some((place) => lastName(place) === name) && ![...form.labels].some((place) => lastName(place) === name);
+  const textDroppable = (name: string): boolean => !names.has(name) || (textsKept === "place" && statedAsText(name));
+  const emptyValue = (node: ReplyTree): boolean => (node.kind === "scalar" && node.value === null)
+    || (node.kind === "object" && node.members.length === 0) || (node.kind === "list" && node.entries.length === 0);
+
+  /** A value kept exactly as written; only the two tolerances are judged inside it (pre-flight PF-S1). */
+  const keep = (node: ReplyTree, place: string): unknown => node.kind === "object" ? shapeObject(node, place, true)
+    : node.kind === "list" ? node.entries.map((entry) => keep(entry, place)) : node.value;
+  /** A value at a place the form states: walked into only when the form states a place below it. */
+  const stated = (node: ReplyTree, place: string): unknown => {
+    if (!statedBelow(place)) return keep(node, place);
+    if (node.kind === "object") return shapeObject(node, place, false);
+    if (node.kind === "list") return node.entries.map((entry) => entry.kind === "object" ? shapeObject(entry, place, false) : keep(entry, place));
+    return node.value;
+  };
+  const echo = (node: ReplyTree, name: string): void => {
+    const targets = [...form.places].filter((place) => lastName(place) === name);
+    if (targets.length !== 1) { refuse("NOT_DROPPABLE"); return; }
+    const event = { place: targets[0]!, value: undefined as unknown };
+    const at = events.push(event) - 1;
+    event.value = stated(node, event.place);
+    // Fix round 1: an object every member of which was dropped echoes nothing; its drops were each allowed, so it is an
+    // unasked value left out (any refusal inside it is still an event of its own). Final review: it is left out by the
+    // rule a `{}` written there meets — on a step that keeps every text, a name the form states refuses.
+    if (isPlainObject(event.value) && Object.keys(event.value).length === 0) {
+      events.splice(at, 1);
+      if (textsKept === "place" || !names.has(name)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
+      return;
+    }
+    drops.add("ECHO_DROPPED");
+  };
+  function shapeObject(node: ReplyTree & { kind: "object" }, parent: string | null, asWritten: boolean): Record<string, unknown> {
+    const kept = new Map<string, unknown>();
+    const seen = new Map<string, ReplyTree>();
+    let lastKey: string | null = null;
+    for (const member of node.members) {
+      if (member.key === null) {
+        // Fix round 1 (owner answer 3): only a keyless TEXT may be dropped; a keyless score, verdict, object or list may
+        // be a second answer, so it refuses.
+        if (!isTextNode(member.value)) refuse("NOT_DROPPABLE");
+        else if (textsKept === "anywhere") refuse("KEYLESS_KEPT");
+        else if (member.afterText && lastKey !== null && form.lists.has(placeOf(parent, lastKey))) refuse("KEYLESS_LIST_ENTRY");
+        else drops.add("KEYLESS_VALUE_DROPPED");
+        continue;
+      }
+      const key = member.key;
+      lastKey = key;
+      const earlier = seen.get(key);
+      if (earlier !== undefined) {
+        if (sameTree(earlier, member.value)) drops.add("DUPLICATE_KEY_DROPPED"); else refuse("DUPLICATE_DIFFERS");
+        continue;
+      }
+      seen.set(key, member.value);
+      const place = placeOf(parent, key);
+      if (asWritten) { kept.set(key, keep(member.value, place)); continue; }
+      if (form.places.has(place)) { kept.set(key, stated(member.value, place)); continue; }
+      if (isTextNode(member.value)) {
+        if (textDroppable(key)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
+        continue;
+      }
+      if (emptyValue(member.value)) {
+        if (textsKept === "place" || !names.has(key)) drops.add("UNASKED_VALUE_DROPPED"); else refuse("NOT_DROPPABLE");
+        continue;
+      }
+      echo(member.value, key);
+    }
+    return Object.fromEntries(kept);
+  }
+  const base = shapeObject(tree, null, false);
+  return Object.freeze({ base, drops, events });
+}
+
+/**
+ * A1 (refused-repair salvage, 2026-10-16): the verified subset of a STRUCTURE reply, read in code with no call. It DROPS
+ * only: a TEXT written with no key (only where `textsKept` is "place", the judge steps; and never right after a text
+ * under a key the form states as a list, where it is a list's lost `[`); a repeat of a key with the SAME value; a text,
+ * null, `{}` or `[]` under a name not stated at its place, as the step's own fixer drops it (on a "place" step a text only
+ * under a name the form never states or states as a text, never under a number, true/false or enum label list name); and
+ * an exact echo of the value kept at the one stated place of that name (an object left with no member is no echo). A keyless
+ * number, true/false, null, object or list refuses. A value at a place the form states as a scalar is
+ * kept exactly as written, a wrapper and all. A dotted key, any other drop and a key written twice with two values refuse.
+ *
+ * With no tree, an object the tolerant decode reads is the base, with no drop. The base counts only when
+ * `structureRepairKeepsWords` holds and then the step's own `classify` (run LAST, on the exact string returned) accepts it
+ * with no value-changing repair: ACCEPTED, its drops named after the step's own repairs, the first drop the headline. A
+ * step refusal hands the base on (PARTIAL) with that refusal; nothing readable is NO_OBJECT.
+ */
+export function salvageStructureReply(input: Readonly<{ content: string; reply: ModelReplyFacts | undefined; answerForm: string;
+  textsKept: StructureRepairTextsKept; classify: (content: string, reply?: ModelReplyFacts) => ContentClassification }>): StructureSalvage {
+  const refused = (reason: StructureSalvageRefusal): StructureSalvage => Object.freeze({ kind: "REFUSED", reason });
+  const tree = readReplyTree(input.content);
+  let base: Readonly<Record<string, unknown>>;
+  let drops: readonly StructureSalvageRepair[] = [];
+  if (tree === null || tree.kind !== "object") {
+    const decoded = decodeModelJson(input.content, input.reply);
+    if (!decoded.ok || !isPlainObject(decoded.value)) return Object.freeze({ kind: "NO_OBJECT" });
+    base = decoded.value;
+  } else {
+    if (hasDottedKey(tree)) return refused("DOTTED_KEY");
+    const shaped = shapeReplyTree(tree, input.answerForm, input.textsKept);
+    for (const event of shaped.events) {
+      if ("refusal" in event) return refused(event.refusal);
+      if (!echoMatches(event.value, keptAt(shaped.base, event.place))) return refused("NOT_DROPPABLE");
+    }
+    base = shaped.base;
+    drops = STRUCTURE_SALVAGE_REPAIRS.filter((repair) => shaped.drops.has(repair));
+  }
+  if (!structureRepairKeepsWords(input.content, base, input.answerForm, { textsKept: input.textsKept })) return refused("WORDS_NOT_KEPT");
+  const content = JSON.stringify(base);
+  const classification = input.classify(content, input.reply);
+  if (classification.parseStatus !== "PARSED") return Object.freeze({ kind: "PARTIAL", base, classification });
+  const stepRepairs = contentRepairsOf(classification);
+  if (stepRepairs.some((repair) => VALUE_CHANGING_REPAIRS.has(repair))) return refused("VALUE_CHANGING_REPAIR");
+  if (drops.length === 0) return refused("NOTHING_TO_DROP");
+  return Object.freeze({ kind: "ACCEPTED", content, classification: parsedWithRepairs([...stepRepairs, ...drops], drops[0]!),
+    repairs: Object.freeze(drops) });
+}
+
+/** A structured step with its own check and a readable frame, not the evaluator lane, not a structure-repair call. */
+function structuredStep(request: ProviderCallRequest): boolean {
+  if (request.classifyContent === undefined || request.lane === "evaluator"
     || request.callSiteKey.startsWith(STRUCTURE_REPAIR_CALL_SITE_PREFIX)) return false;
   try { return framedAnswerForm(request.packet).trim() !== ""; } catch { return false; }
+}
+
+/** A request the wrapper routes: a structured step (`structuredStep`), not routed yet. */
+function routable(request: ProviderCallRequest): boolean {
+  return request.structureRepairRouted === undefined && structuredStep(request);
+}
+
+/**
+ * Refused-repair salvage (2026-10-16, A1): the step's own A1, which the wrapper hands the gateway
+ * (`ProviderCallRequest.structureSalvage`): `salvageStructureReply` with the step's answer form, where it keeps texts and
+ * its own check, returning the content and classification only when A1 ACCEPTED the reply (else null). Null for a request
+ * the wrapper does not route (the routed test aside).
+ */
+export function structureSalvageFor(request: ProviderCallRequest):
+  ((content: string, reply: ModelReplyFacts | undefined) => StructureSalvaged | null) | null {
+  if (!structuredStep(request)) return null;
+  const answerForm = framedAnswerForm(request.packet);
+  const textsKept = structureRepairTextsKeptAt(request.callSiteKey, request.lane);
+  const classify = request.classifyContent!;
+  return (content, reply) => {
+    const salvage = salvageStructureReply({ content, reply, answerForm, textsKept, classify });
+    return salvage.kind === "ACCEPTED" ? Object.freeze({ content: salvage.content, classification: salvage.classification }) : null;
+  };
+}
+
+/** Refused-repair salvage (B, owner answer 2): the only steps whose unreadable reply gets the whole answer asked again. */
+const FULL_FOLLOW_UP_STEPS: ReadonlySet<string> = new Set(["answer_writer", "answer_checker"]);
+
+/**
+ * Refused-repair salvage (2026-10-16, B; spec §6 option iii): the one follow-up to the ORIGINAL AI after the structure-repair
+ * call did not do, planned from its first reply (`first`). A1 reads that reply again (`salvageStructureReply`, the step's
+ * answer form, where it keeps texts and its own check): when A1 built an object the step still refuses at 1-8 settable
+ * members (PARTIAL), PATCH asks only those members, on A1's object; when no object could be read at all, the answer writer
+ * and the answer checker (and only they, with a full re-ask of their own) get FULL, the whole answer again. Anything else is
+ * null: no follow-up, the call ends as today's refusal. It may throw (the step's classifier, `framedAnswerForm`); its one
+ * caller treats a throw as null.
+ */
+export function structureFollowUpFor(request: ProviderCallRequest, first: StructureFirstReply): StructureFollowUp | null {
+  const classify = request.classifyContent;
+  if (classify === undefined) return null;
+  const salvage = salvageStructureReply({ content: first.rejected.rawText, reply: FINISHED, answerForm: framedAnswerForm(request.packet),
+    textsKept: structureRepairTextsKeptAt(request.callSiteKey, request.lane), classify });
+  if (salvage.kind === "PARTIAL") {
+    const planned = planPatchFollowUp({ content: JSON.stringify(salvage.base), reply: FINISHED,
+      parseStatus: salvage.classification.parseStatus, parseError: salvage.classification.parseError });
+    if (planned === null) return null;
+    const plan = Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
+      reason: contentFollowUpSentence(planned.locator.code, "STRUCTURE") }) });
+    return Object.freeze({ form: "PATCH" as const, plan, first });
+  }
+  const step = lengthCallStepOf(request.callSiteKey, request.lane);
+  if (salvage.kind === "NO_OBJECT" && step !== null && FULL_FOLLOW_UP_STEPS.has(step) && request.buildRepairPacket !== undefined) {
+    return Object.freeze({ form: "FULL" as const, first });
+  }
+  return null;
+}
+
+/**
+ * Refused-repair salvage (2026-10-16): the two readers a reclaim's replay hands `rebuildRecordedCallContent` so a call the
+ * first copy's gateway rescued (A1) or followed up (B's PATCH) is rebuilt from its recorded rows exactly as that gateway
+ * accepted it, with no POST. `structureSalvage` is A1 (`structureSalvageFor`); `structureFollowUpPlan` is B's patch plan,
+ * built from A's base (`structureFollowUpFor`): null for an accepted reply, a FULL or no follow-up, or a throw. As in the
+ * gateway, a throw is no rescue and no plan (null): the call is rebuilt from its OK reply alone, or made again. Null for a
+ * request the wrapper does not route. The runner passes them only on a run whose structure-repair route is wired.
+ */
+export function structureReplayReaders(request: ProviderCallRequest): Readonly<{
+  structureSalvage: (content: string, reply: ModelReplyFacts) => StructureSalvaged | null;
+  structureFollowUpPlan: (content: string, reply: ModelReplyFacts) => PatchFollowUpPlan | null;
+}> | null {
+  const salvage = structureSalvageFor(request);
+  if (salvage === null) return null;
+  const classify = request.classifyContent!;
+  const structureSalvage = (content: string, reply: ModelReplyFacts): StructureSalvaged | null => {
+    try {
+      return salvage(content, reply);
+    } catch {
+      return null;
+    }
+  };
+  const structureFollowUpPlan = (content: string, reply: ModelReplyFacts): PatchFollowUpPlan | null => {
+    try {
+      const classified = classify(content, reply);
+      if (classified.parseStatus === "PARSED") return null;
+      const planned = structureFollowUpFor(request, { rejected: { rawText: content, parseStatus: classified.parseStatus,
+        parseError: classified.parseError, failureClass: "STRUCTURE" }, rawArtifactRef: "", ledgerEntryRef: "", materialMarked: false });
+      return planned !== null && planned.form === "PATCH" ? planned.plan : null;
+    } catch {
+      return null;
+    }
+  };
+  return Object.freeze({ structureSalvage, structureFollowUpPlan });
+}
+
+/**
+ * B's FULL re-ask (controller ruling on Task 3): the step's own packet, then its rejection block (the step's own builder
+ * appends the same block to the same packet), whose plain-word reason is the owner's sentence for an unreadable reply,
+ * named here by its constant; no code or class selects it.
+ */
+function unreadableReplyRepairPacket(packet: PromptPacket): (rejected: RejectedProviderContent) => PromptPacket {
+  return (rejected) => appendFramedRejection(packet, { ...schemaFailureLocator({ parseStatus: rejected.parseStatus,
+    parseError: rejected.parseError }), reason: CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD });
 }
 
 /**
@@ -518,10 +975,27 @@ export const STRUCTURE_REPAIR_PASSED_STOPS = Object.freeze(["CALL_LANE_STOPPED",
 /** The repair reply's refusal when it changed what the AI wrote (STRUCTURE_REPAIR_NOT_VERBATIM, INTERFACE §9). */
 const NOT_VERBATIM = JSON.stringify([{ code: "custom", path: [], message: "STRUCTURE_REPAIR_NOT_VERBATIM" }]);
 
-async function repairStructure(request: ProviderCallRequest, unrepaired: ProviderStructureUnrepairedError,
+async function repairStructure(gateway: ProviderGateway, request: ProviderCallRequest, unrepaired: ProviderStructureUnrepairedError,
   route: StructureRepairRoute): Promise<ProviderCallResult> {
   const unaccepted = (): ProviderContentUnacceptedError => new ProviderContentUnacceptedError(unrepaired.attempts,
     unrepaired.rejected.parseStatus, unrepaired.rejected.parseError, unrepaired.lastRawArtifactRef, unrepaired.lastLedgerEntryRef);
+  /**
+   * Refused-repair salvage (B, spec §6 option iii): the structure-repair call did not do, so the ORIGINAL AI gets its one
+   * short follow-up, the same call's second POST on its own gateway (`structureFollowUp`). No follow-up planned: today's
+   * refusal. Every error of that POST is the original AI's own and passes through unchanged.
+   */
+  const followUp = async (): Promise<ProviderCallResult> => {
+    let planned: StructureFollowUp | null;
+    try {
+      planned = structureFollowUpFor(request, { rejected: unrepaired.rejected, rawArtifactRef: unrepaired.lastRawArtifactRef,
+        ledgerEntryRef: unrepaired.lastLedgerEntryRef, materialMarked: unrepaired.materialMarked });
+    } catch {
+      planned = null; // a throw while planning is no B, never a lost refusal (as Task 2's hook; pre-flight PF-S9)
+    }
+    if (planned === null) throw unaccepted();
+    return gateway.call({ ...request, structureRepairRouted: true, structureFollowUp: planned,
+      ...(planned.form === "FULL" ? { buildRepairPacket: unreadableReplyRepairPacket(request.packet) } : {}) });
+  };
   const classify = request.classifyContent!;
   const broken = unrepaired.rejected.rawText;
   let packet: PromptPacket;
@@ -576,12 +1050,13 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
     // (`@debateai/kernel` RUN_LEVEL_SPEND_STOP_CODES), among them (ruling R9, pre-flight PF-A48) the run's attempt ceiling,
     // which the repair gateway's `assertAttemptAllowed` raises unwrapped before it sends; and so does a stop of the run's
     // own machinery (STRUCTURE_REPAIR_PASSED_STOPS: the lane stopped, root 0's room kept). Every other
-    // way the repair did not do leaves today's refusal. (The list is read here, inside the function: ./index.js re-exports
-    // this file, so a module-level copy would read it before index.js has run.)
+    // way the repair did not do (refused, unavailable, cut off, a transport death) never leaves the wrapper: it goes on to
+    // the original AI's follow-up B. (The list is read here, inside the function: ./index.js re-exports this file, so a
+    // module-level copy would read it before index.js has run.)
     if (error instanceof TypedDomainError && ((RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(error.code)
       || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code)
       || (STRUCTURE_REPAIR_PASSED_STOPS as readonly string[]).includes(error.code))) throw error;
-    throw unaccepted();
+    return followUp();
   }
   return Object.freeze({
     ...unrepaired.reply,
@@ -603,8 +1078,10 @@ async function repairStructure(request: ProviderCallRequest, unrepaired: Provide
  * one), INSIDE every wrapper the runner adds per run — the candidate stamp, the sit-out book, the call lane, the
  * keep-alive, the cheaper-model fallback and the seat caller's backup. ProviderStructureUnrepairedError must never reach
  * those: the seat caller's switching rule (`seatFailureCause`, A16) and the fallbacks read typed codes, and an
- * unrepaired reply is neither a transport failure nor a money stop. Wrapped there, a call ends as today's
- * ProviderContentUnacceptedError (or a money stop, unchanged) whenever the repair does not do. The route's own gateway
+ * unrepaired reply is neither a transport failure nor a money stop. Wrapped there, the repair call's own failure never
+ * leaves the wrapper (only the run's own stops pass through as themselves): the original AI's follow-up B is sent instead,
+ * as that AI's own second POST, and its outcome is the call's (an accepted answer, today's
+ * ProviderContentUnacceptedError, or the original AI's own transport failure or stop, unchanged). The route's own gateway
  * is never wrapped in a route: a repair call is never routed again (`routable`).
  */
 export function withStructureRepair(gateway: ProviderGateway, route: StructureRepairRoute | null): ProviderGateway {
@@ -617,11 +1094,12 @@ export function withStructureRepair(gateway: ProviderGateway, route: StructureRe
   return Object.freeze({
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
       if (!routable(request)) return gateway.call(request);
+      const salvage = structureSalvageFor(request);
       try {
-        return await gateway.call({ ...request, structureRepairRouted: true });
+        return await gateway.call({ ...request, structureRepairRouted: true, ...(salvage === null ? {} : { structureSalvage: salvage }) });
       } catch (error) {
         if (!(error instanceof ProviderStructureUnrepairedError)) throw error;
-        return repairStructure(request, error, route);
+        return repairStructure(gateway, request, error, route);
       }
     }
   });

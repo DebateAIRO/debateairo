@@ -39,6 +39,8 @@ const CHOICE_KEYS = ["depth_mode", "scrutiny", "answer_length"] as const;
 const LENGTH_ROOM = { ...PLAIN_ROOM, answer_words: { short: 200, standard: 350, detailed: 1000 }, length_settings: true } as const;
 
 import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
+import { answerLengthHintVars } from "../../apps/ui/app/new/defaults.js";
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
 import chromeCatalog from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 import newDebateCatalog from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
@@ -157,7 +159,9 @@ describe("debate shape P2c — the /new controls", () => {
     expect(document.querySelector("#depthMode-hint")?.textContent).toBe(words["newDebate.depthModeFixedHelp"]);
     await selectValue("#scrutinyDepth", "exhaustive");
     expect(document.querySelector("#scrutinyDepth-hint")?.textContent).toBe(words["newDebate.scrutinyExhaustiveHelp"]);
-    expect(document.querySelector("#answerLength-hint")?.textContent).toBe(words["newDebate.answerLengthHint"]);
+    // LG-C Task 16 (pre-flight PF-C6.4): the hint carries the three numbers; no room words here, so the start values.
+    expect(document.querySelector("#answerLength-hint")?.textContent)
+      .toBe(t(words, "newDebate.answerLengthHint", answerLengthHintVars(null, "en")));
     // Accessibility (pre-flight PF-C34): SegmentedRow names its radiogroup by `${field}-label` and points every
     // pill at `${field}-hint`, so a screen reader hears "Answer length" and the hint on each pill.
     const group = document.querySelector<HTMLElement>('[role="radiogroup"][aria-labelledby="answerLength-label"]');
@@ -165,6 +169,14 @@ describe("debate shape P2c — the /new controls", () => {
     expect(document.getElementById(group!.getAttribute("aria-labelledby")!)?.textContent).toBe(words["newDebate.answerLength"]);
     expect([...document.querySelectorAll<HTMLButtonElement>('[data-field="answerLength"]')].map((pill) => pill.getAttribute("aria-describedby")))
       .toEqual(["answerLength-hint", "answerLength-hint", "answerLength-hint"]);
+  });
+
+  it("the answer-length hint names the room read's words (LG-C Task 16)", async () => {
+    mocks.getAskRoom.mockResolvedValue({ ...SHAPE_ROOM, answer_words: { short: 250, standard: 800, detailed: 2000 } });
+    await renderPage();
+    await click(".ndOptionsToggle");
+    expect(document.querySelector("#answerLength-hint")?.textContent)
+      .toBe("About 250, 800 or 2,000 words: a target, not a hard limit.");
   });
 
   it("sends Premium's choices with the ask", async () => {

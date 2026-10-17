@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
-import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/runner";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
-import { promptContractFingerprintText } from "@debateai/providers";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
 import {
   ENGINE_BAND_ORDER,
@@ -59,6 +58,9 @@ import {
  *
  * 2026-10-15: serve.synthesizer.v4 + length.v2 (owner-approved plain-words
  * wording) moved `composerContractHash` again, the same way.
+ *
+ * 2026-10-15: length guidance (LG-C) moved `judgeContractHash` and `conformanceContractHash` (and `mapContractHash`, which
+ * this seeder does not carry) the same way, with the same consequence for a standing ceremony database.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**
@@ -174,7 +176,8 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     // Debate shape (2026-10-13): the writer's seal is the current contract then its answer-length variant
     // (since 2026-10-15 v4 + length.v2).
     composerContractHash: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-    conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
+    // Length guidance (LG-C, 2026-10-15): the checker's seal is v2 then its length variant length.v1.
+    conformanceContractHash: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left
     // for a comment, string, regex or template literal to confuse.

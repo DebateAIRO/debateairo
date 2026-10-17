@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { replyLanguageExpectation } from "@debateai/kernel";
+import { promptContractFingerprintText } from "@debateai/providers";
 import {
+  MAP_CONTRACT_NAMES,
   MAP_INTERNAL_FIELD_NAMES,
   MAP_NOTES,
   mapAlsoRaisedOf,
@@ -18,6 +21,7 @@ import {
   mapMergedAnswer,
   mapNamesInternalWord,
   mapPromptContractHash,
+  mapPromptContracts,
   mapSnowballSpec,
   type MapChooseReply,
   type MapItemDraft,
@@ -202,6 +206,10 @@ describe("map internal words: a chosen answer or a key point that names a field 
 
 describe("map internal words: no prompt change", () => {
   it("keeps the map contract hash pinned", () => {
-    expect(mapPromptContractHash()).toBe("25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392");
+    // LG-C Task 14: today's 7 contracts + the 7 length variants; 25b4c106…9392 is history (register 14's map seal).
+    expect(mapPromptContractHash()).toBe("d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71");
+    // Review Focus 1: today's seven are byte for byte unchanged (their own fingerprint is still register 14's seal).
+    expect(createHash("sha256").update(MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(mapPromptContracts()[name]))
+      .join("\n---\n")).digest("hex")).toBe("25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392");
   });
 });

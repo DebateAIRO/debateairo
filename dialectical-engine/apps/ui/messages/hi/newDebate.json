@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "संपूर्ण",
   "newDebate.scrutinyExhaustiveHelp": "सबसे अधिक अतिरिक्त दौर, और संदेह वाले अधिक बिंदुओं पर।",
   "newDebate.answerLength": "उत्तर की लंबाई",
-  "newDebate.answerLengthHint": "लगभग 300, 700 या 1,500 शब्द: यह एक लक्ष्य है, सख़्त अधिकतम नहीं।",
+  "newDebate.answerLengthHint": "लगभग {short}, {standard} या {detailed} शब्द: यह एक लक्ष्य है, सख़्त अधिकतम नहीं।",
   "newDebate.answerLengthShort": "छोटा",
   "newDebate.answerLengthStandard": "मानक",
   "newDebate.answerLengthDetailed": "विस्तृत",
