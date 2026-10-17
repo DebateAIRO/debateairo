@@ -178,6 +178,7 @@ import {
   type EvaluatorRequest,
   type EvaluatorVerdict,
   type FactBundle,
+  type JudgesVerdict,
   type PreservedConditionMarkRecord,
   type ServeGateResult,
   type ServeNode,
@@ -207,6 +208,7 @@ import {
   ENGINE2_REDUCER_VERSION,
   pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
+  SERVED_ROOT_SELECTION_RULE_JUDGES,
   TypedDomainError,
   exhaustive,
   type CompositionBudgetTier,
@@ -4002,6 +4004,43 @@ export function selectServedRootByStrength<T extends { readonly nodeId: string }
   });
 }
 
+/**
+ * Engine 2 (spec 2026-10-15 §4.4; INTERFACE §9.5; R2b) — THE COMPARING JUDGES CHOOSE THE SERVED ROOT. Their verdict's
+ * winner (`deriveJudgesVerdict`: counted votes, ties by the honest final strength, then the lexicographic node id) is
+ * served, at its own honest final strength. The runner-up and the margin are the strongest OTHER servable root's, kept
+ * for the record only: the votes decided, so the margin may be negative. Engine 1 never calls it.
+ */
+export function selectServedRootByJudges<T extends { readonly nodeId: string }>(
+  servableRoots: readonly T[],
+  verdict: JudgesVerdict,
+  strengths: readonly { readonly nodeId: string; readonly strength: number }[]
+): ServedRootSelection<T> {
+  const root = servableRoots.find((candidate) => candidate.nodeId === verdict.winnerRootNodeId);
+  if (root === undefined) throw new TypedDomainError("SERVED_ROOT_JUDGES_WINNER_UNSERVABLE", verdict.winnerRootNodeId);
+  const byNodeId = new Map(strengths.map((row) => [row.nodeId, row.strength] as const));
+  const strengthOf = (nodeId: string): number => {
+    const strength = byNodeId.get(nodeId);
+    if (strength === undefined || !Number.isFinite(strength)) throw new TypedDomainError("SERVED_ROOT_STRENGTH_UNRESOLVED", nodeId);
+    return strength;
+  };
+  const servedStrength = strengthOf(root.nodeId);
+  const runnerUp = servableRoots
+    .filter((candidate) => candidate.nodeId !== root.nodeId)
+    .map((candidate) => ({ nodeId: candidate.nodeId, strength: strengthOf(candidate.nodeId) }))
+    .sort((left, right) => right.strength - left.strength
+      || (left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0))[0];
+  return Object.freeze({
+    rule: SERVED_ROOT_SELECTION_RULE_JUDGES,
+    root,
+    servedStrength,
+    runnerUp: runnerUp === undefined ? null : Object.freeze({ nodeId: runnerUp.nodeId, strength: runnerUp.strength }),
+    margin: runnerUp === undefined
+      ? Object.freeze({ kind: "ABSENT" as const, reason: "SINGLE_SERVABLE_ROOT" as const })
+      : Object.freeze({ kind: "MEASURED" as const, value: servedStrength - runnerUp.strength }),
+    tiebreak: runnerUp !== undefined && runnerUp.strength === servedStrength ? "LEXICOGRAPHIC_NODE_ID" : "NOT_APPLIED"
+  });
+}
+
 /** PANEL-01 rev3: budget records append without erasing prior honesty records. */
 export function preserveEnvelopeTerminalConditionMarkRecords(
   existing: readonly ConditionMarkRecord[],
@@ -4306,6 +4345,10 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   runBodyBudgetStop: EnvelopeStopKind | null;
   authoredMakerPositions: readonly MakerPositionDisclosureRoot[];
   servedRoot: MakerPositionDisclosureRoot;
+  /** The rule that chose `servedRoot` (engine 2: the judges'); absent: today's rule. */
+  servedRootRule?: ServedRootRule;
+  /** Engine 2: false when no judge's vote counted (the honest strengths chose); absent: true. (pre-flight PF-R2b2.1) */
+  judgesChose?: boolean;
   monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
   monoMakerRecords: readonly ConditionMarkRecord[];
   membersSatOut?: string | null;
@@ -4358,7 +4401,8 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   return Object.freeze({
     conditionMarks: Object.freeze(["UNSERVED-MAKER-POSITION" as const]),
     records: Object.freeze([
-      buildUnservedMakerPositionRecord(input.authoredMakerPositions, input.servedRoot)
+      buildUnservedMakerPositionRecord(input.authoredMakerPositions, input.servedRoot,
+        input.servedRootRule ?? SERVED_ROOT_SELECTION_RULE, input.judgesChose ?? true)
     ])
   });
 }
@@ -4443,6 +4487,12 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
    * ended because too few members were left to argue; absent or null on every other run (today's decision).
    */
   membersSatOut?: string | null;
+  /**
+   * Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' verdict, taken on this same decision's propagation; the
+   * served root and its disclosure then follow the judges (`selectServedRootByJudges`). Absent or null: today's
+   * selection by strength, byte for byte.
+   */
+  judgesVerdict?: JudgesVerdict | null;
 }>): MakerPositionServeDecision<T> {
   const membersSatOut = input.membersSatOut ?? null;
   const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
@@ -4478,14 +4528,20 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
       "Every authored maker position was excluded after cross-maker review transport exhaustion"
     );
   }
-  // T10: propagation picks the served root, configuration order does not.
-  const servedRootSelection = selectServedRootByStrength(servableMakerPositions, propagation.strengths);
+  // T10: propagation picks the served root, configuration order does not. Engine 2 (R2b): the comparing judges do.
+  const judgesVerdict = input.judgesVerdict ?? null;
+  const servedRootSelection = judgesVerdict === null
+    ? selectServedRootByStrength(servableMakerPositions, propagation.strengths)
+    : selectServedRootByJudges(servableMakerPositions, judgesVerdict, propagation.strengths);
   const servedRoot = servedRootSelection.root;
   const disclosure = buildMakerPositionDisclosure({
     effectiveMakerCount: input.effectiveMakerCount,
     runBodyBudgetStop: input.runBodyBudgetStop,
     authoredMakerPositions: input.authoredMakerPositions,
     servedRoot,
+    servedRootRule: servedRootSelection.rule,
+    // pre-flight PF-R2b2.1: false when no judge's vote counted (the honest strengths chose under the judges' rule).
+    ...(judgesVerdict === null ? {} : { judgesChose: judgesVerdict.winnerVotes > 0 }),
     monoMakerConditionMarks: input.monoMakerConditionMarks,
     monoMakerRecords: input.monoMakerRecords(servedRoot),
     ...(membersSatOut === null ? {} : { membersSatOut })
@@ -4503,24 +4559,33 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   });
 }
 
+// OWNER WORDING — approve before switch-on: the two judges' reasons below (engine 2) are option-1 drafts (O1 sheet).
 export function buildUnservedMakerPositionRecord(
   authoredMakerPositions: readonly MakerPositionDisclosureRoot[],
-  servedRoot: MakerPositionDisclosureRoot
+  servedRoot: MakerPositionDisclosureRoot,
+  rule: ServedRootRule = SERVED_ROOT_SELECTION_RULE,
+  judgesChose = true
 ): ConditionMarkRecord {
   const unserved = authoredMakerPositions.filter((root) => root.nodeId !== servedRoot.nodeId);
   if (unserved.length === 0) {
     throw new TypedDomainError("UNSERVED_MAKER_POSITION_UNRESOLVED", "No unserved maker position exists");
   }
   const unservedDescription = unserved.map((root) => `${root.maker} position ${root.nodeId}`).join(", ");
+  const served = `${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedDescription} ${unserved.length === 1 ? "remains" : "remain"} graph-visible but unserved`;
   return Object.freeze({
     mark: "UNSERVED-MAKER-POSITION",
     scope: "answer",
     subjectRef: servedRoot.nodeId,
-    reason: `The strongest post-exclusion maker root was served: ${servedRoot.maker} position ${servedRoot.nodeId}; ${unservedDescription} ${unserved.length === 1 ? "remains" : "remain"} graph-visible but unserved`,
+    // pre-flight PF-R2b2.1: the third sentence when no judge's vote counted.
+    reason: rule !== SERVED_ROOT_SELECTION_RULE_JUDGES
+      ? `The strongest post-exclusion maker root was served: ${served}`
+      : judgesChose
+        ? `The answer the judges chose was served: ${served}`
+        : `No judge's choice could be counted, so the answer whose case held up best was served: ${served}`,
     liftPath: unserved.length === 1
       ? "Serve the other maker root in a separately ruled answer"
       : "Serve another maker root in a separately ruled answer",
-    servedRootRule: SERVED_ROOT_SELECTION_RULE,
+    servedRootRule: rule,
     affectedNodeIds: Object.freeze([servedRoot.nodeId, ...unserved.map((root) => root.nodeId)])
   });
 }
@@ -11434,6 +11499,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  "JUDGES_VERDICT_INPUT_INVALID",
   // FW-B / F-I2: the judgement package's closed leg table refuses an undeclared
   // material name (packages/judgement/src/index.ts) on the way INTO the frame,
   // so the refusal travels the same path a schema failure does.
@@ -11612,6 +11678,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SEQUENCE_ALLOCATION_FAILED",
   "SERVED_NUMBER_NOT_FOUND",
   "SERVED_ROOT_JUDGEMENT_UNRESOLVED",
+  "SERVED_ROOT_JUDGES_WINNER_UNSERVABLE",
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
@@ -11701,6 +11768,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "VALUE_CRITERIA_EMPTY",
   "VALUE_OPTIONS_INSUFFICIENT",
   "VALUE_PHASE_NOT_READY",
+  "VERDICT_LABEL_BASIS_AMBIGUOUS",
   "VERDICT_LABEL_BASIS_UNRESOLVED",
   "VERDICT_LABEL_CONTROLS_INVALID",
   "VERDICT_LABEL_CONTROLS_PROVENANCE_MISSING",

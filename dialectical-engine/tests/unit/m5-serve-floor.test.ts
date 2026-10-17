@@ -37,7 +37,7 @@ describe("M5 · the floor is the label and the leading position of an answer no 
     expect(crashClass).toMatch(ENGINE_CODE);
   });
 
-  it.each(["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const)("keeps the label exactly as derived: %s", (label) => {
+  it.each(["SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT"] as const)("keeps the label exactly as derived: %s", (label) => {
     expect(serveFloorOf({ terminal: "COMPONENTS_ONLY", crashClass: "ENVELOPE_EXHAUSTED", label, leadingNodeId: LEADING }))
       .toMatchObject({ verdictState: label });
   });

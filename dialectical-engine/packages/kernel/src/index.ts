@@ -93,8 +93,14 @@ export type AbstentionKind = typeof ABSTENTION_KINDS[number];
  * (migrations). One declaration; every representation imports it.
  */
 export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
-/** The rule a NEW selection may record. The write vocabulary. */
-export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+/**
+ * Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' counted votes pick the served root; a tie, or no counted
+ * vote, goes to the higher honest final strength, then the lexicographic node id. A live rule beside today's: engine 1
+ * keeps recording SERVED_ROOT_SELECTION_RULE. Migration 0121_engine_verdict re-adds the DDL CHECK with it.
+ */
+export const SERVED_ROOT_SELECTION_RULE_JUDGES = "comparing-judges-votes-honest-strength-tiebreak" as const;
+/** The rules a NEW selection may record. The write vocabulary. */
+export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE | typeof SERVED_ROOT_SELECTION_RULE_JUDGES;
 
 /**
  * Rules that were lawful when older answers were sealed, and are therefore
@@ -113,6 +119,7 @@ export type RetiredServedRootRule = typeof RETIRED_SERVED_ROOT_RULES[number];
 /** Every value a sealed record may lawfully carry — the READ vocabulary. */
 export const SERVED_ROOT_RULE_HISTORY = Object.freeze([
   SERVED_ROOT_SELECTION_RULE,
+  SERVED_ROOT_SELECTION_RULE_JUDGES,
   ...RETIRED_SERVED_ROOT_RULES
 ] as const);
 export type ServedRootRuleHistory = ServedRootRule | RetiredServedRootRule;

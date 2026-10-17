@@ -15,6 +15,7 @@
  */
 import { TypedDomainError, type EngineAnswerLetter, type EngineQuestionKind } from "@debateai/kernel";
 import type { EngineLabel } from "@debateai/register";
+import type { VerdictLabelDerivation } from "./index.js";
 
 export const ENGINE_VERDICT_TRIGGERS = Object.freeze([
   "JUDGES_UNANIMOUS", "JUDGES_CONDITIONAL", "JUDGES_MAJORITY", "JUDGES_NO_MAJORITY", "JUDGES_UNAVAILABLE", "JUDGES_VOTES_IGNORED"
@@ -234,5 +235,20 @@ export function deriveJudgesVerdict(input: JudgesVerdictInput): JudgesVerdict {
     winnerVotes,
     questionKinds: Object.freeze(standing.flatMap(({ reply }) => reply === null ? [] : [reply.questionKind])),
     marks: Object.freeze(MARK_ORDER.filter((mark) => marks.has(mark)))
+  });
+}
+
+/**
+ * The judges' verdict as the label record every served answer, receipt and story reads (INTERFACE §9.5): rung 5 ("decided
+ * by the comparing judges"), its trigger, no basis absence and no LABEL-BASIS-INCOMPLETE mark (the judges' own marks are
+ * the runner's typed records). `deriveVerdictLabel` stays engine 1's and is not touched.
+ */
+export function verdictDerivationOfJudges(verdict: JudgesVerdict): VerdictLabelDerivation {
+  return Object.freeze({
+    label: verdict.label,
+    rung: 5,
+    trigger: verdict.trigger,
+    basisAbsence: Object.freeze([]),
+    marks: Object.freeze([])
   });
 }

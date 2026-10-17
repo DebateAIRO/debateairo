@@ -24,6 +24,7 @@ import {
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
@@ -1321,12 +1322,15 @@ export type VerdictLabelTrigger =
   | "MARGIN_WITHIN_GAMMA"
   | "DISAGREEMENT_AT_THRESHOLD"
   | "AT_OR_ABOVE_HIGH_CUT"
-  | "MID_BAND";
+  | "MID_BAND"
+  // Engine 2 (R2b): the comparing judges decided (rung 5).
+  | EngineVerdictTrigger;
 
 export interface VerdictLabelDerivation {
-  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
-  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them. */
-  readonly rung: 0 | 1 | 2 | 3 | 4;
+  /** SPLIT ("Contested", owner ruling E8) only from the comparing judges; the ladder never gives it. */
+  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
+  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2). */
+  readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
   readonly trigger: VerdictLabelTrigger;
   /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
   readonly basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
@@ -1421,9 +1425,16 @@ export function deriveHonestVerdict(input: {
   readonly usableBasis: boolean;
   readonly reasonRef: string;
   readonly labelBasis: VerdictLabelBasis | null;
+  /**
+   * Engine 2 (spec 2026-10-15 §4.4; R2b): the label the comparing judges' votes gave (`verdictDerivationOfJudges`),
+   * derived before synthesis exactly as the ladder's is. Exactly one of this and `labelBasis` names a servable answer's
+   * label (an answer that carries no label has neither: the unusable-basis return above comes first); absent on every
+   * engine-1 answer.
+   */
+  readonly judgesDerivation?: VerdictLabelDerivation | null;
 }):
   | {
-      readonly verdictState: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      readonly verdictState: VerdictLabelDerivation["label"];
       readonly confidenceBand: null;
       readonly unavailable: null;
       readonly derivation: VerdictLabelDerivation;
@@ -1436,6 +1447,16 @@ export function deriveHonestVerdict(input: {
     } {
   if (!input.usableBasis) {
     return { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef }, derivation: null };
+  }
+  const judgesDerivation = input.judgesDerivation ?? null;
+  if (judgesDerivation !== null) {
+    if (input.labelBasis !== null) {
+      throw new TypedDomainError(
+        "VERDICT_LABEL_BASIS_AMBIGUOUS",
+        "A servable answer's label comes from the ladder basis or from the comparing judges, never from both"
+      );
+    }
+    return { verdictState: judgesDerivation.label, confidenceBand: null, unavailable: null, derivation: judgesDerivation };
   }
   if (input.labelBasis === null) {
     throw new TypedDomainError(
@@ -1572,6 +1593,8 @@ export interface PersistServeInput {
    * DR-184 superseding path, which preserves the prior answer's projection.
    */
   readonly verdictLabelBasis?: VerdictLabelBasis | null;
+  /** Engine 2 (R2b): the comparing judges' label record instead of a ladder basis; absent on every engine-1 answer. */
+  readonly judgesDerivation?: VerdictLabelDerivation | null;
   /** DR-184: append a new immutable version of an already-served answer. */
   readonly supersedes?: { readonly answerId: string };
 }
@@ -2100,7 +2123,8 @@ export class ServeRepository {
         && input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
       reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`,
-      labelBasis: input.verdictLabelBasis ?? null
+      labelBasis: input.verdictLabelBasis ?? null,
+      judgesDerivation: input.judgesDerivation ?? null
     });
     // The mark and the label are ONE decision. A derivation that says the basis
     // was incomplete while the answer's marks stay silent is the facsimile shape
