@@ -29,6 +29,7 @@ import { pickComparingJudges, type ComparingJudgeReply, type ComparingJudgeSeat 
 import { deriveJudgesVerdict, type ConditionMarkRecord, type JudgesVerdict } from "@debateai/serve";
 import type { EngineSettings } from "@debateai/register";
 import { CALL_LANE_STOPPED } from "./call-scheduler.js";
+import { namedCodeDefect } from "./engine-investigations.js";
 
 /** Why no judge's vote decided (the reason code of VERDICT-JUDGES-UNAVAILABLE). */
 export const COMPARING_JUDGES_UNAVAILABLE_CAUSES = Object.freeze(["MONEY_STOP", "ONE_ANSWER", "NO_JUDGE_SEAT", "ALL_JUDGES_FAILED"] as const);
@@ -80,6 +81,11 @@ export type ComparingJudgesStepInput = Readonly<{
   moneyStopped: boolean;
   /** Votes an earlier copy of this run recorded. */
   recorded: readonly RecordedComparingJudgeVote[];
+  /**
+   * The run's recorded votes, read again once every judge answered and before any row is written (controller ruling
+   * R2b-B5.1): a row another copy stored meanwhile is that seat's vote. Absent: the rows read at the start stand.
+   */
+  readRecorded?: () => Promise<readonly RecordedComparingJudgeVote[]>;
   ask: (seat: ComparingJudgeSeat) => Promise<ComparingJudgeAsked>;
   /**
    * Records one vote. A vote another write stored first (ALREADY_PRESENT) hands back the STORED row, read back, which
@@ -114,15 +120,30 @@ export function endsThisCopy(error: unknown): boolean {
 }
 
 /**
- * A TypeError the code raised by name (its message is a code of two or more words, optionally `:<field path>`: the
- * length field's `LENGTH_FIELD_INVALID`, the material's `ENGINE_MATERIAL_INVALID:<field>`, ...) is a code defect: it
- * fails the debate, as A14's investigation step rules (`pointInvestigationFailureOutcome`, the same pattern, held equal
- * by `tests/unit/r2-judging-step.test.ts`). Decided by the message being a code, never by the class: fetch's own network
- * failure is a TypeError ("fetch failed") and stays a failed judge.
+ * A code defect inside a judge's call fails the debate: the one rule of engine 2's AI steps (`namedCodeDefect`, a
+ * TypeError whose message is a code, shared with A14's `pointInvestigationFailureOutcome`). The one intended difference
+ * from A14: DEBATE_MAKER_UNRESOLVED (`callSeat` found no eligible member) is a failed judge here, disclosed as
+ * VERDICT-JUDGE-MISSING, and effectively unreachable, since the judge's maker comes from `seatCaller.plan` on the same
+ * seat; A14, which has no such disclosure, rethrows it.
  */
-const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
 export function comparingJudgeCodeDefect(error: unknown): boolean {
-  return error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message);
+  return namedCodeDefect(error);
+}
+
+/**
+ * Controller carry 6 and ruling R2b-B5.1 (B5 fix 1): what a vote's write hands back to the step. ALREADY_PRESENT: the
+ * STORED row of the seat, read back; a stored row that cannot be read back is a code defect, never a reason to act on
+ * the unstored vote. INSERTED and RUN_ERASED: nothing (an erased run is ignored, as A14's investigation rows are).
+ */
+export async function storedVoteOnConflict(
+  outcome: "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED",
+  judgeSeat: number,
+  readBack: () => Promise<readonly RecordedComparingJudgeVote[]>
+): Promise<RecordedComparingJudgeVote | null> {
+  if (outcome !== "ALREADY_PRESENT") return null;
+  const stored = (await readBack()).find((row) => row.judgeSeat === judgeSeat);
+  if (stored === undefined) throw new TypeError("COMPARING_JUDGE_STORED_ROW_MISSING");
+  return stored;
 }
 
 /**
@@ -142,16 +163,18 @@ export function comparingJudgeVoteLettersStand(
 /**
  * The source the judges' material is built from (and R4's final writers read, Ruling PF-R43.1): only the servable
  * answers (letters stay fixed), every point ordered by THIS pass's honest final strength (`engineMaterialOf` sorts
- * strongest first). A point the standing projection hid (its review never landed; the source is built from A8's
- * link-weighted snapshot before the projection, as A14's investigator material is) has no propagated strength and sorts
- * last at the bottom of the scale; any other point without one is a code defect (controller carry 7, B5). A rival reply
- * is named only when it came from a servable answer (pre-flight PF-R2b3.19).
+ * strongest first). A point that did not propagate (the standing projection hid it, its base is null: no reduced
+ * judgement, or it abstained; `evaluate` gives such a node no strength) sorts last at the bottom of the scale, as A8's
+ * links and A14's material read it. Only a point that should have propagated (in the standing snapshot, a base, not
+ * abstained: `propagatableNodeIds`) and still has no strength is a code defect (controller carry 7; B5 fix 1, Important
+ * 1). A rival reply is named only when it came from a servable answer (pre-flight PF-R2b3.19).
  */
 export function comparingJudgesSourceOf(input: Readonly<{
   source: EngineMaterialSource;
   servableRootIds: ReadonlySet<string>;
   honestFinalStrength: ReadonlyMap<string, number>;
-  hiddenNodeIds: ReadonlySet<string>;
+  /** The standing snapshot's nodes with a base strength that did not abstain: each one must have propagated. */
+  propagatableNodeIds: ReadonlySet<string>;
 }>): EngineMaterialSource {
   const servableLetters = new Set(input.source.answers.filter((answer) => input.servableRootIds.has(answer.rootNodeId))
     .map((answer) => answer.letter));
@@ -160,7 +183,7 @@ export function comparingJudgesSourceOf(input: Readonly<{
     answers: Object.freeze(input.source.answers.filter((answer) => servableLetters.has(answer.letter))),
     points: Object.freeze(input.source.points.filter((point) => servableLetters.has(point.answerLetter)).map((point) => {
       const strength = input.honestFinalStrength.get(point.nodeId);
-      if (strength === undefined && !input.hiddenNodeIds.has(point.nodeId)) {
+      if (strength === undefined && input.propagatableNodeIds.has(point.nodeId)) {
         throw new TypeError("ENGINE_MATERIAL_INVALID:honestFinalStrength");
       }
       return Object.freeze({
@@ -248,19 +271,46 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
     });
     return Object.freeze({ verdict, countedBySeat: new Map(verdict.counted.map((entry) => [entry.seat, entry] as const)) });
   };
-  const counted = tallyOf(outcomes);
+  // Controller ruling R2b-B5.1 (B5 fix 1): a fresh row's `counted` is written from the FINAL tally. One seat's `counted`
+  // depends on the other seats' replies (OWN_MAKER reads the majority groups, built from every standing reply), so every
+  // row another copy stored while these judges were being asked (read again now, `readRecorded`) is the seat's vote
+  // before any fresh row is written.
+  const storedBySeat = new Map<number, RecordedComparingJudgeVote>();
+  if (input.readRecorded !== undefined && outcomes.some((outcome) => outcome.recorded === null)) {
+    for (const row of await input.readRecorded()) {
+      if (!recordedBySeat.has(row.judgeSeat)) storedBySeat.set(row.judgeSeat, row);
+    }
+  }
+  // Controller carry 6 (B5): a seat another write stored first decides by its STORED row, so the count, the ballots, the
+  // records and the writer's block all read it, exactly as a resumed copy would.
+  const finalOf = (): readonly Outcome[] => {
+    const asRecorded = (row: RecordedComparingJudgeVote): Outcome => Object.freeze({ seat: seatOfRow(row), recorded: row, asked: null });
+    const replaced = outcomes.map((outcome) => {
+      const stored = storedBySeat.get(outcome.seat.seat);
+      return stored === undefined ? outcome : asRecorded(stored);
+    });
+    const extra = [...storedBySeat.values()].filter((row) => !outcomes.some((outcome) => outcome.seat.seat === row.judgeSeat))
+      .map(asRecorded);
+    return Object.freeze([...replaced, ...extra].sort((left, right) => left.seat.seat - right.seat.seat));
+  };
+  let final = finalOf();
+  let tally = tallyOf(final);
 
   // Each new vote recorded once, in seat order, after the count (so `counted` and its reason are known).
   // The letter's root in THIS copy's servable answers, never a root read from a recorded row (ruling PF-R2b4.6).
   const rootOf = new Map(answers.map((answer) => [answer.letter, answer.rootNodeId] as const));
   const modelOf = new Map(input.candidates.map((candidate) => [candidate.providerRef, candidate.modelId] as const));
-  const storedBySeat = new Map<number, RecordedComparingJudgeVote>();
-  let asked = 0;
+  /** The seats this copy asked (a call was made); every other seat's vote is a stored row. */
+  const asked = outcomes.filter((outcome) => outcome.recorded === null).length;
   for (const outcome of outcomes) {
-    if (outcome.recorded !== null) continue;
-    asked += 1;
-    const reply = standingReplyOf(counted, outcome);
-    const entry = counted.countedBySeat.get(outcome.seat.seat);
+    if (outcome.recorded !== null || storedBySeat.has(outcome.seat.seat)) continue;
+    const reply = standingReplyOf(tally, outcome);
+    const entry = tally.countedBySeat.get(outcome.seat.seat);
+    /*
+     * The counted column is a hint; readers recount through deriveJudgesVerdict from the stored letters, groups and
+     * makers (controller ruling R2b-B5.1). Rows are immutable: a row an earlier copy wrote keeps the counted value of
+     * ITS tally, and a row written here before a later write in this loop answers ALREADY_PRESENT keeps this tally's.
+     */
     const vote: ComparingJudgeVoteRecord = Object.freeze({
       judgeSeat: outcome.seat.seat,
       maker: outcome.asked?.maker ?? outcome.seat.maker,
@@ -283,15 +333,10 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
     if (stored !== undefined && stored !== null) {
       if (stored.judgeSeat !== vote.judgeSeat) throw new TypeError("COMPARING_JUDGE_STORED_SEAT_MISMATCH");
       storedBySeat.set(vote.judgeSeat, stored);
+      final = finalOf();
+      tally = tallyOf(final);
     }
   }
-  // Controller carry 6 (B5): a seat another write stored first decides by its STORED row, read back, so the count, the
-  // ballots, the records and the writer's block all read it, exactly as a resumed copy would.
-  const final: readonly Outcome[] = storedBySeat.size === 0 ? outcomes : Object.freeze(outcomes.map((outcome) => {
-    const stored = storedBySeat.get(outcome.seat.seat);
-    return stored === undefined ? outcome : Object.freeze({ seat: seatOfRow(stored), recorded: stored, asked: null });
-  }));
-  const tally = storedBySeat.size === 0 ? counted : tallyOf(final);
   const { verdict } = tally;
   const seats = Object.freeze(final.map((outcome) => outcome.seat));
 

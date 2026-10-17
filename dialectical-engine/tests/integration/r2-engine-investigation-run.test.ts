@@ -75,8 +75,6 @@ const ENGINE: EngineSettings = engineSettingsOf({ ...engineVersionPolicyStartVal
   { makers: PANEL_REFS.length, mapOpening: false });
 /** The first non-root reviews answered "cannot assess" (non-root: the review offers the node's own sourced edges). */
 const CANNOT_ASSESS_REVIEWS = 3;
-/** The engine seal the investigator's calls carry (A13's pin; the code computes it, the prefix ties it to the brief). */
-const ENGINE_SEAL_PREFIX = "bb9e93c3";
 const INVESTIGATE_KEY = /^VERDICT:investigate:1(?::.+)?$/u;
 
 type Outcome = "holds" | "fails" | "dead_end" | "unusable";
@@ -224,8 +222,9 @@ async function expectInvestigated(run: Awaited<ReturnType<typeof investigationDe
   const call = calls[0]!;
   expect(call.call_site_key).toMatch(INVESTIGATE_KEY);
   expect(call.outcome).toBe("OK");
+  // The engine seal the investigator's calls carry is the code's; tests/unit/engine-contract-hash.test.ts pins its value
+  // (R2b B5 fix 1: a hard-coded prefix here went stale when B1 sealed verdict.judge.v1).
   expect(call.contract_hash).toBe(engineContractHash());
-  expect(call.contract_hash.startsWith(ENGINE_SEAL_PREFIX)).toBe(true);
   expect(call.model_role).toBe("REVIEWER");
   expect(gates.requests.filter((request) => recordContractOf(request) === POINT_INVESTIGATION_CONTRACT_ID)
     .map((request) => request.answer)).toEqual(["OK"]);

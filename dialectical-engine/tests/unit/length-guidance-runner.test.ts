@@ -75,7 +75,7 @@ describe("the runner's length call sites (source pins)", () => {
   const count = (text: string): number => RUNNER.split(text).length - 1;
 
   // Engine redesign R2a A14: the investigator's call is the ninth sized site.
-  it("nine guided bounds beside the definition, one per sized call site", () => {
+  it("eleven guided bounds: the definition and one per sized call site (ten)", () => {
     // R2a A14 added the investigator's site, R2b B5 the comparing judges'.
     expect(count("guidedCallBound(")).toBe(11);
     for (const site of [

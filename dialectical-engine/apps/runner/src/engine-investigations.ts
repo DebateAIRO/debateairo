@@ -124,6 +124,19 @@ export function engineInvestigatedStatuses(rows: readonly Readonly<{ nodeId: str
   return new Map(rows.flatMap(investigatedStatusEntry));
 }
 
+/** A TypeError the code raised by name: an upper-case code of two or more words, optionally `:<field path>`. */
+const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
+
+/**
+ * The ONE code-defect rule of engine 2's AI steps (R2b B5 fix 1): a TypeError whose message is a code the code itself
+ * named (`POINT_INVESTIGATION_*`, `LENGTH_FIELD_INVALID`, `ENGINE_MATERIAL_INVALID:<field>`, ...). The investigation step
+ * (`pointInvestigationFailureOutcome`) and the judging step (`comparingJudgeCodeDefect`) both read it. Decided by the
+ * message being a code, never by the class: fetch's own network failure is a TypeError ("fetch failed") and is no defect.
+ */
+export function namedCodeDefect(error: unknown): boolean {
+  return error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message);
+}
+
 /**
  * R2a final wave (Ruling W3): the maker that actually answered an investigation is neither the point's author's nor its
  * reviewer's. The seat caller's eligibility filter already keeps both off the call (a moved call too), so a breach is a

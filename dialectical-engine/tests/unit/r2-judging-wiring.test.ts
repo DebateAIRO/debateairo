@@ -105,10 +105,12 @@ describe("R2b: the controller's carries in the run body", () => {
     expect(call).not.toMatch(/\border\b/u);
   });
 
-  it("builds the material from this pass's strengths, refusing a missing one, over the projection's hidden points (carry 7)", async () => {
+  it("builds the material from this pass's strengths, refusing a missing one only where the point should have propagated (carry 7)", async () => {
     const body = judgesBlock(await readFile(RUNNER, "utf8"));
     expect(body).toContain("const servableSource = comparingJudgesSourceOf({");
-    expect(body).toContain("hiddenNodeIds: new Set(strengthDecision.standing.hiddenNodeIds)");
+    // B5 fix 1 (Important 1): only a node of the standing snapshot with a base that did not abstain must have propagated.
+    expect(body).toContain("propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes\n"
+      + "          .filter((node) => node.baseStrength !== null && node.abstained !== true).map((node) => node.nodeId))");
   });
 
   it("reads back the stored vote on ALREADY_PRESENT and hands it to the step (carry 6)", async () => {
@@ -116,8 +118,10 @@ describe("R2b: the controller's carries in the run body", () => {
     const recordAt = body.indexOf("record: async (vote) => {");
     expect(recordAt).toBeGreaterThan(0);
     const record = body.slice(recordAt);
-    expect(record).toContain("if (outcome !== \"ALREADY_PRESENT\") return null;");
-    expect(record).toContain("(await verdictVotes.readVerdictVotesForRun(run.runId)).find((row) => row.judgeSeat === vote.judgeSeat)");
+    expect(record).toContain("return storedVoteOnConflict(outcome, vote.judgeSeat, readRecordedVotes);");
+    // Controller ruling R2b-B5.1: the rows are read again after the judges answered, before any fresh row is written.
+    expect(body).toContain("readRecorded: readRecordedVotes,");
+    expect(body).toContain("(await verdictVotes.readVerdictVotesForRun(run.runId)).map(recordedVoteOf);");
   });
 
   it("leaves one content-free line for a judge whose call failed, never its message (carry 10)", async () => {

@@ -278,8 +278,8 @@ import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
   assertFairInvestigator, engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates,
-  investigatedStatusEntry, pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations,
-  type PointInvestigationRow
+  investigatedStatusEntry, namedCodeDefect, pointInvestigationRowOfStored, recordPointInvestigationRows,
+  runPointInvestigations, type PointInvestigationRow
 } from "./engine-investigations.js";
 import { engineMaterialGraphOf, engineMaterialInvestigationsOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
 import {
@@ -287,6 +287,7 @@ import {
   comparingJudgesSourceOf,
   endsThisCopy,
   runComparingJudges,
+  storedVoteOnConflict,
   type RecordedComparingJudgeVote
 } from "./engine-judging.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
@@ -565,15 +566,13 @@ export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "U
   if (error instanceof Error && POINT_INVESTIGATION_REPLY_REFUSALS.has(error instanceof TypedDomainError ? error.code : error.message)) {
     return "UNAVAILABLE";
   }
-  if (error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message)) return "RETHROW";
+  if (namedCodeDefect(error)) return "RETHROW";
   return "UNAVAILABLE";
 }
 
 /** The investigator's reply refusals (packages/judgement's reader): a reply, never a code defect. */
 const POINT_INVESTIGATION_REPLY_REFUSALS: ReadonlySet<string> = new Set(["POINT_INVESTIGATION_PARSE_FAILURE", "POINT_INVESTIGATION_SCHEMA_FAILURE"]);
 
-/** A TypeError the code raised by name: an upper-case code of two or more words, optionally `:<field path>`. */
-const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
 /** A content-free code (a domain code or a system one such as ECONNRESET). */
 const FAILURE_CODE_SHAPE = /^[A-Z][A-Z0-9_]{0,63}$/u;
 
@@ -9581,15 +9580,17 @@ export class WalkingSkeletonRunner {
         await readEngineReviews(this.pool, run.runId, graph.points.map((point) => point.nodeId)),
         engineMaterialInvestigationsOf(engineInvestigation?.rows ?? []));
       // Only servable answers are compared (letters stay fixed); every point is ordered by THIS pass's honest final
-      // strength (the propagation receipt is recorded after the label); a point the standing projection hid goes last,
-      // and any other point without a strength is a code defect (controller carry 7; pre-flight PF-R2b3.19). R4 (R4
+      // strength (the propagation receipt is recorded after the label); a point that did not propagate (hidden, no base,
+      // or abstained) goes last, and only a point that should have propagated and has no strength is a code defect
+      // (controller carry 7, B5 fix 1; pre-flight PF-R2b3.19). R4 (R4
       // pre-flight consistency; Ruling PF-R43.1): the servable source keeps its name, so R4's final writers' bundle reads
       // the very source the judges read (returned below as `materialSource`).
       const servableSource = comparingJudgesSourceOf({
         source,
         servableRootIds: servable,
         honestFinalStrength: strengthOf,
-        hiddenNodeIds: new Set(strengthDecision.standing.hiddenNodeIds)
+        propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes
+          .filter((node) => node.baseStrength !== null && node.abstained !== true).map((node) => node.nodeId))
       });
       const material = engineMaterialOf(servableSource);
       const judgeLength = lengthGuideOf("comparing_judge").length;
@@ -9620,6 +9621,8 @@ export class WalkingSkeletonRunner {
         conditional: row.choice?.conditional ?? null, sameAs: row.choice?.sameAs ?? [],
         questionKind: row.choice?.questionKind ?? null, reasons: row.choice?.reasons ?? null
       });
+      const readRecordedVotes = async (): Promise<readonly RecordedComparingJudgeVote[]> =>
+        (await verdictVotes.readVerdictVotesForRun(run.runId)).map(recordedVoteOf);
       const judged = await runComparingJudges({
         engine: engineTwo,
         material,
@@ -9630,7 +9633,9 @@ export class WalkingSkeletonRunner {
         })),
         rotationOffset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: planKey }),
         moneyStopped: runBodyBudgetStop !== null,
-        recorded: (await verdictVotes.readVerdictVotesForRun(run.runId)).map(recordedVoteOf),
+        recorded: await readRecordedVotes(),
+        // Controller ruling R2b-B5.1: read again after the judges answered, so every fresh row's counted is the final tally's.
+        readRecorded: readRecordedVotes,
         ask: async (judge) => {
           const judgeKey = comparingJudgeCallSiteKey(judge.seat);
           try {
@@ -9676,7 +9681,9 @@ export class WalkingSkeletonRunner {
         },
         // A10's VerdictVoteRecord is nested: a failed judge (no letter) records `choice: null` and JUDGE_FAILED. A seat
         // another write stored first (ALREADY_PRESENT; open question 8) hands back its STORED row, read back, which the
-        // step then counts in place of this copy's vote (controller carry 6). A RUN_ERASED is ignored, as A14's is.
+        // step then counts in place of this copy's vote (controller carry 6); one that cannot be read back is a code
+        // defect. A RUN_ERASED is ignored, as A14's is. The counted column is a hint; readers recount through
+        // deriveJudgesVerdict from the stored letters, groups and makers (controller ruling R2b-B5.1).
         record: async (vote) => {
           const choice = vote.chosenLetter === null || vote.chosenRootNodeId === null || vote.conditional === null
             || vote.questionKind === null || vote.reasons === null
@@ -9688,9 +9695,7 @@ export class WalkingSkeletonRunner {
             judge: Object.freeze({ maker: vote.maker, providerRef: vote.providerRef, modelId: vote.modelId }),
             rawArtifactRef: vote.rawArtifactRef, choice, counted: vote.counted, notCountedReason: vote.notCountedReason
           });
-          if (outcome !== "ALREADY_PRESENT") return null;
-          const stored = (await verdictVotes.readVerdictVotesForRun(run.runId)).find((row) => row.judgeSeat === vote.judgeSeat);
-          return stored === undefined ? null : recordedVoteOf(stored);
+          return storedVoteOnConflict(outcome, vote.judgeSeat, readRecordedVotes);
         }
       });
       // R4 (R4 pre-flight consistency; Ruling PF-R43.1): R4's final writers read the judges' own servable source and this

@@ -4,6 +4,7 @@ import {
   TypedDomainError,
   comparingJudgeCallSiteKey,
   debateRoleFromCallSiteKey,
+  engineMaterialOf,
   type EngineDebateMaterial,
   type EngineMaterialSource
 } from "@debateai/kernel";
@@ -23,11 +24,13 @@ import {
   comparingJudgeVoteLettersStand,
   comparingJudgesSourceOf,
   runComparingJudges,
+  storedVoteOnConflict,
   type ComparingJudgeAsked,
   type ComparingJudgeVoteRecord,
   type ComparingJudgesStepInput,
   type RecordedComparingJudgeVote
 } from "../../apps/runner/src/engine-judging.js";
+import { namedCodeDefect } from "../../apps/runner/src/engine-investigations.js";
 import {
   bodyCallMayMove,
   catchUpFloorWouldMove,
@@ -278,6 +281,71 @@ describe("the controller's carries on the judging step", () => {
     await expect(run()).rejects.toThrowError(new TypeError("COMPARING_JUDGE_STORED_SEAT_MISMATCH"));
   });
 
+  // Controller ruling R2b-B5.1 (B5 fix 1, Important 2): one seat's `counted` depends on the other seats' groups, so a fresh
+  // row is written from the FINAL tally, the stored rows of the other seats included.
+  describe("a fresh row's counted is the final tally's", () => {
+    const grouped = (seat: ComparingJudgeSeat, best: "A" | "B"): ComparingJudgeAsked => Object.freeze({ ...asked(seat, best),
+      reply: Object.freeze({ ...reply(best), sameAs: Object.freeze([Object.freeze(["A", "B"] as const)]) }) });
+    // Seat 1 groups A with B; seat 3 (DeepSeek, which argued A) votes B. Alone, nobody else names the pair, so seat 3 counts.
+    const ask = async (seat: ComparingJudgeSeat): Promise<ComparingJudgeAsked> =>
+      seat.seat === 1 ? grouped(seat, "A") : seat.seat === 2 ? asked(seat, "A") : asked(seat, "B");
+    // Another copy stored seat 2 meanwhile: A, with the same pair, so a majority names {A, B} and seat 3's B is its own maker's.
+    const storedSeat2: RecordedComparingJudgeVote = Object.freeze({ judgeSeat: 2, maker: "xiaomi", providerRef: "mimo",
+      modelId: "mimo-v3", rawArtifactRef: "stored-2", chosenLetter: "A", conditional: false,
+      sameAs: Object.freeze([Object.freeze(["A", "B"] as const)]), questionKind: "general", reasons: "Because A held up best." });
+    const seat3Of = (records: readonly ComparingJudgeVoteRecord[]) => records.find((vote) => vote.judgeSeat === 3);
+
+    it("counts seat 3 when no other row names the pair (the control)", async () => {
+      const { run, records } = step({ ask });
+      await run();
+      expect(seat3Of(records)).toMatchObject({ chosenLetter: "B", counted: true, notCountedReason: null });
+    });
+
+    it("reads the rows again before writing, and writes seat 3 as its own maker's vote", async () => {
+      const { run, records } = step({ ask, readRecorded: async () => [storedSeat2] });
+      const result = await run();
+      expect(records.map((vote) => vote.judgeSeat)).toEqual([1, 3]);
+      expect(seat3Of(records)).toMatchObject({ chosenLetter: "B", counted: false, notCountedReason: "OWN_MAKER" });
+      expect(result.verdict.counted[2]).toEqual({ seat: 3, counted: false, notCountedReason: "OWN_MAKER" });
+      expect(result.verdict.groups).toEqual([["A", "B"]]);
+    });
+
+    it("recounts after an ALREADY_PRESENT, so the seats written after it carry the final tally", async () => {
+      const records: ComparingJudgeVoteRecord[] = [];
+      const { run } = step({ ask, record: async (vote) => { records.push(vote); return vote.judgeSeat === 2 ? storedSeat2 : null; } });
+      const result = await run();
+      expect(records.map((vote) => vote.judgeSeat)).toEqual([1, 2, 3]);
+      expect(seat3Of(records)).toMatchObject({ counted: false, notCountedReason: "OWN_MAKER" });
+      expect(result.verdict.counted[2]).toEqual({ seat: 3, counted: false, notCountedReason: "OWN_MAKER" });
+    });
+
+    // Rows are immutable: a row an earlier copy wrote keeps ITS counted value. The step never reads that column (the
+    // recorded vote type has none); readers recount through deriveJudgesVerdict from the letters, groups and makers.
+    it("never reads a reused row's stored counted value: the verdict recounts it", async () => {
+      const staleRow = Object.freeze({ judgeSeat: 3, maker: "deepseek", providerRef: "ds", modelId: "deepseek-v4.1",
+        rawArtifactRef: "earlier-3", chosenLetter: "A" as const, conditional: false, sameAs: Object.freeze([]),
+        questionKind: "general" as const, reasons: "Because A held up best.", counted: true, notCountedReason: null });
+      const { run } = step({ recorded: [staleRow] });
+      const result = await run();
+      expect(result.verdict.counted[2]).toEqual({ seat: 3, counted: false, notCountedReason: "OWN_MAKER" });
+    });
+  });
+
+  it.each([
+    ["INSERTED", null],
+    ["RUN_ERASED", null]
+  ] as const)("hands nothing back after %s", async (outcome, expected) => {
+    expect(await storedVoteOnConflict(outcome, 2, async () => { throw new Error("never read"); })).toBe(expected);
+  });
+
+  it("hands back the STORED row on ALREADY_PRESENT, and refuses one that cannot be read back (a code defect)", async () => {
+    const stored: RecordedComparingJudgeVote = Object.freeze({ judgeSeat: 2, maker: "xiaomi", providerRef: "mimo", modelId: "m",
+      rawArtifactRef: null, chosenLetter: null, conditional: null, sameAs: Object.freeze([]), questionKind: null, reasons: null });
+    expect(await storedVoteOnConflict("ALREADY_PRESENT", 2, async () => [stored])).toBe(stored);
+    await expect(storedVoteOnConflict("ALREADY_PRESENT", 3, async () => [stored]))
+      .rejects.toThrowError(new TypeError("COMPARING_JUDGE_STORED_ROW_MISSING"));
+  });
+
   it("checks every letter of a vote against the debate's own answers before it is written", () => {
     const roots = new Map([["A", ROOT.A], ["B", ROOT.B]] as const);
     const vote = (over: Partial<ComparingJudgeVoteRecord>) => ({ chosenLetter: "A" as const, chosenRootNodeId: ROOT.A,
@@ -322,13 +390,25 @@ describe("the controller's carries on the judging step", () => {
     expect(result.verdict.marks).toEqual(["VERDICT-JUDGE-MISSING"]);
   });
 
-  it("names a code defect by the same rule as the investigation step's", () => {
+  it("names a code defect by the one rule the investigation step reads too", () => {
     for (const error of [new TypeError("LENGTH_FIELD_INVALID"), new TypeError("ENGINE_MATERIAL_INVALID:answers.0.words"),
       new TypeError("fetch failed"), new TypeError("terminated"), new TypedDomainError("PROVIDER_CALL_FAILED", "x"),
       new Error("LENGTH_FIELD_INVALID")]) {
       expect([error.message, comparingJudgeCodeDefect(error)])
         .toEqual([error.message, pointInvestigationFailureOutcome(error) === "RETHROW"]);
+      expect(comparingJudgeCodeDefect(error)).toBe(namedCodeDefect(error));
     }
+    // The one intended difference: a seat with no eligible member is a failed judge, disclosed as VERDICT-JUDGE-MISSING,
+    // while the investigation step (no such disclosure) rethrows it.
+    const noMember = new TypedDomainError("DEBATE_MAKER_UNRESOLVED", "JUDGE seat 1 has no member eligible to answer VERDICT:judge:1");
+    expect([comparingJudgeCodeDefect(noMember), pointInvestigationFailureOutcome(noMember)]).toEqual([false, "RETHROW"]);
+  });
+
+  it("records a seat with no eligible member as a failed judge (VERDICT-JUDGE-MISSING)", async () => {
+    const { run, records } = step({ answers: { haiku: "A", mimo: new TypedDomainError("DEBATE_MAKER_UNRESOLVED", "x"), ds: "A" } });
+    const result = await run();
+    expect(records[1]).toMatchObject({ judgeSeat: 2, notCountedReason: "JUDGE_FAILED", chosenLetter: null });
+    expect(result.verdict.marks).toEqual(["VERDICT-JUDGE-MISSING"]);
   });
 
   it("calls every judge as a JUDGE on the arguing's money, never moved to another maker", () => {
@@ -344,10 +424,14 @@ describe("the controller's carries on the judging step", () => {
 });
 
 /*
- * Controller carry 7 (B5): the judges' material is built from this pass's servable answers, a strength for every point
- * (a point the standing projection hid sorts last, by design; any other missing strength is a code defect).
+ * Controller carry 7 (B5) and B5 fix 1 (Important 1): the judges' material is built from this pass's servable answers. A
+ * point that did not propagate (hidden by the projection, a null base: no reduced judgement, or abstained) sorts last at
+ * the bottom of the scale; only a point that should have propagated and has no strength is a code defect.
  */
 describe("the judges' servable source", () => {
+  const point = (nodeId: string, answerLetter: "A" | "B" | "C", targetRef: string, fromRivalReply: "A" | "B" | "C" | null) =>
+    Object.freeze({ nodeId, answerLetter, fromRivalReply, text: nodeId, relation: "ATTACKS" as const, targetRef, restsOn: null,
+      status: "NONE" as const, reviewerReasons: Object.freeze([]), honestFinalStrength: 9, investigation: null });
   const source: EngineMaterialSource = Object.freeze({
     question: "Q?",
     answers: Object.freeze([
@@ -356,26 +440,33 @@ describe("the judges' servable source", () => {
       Object.freeze({ letter: "C" as const, rootNodeId: ROOT.C, words: "C.", caseText: null, assumptions: Object.freeze([]) })
     ]),
     points: Object.freeze([
-      { nodeId: "p-a", answerLetter: "A" as const, fromRivalReply: "C" as const },
-      { nodeId: "p-b", answerLetter: "B" as const, fromRivalReply: "A" as const },
-      { nodeId: "p-c", answerLetter: "C" as const, fromRivalReply: null },
-      { nodeId: "p-hidden", answerLetter: "A" as const, fromRivalReply: null }
-    ].map((point) => Object.freeze({ ...point, text: point.nodeId, relation: "ATTACKS" as const, targetRef: ROOT.A,
-      restsOn: null, status: "NONE" as const, reviewerReasons: Object.freeze([]), honestFinalStrength: 9, investigation: null })))
+      point("p-a", "A", ROOT.A, "C"), point("p-b", "B", ROOT.B, "A"), point("p-c", "C", ROOT.C, null),
+      point("p-hidden", "A", ROOT.A, null), point("p-null-base", "A", ROOT.A, null)
+    ])
   });
   const strengths = new Map([["p-a", 0.2], ["p-b", 0.3], ["p-c", 0.4]]);
+  // The standing snapshot's nodes with a base that did not abstain: neither the hidden point nor the null-base one.
+  const propagatable = new Set([ROOT.A, ROOT.B, ROOT.C, "p-a", "p-b", "p-c"]);
 
   it("keeps the servable answers only, this pass's strengths, and a rival reply only from a servable answer", () => {
     const built = comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
-      hiddenNodeIds: new Set(["p-hidden"]) });
+      propagatableNodeIds: propagatable });
     expect(built.answers.map((entry) => entry.letter)).toEqual(["A", "B"]);
-    expect(built.points.map((point) => [point.nodeId, point.honestFinalStrength, point.fromRivalReply])).toEqual([
-      ["p-a", 0.2, null], ["p-b", 0.3, "A"], ["p-hidden", 0, null]]);
+    expect(built.points.map((entry) => [entry.nodeId, entry.honestFinalStrength, entry.fromRivalReply])).toEqual([
+      ["p-a", 0.2, null], ["p-b", 0.3, "A"], ["p-hidden", 0, null], ["p-null-base", 0, null]]);
   });
 
-  it("refuses a point with no strength the projection did not hide (a code defect)", () => {
+  it("builds the material when a point that is not hidden never propagated (a null base): it sorts last", () => {
+    const built = comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B, ROOT.C]),
+      honestFinalStrength: new Map([...strengths, ["p-hidden", 0.1]]), propagatableNodeIds: new Set([...propagatable, "p-hidden"]) });
+    const material = engineMaterialOf(built);
+    expect(material.answers[0]!.objections.map((entry) => entry.pointRef)).toEqual(["p-a", "p-hidden", "p-null-base"]);
+  });
+
+  it("refuses a point that should have propagated and has no strength (a code defect)", () => {
     expect(() => comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
-      hiddenNodeIds: new Set() })).toThrowError(new TypeError("ENGINE_MATERIAL_INVALID:honestFinalStrength"));
+      propagatableNodeIds: new Set([...propagatable, "p-null-base"]) }))
+      .toThrowError(new TypeError("ENGINE_MATERIAL_INVALID:honestFinalStrength"));
   });
 });
 
@@ -401,6 +492,8 @@ describe("the review catch-up keeps the judges' floor (spec §4.7)", () => {
     expect(catchUpFloorWouldMove(kept, Object.freeze({ ...kept }))).toBe(false);
   });
 
+  // The catch-up's short-circuit itself is pinned on the source here (r2-judging-wiring) and driven end to end by B12's
+  // split-floor case on a database.
   it("knows a judges' floor by the rule its label receipt recorded", () => {
     expect(floorDecidedByJudges("comparing-judges-votes-honest-strength-tiebreak")).toBe(true);
     expect(floorDecidedByJudges("max-propagated-strength-lexicographic-tiebreak")).toBe(false);
