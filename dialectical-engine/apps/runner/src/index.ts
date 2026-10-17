@@ -50,7 +50,9 @@ import {
   type JudgementSelectionRule,
   type HonestSelectionRule,
   type EngineReviewStatus,
-  type WayOfKnowingDowngradeRecord
+  type WayOfKnowingDowngradeRecord,
+  PointInvestigationRepository,
+  type PointInvestigationSeat
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
@@ -63,6 +65,7 @@ import {
   readVerdictLabelControls,
   resolveScoringOperator,
   type AdaptiveStoppingControls,
+  type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
 import {
@@ -201,6 +204,7 @@ import {
   type LengthGuide,
   type LengthGuidanceStep,
   ENGINE2_REDUCER_VERSION,
+  pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -263,9 +267,15 @@ import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
+import {
+  engineFactsWithInvestigations, engineInvestigationCandidates, pointInvestigationRowOfStored, recordPointInvestigationRows,
+  runPointInvestigations, type PointInvestigationRow
+} from "./engine-investigations.js";
+import { engineMaterialGraphOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
 import {
-  engineCatchUpSelectionRule, engineLinkedGraph, engineOwnReplyEdgeIdsOf, engineUnassessedRecords, type EngineLinkedGraph
+  engineCatchUpSelectionRule, engineLinkedGraph, engineNodeFactsOf, engineOwnReplyEdgeIdsOf, engineUnassessedRecords,
+  pointInvestigationStandings, type EngineLinkedGraph, type EngineNodeFacts
 } from "./engine-links.js";
 import {
   createRunSitOutBook,
@@ -517,6 +527,18 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
     return Object.freeze({ kind: "RETHROW" as const });
   }
   return Object.freeze({ kind: "UNAVAILABLE" as const });
+}
+
+/**
+ * Engine 2 (spec §4.2b, E13): what one failed investigation call means. The keep-alive's refusal and a stopped lane
+ * leave as they arrived (the debate must make no further call); everything else, a reply still refused after LG-A's
+ * repairs, a vendor error or a spend refusal included, leaves the point at the reduced weight
+ * (INVESTIGATION_UNAVAILABLE). No investigation fails or stops the debate, and none is a run-body stop.
+ */
+export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "UNAVAILABLE" {
+  if (keepAliveStop(error)) return "RETHROW";
+  if (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED) return "RETHROW";
+  return "UNAVAILABLE";
 }
 
 /**
@@ -2163,13 +2185,20 @@ export function createPostgresReviewCatchUpDependencies(input: {
       const fullSnapshot = await resolveSnapshot(runId);
       const reviewedNodeIds = await judgements.readReviewedNodeIds(runId);
       // Engine 2 (spec §4.2a; INTERFACE §7.2): the catch-up scores the graph with the link rules, as the run did; the
-      // own-reply links are read from the graph (the save sites' record died with the run). A14 adds `investigated`.
+      // own-reply links are read from the graph (the save sites' record died with the run), and the investigations
+      // from their record (A14).
       const engine = engineOfRun(await budget.readPinnedBasis(runId));
       const linked = engine.engine !== 2 ? null : engineLinkedGraph({
         engine, snapshot: fullSnapshot, reviewedNodeIds,
         disputedNodeIds: await judgements.readDisputedNodeIds(runId),
         cannotAssessNodeIds: await judgements.readCannotAssessNodeIds(runId),
-        ownReplyEdgeIds: engineOwnReplyEdgeIdsOf(fullSnapshot)
+        ownReplyEdgeIds: engineOwnReplyEdgeIdsOf(fullSnapshot),
+        // A14: the run's investigation outcomes, read back (HOLDS = AGREE; FAILS = DISPUTE, its links still at the
+        // cannot-assess weight; a dead end stays cannot-assess).
+        investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationsForRun(runId))
+          .flatMap((row): (readonly [string, EngineReviewStatus])[] =>
+            row.result === "HOLDS" ? [[row.nodeId, "AGREE"] as const]
+              : row.result === "FAILS" ? [[row.nodeId, "DISPUTE"] as const] : []))
       });
       const standing = projectJudgedStanding(linked === null ? fullSnapshot : linked.snapshot,
         linked === null ? reviewedNodeIds : linked.reviewedNodeIds);
@@ -4753,6 +4782,7 @@ export class WalkingSkeletonRunner {
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
   readonly #mapChoices: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
+  readonly #pointInvestigations: Pick<PointInvestigationRepository, "recordPointInvestigation" | "readPointInvestigationsForRun">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -4782,6 +4812,7 @@ export class WalkingSkeletonRunner {
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
     this.#mapChoices = settings.mapChoices?.store ?? new MapChoiceRepository(pool);
+    this.#pointInvestigations = new PointInvestigationRepository(pool);
     const critique = settings.critique === undefined ? undefined
       : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
@@ -9180,6 +9211,166 @@ export class WalkingSkeletonRunner {
      */
     const panelRevisedDuringRun = runPanelRevisedReason(sitOut, configuredMakers.map((maker) => maker.providerRef));
     /**
+     * A10's PointInvestigationRecord is nested (`investigator`, `standings`); this is the one mapping. A row that never
+     * reached a reply (UNAVAILABLE, a money stop included) names the planned member's model id, as B5 does for a failed
+     * judge (`panelModelIds`, the run's discovered panel, apps/runner/src/index.ts:5824 (at 1bc8f549b)). The repository
+     * answers INSERTED / ALREADY_PRESENT / RUN_ERASED. A RUN_ERASED is deliberately ignored here (pre-flight PF-R2a8.7).
+     * An ALREADY_PRESENT (another write stored this point first; open question 8) hands back the STORED row, read back,
+     * which stands in for this copy's own in every later reading (A10's write-once rule, as the map's stored result
+     * does in `resolveShapeMap`); never this copy's fresh outcome.
+     */
+    const recordPointInvestigationRow = async (row: PointInvestigationRow): Promise<PointInvestigationRow | undefined> => {
+      const outcome = await this.#pointInvestigations.recordPointInvestigation({
+        runId: run.runId, nodeId: row.nodeId, investigationOrder: row.investigationOrder, result: row.result,
+        basis: row.basis,
+        investigator: row.maker === null || row.providerRef === null ? null : Object.freeze({
+          maker: row.maker, providerRef: row.providerRef,
+          modelId: row.modelId ?? panelModelIds.get(row.providerRef) ?? row.providerRef
+        }),
+        rawArtifactRef: row.rawArtifactRef,
+        standings: row.standingsMoved === null || row.leaderWithoutRootNodeId === null || row.leaderWithRootNodeId === null
+          ? null
+          : Object.freeze({ leaderWithoutRootNodeId: row.leaderWithoutRootNodeId,
+            leaderWithRootNodeId: row.leaderWithRootNodeId, moved: row.standingsMoved }),
+        content: row.content
+      });
+      if (outcome !== "ALREADY_PRESENT") return undefined;
+      const stored = (await this.#pointInvestigations.readPointInvestigationsForRun(run.runId))
+        .find((entry) => entry.nodeId.toLowerCase() === row.nodeId.toLowerCase());
+      // The stored row, under this copy's spelling of the node id (the ledger hands ids back lower-case).
+      return stored === undefined ? undefined : Object.freeze({ ...pointInvestigationRowOfStored(stored), nodeId: row.nodeId });
+    };
+    /**
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
+     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
+     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
+     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this.
+     */
+    const investigateCannotAssessPoints = async (
+      settings: EngineSettings,
+      facts: ReadonlyMap<string, EngineNodeFacts>,
+      materialisedSnapshot: EvaluationSnapshot
+    ): Promise<Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }>> => {
+      const rootIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
+      const ownNodeIds = new Set(authoredNodeList.map((node) => node.nodeId));
+      const cannotAssess = [...facts.values()]
+        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
+        .map((entry) => entry.nodeId);
+      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
+      if (lengthGuidance === null) {
+        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
+      }
+      const engineSeal = this.settings.engine?.engineContractHash;
+      if (engineSeal === undefined) {
+        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
+      }
+      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
+      // they order the candidates; the investigator's material carries no number.
+      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
+      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
+      const source = engineMaterialSourceOf(engineMaterialGraphOf({
+        question: run.questionLine,
+        rootCount,
+        authored: authoredNodes,
+        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
+        snapshot: materialisedSnapshot,
+        facts,
+        honestFinalStrength: honestScores
+      }), reviews, new Map());
+      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord });
+      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
+      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
+      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
+        member.maker !== authorMaker && member.maker !== reviewerMaker;
+      const investigated = await runPointInvestigations({
+        engine: settings,
+        facts,
+        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
+        spendStopped: runBodyBudgetStop !== null,
+        arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker)),
+        seatsFor: (candidate, callSiteKey) => {
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          return seatBook.reviewer.flatMap((seat) => {
+            if (seatSitsOut(seat)) return [];
+            const first = seatCaller.plan(seat, callSiteKey, { eligible: fair });
+            if (first === null) return [];
+            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
+            investigatorSeat.set(identity, seat);
+            return [identity];
+          });
+        },
+        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey }),
+        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
+        call: async ({ callSiteKey, investigator, candidate, material }) => {
+          const seat = investigatorSeat.get(investigator);
+          if (seat === undefined) return Object.freeze({ kind: "UNAVAILABLE" as const });
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
+          movedCallBars.set(callSiteKey, fair);
+          try {
+            const answered = await seatCaller.callSeat({
+              seat,
+              callSiteKey,
+              eligible: fair,
+              fair,
+              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey: memberCallSiteKey,
+                providerRef: member.providerRef,
+                contractHash: engineSeal,
+                bound: guidedCallBound(this.settings.judgeBound, "investigator", lengthGuidance),
+                material,
+                length: lengthGuide,
+                argumentLanguageName: run.argumentLanguageName,
+                ...shapeLanguageInput,
+              })
+            });
+            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
+              reply: answered.value.reply,
+              rawArtifactRef: answered.value.provenanceRef,
+              maker: answered.value.maker,
+              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
+              modelId: answered.value.model
+            }) });
+          } catch (error) {
+            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+        }
+      });
+      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
+      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
+      // weight on its score (pre-flight PF-R2a8.11).
+      return Object.freeze({
+        statuses: new Map([...investigated.facts].flatMap(([nodeId, entry]) =>
+          cannotAssess.includes(nodeId) && entry.status !== "CANNOT_ASSESS" ? [[nodeId, entry.status] as const] : [])),
+        facts: investigated.facts,
+        rows: investigated.rows
+      });
+    };
+    /** A14: the investigations' facts and rows, kept for the record after the serve decision (null: none ran). */
+    let engineInvestigation: Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }> | null = null;
+    if (engine.engine === 2 && effectiveMakerCount > 1) {
+      const investigationFacts = engineNodeFactsOf({
+        reviewedNodeIds: await this.#judgements.readReviewedNodeIds(run.runId),
+        disputedNodeIds: await this.#judgements.readDisputedNodeIds(run.runId),
+        cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId),
+        ownReplyEdgeIds
+      });
+      engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      for (const [nodeId, status] of engineInvestigation.statuses) engineInvestigated.set(nodeId, status);
+    }
+    /**
      * Engine 2 (spec §4.2a; INTERFACE §7.2): the link rules on the graph the answer is served from. Null on engine 1:
      * the decision below reads today's graph and seed, value for value. R2a interim (practice registers only): the
      * served root is `selectServedRootByStrength` over these honest final strengths and the label today's ladder; B5
@@ -9207,6 +9398,35 @@ export class WalkingSkeletonRunner {
       // Fix (d): the arguing that ended because too few members were left is not money, and says why.
       ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {})
     });
+    /**
+     * Engine 2 (spec §4.2b "Measured"; INTERFACE §8.6): the investigation rows, written now that the serve decision has
+     * named the served graph. "Standings moved" is read on that graph (the operator-resolved snapshot projected on the
+     * decision's own seed, BEFORE the link weights: projection and the link weights commute, A6's test) with every
+     * outcome applied, over the servable roots only, so the record names the leader the served propagation names. The
+     * rows as recorded (a row another write stored first stands in for this copy's own) then decide every later reading:
+     * the investigation's facts, its statuses and `engineInvestigated`.
+     */
+    if (engine.engine === 2 && engineInvestigation !== null && engineInvestigation.rows.length > 0) {
+      const investigation = engineInvestigation;
+      const servedGraph = projectJudgedStanding(operatorResolvedSnapshot, makerPositionServe.judgedStandingSeed).snapshot;
+      const servableRootIds = makerPositionServe.servableMakerPositions.map((root) => root.nodeId);
+      const recordedRows = await recordPointInvestigationRows({
+        rows: investigation.rows,
+        facts: investigation.facts,
+        standingsOf: (nodeId, finalFacts) => pointInvestigationStandings({
+          snapshot: servedGraph, facts: finalFacts, engine, nodeId, servableRootIds
+        }),
+        record: recordPointInvestigationRow
+      });
+      const recordedFacts = engineFactsWithInvestigations(investigation.facts, recordedRows);
+      const recordedStatuses = new Map(recordedRows.flatMap((row) => {
+        const status = recordedFacts.get(row.nodeId)?.status;
+        return status === undefined || status === "CANNOT_ASSESS" ? [] : [[row.nodeId, status] as const];
+      }));
+      engineInvestigation = Object.freeze({ statuses: recordedStatuses, facts: recordedFacts, rows: recordedRows });
+      engineInvestigated.clear();
+      for (const [nodeId, status] of recordedStatuses) engineInvestigated.set(nodeId, status);
+    }
     // Task M3 (spec §14.4.5): what the arguing left for the owner's disclosure
     // row, taken HERE, where the body ends and the serve decision reads the same
     // stop. Nothing from the serve gate on reads the stop itself

@@ -49,7 +49,8 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
   it("every judge input (panel, root, child leg, review) and root 0's room carry it, in one change", () => {
     const sites = [...source.matchAll(/argumentLanguageName: run\.argumentLanguageName,(\s*\.\.\.shapeLanguageInput,| questionLanguage: shapeLanguage,)?/gu)]
       .filter((match) => match.index > declared);
-    expect(sites).toHaveLength(5);
+    // Five judge inputs, and (engine redesign R2a A14) the investigator's: each one carries the lock.
+    expect(sites).toHaveLength(6);
     for (const site of sites) expect(site[1]).toBeDefined();
   });
 
