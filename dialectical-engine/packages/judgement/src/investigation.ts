@@ -64,6 +64,7 @@ export const POINT_INVESTIGATION_MATERIAL_FIELDS = Object.freeze([
   "question", "answer", "point", "target_point", "relation", "rests_on", "reviewer_reason", "length"
 ] as const);
 
+// OWNER WORDING — approve before switch-on (C4, Ruling (A13 Minors) 2): the two relation words are new text the AI reads.
 /** The relation, as one code word the AI reads in the `relation` field. */
 const RELATION_WORDS = Object.freeze({ ATTACKS: "attacks", SUPPORTS: "supports" } as const);
 

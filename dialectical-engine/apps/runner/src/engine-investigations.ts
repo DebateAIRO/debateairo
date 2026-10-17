@@ -7,7 +7,7 @@
  * honest score, then review order). The investigator is one AI of a maker that is neither the point's author's nor its
  * reviewer's, preferring a maker that argued no answer, in seat rotation. Its outcome is read as the review the point
  * lacked. Every qualifying point gets one row: HOLDS, FAILS, DEAD_END, or why it was not investigated
- * (INVESTIGATION_UNAVAILABLE, _SKIPPED, _CAPPED). Nothing here stops the debate.
+ * (INVESTIGATION_UNAVAILABLE, _SKIPPED, _CAPPED). No answer or vendor failure fails the debate; a code defect does.
  *
  * The runner passes in everything that touches the run (seats, the call, the standings, the record), so this file
  * holds the rules alone and is tested with scripted calls.

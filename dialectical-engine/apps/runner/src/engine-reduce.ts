@@ -70,6 +70,8 @@ export function reduceHonest<V extends HonestHeardVoice>(input: Readonly<{
     isAuthor: entry.judgementRef === input.authorJudgementRef, grade: entry.honest
   })), input.engine.scoring);
   if (score === null) throw new TypedDomainError("NO_USABLE_JUDGEMENTS", "The panel produced no reducible judgement");
+  // Mirrors engine 1's spread and family block in apps/runner/src/index.ts's panel reduction (`const dispersion =
+  // measureDispersion(` through `applyCorrelatedErrorDiscount(`), value for value; one shared helper after R2 (A4 ruling).
   const dispersion = measureDispersion(
     reducedMembers.map((entry) => ({ judgementRef: entry.judgementRef, tau: entry.tau })),
     {
@@ -97,6 +99,9 @@ export function reduceHonest<V extends HonestHeardVoice>(input: Readonly<{
   const selection = Object.freeze({
     kind: "SELECTED" as const, selectedJudgementRef: score.selectedJudgementRef, tau: score.score, selectionScore: score.score, rule: input.rule
   });
+  // The honest record keys each voice by `memberRole`, the maker. It relies on runJudgePanel (packages/judgement/src/
+  // s04.ts) refusing a member of the author's own maker (PRODUCER_GRADING_FORBIDDEN): no other voice shares the author's
+  // maker. If that refusal is ever dropped, honestPointScore's same-maker filter alone keeps such a voice out of the median.
   const honest: HonestDisagreementRecord = honestDisagreementRecord(
     reducedMembers.map((entry) => ({ memberRole: entry.memberRole, grade: entry.honest })), score);
   return Object.freeze({ reducedMembers, dispersion, weighted, selection, honest });

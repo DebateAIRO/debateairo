@@ -216,6 +216,7 @@ export function engineMaterialSourceOf(
       restsOn: null,
       status: graph.facts.get(point.nodeId)?.status ?? "NONE",
       reviewerReasons: Object.freeze([...(reviews.get(point.nodeId)?.reasons ?? [])]),
+      // A point with no honest strength yet sorts last (pre-flight PF-R2b3.19); B5 passes one for every point.
       honestFinalStrength: graph.honestFinalStrength.get(point.nodeId) ?? 0,
       investigation: investigations.get(point.nodeId) ?? null
     })];
@@ -223,7 +224,11 @@ export function engineMaterialSourceOf(
   return Object.freeze({ question: graph.question, answers: Object.freeze(answers), points: Object.freeze(points) });
 }
 
-/** The full source: every point's review (reasons and makers) and every recorded investigation, read; the rest in memory. */
+/**
+ * The full source: every point's review (reasons and makers) and every recorded investigation, read; the rest in memory.
+ * No caller yet in R2a: kept on purpose (plan deviation 18) as the one door R2b's judges and R4's writer read the
+ * material through.
+ */
 export async function readEngineMaterialSource(input: Readonly<{ pool: Pool; runId: string; graph: EngineMaterialGraph }>):
   Promise<EngineMaterialSource> {
   const reviews = await readEngineReviews(input.pool, input.runId, input.graph.points.map((point) => point.nodeId));

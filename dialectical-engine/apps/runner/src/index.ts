@@ -532,9 +532,9 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
 
 /**
  * Engine 2 (spec §4.2b, E13): what one failed investigation call means. The keep-alive's refusal and a stopped lane
- * leave as they arrived (the debate must make no further call); everything else, a reply still refused after LG-A's
- * repairs, a vendor error or a spend refusal included, leaves the point at the reduced weight
- * (INVESTIGATION_UNAVAILABLE). No investigation fails or stops the debate, and none is a run-body stop.
+ * leave as they arrived (the debate must make no further call). No answer or vendor failure fails the debate: a reply
+ * still refused after LG-A's repairs, a vendor error or a spend refusal leaves the point at the reduced weight
+ * (INVESTIGATION_UNAVAILABLE), and none is a run-body stop. A code defect does fail it (below).
  */
 export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "UNAVAILABLE" {
   if (keepAliveStop(error)) return "RETHROW";

@@ -931,7 +931,8 @@ export class Judge {
    * repair order and the salvage apply: the code fixer; on an unreadable reply, A1's code rescue, then one
    * structure-repair call, then B's short PATCH follow-up to the original AI (never a full re-ask); on a content
    * refusal, one follow-up (pre-flight PF-R2a8.14). A reply still refused after that is
-   * POINT_INVESTIGATION_SCHEMA_FAILURE; the runner reads every failure as INVESTIGATION_UNAVAILABLE and the debate goes on.
+   * POINT_INVESTIGATION_SCHEMA_FAILURE. No answer or vendor failure fails the debate (the runner reads it as
+   * INVESTIGATION_UNAVAILABLE and goes on); a code defect does (a named TypeError, rethrown by the runner's rule).
    */
   async investigatePoint(input: PointInvestigationInput): Promise<InvestigatedPoint> {
     const framed = buildFramedPrompt({

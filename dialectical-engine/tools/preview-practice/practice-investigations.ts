@@ -2,10 +2,10 @@
  * Preview practice, debate mode (R2, E12, E13; INTERFACE §15.4): the "cannot assess" reviews and the investigations.
  *
  * Plain words: how many points a reviewer could not assess, and what was done about them: how many one more AI was asked
- * to look into, and what it found (the point holds, fails, or is still a dead end); how many could not be looked into (the
- * call failed or the money had run out, no AI of another maker was left, the debate's cap was reached; an answer itself
- * is never investigated) (pre-flight PF-R2a10.7); how many investigations changed which answer
- * leads; and their money and time. Counts only, never a text. A debate on engine 1 runs no investigation: only its
+ * to look into ("asked"), and what it found (the point holds, fails, or is still a dead end) or that its answer was
+ * unavailable (the call failed, or the money had run out before it); how many were not asked (no AI of another maker
+ * was left, or the debate's cap was reached; an answer itself is never investigated) (pre-flight PF-R2a10.7); how many
+ * investigations changed which answer leads; and their money and time. Counts only, never a text. A debate on engine 1 runs no investigation: only its
  * "cannot assess" count is not zero. What the weight of a "cannot assess" link does is measured by the `rescore` mode.
  */
 import type { Pool } from "pg";

@@ -339,7 +339,9 @@ each debate with engine 2's honest scores and link rules, a "cannot assess" link
 with the investigations' outcomes applied and not, and writes `rescore.json` (every row) and `rescore.md` (counts and
 letters only): which answer leads by honest final strength, the gaps, whether the lead differs from what engine 1 served
 and from the start setting, and per debate how many investigations held, failed or stayed a dead end (`holds/fails/dead
-end`: what the "applied" rows applied). The comparing judges are not asked (that needs AI calls). A transcript written before R2 has no
+end`: what the "applied" rows applied). At 1.0 a point an investigation found to hold and a dead end weigh the same (both
+links at full weight); only a point found to fail still weighs less there (its disputed score). The comparing judges are not
+asked (that needs AI calls). A transcript written before R2 has no
 engine graph: it is rebuilt from its answer and its calls when it can be, else listed as
 `PRACTICE_RESCORE_INPUT_INCOMPLETE <what>`. `--engine-policy FILE` picks the settings the sweep starts from (default
 `tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
