@@ -23,6 +23,7 @@ import {
   parseStructuredArtifact,
   REVIEW_ARTIFACT_READING,
   parsedStructuredRepairs,
+  type JudgeAssessment,
   type JudgeLeg
 } from "@debateai/judgement";
 import {
@@ -351,6 +352,29 @@ function structuredReadingOf(callSiteKey: string, content: string, ending: Model
     }
     default: return null;
   }
+}
+
+/** R2 (E12): an author's or a grader's accepted reply, read again exactly as its step read it. */
+export type PracticeJudgeReading = Readonly<{ statement: string | null; assessment: JudgeAssessment }>;
+
+/**
+ * The statement (author calls only) and the seven-measure assessment of an accepted JUDGE or PANEL reply, through the
+ * step's own reader and repairs (`structuredReadingOf`); null for any other call or a reply that reader refuses.
+ */
+export function practiceJudgeReadingOf(callSiteKey: string, content: string, finishReason: unknown): PracticeJudgeReading | null {
+  const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
+  const family = callFamilyOf(callSiteKey);
+  if (family === "JUDGE") {
+    const read = parseStructuredArtifact(content, judgeArtifactSchema, ending, JUDGE_ARTIFACT_READING);
+    if (read.kind !== "PARSED") return null;
+    const { statement, steelman, critic, evidence, context, fallacy } = read.value;
+    return Object.freeze({ statement, assessment: Object.freeze({ steelman, critic, evidence, context, fallacy }) });
+  }
+  if (family === "PANEL") {
+    const read = parseStructuredArtifact(content, judgeAssessmentSchema, ending, JUDGE_ARTIFACT_READING);
+    return read.kind === "PARSED" ? Object.freeze({ statement: null, assessment: read.value }) : null;
+  }
+  return null;
 }
 
 /**

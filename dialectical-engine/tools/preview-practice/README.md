@@ -231,6 +231,13 @@ deleted a moment later), and it holds one JSON object:
 - `unavailable`: what the file could not hold and why (for example: the site's reader lists only positions that got a
   judgement, so a position with none is seen only in `attempts`).
 
+`transcript.json` also holds `structure.engineGraph` (R2, both engines): every point the debate argued, the hidden
+ones too; every link with the bearing its reviewer measured (null when not measured) and whether it is a cross-reply's
+own support of its position; every review; every grader's own seven measures (`voices`, the author marked); each
+investigation's result; whether engine 2's dispute factor lowered each point's score; and the base and final strengths
+the engine served. It is what the `rescore` mode reads (no AI call). A grader reply its step's reader could not read
+again is listed in `unreadVoices`, and `rescore` then leaves that debate out and says why.
+
 Nothing is cut and model text is not blanked (the 64 KiB cap and the redaction of `report.json` do not apply). As a
 safety net, every string still goes through the named key shapes (a PEM block, a bearer or authorization header, a
 vendor key, a JWT, a `secret=`-style pair): the practice prints whether that blanked anything (`transcript: the

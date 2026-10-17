@@ -26,6 +26,7 @@ import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegis
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
+import type { TranscriptEngineGraph } from "../../tools/preview-practice/practice-engine-graph.js";
 import { PRACTICE_LANGUAGE_DRY_REWRITES, practiceLanguageDryReading } from "../../tools/preview-practice/practice-language.js";
 import { PRACTICE_LANGUAGE_CASES, PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 import { startPreviewGateStubs, stubChatBody, stubMapContent, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
@@ -747,7 +748,7 @@ describe("preview practice: debate mode", () => {
       attempts: { sequence: number; providerRef: string; model: string; maker: string | null; family: string; outcome: string;
         replyForm: string | null; prompt: { messages: unknown[] } | null; reply: { content: string } | null;
         parse: { status: string | null } }[];
-      structure: { answer: { nodes?: unknown[] } | null; story: { outcome: string } | null };
+      structure: { answer: { nodes?: { node_id: string }[] } | null; story: { outcome: string } | null; engineGraph?: TranscriptEngineGraph };
       unavailable: string[];
     };
     expect(transcript.schema).toBe("preview-practice-transcript-v1");
@@ -777,6 +778,25 @@ describe("preview practice: debate mode", () => {
     expect(text).not.toContain(env.PRACTICE_DEEPINFRA_SOCKET);
     expect(text).not.toContain(env.PRACTICE_ANTHROPIC_SOCKET);
     expect(text).not.toContain("REDACTED");
+    // R2 (E12): the whole graph, read from the throwaway database before it went.
+    const graph = transcript.structure.engineGraph!;
+    expect(graph.engine).toBe(1);
+    const served = new Set(Object.keys(graph.served.finalStrength));
+    for (const node of transcript.structure.answer!.nodes!) expect(served.has(node.node_id)).toBe(true);
+    expect(graph.nodes.length).toBeGreaterThanOrEqual(served.size);
+    const rootIndexes = graph.nodes.filter((node) => node.kind === "ROOT").map((node) => node.rootIndex).sort((a, b) => a - b);
+    expect(rootIndexes).toEqual(rootIndexes.map((_, index) => index));
+    expect(graph.served.servedRootNodeId).not.toBeNull();
+    // Every judged node has its author's voice; every grader voice is another maker's.
+    for (const node of graph.nodes.filter((entry) => graph.served.baseStrength[entry.nodeId] !== undefined)) {
+      const voices = graph.voices.filter((voice) => voice.nodeId === node.nodeId);
+      expect(voices.filter((voice) => voice.isAuthor)).toHaveLength(1);
+      for (const voice of voices.filter((entry) => !entry.isAuthor)) expect(voice.maker).not.toBe(node.authorMaker);
+    }
+    expect(graph.unreadVoices).toEqual([]);
+    expect(graph.reviews.length).toBeGreaterThan(0);
+    // Pre-flight PF-R2a2.9: engine 1 never applies the dispute factor.
+    expect(graph.nodes.some((node) => node.disputeFactorApplied)).toBe(false);
   }, 600_000);
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
@@ -1041,7 +1061,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(storytellerAlsoRaised(stubs.requests)).toBe(0);
     const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string }; structure: object };
     expect(transcript.run.registerVersion).toBe("5");
-    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story"]);
+    // R2 (E12): a served run always carries the engine graph.
+    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story", "engineGraph"]);
   }, 600_000);
 
   it("refuses a malformed --shape-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched", async () => {
