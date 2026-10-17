@@ -361,6 +361,33 @@ engine graph: it is rebuilt from its answer and its calls when it can be, else l
 `tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
 a debate's served numbers could not be given back, 30 when nothing could be rescored.
 
+### The judges' order (judge-order mode, R2b, owner ruling D3)
+
+Do the comparing judges lean on the order they read the answers in? `judge-order` takes saved engine-2 debates (debate
+mode with `--transcript`; their `transcript.json` holds the judges' recorded votes) and asks each judge that voted the
+very prompt it was sent, once more, with the answers in reverse order (each keeps its letter):
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --transcripts "$P" --out "$P/judge-order" \
+  --settings "$S" --gate-status-deepinfra "$D" --gate-status-anthropic "$A"
+```
+
+It spends real money: one judge call per recorded vote (about half a cent to a cent each), two with `--control`, which
+also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time. Spend
+stays inside the owner's test budget in force that day, and the paid run waits for the owner's go. `--dry` answers from
+a script (every scripted judge picks the first answer shown) and spends nothing:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --dry --transcripts "$P" --out "$P/judge-order-dry"
+```
+
+Per maker of the judge, `report.md` gives: the flip rate (the choice changed when the order was reversed), the same with
+the order unchanged (`--control`), how often the choice was among the longest answers shown (both orders) beside the
+rate chance alone would give, and how often the judge called its choice conditional (both orders). An answer's length
+is the words of its answer, its case and its supporting points. Counts and codes only. These numbers go to the owner
+before any rule that asks the judges in both orders; nothing here changes how a debate is judged, and `rescore` never
+runs it.
+
 ### Tokens and words per AI and step (every debate, length guidance LG-B)
 
 `report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
@@ -1263,6 +1290,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   what was done about them).
 - `practice-judges.ts`: the report's comparing judges block (`judgeVotes`, `labels`, `judgesSeconds`,
   `conditionalWinner`, R2).
+- `practice-judge-order.ts`: the judges' order practice (D3).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
@@ -1293,6 +1321,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-language.test.ts`,
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
+  `tests/unit/r2-practice-judge-order.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/unit/preview-practice-pins.test.ts`,
   `tests/unit/practice-story-length.test.ts`,

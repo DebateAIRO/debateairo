@@ -50,6 +50,36 @@ import { practiceTryTier } from "./practice-tokens.js";
 export const PRACTICE_TRANSCRIPT_SCHEMA = "preview-practice-transcript-v1";
 export const PRACTICE_TRANSCRIPT_FILE = "transcript.json";
 
+/**
+ * Engine redesign R2b (B11b, D3): the comparing judges' recorded votes, content-free columns only (the reasons are
+ * encrypted content and are not needed): the judges' order practice re-asks each judge from the saved transcript, after
+ * the throwaway database is gone. `counted` / `not_counted_reason` are the stored hint, kept as recorded; nothing reads
+ * them as which votes counted (controller ruling R2b-B5.1: a reader that needs that recounts with recountJudgesVotes).
+ */
+export const PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL = `SELECT judge_seat, maker, provider_ref, model_id, chosen_letter, conditional,
+       counted, not_counted_reason, question_kind, same_as FROM ledger.verdict_vote WHERE run_id=$1 ORDER BY judge_seat`;
+
+export type TranscriptJudgeVote = Readonly<{
+  seat: number; maker: string; providerRef: string; modelId: string; letter: string | null; conditional: boolean | null;
+  /** The stored hint as recorded (ruling R2b-B5.1: never read as which votes counted). */
+  counted: boolean; notCountedReason: string | null; questionKind: string | null; sameAs: readonly (readonly string[])[];
+}>;
+
+/** The run's recorded votes in seat order (none on engine 1, or when no judge was seated). */
+export async function readTranscriptJudgeVotes(pool: Pick<Pool, "query">, runId: string): Promise<readonly TranscriptJudgeVote[]> {
+  const rows = (await pool.query<{ judge_seat: number; maker: string; provider_ref: string; model_id: string;
+    chosen_letter: string | null; conditional: boolean | null; counted: boolean; not_counted_reason: string | null;
+    question_kind: string | null; same_as: unknown }>(PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL, [runId])).rows;
+  return Object.freeze(rows.map((row) => Object.freeze({
+    seat: row.judge_seat, maker: row.maker, providerRef: row.provider_ref, modelId: row.model_id, letter: row.chosen_letter,
+    conditional: row.conditional, counted: row.counted, notCountedReason: row.not_counted_reason, questionKind: row.question_kind,
+    sameAs: Object.freeze(Array.isArray(row.same_as)
+      ? row.same_as.filter((group): group is string[] => Array.isArray(group) && group.every((letter) => typeof letter === "string"))
+        .map((group) => Object.freeze([...group]))
+      : [])
+  })));
+}
+
 /** One ledger row of a model call, as stored (ledger.ledger_entry). */
 export type TranscriptLedgerRow = Readonly<{
   sequence: string | number;
@@ -216,6 +246,8 @@ export type PracticeTranscript = Readonly<{
      * propagation (then `unavailable` says so).
      */
     engineGraph?: TranscriptEngineGraph;
+    /** Engine 2 only (B11b, D3): the comparing judges' recorded votes; absent when the run recorded none (today's keys). */
+    judgeVotes?: readonly TranscriptJudgeVote[];
   }>;
   /** What this file could not hold, and why. */
   unavailable: readonly string[];
@@ -408,6 +440,7 @@ export function buildPracticeTranscript(input: Readonly<{
   unavailable: readonly string[];
   map?: unknown;
   engineGraph?: TranscriptEngineGraph;
+  judgeVotes?: readonly TranscriptJudgeVote[];
   now?: Date;
 }>): PracticeTranscript {
   const bytes = (text: string | null | undefined) => (text === null || text === undefined ? 0 : Buffer.byteLength(text, "utf8"));
@@ -426,7 +459,8 @@ export function buildPracticeTranscript(input: Readonly<{
     attempts: input.attempts,
     structure: Object.freeze({ answer: input.answer, inspection: input.inspection, story: input.story,
       ...(input.map === undefined ? {} : { map: input.map }),
-      ...(input.engineGraph === undefined ? {} : { engineGraph: input.engineGraph }) }),
+      ...(input.engineGraph === undefined ? {} : { engineGraph: input.engineGraph }),
+      ...(input.judgeVotes === undefined || input.judgeVotes.length === 0 ? {} : { judgeVotes: input.judgeVotes }) }),
     unavailable: Object.freeze([...input.unavailable])
   });
 }
@@ -532,7 +566,12 @@ export async function recordPracticeTranscript(input: Readonly<{
   } catch (error) {
     unavailable.push(`structure.engineGraph: ${practiceUnavailableName(error)}`);
   }
+  // Engine redesign R2b (B11b, D3): the judges' votes, read before the database goes. A read that breaks costs only them.
+  let judgeVotes: readonly TranscriptJudgeVote[] = [];
+  try { judgeVotes = await readTranscriptJudgeVotes(input.pool, input.run.runId); } catch (error) {
+    unavailable.push(`structure.judgeVotes: ${practiceUnavailableName(error)}`);
+  }
   const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable,
-    ...(input.map === undefined ? {} : { map }), ...(engineGraph === null ? {} : { engineGraph }) });
+    ...(input.map === undefined ? {} : { map }), ...(engineGraph === null ? {} : { engineGraph }), judgeVotes });
   return Object.freeze({ ...writePracticeTranscript(input.directory, transcript), attempts: attempts.length });
 }
