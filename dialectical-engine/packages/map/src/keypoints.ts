@@ -1,6 +1,6 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { mapItemsById, mapKeyPoint, mapMergedAnswer } from "./items.js";
-import type { MapMergeReply } from "./replies.js";
+import type { MapMergeReply, MapMergeReplyV2 } from "./replies.js";
 import { mapNormaliseText } from "./text.js";
 import type { MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem } from "./types.js";
 
@@ -46,7 +46,8 @@ export function mapCodeMerge(items: readonly MapItem[]): MapMergedMap {
  * Ruling T7-PRIV: nothing the merger named survives as an id. Its key_point_id and answer_id stay in its raw reply only,
  * and a member id that is not one of the items is dropped (the check refuses one; this holds for any reply).
  */
-export function mapApplyMerge(reply: MapMergeReply, items: readonly MapItem[]): MapMergedMap & Readonly<{ omittedItemIds: readonly string[] }> {
+export function mapApplyMerge(reply: MapMergeReply | MapMergeReplyV2, items: readonly MapItem[]):
+  MapMergedMap & Readonly<{ omittedItemIds: readonly string[] }> {
   const byId = mapItemsById(items);
   const used = new Set<string>();
   const members = (ids: readonly string[]): readonly string[] => {
@@ -55,7 +56,8 @@ export function mapApplyMerge(reply: MapMergeReply, items: readonly MapItem[]): 
     return known;
   };
   const keyPoints: MapKeyPoint[] = reply.key_points.map((group, index) =>
-    mapKeyPoint(mapKeyPointId(index + 1), group.claim, members(group.member_item_ids), byId));
+    mapKeyPoint(mapKeyPointId(index + 1), group.claim, members(group.member_item_ids), byId,
+      "rests_on" in group ? group.rests_on : undefined));
   const mergedAnswers: MapMergedAnswer[] = reply.answers.map((group, index) =>
     mapMergedAnswer(mapAnswerGroupId(index + 1), group.answer, members(group.member_item_ids), byId));
   const omitted = [...items].sort((a, b) => a.itemId.localeCompare(b.itemId)).filter((item) => !used.has(item.itemId));
@@ -101,7 +103,8 @@ export function mapAddGapPoints(current: MapMergedMap, items: readonly MapItem[]
       }));
     if (at >= 0) {
       const keyPoint = keyPoints[at]!;
-      keyPoints[at] = mapKeyPoint(keyPoint.keyPointId, keyPoint.claim, [...keyPoint.memberItemIds, item.itemId], byId);
+      // The join keeps the merger's word; the members' own (a gap point's included) are added by mapGroupRestsOn.
+      keyPoints[at] = mapKeyPoint(keyPoint.keyPointId, keyPoint.claim, [...keyPoint.memberItemIds, item.itemId], byId, keyPoint.restsOn);
     } else {
       created += 1;
       keyPoints.push(mapKeyPoint(mapKeyPointId(keyPoints.length + 1), item.claim, [item.itemId], byId));

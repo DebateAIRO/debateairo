@@ -110,19 +110,32 @@ export function mapRaisedBy(memberItemIds: readonly string[], itemsById: Readonl
   });
 }
 
+/**
+ * P2.2's code merge rule (spec 2026-10-15 §5.2 item 2): a group is an assumption when any member (or the merger) says
+ * so; a question when every member that says anything says question; nothing when nobody said (engine 1).
+ */
+export function mapGroupRestsOn(members: readonly (MapRestsOn | undefined)[], named?: MapRestsOn): MapRestsOn | undefined {
+  const all = named === undefined ? members : [...members, named];
+  if (all.includes("assumption")) return "assumption";
+  return all.includes("question") ? "question" : undefined;
+}
+
 export function mapKeyPoint(keyPointId: string, claim: string, memberItemIds: readonly string[],
-  itemsById: ReadonlyMap<string, MapItem>): MapKeyPoint {
+  itemsById: ReadonlyMap<string, MapItem>, named?: MapRestsOn): MapKeyPoint {
   const members = memberItemIds.map((id) => itemsById.get(id)).filter((item): item is MapItem => item !== undefined);
   const points = members.filter((item): item is MapPointItem => item.kind === "POINT");
   const against = points.filter((item) => item.leans === "against_some_answer").length;
   const support = points.filter((item) => item.leans === "for_some_answer").length;
+  const restsOn = mapGroupRestsOn(points.map((item) => item.restsOn), named);
   return Object.freeze({
     keyPointId,
     claim,
     memberItemIds: Object.freeze([...memberItemIds]),
     ...mapRaisedBy(memberItemIds, itemsById),
     fixedAngleKinds: Object.freeze(MAP_FIXED_ANGLE_KINDS.filter((kind) => members.some((item) => item.angleKind === kind))),
-    leansAgainst: against > support
+    leansAgainst: against > support,
+    // Engine 2 only: never written as undefined, so an engine-1 key point keeps today's keys (and the stored map its bytes).
+    ...(restsOn === undefined ? {} : { restsOn })
   });
 }
 

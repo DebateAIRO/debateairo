@@ -47,6 +47,7 @@ import {
   type MapNote,
   type MapNoteRecord,
   type MapPointItem,
+  type MapRestsOn,
   type MapResult,
   type MapSeat,
   type MapStep
@@ -123,7 +124,7 @@ export type MapRunInput = Readonly<{
 }>;
 
 type MapListLike = Readonly<{
-  points: readonly Readonly<{ claim: string; why_it_matters: string; leans: MapLean }>[];
+  points: readonly Readonly<{ claim: string; why_it_matters: string; leans: MapLean; rests_on?: MapRestsOn }>[];
   candidate_answers: readonly string[];
 }>;
 
@@ -233,7 +234,9 @@ function mapDraftsOfList(assignment: MapListAssignment, reply: MapListLike, orig
     angleKind: assignment.angle?.kind ?? null, listIndex: assignment.listIndex };
   return [
     ...reply.points.map((point, position): MapItemDraft => Object.freeze({ ...base, position, kind: "POINT" as const,
-      claim: point.claim, whyItMatters: point.why_it_matters, leans: point.leans })),
+      claim: point.claim, whyItMatters: point.why_it_matters, leans: point.leans,
+      // Engine 2 (P2.2): a v2 point carries rests_on; an engine-1 one has no such key, so none is written.
+      ...(point.rests_on === undefined ? {} : { restsOn: point.rests_on }) })),
     ...reply.candidate_answers.map((answer, position): MapItemDraft => Object.freeze({ ...base, position, kind: "ANSWER" as const, answer }))
   ];
 }
@@ -292,8 +295,11 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
       run.mapNote("GAP_SKIPPED", "GAP", `round ${String(round)}`);
       continue;
     }
-    const drafts = reply.new_points.map((point, position): MapItemDraft => Object.freeze({ kind: "POINT" as const, seat, origin: "GAP" as const,
-      angleId: null, angleKind: null, listIndex: 100 + round, position, claim: point.claim, whyItMatters: point.why_it_matters, leans: point.leans }));
+    // Engine 2 (P2.2): a v2 gap point carries rests_on; an engine-1 one has no such key (read through one widened type).
+    const newPoints: readonly Readonly<{ claim: string; why_it_matters: string; leans: MapLean; rests_on?: MapRestsOn }>[] = reply.new_points;
+    const drafts = newPoints.map((point, position): MapItemDraft => Object.freeze({ kind: "POINT" as const, seat, origin: "GAP" as const,
+      angleId: null, angleKind: null, listIndex: 100 + round, position, claim: point.claim, whyItMatters: point.why_it_matters, leans: point.leans,
+      ...(point.rests_on === undefined ? {} : { restsOn: point.rests_on }) }));
     // Numbering continues after EVERY item so far, points and candidate answers alike (no id is ever given twice).
     const gapItems = mapAssignItemIds(drafts, `${run.input.seed}|gap|${String(round)}`, mapNextItemNumbers(allItems))
       .filter((item): item is MapPointItem => item.kind === "POINT");
