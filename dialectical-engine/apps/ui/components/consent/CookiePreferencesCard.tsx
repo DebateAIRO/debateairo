@@ -3,6 +3,7 @@
 import { useId, useRef, type RefObject } from "react";
 import { LEGAL_INVENTORY } from "../../lib/legal/pages";
 import { backdropCloseHandler, useModalSurface } from "./modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /**
@@ -55,6 +56,7 @@ export function CookiePreferencesCard({
    * surface and nowhere else — so `open` is the constant `true` and the helper's
    * mount/unmount IS the open/close.
    */
+  useHideOutside(cardRef);
   useModalSurface(true, {
     containerRef: cardRef,
     initialFocusRef: closeRef,

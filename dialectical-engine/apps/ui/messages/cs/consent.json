@@ -16,5 +16,6 @@
   "consent.policy.close": "Zavřít",
   "consent.policy.questions": "Dotazy:",
   "consent.policy.gateHint": "Chcete-li pokračovat, přejděte na konec zásad.",
+  "consent.policy.gateOpened": "Dostali jste se na konec. Nyní můžete pokračovat.",
   "consent.policy.acknowledge": "Přečetl(a) jsem si zásady"
 }

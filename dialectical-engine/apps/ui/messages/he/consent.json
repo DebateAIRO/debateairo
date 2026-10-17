@@ -16,5 +16,6 @@
   "consent.policy.close": "סגירה",
   "consent.policy.questions": "לשאלות:",
   "consent.policy.gateHint": "כדי להמשיך, יש לגלול עד סוף המדיניות.",
+  "consent.policy.gateOpened": "זהו סוף המסמך. כעת אפשר להמשיך.",
   "consent.policy.acknowledge": "קראתי"
 }

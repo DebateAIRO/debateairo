@@ -61,6 +61,7 @@
   "done.hint": "Kata sandi situs Anda tetap sama. Tunggu kode baru berikutnya dari autentikator pengganti sebelum masuk.",
   "login": "Kembali ke halaman masuk",
   "deadline": "Selesaikan sebelum",
+  "deadline.warning": "Pemulihan ini akan kedaluwarsa dalam sekitar satu menit. Setelah itu, Anda perlu meminta tautan baru.",
   "restart.hint": "Penyiapan terhenti. Anda dapat mengulangi langkah ini sampai waktu yang ditampilkan di bawah; waktu itu tidak berubah.",
   "cancel": "Batalkan pemulihan",
   "cancel.title": "Batalkan pemulihan ini?",

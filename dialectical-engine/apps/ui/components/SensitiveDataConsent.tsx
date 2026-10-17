@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ContractHttpError, SENSITIVE_DATA_CONSENT_REQUIRED, type ContractClient } from "@debateai/contract";
 import { backdropCloseHandler, useModalSurface } from "@/components/consent/modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import { contractClient } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -91,6 +92,7 @@ export function SensitiveDataConsentDialog({
   const [busy, setBusy] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   // Esc, the backdrop and "I don't agree" all decline: no dismissal can agree on anyone's behalf.
+  useHideOutside(dialogRef);
   useModalSurface(true, { containerRef: dialogRef, initialFocusRef: agreeRef, onClose: onDecline });
 
   async function agree(): Promise<void> {

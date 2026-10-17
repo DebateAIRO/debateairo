@@ -171,7 +171,11 @@ test("the consent state machine and modal behavior survive the copy migration", 
   assert.doesNotMatch(card, /role="switch"/);
   assert.match(policy, /useModalSurface\(open/);
   assert.match(policy, /region\.scrollTop \+ region\.clientHeight >= region\.scrollHeight - SCROLL_SLACK/);
-  assert.match(policy, /disabled=\{!gateOpen\}/);
+  // Locked, the button stays in the Tab order (aria-disabled, so its reason is heard) and pressing
+  // it only re-says that reason: acknowledgement still runs only once the gate is open.
+  assert.match(policy, /aria-disabled=\{!gateOpen \? "true" : undefined\}/);
+  assert.match(policy, /onClick=\{gateOpen \? acknowledge : /);
+  assert.doesNotMatch(policy, /\sdisabled=\{!gateOpen\}/);
 });
 
 test("the English allowlist no longer exempts the consent cluster", () => {

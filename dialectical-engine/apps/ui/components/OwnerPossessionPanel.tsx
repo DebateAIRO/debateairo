@@ -70,7 +70,7 @@ export function OwnerPossessionPanel({ client, catalog, disabled, onAuthorityEnd
       <fieldset disabled={disabled || busy}>
         {([["command_id", "staff.command"], ["command_nonce", "staff.nonce"], ["credential_one", "staff.keyOne"], ["credential_two", "staff.keyTwo"], ["password", "staff.password"], ["totp_code", "staff.code"]] as const).map(([name, key]) => <div className="staffField" key={name}>
           <label htmlFor={`owner-${name}`}>{t(catalog, key)}</label>
-          <input id={`owner-${name}`} name={name} type={name === "password" || name === "command_nonce" ? "password" : "text"} autoComplete={name === "password" ? "current-password" : name === "totp_code" ? "one-time-code" : "off"} maxLength={name === "command_nonce" ? 43 : 1024} required={name !== "credential_two"}/>
+          <input id={`owner-${name}`} name={name} type={name === "password" || name === "command_nonce" ? "password" : "text"} autoComplete={name === "password" ? "current-password" : name === "totp_code" ? "one-time-code" : "off"} maxLength={name === "command_nonce" ? 43 : 1024} required={name !== "credential_two"} aria-invalid="false"/>
         </div>)}
         <button className="setBtn setBtnPrimary" type="submit">{t(catalog, "staff.possess")}</button>
       </fieldset>

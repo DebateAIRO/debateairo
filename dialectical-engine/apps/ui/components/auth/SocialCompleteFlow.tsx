@@ -70,6 +70,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const declaredRegion = declaredRegionFromPick(region.country, region.usState);
     const [birth, setBirth] = useState<DobParts>(EMPTY_DOB);
     const [errors, setErrors] = useState<SignupFieldErrors>({});
+    // Set by a submit made with no region (or a US pick with no state); any region edit clears it (a11y repair, 2026-10-15).
+    const [regionMissing, setRegionMissing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(true);
     const [code, setCode] = useState('');
@@ -235,10 +237,14 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setPhone(rawPhone);
         const checked = validateSignup({ email: address, phone: rawPhone, dateOfBirth: birth, privacy: data.get('privacy') === 'on', terms: data.get('terms') === 'on' });
         setErrors(checked);
-        if (Object.keys(checked).length) {
-            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
+        // No region is an error like any other (a11y repair, 2026-10-15): said, shown under the picker, and focused in page order.
+        const noRegion = declaredRegion === null;
+        setRegionMissing(noRegion);
+        if (Object.keys(checked).length || noRegion) {
+            const regionControl = region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger';
+            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : noRegion ? regionControl : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
             // The first error, in the order focus takes; the date of birth says what its own field says.
-            const first = checked.email ?? checked.phone ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            const first = checked.email ?? checked.phone ?? (noRegion ? "auth.signUp.regionHint" : undefined) ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
             signupAnnouncer.announce(first !== undefined ? t(catalog, first) : dobErrorMessage(catalog, 'incomplete', resolveDobLocale(uiLocale).order));
             return;
         }
@@ -391,12 +397,15 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 e.preventDefault();
                 void submitSignup(e.currentTarget);
             }} aria-busy={busy}>
- <div className="authField"><label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/></div>
+ <div className="authField"><label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/></div>
  <PhoneField optional id="social-phone" catalog={catalog} value={phone} onChange={setPhone} error={fieldError('phone')} disabled={busy}/>
- <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={setRegion} disabled={busy}/>
+ <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={next => {
+                setRegion(next);
+                setRegionMissing(false);
+            }} disabled={busy} errorId={regionMissing ? "social-region-error" : undefined}/><InlineFieldMessage id="social-region-error" message={regionMissing ? t(catalog, "auth.signUp.regionHint") : null}/>
  <DateOfBirthField catalog={catalog} locale={resolveDobLocale(uiLocale)} value={birth} onChange={setBirth} error={errors.dateOfBirth ? 'incomplete' : null} disabled={busy} minimumAgeMessage={t(catalog, "auth.dob.underAge")}/>
- <div className="consentGroup"><div className="consentRow"><input className="consentBox" name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span className="consentText" id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/>
- <div className="consentRow"><input className="consentBox" name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span className="consentText" id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
+ <div className="consentGroup"><div className="consentRow"><input className="consentBox" name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span className="consentText" id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/>
+ <div className="consentRow"><input className="consentBox" name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span className="consentText" id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={uiLocale} resetKey={reset} onToken={setProof} onError={() => {
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
@@ -415,7 +424,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         return;
                     }
                     void submitCode(digits);
-                }}><div className="authField"><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p className="authFieldHint" id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input ref={codeField} className={recoveryMode ? 'authRecoveryInput' : undefined} aria-invalid={codeFormatError || undefined} aria-describedby={[!recoveryMode ? 'social-code-help' : '', codeFormatError ? 'social-code-error' : ''].filter(Boolean).join(' ') || undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : undefined} value={code} disabled={busy} onChange={e => {
+                }}><div className="authField"><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p className="authFieldHint" id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input ref={codeField} className={recoveryMode ? 'authRecoveryInput' : undefined} aria-invalid={codeFormatError} aria-describedby={[!recoveryMode ? 'social-code-help' : '', codeFormatError ? 'social-code-error' : ''].filter(Boolean).join(' ') || undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : undefined} value={code} disabled={busy} onChange={e => {
                     // Exactly six digits (spaces and dashes ignored); a longer paste is shown and refused, never cut.
                     const typed = readSixDigitCode(e.target.value);
                     const value = recoveryMode || !typed.valid ? e.target.value : typed.digits;

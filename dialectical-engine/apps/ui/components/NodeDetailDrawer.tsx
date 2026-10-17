@@ -34,6 +34,7 @@ import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -152,6 +153,7 @@ export function NodeDetailDrawer({
    */
   conditionRecords?: readonly Pick<Answer["condition_mark_records"][number], "mark" | "reason">[];
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const { locale } = useChromeI18n();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
@@ -242,6 +244,8 @@ export function NodeDetailDrawer({
         className="drawer scroll"
         data-drawer-panel
         data-design-turn="5"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal
         aria-label={t(catalog, "debateDrawers.node.argumentDetail")}
@@ -293,7 +297,7 @@ export function NodeDetailDrawer({
           ) : null}
           <div className="drawerClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
           {generation?.argument ? (
-            <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} onMouseUp={onChallenge ? selectProse : undefined}>
+            <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} data-challenge-prose={node.id} onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
           ) : (

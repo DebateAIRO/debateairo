@@ -61,6 +61,7 @@
   "done.hint": "A weboldali jelszava nem változik. Bejelentkezés előtt várja meg az új hitelesítő alkalmazás következő friss kódját.",
   "login": "Vissza a bejelentkezéshez",
   "deadline": "Befejezési határidő",
+  "deadline.warning": "Ez a helyreállítás körülbelül egy perc múlva lejár. Ezután új hivatkozást kell kérnie.",
   "restart.hint": "A beállítás megszakadt. Ezt a lépést megismételheti az alábbi időpontig; ez az időpont nem változik.",
   "cancel": "Helyreállítás megszakítása",
   "cancel.title": "Megszakítja ezt a helyreállítást?",

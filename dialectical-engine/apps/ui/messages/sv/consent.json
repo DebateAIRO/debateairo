@@ -16,5 +16,6 @@
   "consent.policy.close": "Stäng",
   "consent.policy.questions": "Frågor:",
   "consent.policy.gateHint": "Rulla till slutet av policyn för att fortsätta.",
+  "consent.policy.gateOpened": "Du har nått slutet. Nu kan du fortsätta.",
   "consent.policy.acknowledge": "Jag har läst den"
 }

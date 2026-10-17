@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "インターフェース言語",
   "chrome.searchLanguage": "言語またはコードを検索",
   "chrome.changeLanguage": "言語を変更",
+  "chrome.skipToContent": "メインコンテンツへスキップ",
   "chrome.europe": "ヨーロッパ",
   "chrome.asia": "アジア",
   "chrome.middleEast": "中東",

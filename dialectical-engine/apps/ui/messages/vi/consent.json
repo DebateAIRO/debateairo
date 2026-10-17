@@ -16,5 +16,6 @@
   "consent.policy.close": "Đóng",
   "consent.policy.questions": "Câu hỏi:",
   "consent.policy.gateHint": "Hãy cuộn đến cuối chính sách để tiếp tục.",
+  "consent.policy.gateOpened": "Bạn đã đến cuối. Giờ bạn có thể tiếp tục.",
   "consent.policy.acknowledge": "Tôi đã đọc"
 }

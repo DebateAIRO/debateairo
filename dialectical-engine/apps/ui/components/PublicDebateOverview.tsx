@@ -163,7 +163,7 @@ export function PublicDebateOverview({
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
 
   return (
-    <main className="publicOverviewScroll scroll" data-design-turn="3b">
+    <div className="publicOverviewScroll scroll" data-design-turn="3b">
       <div className="publicOverview">
         <div className="publicOverviewInner">
         <section className="publicVerdictShell" aria-labelledby="public-verdict-label" data-ai-generated="true">
@@ -208,11 +208,12 @@ export function PublicDebateOverview({
               ) : null}
             </div>
             <p className="publicVerdictCaveat"><span aria-hidden>⚠</span> {t(catalog, "public.overview.caveat", { caveat: presentation.caveat })}</p>
-            <div className="publicMetricRow">
-              <span>{t(catalog, "public.overview.dialecticalSupport", { support: presentation.metrics.support })}</span>
-              <span>{t(catalog, "public.overview.verification", { reviewed: presentation.metrics.reviewed })}</span>
-              <span>{t(catalog, "public.overview.judgeCoverage", { judged: presentation.metrics.judged })}</span>
-              <span>{t(catalog, "public.overview.convergence", { convergence: presentation.metrics.convergence })}</span>
+            {/* A list, so a screen reader reads four metrics rather than one run-together line. */}
+            <div className="publicMetricRow" role="list">
+              <span role="listitem">{t(catalog, "public.overview.dialecticalSupport", { support: presentation.metrics.support })}</span>
+              <span role="listitem">{t(catalog, "public.overview.verification", { reviewed: presentation.metrics.reviewed })}</span>
+              <span role="listitem">{t(catalog, "public.overview.judgeCoverage", { judged: presentation.metrics.judged })}</span>
+              <span role="listitem">{t(catalog, "public.overview.convergence", { convergence: presentation.metrics.convergence })}</span>
             </div>
           </div>
         </section>
@@ -222,6 +223,7 @@ export function PublicDebateOverview({
             <span className="publicSupportPro">{t(catalog, "public.overview.caseFor", { count: presentation.proCount })}</span>
             <div
               className="publicSupportMeter"
+              role="img"
               data-measured={presentation.supportMeasured ? "true" : "false"}
               style={{ "--pro-pct": `${presentation.proPercent}%` } as CSSProperties}
               aria-label={presentation.supportMeasured
@@ -247,6 +249,6 @@ export function PublicDebateOverview({
         </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

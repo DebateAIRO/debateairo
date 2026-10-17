@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { QuestionLanguageOffer } from "@debateai/contract";
 import { backdropCloseHandler, useModalSurface } from "@/components/consent/modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -89,6 +90,7 @@ function QuestionLanguageChoiceDialog({
   const primaryRef = React.useRef<HTMLElement | null>(null);
   const edit = (): void => onAnswer("EDIT");
   // Esc, the backdrop and [Edit] all go back to the question: no dismissal sends anything.
+  useHideOutside(dialogRef);
   useModalSurface(true, { containerRef: dialogRef, initialFocusRef: primaryRef, onClose: edit });
 
   const body = t(catalog, "newDebate.languageCheck.body", {

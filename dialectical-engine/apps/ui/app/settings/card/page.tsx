@@ -33,11 +33,11 @@ export default async function CardChangePage({
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const billingCatalog = await loadNamespace(locale, "billing");
   return (
-    <main className="screen scroll billingPage">
+    <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <CardChangeFlow catalog={billingCatalog} locale={locale}
           renewalConsent={currentDocument("CONSENT_RENEWAL", locale)} returnedChargeRef={returnedChargeRef} />
       </div>
-    </main>
+    </div>
   );
 }

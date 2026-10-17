@@ -143,7 +143,7 @@ export function CardChangeFlow({
             onChange={(field, value) => setDetails({ ...details, [field]: value })} />
           <div className="billingField">
             <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
-            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
+            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required aria-invalid="false" />
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
           {total !== null && currency !== null ? (

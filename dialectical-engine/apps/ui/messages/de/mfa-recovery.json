@@ -61,6 +61,7 @@
   "done.hint": "Ihr Passwort für die Website bleibt gleich. Warten Sie vor der Anmeldung auf den nächsten neuen Code aus der neuen Authenticator-App.",
   "login": "Zurück zur Anmeldung",
   "deadline": "Abschließen bis",
+  "deadline.warning": "Diese Wiederherstellung läuft in etwa einer Minute ab. Danach müssen Sie einen neuen Link anfordern.",
   "restart.hint": "Die Einrichtung wurde unterbrochen. Sie können diesen Schritt bis zur unten angezeigten Uhrzeit wiederholen; diese Uhrzeit ändert sich nicht.",
   "cancel": "Wiederherstellung abbrechen",
   "cancel.title": "Diese Wiederherstellung abbrechen?",

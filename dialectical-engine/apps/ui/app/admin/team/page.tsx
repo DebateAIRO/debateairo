@@ -6,5 +6,5 @@ import staffRomanian from "../../../messages/ro/staff.json";
 export default async function TeamPage() {
     const requested = (await cookies()).get(LOCALE_COOKIE)?.value;
     const locale = isLocale(requested) ? requested : "en";
-    return <main className="screen scroll setScreen"><div className="setBody"><StaffAccessPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/></div></main>;
+    return <div className="screen scroll setScreen"><div className="setBody"><StaffAccessPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/></div></div>;
 }

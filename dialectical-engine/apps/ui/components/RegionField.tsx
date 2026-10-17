@@ -35,12 +35,14 @@ function onActionKey(event: ReactKeyboardEvent<HTMLButtonElement>, action: () =>
   }
 }
 
-export function RegionField({ catalog, locale, value, onChange, disabled }: Readonly<{
+export function RegionField({ catalog, locale, value, onChange, disabled, errorId }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   value: RegionPick;
   onChange: (next: RegionPick) => void;
   disabled: boolean;
+  /** The id of the error shown under the picker, while one is shown. */
+  errorId?: string;
 }>): JSX.Element {
   const [open, setOpen] = useState(false);
   const [continent, setContinent] = useState<RegionContinent | null>(null);
@@ -117,11 +119,14 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
         ref={triggerRef}
         aria-expanded={open}
         aria-controls={open ? "signup-region-popover" : undefined}
+        // The label names the button "Region"; the chosen country (or the placeholder) and any error
+        // are its description, so a screen reader says what is picked.
+        aria-describedby={errorId ? `signup-region-value ${errorId}` : "signup-region-value"}
         disabled={disabled}
         onClick={toggle}
       >
         {value.country === null ? null : <span className="regionFlag">{regionFlag(value.country)}</span>}
-        <span className="regionName">{value.country === null ? t(catalog, "auth.region.placeholder") : regionCountryName(value.country, locale)}</span>
+        <span className="regionName" id="signup-region-value">{value.country === null ? t(catalog, "auth.region.placeholder") : regionCountryName(value.country, locale)}</span>
         {value.country === null || pickedContinent === null ? null : <span className="regionPath">{continentName(catalog, pickedContinent)} · {value.country}</span>}
         <span className="regionChevron" aria-hidden="true">▾</span>
       </button>

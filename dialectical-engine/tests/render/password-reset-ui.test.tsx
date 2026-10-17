@@ -42,7 +42,7 @@ describe("ordinary password-only reset screen", () => {
     await act(async () => root.render(<PasswordResetFlow locale={locale} catalog={catalog} client={fixture().client} />));
     const field = [...host.querySelectorAll("label")].find(item => item.textContent === label)!;
     expect(host.querySelector(`#${field.htmlFor}`)?.tagName).toBe("INPUT");
-    expect(host.querySelector("main")?.getAttribute("lang")).toBe(locale);
+    expect(host.querySelector(".authScreen")?.getAttribute("lang")).toBe(locale);
     expect(host.querySelector('a[href="/recover"]')).not.toBeNull();
     expect(host.textContent).not.toMatch(/T2|csrf|user_id|capability|QR/);
   });
