@@ -53,7 +53,10 @@ import {
   type EngineReviewStatus,
   type WayOfKnowingDowngradeRecord,
   PointInvestigationRepository,
-  type PointInvestigationSeat
+  VerdictVoteRepository,
+  askComparingJudge,
+  type PointInvestigationSeat,
+  type StoredVerdictVote
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
@@ -185,7 +188,8 @@ import {
   type SynthesisDigest,
   type SynthesizerRequest,
   type VerdictLabelBasis,
-  type VerdictLabelDerivation
+  type VerdictLabelDerivation,
+  verdictDerivationOfJudges
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
 import { MapChoiceRepository, mapAnswersArgued, mapLimitsFor, type MapResult } from "@debateai/map";
@@ -206,6 +210,8 @@ import {
   type LengthGuide,
   type LengthGuidanceStep,
   ENGINE2_REDUCER_VERSION,
+  comparingJudgeCallSiteKey,
+  engineMaterialOf,
   pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
   SERVED_ROOT_SELECTION_RULE_JUDGES,
@@ -275,7 +281,14 @@ import {
   investigatedStatusEntry, pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations,
   type PointInvestigationRow
 } from "./engine-investigations.js";
-import { engineMaterialGraphOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
+import { engineMaterialGraphOf, engineMaterialInvestigationsOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
+import {
+  comparingJudgeCodeDefect,
+  comparingJudgesSourceOf,
+  endsThisCopy,
+  runComparingJudges,
+  type RecordedComparingJudgeVote
+} from "./engine-judging.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
 import {
   engineCatchUpSelectionRule, engineLinkedGraph, engineNodeFactsOf, engineOwnReplyEdgeIdsOf, engineUnassessedRecords,
@@ -584,6 +597,14 @@ export function pointInvestigationFailureCode(error: unknown): string {
 /** Engine 2 (A14 fix round 1): the runner's content-free investigation line. Codes and ids only, never debate or model text. */
 export function logPointInvestigation(event: string, detail: Readonly<Record<string, unknown>>): void {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_POINT_INVESTIGATION", event }));
+}
+
+/**
+ * Engine 2 (R2b): the runner's content-free judging line, one per judge whose call failed (the step records it as
+ * JUDGE_FAILED). Codes and ids only, never debate or model text, as the investigation line.
+ */
+export function logComparingJudge(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_COMPARING_JUDGE", event }));
 }
 
 /**
@@ -2141,6 +2162,11 @@ export function rederiveCatchUpFloor(input: Readonly<{
   return Object.freeze({ leadingNodeId: selection.root.nodeId, verdictState: label.label });
 }
 
+/** Engine 2 (R2b): a floor's label receipt says the comparing judges chose it (its stored served-root rule). */
+export function floorDecidedByJudges(servedRootRule: string | null): boolean {
+  return servedRootRule === SERVED_ROOT_SELECTION_RULE_JUDGES;
+}
+
 export function createPostgresReviewCatchUpDependencies(input: {
   readonly pool: Pool;
   readonly reviewers: readonly {
@@ -2371,6 +2397,13 @@ export function createPostgresReviewCatchUpDependencies(input: {
         verdictState: floorReceipt.floor.verdictState
       });
       const floorAfter = floorReceipt === null ? null : await (async () => {
+        // Engine 2 (R2b, spec §4.7): a floor the comparing judges chose stands as stored; a review never re-opens their
+        // vote. It reads no ladder controls: its label never came from them, and the register version it names may carry
+        // none (plan Task B12's harness) (pre-flight PF-R2b7.2). The rule is the label receipt's own (the propagation
+        // receipt's served-root selection), never a condition-mark record's (controller carry 14).
+        if (floorDecidedByJudges(floorReceipt.servedRootRule)) {
+          return Object.freeze({ leadingNodeId: floorReceipt.floor.leadingNodeId, verdictState: floorReceipt.floor.verdictState });
+        }
         const controls = await readVerdictLabelControls(input.pool, floorReceipt.registerVersion);
         return rederiveCatchUpFloor({
           nodes: fullSnapshot.nodes,
@@ -9493,7 +9526,7 @@ export class WalkingSkeletonRunner {
     const engineServeLinked = engine.engine === 2
       ? await engineLinkedGraphNow(snapshot, effectiveMakerCount <= 1 ? [] : await this.#judgements.readReviewedNodeIds(run.runId))
       : null;
-    const makerPositionServe = decideMakerPositionServe({
+    const serveDecisionInput = Object.freeze({
       // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M.
       effectiveMakerCount: rootCount,
       runBodyBudgetStop,
@@ -9511,6 +9544,164 @@ export class WalkingSkeletonRunner {
       monoMakerRecords,
       // Fix (d): the arguing that ended because too few members were left is not money, and says why.
       ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {})
+    });
+    /**
+     * Engine 2 (spec 2026-10-15 §4.3-§4.4, §4.7; R2b) — THE COMPARING JUDGES, after the arguing, the reviews, the
+     * investigations and the final propagation, before the label and the answer writer. They read the honest final
+     * strengths of this same decision (taken once by strength: pure, no call); the decision below is then taken again
+     * with their verdict, from the same inputs, so the projection and the propagation are identical and only the served
+     * root and its disclosure follow the judges. Nothing here fails the debate but a code defect or a stop that ends this
+     * copy (`runComparingJudges`). Engine 1: null, and the decision is today's, taken once.
+     */
+    const engineTwo = engine.engine === 2 ? engine : null;
+    const comparingJudges = engineTwo === null ? null : await (async () => {
+      const strengthDecision = decideMakerPositionServe(serveDecisionInput);
+      const strengthOf = new Map(strengthDecision.propagation.strengths.map((row) => [row.nodeId, row.strength] as const));
+      const servable = new Set(strengthDecision.servableMakerPositions.map((root) => root.nodeId));
+      // Engine 2 always links its serve graph (A8: `engineLinkedGraphNow` is null on engine 1 only). With an empty facts
+      // map a cross-reply could be filed as a support of its own answer (pre-flight PF-R2a7.6, PF-R2b3.7).
+      if (engineServeLinked === null) {
+        throw new TypedDomainError("ENGINE_FACTS_INVALID", "Engine 2's judges read the link-weighted serve graph and its facts");
+      }
+      // The texts: the graph this decision served from is in memory (A12's `engineMaterialGraphOf`, over A8's
+      // link-weighted snapshot and facts). Only the review reasons are read (A12's `readEngineReviews`, inside the
+      // disclosure content lease this run body holds, plan deviation 18). The investigations are THIS copy's own
+      // outcomes, from memory: A14 writes their rows only after the serve decision below (Ruling PF-R2a8.10), and these
+      // are the outcomes this propagation used (pre-flight PF-R2b3.6).
+      const graph = engineMaterialGraphOf({
+        question: run.questionLine,
+        rootCount,
+        authored: authoredNodes,
+        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
+        snapshot: engineServeLinked.snapshot,
+        facts: engineServeLinked.facts,
+        honestFinalStrength: strengthOf
+      });
+      const source = engineMaterialSourceOf(graph,
+        await readEngineReviews(this.pool, run.runId, graph.points.map((point) => point.nodeId)),
+        engineMaterialInvestigationsOf(engineInvestigation?.rows ?? []));
+      // Only servable answers are compared (letters stay fixed); every point is ordered by THIS pass's honest final
+      // strength (the propagation receipt is recorded after the label); a point the standing projection hid goes last,
+      // and any other point without a strength is a code defect (controller carry 7; pre-flight PF-R2b3.19). R4 (R4
+      // pre-flight consistency; Ruling PF-R43.1): the servable source keeps its name, so R4's final writers' bundle reads
+      // the very source the judges read (returned below as `materialSource`).
+      const servableSource = comparingJudgesSourceOf({
+        source,
+        servableRootIds: servable,
+        honestFinalStrength: strengthOf,
+        hiddenNodeIds: new Set(strengthDecision.standing.hiddenNodeIds)
+      });
+      const material = engineMaterialOf(servableSource);
+      const judgeLength = lengthGuideOf("comparing_judge").length;
+      if (judgeLength === undefined) {
+        // Unreachable: a receipt with `engine` and no `length` is refused when it is parsed (INTERFACE §1.5).
+        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2's judges read their words from the length row");
+      }
+      // The one engine seal of the run body (A14's source; pre-flight PF-R2b3.15): R1d's boot refuses a runner whose
+      // register seal differs from `engineContractHash()`, and its per-run guard refuses an engine-2 run without it.
+      const engineSeal = this.settings.engine?.engineContractHash;
+      if (engineSeal === undefined) {
+        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
+      }
+      const judgeBound = guidedCallBound(this.settings.judgeBound, "comparing_judge", lengthGuidance);
+      const planKey = comparingJudgeCallSiteKey(1);
+      const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {
+        const member = seatCaller.plan(seat, planKey);
+        return member === null ? [] : [Object.freeze({ seat, member })];
+      });
+      const runSeatOf = new Map(judgeSeats.map(({ seat, member }) => [member.providerRef, seat] as const));
+      const modelIdOf = (member: Readonly<{ providerRef: string; candidate: SeatCandidate | null }>): string =>
+        member.candidate?.modelId ?? panelModelIds.get(member.providerRef) ?? member.providerRef;
+      const verdictVotes = new VerdictVoteRepository(this.pool);
+      // A10's StoredVerdictVote is nested (`judge`, `choice`); this mapping is the one place that reads it.
+      const recordedVoteOf = (row: StoredVerdictVote): RecordedComparingJudgeVote => Object.freeze({
+        judgeSeat: row.judgeSeat, maker: row.judge.maker, providerRef: row.judge.providerRef, modelId: row.judge.modelId,
+        rawArtifactRef: row.rawArtifactRef, chosenLetter: row.choice?.letter ?? null,
+        conditional: row.choice?.conditional ?? null, sameAs: row.choice?.sameAs ?? [],
+        questionKind: row.choice?.questionKind ?? null, reasons: row.choice?.reasons ?? null
+      });
+      const judged = await runComparingJudges({
+        engine: engineTwo,
+        material,
+        arguedByMaker: new Map(authoredMakerPositions.map((root) => [root.nodeId, root.maker] as const)),
+        honestFinalStrength: new Map([...strengthOf].filter(([nodeId]) => servable.has(nodeId))),
+        candidates: judgeSeats.map(({ member }) => Object.freeze({
+          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member)
+        })),
+        rotationOffset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: planKey }),
+        moneyStopped: runBodyBudgetStop !== null,
+        recorded: (await verdictVotes.readVerdictVotesForRun(run.runId)).map(recordedVoteOf),
+        ask: async (judge) => {
+          const judgeKey = comparingJudgeCallSiteKey(judge.seat);
+          try {
+            const runSeat = runSeatOf.get(judge.providerRef);
+            if (runSeat === undefined) throw new TypedDomainError("COMPARING_JUDGE_SEAT_UNRESOLVED", judge.providerRef);
+            // A stand-in member answers only for the same maker, so the maker rules (never two judges of one maker; a
+            // vote for its own maker's answer ignored) hold for whoever answers.
+            const sameMaker = (member: SeatIdentity): boolean => member.maker === judge.maker;
+            const answered = await seatCaller.callSeat({
+              seat: runSeat,
+              callSiteKey: comparingJudgeCallSiteKey(judge.seat),
+              eligible: sameMaker,
+              fair: sameMaker,
+              // The member's own gateway (lane-wrapped, sit-out aware), never the member's arguing judge: the judges'
+              // calls never move to a cheaper maker the way an arguing call may (ruling PF-R2b1.1: B1 admits
+              // comparing-judges.ts in s10-carrier-erasure-red's provider-call list for exactly this call shape). A
+              // JUDGE call on the served lane: the arguing's (BODY) money and attempt ceiling, as the investigator's.
+              call: (member, callSiteKey) => askComparingJudge(member.provider, {
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey,
+                argumentLanguageName: run.argumentLanguageName,
+                ...shapeLanguageInput,
+                material,
+                seat: judge.seat,
+                length: judgeLength,
+                providerRef: member.providerRef,
+                contractHash: engineSeal,
+                bound: judgeBound
+              })
+            });
+            return Object.freeze({
+              reply: answered.value.reply, rawArtifactRef: answered.value.rawArtifactRef,
+              maker: answered.member.maker, providerRef: answered.member.providerRef, modelId: answered.value.model
+            });
+          } catch (error) {
+            // A failed judge is recorded as JUDGE_FAILED by the step; this line names it by code only, never its text.
+            if (!endsThisCopy(error) && !comparingJudgeCodeDefect(error)) {
+              logComparingJudge("JUDGE_FAILED", { runId: run.runId, callSiteKey: judgeKey, code: pointInvestigationFailureCode(error) });
+            }
+            throw error;
+          }
+        },
+        // A10's VerdictVoteRecord is nested: a failed judge (no letter) records `choice: null` and JUDGE_FAILED. A seat
+        // another write stored first (ALREADY_PRESENT; open question 8) hands back its STORED row, read back, which the
+        // step then counts in place of this copy's vote (controller carry 6). A RUN_ERASED is ignored, as A14's is.
+        record: async (vote) => {
+          const choice = vote.chosenLetter === null || vote.chosenRootNodeId === null || vote.conditional === null
+            || vote.questionKind === null || vote.reasons === null
+            ? null
+            : Object.freeze({ letter: vote.chosenLetter, rootNodeId: vote.chosenRootNodeId, conditional: vote.conditional,
+              questionKind: vote.questionKind, sameAs: vote.sameAs, reasons: vote.reasons });
+          const outcome = await verdictVotes.recordVerdictVote({
+            runId: run.runId, judgeSeat: vote.judgeSeat,
+            judge: Object.freeze({ maker: vote.maker, providerRef: vote.providerRef, modelId: vote.modelId }),
+            rawArtifactRef: vote.rawArtifactRef, choice, counted: vote.counted, notCountedReason: vote.notCountedReason
+          });
+          if (outcome !== "ALREADY_PRESENT") return null;
+          const stored = (await verdictVotes.readVerdictVotesForRun(run.runId)).find((row) => row.judgeSeat === vote.judgeSeat);
+          return stored === undefined ? null : recordedVoteOf(stored);
+        }
+      });
+      // R4 (R4 pre-flight consistency; Ruling PF-R43.1): R4's final writers read the judges' own servable source and this
+      // pass's honest strengths (every node's, by node id; R4 Task 8 picks the servable roots' out of it). R2's readers of
+      // `comparingJudges` (`.verdict`, `.records`, `.ballots`, `.verdictMaterial`) are unchanged.
+      return Object.freeze({ ...judged, materialSource: servableSource, honestFinalStrength: strengthOf });
+    })();
+    const makerPositionServe = decideMakerPositionServe({
+      ...serveDecisionInput,
+      // Engine 2 (R2b): the comparing judges' verdict picks the served root; engine 1: today's decision.
+      ...(comparingJudges === null ? {} : { judgesVerdict: comparingJudges.verdict })
     });
     /**
      * Engine 2 (spec §4.2b "Measured"; INTERFACE §8.6): the investigation rows, written now that the serve decision has
@@ -9621,7 +9812,10 @@ export class WalkingSkeletonRunner {
         disagreementThreshold: verdictLabelControls.disagreementThreshold
       })
     });
-    const verdictLabel = deriveVerdictLabel(verdictLabelBasis);
+    // T11 / engine 1: the sealed ladder. Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' label, rung 5; the
+    // ladder is still derived from the same numbers but never served.
+    const ladderLabel = deriveVerdictLabel(verdictLabelBasis);
+    const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
     // J23: the citable set follows the DIGEST — same source, same membership,
     // so "every load-bearing claim traces to a digest node" is satisfiable by
     // construction rather than by the synthesizer guessing. Exactly one node is
@@ -9781,7 +9975,9 @@ export class WalkingSkeletonRunner {
       // Debate shape: the map's fallbacks and fills, and the two extensions — each mark with its record (below).
       ...new Set(shapeRecords.map((record) => record.mark)),
       // Engine 2: the reduced-weight mark with its records (below); none on engine 1.
-      ...new Set(engineLinkRecords.map((record) => record.mark))
+      ...new Set(engineLinkRecords.map((record) => record.mark)),
+      // Engine 2 (R2b): a missing, unavailable or ignored judge is disclosed on the answer, each mark with its record.
+      ...new Set((comparingJudges?.records ?? []).map((record) => record.mark))
     ]);
     /**
      * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
@@ -9865,6 +10061,8 @@ export class WalkingSkeletonRunner {
       ...shapeRecords,
       // Engine 2: one UNASSESSED-AT-REDUCED-WEIGHT record per unsettled cannot-assess point; none on engine 1.
       ...engineLinkRecords,
+      // Engine 2 (R2b): the comparing judges' records (none on engine 1).
+      ...(comparingJudges?.records ?? []),
       // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
       // the ONE record; with none, the reason is today's to the byte.
       ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({
@@ -10926,7 +11124,10 @@ export class WalkingSkeletonRunner {
       // from these — the derivation is pure, so the runner's disclosure decision
       // above and the persisted label cannot disagree, and serve stops loudly if
       // they ever do.
-      verdictLabelBasis: answerCarriesLabel ? verdictLabelBasis : null
+      verdictLabelBasis: answerCarriesLabel && comparingJudges === null ? verdictLabelBasis : null,
+      // Engine 2 (R2b): the judges' label record instead of a ladder basis (serve takes at most one of the two; an answer
+      // that carries no label passes neither).
+      ...(answerCarriesLabel && comparingJudges !== null ? { judgesDerivation: verdictLabel } : {})
     }));
     // Task M3 (spec §14.4.5): the owner-side disclosure row, once, after the
     // sealed persist, for every answer. It can never change the answer: the

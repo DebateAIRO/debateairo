@@ -338,6 +338,7 @@ apps/runner/src/dev-ui-process.ts
 apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
 apps/runner/src/engine-investigations.ts
+apps/runner/src/engine-judging.ts
 apps/runner/src/engine-links.ts
 apps/runner/src/engine-material-reader.ts
 apps/runner/src/engine-reduce.ts

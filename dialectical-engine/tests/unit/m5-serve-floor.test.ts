@@ -92,7 +92,7 @@ describe("M5 · wired into the shipped runner", () => {
 
   it("derives the floor from the sealed result and the label taken before the answer-writing step", async () => {
     const source = await runner();
-    const label = source.indexOf("const verdictLabel = deriveVerdictLabel(verdictLabelBasis);");
+    const label = source.indexOf("const ladderLabel = deriveVerdictLabel(verdictLabelBasis);");
     const chain = source.indexOf("result = await runnerStage(\"SERVE_GATE_CHAIN_FAILED\", () => runServeGateChain({");
     const floor = source.indexOf("const floor = serveFloorOf({");
     const persist = source.indexOf("const persisted = await runnerStage(\"ANSWER_PERSIST_FAILED\"");
@@ -108,7 +108,7 @@ describe("M5 · wired into the shipped runner", () => {
     // The same node the label's `servedNodeId` names.
     expect(call).toContain("leadingNodeId: servedRoot.nodeId");
     // The sealed persist is handed no basis for a floor: the answer stays COMPONENTS_ONLY.
-    expect(source).toContain("verdictLabelBasis: answerCarriesLabel ? verdictLabelBasis : null");
+    expect(source).toContain("verdictLabelBasis: answerCarriesLabel && comparingJudges === null ? verdictLabelBasis : null");
   });
 
   it("hands the floor to the owner's row and to the story, whose statement is the leading position's", async () => {

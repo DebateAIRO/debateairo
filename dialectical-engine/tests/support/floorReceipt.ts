@@ -13,6 +13,8 @@ export async function recordFloorLabelReceipt(pool: Pool, input: Readonly<{
   servedNodeId: string;
   label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
   basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
+  /** Engine 2 (R2b): a floor the comparing judges chose; absent: today's rule and ladder. */
+  servedRootRule?: "max-propagated-strength-lexicographic-tiebreak" | "comparing-judges-votes-honest-strength-tiebreak";
 }>): Promise<void> {
   await new LedgerRepository(pool).recordPropagation({
     runId: input.runId,
@@ -26,7 +28,7 @@ export async function recordFloorLabelReceipt(pool: Pool, input: Readonly<{
     liftRecords: [],
     judgementSelectionRule: { kind: "TEST_LAYER" },
     servedRootSelection: {
-      rule: "max-propagated-strength-lexicographic-tiebreak",
+      rule: input.servedRootRule ?? "max-propagated-strength-lexicographic-tiebreak",
       servedNodeId: input.servedNodeId,
       servedStrength: 0.5,
       runnerUp: null,
@@ -35,8 +37,11 @@ export async function recordFloorLabelReceipt(pool: Pool, input: Readonly<{
       candidateCount: 1,
       verdictLabel: {
         label: input.label,
-        rung: input.basisAbsence.length > 0 ? 0 : 4,
-        trigger: input.basisAbsence.length > 0 ? "BASIS_INCOMPLETE" : "MID_BAND",
+        rung: input.servedRootRule === "comparing-judges-votes-honest-strength-tiebreak" ? 5
+          : input.basisAbsence.length > 0 ? 0 : 4,
+        trigger: input.servedRootRule === "comparing-judges-votes-honest-strength-tiebreak"
+          ? (input.label === "SPLIT" ? "JUDGES_NO_MAJORITY" : "JUDGES_MAJORITY")
+          : input.basisAbsence.length > 0 ? "BASIS_INCOMPLETE" : "MID_BAND",
         basisAbsence: [...input.basisAbsence],
         disagreement: { kind: "ABSENT", reason: "FEWER_THAN_TWO_PARSEABLE_JUDGEMENTS" },
         registerVersion: 1,
