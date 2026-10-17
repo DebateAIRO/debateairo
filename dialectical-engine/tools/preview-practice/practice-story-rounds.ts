@@ -15,12 +15,16 @@
 import type { Pool } from "pg";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
-import { PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, structureRepairOriginalKey, type PromptPacket } from "@debateai/providers";
+import {
+  PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, mergePatchReply, structureRepairOriginalKey, type PromptPacket
+} from "@debateai/providers";
 import { engineOfRun } from "@debateai/register";
 import type { StoryBackupRecord, StoryBackupSignal } from "@debateai/story";
 import { practiceIsRevisionPrompt, replyContentOf } from "./practice-lanes.js";
 
-export type PracticeStoryRoundOutcome = "SATISFIED" | "WORDING_NOTE_ONLY" | "MISLEADING" | "NOT_SATISFIED" | "NO_DRAFT" | "NO_VERDICT";
+/** VERDICT_UNREAD (fix round 1): the checker answered through the patch follow-up and its earlier try could not be read. */
+export type PracticeStoryRoundOutcome = "SATISFIED" | "WORDING_NOTE_ONLY" | "MISLEADING" | "NOT_SATISFIED" | "NO_DRAFT" | "NO_VERDICT"
+  | "VERDICT_UNREAD";
 export type PracticeStoryRoundRow = Readonly<{
   model: string; round: number; misleading: boolean | null; wordingNoteOnly: boolean; revisedOwnDraft: boolean;
   outcome: PracticeStoryRoundOutcome;
@@ -35,9 +39,11 @@ export type PracticeStoryEngineBlock = Readonly<{
 }>;
 /** The checker's accepted verdict as the report reads it; `misleading` null: a v3 checker (it has no such member). */
 export type PracticeCheckerVerdict = Readonly<{ satisfied: boolean; misleading: boolean | null }>;
+/** A checker verdict accepted through the patch follow-up whose earlier refused try could not be read (fix round 1). */
+export type PracticeCheckerVerdictUnread = "UNREAD";
 /** What one round did, read from the ledger (pure input of `practiceStoryRoundRows`). */
 export type PracticeStoryRoundFacts = Readonly<{
-  round: number; model: string; drafted: boolean; revisedOwnDraft: boolean; verdict: PracticeCheckerVerdict | null;
+  round: number; model: string; drafted: boolean; revisedOwnDraft: boolean; verdict: PracticeCheckerVerdict | PracticeCheckerVerdictUnread | null;
 }>;
 /** One story ledger row as the round grouping reads it, in ledger order (pure input of `practiceStoryRoundFactsOf`). */
 export type PracticeStoryLedgerRow = Readonly<{
@@ -46,8 +52,11 @@ export type PracticeStoryLedgerRow = Readonly<{
   accepted: boolean;
   /** A storyteller try's sent request revised its own draft; null: no recorded prompt, or not read (not the round's first sent try). */
   revisionPrompt: boolean | null;
-  /** An accepted checker reply's verdict; null otherwise. */
-  verdict: PracticeCheckerVerdict | null;
+  /**
+   * An accepted checker reply's verdict (a PATCH try's: merged onto the call's earlier refused try, "UNREAD" when that try
+   * could not be read); null otherwise.
+   */
+  verdict: PracticeCheckerVerdict | PracticeCheckerVerdictUnread | null;
 }>;
 
 const STORY_ROUND_SITE = /^STORY:(STORYTELLER|CHECKER):([1-9][0-9]*)$/u;
@@ -65,7 +74,7 @@ function modelOfRef(providerRef: string): string {
  */
 export function practiceStoryRoundFactsOf(rows: readonly PracticeStoryLedgerRow[]): readonly PracticeStoryRoundFacts[] {
   const tellers = new Map<number, { model: string; drafted: boolean; revisedOwnDraft: boolean | null }>();
-  const checkers = new Map<number, PracticeCheckerVerdict | null>();
+  const checkers = new Map<number, PracticeCheckerVerdict | PracticeCheckerVerdictUnread | null>();
   for (const row of rows) {
     const original = structureRepairOriginalKey(row.callSiteKey);
     const repair = original !== row.callSiteKey;
@@ -103,11 +112,39 @@ export function practiceCheckerVerdictOf(content: string): PracticeCheckerVerdic
   return Object.freeze({ satisfied: value.satisfied, misleading: typeof value.misleading === "boolean" ? value.misleading : null });
 }
 
-/** One row per round, in round order. A round without an accepted draft is NO_DRAFT; one without a verdict NO_VERDICT. */
+/**
+ * Fix round 1: a checker verdict accepted through the PATCH follow-up. Its stored reply is the patch alone (dotted keys,
+ * e.g. {"criteria.no_overstatement": true}); the merged verdict is never stored. It is rebuilt as the gateway merged it
+ * (`mergePatchReply`, packages/providers/src/patch-follow-up.ts): each dotted key set at its path in the call's earlier
+ * refused try, then read with `practiceCheckerVerdictOf`. "UNREAD" when the earlier try is missing or not one object,
+ * the patch is not one object or does not fit it, or the merge holds no verdict.
+ */
+export function practicePatchedCheckerVerdictOf(earlier: string | null, patch: string): PracticeCheckerVerdict | PracticeCheckerVerdictUnread {
+  if (earlier === null) return "UNREAD";
+  const base = decodeModelJson(earlier);
+  const asked = decodeModelJson(patch);
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+  if (!base.ok || !asked.ok || !isObject(base.value) || !isObject(asked.value)) return "UNREAD";
+  try {
+    const merged = mergePatchReply(
+      Object.freeze({ base: base.value, locator: Object.freeze({ code: "SCHEMA_FAILED", paths: Object.keys(asked.value) }) }), patch, undefined);
+    return merged.ok ? practiceCheckerVerdictOf(merged.content) ?? "UNREAD" : "UNREAD";
+  } catch {
+    // A dotted key whose parent is not in the earlier try: the merge cannot place it.
+    return "UNREAD";
+  }
+}
+
+/**
+ * One row per round, in round order. A round without an accepted draft is NO_DRAFT; one without a verdict NO_VERDICT; one
+ * whose patched verdict could not be read VERDICT_UNREAD.
+ */
 export function practiceStoryRoundRows(facts: readonly PracticeStoryRoundFacts[]): readonly PracticeStoryRoundRow[] {
   return Object.freeze([...facts].sort((left, right) => left.round - right.round).map((fact) => {
-    const verdict = fact.drafted ? fact.verdict : null;
-    const outcome: PracticeStoryRoundOutcome = !fact.drafted ? "NO_DRAFT" : verdict === null ? "NO_VERDICT"
+    const read = fact.drafted ? fact.verdict : null;
+    const verdict = read === "UNREAD" ? null : read;
+    const outcome: PracticeStoryRoundOutcome = !fact.drafted ? "NO_DRAFT" : read === "UNREAD" ? "VERDICT_UNREAD" : verdict === null ? "NO_VERDICT"
       : verdict.satisfied ? "SATISFIED" : verdict.misleading === true ? "MISLEADING"
         : verdict.misleading === false ? "WORDING_NOTE_ONLY" : "NOT_SATISFIED";
     return Object.freeze({
@@ -164,24 +201,31 @@ export function practiceStoryEngineLines(block: PracticeStoryEngineBlock): reado
  * The backup's model is the first storyteller call whose ref is not the first storyteller's (its rounds come after the
  * first loop's: STORY:STORYTELLER:3 with two rounds); a `REPAIR:STRUCTURE:` row (Haiku's) is never read as the backup.
  * The rows Haiku's structure repair answered (`REPAIR:STRUCTURE:STORY:<role>:<n>`) are read with their round
- * (pre-flight PF-D8.2).
+ * (pre-flight PF-D8.2). A checker try accepted through the patch follow-up (recorded form PATCH) is read merged onto the
+ * latest earlier refused try of the same call (its call-site key and AI; each try has its own attempt id) (fix round 1).
+ * Null when the run's row is absent: the block is left out, as the practice's other run readers read a missing run
+ * (`readPracticeFrozenLength`, `readPracticeShapeFacts`), never thrown (fix round 1).
  */
 export async function collectPracticeStoryEngine(pool: Pool, runId: string,
-  story: Readonly<{ outcome: string; backup?: StoryBackupRecord }> | null): Promise<PracticeStoryEngineBlock> {
+  story: Readonly<{ outcome: string; backup?: StoryBackupRecord }> | null): Promise<PracticeStoryEngineBlock | null> {
   const run = (await pool.query<{ envelope_basis: unknown }>("SELECT envelope_basis FROM core.run WHERE run_id=$1", [runId])).rows[0];
-  if (run === undefined) throw new TypeError("PRACTICE_STORY_ENGINE_RUN_ABSENT");
+  if (run === undefined) return null;
   const engine = engineOfRun(parseCostEnvelopeBasis(run.envelope_basis)).engine;
   const entries = (await pool.query<{ call_site_key: string; actor_ref: string; outcome: string; attempt_id: string | null;
-    raw_artifact_ref: string | null; parse_status: string | null; raw_text: string | null; content_ciphertext: unknown }>(
+    raw_artifact_ref: string | null; parse_status: string | null; reply_form: string | null; raw_text: string | null;
+    content_ciphertext: unknown }>(
     `SELECT e.call_site_key, e.actor_ref, e.outcome, e.attempt_id::text AS attempt_id, e.raw_artifact_ref::text AS raw_artifact_ref,
-            a.parse_status, a.raw_text, a.content_ciphertext
+            a.parse_status, a.reply_form, a.raw_text, a.content_ciphertext
        FROM ledger.ledger_entry e LEFT JOIN ledger.raw_artifact a ON a.raw_artifact_id = e.raw_artifact_ref
       WHERE e.run_id=$1 AND e.action_kind='MODEL_CALL'
         AND (e.call_site_key LIKE 'STORY:%' OR e.call_site_key LIKE 'REPAIR:STRUCTURE:STORY:%')
       ORDER BY e.sequence`, [runId])).rows;
   const ledgerRows: PracticeStoryLedgerRow[] = [];
   const promptRead = new Set<number>();
-  for (const entry of entries) {
+  const contentOf = async (entry: (typeof entries)[number]): Promise<string> => replyContentOf((await decryptContentForRun<{
+    rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact", entry.raw_artifact_ref!,
+    (entry.content_ciphertext ?? null) as never, { rawText: entry.raw_text ?? "", parseErrorDetail: null })).rawText);
+  for (const [index, entry] of entries.entries()) {
     const original = structureRepairOriginalKey(entry.call_site_key);
     const repair = original !== entry.call_site_key;
     const site = STORY_ROUND_SITE.exec(original);
@@ -198,11 +242,21 @@ export async function collectPracticeStoryEngine(pool: Pool, runId: string,
         revisionPrompt = Array.isArray(messages) && practiceIsRevisionPrompt(messages as PromptPacket["messages"]);
       }
     }
-    let verdict: PracticeCheckerVerdict | null = null;
-    if (site[1] === "CHECKER" && accepted) {
-      const stored = await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
-        entry.raw_artifact_ref!, (entry.content_ciphertext ?? null) as never, { rawText: entry.raw_text ?? "", parseErrorDetail: null });
-      verdict = practiceCheckerVerdictOf(replyContentOf(stored.rawText));
+    let verdict: PracticeCheckerVerdict | PracticeCheckerVerdictUnread | null = null;
+    if (site[1] === "CHECKER" && accepted && entry.reply_form === "PATCH") {
+      // The patch alone was stored: merge it onto the same call's latest earlier refused (non-patch) try.
+      const earlier = entries.slice(0, index).findLast((before) => before.call_site_key === entry.call_site_key
+        && before.actor_ref === entry.actor_ref && before.reply_form !== "PATCH" && before.raw_artifact_ref !== null
+        && before.parse_status !== null && before.parse_status !== "PARSED");
+      let earlierContent: string | null = null;
+      try {
+        earlierContent = earlier === undefined ? null : await contentOf(earlier);
+      } catch {
+        earlierContent = null;
+      }
+      verdict = practicePatchedCheckerVerdictOf(earlierContent, await contentOf(entry));
+    } else if (site[1] === "CHECKER" && accepted) {
+      verdict = practiceCheckerVerdictOf(await contentOf(entry));
     }
     ledgerRows.push(Object.freeze({ callSiteKey: entry.call_site_key, model: modelOfRef(entry.actor_ref), accepted, revisionPrompt, verdict }));
   }

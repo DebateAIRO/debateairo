@@ -22,7 +22,8 @@ import { replyContentOf } from "./practice-lanes.js";
  * - `storyJsonBreaks`: per AI, its storyteller replies and those that were not readable JSON, by where the break came:
  *   after the long version began, before it, or unknown. The v4 form puts long last so a late break loses only it.
  *
- * Counts and codes only; never a reply's text. A patch reply (only the asked members) is not a whole story and is skipped.
+ * Counts and codes only; never a reply's text. A patch try (recorded form PATCH: only the asked members) is not a whole
+ * story nor a storyteller reply of its own, and is skipped in both tables.
  */
 
 export type PracticeStoryField = StoryWordTargetField | "long";
@@ -167,42 +168,73 @@ export function practiceStoryTargetsOf(basis: Readonly<{ length?: LengthGuidance
   return Object.freeze({ story: basis.length.story, charactersPerWord: basis.length.charactersPerWord });
 }
 
+/** One storyteller ledger row as the tables read it, in ledger order, its reply already decrypted (pure input). */
+export type PracticeStoryLengthLedgerRow = Readonly<{
+  callSiteKey: string;
+  /** The row's own model (a structure-repair row's is the repair model's, never counted). */
+  model: string;
+  outcome: string; parseStatus: string;
+  /** The artifact's recorded form (`ledger.raw_artifact.reply_form`, migration 0120); null for an older row. */
+  replyForm: string | null;
+  content: string;
+}>;
+
 /**
- * Debate mode: read before the throwaway database goes. The targets come from the run's own receipt
- * (`envelope_basis.length` beside `envelope_basis.engine`), never from the register; a run admitted without both has none.
- * A storyteller reply Haiku's structure repair rescued stands under `REPAIR:STRUCTURE:STORY:STORYTELLER:<n>` while the
- * original try stays FAILED (LG-A contract deviation 7): its words count under the model of the call it repaired (the
- * latest earlier plain-key row of that key, as LG-B's `wordsModel` does), and it is never a storyteller reply of its own.
+ * The two tables from the storyteller's rows. A storyteller reply Haiku's structure repair rescued stands under
+ * `REPAIR:STRUCTURE:STORY:STORYTELLER:<n>` while the original try stays FAILED (LG-A contract deviation 7): its words count
+ * under the model of the call it repaired (the latest earlier plain-key row of that key, as LG-B's `wordsModel` does), and
+ * it is never a storyteller reply of its own. A PATCH try (the short follow-up, recorded form PATCH) holds only the asked
+ * members: it is neither a story nor a storyteller reply, so it counts in neither table (fix round 1).
  */
-export async function collectPracticeStoryLength(pool: Pool, runId: string): Promise<PracticeStoryLengthBlock> {
-  const run = (await pool.query<{ envelope_basis: unknown }>("SELECT envelope_basis FROM core.run WHERE run_id=$1", [runId])).rows[0];
-  const targets = practiceStoryTargetsOf(run === undefined ? undefined : parseCostEnvelopeBasis(run.envelope_basis));
-  const rows = (await pool.query<{ call_site_key: string; actor_ref: string; outcome: string; raw_artifact_ref: string; parse_status: string;
-    raw_text: string; content_ciphertext: unknown }>(
-    `SELECT e.call_site_key, e.actor_ref, e.outcome, e.raw_artifact_ref::text AS raw_artifact_ref, a.parse_status, a.raw_text, a.content_ciphertext
-       FROM ledger.ledger_entry e JOIN ledger.raw_artifact a ON a.raw_artifact_id = e.raw_artifact_ref
-      WHERE e.run_id=$1 AND e.action_kind='MODEL_CALL'
-        AND (e.call_site_key LIKE 'STORY:STORYTELLER:%' OR e.call_site_key LIKE 'REPAIR:STRUCTURE:STORY:STORYTELLER:%')
-      ORDER BY e.sequence`, [runId])).rows;
+export function practiceStoryLengthBlockOf(rows: readonly PracticeStoryLengthLedgerRow[], targets: StoryTargets | null): PracticeStoryLengthBlock {
   const accepted: { model: string; samples: readonly PracticeStoryFieldSample[] }[] = [];
   const replies: { model: string; jsonBreak: PracticeStoryJsonBreak | null }[] = [];
   const callModels = new Map<string, string>();
   for (const row of rows) {
-    const original = structureRepairOriginalKey(row.call_site_key);
-    const repair = original !== row.call_site_key;
-    const ownModel = PREVIEW_PROVIDER_REF_MODELS[row.actor_ref] ?? `unreviewed:${row.actor_ref}`;
-    if (!repair) callModels.set(original, ownModel);
+    if (row.replyForm === "PATCH") continue;
+    const original = structureRepairOriginalKey(row.callSiteKey);
+    const repair = original !== row.callSiteKey;
+    if (!repair) callModels.set(original, row.model);
     // A repair row with no try of its key before it has no call to count for.
-    const model = repair ? callModels.get(original) : ownModel;
+    const model = repair ? callModels.get(original) : row.model;
     if (model === undefined) continue;
-    const stored = await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
-      row.raw_artifact_ref, (row.content_ciphertext ?? null) as never, { rawText: row.raw_text, parseErrorDetail: null });
-    const content = replyContentOf(stored.rawText);
-    if (!repair) replies.push({ model, jsonBreak: row.parse_status === "PARSE_FAILED" ? practiceStoryJsonBreakOf(content) : null });
-    if (row.outcome === "OK" && row.parse_status === "PARSED") {
-      const samples = practiceStoryFieldSamples(content, targets);
+    if (!repair) replies.push({ model, jsonBreak: row.parseStatus === "PARSE_FAILED" ? practiceStoryJsonBreakOf(row.content) : null });
+    if (row.outcome === "OK" && row.parseStatus === "PARSED") {
+      const samples = practiceStoryFieldSamples(row.content, targets);
       if (samples !== null) accepted.push({ model, samples });
     }
   }
   return Object.freeze({ storyLengthByField: practiceStoryLengthRows(accepted), storyJsonBreaks: practiceStoryJsonBreakRows(replies) });
+}
+
+/**
+ * Debate mode: read before the throwaway database goes. The targets come from the run's own receipt
+ * (`envelope_basis.length` beside `envelope_basis.engine`), never from the register; a run admitted without both has none.
+ * Null when the run's row is absent: the block is left out, as the practice's other run readers read a missing run
+ * (`readPracticeFrozenLength`, `readPracticeShapeFacts`), never thrown (fix round 1).
+ */
+export async function collectPracticeStoryLength(pool: Pool, runId: string): Promise<PracticeStoryLengthBlock | null> {
+  const run = (await pool.query<{ envelope_basis: unknown }>("SELECT envelope_basis FROM core.run WHERE run_id=$1", [runId])).rows[0];
+  if (run === undefined) return null;
+  const targets = practiceStoryTargetsOf(parseCostEnvelopeBasis(run.envelope_basis));
+  const entries = (await pool.query<{ call_site_key: string; actor_ref: string; outcome: string; raw_artifact_ref: string; parse_status: string;
+    reply_form: string | null; raw_text: string; content_ciphertext: unknown }>(
+    `SELECT e.call_site_key, e.actor_ref, e.outcome, e.raw_artifact_ref::text AS raw_artifact_ref, a.parse_status, a.reply_form,
+            a.raw_text, a.content_ciphertext
+       FROM ledger.ledger_entry e JOIN ledger.raw_artifact a ON a.raw_artifact_id = e.raw_artifact_ref
+      WHERE e.run_id=$1 AND e.action_kind='MODEL_CALL'
+        AND (e.call_site_key LIKE 'STORY:STORYTELLER:%' OR e.call_site_key LIKE 'REPAIR:STRUCTURE:STORY:STORYTELLER:%')
+      ORDER BY e.sequence`, [runId])).rows;
+  const rows: PracticeStoryLengthLedgerRow[] = [];
+  for (const entry of entries) {
+    // A PATCH try is skipped by the pure reading; its reply need not be decrypted.
+    const stored = entry.reply_form === "PATCH" ? { rawText: "" }
+      : await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
+        entry.raw_artifact_ref, (entry.content_ciphertext ?? null) as never, { rawText: entry.raw_text, parseErrorDetail: null });
+    rows.push(Object.freeze({
+      callSiteKey: entry.call_site_key, model: PREVIEW_PROVIDER_REF_MODELS[entry.actor_ref] ?? `unreviewed:${entry.actor_ref}`,
+      outcome: entry.outcome, parseStatus: entry.parse_status, replyForm: entry.reply_form, content: replyContentOf(stored.rawText)
+    }));
+  }
+  return practiceStoryLengthBlockOf(rows, targets);
 }

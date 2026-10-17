@@ -8,6 +8,7 @@ import {
 } from "@debateai/register";
 import {
   practiceStoryFieldSamples,
+  practiceStoryLengthBlockOf,
   practiceStoryJsonBreakOf,
   practiceStoryJsonBreakRows,
   practiceStoryLengthLines,
@@ -124,5 +125,44 @@ describe("practice: the story's targets come only with engine 2 (R1d)", () => {
     expect(practiceStoryTargetsOf(undefined)).toBeNull();
     expect(practiceStoryTargetsOf({ length })).toBeNull();
     expect(practiceStoryTargetsOf({ length, engine })).toEqual({ story: length.story, charactersPerWord: length.charactersPerWord });
+  });
+});
+
+// Fix round 1: a PATCH try (the short follow-up) holds only the asked members; it is skipped by its recorded form,
+// never guessed from its shape, in both the words table and the reply count.
+describe("practice: the story tables skip the patch follow-up by its recorded form (R1d, fix round 1)", () => {
+  const whole = JSON.stringify(STORY);
+  const row = (over: Partial<Parameters<typeof practiceStoryLengthBlockOf>[0][number]>) => ({
+    callSiteKey: "STORY:STORYTELLER:1", model: "m", outcome: "OK", parseStatus: "PARSED", replyForm: "ORIGINAL", content: whole, ...over
+  });
+
+  it("a PATCH try counts neither its words nor as a reply, even when its text reads as a whole story", () => {
+    const block = practiceStoryLengthBlockOf([
+      row({ outcome: "FAILED", parseStatus: "SCHEMA_FAILED" }),
+      row({ replyForm: "PATCH" }),
+      row({ replyForm: "PATCH", outcome: "FAILED", parseStatus: "PARSE_FAILED", content: "{" })
+    ], TARGETS);
+    expect(block.storyJsonBreaks).toEqual([
+      { model: "m", replies: 1, parseFailed: 0, afterLongStarted: 0, beforeLong: 0, positionUnknown: 0 }
+    ]);
+    expect(block.storyLengthByField).toEqual([]);
+  });
+
+  it("a whole accepted story counts; a structure-repair row counts its words under the call it repaired, never as a reply", () => {
+    const block = practiceStoryLengthBlockOf([
+      row({ outcome: "FAILED", parseStatus: "PARSE_FAILED", content: whole.slice(0, 40) }),
+      row({ callSiteKey: "REPAIR:STRUCTURE:STORY:STORYTELLER:1", model: "h", replyForm: "STRUCTURE" }),
+      row({ callSiteKey: "REPAIR:STRUCTURE:STORY:STORYTELLER:2", model: "h", replyForm: "STRUCTURE" })
+    ], TARGETS);
+    expect(block.storyJsonBreaks).toEqual([
+      { model: "m", replies: 1, parseFailed: 1, afterLongStarted: 0, beforeLong: 1, positionUnknown: 0 }
+    ]);
+    // One story: one text per short field, two path lines and two reasons; nothing from the second repair (no call of its key).
+    expect(block.storyLengthByField.map((entry) => [entry.model, entry.field, entry.texts])).toEqual([
+      ["m", "headline", 1], ["m", "summary", 1], ["m", "confidence", 1], ["m", "positionLine", 2], ["m", "change", 1],
+      ["m", "whyReason", 2], ["m", "long", 1]
+    ]);
+    expect(block.storyLengthByField.find((entry) => entry.field === "headline")).toEqual(
+      { model: "m", field: "headline", guidedWords: 15, texts: 1, actualWords: { median: words(STORY.short.headline), max: words(STORY.short.headline) } });
   });
 });

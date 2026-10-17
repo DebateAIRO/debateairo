@@ -464,8 +464,9 @@ echo "exit: $?"
 - Example (S-6's debate command plus): `--length-policy tools/preview-practice/length-policy-start.json --engine-policy tools/preview-practice/engine-policy-start.json`.
 - Every debate report now says which engine the run was admitted with (`report.json` `ask.engine`, from the run's own
   receipt) and, counts and codes only: `storyRounds` (per story round: the storyteller's model, `MISLEADING`,
-  `WORDING_NOTE_ONLY`, `SATISFIED`, `NOT_SATISFIED` for today's checker, `NO_DRAFT` or `NO_VERDICT`, and whether the round
-  revised its own draft), `storyBackups` (the first storyteller's model, the signal `UNREACHABLE`, `TOO_SLOW`,
+  `WORDING_NOTE_ONLY`, `SATISFIED`, `NOT_SATISFIED` for today's checker, `NO_DRAFT`, `NO_VERDICT` or `VERDICT_UNREAD` (the
+  checker answered through the short follow-up and its earlier reply could not be read), and whether the round revised
+  its own draft), `storyBackups` (the first storyteller's model, the signal `UNREACHABLE`, `TOO_SLOW`,
   `OUT_OF_ROOM` or `UNUSABLE`, the backup's model, the outcome) and `storyReadyRate` (the stored stories by outcome, to
   sum over runs). The story tables `storyLengthByField` and `storyJsonBreaks` are described under "The story in words".
 - A story or checker reply that Haiku's structure repair rescued counts for its own round (and its words for the AI

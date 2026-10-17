@@ -3,6 +3,7 @@ import { PREVIEW_PROVIDER_REF_MODELS, buildFramedRevisionPrompt } from "@debatea
 import { practiceIsRevisionPrompt, practiceReplyFormOf } from "../../tools/preview-practice/practice-lanes.js";
 import {
   practiceCheckerVerdictOf,
+  practicePatchedCheckerVerdictOf,
   practiceStoryBackupRows,
   practiceStoryEngineLines,
   practiceStoryReadyRate,
@@ -63,6 +64,48 @@ describe("practice: one row per story round (R1d)", () => {
         verdict: { satisfied: false, misleading: true } },
       { callSiteKey: "REPAIR:STRUCTURE:STORY:STORYTELLER:2", model: "h", accepted: true, revisionPrompt: null, verdict: null },
       { callSiteKey: "ANSWER:WRITER", model: "w", accepted: true, revisionPrompt: null, verdict: null }
+    ]);
+    expect(practiceStoryRoundRows(facts)).toEqual([
+      { model: "m", round: 1, misleading: true, wordingNoteOnly: false, revisedOwnDraft: false, outcome: "MISLEADING" }
+    ]);
+  });
+});
+
+// Fix round 1: a checker verdict accepted through the PATCH follow-up is stored as the patch alone (dotted keys); the
+// merged verdict is never stored, so it is rebuilt from the call's earlier refused try, as the gateway merged it.
+describe("practice: a story checker verdict accepted through the patch follow-up (R1d, fix round 1)", () => {
+  const earlier = JSON.stringify({ satisfied: false, misleading: true, objection: "x",
+    criteria: { ...CRITERIA, no_overstatement: "not a boolean" } });
+
+  it("the patch is applied at its dotted paths onto the earlier refused try, then the verdict is read", () => {
+    expect(practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "criteria.no_overstatement": false })))
+      .toEqual({ satisfied: false, misleading: true });
+    expect(practicePatchedCheckerVerdictOf(JSON.stringify({ satisfied: "yes", misleading: true, objection: null, criteria: CRITERIA }),
+      JSON.stringify({ satisfied: true, misleading: false }))).toEqual({ satisfied: true, misleading: false });
+  });
+
+  it("an earlier try that cannot be read, or a patch that does not merge into it, is VERDICT_UNREAD, never NO_VERDICT", () => {
+    const patch = JSON.stringify({ "criteria.no_overstatement": false });
+    expect(practicePatchedCheckerVerdictOf(null, patch)).toBe("UNREAD");
+    expect(practicePatchedCheckerVerdictOf("not json", patch)).toBe("UNREAD");
+    expect(practicePatchedCheckerVerdictOf(earlier, "not json")).toBe("UNREAD");
+    expect(practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "nowhere.at.all": true }))).toBe("UNREAD");
+    const facts = practiceStoryRoundFactsOf([
+      { callSiteKey: "STORY:STORYTELLER:1", model: "m", accepted: true, revisionPrompt: false, verdict: null },
+      { callSiteKey: "STORY:CHECKER:1", model: "c", accepted: false, revisionPrompt: null, verdict: null },
+      { callSiteKey: "STORY:CHECKER:1", model: "c", accepted: true, revisionPrompt: null, verdict: "UNREAD" }
+    ]);
+    expect(practiceStoryRoundRows(facts)).toEqual([
+      { model: "m", round: 1, misleading: null, wordingNoteOnly: false, revisedOwnDraft: false, outcome: "VERDICT_UNREAD" }
+    ]);
+  });
+
+  it("a merged verdict counts for its round like any accepted verdict", () => {
+    const verdict = practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "criteria.no_overstatement": false }));
+    const facts = practiceStoryRoundFactsOf([
+      { callSiteKey: "STORY:STORYTELLER:1", model: "m", accepted: true, revisionPrompt: false, verdict: null },
+      { callSiteKey: "STORY:CHECKER:1", model: "c", accepted: false, revisionPrompt: null, verdict: null },
+      { callSiteKey: "STORY:CHECKER:1", model: "c", accepted: true, revisionPrompt: null, verdict }
     ]);
     expect(practiceStoryRoundRows(facts)).toEqual([
       { model: "m", round: 1, misleading: true, wordingNoteOnly: false, revisedOwnDraft: false, outcome: "MISLEADING" }

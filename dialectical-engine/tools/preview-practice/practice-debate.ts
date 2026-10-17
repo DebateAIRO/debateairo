@@ -945,7 +945,8 @@ export async function runPracticeDebate(input: Readonly<{
     // A reading that breaks costs only this block, never the report.
     let storyLength: PracticeStoryLengthBlock | undefined;
     try {
-      storyLength = await collectPracticeStoryLength(pool, job.runId);
+      storyLength = await collectPracticeStoryLength(pool, job.runId) ?? undefined;
+      if (storyLength === undefined) progress("story length: the run's row is absent");
     } catch (error) {
       progress(`story length: could not be read (${codeOf(error)})`);
     }
@@ -953,7 +954,8 @@ export async function runPracticeDebate(input: Readonly<{
     // (the stored story's backup record comes from the story the practice already read). Same rule: only this block.
     let storyEngine: PracticeStoryEngineBlock | undefined;
     try {
-      storyEngine = await collectPracticeStoryEngine(pool, job.runId, storedStory);
+      storyEngine = await collectPracticeStoryEngine(pool, job.runId, storedStory) ?? undefined;
+      if (storyEngine === undefined) progress("story rounds: the run's row is absent");
     } catch (error) {
       progress(`story rounds: could not be read (${codeOf(error)})`);
     }
