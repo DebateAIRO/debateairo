@@ -334,6 +334,7 @@ apps/runner/src/dev-support-config.ts
 apps/runner/src/dev-support-model.ts
 apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
+apps/runner/src/engine-contracts.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts
 apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
@@ -1047,6 +1048,7 @@ packages/register/src/country-policy.ts
 packages/register/src/debate-shape-ceiling.ts
 packages/register/src/debate-shape-policy.ts
 packages/register/src/email-mfa-policy.ts
+packages/register/src/engine-contract-hash.ts
 packages/register/src/engine-shape.ts
 packages/register/src/engine-version-policy.ts
 packages/register/src/index.ts

@@ -1333,6 +1333,7 @@ export {
   type DebateShapeSiteCounts
 } from "./debate-shape-ceiling.js";
 export { MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, readMapContractHash } from "./map-contract-hash.js";
+export { ENGINE_CONTRACT_HASH_ROW_KEY, parseEngineContractHash, readEngineContractHash } from "./engine-contract-hash.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_DEPLOYMENT_REGISTER_ROW,

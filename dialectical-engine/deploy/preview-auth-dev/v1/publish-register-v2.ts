@@ -72,17 +72,17 @@ const COMPOSER = 'preview-register-composer-v2' as const;
 export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy','staffAccessPolicy'] as const);
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
- * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (68: the 67 at
- * dev 5109a5501 plus role rotation — the 66 of dev b75e4c294 and answerRoleRotationPolicy — and mapContractHash, the
- * debate shape's sealed map prompts (P2b Task 6); the same keys the live v9 holds minus the two base-owned ones, plus
- * those two rows once they are published).
+ * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (69: the 67 at
+ * dev 5109a5501 plus role rotation — the 66 of dev b75e4c294 and answerRoleRotationPolicy — mapContractHash, the
+ * debate shape's sealed map prompts (P2b Task 6), and engineContractHash, engine 2's seal (engine redesign R1d Task 4);
+ * the same keys the live v9 holds minus the two base-owned ones, plus those two rows once they are published).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'acceptanceOrganCostBounds','admissionPolicy','answerRoleRotationPolicy','auditSourceIpKdfPolicy','backupEmailVerificationPolicy','billingPlans','billingPolicy',
   'branchFreezeEpsilon','candidateConfidenceBand','channelPolicy','claimTypeCompositionMap','composerContractHash','compositionBundleBudget',
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
-  'disagreementThreshold','dispersionScale','downgradeBands','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
+  'disagreementThreshold','dispersionScale','downgradeBands','engineContractHash','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
   'evaluatorRoleRef','globalStopDelta','hiddenNodeScoreThreshold','judgeContractHash','judgementSelectionPolicy','livenessPolicy',
   'mapContractHash','mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
   'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy',

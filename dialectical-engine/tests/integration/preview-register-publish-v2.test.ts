@@ -31,11 +31,11 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       expect(first.addedKeys).toEqual(['answerRoleRotationPolicy', 'consumerRecoveryPolicy', 'publicationCheckPolicy', 'taxAuthorities']);
       const firstInput = { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: first, approval: approvalOf(first) };
       const v5 = await publishPreviewRegisterV2(pool, firstInput);
-      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: 70, snapshotSha256: first.snapshotSha256 });
+      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: 71, snapshotSha256: first.snapshotSha256 });
       // A crashed run re-run with the same plan replays its own receipt.
       expect(await publishPreviewRegisterV2(pool, firstInput)).toEqual(v5);
 
-      // 2. One value changed on top of the 70-row result (v1's composer refuses this base).
+      // 2. One value changed on top of the 71-row result (v1's composer refuses this base).
       const changed = source.map(row => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: '"' + 'e'.repeat(64) + '"' } : row) as typeof source;
       const current = await readSealedSnapshot(pool, '5');
       const second = composePreviewSnapshotV2({ sourceRows: changed, baseRows: current.rows, baseRegisterVersion: '5', baseSnapshotSha256: current.snapshotSha256 });
@@ -44,7 +44,7 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       // An approval for a different delta writes nothing.
       await expect(publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: { ...approvalOf(second), deltaSha256: first.deltaSha256 } })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
       const v6 = await publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: approvalOf(second) });
-      expect(v6).toMatchObject({ registerVersion: '6', baseRegisterVersion: '5', rowCount: 70 });
+      expect(v6).toMatchObject({ registerVersion: '6', baseRegisterVersion: '5', rowCount: 71 });
       const v6Rows = (await readSealedSnapshot(pool, '6')).rows;
       expect(v6Rows.find(row => row.rowKey === 'composerContractHash')!.valueJsonText).toBe('"' + 'e'.repeat(64) + '"');
       for (const row of v6Rows) if (row.rowKey !== 'composerContractHash') expect(row).toEqual(current.rows.find(old => old.rowKey === row.rowKey));

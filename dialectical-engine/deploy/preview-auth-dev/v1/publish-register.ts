@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
   createPostgresRegisterPublicationPort, parseRegisterVersionText, buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
-  PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW, MAP_CONTRACT_HASH_ROW_KEY,
+  PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW, MAP_CONTRACT_HASH_ROW_KEY, ENGINE_CONTRACT_HASH_ROW_KEY,
   type BootstrapRegister, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -30,7 +30,8 @@ export async function buildPreviewSourceRows(bootstrap:BootstrapRegister, runtim
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
   const rows=[...(await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_GLM_PROVIDER_REFS[0],evaluatorRoleRef:PREVIEW_GLM_PROVIDER_REFS[1]},'local'))
     // P2b: the v1 kit predates the debate shape; its reviewed closure stays the 66 keys it was written for.
-    .filter(row=>row.rowKey!==MAP_CONTRACT_HASH_ROW_KEY),
+    // Engine redesign (R1d Task 4): so it predates engine 2's seal too.
+    .filter(row=>row.rowKey!==MAP_CONTRACT_HASH_ROW_KEY&&row.rowKey!==ENGINE_CONTRACT_HASH_ROW_KEY),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   if(rows.length!==66)fail(); // Reviewed source closure; allocator result is never assumed from this count.
   return Object.freeze(rows.map(row=>Object.freeze(row)));

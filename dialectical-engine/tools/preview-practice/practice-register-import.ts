@@ -547,13 +547,14 @@ export type PracticeShapeVersion = Readonly<{
  * The contract-hash rows the practice version takes from THIS code (P2b ruling X3, plan 2026-10-12-debate-shape-phase2d
  * Contract deviation 7). The runner refuses a debate-shape row whose map hash is not its own map contracts, and its
  * boot (assertRegisterPromptContractHashes) refuses a register whose judge, composer or conformance hash is not what
- * this candidate code sends (pre-flight PF-D7).
+ * this candidate code sends (pre-flight PF-D7). Engine redesign (R1d Task 4): engineContractHash too, the seal the runner
+ * checks beside an engine row (apps/runner/src/engine-boot.ts), so a throwaway version always carries this code's seal.
  */
-export const PRACTICE_CODE_HASH_ROW_KEYS = Object.freeze(["composerContractHash", "conformanceContractHash", "judgeContractHash",
-  "mapContractHash"] as const);
+export const PRACTICE_CODE_HASH_ROW_KEYS = Object.freeze(["composerContractHash", "conformanceContractHash", "engineContractHash",
+  "judgeContractHash", "mapContractHash"] as const);
 
 /**
- * The code's own values of those four rows, exactly as the development register builder seals them
+ * The code's own values of those five rows, exactly as the development register builder seals them
  * (apps/runner/src/dev-deployment-register.ts), its source ref included: the runner's policy reader
  * (apps/runner/src/dev-runner-policy.ts) refuses a judge, composer or conformance hash row sealed by anyone else
  * (DEV_RUNNER_POLICY_PROVENANCE_INVALID; found by P2d Task 6's whole shape debate). The version itself is still

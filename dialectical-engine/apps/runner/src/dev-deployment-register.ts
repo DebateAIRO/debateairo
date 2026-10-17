@@ -8,6 +8,7 @@ import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT } from "./index.js";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
 import { mapPromptContractHash } from "@debateai/map";
+import { engineContractHash } from "./engine-contracts.js";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -559,6 +560,11 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
     // Debate shape (P2b Task 6, spec 2026-10-12 §4): the map's prompt contracts, sealed. An optional row: the runner
     // requires it only beside a debateShapePolicy row (apps/runner/src/debate-shape-boot.ts).
     mapContractHash: mapPromptContractHash(),
+    // Engine redesign (R1d, INTERFACE §2.4; controller ruling Q2): the seal over engine 2's sealed contracts, code-owned
+    // like mapContractHash, so every dev, hosted and preview version carries the seal of the code that built it. An
+    // optional row: the runner reads it only beside an engineVersionPolicy row (apps/runner/src/engine-boot.ts). R1d's
+    // list is empty, so its value is the sha256 of the fingerprint header alone.
+    engineContractHash: engineContractHash(),
     // Length guidance (LG-C, 2026-10-15): the checker's seal is v2 then its length variant length.v1.
     conformanceContractHash: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT),
     // codex r2 B1a: the fingerprint is taken from the constant the runner

@@ -16,6 +16,7 @@ import {
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import { buildPreviewSourceRowsV3, composePreviewSnapshotV3 } from "../../deploy/preview-auth-dev/v1/publish-register-v3.js";
 import { buildDevelopmentRunnerRegisterRows, DEVELOPMENT_RUNNER_SOURCE_REF } from "../../apps/runner/src/dev-deployment-register.js";
+import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW, STAFF_ACCESS_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import { callFamilyOf, practiceMapStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
@@ -142,7 +143,7 @@ function exportWith(rows: readonly Readonly<{ row_key: string; value_json: strin
 }
 
 describe("practice debate shape: the throwaway register version", () => {
-  /** The practice's own rows: the debate-shape row and the code's four contract-hash rows (ruling X3; pre-flight PF-D7). */
+  /** The practice's own rows: the debate-shape row and the code's five contract-hash rows (ruling X3; pre-flight PF-D7). */
   const OWN = new Set<string>([DEBATE_SHAPE_POLICY_ROW_KEY, ...PRACTICE_CODE_HASH_ROW_KEYS]);
   let CODE: readonly RegisterPublicationRow[] = [];
   beforeAll(async () => { CODE = await practiceCodeContractHashRows(); });
@@ -152,7 +153,7 @@ describe("practice debate shape: the throwaway register version", () => {
     const { rows, row } = practiceShapeVersionRows(document, debateShapePolicyStartValues(), CODE);
     expect(row).toBe("ADDED");
     expect(rows.map((entry) => entry.rowKey))
-      .toEqual(["alpha", "composerContractHash", "conformanceContractHash", DEBATE_SHAPE_POLICY_ROW_KEY, "judgeContractHash", "mapContractHash", "zeta"]);
+      .toEqual(["alpha", "composerContractHash", "conformanceContractHash", DEBATE_SHAPE_POLICY_ROW_KEY, "engineContractHash", "judgeContractHash", "mapContractHash", "zeta"]);
     expect(rows.filter((entry) => !OWN.has(entry.rowKey))).toEqual(practiceVersionRows(document, "5"));
     expect(rows.find((entry) => entry.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY))
       .toEqual({ ...debateShapePolicyRow(debateShapePolicyStartValues(), PRACTICE_SHAPE_SOURCE_REF) });
@@ -168,7 +169,7 @@ describe("practice debate shape: the throwaway register version", () => {
     expect(shapeRows[0]).toEqual({ ...debateShapePolicyRow(debateShapePolicyStartValues(), PRACTICE_SHAPE_SOURCE_REF) });
   });
 
-  it("supersedes the judge, composer and conformance hashes and adds the map hash, all four the code's own (the dev builder's)", async () => {
+  it("supersedes the judge, composer and conformance hashes and adds the map hash and the engine seal, all five the code's own (the dev builder's)", async () => {
     const dev = await buildDevelopmentRunnerRegisterRows();
     expect(CODE.map((entry) => entry.rowKey)).toEqual([...PRACTICE_CODE_HASH_ROW_KEYS]);
     for (const key of PRACTICE_CODE_HASH_ROW_KEYS) {
@@ -180,6 +181,7 @@ describe("practice debate shape: the throwaway register version", () => {
         .toEqual({ rowKey: key, valueJsonText: canonicalRegisterJson(value as string), sourceRef: DEVELOPMENT_RUNNER_SOURCE_REF });
     }
     expect(CODE.find((entry) => entry.rowKey === "mapContractHash")!.valueJsonText).toBe(canonicalRegisterJson(mapPromptContractHash()));
+    expect(CODE.find((entry) => entry.rowKey === "engineContractHash")!.valueJsonText).toBe(canonicalRegisterJson(engineContractHash()));
     // The export's own (live) hashes are superseded, never kept beside the code's.
     const stale = JSON.stringify("0".repeat(64));
     const document = exportWith([{ row_key: "judgeContractHash", value_json: stale }, { row_key: "composerContractHash", value_json: stale },
