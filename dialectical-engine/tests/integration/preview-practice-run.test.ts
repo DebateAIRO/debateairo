@@ -1220,6 +1220,7 @@ describe("engine 2's story (R1d)", () => {
     storyLengthByField?: { field: string; guidedWords: number | null }[];
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
+    investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
     admission: { panel: { providerRef: string; modelId: string }[];
       rotation: { answerWriter: string; answerChecker: string; storyteller: string; storyChecker: string } | null };
   };
@@ -1243,6 +1244,11 @@ describe("engine 2's story (R1d)", () => {
     expect(markdown).toContain("Story rounds (codes only;");
     expect(markdown).toContain(`Story outcomes: READY ${String(report.storyReadyRate!.ready)}, `);
     expect(markdown).toContain("Story length per AI and field");
+    // R2 (A17): the investigations block's reader swallows a failure the same way, so it is checked present here too;
+    // engine 1 runs no investigation.
+    expect(report.investigations).toBeDefined();
+    if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
+    expect(markdown).toContain("| cannot-assess reviews | investigated |");
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>

@@ -18,6 +18,7 @@ import {
   type PracticeLanguageCaseRecord,
   type PracticeLanguageNotRun
 } from "./practice-language.js";
+import { practiceInvestigationLines, type PracticeInvestigationBlock } from "./practice-investigations.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
@@ -427,6 +428,8 @@ export function debateReport(input: Readonly<{
     ...(r.length === undefined ? {} : { length: r.length }),
     // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).
     ...(r.language === undefined ? {} : { language: r.language }),
+    // R2 (E12, E13): the "cannot assess" reviews and the investigations; absent only when the debate was never admitted.
+    ...(r.investigations === undefined ? {} : { investigations: r.investigations }),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -515,6 +518,9 @@ export function reportMarkdown(report: PracticeReport): string {
   const language = report.mode === "debate" && typeof report.language === "object" && report.language !== null
     ? report.language as PracticeDebateLanguageBlock : undefined;
   if (language !== undefined) lines.push(...practiceDebateLanguageLines(language));
+  const investigations = report.mode === "debate" && typeof report.investigations === "object" && report.investigations !== null
+    ? report.investigations as PracticeInvestigationBlock : undefined;
+  if (investigations !== undefined) lines.push(...practiceInvestigationLines(investigations, usd));
   if (report.mode === "language" && Array.isArray(report.cases)) {
     lines.push(...practiceLanguageLines(report.cases as readonly PracticeLanguageCaseRecord[],
       Array.isArray(report.notRun) ? report.notRun as readonly PracticeLanguageNotRun[] : []));

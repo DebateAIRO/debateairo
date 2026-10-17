@@ -162,6 +162,14 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
+A debate's report also counts the "cannot assess" reviews and what was done about them (`investigations`, R2): how many
+points one more AI was asked to look into and what it found (holds, fails, dead end), how many could not be looked into
+(the call failed or the money had run out, no AI of another maker was left, the debate's cap was reached; an answer
+itself is never investigated, nor a point that bears on no answer, so these add up to at most the "cannot assess"
+count), how many investigations changed which answer leads, and their money and time. On engine 1 only the "cannot
+assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the comparing judges
+(`VERDICT_JUDGE`) as their own steps.
+
 ### The openings record (openings mode)
 
 Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
@@ -1233,6 +1241,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   report's two LG-A tables, `repairsByKind` and `unrepaired`); `practice-transcript.ts`: its `--transcript` file.
 - `practice-engine-graph.ts`: the transcript's engine graph (A15, `structure.engineGraph`); `practice-rescore.ts`: the
   rescore mode (`rescore.json`, `rescore.md`).
+- `practice-investigations.ts`: the report's investigations block (`investigations`, R2: the "cannot assess" reviews and
+  what was done about them).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it

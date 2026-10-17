@@ -62,6 +62,7 @@ import {
   type PracticeDebateLanguageBlock,
   type PracticeMapLanguage
 } from "./practice-language.js";
+import { readPracticeInvestigations, type PracticeInvestigationBlock } from "./practice-investigations.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
 import {
@@ -240,6 +241,8 @@ export type PracticeDebateResult = Readonly<{
   length?: PracticeLengthBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
+  /** R2 (E12, E13): the "cannot assess" reviews and the investigations, counts, money and time (practice-investigations.ts). */
+  investigations?: PracticeInvestigationBlock;
   /**
    * Pinned final writers (R1d): each pin, the model the run's own pin names, the models that served the step, whether it
    * held (the pinned model served it); absent without a pin.
@@ -265,8 +268,9 @@ export type PracticeDebateResult = Readonly<{
   }>;
 }>;
 
-const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "SYNTHESIZER", "EVALUATOR", "STORYTELLER", "STORY_CHECKER",
-  "STRUCTURE_REPAIR", "UNMAPPED"]);
+/** The per-AI table's order: the steps in debate order (R2: the investigations after the reviews, then the comparing judges). */
+export const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
+  "STORYTELLER", "STORY_CHECKER", "STRUCTURE_REPAIR", "UNMAPPED"]);
 
 /** LG-A (L34): one try as the report's two new tables read it (the ledger row with its artifact's 0120 columns). */
 export type PracticeTryRecord = Readonly<{
@@ -948,6 +952,14 @@ export async function runPracticeDebate(input: Readonly<{
       }
     }
     const { answerWritersServed, ...collected } = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    // R2 (E12, E13): the "cannot assess" reviews and the investigations, both engines (engine 1 runs none). A reading that
+    // breaks costs only this block, never the report.
+    let investigations: PracticeInvestigationBlock | undefined;
+    try {
+      investigations = await readPracticeInvestigations(pool, job.runId, collected.byModelAndSite);
+    } catch (error) {
+      progress(`investigations: could not be read (${codeOf(error)})`);
+    }
     // Pinned final writers (R1d; Task 21 review ruling A1): which models the run's own pin names, and which actually
     // served each step (the answered final-writer calls; the stored story's storyteller), beside the pins (codes and
     // model ids only). A cost fallback or a backup storyteller serving instead: not held.
@@ -1036,6 +1048,7 @@ export async function runPracticeDebate(input: Readonly<{
       ...(shape === undefined ? {} : { shape }),
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
+      ...(investigations === undefined ? {} : { investigations }),
       ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })
     });
