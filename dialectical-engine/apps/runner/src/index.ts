@@ -10535,6 +10535,7 @@ export class WalkingSkeletonRunner {
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
+              ...(lengthGuidance === null ? {} : { lengthGuidance }),
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,

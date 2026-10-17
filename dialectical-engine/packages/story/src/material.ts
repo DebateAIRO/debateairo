@@ -704,11 +704,15 @@ function storyWithAlsoRaised(
   material: StoryMaterial,
   ranked: readonly string[],
   claimChars: number | null,
-  budgetBytes: number
+  budgetBytes: number,
+  whole = false
 ): StoryMaterial {
   if (ranked.length === 0) return material;
-  const limit = claimChars === null ? STORY_ALSO_RAISED_CLAIM_CHARS : Math.min(claimChars, STORY_ALSO_RAISED_CLAIM_CHARS);
-  const items = ranked.map((claim): StoryMaterialAlsoRaised => Object.freeze({ claim: storyClip(claim, limit) }));
+  // Length guidance (spec 2026-10-15 §3.9, ruling L19): with the length row the 240-character clip goes; the ladder
+  // step's own claim cut (`claimChars`) stays until LG-E removes the ladder's cuts (controller ruling Q6).
+  const limit = whole ? claimChars
+    : claimChars === null ? STORY_ALSO_RAISED_CLAIM_CHARS : Math.min(claimChars, STORY_ALSO_RAISED_CLAIM_CHARS);
+  const items = ranked.map((claim): StoryMaterialAlsoRaised => Object.freeze({ claim: limit === null ? claim : storyClip(claim, limit) }));
   for (let count = items.length; count > 0; count -= 1) {
     const kept = Object.freeze(items.slice(0, count));
     const bytes = material.bytes + Buffer.byteLength(JSON.stringify(kept), "utf8");
@@ -728,6 +732,8 @@ export function buildStoryMaterial(input: {
   readonly enrichment: ReadonlyMap<string, StoryNodeEnrichment>;
   readonly budgetBytes: number;
   readonly shapeIds: ReadonlySet<string>;
+  /** Length guidance (L19): the also-raised claims are not clipped to 240 characters. Absent: today's material. */
+  readonly alsoRaisedWhole?: boolean;
 }): StoryMaterialResult {
   const { snapshot, enrichment, budgetBytes } = input;
   if (!Number.isInteger(budgetBytes) || budgetBytes <= 0) {
@@ -924,7 +930,7 @@ export function buildStoryMaterial(input: {
   for (const [step, shrink] of STORY_SHRINK_LADDER.entries()) {
     const fitted = materialAt(shrink);
     if (fitted.material.bytes <= budgetBytes) {
-      const material = storyWithAlsoRaised(fitted.material, alsoRaised, shrink.claimChars, budgetBytes);
+      const material = storyWithAlsoRaised(fitted.material, alsoRaised, shrink.claimChars, budgetBytes, input.alsoRaisedWhole === true);
       const visible = fitted.visible;
       return Object.freeze({
         kind: "OK",
