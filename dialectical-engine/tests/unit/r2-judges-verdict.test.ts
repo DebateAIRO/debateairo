@@ -243,6 +243,14 @@ describe("input checks and frozen members (fix round 1, Minors 3 and 4)", () => 
     for (const seat of [0, -1]) expect(() => derive([vote(seat, "anthropic", "A")])).toThrowError(refused);
   });
 
+  // Ruling W2 (R2b whole-branch review M1, spec §4.3): never two judges of one maker. Before the fix two votes of one
+  // maker plus one other gave SUPPORTED / JUDGES_UNANIMOUS.
+  it("refuses two seats of one maker, whatever their replies (no new code)", () => {
+    expect(() => derive([vote(1, "anthropic", "A"), vote(2, "anthropic", "A"), vote(3, "qwen", "A")])).toThrowError(refused);
+    expect(() => derive([vote(1, "anthropic", null), vote(3, "anthropic", "B")])).toThrowError(refused);
+    expect(derive([vote(1, "anthropic", "A"), vote(2, "xiaomi", "A"), vote(3, "qwen", "A")]).label).toBe("SUPPORTED");
+  });
+
   it("refuses an empty or non-string maker, on a vote or on an answer", () => {
     expect(() => derive([vote(1, "", "A")])).toThrowError(refused);
     expect(() => derive([vote(1, 7 as unknown as string, "A")])).toThrowError(refused);

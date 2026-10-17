@@ -150,8 +150,10 @@ export function deriveJudgesVerdict(input: JudgesVerdictInput): JudgesVerdict {
     strengthOf(right) - strengthOf(left) || codeUnits(byLetter.get(left)!.rootNodeId, byLetter.get(right)!.rootNodeId);
 
   const votes = [...input.votes].sort((left, right) => left.seat - right.seat);
+  // Ruling W2 (R2b whole-branch review M1, spec §4.3): never two judges of one maker; a second seat of a maker would
+  // count one maker's choice twice, so the count refuses it rather than serve on it.
   if (votes.some((vote, index) => !Number.isSafeInteger(vote.seat) || vote.seat < 1 || votes[index - 1]?.seat === vote.seat
-    || !isMaker(vote.maker))) {
+    || !isMaker(vote.maker)) || new Set(votes.map((vote) => vote.maker)).size !== votes.length) {
     invalid("votes");
   }
   const letters = new Set<string>(order);

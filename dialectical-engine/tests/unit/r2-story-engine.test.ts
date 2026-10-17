@@ -189,8 +189,9 @@ describe("R2 B9: the story under engine 2", () => {
       { best: "B", conditional: false, sameAs: [["A", "B"]], questionKind: "health" },
       { best: "C", conditional: false, sameAs: [], questionKind: "legal" }];
     // A judge of a maker that argued no answer, or of the makers that argued A or C (an own-maker choice, directly or
-    // through the A+B group, is not counted).
-    const makers = ["judge-maker", "maker-a", "maker-c"];
+    // through the A+B group, is not counted). Never two judges of one maker (ruling W2): each seating is a set of
+    // distinct makers (the count reads no seat order, so each set is walked once).
+    const makers = ["judge-maker", "judge-maker-2", "judge-maker-3", "maker-a", "maker-c"];
     const reached = new Set<string>();
     const false_: string[] = [];
     let rawLeaderLost = false;
@@ -240,11 +241,15 @@ describe("R2 B9: the story under engine 2", () => {
               break;
           }
         };
-        const walk = (seat: number, votes: ComparingJudgeVote[]): void => {
+        const walk = (seat: number, votes: ComparingJudgeVote[], nextMaker: number): void => {
           if (seat > seats) return check(votes);
-          for (const reply of replies) for (const maker of makers) walk(seat + 1, [...votes, { seat, maker, reply }]);
+          for (const reply of replies) {
+            makers.forEach((maker, index) => {
+              if (index >= nextMaker) walk(seat + 1, [...votes, { seat, maker, reply }], index + 1);
+            });
+          }
         };
-        walk(1, []);
+        walk(1, [], 0);
       }
     }
     expect(false_.slice(0, 5)).toEqual([]);

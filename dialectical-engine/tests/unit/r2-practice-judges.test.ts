@@ -131,10 +131,11 @@ describe("R2 B11: the comparing judges' block of the practice report", () => {
     expect(practiceJudgesBlocks(served(single)).conditionalWinner).toBe(false);
     // No receipt: not recorded.
     expect(practiceJudgesBlocks({ ...served(grouped), servedRootSelection: null }).conditionalWinner).toBeNull();
-    // Every vote ignored (each judge chose its own maker's answer): no counted voter, so no conditional winner.
-    const ownMaker = served(single.map((vote) => ({ ...vote, maker: vote.chosen_letter === "A" ? "zhipu" : "moonshot" })));
+    // Every vote ignored (each judge chose its own maker's answer): no counted voter, so no conditional winner. Two
+    // judges, one per arguing maker: never two judges of one maker (ruling W2).
+    const ownMaker = served(single.slice(0, 2).map((vote) => ({ ...vote, maker: vote.chosen_letter === "A" ? "zhipu" : "moonshot" })));
     expect(practiceJudgesBlocks(ownMaker).judgeVotes.map((vote) => [vote.counted, vote.notCountedReason]))
-      .toEqual([[false, "OWN_MAKER"], [false, "OWN_MAKER"], [false, "OWN_MAKER"]]);
+      .toEqual([[false, "OWN_MAKER"], [false, "OWN_MAKER"]]);
     expect(practiceJudgesBlocks(ownMaker).conditionalWinner).toBe(false);
   });
 

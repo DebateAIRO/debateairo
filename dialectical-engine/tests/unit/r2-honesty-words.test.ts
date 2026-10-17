@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 const LOCALES = readdirSync("apps/ui/messages", { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 const misc = (locale: string) =>
   JSON.parse(readFileSync(`apps/ui/messages/${locale}/misc.json`, "utf8")) as Record<string, string>;
-const KEYS = ["title", "intro", "counted", "notCounted", "noneCounted", "chosen", "strength"]
+// Ruling W1 (R2b whole-branch review I1): sameAnswer added; notCounted names the group case.
+const KEYS = ["title", "intro", "counted", "notCounted", "noneCounted", "sameAnswer", "chosen", "strength"]
   .map((key) => `misc.answerHonesty.comparison.${key}`);
 const placeholders = (text: string) => [...text.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/gu)].map((match) => match[1]).sort();
 /** Codes of the engine that no reader text may carry, in any language. */

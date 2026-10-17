@@ -179,6 +179,18 @@ describe("engine 2 end to end (spec §14.2)", () => {
       expect(story).toMatchObject({ outcome: "READY" });
       expect(story!.verdictBasis).toMatchObject({ label, rung: 5, winner_node_id: receipt.servedNodeId });
       if (shaped) {
+        // Ruling W4 (B12 Minor 1, whole-branch review): the judges' winner is NOT the strength leader here (its strongest
+        // rival finished above it, so the receipt's margin is negative), and the served answer, the label and the story's
+        // material all follow the judges' winner, never the leader.
+        const margin = receipt.margin as Readonly<{ kind: string; value?: number }>;
+        const runnerUp = receipt.runnerUp as Readonly<{ nodeId: string; strength: number }> | null;
+        expect(margin.kind).toBe("MEASURED");
+        expect(margin.value!).toBeLessThan(0);
+        expect(runnerUp!.strength).toBeGreaterThan(receipt.servedStrength as number);
+        expect(answer!.judges_comparison!.answers[0]!.root_node_id).toBe(receipt.servedNodeId);
+        expect(story!.verdictBasis).toMatchObject({ winner_node_id: receipt.servedNodeId, label: answer!.verdict_state,
+          runner_up_node_id: runnerUp!.nodeId });
+        expect(story!.verdictBasis!.margin!).toBeLessThan(0);
         expect(story!.shapeId).toBe("factual");
         // The ring (A5): one cross-reply per answer, as before.
         expect((await callKeys(runId, "OK")).filter((key) => key.startsWith("JUDGE:cross-root:"))).toHaveLength(run.shape!.answers);

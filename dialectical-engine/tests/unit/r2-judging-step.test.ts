@@ -236,6 +236,44 @@ describe("reclaim resume: a recorded vote is never asked again", () => {
     expect(resumed).toMatchObject({ asked: 0, reused: 3 });
   });
 
+  // Ruling W2 (R2b whole-branch review M1, spec §4.3): never two judges of one maker. The earlier copy's pick order
+  // differed (it seated DeepSeek at seat 1); this pass's pick gives DeepSeek seat 3 again.
+  describe("never two judges of one maker (ruling W2)", () => {
+    it("gives the clashing seat to the next eligible maker no seat holds", async () => {
+      const { run, asks, records } = step({ recorded: [row(1, "deepseek", "ds", "A")], answers: { mimo: "A", haiku: "A" } });
+      const result = await run();
+      expect(asks.map((seat) => [seat.seat, seat.maker])).toEqual([[2, "xiaomi"], [3, "anthropic"]]);
+      expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "deepseek"], [2, "xiaomi"], [3, "anthropic"]]);
+      expect(records.map((vote) => [vote.judgeSeat, vote.maker])).toEqual([[2, "xiaomi"], [3, "anthropic"]]);
+      expect(result).toMatchObject({ asked: 2, reused: 1 });
+    });
+
+    it("prefers a maker the recorded seat displaced, then leaves the seat unfilled when no maker is left", async () => {
+      const two = [CANDIDATES[1]!, CANDIDATES[2]!];
+      // Seat 2 recorded for xiaomi; this pass would seat xiaomi at 1 and deepseek at 2: deepseek takes seat 1.
+      const displaced = step({ candidates: two, recorded: [row(2, "xiaomi", "mimo", "A")], answers: { ds: "A" } });
+      expect((await displaced.run()).seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "deepseek"], [2, "xiaomi"]]);
+      expect(displaced.asks.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "deepseek"]]);
+      // Only xiaomi is a candidate, and it already holds seat 2: seat 1 stays unfilled, nobody is asked.
+      const none = step({ candidates: [CANDIDATES[1]!], recorded: [row(2, "xiaomi", "mimo", "A")] });
+      const result = await none.run();
+      expect(none.asks).toEqual([]);
+      expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[2, "xiaomi"]]);
+      expect(result.verdict.judgesSeated).toBe(1);
+    });
+
+    it("neither counts nor writes a seat whose maker another copy's row took at another seat meanwhile", async () => {
+      // Another copy stored seat 4 for xiaomi while this copy asked xiaomi at seat 2.
+      const theirs = Object.freeze({ ...row(4, "xiaomi", "mimo", "A"), modelId: "mimo-v3" });
+      const { run, records } = step({ readRecorded: async () => [theirs] });
+      const result = await run();
+      expect(records.map((vote) => [vote.judgeSeat, vote.maker])).toEqual([[1, "anthropic"], [3, "deepseek"]]);
+      expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "anthropic"], [3, "deepseek"], [4, "xiaomi"]]);
+      expect(new Set(result.seats.map((seat) => seat.maker)).size).toBe(3);
+      expect(result).toMatchObject({ asked: 3, reused: 1 });
+    });
+  });
+
   it("asks only the seats with no recorded vote, and reuses a recorded failure as a failure", async () => {
     const { run, asks, records } = step({ recorded: [row(1, "anthropic", "haiku", null)] });
     const result = await run();

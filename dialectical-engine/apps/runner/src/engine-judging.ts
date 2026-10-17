@@ -227,17 +227,34 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   })));
   const arguingMakers = new Set(answers.flatMap((answer) => answer.arguedByMaker === null ? [] : [answer.arguedByMaker]));
   const mayAsk = !input.moneyStopped && answers.length >= 2;
-  const picked = mayAsk ? pickComparingJudges({
-    seats: input.candidates.map(({ maker, providerRef }) => Object.freeze({ maker, providerRef })),
-    arguingMakers,
-    count: input.engine.sites.comparingJudges,
-    rotationOffset: input.rotationOffset
-  }) : [];
+  const candidateSeats = Object.freeze(input.candidates.map(({ maker, providerRef }) => Object.freeze({ maker, providerRef })));
+  const pickOf = (seats: typeof candidateSeats, count: number): readonly ComparingJudgeSeat[] =>
+    pickComparingJudges({ seats, arguingMakers, count, rotationOffset: input.rotationOffset });
   const seatOfRow = (row: RecordedComparingJudgeVote): ComparingJudgeSeat => Object.freeze({
     seat: row.judgeSeat, maker: row.maker, providerRef: row.providerRef, argued: arguingMakers.has(row.maker)
   });
   // A recorded vote is the seat's vote, whatever this pass would pick (reclaim resume).
   const recordedBySeat = new Map(input.recorded.map((row) => [row.judgeSeat, row] as const));
+  /*
+   * Ruling W2 (R2b whole-branch review M1, spec §4.3 "never two judges of one maker"): a maker that holds a recorded seat
+   * is never picked again for another seat. A resumed copy's pick can differ from the earlier copy's (a member's sit-out
+   * state changed between claims), so this pass's seat for that maker goes to the next eligible maker no seat holds, in
+   * the same rotation and order; when none is left, the seat stays unfilled. A first pass (no recorded row) is today's.
+   */
+  const heldMakers = new Set(input.recorded.map((row) => row.maker));
+  const firstPick = mayAsk ? pickOf(candidateSeats, input.engine.sites.comparingJudges) : [];
+  const freshSeats = firstPick.filter((seat) => !recordedBySeat.has(seat.seat));
+  const clashing = freshSeats.filter((seat) => heldMakers.has(seat.maker));
+  const seatedMakers = new Set([...heldMakers, ...freshSeats.filter((seat) => !heldMakers.has(seat.maker)).map((seat) => seat.maker)]);
+  const spares = clashing.length === 0 ? []
+    : pickOf(Object.freeze(candidateSeats.filter((seat) => !seatedMakers.has(seat.maker))), clashing.length);
+  const picked: readonly ComparingJudgeSeat[] = [
+    ...firstPick.filter((seat) => !clashing.includes(seat)),
+    ...clashing.flatMap((seat, index) => {
+      const spare = spares[index];
+      return spare === undefined ? [] : [Object.freeze({ ...spare, seat: seat.seat })];
+    })
+  ];
   const seatsByNumber = new Map<number, ComparingJudgeSeat>(picked.map((seat) => [seat.seat, seat] as const));
   for (const row of input.recorded) seatsByNumber.set(row.judgeSeat, seatOfRow(row));
   const seatsAsked = [...seatsByNumber.values()].sort((left, right) => left.seat - right.seat);
@@ -291,7 +308,11 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
     });
     const extra = [...storedBySeat.values()].filter((row) => !outcomes.some((outcome) => outcome.seat.seat === row.judgeSeat))
       .map(asRecorded);
-    return Object.freeze([...replaced, ...extra].sort((left, right) => left.seat.seat - right.seat.seat));
+    // Ruling W2: a seat this copy asked whose maker another copy's row now holds at another seat is not this copy's to
+    // fill (never two judges of one maker); it is neither counted nor written.
+    const storedMakers = new Set([...storedBySeat.values()].map((row) => row.maker));
+    const kept = replaced.filter((outcome) => outcome.recorded !== null || !storedMakers.has(outcome.asked?.maker ?? outcome.seat.maker));
+    return Object.freeze([...kept, ...extra].sort((left, right) => left.seat.seat - right.seat.seat));
   };
   let final = finalOf();
   let tally = tallyOf(final);
@@ -303,7 +324,7 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   /** The seats this copy asked (a call was made); every other seat's vote is a stored row. */
   const asked = outcomes.filter((outcome) => outcome.recorded === null).length;
   for (const outcome of outcomes) {
-    if (outcome.recorded !== null || storedBySeat.has(outcome.seat.seat)) continue;
+    if (outcome.recorded !== null || storedBySeat.has(outcome.seat.seat) || !final.includes(outcome)) continue;
     const reply = standingReplyOf(tally, outcome);
     const entry = tally.countedBySeat.get(outcome.seat.seat);
     /*
@@ -386,6 +407,6 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
     records,
     verdictMaterial,
     asked,
-    reused: final.length - asked
+    reused: final.length - outcomes.filter((outcome) => outcome.recorded === null && final.some((seat) => seat.seat.seat === outcome.seat.seat)).length
   });
 }

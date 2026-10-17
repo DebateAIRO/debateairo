@@ -35,8 +35,8 @@ const fill = (text: string, values: Record<string, number>) => text.replace(/\{(
 
 // No `as const` (pre-flight PF-R2b4.10): Answer["judges_comparison"] takes mutable arrays.
 const COMPARISON: NonNullable<Answer["judges_comparison"]> = { judges_seated: 3, judges_counted: 2, answers: [
-  { root_node_id: "node:position-b", honest_score: 0.3, judges_chose: 2 },
-  { root_node_id: "node:position", honest_score: 0.41, judges_chose: 0 }
+  { root_node_id: "node:position-b", honest_score: 0.3, judges_chose: 2, same_answer_as: [] },
+  { root_node_id: "node:position", honest_score: 0.41, judges_chose: 0, same_answer_as: [] }
 ] };
 
 describe("R2 honesty panel: how the answers compared", () => {
@@ -61,10 +61,39 @@ describe("R2 honesty panel: how the answers compared", () => {
     expect(text).not.toMatch(/0\.41|0\.3\b|41\s?%/u);
   });
 
+  // Ruling W1 (R2b whole-branch review I1), the review's probe: A and B counted as the same answer, one choice each, C
+  // one choice; A is served (a majority). The panel shows A with B, one sentence, one combined count, first.
+  it("shows answers counted as the same together, with one sentence and one combined count, the served answer's group first", () => {
+    const en = catalog("en", "misc");
+    const base = answerWith(undefined);
+    const third = { ...base.nodes.find((node) => node.node_id === "node:position-b")!, node_id: "node:position-c", claim: "The third position." };
+    const html = drawer({ ...base, nodes: [...base.nodes, third], judges_comparison: { judges_seated: 3, judges_counted: 3, answers: [
+      { root_node_id: "node:position", honest_score: 0.5, judges_chose: 1, same_answer_as: ["node:position-b"] },
+      { root_node_id: "node:position-b", honest_score: 0.4, judges_chose: 1, same_answer_as: ["node:position"] },
+      { root_node_id: "node:position-c", honest_score: 0.6, judges_chose: 1, same_answer_as: [] }
+    ] } });
+    const text = visible(html);
+    const section = html.slice(html.indexOf(`aria-label="${en["misc.answerHonesty.comparison.title"]}"`));
+    const items = [...section.slice(0, section.indexOf("</section>")).matchAll(/<li class="drawerFindingItem">(.*?)<\/li>/gsu)]
+      .map((match) => visible(match[1]!));
+    expect(items).toHaveLength(2);
+    expect(items[0]).toContain("The position claim under test.");
+    expect(items[0]).toContain("The second position.");
+    expect(items[0]).toContain(en["misc.answerHonesty.comparison.sameAnswer"]);
+    expect(items[0]).toContain(fill(en["misc.answerHonesty.comparison.chosen"]!, { chose: 2, counted: 3 }));
+    expect(items[1]).toContain("The third position.");
+    expect(items[1]).not.toContain(en["misc.answerHonesty.comparison.sameAnswer"]);
+    expect(items[1]).toContain(fill(en["misc.answerHonesty.comparison.chosen"]!, { chose: 1, counted: 3 }));
+    expect(text.split(en["misc.answerHonesty.comparison.sameAnswer"]!)).toHaveLength(2);
+    // Each answer keeps its own bar; every choice was counted, so no "does not count" sentence.
+    expect(html.match(/<meter class="drawerComparisonMeter"/gu)).toHaveLength(3);
+    expect(text).not.toContain(en["misc.answerHonesty.comparison.notCounted"]);
+  });
+
   it("says no choice counted when none did, and draws no bar for an answer without a strength", () => {
     const en = catalog("en", "misc");
     const html = drawer(answerWith({ judges_seated: 2, judges_counted: 0, answers: [
-      { root_node_id: "node:position", honest_score: null, judges_chose: 0 }
+      { root_node_id: "node:position", honest_score: null, judges_chose: 0, same_answer_as: [] }
     ] }));
     expect(visible(html)).toContain(en["misc.answerHonesty.comparison.noneCounted"]);
     expect(visible(html)).not.toContain(en["misc.answerHonesty.comparison.notCounted"]);

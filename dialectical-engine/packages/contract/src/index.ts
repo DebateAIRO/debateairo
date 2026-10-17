@@ -1435,6 +1435,11 @@ export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
  * every engine-1 answer. Each answer is a position of the debate, named by its root node; `honest_score` is its
  * latest final strength (a review catch-up refreshes it), shown as a bar, never printed; `judges_chose` counts the
  * counted choices that picked it. No letters: they exist only in the judges' material.
+ *
+ * Ruling W1 (R2b whole-branch review I1): `same_answer_as` names the other answers the judges' count treated as the
+ * same answer as this one (its group, ruling R2b-B2.1; empty when none). The count decides on a group's combined
+ * choices, so the panel shows a group together with one combined count. The list is in the count's order: groups by
+ * their combined counted choices, the served answer's group first, a group's answers side by side.
  */
 export const JudgesComparisonSchema = z.object({
   judges_seated: z.number().int().min(1).max(5),
@@ -1442,7 +1447,8 @@ export const JudgesComparisonSchema = z.object({
   answers: z.array(z.object({
     root_node_id: z.string().min(1),
     honest_score: z.number().min(0).max(1).nullable(),
-    judges_chose: z.number().int().min(0)
+    judges_chose: z.number().int().min(0),
+    same_answer_as: z.array(z.string().min(1))
   }).strict()).min(1)
 }).strict().superRefine((comparison, context) => {
   if (comparison.judges_counted > comparison.judges_seated) {
@@ -1450,6 +1456,14 @@ export const JudgesComparisonSchema = z.object({
   }
   if (comparison.answers.reduce((sum, entry) => sum + entry.judges_chose, 0) > comparison.judges_counted) {
     context.addIssue({ code: "custom", message: "the answers' choices cannot exceed judges_counted" });
+  }
+  // A group is named from each of its answers: another listed answer, never itself, and both ways.
+  const sameOf = new Map(comparison.answers.map((entry) => [entry.root_node_id, entry.same_answer_as] as const));
+  for (const entry of comparison.answers) {
+    if (entry.same_answer_as.some((other) => other === entry.root_node_id
+      || !(sameOf.get(other) ?? []).includes(entry.root_node_id))) {
+      context.addIssue({ code: "custom", message: "same_answer_as must name other listed answers, each naming this one back" });
+    }
   }
 });
 export type JudgesComparison = z.infer<typeof JudgesComparisonSchema>;

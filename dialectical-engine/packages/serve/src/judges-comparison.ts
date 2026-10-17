@@ -16,8 +16,12 @@ import { seatBaseCallSiteKey } from "./synthesis.js";
  * judge's own maker argued; a failed judge is never a choice), from the stored letters, groups and makers. The stored
  * `counted` column is a hint that can drift after a resume, because one seat's count depends on the other seats'
  * groups; it is never read here (controller ruling R2b-B5.1). Every position of the debate is listed (a node that
- * argues about no other node, the story's and the page's own rule), most counted choices first, then the stronger
- * case, then the node id; its case is the position's latest final strength.
+ * argues about no other node, the story's and the page's own rule); its case is the position's latest final strength.
+ *
+ * Groups (ruling W1, whole-branch review I1): the count decides on a group's combined choices, so each position names
+ * the others of its group (`same_answer_as`) and the list follows the count: groups by their combined counted choices,
+ * the count's winner's group first, then the group whose strongest case is stronger, then the node id; inside a group
+ * the winner first, then the most counted choices, the stronger case, the node id.
  *
  * Letters (ruling R2b-B6.1): a letter is the root's place in the debate's PLAN, as the judges' material gives it
  * (`ENGINE_ANSWER_LETTERS[rootIndex]`), never its count among the saved roots: a root that sat out leaves a gap (roots
@@ -151,6 +155,8 @@ export type JudgesRecount = Readonly<{
   counted: ReturnType<typeof deriveJudgesVerdict>["counted"];
   /** The groups a majority of the seated judges named (rule 2), letters in answer order. */
   groups: ReturnType<typeof deriveJudgesVerdict>["groups"];
+  /** The count's winner (rule 3), over the positions' latest final strengths: the served answer's group leads the panel. */
+  winnerRootNodeId: string;
 }>;
 
 /**
@@ -187,7 +193,7 @@ export function recountJudgesVotes(
       honestFinalStrength: new Map(lettered.map((position) => [position.nodeId, position.strength ?? -1] as const)),
       label: RECOUNT_LABEL
     });
-    return Object.freeze({ letterOfRoot, counted: recount.counted, groups: recount.groups });
+    return Object.freeze({ letterOfRoot, counted: recount.counted, groups: recount.groups, winnerRootNodeId: recount.winnerRootNodeId });
   } catch (error) {
     // Rows the count refuses (B6 fix round 1, Minor 2): no numbers, never a failed read. The code only.
     if (error instanceof TypedDomainError && error.code === "JUDGES_VERDICT_INPUT_INVALID") return null;
@@ -223,14 +229,39 @@ export function judgesComparisonOf(
     const root = rootOfLetter.get(vote.chosenLetter ?? "");
     if (root !== undefined) chose.set(root, (chose.get(root) ?? 0) + 1);
   }
-  const answers = positions.map((node) => ({
+  // Ruling W1: the count's groups, as roots; a position in no group is a group of its own.
+  const groupOfRoot = new Map<string, readonly string[]>();
+  for (const group of recount.groups) {
+    const roots = group.flatMap((letter) => rootOfLetter.get(letter) ?? []);
+    for (const root of roots) groupOfRoot.set(root, roots);
+  }
+  type Entry = JudgesComparison["answers"][number];
+  const entries: Entry[] = positions.map((node) => ({
     root_node_id: node.node_id,
     honest_score: strengthOf(node),
-    judges_chose: chose.get(node.node_id) ?? 0
-  })).sort((left, right) =>
-    right.judges_chose - left.judges_chose
-    || (right.honest_score ?? -1) - (left.honest_score ?? -1)
-    || (left.root_node_id < right.root_node_id ? -1 : left.root_node_id > right.root_node_id ? 1 : 0));
+    judges_chose: chose.get(node.node_id) ?? 0,
+    same_answer_as: (groupOfRoot.get(node.node_id) ?? []).filter((root) => root !== node.node_id)
+  }));
+  const codeUnits = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+  const winner = recount.winnerRootNodeId;
+  const firstOf = (entry: Entry): number => (entry.root_node_id === winner ? 0 : 1);
+  const stronger = (left: Entry, right: Entry): number =>
+    (right.honest_score ?? -1) - (left.honest_score ?? -1) || codeUnits(left.root_node_id, right.root_node_id);
+  const byId = new Map(entries.map((entry) => [entry.root_node_id, entry] as const));
+  const placed = new Set<string>();
+  const clusters: Entry[][] = [];
+  for (const entry of entries) {
+    if (placed.has(entry.root_node_id)) continue;
+    const members = [entry, ...entry.same_answer_as.flatMap((root) => byId.get(root) ?? [])];
+    for (const member of members) placed.add(member.root_node_id);
+    clusters.push(members.sort((left, right) =>
+      firstOf(left) - firstOf(right) || right.judges_chose - left.judges_chose || stronger(left, right)));
+  }
+  const total = (cluster: readonly Entry[]): number => cluster.reduce((sum, entry) => sum + entry.judges_chose, 0);
+  const strongest = (cluster: readonly Entry[]): Entry => [...cluster].sort(stronger)[0]!;
+  clusters.sort((left, right) => firstOf(left[0]!) - firstOf(right[0]!) || total(right) - total(left)
+    || stronger(strongest(left), strongest(right)));
+  const answers = clusters.flat();
   return {
     judges_seated: votes.length,
     judges_counted: answers.reduce((sum, entry) => sum + entry.judges_chose, 0),

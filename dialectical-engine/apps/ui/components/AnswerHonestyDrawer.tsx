@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from "@debateai/contract";
 import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { LiveRunState } from "@/lib/v3/liveEvents";
@@ -120,6 +121,24 @@ function backupRecordKeysFor(record: { readonly mark: string; readonly subject_r
 /** R2 honesty panel: an answer of the comparison, by its own statement (the node's claim), or nothing when it is gone. */
 function comparisonStatement(answer: Answer, rootNodeId: string): string | null {
   return answer.nodes.find((node) => node.node_id === rootNodeId)?.claim ?? null;
+}
+
+type ComparisonEntry = NonNullable<Answer["judges_comparison"]>["answers"][number];
+
+/**
+ * Ruling W1 (R2b whole-branch review I1): answers the judges' count treated as the same answer, kept together in the
+ * list's order (the count's order, the served answer's group first); a group's choices are shown as one count.
+ */
+function comparisonGroups(answers: readonly ComparisonEntry[]): readonly (readonly ComparisonEntry[])[] {
+  const placed = new Set<string>();
+  const groups: ComparisonEntry[][] = [];
+  for (const entry of answers) {
+    if (placed.has(entry.root_node_id)) continue;
+    const members = [entry, ...answers.filter((other) => other !== entry && entry.same_answer_as.includes(other.root_node_id))];
+    for (const member of members) placed.add(member.root_node_id);
+    groups.push(members);
+  }
+  return groups;
 }
 
 export function AnswerHonestyDrawer({
@@ -273,8 +292,8 @@ export function AnswerHonestyDrawer({
           {answer.judges_comparison !== undefined ? (
             // R2 (spec §4.4): how the comparing judges' choices fell. The case's strength is a bar, never a number.
             // Its spoken value is the strength sentence, never the number (ruling PF-R2b4.7 (b)).
-            // OWNER WORDING — approve before switch-on: the seven misc.answerHonesty.comparison.* sentences (option 1) and
-            // the bar's spoken word (aria-valuetext).
+            // OWNER WORDING — approve before switch-on: the eight misc.answerHonesty.comparison.* sentences (option 1;
+            // sameAnswer and the group case of notCounted added by ruling W1) and the bar's spoken word (aria-valuetext).
             <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.comparison.title")}>
               <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.comparison.title")}</div>
               <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.intro")}</div>
@@ -290,25 +309,32 @@ export function AnswerHonestyDrawer({
                 <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.notCounted")}</div>
               ) : null}
               <ul className="drawerFindingList">
-                {answer.judges_comparison.answers.map((entry) => (
-                  <li key={entry.root_node_id} className="drawerFindingItem">
-                    {comparisonStatement(answer, entry.root_node_id) === null ? null : (
-                      <div className="drawerFindingText" data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
-                    )}
-                    {entry.honest_score === null ? null : (
-                      <meter
-                        className="drawerComparisonMeter"
-                        min={0}
-                        max={1}
-                        value={entry.honest_score}
-                        aria-label={t(catalog, "misc.answerHonesty.comparison.strength")}
-                        aria-valuetext={t(catalog, "misc.answerHonesty.comparison.strength")}
-                      />
-                    )}
+                {comparisonGroups(answer.judges_comparison.answers).map((group) => (
+                  <li key={group[0]!.root_node_id} className="drawerFindingItem">
+                    {group.map((entry) => (
+                      <Fragment key={entry.root_node_id}>
+                        {comparisonStatement(answer, entry.root_node_id) === null ? null : (
+                          <div className="drawerFindingText" data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
+                        )}
+                        {entry.honest_score === null ? null : (
+                          <meter
+                            className="drawerComparisonMeter"
+                            min={0}
+                            max={1}
+                            value={entry.honest_score}
+                            aria-label={t(catalog, "misc.answerHonesty.comparison.strength")}
+                            aria-valuetext={t(catalog, "misc.answerHonesty.comparison.strength")}
+                          />
+                        )}
+                      </Fragment>
+                    ))}
+                    {group.length > 1 ? (
+                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.sameAnswer")}</div>
+                    ) : null}
                     <div className="drawerFindingMeta">
                       <span>
                         {t(catalog, "misc.answerHonesty.comparison.chosen", {
-                          chose: entry.judges_chose,
+                          chose: group.reduce((sum, entry) => sum + entry.judges_chose, 0),
                           counted: answer.judges_comparison!.judges_counted
                         })}
                       </span>
