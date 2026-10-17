@@ -20,10 +20,17 @@ export {
   STORY_CHECKER_CONTRACT_ID,
   STORY_CHECKER_LIMITS,
   STORY_CHECKER_RUNAWAY_LIMITS,
+  STORYTELLER_V4_ANSWER_FORM,
+  STORYTELLER_V4_CONTRACT_ID,
+  STORY_CHECKER_V4_ANSWER_FORM,
+  STORY_CHECKER_V4_CONTRACT_ID,
+  STORY_REVISION_FOLLOW_UP,
   buildStoryCheckerContract,
   buildStorytellerContract,
+  storyCheckerLengthField,
   storyContractHash,
-  storyContractInArgumentLanguage
+  storyContractInArgumentLanguage,
+  storyLengthField
 } from "./contracts.js";
 export {
   STORY_BODY_PROSE,

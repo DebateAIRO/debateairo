@@ -72,6 +72,11 @@ import {
   STORYTELLER_CONTRACT_ID,
   STORY_CHECKER_ANSWER_FORM,
   STORY_CHECKER_CONTRACT_ID,
+  STORYTELLER_V4_ANSWER_FORM,
+  STORYTELLER_V4_CONTRACT_ID,
+  STORY_CHECKER_V4_ANSWER_FORM,
+  STORY_CHECKER_V4_CONTRACT_ID,
+  STORY_REVISION_FOLLOW_UP,
   buildStoryCheckerContract,
   buildStorytellerContract,
   loadStoryPack,
@@ -742,6 +747,71 @@ Write the short version compactly. Aim for about 500 characters in short.summary
     expect(buildStorytellerContract(STORY_PACK).answerForm).toBe(STORYTELLER_ANSWER_FORM);
     expect(buildStoryCheckerContract(STORY_PACK).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
   });
+
+  // Story v4 (engine redesign R1d, absorbing LG-D; INTERFACE §5.5): the v4 forms, used only for an engine-2 debate.
+  // No shape_id (code fills it), long last after an empty template of the exact nesting, the length sentence, the round-2
+  // revision sentence; the checker's form adds misleading and states no limit on the objection. v3 above is unchanged.
+  // OWNER WORDING — approve before switch-on: every sentence new in these two forms (option-1 drafts).
+  it("pins the storyteller's v4 answer form byte for byte", () => {
+    expect(STORY_REVISION_FOLLOW_UP).toBe("When a later block carries revision_problems right after your own earlier story, correct what those problems name, keep the rest of your story as it is, and return the whole corrected story in this form.");
+    expect(STORYTELLER_V4_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
+{
+  "short": {
+    "headline": non-empty string,
+    "summary": non-empty string, one paragraph,
+    "confidence": non-empty string, one sentence,
+    "paths": [{ "position_ref": id of a position, "fate": "HELD_UP" | "PARTLY_HELD" | "FELL" | "SET_ASIDE", "line": non-empty string, "node_refs": [id, ...] }, ...],
+    "change": { "text": non-empty string, "node_refs": [id, ...] }
+  },
+  "why": {
+    "reasons": [{ "text": non-empty string, "node_refs": [id, ...] }, ...]
+  },
+  "reviewer_note": null | { "text": non-empty string, "node_refs": [id, ...] },
+  "long": {
+    "sections": [{ "title": non-empty string, "paragraphs": [{ "text": non-empty string, "node_refs": [id, ...] }, ...] }, ...]
+  }
+}
+Write the members in this order: short, why, reviewer_note, and long last, with nothing after long but the object's closing brace. reviewer_note belongs to the object itself, beside short, why and long, never inside one of them, and it is null or one object with text and node_refs, never a string or a list. long holds only sections. The exact nesting, empty, with one entry in each list:
+{"short": {"headline": "", "summary": "", "confidence": "", "paths": [{"position_ref": "", "fate": "", "line": "", "node_refs": []}], "change": {"text": "", "node_refs": []}}, "why": {"reasons": [{"text": "", "node_refs": []}]}, "reviewer_note": null, "long": {"sections": [{"title": "", "paragraphs": [{"text": "", "node_refs": []}]}]}}
+short.paths has one entry per position in the positions field, each position exactly once, and at most 8 entries: when there are more than 8 positions it has exactly 8, for the first 8 positions listed. why.reasons has 1 to 3 entries. long.sections has 3 to 12 entries and each has 1 to 12 paragraphs. Every node_refs array has at most 40 entries, each copied exactly from an id in the points field or the positions field, and each position_ref is copied exactly from an id in the positions field. A text of long or why may name a point by its id, such as P3, but sparingly, and every point a text rests on must be listed in that entry's node_refs. The texts of short (the headline, the summary, the confidence sentence, each path line and the change text) and the text of reviewer_note never mention a point number such as P3: they are shown on the site, where there is no appendix.
+Every text speaks to the person about their question, never about how the debate was run: no internal ids and no engine words such as judge, evaluator, checker, reviewer, runner-up, margin, band or rung. No text contains a score or a threshold from the material, in any form such as 0.64, 0,64 or 0,7: say in words what it means. The headline and the summary always state the best answer to the question plainly, even when it is a close call or rests on weak evidence, and never say that the debate did not settle it. short.confidence is one sentence saying how sure we are and what that rests on in this debate, never surer than the label and the confidence band allow.
+The length field names a target length, never a limit, for each text of short and for each text of why.reasons; the texts of long and of reviewer_note have none.
+When a later block carries revision_problems right after your own earlier story, correct what those problems name, keep the rest of your story as it is, and return the whole corrected story in this form.
+No text contains a straight double quote ("): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\".`);
+  });
+
+  it("pins the checker's v4 answer form byte for byte", () => {
+    expect(STORY_CHECKER_V4_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence:
+{
+  "satisfied": boolean,
+  "misleading": boolean,
+  "objection": null | non-empty string,
+  "criteria": {
+    "faithful_to_material": boolean,
+    "agrees_with_label": boolean,
+    "fair_to_losing_paths": boolean,
+    "no_overstatement": boolean,
+    "citations_correct": boolean,
+    "reviewer_note_separate": boolean,
+    "goal_marked_as_reading": boolean,
+    "speaks_to_the_person": boolean
+  }
+}
+When satisfied is true, misleading is false and every criterion must be true. When satisfied is false, objection must be a non-empty string, and misleading says whether at least one problem in it would mislead the person. In the objection, refer to points by their ids, such as P7.
+The criteria object is always required, with all eight booleans, whether satisfied is true or false. No text contains a straight double quote ("): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\".`);
+  });
+
+  it("carries each v4 form into its contract, under its own id, only when v4 is asked for", () => {
+    const v4 = { shapeId: "general" };
+    expect(STORYTELLER_V4_CONTRACT_ID).toBe("story.storyteller.v4");
+    expect(STORY_CHECKER_V4_CONTRACT_ID).toBe("story.checker.v4");
+    expect(buildStorytellerContract(STORY_PACK, false, v4).answerForm).toBe(STORYTELLER_V4_ANSWER_FORM);
+    expect(buildStoryCheckerContract(STORY_PACK, false, v4).answerForm).toBe(STORY_CHECKER_V4_ANSWER_FORM);
+    expect(buildStorytellerContract(STORY_PACK, false, null).answerForm).toBe(STORYTELLER_ANSWER_FORM);
+    expect(buildStoryCheckerContract(STORY_PACK, false, null).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
+    expect(buildStorytellerContract(STORY_PACK).answerForm).toBe(STORYTELLER_ANSWER_FORM);
+    expect(buildStoryCheckerContract(STORY_PACK).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
+  });
 });
 
 describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentence", () => {
@@ -763,7 +833,10 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["support-case-summary-v2", supportDraftSummaryPromptContract(SUPPORT_SUMMARY_PROMPT)],
     // Verdict story: both contracts, with the SHIPPED pack in the instruction slot.
     ["story-storyteller", buildStorytellerContract(STORY_PACK)],
-    ["story-checker", buildStoryCheckerContract(STORY_PACK)]
+    ["story-checker", buildStoryCheckerContract(STORY_PACK)],
+    // Story v4 (R1d): the v4 pair, with the shipped pack's v4 passages and the default shape.
+    ["story-storyteller-v4", buildStorytellerContract(STORY_PACK, false, { shapeId: "general" })],
+    ["story-checker-v4", buildStoryCheckerContract(STORY_PACK, false, { shapeId: "general" })]
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");
