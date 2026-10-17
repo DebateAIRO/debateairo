@@ -217,6 +217,11 @@ export type PracticeRunOptions = Readonly<{
   wait?: (milliseconds: number) => Promise<void>;
   /** One content-free line at a time. */
   log?: (line: string) => void;
+  /**
+   * Test seam (debate mode): the ask's `as_of` (ISO time), which seeds the run's role rotation, so a test can draw the
+   * same roles in two runs. Absent: the time of the ask (the real command).
+   */
+  asOf?: string;
   /** Lets the operator's interrupt stop the practice between calls. */
   onObserver?: (observer: PracticeGateObserver, stop: () => void) => void;
   /**
@@ -707,6 +712,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+      ...(options.asOf === undefined ? {} : { asOf: options.asOf }),
       progress: log,
       transcriptDirectory: args.switches.has("--transcript") ? directory : null
     });

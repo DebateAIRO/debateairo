@@ -610,6 +610,8 @@ export async function runPracticeDebate(input: Readonly<{
   /** Test seams: the runner's cooldown hold and the preview policy's resend wait. */
   wait?: (milliseconds: number) => Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
+  /** Test seam: the ask's `as_of` (ISO time; it seeds the role rotation). Absent: the time of the ask. */
+  asOf?: string;
   progress?: (line: string) => void;
   /** `--transcript`: the folder transcript.json is written to, before the throwaway database is deleted; null: none. */
   transcriptDirectory?: string | null;
@@ -794,7 +796,7 @@ export async function runPracticeDebate(input: Readonly<{
       question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
       risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "asker-declaration:preview-practice", composition_budget_tier: "high", plan_tier: "premium",
-      depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: new Date().toISOString(),
+      depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: input.asOf ?? new Date().toISOString(),
       steering_presets: [], steering_annotations: []
     } as unknown as AskRequest;
     const session = { asker_id: `owner:${ownerRef}`, session_id: sessionId, caller_scope: "ASKER",

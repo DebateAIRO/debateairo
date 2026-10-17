@@ -1182,7 +1182,7 @@ describe("preview practice: language mode, the question language (P2L)", () => {
  * told its targets, no shape asked, the pack default stored); with the length row alone, or with neither, it is
  * today's v3. A checker that finds round 1 misleading starts round 2, which revises its own draft.
  */
-describe("preview practice: debate mode, engine 2's story (R1d)", () => {
+describe("engine 2's story (R1d)", () => {
   const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
   const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
   type PinOutcome = { pinnedModel: string; wroteModel: string | null; held: boolean };
@@ -1196,13 +1196,15 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
     storyLengthByField?: { field: string; guidedWords: number | null }[];
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
+    admission: { panel: { providerRef: string; modelId: string }[];
+      rotation: { answerWriter: string; answerChecker: string; storyteller: string; storyChecker: string } | null };
   };
   /**
    * Carried from Task 22: the report's new blocks are PRESENT and in report.md. Their two database readers
    * (collectPracticeStoryLength, collectPracticeStoryEngine) swallow a failure into a progress line and leave the block
    * out, so a reader that broke on the real database would otherwise go unseen.
    */
-  const expectStoryBlocks = (report: EngineReport, out: string, engine: 1 | 2) => {
+  const expectStoryBlocks = (report: EngineReport, out: string, engine: 1 | 2, storytellers?: readonly string[]) => {
     expect(report.ask.engine).toEqual({ engine });
     expect(report.storyRounds?.length).toBeGreaterThan(0);
     expect(report.storyBackups).toBeDefined();
@@ -1211,6 +1213,7 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
     // One row per storyteller AI; the stand-ins always answer readable JSON.
     expect(report.storyJsonBreaks?.length).toBeGreaterThan(0);
     expect(report.storyJsonBreaks!.every((row) => row.replies > 0 && row.parseFailed === 0)).toBe(true);
+    if (storytellers !== undefined) expect(report.storyJsonBreaks!.map((row) => row.model).sort()).toEqual([...storytellers].sort());
     const markdown = readFileSync(join(out, "report.md"), "utf8");
     expect(markdown).toContain(engine === 2 ? "Engine: 2 (the engine row; the story is told with story v4)." : "Engine: 1 (today's engine; story v3).");
     expect(markdown).toContain("Story rounds (codes only;");
@@ -1322,7 +1325,7 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
       .toEqual(new Set([HAIKU]));
     expect(report.storyBackups).toEqual([]);
     expect(report.storyReadyRate).toEqual({ ready: 1, readyWithReservation: 0, failed: 0 });
-    expectStoryBlocks(report, out, 1);
+    expectStoryBlocks(report, out, 1, [MIMO]);
     expect(report.storyRounds!.every((row) => row.model === MIMO && row.misleading === null)).toBe(true);
     expect(report.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
     expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, held: yes`);
@@ -1360,7 +1363,7 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
     ]);
     expect(report.run.story.outcome).toBe("READY");
     // Carried: the blocks are present; the draft's own maker revised it; the table shows engine 2's targets.
-    expectStoryBlocks(report, out, 2);
+    expectStoryBlocks(report, out, 2, [tellers[0]!.model]);
     expect(tellers[1]!.model).toBe(tellers[0]!.model);
     expect(report.storyRounds![1]!.model).toBe(report.storyRounds![0]!.model);
     expect(report.storyBackups).toEqual([]);
@@ -1407,6 +1410,8 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
     const today = await runPractice(["formats", ...v3.common, ...args], v3.env, v3.quiet);
     const todayReport = today.report as unknown as FormatsStoryReport;
     expect({ verdict: todayReport.verdict, reasons: todayReport.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(todayReport.byModelAndLane).toHaveLength(10);
+    expect(todayReport.byModelAndLane.every((row) => JSON.stringify(row.statuses) === JSON.stringify({ PARSED: 1 }))).toBe(true);
     expect(answered(v3.stubs.requests, "STORYTELLER")).toHaveLength(5);
     expect(answered(v3.stubs.requests, "STORY_CHECKER")).toHaveLength(5);
     expectStoryV3(v3.stubs.requests);
@@ -1420,6 +1425,9 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
    * preview's sit-out book has benched is never the backup storyteller. The control run finds the AI the backup goes
    * to when nobody sits out; the second run makes that AI sit out (its first call ends in the vendor's gate-proven
    * unbilled refusal, the call and its resend) and the backup goes to another maker, which tells the story.
+   * Fix round 1: the role rotation is seeded by the ask's `as_of` and question, so both runs ask with the SAME fixed
+   * `as_of` and draw the same roles; the benched AI (the control's backup) is then never the planned story checker,
+   * whom the picker skips anyway, and the case can only pass through Task 18's filter (asserted below).
    */
   it("R1d-6 --length-policy --engine-policy, the pinned storyteller unreachable: a backup of another maker tells the story; a maker the sit-out book benched is never the backup", async () => {
     type BackupRow = { firstModel: string; signal: string; backupModel: string | null; outcome: string };
@@ -1427,8 +1435,11 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
       request.model === MIMO && request.kind === "STORYTELLER" ? { gateRefuses: "PROVIDER_ERROR_UNBILLED" } : null;
     const args = ["--register-export", registerExportPath, "--depth", "1", "--length-policy", LENGTH_POLICY_START,
       "--engine-policy", ENGINE_POLICY_START, "--storyteller-model", MIMO];
+    const asOf = "2026-10-17T06:00:00.000Z";
+    const modelOf = (report: EngineReport, providerRef: string | undefined) =>
+      report.admission.panel.find((member) => member.providerRef === providerRef)?.modelId;
     const control = await scenario(storytellerDown);
-    const first = (await runPractice(["debate", ...control.common, ...args], control.env, control.quiet)).report as unknown as EngineReport;
+    const first = (await runPractice(["debate", ...control.common, ...args], control.env, { ...control.quiet, asOf })).report as unknown as EngineReport;
     // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story.
     expect({ verdict: first.verdict, reasons: first.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: ["UNBILLED_REFUSALS:2"] });
     expect(first.ask.engine).toEqual({ engine: 2 });
@@ -1443,8 +1454,17 @@ describe("preview practice: debate mode, engine 2's story (R1d)", () => {
     const benchedBusy = (request: GateRequest): GateOverride | null =>
       request.model === benched && request.kind !== "PROBE" ? { unbilled: true } : storytellerDown(request);
     const second = await scenario(benchedBusy);
-    const report = (await runPractice(["debate", ...second.common, ...args], second.env, second.quiet)).report as unknown as EngineReport;
+    const report = (await runPractice(["debate", ...second.common, ...args], second.env, { ...second.quiet, asOf })).report as unknown as EngineReport;
     expect(report.ask.engine).toEqual({ engine: 2 });
+    // Precondition: the same roles in both runs, and the benched AI is not the planned story checker (whom the picker
+    // skips without any filter), so only Task 18's filter can keep the backup away from it.
+    expect(report.admission.rotation).not.toBeNull();
+    expect(report.admission.rotation).toEqual(first.admission.rotation);
+    const plannedChecker = modelOf(report, report.admission.rotation!.storyChecker);
+    expect(plannedChecker).toBeDefined();
+    expect(plannedChecker).not.toBe(benched);
+    expect(modelOf(report, report.admission.rotation!.storyteller)).toBe(MIMO);
+    expect(new Set(answered(second.stubs.requests, "STORY_CHECKER").map((request) => request.model))).toEqual(new Set([plannedChecker]));
     // The benched AI is named busy (it sat out the rest of the run): NOT_PROVEN, as every run with a busy AI.
     expect(report.reasons).toContain(`MODEL_BUSY:${benched}`);
     expect(second.stubs.requests.some((request) => request.model === benched && request.answer === "UNBILLED")).toBe(true);
