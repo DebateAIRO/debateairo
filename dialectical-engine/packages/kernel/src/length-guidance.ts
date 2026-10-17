@@ -103,7 +103,9 @@ export const LENGTH_GUIDANCE_START = Object.freeze({
     framingChallenge: 35, chosenAnswer: 35, checkReason: 40 }) satisfies Readonly<Record<MapWordTargetPart, number>>,
   thinkingRoom: Object.freeze({ opening: 4096, pros_cons: 6144, cross_exchange: 6144, judge_panel: 4096, reviewer: 2048,
     answer_writer: 16384, answer_checker: 2048, story_checker: 12288, comparing_judge: 4096, investigator: 2048,
-    story_writer: 16384, map: 8192 }) satisfies Readonly<Record<LengthThinkingRoomKey, number>>,
+    // Owner Q-C2 (2026-10-16): the storyteller may think up to 64k; the model's own output maximum still caps the call
+    // (R1d sizes the storyteller; LG-C only carries the number on the row and the receipt).
+    story_writer: 64 * 1024, map: 8192 }) satisfies Readonly<Record<LengthThinkingRoomKey, number>>,
   runawayMultiplier: 4, tokensPerWord: 3, storyLongReferenceWords: 3000,
   charactersPerWord: Object.freeze({ zh: 1.6, ja: 2.0, th: 5.0 }),
   /** The short story's counts (contract STORY_BODY_LIMITS: at most 8 position lines, at most 3 why-reasons). */
@@ -201,4 +203,102 @@ export function proseWordCount(value: unknown,
     }
   }
   return Math.round(total);
+}
+
+/* ------------------------------------------------------------------- LG-C: what each AI is told (spec §3.2) */
+
+/** The material field every lengthed contract carries (INTERFACE §5.3); it rides right before `question_language`. */
+export const LENGTH_FIELD = "length" as const;
+
+/**
+ * The fixed sentences: OWNER-EDITABLE instruction text (spec §3.2, rulings L7, L21; INTERFACE §5.2), each sealed inside
+ * the contract variant that carries it, so editing one is a new variant and a new register version. Unit-neutral ("the
+ * length named in length"), so the zh / ja / th field, which names characters, never contradicts them.
+ */
+export const LENGTH_SENTENCE_WRITING =
+  "Write about the length named in length; it is a target, never a reason to leave out a point.";
+/** The map's steps: one target per part of each item (a claim, why it matters, ...), named together in `length`. */
+export const LENGTH_SENTENCE_PARTS =
+  "Write each part in about the length named for it in length; it is a target, never a reason to leave out a point.";
+export const LENGTH_SENTENCE_ANSWER_CHECKER =
+  "The answer was asked for about the length named in answer_length; never object to its length unless it would "
+  + "genuinely overwhelm a reader. Keep your own reply to about the length named in length.";
+
+/** The languages written without spaces between words (spec L2): their field names characters, not words. */
+const LENGTH_CHARACTER_LANGUAGES = Object.freeze(["zh", "ja", "th"] as const);
+export type LengthCharacterLanguage = typeof LENGTH_CHARACTER_LANGUAGES[number];
+
+/**
+ * The language whose field names characters, read from a run's stored tag by its primary subtag ("zh-Hant", "ZH",
+ * "zh_CN" -> zh; "ja-JP" -> ja); null for every other tag ("und", "zho", "", a fallback name), which reads words.
+ */
+export function lengthCharacterLanguageOf(tag: string | null | undefined): LengthCharacterLanguage | null {
+  if (typeof tag !== "string") return null;
+  const primary = tag.trim().toLowerCase().split(/[-_]/u)[0] ?? "";
+  return (LENGTH_CHARACTER_LANGUAGES as readonly string[]).includes(primary) ? primary as LengthCharacterLanguage : null;
+}
+
+const lengthFieldInvalid = (): never => { throw new TypeError("LENGTH_FIELD_INVALID"); };
+
+/** "about N words", or "about M characters" for zh / ja / th with M = Math.round(N x the row's factor), never below 1. */
+export function lengthGuidanceText(words: number, languageCode: string | null, charactersPerWord: CharactersPerWord): string {
+  if (!Number.isSafeInteger(words) || words < 1) return lengthFieldInvalid();
+  const script = lengthCharacterLanguageOf(languageCode);
+  if (script === null) return `about ${String(words)} words`;
+  const factor = charactersPerWord[script];
+  if (typeof factor !== "number" || !Number.isFinite(factor) || factor <= 0) return lengthFieldInvalid();
+  return `about ${String(Math.max(1, Math.round(words * factor)))} characters`;
+}
+
+/** The one-target field: `{ name: "length", content: "about N words" }`. */
+export function lengthGuidanceField(words: number, languageCode: string | null, charactersPerWord: CharactersPerWord):
+  Readonly<{ name: typeof LENGTH_FIELD; content: string }> {
+  return Object.freeze({ name: LENGTH_FIELD, content: lengthGuidanceText(words, languageCode, charactersPerWord) });
+}
+
+const LENGTH_PART_KEY = /^[a-z][a-z0-9_]{0,63}$/u;
+
+/** Several targets in one field, one line each ("claim: about 35 words"); each key is the reply's own JSON key, once. */
+export function lengthGuidancePartsField(parts: readonly Readonly<{ key: string; words: number }>[],
+  languageCode: string | null, charactersPerWord: CharactersPerWord): Readonly<{ name: typeof LENGTH_FIELD; content: string }> {
+  if (parts.length === 0 || new Set(parts.map((part) => part.key)).size !== parts.length
+    || parts.some((part) => !LENGTH_PART_KEY.test(part.key))) return lengthFieldInvalid();
+  return Object.freeze({
+    name: LENGTH_FIELD,
+    content: parts.map((part) => `${part.key}: ${lengthGuidanceText(part.words, languageCode, charactersPerWord)}`).join("\n")
+  });
+}
+
+/** One call's target as its prompt builder needs it: the guided words, the run's stored language tag, the row's factors. */
+export type LengthGuide = Readonly<{ words: number; languageCode: string | null; charactersPerWord: CharactersPerWord }>;
+
+/**
+ * The longest `length` field any valid row can make (5,000 words x a factor of 10: "about 50000 characters"). A request
+ * size bound frames a lengthed prompt with it, so the bound is never below a real lengthed call (the pattern of
+ * `questionLanguageForBounds`).
+ */
+export function lengthGuideForBounds(): LengthGuide {
+  return Object.freeze({ words: 5000, languageCode: "th", charactersPerWord: Object.freeze({ zh: 10, ja: 10, th: 10 }) });
+}
+
+/** The allowance's code limit (spec §3.3): the guided raise never asks above every preview row's output cap. */
+export const LENGTH_ALLOWANCE_LIMITS = Object.freeze({ capTokens: 32 * 1024 });
+
+/**
+ * Spec §3.3, rulings L4, L8: today's allowance, raised to thinking room + answer room when that is larger; the raise is
+ * clamped to the cap (and to a slow ceiling when one is given), and the result is never below today's allowance
+ * (contract deviation 2: a bound already above the cap is kept). The gateway still clamps every request to its model's
+ * own output cap.
+ */
+export function guidedAllowanceTokens(input: Readonly<{
+  todayTokens: number; thinkingRoomTokens: number; answerRoomTokens: number; capTokens: number; slowCeilingTokens?: number;
+}>): number {
+  const whole = (value: number, min: number) => Number.isSafeInteger(value) && value >= min;
+  if (!whole(input.todayTokens, 1) || !whole(input.capTokens, 1) || !whole(input.thinkingRoomTokens, 0)
+    || !whole(input.answerRoomTokens, 0) || (input.slowCeilingTokens !== undefined && !whole(input.slowCeilingTokens, 1))) {
+    throw new TypeError("LENGTH_ALLOWANCE_INPUT_INVALID");
+  }
+  const raised = Math.min(input.capTokens, input.slowCeilingTokens ?? input.capTokens,
+    input.thinkingRoomTokens + input.answerRoomTokens);
+  return Math.max(input.todayTokens, raised);
 }

@@ -59,10 +59,11 @@ import {
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import {
-  readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls, type DebateShapeCeilingInput
+  lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls,
+  type DebateShapeCeilingInput
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
-import { admittedShapeOf, expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
+import { admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
 
 /**
  * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
@@ -374,7 +375,8 @@ const PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS = previewEstimateInputTokens(PREVIEW
 
 /**
  * CALIBRATED_ESTIMATE: the average call of that kind by that model (previewCallAverage) at the row's list price today.
- * The calibrated average ignores a shaped run's writer and map step bounds; switching to it under-prices those calls.
+ * The calibrated average ignores a shaped run's writer and map step bounds, and a length receipt's guided allowance
+ * (LG-C); switching to it under-prices those calls.
  */
 export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): PreviewCallPricer {
   return (row, type) => {
@@ -454,7 +456,8 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
  * a whole debate in the $10.00 day, so a started debate is not cut off for money.
  * To switch (back to CALIBRATED_ESTIMATE, to STRICT_BOUND, or to a mode added beside these), change
  * this one constant; previewEstimatePricer and previewDebateCallCount follow it, nothing else reads it.
- * The calibrated average ignores a shaped run's writer and map step bounds; switching to it under-prices those calls.
+ * The calibrated average ignores a shaped run's writer and map step bounds, and a length receipt's guided allowance
+ * (LG-C); switching to it under-prices those calls.
  */
 export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
@@ -1276,14 +1279,27 @@ export function previewShapeWriterBound(basis: Readonly<Record<string, unknown>>
 }
 
 /**
+ * The debate steps priced as DEBATE calls (the answer writer and checker are final writers, priced at the row's own
+ * maximum since LG-B; the map's allowance is Task 14's; the story's LG-D's).
+ */
+const PREVIEW_LENGTH_DEBATE_STEPS = Object.freeze(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer"] as const);
+
+/**
  * The output tokens one debate is priced at: the gate's, with the answer writer raised to the run's own writer bound
- * and the map's merge and choose to its map step bounds (X1), never below a debate call's. Today's receipt: `output`.
+ * and the map's merge and choose to its map step bounds (X1), never below a debate call's. Length guidance (spec
+ * 2026-10-15 §3.3, §3.10): with the receipt's `length`, every debate call at the largest guided allowance of its steps, as
+ * the runner sends them (the writer and checker need no raise: LG-B prices them at the row's own maximum). Today's
+ * receipt: `output` itself.
  */
 export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, basis: Readonly<Record<string, unknown>>): PreviewCallOutputTokens {
   const shape = previewShapeOf(basis);
-  if (shape === null) return output;
-  return Object.freeze({ ...output, answerWriter: Math.max(output.debate, shape.writerBound),
+  const shaped: PreviewCallOutputTokens = shape === null ? output : Object.freeze({ ...output,
+    answerWriter: Math.max(output.debate, shape.writerBound),
     mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
+  const length = admittedLengthOf(basis);
+  if (length === null) return shaped;
+  return Object.freeze({ ...shaped,
+    debate: Math.max(...PREVIEW_LENGTH_DEBATE_STEPS.map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate))) });
 }
 
 /** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */

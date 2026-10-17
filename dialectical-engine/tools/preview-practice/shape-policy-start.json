@@ -38,9 +38,9 @@
     }
   },
   "answerLength": {
-    "short": { "words": 300, "writerBound": 8192 },
-    "standard": { "words": 700, "writerBound": 12288 },
-    "detailed": { "words": 1500, "writerBound": 16384 }
+    "short": { "words": 200, "writerBound": 8192 },
+    "standard": { "words": 350, "writerBound": 12288 },
+    "detailed": { "words": 1000, "writerBound": 16384 }
   },
   "mapStepBounds": { "merge": 32768, "choose": 32768 }
 }

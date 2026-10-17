@@ -40,6 +40,9 @@
  *    Likewise optional, the `questionLanguagePolicy` (question-language spec 2026-10-13): the policy without its kind,
  *    sealed as the ADDITIVE `questionLanguagePolicy` row under the file's sourceRef; left out, no such row is sealed and
  *    an API with the debate shape in force uses the code's start values.
+ *    Likewise optional, the `lengthGuidancePolicy` (spec 2026-10-15, length guidance): the policy without its kind,
+ *    sealed as the ADDITIVE `lengthGuidancePolicy` row under the file's sourceRef; left out, no such row is sealed and
+ *    every request keeps today's bytes.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -121,9 +124,15 @@ import {
   callConcurrencyPolicyRow,
   debateShapeInForce,
   debateShapePolicyRow,
-  debateShapeWriterCeiling,
   parseDebateShapePolicy,
   type DebateShapePolicy,
+  LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  answerJobTokenCeilings,
+  lengthGuidancePolicyRow,
+  lengthGuidedFirstCallCeiling,
+  parseLengthGuidancePolicy,
+  readLengthGuidancePolicy,
+  type LengthGuidancePolicy,
   QUESTION_LANGUAGE_POLICY_ROW_KEY,
   parseQuestionLanguagePolicy,
   questionLanguagePolicyRow,
@@ -235,7 +244,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Debate shape (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the engine keeps today's shape.
   "debateShapePolicy",
   // Question language (spec 2026-10-13): OPTIONAL. Left out, no row is sealed (the code's start values apply).
-  "questionLanguagePolicy"
+  "questionLanguagePolicy",
+  // Length guidance (spec 2026-10-15): OPTIONAL. Left out, no row is sealed and every request keeps today's bytes.
+  "lengthGuidancePolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -433,6 +444,8 @@ export type HostedRegisterFile = Readonly<{
   debateShapePolicy?: unknown;
   /** Optional (spec 2026-10-13): the question-language policy without its kind; absent = no questionLanguagePolicy row. */
   questionLanguagePolicy?: unknown;
+  /** Optional (spec 2026-10-15): the length guidance policy without its kind; absent = no row. */
+  lengthGuidancePolicy?: unknown;
 }>;
 
 /**
@@ -496,7 +509,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
-    ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {})
+    ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {}),
+    ...(Object.hasOwn(record, "lengthGuidancePolicy") ? { lengthGuidancePolicy: record.lengthGuidancePolicy } : {})
   });
 }
 
@@ -841,6 +855,25 @@ function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
 }
 
 /**
+ * The lengthGuidancePolicy row for the file's optional member (spec 2026-10-15 §3.1): the policy without its `kind`. A
+ * member that is not an object, carries `kind`, or that the register's own parser refuses is refused with the file's own
+ * code (never the parser's message), so a malformed member can never seal a malformed row.
+ */
+function lengthGuidanceRowOf(member: unknown, sourceRef: string): Readonly<{
+  row: ReturnType<typeof lengthGuidancePolicyRow>; policy: LengthGuidancePolicy;
+}> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID");
+  }
+  try {
+    const policy = parseLengthGuidancePolicy({ kind: "LENGTH_GUIDANCE_POLICY", ...member });
+    return Object.freeze({ row: lengthGuidancePolicyRow(policy, sourceRef), policy });
+  } catch {
+    return refuse("HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID");
+  }
+}
+
+/**
  * P2L final review I4: what the hosted API's question-language boot step (apps/api/src/question-language/boot.ts, run
  * with the debate shape in force and no preview configured) refuses of a parsed policy, asked here without the API:
  *  · an owner instruction carrying a token the safety frame reserves (QUESTION_LANGUAGE_INSTRUCTION_RESERVED_TOKEN) —
@@ -932,6 +965,9 @@ export async function planHostedRegisterPublication(
   // Debate shape (P2b Task 6, pre-flight PF-B21): the member in force (absent, or `enabled: false`, = none), for the
   // Free answer-job check below.
   const debateShapeInForcePolicy = debateShapeInForce(debateShape === null ? null : debateShape.policy);
+  // Length guidance (spec 2026-10-15): the optional member; absent = no row (today's requests).
+  const lengthGuidance = file.lengthGuidancePolicy === undefined ? null
+    : lengthGuidanceRowOf(file.lengthGuidancePolicy, file.sourceRef);
   // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
   const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
     : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
@@ -1090,13 +1126,23 @@ export async function planHostedRegisterPublication(
     valueJsonText: questionLanguageRow.valueJsonText,
     sourceRef: questionLanguageRow.sourceRef
   })];
+  // Length guidance (spec 2026-10-15) is ADDITIVE too, for the same reason.
+  if (lengthGuidance !== null && codeOwnedRows.some((row) => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const lengthGuidanceRows: readonly RegisterPublicationRow[] = lengthGuidance === null ? [] : [Object.freeze({
+    rowKey: lengthGuidance.row.rowKey,
+    valueJsonText: lengthGuidance.row.valueJsonText,
+    sourceRef: lengthGuidance.row.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
     ...roleRotationRows,
     ...callConcurrencyRows,
     ...debateShapeRows,
-    ...questionLanguageRows
+    ...questionLanguageRows,
+    ...lengthGuidanceRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1145,7 +1191,8 @@ export async function planHostedRegisterPublication(
   if (costEnvelopeBand(costEnvelope) !== null) {
     const firstCalls = firstPositionCallProjections({
       targets,
-      judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
+      // Length guidance (LG-C): with the member, the largest guided opening allowance (the first position's call).
+      judgeTokenCeiling: lengthGuidedFirstCallCeiling(judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value), lengthGuidance?.policy ?? null),
       questionMaxBytes: askQuestionMaxBytes(),
       // Ruling L-B9R (P2L Task 17): the runner's boot prices the longest lock whenever the version carries ANY
       // debateShapePolicy row (enabled false too), so the plan asks the same.
@@ -1191,11 +1238,9 @@ export async function planHostedRegisterPublication(
       targets,
       freeRosterModelIds: PLAN_TIER_ROSTERS.free,
       // Debate shape (P2b Task 6, pre-flight PF-B22): with the member in force a Free `detailed` answer asks the writer
-      // for up to the member's largest writer bound, and Free's writer has no fallback.
-      answerTokenCeilingByRole: {
-        ANSWER_WRITER: debateShapeWriterCeiling(ceilings.synthesizer, debateShapeInForcePolicy),
-        ANSWER_CHECKER: ceilings.evaluator
-      }
+      // for up to the member's largest writer bound, and Free's writer has no fallback. Length guidance (LG-C): with the
+      // member, the largest guided writer and checker allowance any plan and answer length can ask.
+      answerTokenCeilingByRole: answerJobTokenCeilings({ writer: ceilings.synthesizer, checker: ceilings.evaluator }, debateShapeInForcePolicy, lengthGuidance?.policy ?? null)
     })) {
       refuse(SCORECARD_FREE_ANSWER_UNSCORED);
     }
@@ -1317,6 +1362,10 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     // its sealed map prompts. Absent: no line (today's text).
     ...(plan.rows.some((row) => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)
       ? ["debate_shape=present (the runner argues the debate shape; this version also seals mapContractHash)"]
+      : []),
+    // Length guidance (LG-C): said BEFORE sealing, so the operator sees the version tells the AIs target lengths.
+    ...(plan.rows.some((row) => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)
+      ? ["length_guidance=present (every debate admitted on this version is told target lengths)"]
       : []),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
@@ -1452,6 +1501,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readDebateShapeRunnerSettings(pool, version);
   // Question language (P2L final review I4): main.ts's question-language step, with the shape in force only.
   await assertHostedQuestionLanguageBootReady(pool, version);
+  // Length guidance (spec 2026-10-15 §3.1): optional (ABSENT = today's requests), but a malformed row refuses the API's boot.
+  await readLengthGuidancePolicy(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

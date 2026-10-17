@@ -18,6 +18,7 @@ import {
   type PracticeLanguageCaseRecord,
   type PracticeLanguageNotRun
 } from "./practice-language.js";
+import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
 import { practiceLengthLines, practiceTokenLines, type PracticeLengthRow, type PracticeTokenRow } from "./practice-tokens.js";
@@ -414,6 +415,8 @@ export function debateReport(input: Readonly<{
     ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
+    // Length guidance: only when the debate ran with a length row; absent otherwise (today's keys).
+    ...(r.length === undefined ? {} : { length: r.length }),
     // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).
     ...(r.language === undefined ? {} : { language: r.language }),
     admission: r.admission,
@@ -487,6 +490,10 @@ export function reportMarkdown(report: PracticeReport): string {
   if (totals !== undefined) lines.push("Totals:", "", ...Object.entries(totals).map(([key, value]) => `- ${key}: ${String(value)}`), "");
   const shape = typeof report.shape === "object" && report.shape !== null ? report.shape as PracticeShapeBlock : undefined;
   if (shape !== undefined) lines.push(...practiceShapeLines(shape));
+  // Length guidance: where the numbers came from and what the run was admitted with (codes and numbers only).
+  const lengthBlock = report.mode === "debate" && typeof report.length === "object" && report.length !== null
+    ? report.length as PracticeLengthBlock : undefined;
+  if (lengthBlock !== undefined) lines.push(...practiceLengthBlockLines(lengthBlock));
   const language = report.mode === "debate" && typeof report.language === "object" && report.language !== null
     ? report.language as PracticeDebateLanguageBlock : undefined;
   if (language !== undefined) lines.push(...practiceDebateLanguageLines(language));

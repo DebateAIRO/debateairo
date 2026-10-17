@@ -94,6 +94,8 @@ import {
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
   debateShapeInForce,
+  readLengthGuidancePolicy,
+  lengthGuidedFirstCallCeiling,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -636,6 +638,9 @@ const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTo
 const debateShapePolicy = await boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION));
 // The row in force for the ask side (amendment 2026-10-13, the preview's rollback): `enabled: false` is no row here.
 const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+// Length guidance (spec 2026-10-15 §3.1): the optional row; absent = today's asks byte for byte, a malformed row refuses
+// the boot (LENGTH_GUIDANCE_POLICY_INVALID). Only the ask side reads it; the runner reads each run's receipt.
+const lengthGuidancePolicy = await boot.run("length-guidance-policy", () => readLengthGuidancePolicy(pool, environment.REGISTER_VERSION));
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
 // the debate targets take above. Hosted refuses a relay target here exactly as
 // it refuses one there; local keeps today's relay path. Parsed HERE, above the
@@ -716,6 +721,7 @@ const modelPicker = await composeAskModelPicker({
   billingEnabled,
   // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).
   debateShapePolicy: debateShapeInForcePolicy,
+  lengthGuidancePolicy,
   log: (line) => console.error(line)
 });
 /**
@@ -734,7 +740,8 @@ await boot.run("run-ceiling-covers-one-call", async () => {
   if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
-    judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
+    // Length guidance (spec 2026-10-15 §3.3): a first position may ask up to the largest guided opening allowance.
+    judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION), lengthGuidancePolicy),
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38: with the debate-shape row in force a run may be shaped, and its first call carries the locked
     // language (the named sentence and the question_language field): priced at the longest lock too. Row absent: today's.
@@ -1065,6 +1072,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
   // Debate shape (spec 2026-10-12 §3.1): admission sizes a shaped basis only with the row in force.
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Length guidance (spec 2026-10-15 §3.1): admission freezes the numbers on the receipt only with the row.
+  ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
   // Question language (spec 2026-10-13): the decider, composed above only with the shape row in force.
   ...(questionLanguage === undefined ? {} : { questionLanguage }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
@@ -1082,7 +1091,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
     backupSequencesProvisioned: input.backupSequencesProvisioned,
     // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
-    ...(input.shape === null ? {} : { shape: input.shape })
+    ...(input.shape === null ? {} : { shape: input.shape }),
+    // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
+    ...(input.length === null ? {} : { length: input.length })
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -1615,6 +1626,8 @@ const api = buildApi({
   ...(askBilling === undefined ? {} : { askBilling }),
   // Debate shape: the room read normalises its query under the same row as submit.
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+  // Length guidance: the room read normalises under the same row as submit and names the plan's answer words.
+  ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

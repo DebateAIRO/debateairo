@@ -88,13 +88,16 @@ import {
   readEngineVersion,
   readEnvelopeFormulaInputs,
   readJudgeTokenCeiling,
+  lengthGuidedFirstCallCeiling,
+  readLengthGuidancePolicy,
   readModelScorecard,
   readPanelDiscoveryPolicy,
   readQuestionLanguagePolicy,
   readStoryPolicyFromRegister,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
-  type DeploymentMode
+  type DeploymentMode,
+  type LengthGuidancePolicy
 } from "@debateai/register";
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
@@ -217,13 +220,15 @@ async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
   scorecardState: string;
   /** main.ts's `debateShapeInForcePolicy !== null`: a shaped run's first call carries the locked language. */
   questionLanguageLocked: boolean;
+  /** Length guidance (spec 2026-10-15 §3.3), as main.ts: the first call is checked at the largest guided opening allowance. */
+  lengthGuidancePolicy: LengthGuidancePolicy | null;
 }>): Promise<void> {
   const { pool, money: { costEnvelopeRows }, declaredProviderTargets } = input;
   const billingEnabled = input.money.registerBillingEnabled;
   if (costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
   const firstCalls = firstPositionCallProjections({
     targets: declaredProviderTargets,
-    judgeTokenCeiling: await readJudgeTokenCeiling(pool, input.registerVersion),
+    judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, input.registerVersion), input.lengthGuidancePolicy),
     questionMaxBytes: askQuestionMaxBytes(),
     // Pre-flight PF-L38, as main.ts: with the debate-shape row in force a run may be shaped, and its first call carries
     // the locked language: priced at the longest lock too. Row absent (or switched off): today's price.
@@ -313,6 +318,8 @@ export async function composePracticeAsk(input: Readonly<{
   const debateShapePolicy = await readDebateShapePolicy(pool, version);
   // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
   const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
+  // Length guidance (spec 2026-10-15 §3.1): as main.ts reads it.
+  const lengthGuidancePolicy = await readLengthGuidancePolicy(pool, version);
   // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
   // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
   // blind-index key here, so the check reference key is per process. The same in hosted mode: the hosted preview still
@@ -344,11 +351,13 @@ export async function composePracticeAsk(input: Readonly<{
     // picker's billing rules apply only under a VALID scorecard, which the preview refuses (PREVIEW_SCORECARD_CONFLICT).
     billingEnabled: false,
     debateShapePolicy: debateShapeInForcePolicy,
+    lengthGuidancePolicy,
     log: (line) => input.log?.(line)
   });
   if (money !== null) {
     await assertPracticeRunCeilingCoversOneCall({ pool, registerVersion: version, money, declaredProviderTargets,
-      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null });
+      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null,
+      lengthGuidancePolicy });
   }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
@@ -369,6 +378,7 @@ export async function composePracticeAsk(input: Readonly<{
     modelPicker,
     ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
     ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
+    ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
@@ -383,7 +393,8 @@ export async function composePracticeAsk(input: Readonly<{
       evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
       maxDepth: envelopeFormulaInputs.maxDepth,
       backupSequencesProvisioned: basis.backupSequencesProvisioned,
-      ...(basis.shape === null ? {} : { shape: basis.shape })
+      ...(basis.shape === null ? {} : { shape: basis.shape }),
+      ...(basis.length === null ? {} : { length: basis.length })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

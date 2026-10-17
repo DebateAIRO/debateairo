@@ -223,15 +223,23 @@ function NewDebateForm({
   // ALREADY_WAITING read never hides the controls mid-edit. Without it the page offers and sends none of
   // the three settings, which the API would otherwise drop without a word.
   const [shapeSettings, setShapeSettings] = useState(false);
+  // Length guidance (spec 2026-10-15 §3.8): true once a room read said the length row is in force; kept for the page's
+  // life like shapeSettings. With it alone the page offers and sends the answer length only.
+  const [lengthSettings, setLengthSettings] = useState(false);
+  // The plan's three answer targets from the room read (null: none named; the hint shows its own fallback numbers).
+  const [answerWords, setAnswerWords] = useState<Readonly<{ short: number; standard: number; detailed: number }> | null>(null);
   // Contract deviation 9: the room is read for the ask this form would send, the three choices included
   // exactly when they are shown (and so sent).
   const roomQuery: AskRoomQuery = {
     plan_tier: planTier, composition_budget_tier: budgetTier, depth,
-    ...(shapeSettings ? { depth_mode: depthMode, scrutiny, answer_length: answerLength } : {})
+    ...(shapeSettings ? { depth_mode: depthMode, scrutiny, answer_length: answerLength }
+      : lengthSettings ? { answer_length: answerLength } : {})
   };
   const [room, setRoom] = useAskRoom(contractClient, roomQuery);
   useEffect(() => {
     if (room?.shape_settings === true) setShapeSettings(true);
+    if (room?.length_settings === true) setLengthSettings(true);
+    if (room?.answer_words !== undefined) setAnswerWords(room.answer_words);
   }, [room]);
   // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
   // for this person (B8), as the room read (and B10c's usage read) names it. It
@@ -333,7 +341,7 @@ function NewDebateForm({
         asOf,
         depth,
         // Debate shape P2c (Contract deviation 7): sent only when the room says the settings are in force.
-        ...(shapeSettings ? { depthMode, scrutiny, answerLength } : {}),
+        ...(shapeSettings ? { depthMode, scrutiny, answerLength } : lengthSettings ? { answerLength } : {}),
         asOfWasEdited: false,
         riskTierWasEdited,
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
@@ -607,16 +615,19 @@ function NewDebateForm({
                     onChange={(value) => setScrutiny(value as Scrutiny)}
                     options={SCRUTINY_LEVELS.map((level) => ({ value: level, label: t(catalog, SCRUTINY_WORDS[level].label) }))}
                   />
-                  {/* S8: Answer length replaces Max tokens and is every plan's choice, Free's included. */}
-                  <SegmentedRow
-                    field="answerLength"
-                    label={t(catalog, "newDebate.answerLength")}
-                    hint={t(catalog, "newDebate.answerLengthHint")}
-                    options={ANSWER_LENGTHS.map((length) => ({ value: length, label: t(catalog, ANSWER_LENGTH_WORDS[length]) }))}
-                    value={answerLength}
-                    onChange={(value) => setAnswerLength(value as AnswerLength)}
-                  />
                 </>
+              ) : null}
+              {/* S8 + length guidance: the answer length replaces Max tokens, is every plan's choice (Free's included)
+                  and is offered with either row (spec 2026-10-15 §3.8). */}
+              {shapeSettings || lengthSettings ? (
+                <SegmentedRow
+                  field="answerLength"
+                  label={t(catalog, "newDebate.answerLength")}
+                  hint={t(catalog, "newDebate.answerLengthHint")}
+                  options={ANSWER_LENGTHS.map((length) => ({ value: length, label: t(catalog, ANSWER_LENGTH_WORDS[length]) }))}
+                  value={answerLength}
+                  onChange={(value) => setAnswerLength(value as AnswerLength)}
+                />
               ) : null}
               <p className="ndProvenance">
                 {t(catalog, "newDebate.roleOverrides")}{" "}

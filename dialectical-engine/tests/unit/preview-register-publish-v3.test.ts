@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues } from '@debateai/register';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
@@ -331,6 +331,34 @@ describe('publish kit v3: the optional questionLanguagePolicy row (ruling L-KIT,
   });
 });
 
+describe('publish kit v3: the optional lengthGuidancePolicy row (LG-C, spec 2026-10-15 §3.1)', () => {
+  const policy = lengthGuidancePolicyStartValues();
+  /** v3's ninth argument is the length guidance (v2's eighth). */
+  const v3 = async (...length: [] | [unknown]) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON, undefined, undefined, null, null, null, ...length)] as Row[];
+  const v2 = async (length: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, undefined, undefined, null, null, null, length as any)] as Row[];
+  const lengthRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY);
+
+  it('passes the policy through to kit v2: the same row as v2 builds; null or nothing = no row', async () => {
+    const given = await v3(policy);
+    expect(lengthRow(given)).toEqual(lengthRow(await v2(policy)));
+    const absent = await v3();
+    expect(lengthRow(absent)).toBeUndefined();
+    expect(await v3(null)).toEqual(absent);
+    expect(given.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY)).toEqual(absent);
+  });
+
+  it('R19: a base row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
+    const base = sorted([...await v2(policy), ...owned()]);
+    const source = await v3();
+    const plan = compose(source, base);
+    expect(lengthRow([...plan.rows] as Row[])).toEqual(lengthRow(base));
+    expect(plan.delta.map(entry => entry.rowKey)).not.toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    const broken = base.map(row => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"LENGTH_GUIDANCE_POLICY"', '"X"') } : row);
+    expect(refusal(() => compose(source, broken))).toContain('LENGTH_GUIDANCE_POLICY_INVALID:');
+  });
+});
+
 describe('the native operator chooses the kit by the plan', () => {
   const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
   const body = text.slice(text.indexOf('export async function runNativeOperator('));
@@ -338,7 +366,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {

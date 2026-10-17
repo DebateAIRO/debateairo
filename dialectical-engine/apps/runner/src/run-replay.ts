@@ -90,6 +90,8 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
  * A REFUSED row (the preview's provably unbilled refusal) holds no place: its one resend is sent at the same place in the
  * call, so the call's attempts are counted, and its start found, without it (final review Minor 1: a follow-up B resent
  * after an unbilled refusal is replayed, not bought again). A call with no REFUSED row is read exactly as before.
+ * The skip assumes the preview policy's whole-call resend; a call whose in-gateway loop goes on to attempt+1 after a
+ * REFUSED attempt (story calls) is not replayed (not reachable today: story calls run after the replay book closes).
  */
 export function replayOf(call: RecordedCall, fingerprint: string): Replay | null {
   const acceptedIndex = call.attempts.length - 1;

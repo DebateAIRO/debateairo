@@ -1,10 +1,11 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, LENGTH_GUIDANCE_START } from "@debateai/kernel";
 import {
   debateShapeSettingsOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
 } from "@debateai/contract";
 import type { PlanId } from "./billing-plans.js";
+import type { LengthGuidancePolicy } from "./length-guidance-policy.js";
 import { canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst, type CanonicalRegisterJson } from "./register-publication.js";
 
 /**
@@ -222,7 +223,7 @@ export function debateShapePolicyRow(policy: DebateShapePolicy, sourceRef: strin
   return Object.freeze({ rowKey: DEBATE_SHAPE_POLICY_ROW_KEY, valueJsonText: canonicalRegisterJson(shapeAst(checked)), sourceRef });
 }
 
-/** The owners' start values (rulings S5-S8); `opening` is the Phase 1 pick (ruling S1: the angle map). */
+/** The owners' start values (rulings S5-S8; answer words OVERVIEW C-1); `opening` is the Phase 1 pick (ruling S1: the angle map). */
 export function debateShapePolicyStartValues(opening: DebateShapeOpening = "ANGLE_MAP"): DebateShapePolicy {
   const premiumScrutiny = {
     deep: { roundsPerPoint: 2, pointsPerDebate: 6 },
@@ -249,10 +250,13 @@ export function debateShapePolicyStartValues(opening: DebateShapeOpening = "ANGL
       max: premium(7, 4),
       premium: premium(5, 4)
     },
+    // OVERVIEW C-1 / engine INTERFACE §4.1 (owner G5): the answer writer's words are the length row's start words, one
+    // vocabulary (200 / 350 / 1,000); the writer bounds are unchanged. A sealed version keeps its own words: start
+    // values seed only new versions.
     answerLength: {
-      short: { words: 300, writerBound: 8192 },
-      standard: { words: 700, writerBound: 12288 },
-      detailed: { words: 1500, writerBound: 16384 }
+      short: { words: LENGTH_GUIDANCE_START.answerWriterWords.short, writerBound: 8192 },
+      standard: { words: LENGTH_GUIDANCE_START.answerWriterWords.standard, writerBound: 12288 },
+      detailed: { words: LENGTH_GUIDANCE_START.answerWriterWords.detailed, writerBound: 16384 }
     },
     mapStepBounds: mapStepBoundsStartValues()
   });
@@ -292,11 +296,18 @@ const FREE_SHAPE_DEPTH_CEILING = 2;
  * The plan's normalisation (spec §3.2). With the row: fixed -> adaptive where the plan does not allow it, a scrutiny
  * the plan has no budget for -> standard, Free's depth capped at its ceiling (ruling S6), and every key written in one
  * order. Without it: `{ depth }` exactly (the same object for a depth-only ask), so nothing a client sends can change
- * today's stored bytes and the depth is untouched. With billing on, billing's Free gauge sets the depth first; this
- * ceiling can only lower it.
+ * today's stored bytes and the depth is untouched. Length guidance (spec 2026-10-15 §3.1): with the shape row absent and
+ * the length row in force, `{ depth, answerLength }` exactly, in that order (the answer length is the one setting the
+ * length row reads). With billing on, billing's Free gauge sets the depth first; this ceiling can only lower it.
  */
-export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey): DepthParams {
-  if (policy === null) return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });
+export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey,
+  lengthPolicy: LengthGuidancePolicy | null = null): DepthParams {
+  if (policy === null) {
+    if (lengthPolicy !== null) {
+      return Object.freeze({ depth: depthParams.depth, answerLength: debateShapeSettingsOf(depthParams).answerLength });
+    }
+    return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });
+  }
   const rules = policy.plans[plan];
   const asked = debateShapeSettingsOf(depthParams);
   const depth = plan === "free" ? Math.min(depthParams.depth, FREE_SHAPE_DEPTH_CEILING) : depthParams.depth;

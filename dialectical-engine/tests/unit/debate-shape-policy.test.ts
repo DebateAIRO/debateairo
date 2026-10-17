@@ -27,8 +27,9 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
     expect(START.plans.pro).toEqual(premium(5, 4));
     expect(START.plans.max).toEqual(premium(7, 4));
     expect(START.plans.premium).toEqual(START.plans.pro);
-    expect(START.answerLength).toEqual({ short: { words: 300, writerBound: 8192 }, standard: { words: 700, writerBound: 12288 },
-      detailed: { words: 1500, writerBound: 16384 } });
+    // OVERVIEW C-1 (LG-C Task 4 Step 3a): the length row's answer words; the writer bounds are unchanged.
+    expect(START.answerLength).toEqual({ short: { words: 200, writerBound: 8192 }, standard: { words: 350, writerBound: 12288 },
+      detailed: { words: 1000, writerBound: 16384 } });
     // Controller ruling X1: the map's merge and choose steps answer at their own bound (P2b ruling R-2).
     expect(START.mapStepBounds).toEqual({ merge: 32_768, choose: 32_768 });
     expect(Object.isFrozen(START.plans.max.scrutiny.exhaustive)).toBe(true);
@@ -161,7 +162,7 @@ describe("debateShapePolicy: one optional row, absent means today's shape (spec 
       plan: "max", depthMode: "fixed", scrutiny: "exhaustive", answerLength: "detailed", mapAIs: 7, answers: 4, graders: 3,
       pointsPerAnswer: 4, deeperTopPoints: 2, gapRounds: 2, closeCallExtraGraders: 2, scrutinyRoundsPerPoint: 3,
       scrutinyPointsPerDebate: 15, scrutinyLeverageMin: 0.05, scrutinyWeakBelow: 0.5, opening: "ANGLE_MAP",
-      answerWords: 1500, writerBound: 16384, mapMergeBound: 32_768, mapChooseBound: 32_768 });
+      answerWords: 1000, writerBound: 16384, mapMergeBound: 32_768, mapChooseBound: 32_768 });
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 3, settings: { ...SETTINGS, depthMode: "fixed" } }))
       .toThrow("DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:depthMode");
     expect(() => resolveDebateShape({ policy: START, plan: "free", makers: 3, settings: { ...SETTINGS, scrutiny: "deep" } }))

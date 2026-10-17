@@ -45,6 +45,7 @@ import {
   answerRoleRotationPolicyRow, callConcurrencyPolicyRow, callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
   DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyRow, debateShapePolicyStartValues, parseDebateShapePolicy, debateShapeInForce, type DebateShapePolicy,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyRow, parseQuestionLanguagePolicy, type QuestionLanguagePolicy,
+  LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, parseLengthGuidancePolicy, type LengthGuidancePolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
@@ -92,7 +93,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
  * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key that the source leaves out is
  * carried from the base unchanged (R19: a plan that does not name the value keeps the current one); it is never dropped.
  */
-export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY] as const);
+export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY] as const);
 
 /** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
@@ -142,10 +143,11 @@ const sourceKeysReviewed = (keys:readonly string[]) => {
  * a time); `debateShape` the operator's optional debate shape policy (default null: no row, today's shape; 'off': the
  * row published disabled, the start values with enabled false — P2b Task 6); `questionLanguage` the operator's optional
  * question-language policy (default null: no row, the code's start values; the owners switch the fast check off with
- * `fastCheck: null`, P2L Task 12). All are checked before anything else is built (each policy by the register's own
- * parser, CALL_CONCURRENCY_POLICY_INVALID, DEBATE_SHAPE_POLICY_INVALID or QUESTION_LANGUAGE_POLICY_INVALID).
+ * `fastCheck: null`, P2L Task 12); `lengthGuidance` the owners' optional length guidance (default null: no row; LG-C).
+ * All are checked before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID,
+ * DEBATE_SHAPE_POLICY_INVALID, QUESTION_LANGUAGE_POLICY_INVALID or LENGTH_GUIDANCE_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
   const evaluatorRoleRef=previewCheckerRoleRef(checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
@@ -155,6 +157,8 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const shapeRows=debateShape===null?[]:[debateShapePolicyRow(debateShape==='off'?{...debateShapePolicyStartValues(),enabled:false}:debateShape,'docs/superpowers/specs/2026-10-12-debate-shape-design.md; owner 2026-10-12')];
   // Question language (P2L Task 12): the register's own parser refuses a malformed policy here, before any row is built.
   const languageRows=questionLanguage===null?[]:[questionLanguagePolicyRow(questionLanguage,'question-language spec 2026-10-13 (owner rulings L1-L8); owner 2026-10-13')];
+  // Length guidance (LG-C): the register's own parser refuses a malformed policy here, before any row is built.
+  const lengthRows=lengthGuidance===null?[]:[lengthGuidancePolicyRow(lengthGuidance,'length guidance spec 2026-10-15 (owner rulings L1-L36); owner 2026-10-15')];
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -178,7 +182,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     // Debate shape (spec 2026-10-12 §3.1): only when the operator supplied a policy.
     ...shapeRows,
     // Question language (spec 2026-10-13): only when the operator supplied a policy.
-    ...languageRows];
+    ...languageRows,
+    // Length guidance (LG-C, spec 2026-10-15 §3.1): only when the operator supplied a policy.
+    ...lengthRows];
   if(!sourceKeysReviewed(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
@@ -267,6 +273,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===CALL_CONCURRENCY_POLICY_ROW_KEY)callConcurrencyPolicyFromValue(JSON.parse(row.valueJsonText));
     if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
   }
   // Any other base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');

@@ -18,6 +18,7 @@
  *             With --transcript it also writes <out>/transcript.json: every prompt and every reply, decrypted
  *             (practice-transcript.ts).
  *             --shape-policy FILE runs it in the new debate shape, in the throwaway register only (practice-shape.ts).
+ *             --length-policy FILE runs it with the length row, in the throwaway register only (practice-length.ts).
  *             --site-language and --language-choice set the site language and answer the one-language offer (default keep).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
@@ -99,6 +100,7 @@ import {
   remainingLine
 } from "./practice-samples-log.js";
 import { practiceShapeOverrideFromArgs } from "./practice-shape.js";
+import { practiceLengthOverrideFromArgs } from "./practice-length.js";
 import { writeSideBySideFile } from "./practice-side-by-side.js";
 import {
   assertGateStatusAllowsPractice,
@@ -133,7 +135,7 @@ const REGISTER_NEXT_INPUT_FLAGS = Object.freeze(["--hosted-billing", "--checker"
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
-  "--answer-length", "--site-language", "--language-choice", ...REGISTER_NEXT_INPUT_FLAGS]);
+  "--answer-length", "--site-language", "--language-choice", "--length-policy", ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
 
 /**
@@ -381,6 +383,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // Debate shape (spec 2026-10-12 §5): the four debate-only flags, read and checked here, before any socket, settings
     // file or gate is touched; a policy file that does not pass the register's own check never starts a paid run.
     const shapeOverride = practiceShapeOverrideFromArgs(args.mode, args.flags);
+    // Length guidance (spec 2026-10-15 §3.7): the debate-only flag, read and checked here, before any socket, settings file
+    // or gate is touched; a policy file that does not pass the register's own check never starts a paid run.
+    const lengthOverride = practiceLengthOverrideFromArgs(args.mode, args.flags);
     // The debate's question, a fixed id only, checked here too (it used to fail only once the database had started).
     const debateQuestionId = args.mode === "debate" ? practiceDebateQuestion(args.flags.get("--question") ?? "ro").id : "ro";
     // Question language (P2L, practice-language.ts): debate mode's two language flags, checked here too.
@@ -535,7 +540,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     const nextInputs = register !== null && args.switches.has("--register-next") ? await parsePracticeNextRegisterInputs({
       hostedBilling: args.flags.get("--hosted-billing"), checker: args.flags.get("--checker"),
       deepseekEnabledOnGate: args.flags.get("--deepseek-enabled-on-gate"), roleRotation: args.flags.get("--role-rotation"),
-      callConcurrency: args.flags.get("--register-call-concurrency"), debateShape: nextShape
+      callConcurrency: args.flags.get("--register-call-concurrency"), debateShape: nextShape, lengthGuidance: lengthOverride
     }) : null;
     // As the server's plan: a hosted preview's next version needs the hosted inputs (HOSTED_BILLING_REQUIRED there).
     if (nextInputs?.kit === "v2" && settings.runner.DEPLOYMENT_MODE === "hosted") {
@@ -671,6 +676,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: debateQuestionId,
       ...(shapeOverride === null ? {} : { shape: shapeOverride }),
+      ...(lengthOverride === null ? {} : { length: lengthOverride }),
       ...(debateLanguage === null ? {} : { language: debateLanguage }),
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),

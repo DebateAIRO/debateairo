@@ -165,6 +165,30 @@ describe("the call policy gives the final writers their room, and only them", ()
       .toEqual([true, true, true, false, false]);
   });
 
+  // LG-C (pre-flight PF-C3.9, accepted by the controller): with the length row the runner's writer bound is the guided bound
+  // (Task 7 Step 1: 18,784 / 20,584 / 28,384). The wrapper keeps max(request bound, tier floor), so a slow row's final writer
+  // now asks the guided bound FIRST, before LG-B's 16,384 (more room, never less); a fast row still asks its own maximum.
+  it("LG-C: a slow row's writer asks the guided bound (28,384 at Detailed) before 16,384; a fast row's its own maximum", async () => {
+    const guided = (model: string, gate: GateReaders | null = OFFERS) => {
+      const { policy, seen } = spy(model, gate);
+      return { seen, sent: policy.call({ ...call("COMPOSER:SYNTHESIZER:INITIAL:1", "served", "SYNTHESIZER"),
+        bound: { maxAttempts: 2, tokenCeiling: 28_384, deadlineMs: 5_000 }, guidedWords: 1000 }) };
+    };
+    for (const model of [GLM, MIMO, QWEN]) {
+      const { seen, sent } = guided(model);
+      await sent;
+      expect([seen[0]!.bound.tokenCeiling, seen[0]!.packetByteCap, seen[0]!.outputTokenCap], model).toEqual([28_384, MIB, 32_768]);
+    }
+    const fast = guided(DEEPSEEK);
+    await fast.sent;
+    expect(fast.seen[0]!.bound.tokenCeiling).toBe(row(DEEPSEEK).finalWriterOutputBound);
+    // No final-writer tier offered: today's STANDARD call keeps the request's guided bound and sets no caps.
+    const standard = guided(GLM, gates(async () => NOT_OFFERED));
+    await standard.sent;
+    expect([standard.seen[0]!.bound.tokenCeiling, standard.seen[0]!.packetByteCap, standard.seen[0]!.outputTokenCap])
+      .toEqual([28_384, undefined, undefined]);
+  });
+
   it("every other call keeps today's bound and sets neither cap", async () => {
     const { policy, seen } = spy(DEEPSEEK);
     await policy.call(call("JUDGE:critic:node-1", "served", "JUDGE"));
