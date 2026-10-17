@@ -44,7 +44,6 @@ import {
   decodedRepairsOf,
   decodeModelJson,
   fixReplyStructure,
-  promptContractFingerprintText,
   rememberingAcceptedReply,
   structureRepairOriginalKey,
   type CallBound,
@@ -55,7 +54,7 @@ import {
 } from "@debateai/providers";
 import { buildStoryRegisterRows, readStoryPolicy, type StoryPolicy } from "@debateai/register";
 import {
-  EVALUATOR_PROMPT_CONTRACT,
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT,
   buildComposedRepairPacket,
   buildDigestFollowingServeNodes,
   buildSchemaRepairPacket,
@@ -420,7 +419,7 @@ const digestHex = (text: string): string => createHash("sha256").update(text).di
 export const PRACTICE_CONTRACT_HASHES = Object.freeze({
   judge: digestHex(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
   composer: digestHex(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-  conformance: digestHex(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+  conformance: digestHex(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)
 });
 
 export type PracticeLaneBounds = Readonly<{ judge: CallBound; synthesizer: CallBound; evaluator: CallBound }>;

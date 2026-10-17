@@ -4,9 +4,8 @@ import { constants } from "node:fs";
 import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
-import { EVALUATOR_PROMPT_CONTRACT } from "./index.js";
+import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT } from "./index.js";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
-import { promptContractFingerprintText } from "@debateai/providers";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
 import { mapPromptContractHash } from "@debateai/map";
 import { CLAIM_TYPES } from "@debateai/kernel";
@@ -560,7 +559,8 @@ async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDep
     // Debate shape (P2b Task 6, spec 2026-10-12 §4): the map's prompt contracts, sealed. An optional row: the runner
     // requires it only beside a debateShapePolicy row (apps/runner/src/debate-shape-boot.ts).
     mapContractHash: mapPromptContractHash(),
-    conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
+    // Length guidance (LG-C, 2026-10-15): the checker's seal is v2 then its length variant length.v1.
+    conformanceContractHash: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left
     // for a comment, string, regex or template literal to confuse.

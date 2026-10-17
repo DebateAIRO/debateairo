@@ -52,9 +52,9 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     composerContractHash: "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its answer form is still the 2026-09-04 text.
-    // serve.evaluator.v2 (2026-10-12) moved its instruction slot; v1's
-    // f205421c…9dcc is history.
-    conformanceContractHash: "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f",
+    // serve.evaluator.v2 + its length variant length.v1 (LG-C Task 13); v2 alone, 660ec7cb…e22f (2026-10-12), and v1's
+    // f205421c…9dcc are history.
+    conformanceContractHash: "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6",
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };

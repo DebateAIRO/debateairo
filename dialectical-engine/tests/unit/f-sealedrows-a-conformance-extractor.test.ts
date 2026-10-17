@@ -3,7 +3,9 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
-import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import {
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT
+} from "@debateai/runner";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 
@@ -41,8 +43,9 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   it("fingerprints the exported evaluator constant in BOTH deployments", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
+    // Length guidance (LG-C Task 13): the seal is v2 then its length variant, the text the runner exports.
     expect(acceptance.conformanceContractHash)
-      .toBe(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)));
+      .toBe(sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT));
     expect(development.conformanceContractHash).toBe(acceptance.conformanceContractHash);
   });
 

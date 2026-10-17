@@ -51,7 +51,7 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
 
   it("the writer, the checker, both readings and the story carry it", () => {
     expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage);");
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);");
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);");
     expect(source).toContain("questionLine: run.questionLine,\n          ...shapeLanguageInput\n        }, reply));");
     expect(source).toContain("classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage)");
     expect(source).toContain("languageLocked: shapeLanguage !== null,");

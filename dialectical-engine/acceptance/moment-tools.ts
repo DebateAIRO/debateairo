@@ -19,7 +19,6 @@ import {
   PROVIDER_USAGE_CAP,
   ProviderCallFailedError,
   buildFramedRepairPrompt,
-  promptContractFingerprintText,
   readPromptFrame,
   schemaFailureLocator,
   type CallBound,
@@ -28,6 +27,7 @@ import {
 } from "@debateai/providers";
 import { resolveDeploymentMode } from "@debateai/register";
 import {
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT,
   EVALUATOR_PROMPT_CONTRACT,
   buildSynthesisRolePrompt,
   classifySynthesisRoleContent,
@@ -447,7 +447,7 @@ export function currentContractHash(family: MomentBuilderFamily): string {
   return family === "SYNTHESIS_WRITER"
     ? sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT)
     : family === "SYNTHESIS_CHECKER"
-      ? sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+      ? sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)
       : sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT);
 }
 

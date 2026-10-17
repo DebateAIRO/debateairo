@@ -6,7 +6,7 @@ import * as providers from "@debateai/providers";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { judgePromptContract, reviewPromptContract, PANEL_PROMPT_CONTRACT } from "@debateai/judgement";
 import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_LENGTH_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { BLIND_JUDGE_GRADE_PROMPT_CONTRACT, DOMAIN_TAGGER_PROMPT_CONTRACT } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
@@ -89,7 +89,7 @@ describe("S01 placement and contract coverage", () => {
     judgePromptContract("primary-root", "unknown"), judgePromptContract("independent-root", "unknown"),
     judgePromptContract("support", "unknown"), judgePromptContract("attack", "unknown"),
     judgePromptContract("cross-root", "unknown"), reviewPromptContract(2), PANEL_PROMPT_CONTRACT,
-    SYNTHESIZER_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT,
+    SYNTHESIZER_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_LENGTH_PROMPT_CONTRACT,
     buildStorytellerContract(pack), buildStoryCheckerContract(pack),
     BLIND_JUDGE_GRADE_PROMPT_CONTRACT, DOMAIN_TAGGER_PROMPT_CONTRACT,
     CONSUMER_AGGREGATE_PROMPT_CONTRACT,

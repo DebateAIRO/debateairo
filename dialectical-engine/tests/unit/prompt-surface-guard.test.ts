@@ -514,17 +514,22 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // as the fifth (null on a run without a shape: today's packet); the checker's packet is never lengthed (null).
     // Length guidance (LG-C Task 7): the fourth argument is now the run's `synthesisLength` (a RoleLength: the length
     // row's words, else the shape's, else null), and the length field is built by `answerLengthField(length)`; this test
-    // keeps guarding the moved text (tests-that-are-not-testing control 1).
+    // keeps guarding the moved text (tests-that-are-not-testing control 1). Length guidance (LG-C Task 13): the checker's
+    // fourth argument is the run's `checkerLength` (the writer's words and its own, with the receipt's `length`, else null).
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
-    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage)")).toBe(1);
+    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage)")).toBe(1);
     expect(occurrences(runner,
       "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage)")).toBe(1);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
     // wrapper returns the same array without a lock, so today's material is that one projection still.
+    // Length guidance (LG-C Task 13): three arms — the lengthed writer (`answer_length`), the lengthed checker
+    // (`answer_length` then its own `length`), else the one projection itself.
+    expect(occurrences(runner, "material: withQuestionLanguageField(")).toBe(1);
+    expect(runner).toContain("writerLengthed ? [...material, answerLengthField(length)]");
     expect(runner).toContain(
-      "material: withQuestionLanguageField(lengthed ? [...material, answerLengthField(length)] : material, questionLanguage),"
+      ": checkerLengthed ? [...material, answerLengthField(length),\n          lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]\n          : material,"
     );
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.

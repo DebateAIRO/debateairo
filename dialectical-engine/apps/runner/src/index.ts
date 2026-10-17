@@ -191,6 +191,8 @@ import {
   LENGTH_GUIDANCE_START,
   LENGTH_GUIDANCE_STEPS,
   lengthGuidanceText,
+  lengthGuidanceField,
+  LENGTH_SENTENCE_ANSWER_CHECKER,
   type CharactersPerWord,
   type LengthCallStep,
   type LengthGuide,
@@ -714,6 +716,24 @@ export const EVALUATOR_PROMPT_CONTRACT: PromptContract = Object.freeze({
 });
 
 /**
+ * Length guidance (spec 2026-10-15 §3.2): `serve.evaluator.length.v1`, v2's instruction plus the checker's one sentence,
+ * v2's answer form (so the verdict schema is unchanged). Its two targets arrive as material fields: `answer_length` (the
+ * writer's) and `length` (its own reply's). Sent only for a run admitted with the length row; every other checker call
+ * is v2's, byte for byte.
+ */
+export const EVALUATOR_LENGTH_CONTRACT_ID = "serve.evaluator.length.v1" as const;
+export const EVALUATOR_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_LENGTH_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+/** What `conformanceContractHash` seals from length guidance on: v2, then its length variant (as the writer's seal). */
+export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+
+/**
  * The fingerprints of the three prompt contracts this code SENDS, derived
  * exactly as the register's builder derives its rows
  * (`computeDevelopmentContractRows` in `./dev-deployment-register.ts`; that
@@ -726,7 +746,7 @@ export function codePromptContractHashes(): Readonly<{ judge: string; composer: 
   return Object.freeze({
     judge: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
     composer: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-    conformance: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+    conformance: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)
   });
 }
 
@@ -841,22 +861,28 @@ export function buildSynthesisRolePrompt(
   length: RoleLength | null = null,
   questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
-  // Debate shape (spec §3.3 step 8) and length guidance (spec 2026-10-15 §3.2): only a writer call with a target takes the
-  // length variant; without one (and, until LG-C2, every checker call) the packet is today's, byte for byte.
-  const lengthed = request.role === "SYNTHESIZER" && length !== null;
-  // V-MINIMUM-PAYLOAD: the one projection, applied once; the length variant only appends its own field after it.
+  // Length guidance (spec 2026-10-15 §3.2): the writer with a target takes its length variant; the checker takes its own
+  // only with its own target (`ownWords`, a run admitted with the length row). Every other call: today's packet.
+  const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
+  const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
+  // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
   const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (lengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
-        : EVALUATOR_PROMPT_CONTRACT,
+        ? (writerLengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
+        : (checkerLengthed ? EVALUATOR_LENGTH_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT),
       argumentLanguageName,
       questionLanguage
     ),
-    // The language field wraps the ONE projection (and the length field after it): it rides LAST; with no lock
+    // The language field wraps the ONE projection (and the length fields after it): it rides LAST; with no lock
     // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(lengthed ? [...material, answerLengthField(length)] : material, questionLanguage),
+    material: withQuestionLanguageField(
+      writerLengthed ? [...material, answerLengthField(length)]
+        : checkerLengthed ? [...material, answerLengthField(length),
+          lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]
+          : material,
+      questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
 }
@@ -5878,6 +5904,10 @@ export class WalkingSkeletonRunner {
       : shapeRun === null ? null
         : Object.freeze({ answerWords: shapeRun.shape.answerWords, ownWords: null, languageCode: null,
           charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
+    /** The answer checker's targets (spec 2026-10-15 §3.2): the writer's words and its own, only with the receipt's `length`. */
+    const checkerLength: RoleLength | null = lengthGuidance === null ? null
+      : Object.freeze({ answerWords: lengthGuidance.steps.answer_writer, ownWords: lengthGuidance.steps.answer_checker,
+        languageCode: run.argumentLanguageTag, charactersPerWord: lengthGuidance.charactersPerWord });
     /**
      * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call of this run, spread into
      * the call's input; nothing without the receipt's `length` (today's request, byte for byte).
@@ -10009,7 +10039,7 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -10079,6 +10109,8 @@ export class WalkingSkeletonRunner {
             // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
             bound: guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, "answer_checker", lengthGuidance),
             contractHash: this.settings.conformanceContractHash,
+            // Length guidance: the checker is told its own target, so its words are recorded beside what it wrote.
+            ...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_checker }),
             providerRef: planned.providerRef,
             packet,
             classifyContent: checkerReading.classifyContent,
