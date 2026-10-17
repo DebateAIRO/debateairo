@@ -1340,6 +1340,18 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     expect(events).not.toContain("STORY_WORDING_NOTE_ONLY");
   });
 
+  // R2 B9 fix round 1 (Minor 3): the comparing judges' question kinds pick the one v4 shape (`storyV4ShapeId`); this case
+  // fails if the writer went back to R1d's `storyShapeOf({ questionKinds: [], pack })` (the pack default, "general").
+  it("engine 2: the judges' question kinds pick the one v4 shape (a majority of health: the health shape)", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...V4, questionKinds: ["health", "health"] });
+    expect(contractOf(calls[0]!)).toBe(STORYTELLER_V4_CONTRACT_ID);
+    expect(PACK.defaultShape).not.toBe("health");
+    expect(inserted[0]).toMatchObject({ outcome: "READY", shapeId: "health" });
+    expect(inserted[0]?.body?.shape_id).toBe("health");
+  });
+
   it("the writer passes the run's language tag to the length field: a Chinese run is told characters", async () => {
     const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
     const { writer } = harness(providing(provider));

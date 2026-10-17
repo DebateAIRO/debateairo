@@ -532,15 +532,19 @@ function storyNamed(ref: string | null): string {
  * Keyed by text because story may not import serve (tools/orphan-audit/src/index.ts row "story"); a unit test proves
  * the keys are exactly serve's `ENGINE_VERDICT_TRIGGERS` (tests/unit/r2-story-engine.test.ts).
  * JUDGES_MAJORITY, JUDGES_NO_MAJORITY and JUDGES_VOTES_IGNORED are worded to be true in every case of B2's counting
- * rules 4-5 (pre-flight PF-R2b5.5).
+ * rules 4-5 (pre-flight PF-R2b5.5), JUDGES_MAJORITY including the case where every seated judge chose this answer but
+ * fewer judges were seated than a clear answer needs (controller ruling R2b-B9.1). A vote for an answer counted together
+ * with one the judge's own maker argued is not counted either (ruling R2b-B2.1), so JUDGES_MAJORITY and
+ * JUDGES_VOTES_IGNORED name that case, and "chose this answer" in JUDGES_UNANIMOUS and JUDGES_CONDITIONAL covers a choice
+ * of an answer the judges counted as the same. A unit test walks every trigger B2 returns for one to five seated judges.
  */
 export const STORY_ENGINE_TRIGGER_RULES: Readonly<Record<string, string>> = Object.freeze({
-  JUDGES_UNANIMOUS: "The label is SUPPORTED because every judge who compared the answers side by side chose this answer, and none of them found that it holds only in some cases.",
-  JUDGES_CONDITIONAL: "The label is CONTESTED because every judge who compared the answers side by side chose this answer, but at least one found that it holds in some cases and not in others.",
-  JUDGES_MAJORITY: "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer to settle it, but not every judge's choice counted for it: at least one judge chose another answer, gave no usable choice, or chose an answer its own maker had argued, which is not counted.",
+  JUDGES_UNANIMOUS: "The label is SUPPORTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, and none of them found that it holds only in some cases.",
+  JUDGES_CONDITIONAL: "The label is CONTESTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, but at least one found that it holds in some cases and not in others.",
+  JUDGES_MAJORITY: "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer to settle it, but not clearly: at least one judge chose another answer, gave no usable choice, or chose an answer its own maker had argued (or one the judges counted as the same as that answer), which is not counted; or too few judges could take part for the answer to be called clear.",
   JUDGES_NO_MAJORITY: "The label is SPLIT because the judges who compared the answers side by side did not settle on one answer: too few of their choices counted for any single answer, and this answer is the one they chose most often or, where that was even, the one whose case held up best against the objections.",
   JUDGES_UNAVAILABLE: "The label is CONTESTED because no judge could compare the answers side by side, so this answer was chosen as the one whose case held up best against the objections, and without that comparison it cannot be called clear.",
-  JUDGES_VOTES_IGNORED: "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."
+  JUDGES_VOTES_IGNORED: "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, or one the judges counted as the same as such an answer, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."
 });
 
 /** The rung and trigger `deriveVerdictLabel` recorded, in plain words. */
