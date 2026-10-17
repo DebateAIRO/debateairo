@@ -46,7 +46,7 @@ function isSetAsidePath(node: DebateNode): boolean {
   );
 }
 
-/** Debate shape P2c (rulings C-TONE, C-DRAWER): the eight shape marks are information, not a dispute. */
+/** Debate shape P2c (rulings C-TONE, C-DRAWER): the twelve shape marks (R3 added the answer check's four) are information, not a dispute. */
 const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
 
 /**

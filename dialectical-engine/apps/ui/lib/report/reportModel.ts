@@ -422,7 +422,7 @@ function pointNote(mark: ConditionMark): PointNote | null {
     // could not be used and a backup that answered instead is said once for the
     // whole answer (its record names the served root), not about one point.
     case "BACKUP-MODEL-USED":
-    // Debate shape (Phase 2b): the six map marks are said once for the whole
+    // Debate shape (Phase 2b, R3): the ten map marks are said once for the whole
     // answer (their record names the served root's node), not about one point;
     // the two extensions are engine detail the page shows through the label only.
     case "MAP_ANGLES_FALLBACK":

@@ -48,7 +48,7 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
     + "threshold, so nothing was expanded beneath it"
 ]]);
 /**
- * Debate shape (Task 14; Task 12 note): the eight shape marks say how the debate was run (the map's fallbacks and fills,
+ * Debate shape (Task 14; Task 12 note): the twelve shape marks say how the debate was run (the map's fallbacks, fills and answer check,
  * a close call that gained graders, a point that got scrutiny), and their records carry codes only. The story is never
  * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
  */

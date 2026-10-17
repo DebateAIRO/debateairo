@@ -277,6 +277,23 @@ describe("buildStoryRunSnapshot", () => {
     for (const code of [...shapeMarks, "SCRUTINY_EXTENDED", "PANEL_CLOSE_CALL_EXTENDED"]) expect(freeText).not.toContain(code);
   });
 
+  // Engine redesign R3 (spec §5.5): the answer check's four marks are debate-shape marks too, so the story is never
+  // handed them either (the story's left-out list reads DEBATE_SHAPE_MARKS, not a hand-written list).
+  it("never hands the story one of the answer check's four marks or its coded reason", () => {
+    const checkMarks = ["MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED"];
+    const snapshot = buildStoryRunSnapshot({
+      ...source(),
+      answerMarks: ["BRANCH-FROZEN-LOW-LEVERAGE", ...checkMarks],
+      conditionMarkRecords: [
+        ...source().conditionMarkRecords,
+        { mark: "MAP_ANSWER_REPLACED", scope: "answer", subjectRef: "run-1", reason: "MAP_ANSWER_REPLACED:CHECK", affectedNodeIds: [ROOT] }
+      ]
+    });
+    expect(snapshot.verdictBasis.marks).toEqual(["BRANCH-FROZEN-LOW-LEVERAGE"]);
+    const freeText = JSON.stringify({ nodes: snapshot.nodes, setAside: snapshot.setAside, marks: snapshot.verdictBasis.marks });
+    for (const code of [...checkMarks, "CHECK"]) expect(freeText).not.toContain(code);
+  });
+
   it("lists set-aside branches from their records, never an answer-scoped mark", () => {
     const snapshot = buildStoryRunSnapshot(source());
     expect(snapshot.setAside).toEqual([{ nodeId: FROZEN, reason: FROZEN_REASON }]);

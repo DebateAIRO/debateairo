@@ -3,7 +3,6 @@ import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { ConditionMarkRecordSchema, ConditionMarkSchema } from "@debateai/contract";
 import { CONDITION_MARKS, ENGINE_MARKS } from "@debateai/kernel";
-import { MAP_MARKS } from "@debateai/map";
 import { assertRequiredConditionMarkRecords, resolveTrueUnjudgedReasons, type ConditionMarkRecord } from "@debateai/serve";
 import { conditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
 
@@ -17,6 +16,8 @@ const BEFORE_R2 = ["UNINSTRUMENTED", "UNFALSIFIED-AFTER-ROTATION", "SKIPPED-BY-B
   "MISSING-NUMBER", "LABEL-BASIS-INCOMPLETE", "OWED-CHECK-UNEXECUTED", "SYNTHESIS-OBJECTION-STANDING", "DIGEST-COMPRESSED",
   "DIGEST-CANNOT-EXIST", "PROTECTED-CORE-GUARD-RETIRED", "HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE",
   "UNAUTHORED-BRANCH-HALTED"];
+/** R3's four answer-check marks (spec §5.5), named so a later map mark cannot slip into the engine-1 pin unnoticed. */
+const R3_CHECK_MARKS = ["MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED"] as const;
 const KEYS = ["debateChrome.condition.verdictJudgeMissing", "debateChrome.condition.verdictJudgesUnavailable",
   "debateChrome.condition.verdictVotesIgnored", "debateChrome.condition.unassessedAtReducedWeight"] as const;
 // pre-flight PF-R2a3.8: folders only, so a Finder `.DS_Store` never reads as a locale.
@@ -47,7 +48,7 @@ describe("R2: the four engine marks (spec §4.7, §4.2a; INTERFACE §13)", () =>
   it("engine 1 pin: every mark from before R2 keeps its relative order", () => {
     // R3 (spec §5.5): the answer check's four marks are not engine-1 marks either.
     expect(CONDITION_MARKS.filter((mark) => !(ENGINE_MARKS as readonly string[]).includes(mark)
-      && !(MAP_MARKS.slice(-4) as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
+      && !(R3_CHECK_MARKS as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
   });
 
   it("are wire vocabulary", () => {
