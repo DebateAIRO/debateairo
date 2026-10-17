@@ -4,9 +4,12 @@ import {
   buildStoryCheckerContract,
   buildStoryRevisionPrompt,
   buildStorytellerContract,
+  classifyStoryContent,
   loadStoryPack,
   parseCheckerVerdict,
-  resolveStoryPackDir
+  parseStoryBody,
+  resolveStoryPackDir,
+  type StoryMaterialIndex
 } from "@debateai/story";
 import {
   STUB_STORY_CHECKER_SATISFIED,
@@ -68,5 +71,17 @@ describe("the scripted gates route and answer story contracts v4 (R1d)", () => {
     // The same story otherwise: one path per handed position.
     expect({ ...v4, shape_id: "general" }).toEqual(v3);
     expect((v4.short as { paths: unknown[] }).paths).toHaveLength(2);
+  });
+
+  // Task 19 review 1 (final wave B13): the stub's shape_id-less v4 story is one the story's own classifier accepts, with
+  // the index's code-set shape (fixedShapeId), and refuses without it (v3 needs the AI's own shape).
+  it("the stub's shape_id-less v4 story passes classifyStoryContent with the index's fixed shape; v3's index refuses it", () => {
+    const content = stubStoryFor(framedChat(buildStorytellerContract(PACK, false, V4)), "general");
+    const v3Index: StoryMaterialIndex = { nodeIds: new Set(["P1", "P2"]), positionIds: new Set(["P1", "P2"]), positionOrder: ["P1", "P2"],
+      shapeIds: new Set(["general"]), pathCap: 4, scoreTexts: new Set(), engineTokens: new Set() };
+    const v4Index: StoryMaterialIndex = { ...v3Index, fixedShapeId: "general" };
+    expect(classifyStoryContent(content, v4Index)).toMatchObject({ parseStatus: "PARSED" });
+    expect(parseStoryBody(content, v4Index).shape_id).toBe("general");
+    expect(classifyStoryContent(content, v3Index).parseStatus).not.toBe("PARSED");
   });
 });

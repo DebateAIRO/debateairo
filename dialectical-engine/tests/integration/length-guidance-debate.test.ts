@@ -4,7 +4,7 @@
 // without it sends today's contracts and records none. Scripted gates, embedded Postgres.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
-import { lengthGuidancePolicyStartValues, resolveLengthGuidance } from "@debateai/register";
+import { engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveLengthGuidance } from "@debateai/register";
 import { SYNTHESIZER_LENGTH_CONTRACT_ID } from "@debateai/serve";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { OWNER_CALL_CONCURRENCY, PANEL_REFS, previewDebateHarness } from "../support/preview-debate-harness.js";
@@ -61,6 +61,23 @@ describe("a debate with the length row (spec 2026-10-15 §6)", () => {
     // The story is LG-D's (now R1d's): it is not told a target yet, so it records none. R1d flips this assertion
     // (Cross-phase notes, R1d) (pre-flight PF-C6.8).
     for (const row of rows.filter((entry) => entry.key.startsWith("STORY:"))) expect(row.guided, row.key).toBeNull();
+  }, 900_000);
+
+  // Engine redesign R1d, Task 5 review 2 (final wave B3): an engine-2 receipt on a runner composed without the engine's
+  // settings (no sealed engine contracts) is refused before any AI is asked.
+  it("an engine-2 receipt on a runner without engine settings ends ENGINE_RUNNER_UNCONFIGURED with zero gateway calls", async () => {
+    const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: PANEL_REFS.length, mapOpening: false });
+    const debate = await harness.admittedRun("engine-unconfigured", { panelRefs: PANEL_REFS, depth: 1, length: GUIDANCE, engine });
+    const gates = await harness.startGates({}, undefined, scriptedAnswers(debate.question));
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY });
+    const outcome = await composed.runner.executeWorkItem(debate.workItemId)
+      .then((result) => ({ result, code: null as string | null }), (error: unknown) => ({ result: null, code: String((error as { code?: unknown }).code) }));
+    const workItem = (await database.pool.query<{ terminal_reason: string | null }>(
+      "SELECT terminal_reason FROM core.work_item WHERE work_item_id=$1", [debate.workItemId])).rows[0];
+    expect([outcome.code, workItem?.terminal_reason ?? null]).toContain("ENGINE_RUNNER_UNCONFIGURED");
+    expect(outcome.result?.kind).not.toBe("COMPLETED");
+    expect(gates.requests).toEqual([]);
+    expect(await guidedByKey(debate.runId)).toEqual([]);
   }, 900_000);
 
   it("the same debate without the row: today's contracts, no length field, no guided words", async () => {

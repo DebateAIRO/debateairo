@@ -165,6 +165,9 @@ describe("buildStoryRunSnapshot", () => {
     expect(made.lengthGuidance).toBe(guidance);
     expect(made.backupCandidates).toEqual(candidates);
     expect(made.backupCandidates?.[0]?.provider).toBe(provider);
+    // Task 18 review 1 (final wave B12): its own frozen copy, never the caller's array.
+    expect(made.backupCandidates).not.toBe(candidates);
+    expect(Object.isFrozen(made.backupCandidates)).toBe(true);
     // A run admitted without them (engine 1, no length row): no member at all, so the writer builds today's bytes.
     const today = buildStoryRunSnapshot(source());
     for (const member of ["engine", "lengthGuidance", "backupCandidates"]) expect(Object.hasOwn(today, member)).toBe(false);

@@ -467,11 +467,14 @@ describe("story v4 — only a misleading problem starts round 2", () => {
   });
 
   it("is READY_WITH_RESERVATION when the last round is still misleading", async () => {
-    const twice = await runStoryLoop({ maxRounds: 2, v4: true },
-      recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict("The winner is misnamed.", true)] }).deps);
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict("The winner is misnamed.", true)] });
+    const twice = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
     expect(twice).toMatchObject({
       outcome: "READY_WITH_RESERVATION", body: storyFor(2), reservation: "The winner is misnamed.", servedRound: 2, laterFailure: null
     });
+    // Task 15 review 1 (final wave B9): round 2 revised round 1's own draft, and both records say misleading.
+    expect(double.writes[1]).toEqual({ round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) });
+    expect(twice.rounds.map((round) => round.misleading)).toEqual([true, true]);
     const once = await runStoryLoop({ maxRounds: 1, v4: true }, recorder({ verdicts: [v4Verdict(PROBLEM, true)] }).deps);
     expect(once).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: PROBLEM, servedRound: 1 });
   });
@@ -490,6 +493,16 @@ describe("story v4 — only a misleading problem starts round 2", () => {
     expect(double.writes).toEqual([
       { round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) }
     ]);
+  });
+
+  // Task 15 review 2 (final wave B9): a v4 check that fails is FAILED, and its round has no verdict, so no misleading member.
+  it("a v4 check that fails is FAILED, and that round's record carries no misleading member", async () => {
+    const double = recorder({ checkFails: () => transportDied() });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" });
+    expect(outcome.rounds).toEqual([{ round: 1, writer: writerRecord(1), checker: null, satisfied: false, objection: null }]);
+    expect(Object.hasOwn(outcome.rounds[0]!, "misleading")).toBe(false);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }]);
   });
 
   it("v3 ignores misleading: an objection starts round 2 as before, with no draft, and no record carries misleading", async () => {

@@ -1618,6 +1618,26 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     }
   });
 
+  // Task 17 review 3 (final wave B11): with five rounds the backup would need rounds 6..10, past the story gateway's 8.
+  it("no round left for a backup loop (five rounds): today's FAILED record, and STORY_BACKUP_UNAVAILABLE NO_ROUND_LEFT", async () => {
+    const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const { writer, inserted, details } = harness({ resolveProvider: world.resolveProvider, policy: { ...POLICY, loopMaxRounds: 5 } });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(world.backup.calls).toEqual([]);
+    expect(world.twin.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", rounds: 0 });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(details.filter((detail) => detail.event === "STORY_BACKUP_UNAVAILABLE")).toEqual([{
+      event: "STORY_BACKUP_UNAVAILABLE", answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_ROUND_LEFT"
+    }]);
+    // Four rounds still fit (rounds 5..8): the backup is asked.
+    const fits = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const four = harness({ resolveProvider: fits.resolveProvider, policy: { ...POLICY, loopMaxRounds: 4 } });
+    await four.writer.writeAfterSettle({ ...V4, backupCandidates: fits.candidates });
+    expect(fits.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:5"]);
+  });
+
   it("the first storyteller benched: its maker's second ref is never the backup (whole-branch Minor 1, ruling W1)", async () => {
     // The runner leaves the benched first storyteller out of the candidates (the sit-out filter) but hands every
     // claim-eligible member's maker over unfiltered (`backupMakers`), so maker-a stays excluded: TWIN is never asked.

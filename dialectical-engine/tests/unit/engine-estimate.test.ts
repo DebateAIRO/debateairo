@@ -6,8 +6,11 @@ import {
   computeStructuralCeilingBasis, debateShapePolicyStartValues, engineSettingsOf, engineVersionPolicyStartValues,
   lengthGuidancePolicyStartValues, resolveDebateShape, resolveLengthGuidance
 } from "@debateai/register";
-import { PREVIEW_MODEL_ROWS_BY_PROVIDER, previewStorytellerTokenCeiling } from "@debateai/providers";
-import { previewCallShares, previewExpectedCalls, type PreviewCallShares } from "../../apps/api/src/preview-budget-estimate.js";
+import { PREVIEW_MODEL_ROWS_BY_PROVIDER, parsePreviewProviderTestConfig, previewStorytellerTokenCeiling } from "@debateai/providers";
+import { STORY_GUIDED_BOUND_LIMITS } from "@debateai/story";
+import {
+  previewCallOutputTokens, previewCallShares, previewExpectedCalls, type PreviewCallShares
+} from "../../apps/api/src/preview-budget-estimate.js";
 import { admittedShapeOf, expectedCallsByRoleFromBasis } from "../../apps/api/src/ask-model-picker.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -90,8 +93,13 @@ describe("an engine-2 receipt: the story's rounds count twice (the backup storyt
     expect(repairPerDenominator(engine2)).toBe(8n);
   });
 
-  it("at the basis ceiling the engine's receipt is never priced below the length-only one (its ceiling holds the engine's attempts)", () => {
-    expect(calls(engine2, 2, "BASIS_CEILING").debate).toBeGreaterThanOrEqual(calls(lengthOnly, 2, "BASIS_CEILING").debate);
+  it("at the basis ceiling the engine's receipt is priced at the length-only one plus exactly the engine's added attempts", () => {
+    // Task 7 review 1 (final wave B5): an exact value, not a lower bound. Per step (above) R1d prices no engine site; the
+    // basis ceiling reads max_model_attempts, which holds the engine's attempts (4 sites x 3 = 12 here), so it is exactly
+    // the length-only value plus the receipt's added_model_attempts (R2 replaces this pin).
+    const added = (engine2.engine as { sites: { added_model_attempts: number } }).sites.added_model_attempts;
+    expect(added).toBe(12);
+    expect(calls(engine2, 2, "BASIS_CEILING").debate).toBe(calls(lengthOnly, 2, "BASIS_CEILING").debate + added);
     expect(calls(engine2, 2, "BASIS_CEILING").story).toBe(16);
   });
 
@@ -130,5 +138,12 @@ describe("the v4 storyteller's price (pre-flight Ruling PF-D4.2)", () => {
     expect(Math.max(...ceilings)).toBe(128 * 1024);
     // The slow rows (GLM, MiMo, Qwen) keep LG-B's 16,384 on the preview, whatever Task 11's bound asks.
     expect(ceilings.filter((ceiling) => ceiling === 16_384)).toHaveLength(3);
+    // Task 7 review 2 (final wave B5): the estimate's storyteller output IS that value, the v4 storyteller's guided cap off
+    // the preview (STORY_GUIDED_BOUND_LIMITS.tokenCeiling), whatever the story row's own bound says.
+    const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM] }))!;
+    const sent = previewCallOutputTokens(config, { debate: [2048], story: { storyteller: 12_000, checker: 2048 } });
+    expect(sent.storyteller).toBe(STORY_GUIDED_BOUND_LIMITS.tokenCeiling);
+    expect(STORY_GUIDED_BOUND_LIMITS.tokenCeiling).toBe(128 * 1024);
   });
 });

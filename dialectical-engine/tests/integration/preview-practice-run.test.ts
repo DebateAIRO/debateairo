@@ -1242,6 +1242,20 @@ describe("engine 2's story (R1d)", () => {
     citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
   } });
 
+  // Task 20 review 1 (final wave B14): engine 2 needs the length row; the export has none and no --length-policy is given,
+  // so runPractice refuses at its argument checks, before the throwaway database starts and before any gate is asked.
+  it("--engine-policy without any length row: PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY before the database starts (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const lines: string[] = [];
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--engine-policy", ENGINE_POLICY_START], env, { ...quiet, log: (line: string) => { lines.push(line); } });
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY"]);
+    expect(lines.some((line) => line.includes("practice database started"))).toBe(false);
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 60_000);
+
   it("R1d-1 --register-next --length-policy --engine-policy: storyteller v4 and checker v4 with their targets, no shape asked, the pack default stored, ask.engine 2: PASS (exit 0)", async () => {
     const { stubs, env, common, quiet, out } = await scenario();
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",

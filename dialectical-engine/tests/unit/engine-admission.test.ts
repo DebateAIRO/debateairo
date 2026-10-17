@@ -69,11 +69,11 @@ describe("engineForAsk (INTERFACE §1.4)", () => {
   });
 
   it("the row without the length numbers is refused ENGINE_REQUIRES_LENGTH_POLICY (a belt: the boot refuses first)", () => {
-    expect(() => engineForAsk({ policy: ENGINE, length: null, makers: 2, mapOpening: false }))
-      .toThrowError(expect.objectContaining({ code: "ENGINE_REQUIRES_LENGTH_POLICY" }));
-    let thrown: unknown;
+    // Task 6 review 3 (final wave B4): one call, one try/catch, the class and the code.
+    let thrown: unknown = null;
     try { engineForAsk({ policy: ENGINE, length: null, makers: 2, mapOpening: false }); } catch (error) { thrown = error; }
     expect(thrown).toBeInstanceOf(TypedDomainError);
+    expect(thrown).toMatchObject({ code: "ENGINE_REQUIRES_LENGTH_POLICY" });
   });
 
   it("the boot rule: the row in force without the length row refuses; every other pair passes", () => {

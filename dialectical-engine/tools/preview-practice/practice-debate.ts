@@ -701,7 +701,8 @@ export async function runPracticeDebate(input: Readonly<{
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
       for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
-        if (change !== null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
+        // `!= null`: a row the version did not touch is null (Task 20 review 2: a caller's double may leave it out).
+        if (change != null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
     }

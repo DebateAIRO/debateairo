@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS, parsePreviewProviderTestConfig, previewPlanTierRosters } from "@debateai/providers";
 import { pickRotatedRoles, type RoleRotationCounts } from "@debateai/scorecard";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import {
@@ -90,6 +91,23 @@ describe("pins: the counts the rotation reads", () => {
     // Task 21 review 3 (final wave A8): practiceWriterPinsFromArgs checks the same premium list before any gate is asked.
     expect(() => practiceRotationCountsWithPins({}, { answerWriter: null, storyteller: "gpt-unknown" }, PREMIUM))
       .toThrowError(new TypeError("PRACTICE_PIN_UNCHECKED: STORYTELLER"));
+  });
+});
+
+// Task 21 review ⚠️ (final wave B15): the counts give a share to every premium model only, so the pin holds only while
+// every model the rotation can pick (the debate's panel) is a premium one. The practice asks on the premium plan, whose
+// roster on the preview is premium_model_ids: the panel is a subset of it.
+describe("pins: the practice panel is drawn from premium_model_ids", () => {
+  it("the practice asks on the premium plan, and the preview's premium roster is premium_model_ids", () => {
+    const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture",
+      anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", free_model_ids: [GLM, HAIKU], premium_model_ids: PREMIUM }))!;
+    expect(previewPlanTierRosters(config, { free: [], premium: [] }).premium).toEqual(PREMIUM);
+    const debateSource = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(debateSource.split("plan_tier: \"premium\"")).toHaveLength(2);
+    // Every premium model gets a count, so no model of a premium panel is left without a share.
+    const counts = practiceRotationCountsWithPins({}, { answerWriter: HAIKU, storyteller: null }, PREMIUM);
+    expect(Object.keys(counts.ANSWER_WRITER!).sort()).toEqual([...PREMIUM].sort());
   });
 });
 

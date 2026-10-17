@@ -257,7 +257,9 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     const mark = marker();
     const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story backup ${mark}`);
     const answerId = await answerFor(runId, mark);
-    const backup = { code: "STORY_BACKUP_USED", signal: "TOO_SLOW", firstModel: "provider:a" } as const;
+    // Task 16 review 1 (final wave B10): a first model no other column could hold, so the readable-column check sees it.
+    const firstModel = `provider:first-${mark}`;
+    const backup = { code: "STORY_BACKUP_USED", signal: "TOO_SLOW", firstModel } as const;
     const repository = new StoryRepository(database.pool);
     await expect(repository.insert({ ...readyRecord(runId, answerId, mark), backup })).resolves.toBe("INSERTED");
     const ownership = { ownerRef: theOwner().ownerRef };
@@ -268,6 +270,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       "SELECT to_jsonb(story)::text AS row_text FROM serve.answer_story AS story WHERE story.answer_id = $1", [answerId]
     );
     expect(row.rows[0]!.row_text).not.toMatch(/STORY_BACKUP_USED|TOO_SLOW/u);
+    expect(row.rows[0]!.row_text).not.toContain(firstModel);
     // A story stored without the member (every row before R1d) reads back with none.
     const otherMark = marker();
     const otherRunId = await createEncryptedStoryRun(database.pool, theOwner(), `story no backup ${otherMark}`);

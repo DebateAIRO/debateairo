@@ -1305,8 +1305,24 @@ describe("story v4 — the material: each position once, reasons only for disput
     expect(v4Stated.index.scoreTexts.has("0,61")).toBe(false);
     expect(v4Stated.index.scoreTexts.has("0.6123")).toBe(true);
     // Equal here because every fixture node's base is 0.5; v4 drops a position's own base, which the material no longer
-    // shows (pre-flight PF-D5.12).
+    // shows (pre-flight PF-D5.12): the case below gives a position its own base and proves the drop.
     expect(v4Stated.index.scoreTexts).toEqual(v3Stated.index.scoreTexts);
+  });
+
+  // Task 13 review 1 (final wave B7), the reviewer's exact PF-D5.12 case: a position whose base is not the points' 0.5.
+  it("drops a position's own base from the score texts in v4, as its positions entry no longer shows it (PF-D5.12)", () => {
+    const based = snapshot({ nodes: snapshot().nodes.map((entry) => entry.nodeId === "position:a" ? { ...entry, baseScore: 0.37 } : entry) });
+    const v4Based = built(buildStoryMaterial({ snapshot: based, enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, v4: V4 }));
+    const v3Based = built(buildStoryMaterial({ snapshot: based, enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+    // v3 lists the position as a point with its base: a reply may not print it, in either decimal form.
+    expect(v3Based.index.scoreTexts.has("0.37")).toBe(true);
+    expect(v3Based.index.scoreTexts.has("0,37")).toBe(true);
+    // v4 shows no base for a position, so it holds neither.
+    expect(v4Based.index.scoreTexts.has("0.37")).toBe(false);
+    expect(v4Based.index.scoreTexts.has("0,37")).toBe(false);
+    const positions = field(toStoryPromptMaterial(v4Based.material, null), "positions");
+    expect(JSON.stringify(positions)).not.toContain("0.37");
+    expect((positions as StoryMaterialPosition[]).every((entry) => !Object.hasOwn(entry, "base"))).toBe(true);
   });
 });
 
@@ -1391,7 +1407,7 @@ describe("story v4 — the shrink ladder still fits the budget", () => {
     expect(result.index.nodeIds.size).toBe(22);
   });
 
-  it("needs fewer bytes than v3 at every budget it fits", () => {
+  it("needs fewer bytes than v3 at the uncut budget", () => {
     expect(built(at(10_000_000, V4)).material.bytes).toBeLessThan(built(at(10_000_000)).material.bytes);
   });
 });

@@ -670,7 +670,10 @@ describe("story v4 — the shape is set by code, and still checked against the p
     sent.long.sections[2]!.paragraphs[0]!.text = "Funding held up, „as the city said\" in its report.";
     const content = `I checked the material first.\n${JSON.stringify(sent).replace("\\\"", "\"")}`;
     expect(classifyStoryContent(content, V4_INDEX, STOP)).toMatchObject({ parseStatus: "PARSED", jsonRepair: "TRAILING_OBJECT" });
-    expect(parseStoryBody(content, V4_INDEX, STOP).shape_id).toBe("health");
+    const body = parseStoryBody(content, V4_INDEX, STOP);
+    expect(body.shape_id).toBe("health");
+    // Task 12 review Minor 2 (final wave B16): the raw-quote text is read back whole, its stray quote kept as written.
+    expect(body.long.sections[2]!.paragraphs[0]!.text).toBe("Funding held up, „as the city said\" in its report.");
     // Control: the same reply against a v3 index (no shape set by code) stays refused.
     expect(classifyStoryContent(content, INDEX, STOP).parseStatus).toBe("PARSE_FAILED");
   });

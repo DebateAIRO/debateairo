@@ -654,6 +654,23 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     expect(await versionCount()).toBe(before + 1);
   }, 120_000);
 
+  // Task 8 review 3 (final wave B6): the engine row beside the length row, but the code-owned seal dropped by hand.
+  it("a version sealing engineVersionPolicy without its engineContractHash (a hand-made plan) is sealed, then refused ENGINE_CONTRACT_HASH_UNSEALED", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    expect((await publishHostedRegister({ plan: await planOf(hostedFile()), operations })).outcome).toBe("CREATED");
+    const { kind: _engineKind, ...engine } = JSON.parse(JSON.stringify(engineVersionPolicyStartValues())) as Record<string, unknown>;
+    const { kind: _lengthKind, ...length } = JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) as Record<string, unknown>;
+    const plan = await planOf({ ...hostedFile(), lengthGuidancePolicy: length, engineVersionPolicy: engine });
+    expect(plan.rows.some((row) => row.rowKey === "engineContractHash")).toBe(true);
+    const handMade = { ...plan, publicationId: randomUUID(), rows: plan.rows.filter((row) => row.rowKey !== "engineContractHash") };
+    const before = await versionCount();
+    const failure = await publishHostedRegister({ plan: handMade, operations }).then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(HostedRegisterBootCheckFailedError);
+    expect(failure).toMatchObject({ code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:ENGINE_CONTRACT_HASH_UNSEALED" });
+    expect((failure as HostedRegisterBootCheckFailedError).result.outcome).toBe("CREATED");
+    expect(await versionCount()).toBe(before + 1);
+  }, 120_000);
+
   it.each([
     ["a size above its bound", (m: any) => { m.plans.free.mapAIs = 10; }],
     ["a member carrying the row's kind", (m: any) => { m.kind = "DEBATE_SHAPE_POLICY"; }],

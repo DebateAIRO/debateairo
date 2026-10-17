@@ -57,6 +57,8 @@ describe("engine row in force: the member rides last (INTERFACE §3.2)", () => {
     // 6 sites x 3 panel-member attempts = 18.
     expect(engineCeiling).toBe(414);
     expect(member).toEqual(engineReceipt(ENGINE, 3));
+    // Task 3 review 1 (final wave B2): one literal, not only the minter compared with itself.
+    expect((member as { sites: unknown }).sites).toEqual({ comparing_judges: 3, investigations: 2, answer_check: 1, added_model_attempts: 18 });
     expect(both.formula_version).toBe("DR-184-v4");
     expect(both.serve_reserve_attempts).toBe(lengthOnly.serve_reserve_attempts);
   });

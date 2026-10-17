@@ -116,6 +116,9 @@ describe("the runner never reads the row (Review Focus 2)", () => {
     const engineBoot = readFileSync(new URL("engine-boot.ts", dir), "utf8");
     expect(engineBoot).toContain("(await readLengthGuidancePolicy(pool, registerVersion)) !== null");
     expect(engineBoot.split("readLengthGuidancePolicy(")).toHaveLength(2);
+    // Task 5 review 1 (final wave B3): the bare name too, so an alias or a passed-on reference cannot dodge the pin:
+    // exactly the import and the one call.
+    expect(engineBoot.split("readLengthGuidancePolicy")).toHaveLength(3);
   });
   // Task 7 review 4: the publisher's exemption is ONE read, inside its boot-readiness check.
   it("the hosted publisher reads the row exactly once, inside verifyHostedRegisterBootReadiness", () => {
