@@ -19,6 +19,7 @@ import {
   type PracticeLanguageNotRun
 } from "./practice-language.js";
 import { practiceInvestigationLines, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { practiceJudgesLines, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
@@ -430,6 +431,8 @@ export function debateReport(input: Readonly<{
     ...(r.language === undefined ? {} : { language: r.language }),
     // R2 (E12, E13): the "cannot assess" reviews and the investigations; absent only when the debate was never admitted.
     ...(r.investigations === undefined ? {} : { investigations: r.investigations }),
+    // Engine redesign R2 (B11): the four members, only when the debate ran on engine 2; absent otherwise (today's keys).
+    ...(r.judges === undefined ? {} : r.judges),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -521,6 +524,15 @@ export function reportMarkdown(report: PracticeReport): string {
   const investigations = report.mode === "debate" && typeof report.investigations === "object" && report.investigations !== null
     ? report.investigations as PracticeInvestigationBlock : undefined;
   if (investigations !== undefined) lines.push(...practiceInvestigationLines(investigations, usd));
+  // Engine redesign R2 (B11): the comparing judges' block, only when the report has it (engine 2).
+  if (report.mode === "debate" && Array.isArray(report.judgeVotes)) {
+    lines.push(...practiceJudgesLines({
+      judgeVotes: report.judgeVotes as PracticeJudgesBlocks["judgeVotes"],
+      labels: (report.labels ?? null) as PracticeJudgesBlocks["labels"],
+      judgesSeconds: typeof report.judgesSeconds === "number" ? report.judgesSeconds : null,
+      conditionalWinner: typeof report.conditionalWinner === "boolean" ? report.conditionalWinner : null
+    }));
+  }
   if (report.mode === "language" && Array.isArray(report.cases)) {
     lines.push(...practiceLanguageLines(report.cases as readonly PracticeLanguageCaseRecord[],
       Array.isArray(report.notRun) ? report.notRun as readonly PracticeLanguageNotRun[] : []));

@@ -27,7 +27,9 @@ import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-as
 import { judgesComparisonOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
-export { judgesComparisonOf, type ComparisonVote, type RootCallSite } from "./judges-comparison.js"; // pre-flight PF-R2b4.4
+export {
+  judgesComparisonOf, recountJudgesVotes, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition, type RootCallSite
+} from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import {

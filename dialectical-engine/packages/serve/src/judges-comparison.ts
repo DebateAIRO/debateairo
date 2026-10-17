@@ -104,7 +104,7 @@ const lettersNamedBy = (vote: ComparisonVote): readonly string[] => [
  * place read from its author call. Otherwise the saved order, only when no row shows a gap.
  */
 function lettersOf(
-  positions: Answer["nodes"],
+  positions: readonly JudgesRecountPosition[],
   votes: readonly ComparisonVote[],
   rootSites: readonly RootCallSite[]
 ): Readonly<{ letterOfRoot: ReadonlyMap<string, string>; exact: boolean }> | null {
@@ -116,11 +116,11 @@ function lettersOf(
     const places = [...(placesOf.get(nodeId) ?? [])];
     return places.length === 1 && places[0] !== null && places[0] !== undefined ? places[0] : null;
   };
-  const exact = positions.every((node) => exactPlace(node.node_id) !== null);
+  const exact = positions.every((position) => exactPlace(position.nodeId) !== null);
   const letterOfRoot = new Map<string, string>();
-  positions.forEach((node, index) => {
-    const letter = LETTER_ORDER[exact ? exactPlace(node.node_id)! : index];
-    if (letter !== undefined) letterOfRoot.set(node.node_id, letter);
+  positions.forEach((position, index) => {
+    const letter = LETTER_ORDER[exact ? exactPlace(position.nodeId)! : index];
+    if (letter !== undefined) letterOfRoot.set(position.nodeId, letter);
   });
   // Two positions at one place, or a place past the letters: the record is not a plan the judges could have read.
   if (exact && new Set(letterOfRoot.values()).size !== positions.length) return null;
@@ -140,6 +140,61 @@ function lettersOf(
   return Object.freeze({ letterOfRoot, exact });
 }
 
+/** A position as the recount reads it: its node, the maker that argued it (null when unknown) and its case. */
+export type JudgesRecountPosition = Readonly<{ nodeId: string; maker: string | null; strength: number | null }>;
+
+/** Which stored votes count, as the served verdict counted them, and the letters that count read. */
+export type JudgesRecount = Readonly<{
+  /** Each lettered position's letter (its plan place, ruling R2b-B6.1). */
+  letterOfRoot: ReadonlyMap<string, string>;
+  /** Per seat, from `deriveJudgesVerdict` (rule 1 with ruling R2b-B2.1), never from the stored `counted` column. */
+  counted: ReturnType<typeof deriveJudgesVerdict>["counted"];
+  /** The groups a majority of the seated judges named (rule 2), letters in answer order. */
+  groups: ReturnType<typeof deriveJudgesVerdict>["groups"];
+}>;
+
+/**
+ * The count again, from the stored rows (controller ruling R2b-B5.1): each position lettered by its plan place (ruling
+ * R2b-B6.1), then `deriveJudgesVerdict` over the stored letters, groups, makers, conditional flags and question kinds.
+ * Null when no honest letter can be given or the count refuses the rows: no numbers rather than numbers that differ
+ * from the served verdict. The honesty panel and the practice report (tools/preview-practice) both read it. Pure.
+ */
+export function recountJudgesVotes(
+  votes: readonly ComparisonVote[],
+  positions: readonly JudgesRecountPosition[],
+  rootSites: readonly RootCallSite[]
+): JudgesRecount | null {
+  const letters = lettersOf(positions, votes, rootSites);
+  if (letters === null) return null;
+  const { letterOfRoot, exact } = letters;
+  /** Letters some row fixes through a root of this version. */
+  const fixedLetters = new Set(votes.flatMap((vote) =>
+    vote.chosenRootNodeId !== null && letterOfRoot.has(vote.chosenRootNodeId) && vote.chosenLetter !== null ? [vote.chosenLetter] : []));
+  // A row reused after a re-claim names the dead copy's root. With exact letters its letter names its answer; with
+  // guessed letters it counts only when a fresh row fixes the same letter, else it is no usable reply (ruling R2b-B6.1).
+  const usable = (vote: ComparisonVote): boolean => exact || vote.chosenRootNodeId === null
+    || letterOfRoot.has(vote.chosenRootNodeId) || (vote.chosenLetter !== null && fixedLetters.has(vote.chosenLetter));
+  const lettered = positions.filter((position) => letterOfRoot.has(position.nodeId));
+  try {
+    const recount = deriveJudgesVerdict({
+      votes: votes.map((vote) => recountVoteOf(vote, usable(vote))),
+      answers: lettered.map((position) => Object.freeze({
+        letter: letterOfRoot.get(position.nodeId) as EngineAnswerLetter,
+        rootNodeId: position.nodeId,
+        arguedByMaker: position.maker
+      })),
+      // The tie-break of the winner only, which no reader of the recount uses; a position without a strength sorts last.
+      honestFinalStrength: new Map(lettered.map((position) => [position.nodeId, position.strength ?? -1] as const)),
+      label: RECOUNT_LABEL
+    });
+    return Object.freeze({ letterOfRoot, counted: recount.counted, groups: recount.groups });
+  } catch (error) {
+    // Rows the count refuses (B6 fix round 1, Minor 2): no numbers, never a failed read. The code only.
+    if (error instanceof TypedDomainError && error.code === "JUDGES_VERDICT_INPUT_INVALID") return null;
+    throw error;
+  }
+}
+
 export function judgesComparisonOf(
   votes: readonly ComparisonVote[],
   nodes: Answer["nodes"],
@@ -154,40 +209,14 @@ export function judgesComparisonOf(
   }
   const positions = nodes.filter((node) => !arguing.has(node.node_id));
   if (positions.length === 0) return undefined;
-  const letters = lettersOf(positions, votes, rootSites);
-  if (letters === null) return undefined;
-  const { letterOfRoot, exact } = letters;
-  const rootOfLetter = new Map([...letterOfRoot].map(([root, letter]) => [letter, root] as const));
-  /** Letters some row fixes through a root of this version. */
-  const fixedLetters = new Set(votes.flatMap((vote) =>
-    vote.chosenRootNodeId !== null && letterOfRoot.has(vote.chosenRootNodeId) && vote.chosenLetter !== null ? [vote.chosenLetter] : []));
-  // A row reused after a re-claim names the dead copy's root. With exact letters its letter names its answer; with
-  // guessed letters it counts only when a fresh row fixes the same letter, else it is no usable reply (ruling R2b-B6.1).
-  const usable = (vote: ComparisonVote): boolean => exact || vote.chosenRootNodeId === null
-    || letterOfRoot.has(vote.chosenRootNodeId) || (vote.chosenLetter !== null && fixedLetters.has(vote.chosenLetter));
-
-  const lettered = positions.filter((node) => letterOfRoot.has(node.node_id));
   const strengthOf = (node: Answer["nodes"][number]): number | null =>
     node.final_strength === null ? null : Math.min(1, Math.max(0, node.final_strength.value));
+  const recount = recountJudgesVotes(votes, positions.map((node) => Object.freeze({
+    nodeId: node.node_id, maker: node.maker_lineage?.maker ?? null, strength: strengthOf(node)
+  })), rootSites);
+  if (recount === null) return undefined;
+  const rootOfLetter = new Map([...recount.letterOfRoot].map(([root, letter]) => [letter, root] as const));
   const chose = new Map<string, number>();
-  let recount: ReturnType<typeof deriveJudgesVerdict>;
-  try {
-    recount = deriveJudgesVerdict({
-      votes: votes.map((vote) => recountVoteOf(vote, usable(vote))),
-      answers: lettered.map((node) => Object.freeze({
-        letter: letterOfRoot.get(node.node_id) as EngineAnswerLetter,
-        rootNodeId: node.node_id,
-        arguedByMaker: node.maker_lineage?.maker ?? null
-      })),
-      // The tie-break of the winner only, which this read never uses; a position without a strength sorts last.
-      honestFinalStrength: new Map(lettered.map((node) => [node.node_id, strengthOf(node) ?? -1] as const)),
-      label: RECOUNT_LABEL
-    });
-  } catch (error) {
-    // Rows the count refuses (B6 fix round 1, Minor 2): no section, never a failed answer read. The code only.
-    if (error instanceof TypedDomainError && error.code === "JUDGES_VERDICT_INPUT_INVALID") return undefined;
-    throw error;
-  }
   const countedSeats = new Set(recount.counted.filter((entry) => entry.counted).map((entry) => entry.seat));
   for (const vote of votes) {
     if (!countedSeats.has(vote.judgeSeat)) continue;

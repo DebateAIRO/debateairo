@@ -4073,6 +4073,30 @@ export function selectServedRootByJudges<T extends { readonly nodeId: string }>(
   });
 }
 
+/**
+ * Engine redesign R2 (INTERFACE §15.4, the practice report only): what today's ladder would say over the SAME honest
+ * final strengths: the strength leader among the servable roots (`selectServedRootByStrength`), its margin, its own
+ * recorded panel dispersion and the run's label controls, through the sealed `deriveVerdictLabel`. An engine-2 run
+ * records it on its propagation receipt as `servedRootSelection.engine1Ladder`; it is never served, never stored on
+ * the answer, and never read by the judges, the writers or the story.
+ */
+export function engine1LadderOf<T extends { readonly nodeId: string; readonly panelDispersion: number | null }>(
+  servableRoots: readonly T[],
+  strengths: readonly { readonly nodeId: string; readonly strength: number }[],
+  controls: VerdictLabelBasis["controls"]
+): Readonly<Pick<VerdictLabelDerivation, "label" | "rung" | "trigger">> {
+  const leader = selectServedRootByStrength(servableRoots, strengths);
+  const derivation = deriveVerdictLabel(Object.freeze({
+    winner: leader.servedStrength,
+    margin: leader.margin,
+    disagreement: leader.root.panelDispersion === null
+      ? Object.freeze({ kind: "ABSENT" as const, reason: "FEWER_THAN_TWO_PARSEABLE_JUDGEMENTS" })
+      : Object.freeze({ kind: "MEASURED" as const, value: leader.root.panelDispersion }),
+    controls
+  }));
+  return Object.freeze({ label: derivation.label, rung: derivation.rung, trigger: derivation.trigger });
+}
+
 /** PANEL-01 rev3: budget records append without erasing prior honesty records. */
 export function preserveEnvelopeTerminalConditionMarkRecords(
   existing: readonly ConditionMarkRecord[],
@@ -9821,6 +9845,12 @@ export class WalkingSkeletonRunner {
     // ladder is still derived from the same numbers but never served.
     const ladderLabel = deriveVerdictLabel(verdictLabelBasis);
     const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
+    // R2 B11 (record only): today's ladder over the same honest final strengths, for the practice report's comparison.
+    const engine1Ladder = engineTwo === null ? null
+      : engine1LadderOf(servableMakerPositions, propagation.strengths, Object.freeze({
+        gamma: verdictLabelControls.gamma, highCut: verdictLabelControls.highCut,
+        lowCut: verdictLabelControls.lowCut, disagreementThreshold: verdictLabelControls.disagreementThreshold
+      }));
     // J23: the citable set follows the DIGEST — same source, same membership,
     // so "every load-bearing claim traces to a digest node" is satisfiable by
     // construction rather than by the synthesizer guessing. Exactly one node is
@@ -9864,7 +9894,11 @@ export class WalkingSkeletonRunner {
           disagreement: verdictLabelBasis.disagreement,
           registerVersion: verdictLabelControls.registerVersion,
           sourceRefs: verdictLabelControls.sourceRefs
-        }
+        },
+        // R2 B11: engine 2 only, record only: today's ladder (`labels.engine1LadderLabel`) and the groups the judges'
+        // count used; never served, never read by a writer, the judges or the story.
+        ...(engine1Ladder === null ? {} : { engine1Ladder }),
+        ...(comparingJudges === null ? {} : { judgesGroups: comparingJudges.verdict.groups })
       },
       judgementSelectionRule: {
         ...selection.rule,
