@@ -8,9 +8,12 @@ import {
   debateShapeOfReceipt,
   debateShapeReceiptSchema,
   debateShapeSiteCounts,
+  engineReceiptSchema,
+  engineSettingsOfReceipt,
   lengthGuidanceOfReceipt,
   lengthGuidanceReceiptSchema,
   type DebateShapeCeilingInput,
+  type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
 import type { Pool } from "pg";
@@ -216,7 +219,12 @@ const costEnvelopeBasisSchema = z.object({
   /** Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt. */
   shape: debateShapeReceiptSchema.optional(),
   /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers; present exactly when the row was in force at admission. */
-  length: lengthGuidanceReceiptSchema.optional()
+  length: lengthGuidanceReceiptSchema.optional(),
+  /**
+   * Engine redesign (INTERFACE §3.2): the run's engine-2 values and extra sites; present exactly when the engine row was
+   * in force at admission. Absent: engine 1. Not tied to `formula_version` (unlike `shape`).
+   */
+  engine: engineReceiptSchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -346,6 +354,23 @@ const costEnvelopeBasisSchema = z.object({
       ctx.addIssue({ code: "custom", path: ["shape", "backup_sequences"], message: "the backup flag and the per-site attempts disagree" });
     }
   }
+  /**
+   * Engine redesign (INTERFACE §3.2): engine 2 is always lengthed, and the engine's added calls are its own sites at
+   * the panel-member allowance, so a receipt can never carry engine values without the words, nor bill engine calls
+   * its own sites do not give.
+   */
+  const engine = basis.engine;
+  if (engine !== undefined) {
+    if (basis.length === undefined) {
+      ctx.addIssue({ code: "custom", path: ["engine"], message: "the engine member needs the length member" });
+    }
+    const added = (engine.sites.comparing_judges + engine.sites.investigations + engine.sites.answer_check)
+      * basis.per_site_attempts.panel_member;
+    if (engine.sites.added_model_attempts !== added) {
+      ctx.addIssue({ code: "custom", path: ["engine", "sites", "added_model_attempts"],
+        message: `engine added attempts ${String(engine.sites.added_model_attempts)} disagree with its sites' ${String(added)}` });
+    }
+  }
 });
 
 export interface CostEnvelopeBasis {
@@ -369,6 +394,11 @@ export interface CostEnvelopeBasis {
   readonly shape?: DebateShapeCeilingInput;
   /** Length guidance: the numbers the run was admitted with; absent on every run admitted without the row. */
   readonly length?: LengthGuidance;
+  /**
+   * Engine redesign: the engine-2 values the run was admitted with; absent on every engine-1 run. Read it through
+   * `engineOfRun(basis)` (`@debateai/register`), never from `wire.engine`.
+   */
+  readonly engine?: EngineSettings;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -419,6 +449,7 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
     serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
     ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
     ...(parsed.data.length === undefined ? {} : { length: lengthGuidanceOfReceipt(parsed.data.length) }),
+    ...(parsed.data.engine === undefined ? {} : { engine: engineSettingsOfReceipt(parsed.data.engine) }),
     wire: Object.freeze(parsed.data)
   });
 }

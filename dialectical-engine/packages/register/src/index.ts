@@ -29,6 +29,7 @@ import {
 } from "./debate-shape-ceiling.js";
 import type { DebateShapeCeilingInput } from "./debate-shape-policy.js";
 import { lengthGuidanceReceipt, type LengthGuidance } from "./length-guidance-policy.js";
+import { engineReceipt, type EngineSettings } from "./engine-version-policy.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -218,6 +219,12 @@ export interface StructuralCeilingInput {
    * member, so the receipt is byte for byte today's. Independent of `shape` and of the formula name.
    */
   readonly length?: LengthGuidance;
+  /**
+   * Engine redesign (spec 2026-10-15 §3.2, INTERFACE §3.2) — the engine-2 values and this debate's extra call sites
+   * (`engineSettingsOf` at admission), passed only when the register's optional `engineVersionPolicy` row is in force.
+   * Needs `length`: engine 2 is always lengthed. Absent: no `engine` member and today's ceiling, byte for byte.
+   */
+  readonly engine?: EngineSettings;
 }
 
 /**
@@ -226,7 +233,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length">[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length" | "engine">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -448,6 +455,15 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const crossExchangeSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
   const panelMemberAttempts = input.judgeMaxAttempts + backupJudgeSequence;
   const serveSiteAttempts = input.organMaxAttempts + backupOrganSequence;
+  // Engine redesign (INTERFACE §3.2, contract deviation 3): the comparing judges, the investigations and the answer
+  // check are one call each, bounded like a panel member (`panelMemberAttempts`, backup included). The member is minted
+  // and checked before any sum, so a bad engine input never mints a ceiling, and the added attempts the ceiling bills
+  // are the ones the member discloses.
+  if (input.engine !== undefined && input.length === undefined) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_ENGINE_INVALID", "The engine member needs the length member: engine 2 is always lengthed");
+  }
+  const engineMember = input.engine === undefined ? null : engineReceipt(input.engine, panelMemberAttempts);
+  const engineAddedAttempts = engineMember === null ? 0 : engineMember.sites.added_model_attempts;
   // Debate shape (spec 2026-10-12 §3.6): the map's sites are author sites at the cooldown allowance; every node has its
   // graders, its close-call extras (counted on EVERY node, so the ceiling never under-counts) and its reviews; the P
   // cross-replies are the cross-exchange author sites (no runner-up), as today's M(M-1).
@@ -484,7 +500,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const maxModelAttempts = (authorSites - crossExchangeAuthorSites + reviewerSites) * cooldownSiteAttempts
     + crossExchangeAuthorSites * crossExchangeSiteAttempts
     + panelSites * panelMemberAttempts
-    + serveSites * serveSiteAttempts;
+    + serveSites * serveSiteAttempts
+    + engineAddedAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
@@ -546,7 +563,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     ...(shaped === null ? {} : { shape: debateShapeReceipt(shaped.shape, shaped.counts, backupSequences) }),
     // Length guidance: the run's frozen numbers, after everything else and only with the row, so a receipt minted
     // without them keeps its bytes (Task 3 pins the order).
-    ...(input.length === undefined ? {} : { length: lengthGuidanceReceipt(input.length) })
+    ...(input.length === undefined ? {} : { length: lengthGuidanceReceipt(input.length) }),
+    // Engine redesign (INTERFACE §3.2): the engine's frozen values and sites, LAST (after `length`) and only with the
+    // engine row, so a receipt minted without them keeps its bytes. `formula_version` never changes for it.
+    ...(engineMember === null ? {} : { engine: engineMember })
   });
 }
 

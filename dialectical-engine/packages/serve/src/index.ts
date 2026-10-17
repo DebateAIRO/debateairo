@@ -164,15 +164,16 @@ export interface ConformanceJudgement {
 }
 
 /**
- * M8 (controller ruling, P2a final review) and the R1d PF-D2.3 ruling: the answer read's `cost_envelope.basis` without
- * the receipt's debate-shape member and without its length-guidance member. Least disclosure: those members name the
- * asker's plan and the plan's sizes, thresholds and internal length settings, and nothing public needs them. A copy
- * without `shape` and `length`, every other member as stored; a basis with neither member is returned as the same
- * object, so today's answer body is byte for byte what it was.
+ * M8 (controller ruling, P2a final review), widened by LG-C (R1c part 2) and the engine redesign (R1d, pre-flight
+ * PF-D2.3): the answer read's `cost_envelope.basis` without the receipt's private members. Least disclosure: `shape`
+ * names the asker's plan and the plan's sizes and thresholds, `length` the plan and its word targets, and `engine` engine
+ * 2's scoring terms, caps, label thresholds and judge counts; nothing public needs them, and engine internals never
+ * reach user-facing output. A copy without them, every other member as stored; a basis with none of them is returned as
+ * the same object, so today's answer body is byte for byte what it was.
  */
 export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  if (!Object.hasOwn(basis, "shape") && !Object.hasOwn(basis, "length")) return basis;
-  const { shape: _shape, length: _length, ...shown } = basis;
+  if (!Object.hasOwn(basis, "shape") && !Object.hasOwn(basis, "length") && !Object.hasOwn(basis, "engine")) return basis;
+  const { shape: _shape, length: _length, engine: _engine, ...shown } = basis;
   return shown;
 }
 
