@@ -524,6 +524,25 @@ function storyNamed(ref: string | null): string {
   return ref === null ? "" : ` ${ref}`;
 }
 
+/**
+ * OWNER WORDING — approve before switch-on
+ *
+ * R2 (spec §4.4, INTERFACE §9.4): the comparing judges' six triggers, one plain sentence each, for the storyteller and
+ * the checker (AI-facing material, never shown to a reader). No number: the judges decided, and the counts stay out.
+ * Keyed by text because story may not import serve (tools/orphan-audit/src/index.ts row "story"); a unit test proves
+ * the keys are exactly serve's `ENGINE_VERDICT_TRIGGERS` (tests/unit/r2-story-engine.test.ts).
+ * JUDGES_MAJORITY, JUDGES_NO_MAJORITY and JUDGES_VOTES_IGNORED are worded to be true in every case of B2's counting
+ * rules 4-5 (pre-flight PF-R2b5.5).
+ */
+export const STORY_ENGINE_TRIGGER_RULES: Readonly<Record<string, string>> = Object.freeze({
+  JUDGES_UNANIMOUS: "The label is SUPPORTED because every judge who compared the answers side by side chose this answer, and none of them found that it holds only in some cases.",
+  JUDGES_CONDITIONAL: "The label is CONTESTED because every judge who compared the answers side by side chose this answer, but at least one found that it holds in some cases and not in others.",
+  JUDGES_MAJORITY: "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer to settle it, but not every judge's choice counted for it: at least one judge chose another answer, gave no usable choice, or chose an answer its own maker had argued, which is not counted.",
+  JUDGES_NO_MAJORITY: "The label is SPLIT because the judges who compared the answers side by side did not settle on one answer: too few of their choices counted for any single answer, and this answer is the one they chose most often or, where that was even, the one whose case held up best against the objections.",
+  JUDGES_UNAVAILABLE: "The label is CONTESTED because no judge could compare the answers side by side, so this answer was chosen as the one whose case held up best against the objections, and without that comparison it cannot be called clear.",
+  JUDGES_VOTES_IGNORED: "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."
+});
+
 /** The rung and trigger `deriveVerdictLabel` recorded, in plain words. */
 function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, refs: StoryRuleRefs): string {
   const winner = storyNumberWords(basis.winner_strength);
@@ -533,7 +552,11 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, ref
   if (positionsArgued <= 1 || basis.runner_up_node_id === null) {
     sentences.push("Only one position was argued, so there is no runner-up and no margin between positions.");
   }
-  if (basis.trigger === "BASIS_INCOMPLETE") {
+  const judgesRule = Object.hasOwn(STORY_ENGINE_TRIGGER_RULES, basis.trigger) ? STORY_ENGINE_TRIGGER_RULES[basis.trigger] : undefined;
+  if (judgesRule !== undefined) {
+    // R2: an engine-2 label (rung 5) was decided by the comparing judges; the numbers' sentences do not apply.
+    sentences.push(judgesRule);
+  } else if (basis.trigger === "BASIS_INCOMPLETE") {
     const missing = [
       ...(basis.margin === null ? ["the margin over a runner-up"] : []),
       ...(basis.disagreement === null ? ["the judges' disagreement about the strongest position"] : [])
@@ -570,7 +593,9 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, ref
   } else {
     sentences.push(`The label is ${basis.label}; the rule that decided is recorded as ${basis.trigger}.`);
   }
-  if (refs.alsoWithinTieMargin.length > 0) {
+  // Under the judges' rule no tie-margin sentence follows: the judges decided, not the margin (the judges' winner can
+  // finish below another answer, so "within the tie margin" would tell the storyteller that numbers decided).
+  if (judgesRule === undefined && refs.alsoWithinTieMargin.length > 0) {
     const others = refs.alsoWithinTieMargin.join(", ");
     sentences.push(
       `${others} also finished within the tie margin of the strongest position, behind the runner-up`

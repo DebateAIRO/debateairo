@@ -11242,6 +11242,8 @@ export class WalkingSkeletonRunner {
               // BEFORE that filter (`backupMakers`, out-of-panel register refs included), so a benched first storyteller
               // or an out-of-panel checker still excludes its maker: the maker exclusion first, the sit-out filter after.
               engine: engine.engine === 2 ? engine : null,
+              // R2 (spec §7.2 item 2): the comparing judges' question kinds pick the story's one shape (engine 2 only).
+              ...(engine.engine === 2 && comparingJudges !== null ? { questionKinds: comparingJudges.verdict.questionKinds } : {}),
               ...(engine.engine === 2
                 ? {
                   backupCandidates: storyBackupCandidatesFrom({

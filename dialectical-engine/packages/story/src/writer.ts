@@ -1,7 +1,7 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField } from "@debateai/kernel";
+import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, type EngineQuestionKind } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -184,6 +184,11 @@ export type StoryWriteInput = StoryRunSnapshot & {
    */
   readonly languageLocked?: true;
   /**
+   * R2 (spec §7.2 item 2, INTERFACE §9.9): the comparing judges' question kinds; their majority picks the v4 story's
+   * one shape (`storyV4ShapeId`). Set by the runner under engine 2 only; absent: the pack's default shape.
+   */
+  readonly questionKinds?: readonly EngineQuestionKind[];
+  /**
    * Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers, set by the runner only when its receipt carries them.
    * LG-C reads only its presence (the also-raised claims whole); LG-D reads the story's targets. Absent: today's story.
    */
@@ -207,6 +212,11 @@ export type StoryWriteInput = StoryRunSnapshot & {
    */
   readonly backupMakers?: readonly StoryBackupMaker[];
 };
+
+/** R2: the one v4 shape, from the comparing judges' question kinds (majority; a tie or none: the pack's default). */
+export function storyV4ShapeId(input: Readonly<{ questionKinds?: readonly EngineQuestionKind[] }>, pack: StoryPack): string {
+  return storyShapeOf({ questionKinds: input.questionKinds ?? [], pack });
+}
 
 /**
  * Part 4, P4-D (P3-N1; the controller's ruling of 3 October 2026): the run's
@@ -600,11 +610,12 @@ export class StoryWriter {
     // length table alone keeps the v3 story: today's contracts, no `length` field, today's bounds, no guided words (the
     // material differs only by LG-C's whole also-raised claims, ruling L19) (pre-flight PF-D6.3).
     const guidance = input.engine?.engine === 2 && input.lengthGuidance !== undefined ? input.lengthGuidance : null;
-    // One shape (decision 2): R1d sends the pack default (no question kinds until R2 passes the judges'). The model never
-    // writes shape_id: the material's index sets it on the decoded body, and the stored row carries it.
+    // One shape (decision 2): the comparing judges' question kinds pick it (R2; `storyV4ShapeId`: their majority, a tie
+    // or none the pack default). The model never writes shape_id: the material's index sets it on the decoded body, and
+    // the stored row carries it.
     const v4: StoryV4Options | null = guidance === null
       ? null
-      : Object.freeze({ shapeId: storyShapeOf({ questionKinds: [], pack }) });
+      : Object.freeze({ shapeId: storyV4ShapeId(input, pack) });
     const built = buildStoryMaterial({
       snapshot,
       enrichment: enrichmentWithoutNodeIds(enrichment),

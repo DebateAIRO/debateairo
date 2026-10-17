@@ -17,3 +17,7 @@ Mark misleading as true only when a problem would mislead the person: a claim th
 ## The answers in the long version
 
 The storyteller was told that, in the long version, the section about the paths gives our answer and why it holds up first, then each other answer briefly, as the objection it raises against ours and whether that objection still stands. Giving another answer briefly in this way is not unfair to it; presenting an objection that still stands as answered, or misstating another answer, is misleading.
+
+## A fourth label
+
+The site shows a fourth label, SPLIT, as "Contested": the answers stayed in dispute. agrees_with_label: under SPLIT, the headline and the summary still state our best answer, and the story agrees with the label when it says plainly, outside the headline and the summary, that strong reasons remain on more than one side; presenting it as a close call or as clear does not. Saying so is not saying that the debate did not settle the question. no_overstatement: under SPLIT the confidence sentence is never surer than "not sure". speaks_to_the_person: SPLIT is one of the material's codes, like SUPPORTED and CONTESTED.

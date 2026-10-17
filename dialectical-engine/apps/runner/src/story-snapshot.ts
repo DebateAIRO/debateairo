@@ -1,4 +1,4 @@
-import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
 import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
@@ -161,6 +161,8 @@ export interface StorySnapshotSource {
    * absent: an engine-1 debate, whose story keeps today's bytes.
    */
   readonly engine?: EngineSettings | null;
+  /** R2 (INTERFACE §9.9): the comparing judges' question kinds, handed on to the story; the runner sets it under engine 2 only. */
+  readonly questionKinds?: readonly EngineQuestionKind[];
   /**
    * R1d (spec §7.2 item 11): the backup storyteller's candidates, the run's claim-eligible members in its stored panel's
    * order (`storyBackupCandidatesFrom`), without the members the preview's sit-out book has benched. The runner hands
@@ -395,6 +397,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     stepLease: source.stepLease,
     costFallback: source.costFallback,
     ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers }),
+    ...(source.questionKinds === undefined ? {} : { questionKinds: Object.freeze([...source.questionKinds]) }),
     ...(source.alsoRaised === undefined
       ? {}
       : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),

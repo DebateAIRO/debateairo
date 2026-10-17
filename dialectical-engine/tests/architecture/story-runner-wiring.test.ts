@@ -102,6 +102,13 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(helper).toContain("export function storyRotationRoleMakers(");
   });
 
+  it("hands the comparing judges' question kinds to the story under engine 2 only (R2 B9)", async () => {
+    const runner = await read("apps/runner/src/index.ts");
+    const snapshot = runner.indexOf("input: buildStoryRunSnapshot({");
+    const call = runner.slice(snapshot, runner.indexOf("}),", runner.indexOf("roleMakers:", snapshot)));
+    expect(call).toContain("...(engine.engine === 2 && comparingJudges !== null ? { questionKinds: comparingJudges.verdict.questionKinds } : {}),");
+  });
+
   it("keeps the runner's framed-prompt builders at one: the story builds its prompts in packages/story", async () => {
     const runner = await read("apps/runner/src/index.ts");
     // Paid plans S1a: dev's two synthesis framings became the scorecard's ONE
