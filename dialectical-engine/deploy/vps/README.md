@@ -1116,7 +1116,7 @@ The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 o
 
 ### Upgrading to the engine redesign R3 (the engine seal and migration 0122)
 
-A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release.
+A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot.
 
 This release adds one migration, `migrations/0122_engine_map_check.sql` (after `0121_engine_verdict.sql`): two
 append-only code tables, what each engine-2 map point rests on and the answer check's codes. Apply it BEFORE the new

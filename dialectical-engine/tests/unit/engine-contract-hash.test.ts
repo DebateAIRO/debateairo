@@ -1,8 +1,9 @@
 // Engine redesign R1d, Task 4 (INTERFACE §2.1, §2.2, §2.4, §2.5): the engineContractHash seal. The register side reads and
 // parses the row; the code side folds engine 2's sealed contracts into one fingerprint text and its sha256. R1d seals no
 // contract (deviation 2), so the hash is the sha256 of the header alone. A phase that appends a contract (R2a: verdict.investigate.v1;
-// R2b: verdict.judge.v1) moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED and says why in its commit (INTERFACE
-// §2.5); R1D_ENGINE_CONTRACT_HASH stays the empty list's seal.
+// R2b: verdict.judge.v1; R3: the map's eight engine-2 contracts, then judge.assigned-root.unknown.v2 and .resolved.v2)
+// moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED and says why in its commit (INTERFACE §2.5); R1D_ENGINE_CONTRACT_HASH
+// stays the empty list's seal.
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
@@ -28,8 +29,8 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
  */
 const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24";
 /**
- * The code's seal now: sha256 of engineContractFingerprintText() over ENGINE_SEALED_IDS. Written by Step 4's command from
- * the code's own output (never typed); the zeros are the red-first value Step 4 replaces.
+ * The code's seal now: sha256 of engineContractFingerprintText() over ENGINE_SEALED_IDS, written by command from the code's
+ * own output (never typed). A phase that appends sets it aside to zeros for its red run, then writes the code's new seal.
  */
 // R3 (2026-10-17): + the map's eight engine-2 contracts and judge.assigned-root.*.v2 (option-1 drafts, approve before switch-on)
 const ENGINE_CONTRACT_HASH_SEALED = "ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d";
