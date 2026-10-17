@@ -531,7 +531,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail),
-        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key)).issues,
+        recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),
+          await mapLengthedOf(entry.attempt_id, entry.call_site_key)).issues,
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }

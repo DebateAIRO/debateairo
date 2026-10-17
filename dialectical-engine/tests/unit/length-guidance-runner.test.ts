@@ -78,4 +78,13 @@ describe("the runner never reads the row (Review Focus 2)", () => {
       expect(source.includes("LENGTH_GUIDANCE_POLICY_ROW_KEY") && !publisher, name).toBe(false);
     }
   });
+  // Task 7 review 4: the publisher's exemption is ONE read, inside its boot-readiness check.
+  it("the hosted publisher reads the row exactly once, inside verifyHostedRegisterBootReadiness", () => {
+    const source = readFileSync(new URL("../../apps/runner/src/hosted-register-publish.ts", import.meta.url), "utf8");
+    expect(source.split("readLengthGuidancePolicy(").length - 1).toBe(1);
+    const start = source.indexOf("export async function verifyHostedRegisterBootReadiness(");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\n}\n", start));
+    expect(body.split("readLengthGuidancePolicy(").length - 1).toBe(1);
+  });
 });

@@ -52,6 +52,11 @@ export type PracticeLengthRow = Readonly<{
 const CUT_OFF = "length";
 const LENGTH_RETRY = "LENGTH_RETRY";
 const SLIP_STATUSES: ReadonlySet<string> = new Set(["PARSE_FAILED", "SCHEMA_FAILED"]);
+/**
+ * Follow-up tries (the salvage interaction ruling, 2026-10-17): a PATCH or FULL follow-up's artifact carries the original
+ * request's guided words while its actual words count only what the follow-up sent back, so its words are no comparison.
+ */
+const FOLLOW_UP_FORMS: ReadonlySet<string> = new Set(["PATCH", "FULL"]);
 
 type GroupKey = (attempt: PracticeMeasuredAttempt) => readonly [string, PracticeStep];
 /** Tokens: the AI that spent them, at its own call's step (a structure-repair try is Haiku's `structure_repair`). */
@@ -125,11 +130,13 @@ export function practiceTokenRows(attempts: readonly PracticeMeasuredAttempt[]):
 
 /**
  * The guided-vs-actual table (deviation 9: guided words from the record when LG-C writes them). A structure-repair try
- * counts for its call's AI and step (pre-flight PF-B4.6): the words are that AI's.
+ * counts for its call's AI and step (pre-flight PF-B4.6): the words are that AI's. A PATCH or FULL follow-up try is left
+ * out of the guided, accepted and actual words and the over share (`FOLLOW_UP_FORMS`); its cut-off and slip still count.
  */
 export function practiceLengthRows(attempts: readonly PracticeMeasuredAttempt[]): readonly PracticeLengthRow[] {
   return Object.freeze(groups(attempts, wordsKey).map(([model, step, mine]) => {
-    const accepted = mine.filter((attempt) => attempt.outcome === "OK");
+    const accepted = mine.filter((attempt) => attempt.outcome === "OK"
+      && (attempt.replyForm === null || !FOLLOW_UP_FORMS.has(attempt.replyForm)));
     const guided = numbers(accepted.map((attempt) => attempt.guidedWords));
     const words = latencySummary(numbers(accepted.map((attempt) => attempt.actualWords)));
     const compared = accepted.filter((attempt) => attempt.guidedWords !== null && attempt.actualWords !== null);
@@ -166,7 +173,7 @@ export function practiceLengthLines(rows: readonly PracticeLengthRow[]): readonl
   if (rows.length === 0) return [];
   return ["Words per AI and step (information only, never checked; actual words of the accepted replies as median / p90 / max; "
     + "over: the share longer than guided; stopped: replies cut off at their allowance; slips: replies refused for their form; "
-    + "a reply Haiku put back into its form counts for the AI and step that wrote it):", "",
+    + "a reply Haiku put back into its form counts for the AI and step that wrote it; follow-up tries are left out of the words):", "",
     "| model | step | guided | accepted | actual | over | stopped | slips |", "|---|---|---|---|---|---|---|---|",
     ...rows.map((row) => `| ${row.model} | ${row.step} | ${row.guidedWords === null ? "-" : String(row.guidedWords)} | ${String(row.accepted)} | `
       + `${spread({ p50: row.actualWords.median, p90: row.actualWords.p90, max: row.actualWords.max })} | ${percent(row.overGuidedShare)} | `

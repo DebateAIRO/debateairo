@@ -31,12 +31,15 @@ const ANSWER_LENGTH_HINT_DEFAULTS = Object.freeze({ short: 200, standard: 350, d
 /**
  * The hint's three numbers for the person's plan (the room read's `answer_words`, else the start values 200 / 350 / 1,000),
  * formatted by the page's language rules with Latin digits, as every translation wrote them before ("1.500", "1 500").
+ * A browser with no number data for the language formats them in English (never another language's grouping).
  */
 export function answerLengthHintVars(words: Readonly<{ short: number; standard: number; detailed: number }> | null,
   locale: string): Readonly<{ short: string; standard: string; detailed: string }> {
   const chosen = words ?? ANSWER_LENGTH_HINT_DEFAULTS;
+  let known: boolean;
+  try { known = Intl.NumberFormat.supportedLocalesOf(locale).length > 0; } catch { known = false; }
   let format: Intl.NumberFormat;
-  try { format = new Intl.NumberFormat(locale, { numberingSystem: "latn" }); } catch { format = new Intl.NumberFormat("en"); }
+  try { format = new Intl.NumberFormat(known ? locale : "en", { numberingSystem: "latn" }); } catch { format = new Intl.NumberFormat("en"); }
   return Object.freeze({ short: format.format(chosen.short), standard: format.format(chosen.standard), detailed: format.format(chosen.detailed) });
 }
 

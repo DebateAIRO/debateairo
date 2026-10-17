@@ -625,6 +625,7 @@ function NewDebateForm({
                   field="answerLength"
                   label={t(catalog, "newDebate.answerLength")}
                   hint={t(catalog, "newDebate.answerLengthHint", answerLengthHintVars(answerWords, pageLocale))}
+                  hintHoldsFormattedNumbers
                   options={ANSWER_LENGTHS.map((length) => ({ value: length, label: t(catalog, ANSWER_LENGTH_WORDS[length]) }))}
                   value={answerLength}
                   onChange={(value) => setAnswerLength(value as AnswerLength)}
@@ -697,6 +698,7 @@ function SegmentedRow({
   options,
   value,
   disabled = false,
+  hintHoldsFormattedNumbers = false,
   onChange
 }: {
   field: string;
@@ -705,13 +707,19 @@ function SegmentedRow({
   options: ReadonlyArray<{ value: string; label: string }>;
   value: string;
   disabled?: boolean;
+  /**
+   * The hint holds numbers formatted by `Intl.NumberFormat` (the answer-length hint): the server's and the browser's
+   * number data can group them differently (fr: U+202F vs U+00A0), so React must not report that text as a hydration
+   * mismatch. No visible change.
+   */
+  hintHoldsFormattedNumbers?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
     <div className="ndRow">
       <div className="ndRowText">
         <div className="ndLabel" id={`${field}-label`}>{label}</div>
-        <div className="ndHint" id={`${field}-hint`}>{hint}</div>
+        <div className="ndHint" id={`${field}-hint`} suppressHydrationWarning={hintHoldsFormattedNumbers}>{hint}</div>
       </div>
       <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`} aria-describedby={`${field}-hint`}>
         {options.map((option) => (

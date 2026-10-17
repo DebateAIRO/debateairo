@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error -- the root test compiler has no JSX mode; Vitest transpiles this TSX module.
 import { answerLengthHintVars } from "../../apps/ui/app/new/defaults.js";
 import { t } from "../../apps/ui/lib/i18n/translate.js";
@@ -35,5 +35,27 @@ describe("the /new answer-length hint (spec §3.8)", () => {
     expect(answerLengthHintVars(null, "ar").detailed).toMatch(/^1\D?000$/u);
     // Explicit words still group by the language: 1,500 in German.
     expect(answerLengthHintVars({ short: 300, standard: 700, detailed: 1500 }, "de").detailed).toBe("1.500");
+  });
+});
+
+describe("the hint's numbers on any browser (R1c final wave A8, whole-branch review M4)", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("a language the browser has no number data for is formatted in English", () => {
+    vi.spyOn(Intl.NumberFormat, "supportedLocalesOf").mockReturnValue([]);
+    expect(answerLengthHintVars(null, "de")).toEqual({ short: "200", standard: "350", detailed: "1,000" });
+  });
+
+  it("a language the browser knows keeps its own grouping", () => {
+    expect(Intl.NumberFormat.supportedLocalesOf("de")).toEqual(["de"]);
+    expect(answerLengthHintVars(null, "de").detailed).toBe("1.000");
+  });
+
+  it("the element holding the formatted numbers tolerates a server/browser grouping difference (no text change)", () => {
+    const page = readFileSync(new URL("../../apps/ui/app/new/NewDebatePageClient.tsx", import.meta.url), "utf8");
+    expect(page).toContain("<div className=\"ndHint\" id={`${field}-hint`} suppressHydrationWarning={hintHoldsFormattedNumbers}>{hint}</div>");
+    const row = page.slice(page.indexOf("field=\"answerLength\""), page.indexOf("onChange={(value) => setAnswerLength(value as AnswerLength)}"));
+    expect(row).toContain("hintHoldsFormattedNumbers");
+    expect(page.split("hintHoldsFormattedNumbers\n").length - 1).toBe(1); // only the answer-length row passes it
   });
 });

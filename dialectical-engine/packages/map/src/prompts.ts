@@ -144,24 +144,38 @@ export function mapContractNameOf(contractId: string): MapContractName | null {
   return MAP_CONTRACT_NAMES.find((name) => MAP_CONTRACT_IDS[name] === contractId || MAP_LENGTH_CONTRACT_IDS[name] === contractId) ?? null;
 }
 
-/** The seven contracts from the given instruction texts (default: the shipped text); `lengthed`: their length variants. */
-export function mapPromptContracts(texts: MapInstructionTexts = MAP_DEFAULT_INSTRUCTIONS, lengthed = false): MapPromptContractSet {
-  const entries = MAP_CONTRACT_NAMES.map((name) => [name, Object.freeze(lengthed
-    ? { contractId: MAP_LENGTH_CONTRACT_IDS[name], instruction: `${texts[name]} ${LENGTH_SENTENCE_PARTS}`, answerForm: MAP_LENGTH_ANSWER_FORMS[name] }
-    : { contractId: MAP_CONTRACT_IDS[name], instruction: texts[name], answerForm: MAP_ANSWER_FORMS[name] })] as const);
+/**
+ * The length variants of the given contracts (spec 2026-10-15 §3.2): each one's own instruction, then the parts
+ * sentence, under the variant's id and form. Built from the SAME texts a run uses, so an owner's edited map text is never
+ * replaced by the shipped one on a lengthed run (Task 14 review 3; the owner-editable prompts rule).
+ */
+export function mapLengthContractsOf(contracts: MapPromptContractSet): MapPromptContractSet {
+  const entries = MAP_CONTRACT_NAMES.map((name) => [name, Object.freeze({ contractId: MAP_LENGTH_CONTRACT_IDS[name],
+    instruction: `${contracts[name].instruction} ${LENGTH_SENTENCE_PARTS}`, answerForm: MAP_LENGTH_ANSWER_FORMS[name] })] as const);
   return Object.freeze(Object.fromEntries(entries) as Record<MapContractName, PromptContract>);
 }
 
-/** The one fingerprint text: today's seven, then the seven length variants (spec 2026-10-15 §3.2), frame version included. */
+/** The seven contracts from the given instruction texts (default: the shipped text); `lengthed`: their length variants. */
+export function mapPromptContracts(texts: MapInstructionTexts = MAP_DEFAULT_INSTRUCTIONS, lengthed = false): MapPromptContractSet {
+  const entries = MAP_CONTRACT_NAMES.map((name) => [name,
+    Object.freeze({ contractId: MAP_CONTRACT_IDS[name], instruction: texts[name], answerForm: MAP_ANSWER_FORMS[name] })] as const);
+  const today = Object.freeze(Object.fromEntries(entries) as Record<MapContractName, PromptContract>);
+  return lengthed ? mapLengthContractsOf(today) : today;
+}
+
+/**
+ * The one fingerprint text: today's seven, then the seven length variants (spec 2026-10-15 §3.2), frame version included.
+ * The variants default to those of the given contracts (owner-edited texts seal their own variants).
+ */
 export function mapPromptFingerprintText(contracts: MapPromptContractSet = mapPromptContracts(),
-  lengthContracts: MapPromptContractSet = mapPromptContracts(MAP_DEFAULT_INSTRUCTIONS, true)): string {
+  lengthContracts: MapPromptContractSet = mapLengthContractsOf(contracts)): string {
   return [...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(contracts[name])),
     ...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(lengthContracts[name]))].join("\n---\n");
 }
 
 /** The map's contract hash: what the register seals as mapContractHash, and what each map call carries. */
 export function mapPromptContractHash(contracts: MapPromptContractSet = mapPromptContracts(),
-  lengthContracts: MapPromptContractSet = mapPromptContracts(MAP_DEFAULT_INSTRUCTIONS, true)): string {
+  lengthContracts: MapPromptContractSet = mapLengthContractsOf(contracts)): string {
   return createHash("sha256").update(mapPromptFingerprintText(contracts, lengthContracts)).digest("hex");
 }
 

@@ -18,7 +18,7 @@ import {
   type PromptContract,
   type PromptPacket
 } from "@debateai/providers";
-import { MAP_DEFAULT_INSTRUCTIONS, mapContractInLanguage, mapPromptContracts, type MapContractName, type MapPromptContractSet } from "./prompts.js";
+import { mapContractInLanguage, mapLengthContractsOf, mapPromptContracts, type MapContractName, type MapPromptContractSet } from "./prompts.js";
 import { mapGuidedWords, mapLengthField, mapReplyWordsCeiling, type MapLength } from "./length.js";
 import {
   MAP_LENGTHED_REPLY_SCHEMAS,
@@ -93,7 +93,9 @@ export function mapLockedLanguage(ctx: Pick<MapSpecContext, "languageTag" | "lan
 function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName, material: readonly FramedMaterialField[],
   schema: z.ZodType<T>, check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): MapStepSpec<T> {
   const lock = mapLockedLanguage(ctx);
-  const contracts = ctx.length === undefined ? (ctx.contracts ?? mapPromptContracts()) : mapPromptContracts(MAP_DEFAULT_INSTRUCTIONS, true);
+  // Length guidance: the variants of the SAME contracts the run uses (owner-edited texts kept; Task 14 review 3).
+  const runs = ctx.contracts ?? mapPromptContracts();
+  const contracts = ctx.length === undefined ? runs : mapLengthContractsOf(runs);
   const contract = mapContractInLanguage(contracts[name], lock, ctx.languageName);
   // Length guidance: the parts' targets ride right before question_language (which stays last); nothing without the row.
   const told = ctx.length === undefined ? material : [...material, mapLengthField(name, ctx.length, ctx.languageTag)];

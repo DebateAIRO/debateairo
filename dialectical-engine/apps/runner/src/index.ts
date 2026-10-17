@@ -911,6 +911,17 @@ export function guidedCallBound(bound: CallBound, step: LengthCallStep, guidance
 }
 
 /**
+ * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call, spread into the call's
+ * input, from a run's receipt `length` and its stored language tag; nothing without the receipt's `length` (today's
+ * request, byte for byte). The run's own calls and the review catch-up both use it (Task 12 review 3).
+ */
+export function lengthGuideFrom(guidance: LengthGuidance | null, step: LengthGuidanceStep, languageCode: string):
+  Readonly<{ length?: LengthGuide }> {
+  return guidance === null ? {}
+    : { length: Object.freeze({ words: guidance.steps[step], languageCode, charactersPerWord: guidance.charactersPerWord }) };
+}
+
+/**
  * What a synthesis call is told about length (INTERFACE §5.4): the writer's target (`answer_length`), the checker's own
  * reply target (`ownWords`, LG-C2), the run's language tag (zh / ja / th name characters) and the row's factors. A run
  * without the length row but with the shape passes the shape's words with `languageCode: null`: today's "about N words".
@@ -1883,17 +1894,18 @@ export async function runReviewCatchUp(input: {
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
   // P2d Task 7c (controller ruling D-CATCHUP): THE RUN'S LOCK, read off its receipt as the runner reads it. The Postgres
   // reader above has already parsed this same receipt, so one that does not parse is refused there, as today.
+  // The run's stored tag, as the lock and the length target both read it ("und" when none was given).
+  const catchUpTag = input.argumentLanguageTag ?? "und";
   const catchUpLanguage: QuestionLanguage | null = input.envelopeBasis === undefined ? null
     : runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {
-      argumentLanguageTag: input.argumentLanguageTag ?? "und",
+      argumentLanguageTag: catchUpTag,
       argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
     });
   const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
-  // Length guidance: a catch-up review is sized like the run's own reviews, from the same receipt (never the row).
+  // Length guidance: a catch-up review is sized and told like the run's own reviews, from the same receipt (never the
+  // row), in the run's stored tag (Task 12 review 3).
   const catchUpLength = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis).length ?? null;
-  const catchUpGuide = catchUpLength === null ? {}
-    : { length: Object.freeze({ words: catchUpLength.steps.reviewer, languageCode: input.argumentLanguageTag ?? null,
-      charactersPerWord: catchUpLength.charactersPerWord }) };
+  const catchUpGuide = lengthGuideFrom(catchUpLength, "reviewer", catchUpTag);
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -5917,9 +5929,8 @@ export class WalkingSkeletonRunner {
      * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call of this run, spread into
      * the call's input; nothing without the receipt's `length` (today's request, byte for byte).
      */
-    const lengthGuideOf = (step: LengthGuidanceStep): Readonly<{ length?: LengthGuide }> => lengthGuidance === null ? {}
-      : { length: Object.freeze({ words: lengthGuidance.steps[step], languageCode: run.argumentLanguageTag,
-        charactersPerWord: lengthGuidance.charactersPerWord }) };
+    const lengthGuideOf = (step: LengthGuidanceStep): Readonly<{ length?: LengthGuide }> =>
+      lengthGuideFrom(lengthGuidance, step, run.argumentLanguageTag);
     /**
      * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
      * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a

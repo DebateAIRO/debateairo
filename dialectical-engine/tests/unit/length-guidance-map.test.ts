@@ -5,10 +5,11 @@ import {
   LENGTH_GUIDANCE_START, LENGTH_SENTENCE_PARTS, TypedDomainError, questionLanguageForBounds, replyLanguageExpectation
 } from "@debateai/kernel";
 import {
-  MAP_ANSWER_FORMS, MAP_CONTRACT_IDS, MAP_CONTRACT_NAMES, MAP_LENGTHED_REPLY_SCHEMAS, MAP_LENGTH_ANSWER_FORMS, MAP_LENGTH_CONTRACT_IDS,
-  MAP_LIMITS, MAP_RUNAWAY_LIMITS, mapAnglesReplySchema, mapAnglesSalvage, mapAnglesSalvageLengthed, mapClassifyReply,
-  mapContractNameOf, mapGuidedWords, mapListSalvage, mapListSalvageLengthed, mapListSpec, mapLimitsFor, mapPromptContractHash,
-  mapPromptContracts, mapPromptFingerprintText, mapReplySchemasFor, mapReplyWordsCeiling, type MapLength
+  MAP_ANSWER_FORMS, MAP_CONTRACT_IDS, MAP_CONTRACT_NAMES, MAP_DEFAULT_INSTRUCTIONS, MAP_LENGTHED_REPLY_SCHEMAS, MAP_LENGTH_ANSWER_FORMS,
+  MAP_LENGTH_CONTRACT_IDS, MAP_LIMITS, MAP_RUNAWAY_LIMITS, mapAnglesReplySchema, mapAnglesSalvage, mapAnglesSalvageLengthed,
+  mapAnglesSpec, mapClassifyReply, mapContractNameOf, mapGuidedWords, mapLengthContractsOf, mapListSalvage, mapListSalvageLengthed,
+  mapListSpec, mapLimitsFor, mapPromptContractHash, mapPromptContracts, mapPromptFingerprintText, mapReplySchemasFor,
+  mapReplyWordsCeiling, type MapLength
 } from "@debateai/map";
 import {
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_REQUEST_BODY_MAX_BYTES, buildFramedPrompt, previewModelRow,
@@ -50,6 +51,24 @@ describe("the map's length variants (spec §3.2, §3.9)", () => {
       expect(mapContractNameOf(MAP_CONTRACT_IDS[name])).toBe(name);
     }
     expect(mapContractNameOf("judge.panel.v1")).toBeNull();
+  });
+
+  // Task 14 review 3 (owner-editable prompts rule): an owner's edited map texts are never silently replaced on a lengthed run.
+  it("owner-edited texts: a lengthed call and the hash default build the variants from the SAME texts the run uses", () => {
+    const owners = mapPromptContracts({ ...MAP_DEFAULT_INSTRUCTIONS, angles: "Owner angles text.", listOpen: "Owner list text." });
+    const spec = mapAnglesSpec({ ...ctx(LENGTH), contracts: owners });
+    expect(spec.contract.contractId).toBe(MAP_LENGTH_CONTRACT_IDS.angles);
+    expect(spec.contract.instruction.startsWith(`Owner angles text. ${LENGTH_SENTENCE_PARTS}`)).toBe(true);
+    expect(spec.contract.answerForm).toBe(MAP_LENGTH_ANSWER_FORMS.angles);
+    expect(mapListSpec({ ...ctx(LENGTH), contracts: owners }, null).contract.instruction.startsWith(`Owner list text. ${LENGTH_SENTENCE_PARTS}`))
+      .toBe(true);
+    // Without the row the owners' own contract, as today.
+    expect(mapAnglesSpec({ ...ctx(), contracts: owners }).contract.instruction.startsWith("Owner angles text.\n\n")).toBe(true);
+    // The hash default seals the owners' variants beside the owners' texts; the shipped default is unchanged.
+    expect(mapPromptFingerprintText(owners)).toBe([...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(owners[name])),
+      ...MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(mapLengthContractsOf(owners)[name]))].join("\n---\n"));
+    expect(mapLengthContractsOf(mapPromptContracts())).toEqual(mapPromptContracts(undefined, true));
+    expect(mapPromptContractHash(owners)).not.toBe(mapPromptContractHash());
   });
 
   it("the map seal is today's seven, then the seven variants", () => {

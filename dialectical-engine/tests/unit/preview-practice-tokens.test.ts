@@ -111,6 +111,38 @@ describe("guided and actual words per AI and step", () => {
   });
 });
 
+describe("follow-up tries stay out of the words (salvage interaction ruling; whole-branch review M2)", () => {
+  it("a judge PATCH try and a FULL follow-up are left out of guided, accepted, actual and over; ORIGINAL and LENGTH_RETRY count as today", () => {
+    const rows = practiceLengthRows([
+      attempt({ actualWords: 300, guidedWords: 250 }),
+      attempt({ callSiteKey: "JUDGE:critic:n2", replyForm: "LENGTH_RETRY", actualWords: 400, guidedWords: 250 }),
+      // A follow-up's actual words count only the fragment it sent back, beside the original request's guided words.
+      attempt({ callSiteKey: "JUDGE:critic:n3", replyForm: "PATCH", actualWords: 40, guidedWords: 900 }),
+      attempt({ callSiteKey: "JUDGE:critic:n4", replyForm: "FULL", actualWords: 30, guidedWords: 900 })
+    ]);
+    expect(rows).toEqual([{ model: DEEPSEEK, step: "pros_cons", guidedWords: 250, accepted: 2,
+      actualWords: { median: 300, p90: 400, max: 400 }, overGuidedShare: 1, runawayStops: 0, slips: 0 }]);
+  });
+
+  it("a map PATCH try is left out too; the map row keeps its ORIGINAL try's words", () => {
+    const rows = practiceLengthRows([
+      attempt({ callSiteKey: "MAP:list:1", guidedWords: 70, actualWords: 400 }),
+      attempt({ callSiteKey: "MAP:list:2", replyForm: "PATCH", guidedWords: 70, actualWords: 12 })
+    ]);
+    expect(rows).toEqual([expect.objectContaining({ model: DEEPSEEK, step: "map", guidedWords: 70, accepted: 1,
+      actualWords: { median: 400, p90: 400, max: 400 }, overGuidedShare: null })]);
+  });
+
+  it("a follow-up try's cut-off and slip still count (they are about the reply's form, not its words)", () => {
+    const rows = practiceLengthRows([
+      attempt({ actualWords: 300, guidedWords: 250 }),
+      attempt({ callSiteKey: "JUDGE:critic:n2", replyForm: "PATCH", outcome: "FAILED", parseStatus: "PARSE_FAILED", finishReason: "length",
+        actualWords: null })
+    ]);
+    expect(rows).toEqual([expect.objectContaining({ accepted: 1, runawayStops: 1, slips: 1 })]);
+  });
+});
+
 describe("formats: each try keeps its bound and its thinking level (pre-flight PF-B4.3)", () => {
   it("copies the stored token_ceiling and the ledger's thinking level onto samples.jsonl's attempts; null without them", () => {
     const at = new Date(0);

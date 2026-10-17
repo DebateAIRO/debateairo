@@ -164,14 +164,15 @@ export interface ConformanceJudgement {
 }
 
 /**
- * M8 (controller ruling, P2a final review): the answer read's `cost_envelope.basis` without the receipt's debate-shape
- * member. Least disclosure: the member names the asker's plan and the plan's sizes and thresholds, and nothing public
- * needs them. A copy without `shape`, every other member as stored; a basis with no `shape` member is returned as the
- * same object, so today's answer body is byte for byte what it was.
+ * M8 (controller ruling, P2a final review) and the R1d PF-D2.3 ruling: the answer read's `cost_envelope.basis` without
+ * the receipt's debate-shape member and without its length-guidance member. Least disclosure: those members name the
+ * asker's plan and the plan's sizes, thresholds and internal length settings, and nothing public needs them. A copy
+ * without `shape` and `length`, every other member as stored; a basis with neither member is returned as the same
+ * object, so today's answer body is byte for byte what it was.
  */
 export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  if (!Object.hasOwn(basis, "shape")) return basis;
-  const { shape: _shape, ...shown } = basis;
+  if (!Object.hasOwn(basis, "shape") && !Object.hasOwn(basis, "length")) return basis;
+  const { shape: _shape, length: _length, ...shown } = basis;
   return shown;
 }
 

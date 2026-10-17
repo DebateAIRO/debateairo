@@ -244,8 +244,9 @@ function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFa
   return first;
 }
 
-function recheckMapReply(callSiteKey: string, content: string): readonly string[] {
-  const read = readMapReply(callSiteKey, content, undefined, null);
+/** `lengthed`: the call was asked under a map length variant, so its reply is re-checked under the lengthed limits (Task 14 review 4). */
+function recheckMapReply(callSiteKey: string, content: string, lengthed: boolean): readonly string[] {
+  const read = readMapReply(callSiteKey, content, undefined, null, lengthed);
   return read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification);
 }
 
@@ -403,9 +404,11 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
  * check's length rule needs the number of edges: `reviewEdgeCount` (read from the call's own prompt,
  * `practiceReviewEdgeCountOf`) when the caller has it, else the reply's own `edge_bearings` length, so only a length
  * mismatch is not re-detected (the stored detail still names it); a reply with no list and no known count is not read
- * as [] (MiMo salvage EMPTY_LIST needs a node with no edges).
+ * as [] (MiMo salvage EMPTY_LIST needs a node with no edges). `mapLengthed`: a map call asked under a length variant
+ * (`practiceMapLengthedOf`), re-checked under the lengthed limits as the live call read it.
  */
-export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
+export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null,
+  mapLengthed = false): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
   // LG-A (L32): a structure-repair try is checked as the step it repairs; its own family stays STRUCTURE_REPAIR.
   const key = structureRepairOriginalKey(callSiteKey);
@@ -432,7 +435,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       if (fixed !== null && StoryBodySchema.safeParse(fixed.value).success) return { family, issues: Object.freeze([]) };
       return { family, issues: fromZod(read) };
     }
-    case "MAP": return { family, issues: recheckMapReply(key, content) };
+    case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }

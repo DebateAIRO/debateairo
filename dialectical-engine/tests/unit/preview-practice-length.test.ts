@@ -7,6 +7,8 @@ import {
   practiceLengthOverrideFromArgs
 } from "../../tools/preview-practice/practice-length.js";
 import { parsePracticeRegisterExport, practiceOverrideVersionRows } from "../../tools/preview-practice/practice-register-import.js";
+import { recheckReply } from "../../tools/preview-practice/practice-lanes.js";
+import { MAP_LIMITS, MAP_RUNAWAY_LIMITS } from "@debateai/map";
 
 const START_TEXT = readFileSync(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url), "utf8");
 const flags = (entries: Record<string, string>) => new Map(Object.entries(entries));
@@ -92,5 +94,28 @@ describe("report.md's length paragraph (pre-flight PF-C4.5)", () => {
       unreadable: "FACTS_UNREADABLE:X" });
     expect(practiceLengthBlockLines(unread)).toEqual(["Length guidance (from the imported register's own row, version 5):", "",
       "- frozen on the run: none (FACTS_UNREADABLE:X)", ""]);
+  });
+});
+
+// Task 14 review 4: a refused reply of a call asked under a map length variant is re-checked under the lengthed limits.
+describe("the practice re-check reads a lengthed map reply under the lengthed limits", () => {
+  const list = (claim: string) => JSON.stringify({ points: [1, 2, 3].map(() => ({ claim, why_it_matters: "w", leans: "context" })),
+    candidate_answers: ["Yes."] });
+
+  it("a claim past the runaway limit: the lengthed re-check names it", () => {
+    const runaway = list("x".repeat(MAP_RUNAWAY_LIMITS.claimMaxChars + 1));
+    expect(recheckReply("MAP:list:1", runaway, null, true).issues).toContain("too_big@points.0.claim");
+  });
+
+  it("a claim past today's limit but within the runaway limit: accepted by the lengthed re-check, refused by today's", () => {
+    const longer = list("y".repeat(MAP_LIMITS.claimMaxChars + 50));
+    expect(MAP_LIMITS.claimMaxChars + 50).toBeLessThanOrEqual(MAP_RUNAWAY_LIMITS.claimMaxChars);
+    expect(recheckReply("MAP:list:1", longer, null, true)).toEqual({ family: "MAP", issues: [] });
+    expect(recheckReply("MAP:list:1", longer).issues).toContain("too_big@points.0.claim");
+  });
+
+  it("the debate report passes the call's own lengthed reading to the re-check", () => {
+    const source = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(source).toContain("await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),\n          await mapLengthedOf(entry.attempt_id, entry.call_site_key)).issues");
   });
 });
