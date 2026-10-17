@@ -77,6 +77,7 @@ import {
   costEnvelopeBand,
   costEnvelopeCeilings,
   debateShapeInForce,
+  engineInForce,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readBillingPlans,
@@ -86,6 +87,7 @@ import {
   readDebateShapePolicy,
   readDeploymentRiskTier,
   readEngineVersion,
+  readEngineVersionPolicy,
   readEnvelopeFormulaInputs,
   readJudgeTokenCeiling,
   lengthGuidedFirstCallCeiling,
@@ -100,12 +102,14 @@ import {
   type LengthGuidancePolicy
 } from "@debateai/register";
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
+import { assertEngineHasLengthPolicy } from "../../apps/api/src/engine-ask.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
+import { practicePinsRequireRotation, practiceRotationCountsWithPins, type PracticeWriterPins } from "./practice-pins.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
 /** The read-only "what is left today" answer of each gate, over the forwarded sockets. */
@@ -272,6 +276,8 @@ export async function composePracticeAsk(input: Readonly<{
   log?: (line: string) => void;
   /** Question language (P2d's report): each lock or offer the decider makes. Never wired to a logger. */
   onQuestionLanguage?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
+  /** Pinned final writers (R1d, `--answer-writer-model`, `--storyteller-model`): steer the rotation's counts, never the pin table. */
+  pins?: PracticeWriterPins;
 }>) {
   const { pool, settings } = input;
   const version = settings.runner.REGISTER_VERSION;
@@ -322,6 +328,11 @@ export async function composePracticeAsk(input: Readonly<{
   const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
   // Length guidance (spec 2026-10-15 §3.1): as main.ts reads it.
   const lengthGuidancePolicy = await readLengthGuidancePolicy(pool, version);
+  // Engine redesign (R1d), as main.ts: the row, the boot rule (in force without the length row refuses), and the row in
+  // force for the ask side. The throwaway practice register is the only place the practice writes it (Task 20).
+  const engineVersionPolicy = await readEngineVersionPolicy(pool, version);
+  const engineInForcePolicy = engineInForce(engineVersionPolicy);
+  assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy);
   // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
   // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
   // blind-index key here, so the check reference key is per process. The same in hosted mode: the hosted preview still
@@ -363,6 +374,8 @@ export async function composePracticeAsk(input: Readonly<{
   }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
+  // Pinned final writers (R1d): they work through the rotation; refused with the rotation off, before any AI is asked.
+  if (input.pins !== undefined) practicePinsRequireRotation(input.pins, answerRoleRotation.state === "ON");
   const runSettings: RunCreationSettings = {
     previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
     previewBudgetGate,
@@ -378,9 +391,16 @@ export async function composePracticeAsk(input: Readonly<{
         }),
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
-    ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+    // Pinned final writers (R1d, INTERFACE §15.2, counts mechanism): the counts the rotation reads give the pinned model
+    // share 0 in its role and every other preview model share 1, so the rotation's own rule picks it when it is on the
+    // panel; the checkers still come from another maker. Without a pin: main.ts's own counts, unchanged.
+    ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: async () => {
+      const counts = await readRoleRotationCounts(pool);
+      return input.pins === undefined ? counts : practiceRotationCountsWithPins(counts, input.pins, previewConfig.premium_model_ids);
+    } } } : {}),
     ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
     ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
+    ...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
       ...structuralInputs,
@@ -396,7 +416,8 @@ export async function composePracticeAsk(input: Readonly<{
       maxDepth: envelopeFormulaInputs.maxDepth,
       backupSequencesProvisioned: basis.backupSequencesProvisioned,
       ...(basis.shape === null ? {} : { shape: basis.shape }),
-      ...(basis.length === null ? {} : { length: basis.length })
+      ...(basis.length === null ? {} : { length: basis.length }),
+      ...(basis.engine === null ? {} : { engine: basis.engine })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

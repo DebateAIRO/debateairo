@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   OpenAICompatibleProviderGateway,
+  PREVIEW_STORY_REPAIR_CONTRACT_IDS,
   buildFramedPrompt,
   buildFramedRepairPrompt,
   createPreviewGuardedFetch,
@@ -17,7 +18,15 @@ import {
   type ProviderLedgerInput,
   type RawArtifactInput
 } from "@debateai/providers";
-import { classifyStoryContent, type StoryMaterialIndex } from "@debateai/story";
+import {
+  STORYTELLER_CONTRACT_ID,
+  STORYTELLER_V4_CONTRACT_ID,
+  STORY_CHECKER_CONTRACT_ID,
+  STORY_CHECKER_V4_CONTRACT_ID,
+  buildStoryRevisionPrompt,
+  classifyStoryContent,
+  type StoryMaterialIndex
+} from "@debateai/story";
 
 const MODEL = "zai-org/GLM-5.3-Flash";
 const ENDPOINT = "https://api.deepinfra.com/v1/openai";
@@ -152,7 +161,8 @@ describe("preview storyteller v3 safe repair allowance", () => {
     ["checker contract", () => storyRequest("story.checker.v1")],
     ["previous checker v2 contract", () => storyRequest("story.checker.v2")],
     ["current checker contract on the storyteller's site", () => storyRequest("story.checker.v3")],
-    ["unknown storyteller version", () => storyRequest("story.storyteller.v4")],
+    // Story v4 (R1d, absorbing LG-D): v4 is a current version now; the first unknown one is v5.
+    ["unknown storyteller version", () => storyRequest("story.storyteller.v5")],
     ...[undefined, null, "classifier"].map(classifyContent => [
       `noncallable classifier ${String(classifyContent)}`,
       () => ({ ...storyRequest(), classifyContent } as unknown as ProviderCallRequest)
@@ -281,5 +291,59 @@ describe("preview storyteller v3 safe repair allowance", () => {
     expect(executions).toHaveLength(1);
     expect(charges).toHaveLength(1);
     expect(ledger.map(entry => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * Story v4 (engine redesign R1d, absorbing LG-D Task 6; spec 2026-10-15 §7.4): an engine-2 debate asks with story
+ * contracts v4. The preview's repair try was allowed only for the literal v3 ids, so without this a v4 story would
+ * silently lose it. A round-2 revision request (the storyteller's own draft as its turn, Task 14) keeps it too.
+ */
+describe("story v4: the preview's story repair check accepts contracts v4", () => {
+  const checkerSite = (contractId: string): ProviderCallRequest =>
+    ({ ...storyRequest(contractId), callSiteKey: "STORY:CHECKER:1", role: "EVALUATOR" } as ProviderCallRequest);
+
+  it("lists the two current versions of each story contract, and the story package's own ids are in it", () => {
+    expect(PREVIEW_STORY_REPAIR_CONTRACT_IDS).toEqual(["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4"]);
+    for (const id of [STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID]) {
+      expect(PREVIEW_STORY_REPAIR_CONTRACT_IDS).toContain(id);
+    }
+  });
+
+  it("a v4 storyteller request keeps exactly what a v3 request keeps: its repair try, its bound and its repair level", async () => {
+    const v3 = await forwarded(storyRequest("story.storyteller.v3"));
+    const v4 = await forwarded(storyRequest("story.storyteller.v4"));
+    const v5 = await forwarded(storyRequest("story.storyteller.v5"));
+    expect({ attempts: v4.maxAttemptsThisCall, bound: v4.bound, repairLevel: v4.repairThinkingLevel })
+      .toEqual({ attempts: v3.maxAttemptsThisCall, bound: v3.bound, repairLevel: v3.repairThinkingLevel });
+    // Not vacuous: an unknown version really is treated differently.
+    expect(v5.maxAttemptsThisCall).toBeLessThan(v4.maxAttemptsThisCall!);
+  });
+
+  it("a v4 checker request on the checker's site keeps exactly what a v3 checker request keeps", async () => {
+    const v3 = await forwarded(checkerSite("story.checker.v3"));
+    const v4 = await forwarded(checkerSite("story.checker.v4"));
+    expect({ attempts: v4.maxAttemptsThisCall, bound: v4.bound }).toEqual({ attempts: v3.maxAttemptsThisCall, bound: v3.bound });
+    expect(v4.maxAttemptsThisCall).toBeGreaterThan(1);
+  });
+
+  it("a v4 round-2 revision request (own draft as the model's turn) keeps the storyteller's repair try", async () => {
+    const revision = buildStoryRevisionPrompt({
+      contract: { contractId: "story.storyteller.v4", instruction: "Write the synthetic policy story.", answerForm: "Return one JSON object." },
+      material: [{ name: "story_material", content: "One policy position, cited as P1." }],
+      ownDraft: story(),
+      problems: "The headline states the finding as settled."
+    });
+    const roundTwo = { ...storyRequest("story.storyteller.v4"), callSiteKey: "STORY:STORYTELLER:2", packet: revision.packet } as ProviderCallRequest;
+    const v3 = await forwarded(storyRequest("story.storyteller.v3"));
+    expect((await forwarded(roundTwo)).maxAttemptsThisCall).toBe(v3.maxAttemptsThisCall);
+    expect(v3.maxAttemptsThisCall).toBeGreaterThan(1);
+  });
+
+  it.each([
+    ["the v4 checker id on the storyteller's site", () => storyRequest("story.checker.v4")],
+    ["the v4 storyteller id on the checker's site", () => checkerSite("story.storyteller.v4")]
+  ] as const)("%s keeps one attempt per call", async (_name, makeRequest) => {
+    expect((await forwarded(makeRequest())).maxAttemptsThisCall).toBe(1);
   });
 });

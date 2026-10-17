@@ -109,6 +109,7 @@ apps/api/src/email-mfa-mail.ts
 apps/api/src/email-mfa-recovery.ts
 apps/api/src/email-mfa-risk.ts
 apps/api/src/email-mfa-routes.ts
+apps/api/src/engine-ask.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
@@ -334,6 +335,8 @@ apps/runner/src/dev-support-config.ts
 apps/runner/src/dev-support-model.ts
 apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
+apps/runner/src/engine-boot.ts
+apps/runner/src/engine-contracts.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts
 apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
@@ -946,6 +949,7 @@ packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
+packages/kernel/src/engine.ts
 packages/kernel/src/index.ts
 packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
@@ -1047,7 +1051,9 @@ packages/register/src/country-policy.ts
 packages/register/src/debate-shape-ceiling.ts
 packages/register/src/debate-shape-policy.ts
 packages/register/src/email-mfa-policy.ts
+packages/register/src/engine-contract-hash.ts
 packages/register/src/engine-shape.ts
+packages/register/src/engine-version-policy.ts
 packages/register/src/index.ts
 packages/register/src/internal-allowance-policy.ts
 packages/register/src/length-guidance-policy.ts
@@ -1081,9 +1087,11 @@ packages/serve/src/index.ts
 packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
+packages/story/src/backup.ts
 packages/story/src/contracts.ts
 packages/story/src/enrichment.ts
 packages/story/src/index.ts
+packages/story/src/length.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts
 packages/story/src/pack.ts

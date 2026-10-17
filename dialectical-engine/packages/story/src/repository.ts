@@ -21,6 +21,7 @@ import {
   type RunOwnershipAccess
 } from "@debateai/db";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
+import { STORY_BACKUP_SIGNALS, STORY_BACKUP_USED, type StoryBackupRecord } from "./backup.js";
 
 /**
  * THE STORY ROW (migration 0074, spec §7). Insert-once per answer version, and
@@ -61,6 +62,12 @@ export interface StoryRecordInput {
    * attestation, like `rounds`.
    */
   readonly storytellerRepairs: number | null;
+  /**
+   * Engine redesign R1d (spec 2026-10-15 §7.2 item 11; INTERFACE §5.3, deviation 13): set only when the first storyteller
+   * really could not provide the story and a backup storyteller wrote it (whatever that story's outcome). Sealed with the
+   * content (no migration, no readable column); absent on every other story and on every row written before R1d.
+   */
+  readonly backup?: StoryBackupRecord;
 }
 
 export interface StoredStory extends StoryRecordInput {
@@ -74,12 +81,21 @@ const PG_INTEGER_MAX = 2_147_483_647;
 /** Migration 0114: `serve.answer_story.storyteller_repairs` is NULL or 0..32. */
 const STORYTELLER_REPAIRS_MAX = 32;
 
+/** The backup storyteller's record (R1d): strict, so nothing but the code, the signal and the first model is stored. */
+const StoredStoryBackupSchema = z.object({
+  code: z.literal(STORY_BACKUP_USED),
+  signal: z.enum(STORY_BACKUP_SIGNALS),
+  firstModel: z.string().min(1)
+}).strict();
+
 const StoredStoryContentSchema = z.object({
   body: StoryBodySchema.nullable(),
   reservation: z.string().nullable(),
   verdictBasis: StoryVerdictBasisSchema.nullable(),
   pointNumbers: z.record(z.string().min(1), z.string().regex(/^P[1-9][0-9]*$/u)).nullable(),
-  languageTag: StoryLanguageTagSchema.nullable()
+  languageTag: StoryLanguageTagSchema.nullable(),
+  // R1d: optional, so every row sealed before it (no member) still parses; a story without a backup writes none.
+  backup: StoredStoryBackupSchema.optional()
 }).strict();
 
 type StoredStoryContent = z.infer<typeof StoredStoryContentSchema>;
@@ -181,7 +197,9 @@ export class StoryRepository {
       reservation: record.reservation,
       verdictBasis: record.verdictBasis,
       pointNumbers: record.pointNumbers,
-      languageTag: record.languageTag
+      languageTag: record.languageTag,
+      // R1d: only when set, so a story without a backup seals exactly today's content.
+      ...(record.backup === undefined ? {} : { backup: record.backup })
     });
     if (!parsed.success) {
       const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "content")))];
@@ -333,6 +351,7 @@ export class StoryRepository {
           pointNumbers: content.data.pointNumbers === null ? null : Object.freeze({ ...content.data.pointNumbers }),
           languageTag: content.data.languageTag,
           storytellerRepairs: row.storyteller_repairs,
+          ...(content.data.backup === undefined ? {} : { backup: Object.freeze({ ...content.data.backup }) }),
           createdAt: row.created_at
         };
         return Object.freeze(stored);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "@debateai/db";
-import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, argumentLanguageDirective, questionLanguageSentence } from "@debateai/kernel";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, argumentLanguageDirective, proseWordCount, questionLanguageSentence } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -8,18 +8,34 @@ import {
   type ProviderCallRequest,
   type ProviderGateway
 } from "@debateai/providers";
-import { lengthGuidancePolicyStartValues, resolveLengthGuidance, type StoryPolicy } from "@debateai/register";
+import {
+  engineSettingsOf,
+  engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues,
+  resolveLengthGuidance,
+  type StoryPolicy
+} from "@debateai/register";
 import {
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
+  STORY_BACKUP_UNAVAILABLE,
+  STORY_BACKUP_USED,
   STORY_CHECKER_CONTRACT_ID,
+  STORY_CHECKER_V4_CONTRACT_ID,
   STORYTELLER_CONTRACT_ID,
+  STORYTELLER_V4_CONTRACT_ID,
   StoryWriter,
   buildStoryCheckerContract,
   buildStorytellerContract,
   loadStoryPack,
   resolveStoryPackDir,
+  storyCheckerLengthField,
   storyContractHash,
   storyContractInArgumentLanguage,
+  storyGuidedBound,
+  storyGuidedWords,
+  storyLengthField,
+  type StoryBackupCandidate,
+  type StoryCostFallback,
   type StoryNodeEnrichment,
   type StoryRecordInput,
   type StoryStepLease,
@@ -1187,5 +1203,550 @@ describe("StoryWriter — the debate shape's map fields (debate shape P2c)", () 
     const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "pro", answerLength: "standard" });
     expect(await sentClaim({ lengthGuidance: guidance })).toBe(claim);
     expect(Array.from(await sentClaim({})).length).toBeLessThanOrEqual(240);
+  });
+});
+
+/**
+ * Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5; R1d decisions 1-5; absorbs LG-D Task 4). The story is told v4
+ * exactly when the run's receipt carries engine 2 AND its length table: contracts v4, one shape set by code, a `length`
+ * field after the material and before the language field, allowances and guided words from the table, round 2 only for
+ * a misleading problem and as a revision of its own draft, and a backup storyteller on four signals. The engine alone
+ * keeps today's v3 story; the length table alone keeps v3 except that also-raised claims are sent whole (LG-C2, L19).
+ */
+describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => {
+  const GUIDANCE = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });
+  const ENGINE = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 3, mapOpening: false });
+  const V4: StoryWriteInput = Object.freeze<StoryWriteInput>({ ...SNAPSHOT, engine: ENGINE, lengthGuidance: GUIDANCE });
+  const CRITERIA = Object.freeze({
+    faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true,
+    no_overstatement: true, citations_correct: true, reviewer_note_separate: true,
+    goal_marked_as_reading: true, speaks_to_the_person: true
+  });
+  const CHECKER_V4_SATISFIED = JSON.stringify({ satisfied: true, misleading: false, objection: null, criteria: CRITERIA });
+  const WORDING_NOTE = "The headline could name the open cost question more plainly.";
+  const CHECKER_V4_WORDING = JSON.stringify({ satisfied: false, misleading: false, objection: WORDING_NOTE, criteria: CRITERIA });
+  const MISLEADING = "The summary presents the disputed cost point (P2) as settled.";
+  const CHECKER_V4_MISLEADING = JSON.stringify({
+    satisfied: false, misleading: true, objection: MISLEADING,
+    criteria: { ...CRITERIA, faithful_to_material: false, no_overstatement: false }
+  });
+  const contractOf = (request: ProviderCallRequest): string => readPromptFrame(request.packet).contractId;
+  /** The v4 storyteller writes no shape_id (decision 2): code sets it on the decoded body. */
+  const storyV4 = (): string => {
+    const parsed = JSON.parse(story()) as Record<string, unknown>;
+    delete parsed.shape_id;
+    return JSON.stringify(parsed);
+  };
+  /** v3 calls get today's replies; v4 calls get v4 replies, the checker's as given. */
+  const answering = (checkerReply: string) => (request: ProviderCallRequest): string => {
+    const contract = contractOf(request);
+    if (contract === STORYTELLER_V4_CONTRACT_ID) return storyV4();
+    if (contract === STORYTELLER_CONTRACT_ID) return story();
+    return contract === STORY_CHECKER_V4_CONTRACT_ID ? checkerReply : CHECKER_SATISFIED;
+  };
+  const names = (request: ProviderCallRequest): string[] => readPromptFrame(request.packet).fields.map((field) => field.name);
+  const fieldOf = (request: ProviderCallRequest, name: string): string | undefined =>
+    readPromptFrame(request.packet).fields.find((field) => field.name === name)?.content;
+  const systemOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
+
+  it("row absent: today's contracts, no length field, the policy's own bound objects, no guided or actual words", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]?.outcome).toBe("READY");
+    const [teller, checker] = calls;
+    expect(contractOf(teller!)).toBe(STORYTELLER_CONTRACT_ID);
+    expect(contractOf(checker!)).toBe(STORY_CHECKER_CONTRACT_ID);
+    for (const request of calls) {
+      expect(names(request)).not.toContain("length");
+      expect(Object.hasOwn(request, "guidedWords")).toBe(false);
+      expect(Object.hasOwn(request, "actualWordsOf")).toBe(false);
+    }
+    expect(teller!.bound).toBe(POLICY.storytellerBound);
+    expect(checker!.bound).toBe(POLICY.checkerBound);
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+  });
+
+  // Pre-flight PF-D6.3 (controller ruling): the snapshot carries an also-raised claim longer than today's 240-character
+  // clip, so the case really checks the one difference the length row makes to a v3 story (LG-C2 Task 15, ruling L19).
+  const LONG_RAISED = "A payroll pilot in one office found costs flat for a full year, and the staff survey backed it. ".repeat(7).trim();
+  const RAISED: StoryWriteInput = Object.freeze<StoryWriteInput>({
+    ...SNAPSHOT, alsoRaised: Object.freeze([Object.freeze({ claim: LONG_RAISED, raisedBy: 1 })])
+  });
+  const raisedClaims = (request: ProviderCallRequest): string[] =>
+    (JSON.parse(fieldOf(request, "also_raised") ?? "[]") as { claim: string }[]).map((item) => item.claim);
+  const withoutRaised = (request: ProviderCallRequest) =>
+    readPromptFrame(request.packet).fields.filter((field) => field.name !== "also_raised");
+
+  it("the engine alone keeps the v3 story; the length table alone keeps v3 except that also-raised claims are sent whole", async () => {
+    expect(Array.from(LONG_RAISED).length).toBeGreaterThan(240);
+    const today = scripted(answering(CHECKER_V4_SATISFIED));
+    await harness(providing(today.provider)).writer.writeAfterSettle(RAISED);
+    // Without the row: today's 240-character clip, in both calls.
+    for (const before of today.calls) {
+      expect(raisedClaims(before)).toHaveLength(1);
+      expect(Array.from(raisedClaims(before)[0]!).length).toBeLessThanOrEqual(240);
+    }
+    for (const [lonely, whole] of [[{ ...RAISED, lengthGuidance: GUIDANCE }, true], [{ ...RAISED, engine: ENGINE }, false]] as const) {
+      const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+      const { writer, inserted } = harness(providing(provider));
+      await writer.writeAfterSettle(lonely);
+      expect(inserted[0]?.outcome).toBe("READY");
+      expect(calls.map(contractOf)).toEqual([STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID]);
+      calls.forEach((request, index) => {
+        const before = today.calls[index]!;
+        // Every other field as today, in today's order; the also-raised claim whole with the row, clipped without it.
+        expect(withoutRaised(request)).toEqual(withoutRaised(before));
+        expect(names(request)).toEqual(names(before));
+        expect(raisedClaims(request)).toEqual(whole ? [LONG_RAISED] : raisedClaims(before));
+        expect(request.contractHash).toBe(before.contractHash);
+        expect(names(request)).not.toContain("length");
+        expect(Object.hasOwn(request, "guidedWords")).toBe(false);
+        expect(Object.hasOwn(request, "actualWordsOf")).toBe(false);
+      });
+      expect(calls[0]!.bound).toBe(POLICY.storytellerBound);
+      expect(calls[1]!.bound).toBe(POLICY.checkerBound);
+    }
+  });
+
+  it("engine 2 with the table: contracts v4, the length field last, no shape_id asked, the shape stored by code", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer, inserted, events } = harness(providing(provider));
+    await writer.writeAfterSettle(V4);
+    expect(calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    const [teller, checker] = calls;
+    expect(contractOf(teller!)).toBe(STORYTELLER_V4_CONTRACT_ID);
+    expect(contractOf(checker!)).toBe(STORY_CHECKER_V4_CONTRACT_ID);
+    expect(names(teller!).at(-1)).toBe("length");
+    expect(names(checker!).slice(-2)).toEqual(["candidate_story", "length"]);
+    // The writer passes the run's language tag (L2): "ro" counts in words.
+    expect(fieldOf(teller!, "length")).toBe(storyLengthField(GUIDANCE.story, "ro", GUIDANCE.charactersPerWord).content);
+    expect(fieldOf(checker!, "length")).toBe(
+      storyCheckerLengthField(GUIDANCE.story, GUIDANCE.steps.story_checker, "ro", GUIDANCE.charactersPerWord).content);
+    // One shape by code (decision 2): the v4 form's empty template, and nothing asks the model for a shape id.
+    expect(systemOf(teller!)).toContain('{"short"');
+    expect(systemOf(teller!)).not.toContain("shape_id");
+    // Tries stay 2 (ruling L35); only the token ceiling moves, as Task 11's function computes it.
+    expect(teller!.bound).toEqual(storyGuidedBound(POLICY.storytellerBound, "STORYTELLER", GUIDANCE));
+    expect(checker!.bound).toEqual(storyGuidedBound(POLICY.checkerBound, "CHECKER", GUIDANCE));
+    expect(teller!.bound.maxAttempts).toBe(2);
+    expect(teller!.guidedWords).toBe(storyGuidedWords(GUIDANCE.story));
+    expect(checker!.guidedWords).toBe(GUIDANCE.steps.story_checker);
+    expect(Object.hasOwn(checker!, "actualWordsOf")).toBe(false);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 1, reservation: null, shapeId: "general" });
+    expect(PACK.defaultShape).toBe("general");
+    expect(inserted[0]?.body?.shape_id).toBe("general");
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(events).not.toContain("STORY_WORDING_NOTE_ONLY");
+  });
+
+  it("the writer passes the run's language tag to the length field: a Chinese run is told characters", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...V4, argumentLanguage: { tag: "zh", name: "Chinese" } });
+    expect(fieldOf(calls[0]!, "length")).toBe(storyLengthField(GUIDANCE.story, "zh", GUIDANCE.charactersPerWord).content);
+    expect(fieldOf(calls[0]!, "length")).toContain("characters");
+  });
+
+  it("a locked run: length, then question_language last", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...V4, questionLine: "Ar trebui echipa sa adopte saptamana de lucru de patru zile?",
+      argumentLanguage: { tag: "ro", name: "Romanian" }, languageLocked: true });
+    expect(names(calls[0]!).slice(-2)).toEqual(["length", "question_language"]);
+  });
+
+  it("counts the storyteller's actual words over its short version and its reasons, never the long version", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    const { writer } = harness(providing(provider));
+    await writer.writeAfterSettle(V4);
+    const count = calls[0]!.actualWordsOf!;
+    const parsed = JSON.parse(storyV4()) as { short: unknown; why: unknown };
+    expect(count(storyV4())).toBe(proseWordCount({ short: parsed.short, why: parsed.why }, GUIDANCE.charactersPerWord));
+    expect(count(storyV4())!).toBeGreaterThan(0);
+    expect(count(storyV4())!).toBeLessThan(proseWordCount(parsed, GUIDANCE.charactersPerWord));
+    expect(count("not json at all")).toBeNull();
+  });
+
+  it("a wording note only: READY after one round, no reservation, logged by code and round alone", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_WORDING));
+    const { writer, inserted, details } = harness(providing(provider));
+    await writer.writeAfterSettle(V4);
+    expect(calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null, rounds: 1, reservation: null });
+    expect(details.filter((detail) => detail.event === "STORY_WORDING_NOTE_ONLY")).toEqual([{
+      event: "STORY_WORDING_NOTE_ONLY", answerId: SNAPSHOT.answerId, answerVersion: 1, round: 1
+    }]);
+    expect(JSON.stringify(details)).not.toContain(WORDING_NOTE);
+  });
+
+  it("a misleading problem: round 2 is a fresh call that revises its own draft, with no prior_objection field", async () => {
+    const { provider, calls } = scripted((request) => contractOf(request) === STORY_CHECKER_V4_CONTRACT_ID
+      ? (request.callSiteKey === "STORY:CHECKER:1" ? CHECKER_V4_MISLEADING : CHECKER_V4_SATISFIED)
+      : storyV4());
+    const { writer, inserted, events } = harness(providing(provider));
+    await writer.writeAfterSettle(V4);
+    expect(calls.map((call) => call.callSiteKey))
+      .toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1", "STORY:STORYTELLER:2", "STORY:CHECKER:2"]);
+    const first = calls[0]!;
+    const second = calls[2]!;
+    expect(contractOf(second)).toBe(STORYTELLER_V4_CONTRACT_ID);
+    // The round-1 material unchanged (it caches), then exactly the revision block's fields.
+    expect(names(second)).toEqual([...names(first), "revision_problems", "machine_reply_form"]);
+    expect(readPromptFrame(second.packet).fields.slice(0, names(first).length)).toEqual(readPromptFrame(first.packet).fields);
+    expect(names(second)).not.toContain("prior_objection");
+    expect(fieldOf(second, "revision_problems")).toContain(MISLEADING);
+    expect(fieldOf(second, "machine_reply_form")).toBe("REVISION");
+    // The accepted round-1 draft as the model's own turn: v4 member order, no shape_id.
+    const own = second.packet.messages.filter((message) => message.role === "assistant");
+    expect(own).toHaveLength(1);
+    const draft = JSON.parse(own[0]!.content) as Record<string, unknown>;
+    expect(Object.keys(draft)).toEqual(["short", "why", "reviewer_note", "long"]);
+    expect(draft.short).toEqual((JSON.parse(storyV4()) as { short: unknown }).short);
+    // A fresh fence, as every new call has (owner answer Q3 of the length plans).
+    expect(readPromptFrame(second.packet).fence).not.toBe(readPromptFrame(first.packet).fence);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null, rounds: 2, reservation: null });
+    expect(events).not.toContain("STORY_WORDING_NOTE_ONLY");
+  });
+
+  const FIRST = POLICY.storytellerRoleRef;
+  const CHECKER = POLICY.storyCheckerRoleRef;
+  const TWIN = "provider:twin";
+  const BACKUP = "provider:backup";
+  /**
+   * The first storyteller (maker-a), the checker (maker-b), a second ref of the first storyteller's maker (never picked),
+   * and the backup (maker-c), handed over in that order as the runner hands its panel.
+   */
+  function backupWorld(input: Readonly<{
+    first: (request: ProviderCallRequest) => string | Error;
+    backup?: (request: ProviderCallRequest) => string | Error;
+    checkerReply?: string;
+  }>) {
+    const first = scripted(input.first);
+    const checker = scripted(answering(input.checkerReply ?? CHECKER_V4_SATISFIED));
+    const twin = scripted(answering(CHECKER_V4_SATISFIED));
+    const backup = scripted(input.backup ?? answering(CHECKER_V4_SATISFIED));
+    const candidates: readonly StoryBackupCandidate[] = Object.freeze([
+      Object.freeze({ provider: first.provider, providerRef: FIRST, maker: "maker-a" }),
+      Object.freeze({ provider: checker.provider, providerRef: CHECKER, maker: "maker-b" }),
+      Object.freeze({ provider: twin.provider, providerRef: TWIN, maker: "maker-a" }),
+      Object.freeze({ provider: backup.provider, providerRef: BACKUP, maker: "maker-c" })
+    ]);
+    const resolveProvider = (roleRef: string) => (roleRef === FIRST ? { provider: first.provider, providerRef: roleRef }
+      : roleRef === CHECKER ? { provider: checker.provider, providerRef: roleRef } : null);
+    return { first, checker, twin, backup, candidates, resolveProvider };
+  }
+
+  it.each([
+    ["UNREACHABLE", () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead")],
+    ["TOO_SLOW", () => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow")],
+    // Pre-flight PF-D6.5: out of room is two cut-offs, the last at the lowest level (the gateway's facts).
+    ["OUT_OF_ROOM", () => new ProviderContentUnacceptedError(2, "LENGTH_EXCEEDED", "cut off at the token ceiling", "artifact:cut", "ledger:cut",
+      { cutOffs: 2, lastAtLowestLevel: true })],
+    ["UNUSABLE", () => new ProviderContentUnacceptedError(2, "SCHEMA_FAILED", "[]", "artifact:bad", "ledger:bad")]
+  ] as const)("signal %s: one backup storyteller of another maker writes on STORY:STORYTELLER:3, and the record says so", async (signal, failure) => {
+    const world = backupWorld({ first: () => failure() });
+    const { writer, inserted, events, details } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(world.backup.calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([["STORY:STORYTELLER:3", BACKUP]]);
+    expect(contractOf(world.backup.calls[0]!)).toBe(STORYTELLER_V4_CONTRACT_ID);
+    // Its own tries (spec §7.2 item 11): the same bound as the first storyteller's.
+    expect(world.backup.calls[0]!.bound).toEqual(storyGuidedBound(POLICY.storytellerBound, "STORYTELLER", GUIDANCE));
+    expect(world.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:3"]);
+    expect(world.twin.calls).toEqual([]);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      outcome: "READY", failureCode: null, rounds: 1, shapeId: "general",
+      storytellerLineage: { provider_ref: BACKUP }, checkerLineage: { provider_ref: CHECKER },
+      backup: { code: STORY_BACKUP_USED, signal, firstModel: FIRST }
+    });
+    expect(events).toEqual(expect.arrayContaining(["STORY_LOOP_FAILED", "STORY_BACKUP_USED", "STORY_STORED"]));
+    expect(details.find((detail) => detail.event === "STORY_BACKUP_USED")).toEqual({
+      event: "STORY_BACKUP_USED", answerId: SNAPSHOT.answerId, answerVersion: 1, signal, firstModel: FIRST, backupModel: BACKUP
+    });
+  });
+
+  it("a backup that fails too: the story is FAILED and still records the backup; no third storyteller is asked", async () => {
+    const world = backupWorld({
+      first: () => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow"),
+      backup: () => new ProviderContentUnacceptedError(2, "SCHEMA_FAILED", "[]", "artifact:bad", "ledger:bad")
+    });
+    const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:3"]);
+    expect(world.twin.calls).toEqual([]);
+    expect(world.checker.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({
+      outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", rounds: 0,
+      backup: { code: STORY_BACKUP_USED, signal: "TOO_SLOW", firstModel: FIRST }
+    });
+    expect(events.filter((event) => event === "STORY_LOOP_FAILED")).toHaveLength(2);
+  });
+
+  it("never backs up on a money refusal", async () => {
+    const world = backupWorld({ first: () => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story's ceiling is reached") });
+    const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_ENVELOPE_EXHAUSTED" });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(world.backup.calls).toEqual([]);
+    expect(events.filter((event) => event.startsWith("STORY_BACKUP"))).toEqual([]);
+  });
+
+  it("a single cut-off is no signal: no backup, today's FAILED record (pre-flight PF-D6.5)", async () => {
+    const world = backupWorld({ first: () => new ProviderContentUnacceptedError(1, "LENGTH_EXCEEDED", "cut off at the token ceiling",
+      "artifact:cut", "ledger:cut", { cutOffs: 1, lastAtLowestLevel: false }) });
+    const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", rounds: 0 });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(world.backup.calls).toEqual([]);
+    expect(events.filter((event) => event.startsWith("STORY_BACKUP"))).toEqual([]);
+  });
+
+  /**
+   * Pre-flight PF-D6.2 (controller ruling "cost fallback note"): the backup storyteller and a v4 revision keep their
+   * maker. This double is today's M7 move — the planned maker first; on a money refusal, the run's other makers (here the
+   * first storyteller's twin, then the checker) — and records every call handed to it.
+   */
+  function movingFallback(world: ReturnType<typeof backupWorld>, handed: string[]): StoryCostFallback {
+    const others = [world.candidates[2]!, world.candidates[1]!];
+    return async ({ planned, request, refusedForMoney, call }) => {
+      handed.push(`${request.callSiteKey}@${planned.providerRef}`);
+      try {
+        return { result: await call(planned, request), servedBy: planned };
+      } catch (refusal) {
+        if (!refusedForMoney(refusal)) throw refusal;
+        for (const other of others) {
+          try {
+            return { result: await call(other, request), servedBy: other };
+          } catch (moveError) {
+            if (!refusedForMoney(moveError)) throw moveError;
+          }
+        }
+        throw refusal;
+      }
+    };
+  }
+  const MONEY = () => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story's ceiling is reached");
+
+  it("a backup refused for money is never moved to the first storyteller's or the checker's maker: FAILED with its record", async () => {
+    const world = backupWorld({
+      first: () => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow"),
+      backup: () => MONEY()
+    });
+    const handed: string[] = [];
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates, costFallback: movingFallback(world, handed) });
+    // Only the first storyteller's round 1 goes through the cost fallback; the backup's call goes straight to the backup.
+    expect(handed).toEqual([`STORY:STORYTELLER:1@${FIRST}`]);
+    expect(world.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:3"]);
+    expect(world.twin.calls).toEqual([]);
+    expect(world.checker.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({
+      outcome: "FAILED", failureCode: "STORY_ENVELOPE_EXHAUSTED", rounds: 0,
+      backup: { code: STORY_BACKUP_USED, signal: "TOO_SLOW", firstModel: FIRST }
+    });
+  });
+
+  it("a v4 revision refused for money keeps its maker: round 1's draft is served with its problem, no other maker revises it", async () => {
+    const world = backupWorld({
+      first: (request) => (request.callSiteKey === "STORY:STORYTELLER:2" ? MONEY() : storyV4()),
+      checkerReply: CHECKER_V4_MISLEADING
+    });
+    const handed: string[] = [];
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates, costFallback: movingFallback(world, handed) });
+    expect(handed).toEqual([`STORY:STORYTELLER:1@${FIRST}`, `STORY:CHECKER:1@${CHECKER}`]);
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:STORYTELLER:2"]);
+    expect(world.twin.calls).toEqual([]);
+    expect(world.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1"]);
+    expect(world.backup.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", reservation: MISLEADING, rounds: 1 });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+  });
+
+  it("a v4 revision goes to the maker that wrote the draft, even when the cost fallback served round 1", async () => {
+    const world = backupWorld({
+      first: (request) => (request.callSiteKey === "STORY:STORYTELLER:1" ? MONEY() : storyV4()),
+      checkerReply: CHECKER_V4_MISLEADING
+    });
+    const handed: string[] = [];
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates, costFallback: movingFallback(world, handed) });
+    // Round 1 was moved to the twin (money); round 2 revises the twin's own draft, sent straight to the twin.
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(world.twin.calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([
+      ["STORY:STORYTELLER:1", FIRST], ["STORY:STORYTELLER:2", TWIN]
+    ]);
+    expect(handed).toEqual([`STORY:STORYTELLER:1@${FIRST}`, `STORY:CHECKER:1@${CHECKER}`, `STORY:CHECKER:2@${CHECKER}`]);
+    expect(inserted[0]).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", rounds: 2, storytellerLineage: { provider_ref: TWIN }
+    });
+  });
+
+  it("never backs up when round 2's write fails: round 1 produced a draft", async () => {
+    const world = backupWorld({
+      first: (request) => (request.callSiteKey === "STORY:STORYTELLER:2"
+        ? new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow")
+        : storyV4()),
+      checkerReply: CHECKER_V4_MISLEADING
+    });
+    const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:STORYTELLER:2"]);
+    expect(world.backup.calls).toEqual([]);
+    // The earlier checked draft is served with its misleading problem as the reservation (the loop's spec §6 rule).
+    expect(inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", reservation: MISLEADING, rounds: 1 });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(events.filter((event) => event.startsWith("STORY_BACKUP"))).toEqual([]);
+  });
+
+  it("no candidate of another maker: today's FAILED record, and STORY_BACKUP_UNAVAILABLE logged by code", async () => {
+    expect(STORY_BACKUP_UNAVAILABLE).toBe("STORY_BACKUP_UNAVAILABLE");
+    for (const candidates of [undefined, "same makers only"] as const) {
+      const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+      const { writer, inserted, details } = harness({ resolveProvider: world.resolveProvider });
+      await writer.writeAfterSettle(candidates === undefined ? V4 : { ...V4, backupCandidates: world.candidates.slice(0, 3) });
+      expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", rounds: 0 });
+      expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+      expect(world.twin.calls).toEqual([]);
+      expect(world.backup.calls).toEqual([]);
+      expect(details.filter((detail) => detail.event === STORY_BACKUP_UNAVAILABLE)).toEqual([{
+        event: STORY_BACKUP_UNAVAILABLE, answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_CANDIDATE"
+      }]);
+    }
+  });
+
+  // Task 17 review 3 (final wave B11): with five rounds the backup would need rounds 6..10, past the story gateway's 8.
+  it("no round left for a backup loop (five rounds): today's FAILED record, and STORY_BACKUP_UNAVAILABLE NO_ROUND_LEFT", async () => {
+    const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const { writer, inserted, details } = harness({ resolveProvider: world.resolveProvider, policy: { ...POLICY, loopMaxRounds: 5 } });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(world.backup.calls).toEqual([]);
+    expect(world.twin.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", rounds: 0 });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(details.filter((detail) => detail.event === STORY_BACKUP_UNAVAILABLE)).toEqual([{
+      event: STORY_BACKUP_UNAVAILABLE, answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_ROUND_LEFT"
+    }]);
+    // Four rounds still fit (rounds 5..8): the backup is asked.
+    const fits = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const four = harness({ resolveProvider: fits.resolveProvider, policy: { ...POLICY, loopMaxRounds: 4 } });
+    await four.writer.writeAfterSettle({ ...V4, backupCandidates: fits.candidates });
+    expect(fits.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:5"]);
+  });
+
+  it("the first storyteller benched: its maker's second ref is never the backup (whole-branch Minor 1, ruling W1)", async () => {
+    // The runner leaves the benched first storyteller out of the candidates (the sit-out filter) but hands every
+    // claim-eligible member's maker over unfiltered (`backupMakers`), so maker-a stays excluded: TWIN is never asked.
+    const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    const benchedOut = world.candidates.filter((candidate) => candidate.providerRef !== FIRST);
+    const makers = world.candidates.map((candidate) => Object.freeze({ providerRef: candidate.providerRef, maker: candidate.maker }));
+    await writer.writeAfterSettle({ ...V4, backupCandidates: benchedOut, backupMakers: makers });
+    expect(world.twin.calls).toEqual([]);
+    expect(world.backup.calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([["STORY:STORYTELLER:3", BACKUP]]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE", firstModel: FIRST } });
+  });
+
+  it("v3 never backs up, even with the length table and candidates", async () => {
+    const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow") });
+    const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...SNAPSHOT, lengthGuidance: GUIDANCE, backupCandidates: world.candidates });
+    expect(contractOf(world.first.calls[0]!)).toBe(STORYTELLER_CONTRACT_ID);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(world.backup.calls).toEqual([]);
+    expect(events.filter((event) => event.startsWith("STORY_BACKUP"))).toEqual([]);
+  });
+
+  /**
+   * Carried review check 1: the loop's `v4` and the checker reader's `v4` are ONE engine fact. A v4 loop fed a verdict
+   * read in the v3 form (no `misleading`) would take every objection for a wording note and serve every unsatisfied
+   * draft READY; a v3 loop fed the v4 reader would refuse every v3 reply. Each half is driven here by its own reply form.
+   */
+  it("wiring: the loop and the checker's reader take v4 from the same engine fact", async () => {
+    const V3_FORM_OBJECTION = JSON.stringify({
+      satisfied: false, objection: MISLEADING, criteria: { ...CRITERIA, faithful_to_material: false }
+    });
+    // Engine 2 with the table: a v3-form objection is refused by the v4 reader, never served READY as a wording note.
+    const v4Run = scripted((request) => (contractOf(request) === STORY_CHECKER_V4_CONTRACT_ID ? V3_FORM_OBJECTION : storyV4()));
+    const v4Story = harness(providing(v4Run.provider));
+    await v4Story.writer.writeAfterSettle(V4);
+    expect(v4Run.calls.map(contractOf)).toEqual([STORYTELLER_V4_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID]);
+    expect(v4Story.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_CHECK_UNAVAILABLE", rounds: 1 });
+    // ... and a v4 misleading verdict is read as misleading by the loop: round 2 runs, the last problem is the reservation.
+    const misled = scripted((request) => (contractOf(request) === STORY_CHECKER_V4_CONTRACT_ID ? CHECKER_V4_MISLEADING : storyV4()));
+    const misledStory = harness(providing(misled.provider));
+    await misledStory.writer.writeAfterSettle(V4);
+    expect(misled.calls.map((call) => call.callSiteKey))
+      .toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1", "STORY:STORYTELLER:2", "STORY:CHECKER:2"]);
+    expect(misledStory.inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", reservation: MISLEADING, rounds: 2 });
+    // No engine: the v3 reader keeps no `misleading` (LG-A's fixer drops the unasked key), so the v4 form is a plain v3
+    // objection and the v3 loop runs every round on it, with today's prior_objection field and no revision turn.
+    const v3Read = scripted((request) => (contractOf(request) === STORY_CHECKER_CONTRACT_ID ? CHECKER_V4_MISLEADING : story()));
+    const v3ReadStory = harness(providing(v3Read.provider));
+    await v3ReadStory.writer.writeAfterSettle({ ...SNAPSHOT, lengthGuidance: GUIDANCE });
+    expect(v3Read.calls.map(contractOf)).toEqual([
+      STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID
+    ]);
+    expect(names(v3Read.calls[2]!)).toContain("prior_objection");
+    expect(v3Read.calls[2]!.packet.messages.some((message) => message.role === "assistant")).toBe(false);
+    expect(v3ReadStory.inserted[0]).toMatchObject({ outcome: "READY_WITH_RESERVATION", reservation: MISLEADING, rounds: 2 });
+    const v3Run = scripted((request) => (contractOf(request) === STORY_CHECKER_CONTRACT_ID
+      ? (request.callSiteKey === "STORY:CHECKER:1" ? V3_FORM_OBJECTION : CHECKER_SATISFIED)
+      : story()));
+    const v3Story = harness(providing(v3Run.provider));
+    await v3Story.writer.writeAfterSettle({ ...SNAPSHOT, engine: ENGINE });
+    expect(v3Run.calls.map(contractOf)).toEqual([
+      STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID
+    ]);
+    expect(names(v3Run.calls[2]!)).toContain("prior_objection");
+    expect(v3Story.inserted[0]).toMatchObject({ outcome: "READY", rounds: 2 });
+    expect(v3Story.events).not.toContain("STORY_WORDING_NOTE_ONLY");
+  });
+
+  /**
+   * Carried review check 4: the unfinished-run story hold (the preview estimate's `NOT EXISTS serve.answer_story` and its
+   * last-call window) lasts while no story row exists, so the first storyteller's failure writes no row before the backup
+   * runs: one row only, stored after every backup call.
+   */
+  it("writes no story row while the backup runs: the one row is stored after the backup's calls", async () => {
+    const rows: StoryRecordInput[] = [];
+    const rowsWhenAsked: number[] = [];
+    const world = backupWorld({
+      first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead"),
+      backup: (request) => {
+        rowsWhenAsked.push(rows.length);
+        return answering(CHECKER_V4_SATISFIED)(request);
+      },
+      checkerReply: CHECKER_V4_SATISFIED
+    });
+    const { writer, events } = harness({
+      resolveProvider: world.resolveProvider,
+      repository: { insert: async (record) => { rows.push(record); return "INSERTED" as const; } }
+    });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(rowsWhenAsked).toEqual([0]);
+    expect(world.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:3"]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ outcome: "READY", backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE" } });
+    expect(events.filter((event) => event === "STORY_STORED")).toHaveLength(1);
+    expect(events.indexOf("STORY_STORED")).toBeGreaterThan(events.indexOf(STORY_BACKUP_USED));
+    expect(events.indexOf(STORY_BACKUP_USED)).toBeGreaterThan(events.indexOf("STORY_LOOP_FAILED"));
+  });
+
+  // Carried review check 5: the gateway records what the counter returns (null = unknown, never a made-up count).
+  it("the actual-words counter: 0 for a decodable array, null for a scalar or null", async () => {
+    const { provider, calls } = scripted(answering(CHECKER_V4_SATISFIED));
+    await harness(providing(provider)).writer.writeAfterSettle(V4);
+    const count = calls[0]!.actualWordsOf!;
+    expect(count("[]")).toBe(0);
+    expect(count("{}")).toBe(0);
+    for (const scalar of ["42", "null", "true", JSON.stringify("a sentence of prose")]) expect(count(scalar)).toBeNull();
   });
 });

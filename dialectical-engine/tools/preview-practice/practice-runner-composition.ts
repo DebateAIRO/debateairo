@@ -114,6 +114,7 @@ import { createCallScheduler, type CallSubject } from "../../apps/runner/src/cal
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { readDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
+import { readEngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -266,6 +267,9 @@ export async function composePracticeRunner(input: Readonly<{
    * it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH).
    */
   const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
+  // Engine redesign (R1d; INTERFACE §2.3), as apps/runner/src/main.ts resolves it, in both modes: the optional engine row
+  // and, only with it, the length row's presence and the sealed engineContractHash.
+  const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);
   const storyLog = input.storyLog ?? (() => undefined);
   const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
     .catch((error: unknown) => {
@@ -476,6 +480,8 @@ export async function composePracticeRunner(input: Readonly<{
     callScheduler: runnerCallScheduler,
     // Debate shape, as main.ts: resolved at boot above; null without the row (today's runner).
     debateShape,
+    // Engine redesign (R1d), as main.ts: resolved at boot above; null without the engine row (engine 1).
+    engine,
     callSubjects: previewCallSubjects(previewConfig),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),

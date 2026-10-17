@@ -52,6 +52,13 @@ export interface StoryMaterialIndex {
    * holding one as a whole, case-sensitive token is refused, STORY_TEXT_ENGINE_TOKEN.
    */
   readonly engineTokens: ReadonlySet<string>;
+  /**
+   * Story v4 (R1d, design decision 2; INTERFACE §5.4): the one shape code chose (`storyShapeOf`). When set, the decoded
+   * reply's `shape_id` is set to it before the fixer, the trailing-object test and the schema read the reply (the v4
+   * form has no `shape_id`; one the AI writes anyway is overwritten), and the content checks still test it against
+   * `shapeIds` (STORY_UNKNOWN_SHAPE). Absent on every v3 index: today's reading.
+   */
+  readonly fixedShapeId?: string;
 }
 
 /**
@@ -115,24 +122,26 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
   return new RegExp(`(?<!\\p{Nd})(?:${alternatives.join("|")})(?!\\p{Nd})(?![\\p{Zs}]?%)`, "u");
 }
 
+/** The checker's eight criteria, the same object in v3 and v4 (moved out of the v3 schema unchanged, R1d). */
+const StoryCheckerCriteriaSchema = z.object({
+  faithful_to_material: z.boolean(),
+  agrees_with_label: z.boolean(),
+  fair_to_losing_paths: z.boolean(),
+  no_overstatement: z.boolean(),
+  citations_correct: z.boolean(),
+  reviewer_note_separate: z.boolean(),
+  goal_marked_as_reading: z.boolean(),
+  /** Spec §14.1: false whenever the story uses engine vocabulary or talks about the machinery instead of the question. */
+  speaks_to_the_person: z.boolean()
+}).strict();
+
 /**
- * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
+ * The three rules every checker verdict keeps, v3 and v4 alike (one helper both refines call, Task 12 review Important 1):
+ * satisfied only with every criterion met; no control character in the objection; an objection whenever not satisfied.
+ * The v4 refine adds only the misleading rule.
  */
-export const StoryCheckerVerdictSchema = z.object({
-  satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
-  criteria: z.object({
-    faithful_to_material: z.boolean(),
-    agrees_with_label: z.boolean(),
-    fair_to_losing_paths: z.boolean(),
-    no_overstatement: z.boolean(),
-    citations_correct: z.boolean(),
-    reviewer_note_separate: z.boolean(),
-    goal_marked_as_reading: z.boolean(),
-    /** Spec §14.1: false whenever the story uses engine vocabulary or talks about the machinery instead of the question. */
-    speaks_to_the_person: z.boolean()
-  }).strict()
-}).strict().superRefine((verdict, context) => {
+function checkerRules(verdict: Readonly<{ satisfied: boolean; objection: string | null; criteria: Readonly<Record<string, boolean>> }>,
+  context: z.RefinementCtx): void {
   if (verdict.satisfied && Object.values(verdict.criteria).some((met) => !met)) {
     context.addIssue({ code: "custom", path: ["satisfied"], message: "STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION" });
   }
@@ -142,8 +151,41 @@ export const StoryCheckerVerdictSchema = z.object({
   if (!verdict.satisfied && verdict.objection === null) {
     context.addIssue({ code: "custom", path: ["objection"], message: "STORY_CHECKER_OBJECTION_REQUIRED" });
   }
+}
+
+/**
+ * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
+ */
+export const StoryCheckerVerdictSchema = z.object({
+  satisfied: z.boolean(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
+  criteria: StoryCheckerCriteriaSchema
+}).strict().superRefine((verdict, context) => checkerRules(verdict, context));
+
+/**
+ * Story v4 (R1d, spec §7.2 item 7; INTERFACE §5.3): the checker also says whether a problem would MISLEAD the person.
+ * Only `misleading: true` starts round 2 (loop.ts); `satisfied: false, misleading: false` is a wording note: recorded,
+ * never shown to a reader, no reservation. `misleading: true` needs `satisfied: false` and an objection
+ * (STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION). v3's three rules hold unchanged; the objection's limit is LG-A's runaway
+ * guard, and the v4 form states no number for it.
+ */
+export const StoryCheckerV4VerdictSchema = z.object({
+  satisfied: z.boolean(),
+  misleading: z.boolean(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
+  criteria: StoryCheckerCriteriaSchema
+}).strict().superRefine((verdict, context) => {
+  checkerRules(verdict, context);
+  if (verdict.misleading && (verdict.satisfied || verdict.objection === null)) {
+    context.addIssue({ code: "custom", path: ["misleading"], message: "STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION" });
+  }
 });
-export type StoryCheckerVerdict = z.infer<typeof StoryCheckerVerdictSchema>;
+
+/** The accepted verdict: v3's members, and on a v4 verdict `misleading` too (never on a v3 one). */
+export type StoryCheckerVerdict = z.infer<typeof StoryCheckerVerdictSchema> & { readonly misleading?: boolean };
+
+/** The form the checker answered in: v3's, or v4's with `misleading`. */
+type StoryCheckerSchema = z.ZodType<StoryCheckerVerdict>;
 
 interface StoryIssue {
   readonly code: "custom";
@@ -320,23 +362,35 @@ function readStoryBody(value: unknown): StoryRead<StoryBody> {
   return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
 }
 
-function readCheckerVerdict(value: unknown): StoryRead<StoryCheckerVerdict> {
-  const parsed = StoryCheckerVerdictSchema.safeParse(value);
+function readCheckerVerdict(value: unknown, schema: StoryCheckerSchema): StoryRead<StoryCheckerVerdict> {
+  const parsed = schema.safeParse(value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
-  const fixed = fixReplyStructure(value, StoryCheckerVerdictSchema, STORY_FIXER_OPTIONS);
-  const refixed = fixed === null ? null : StoryCheckerVerdictSchema.safeParse(fixed.value);
+  const fixed = fixReplyStructure(value, schema, STORY_FIXER_OPTIONS);
+  const refixed = fixed === null ? null : schema.safeParse(fixed.value);
   return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
+}
+
+/**
+ * Story v4 (R1d, design decision 2): the decoded reply with code's shape. With `index.fixedShapeId`, a plain object gets
+ * `shape_id` set to it (the AI's own, if any, overwritten), so the fixer, the trailing-object test and the schema all
+ * read code's shape. Anything else, and every reply read against a v3 index, passes through untouched.
+ */
+function withFixedShape(value: unknown, index: StoryMaterialIndex): unknown {
+  // Only the top-level member is set: a shape_id the AI nested inside another member is left there, and the strict
+  // schema refuses it as an extra key (Task 12 review Minor 1).
+  if (index.fixedShapeId === undefined || typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  return { ...(value as Readonly<Record<string, unknown>>), shape_id: index.fixedShapeId };
 }
 
 function decideStory(content: string, index: StoryMaterialIndex, reply: ModelReplyFacts | undefined,
   inQuestionLanguage: StoryLanguageCheck | undefined): StoryDecision {
   assertStoryMaterialIndex(index);
   const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => {
-    const candidate = readStoryBody(value);
+    const candidate = readStoryBody(withFixedShape(value, index));
     return candidate.ok && storyContentIssues(candidate.value, index).length === 0;
   } });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, body: null };
-  const read = readStoryBody(decoded.value);
+  const read = readStoryBody(withFixedShape(decoded.value, index));
   if (!read.ok) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: read.message }, body: null };
   const contentIssues = storyContentIssues(read.value, index);
   const issues = contentIssues.length === 0 ? inQuestionLanguage?.(read.value) ?? [] : contentIssues;
@@ -369,11 +423,13 @@ export function parseStoryBody(content: string, index: StoryMaterialIndex, reply
   return decided.body;
 }
 
-function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined):
-  { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
-  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => readCheckerVerdict(value).ok });
+function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined,
+  v4: boolean): { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
+  // Story v4 (R1d): the v4 form adds `misleading`; a v3 reply is read exactly as before.
+  const schema: StoryCheckerSchema = v4 ? StoryCheckerV4VerdictSchema : StoryCheckerVerdictSchema;
+  const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => readCheckerVerdict(value, schema).ok });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, verdict: null };
-  const read = readCheckerVerdict(decoded.value);
+  const read = readCheckerVerdict(decoded.value, schema);
   if (!read.ok) return { classification: { parseStatus: "SCHEMA_FAILED", parseError: read.message }, verdict: null };
   const issues = inQuestionLanguage?.(read.value) ?? [];
   return issues.length === 0
@@ -381,17 +437,21 @@ function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQu
     : { classification: { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) }, verdict: null };
 }
 
-/** The checker's content classifier; `inQuestionLanguage` is its language check (`STORY_CHECKER_PROSE`). */
-export function classifyCheckerContent(content: string, reply?: ModelReplyFacts, inQuestionLanguage?: StoryLanguageCheck): ContentClassification {
-  return decideChecker(content, reply, inQuestionLanguage).classification;
+/**
+ * The checker's content classifier; `inQuestionLanguage` is its language check (`STORY_CHECKER_PROSE`). `v4` (R1d):
+ * read the v4 form, with `misleading`.
+ */
+export function classifyCheckerContent(content: string, reply?: ModelReplyFacts, inQuestionLanguage?: StoryLanguageCheck,
+  v4?: boolean): ContentClassification {
+  return decideChecker(content, reply, inQuestionLanguage, v4 === true).classification;
 }
 
 /**
- * The accepted checker verdict, decoded exactly as the classifier decoded it (pass the same `reply`).
+ * The accepted checker verdict, decoded exactly as the classifier decoded it (pass the same `reply` and `v4`).
  * Throws `STORY_CHECKER_CONTENT_INVALID` for refused content.
  */
-export function parseCheckerVerdict(content: string, reply?: ModelReplyFacts): StoryCheckerVerdict {
-  const decided = decideChecker(content, reply, undefined);
+export function parseCheckerVerdict(content: string, reply?: ModelReplyFacts, v4?: boolean): StoryCheckerVerdict {
+  const decided = decideChecker(content, reply, undefined, v4 === true);
   if (decided.verdict === null) {
     throw new TypedDomainError("STORY_CHECKER_CONTENT_INVALID", decided.classification.parseStatus);
   }

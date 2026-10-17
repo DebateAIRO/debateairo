@@ -9,7 +9,11 @@ import {
   replyWordCount, schemaFailureLocator, structureSalvageFor, withStructureRepair, type ContentClassification, type ProviderCallRequest,
   type ProviderGateway
 } from "@debateai/providers";
-import { RUN_COST_ENVELOPE_ROOM_KEPT } from "@debateai/budget";
+import {
+  DAILY_COST_ENVELOPE_REACHED, PERSON_ALLOWANCE_REACHED, PROVIDER_USAGE_UNREPORTED, RUN_COST_ENVELOPE_MONEY_REACHED,
+  RUN_COST_ENVELOPE_ROOM_KEPT, STORY_COST_ENVELOPE_REACHED
+} from "@debateai/budget";
+import { storyBackupSignalOf } from "@debateai/story";
 import { TypedDomainError } from "@debateai/kernel";
 import { mapPromptContractHash } from "@debateai/map";
 import { expansionPhaseStop } from "@debateai/runner";
@@ -259,7 +263,7 @@ describe("LG-A: a repair stopped by the run keeps the stop's name", () => {
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it("names the stops it passes after their owners' constants", () => {
-    expect(STRUCTURE_REPAIR_PASSED_STOPS).toEqual([CALL_LANE_STOPPED, RUN_COST_ENVELOPE_ROOM_KEPT]);
+    expect(STRUCTURE_REPAIR_PASSED_STOPS).toEqual([CALL_LANE_STOPPED, RUN_COST_ENVELOPE_ROOM_KEPT, STORY_COST_ENVELOPE_REACHED]);
   });
 
   it("the lane stopped while the repair waited for Haiku's slot: the call ends CALL_LANE_STOPPED, nothing sent to Haiku", async () => {
@@ -297,6 +301,22 @@ describe("LG-A: a repair stopped by the run keeps the stop's name", () => {
     expect(error).not.toBeInstanceOf(ProviderContentUnacceptedError);
     expect(repair.requests[0]).toMatchObject({ callSiteKey: "REPAIR:STRUCTURE:JUDGE", keepRoomMicros: 5_000 });
   });
+
+  // Engine redesign R1d (pre-flight PF-D6.1; controller ruling: a money stop never starts a backup storyteller, G7).
+  for (const code of [STORY_COST_ENVELOPE_REACHED, RUN_COST_ENVELOPE_MONEY_REACHED, "RUN_COST_ENVELOPE_EXHAUSTED",
+    DAILY_COST_ENVELOPE_REACHED, PERSON_ALLOWANCE_REACHED, PROVIDER_USAGE_UNREPORTED]) {
+    it(`a repair refused by the money stop ${code} keeps its name: no follow-up to the AI, no backup signal`, async () => {
+      const original = previewGlmHarness([{ content: BROKEN }]);
+      const repair = scriptedRepairGateway(new TypedDomainError(code, "refused"));
+      const error = await withStructureRepair(original.gateway, { providerRef: HAIKU_REF, gateway: repair.gateway, bound: BOUND })
+        .call(request()).catch((caught: unknown) => caught);
+      expect(error).toMatchObject({ code });
+      expect(error).not.toBeInstanceOf(ProviderContentUnacceptedError);
+      // The stop ends the call: the original AI is not asked again (no follow-up B).
+      expect(original.executions).toHaveLength(1);
+      expect(storyBackupSignalOf(error)).toBeNull();
+    });
+  }
 
   for (const code of [RUN_COST_ENVELOPE_ROOM_KEPT, CALL_LANE_STOPPED]) {
     it(`the map reads a repair stopped by ${code} as STOPPED, never FAILED`, async () => {

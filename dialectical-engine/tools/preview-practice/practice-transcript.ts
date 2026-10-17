@@ -21,7 +21,6 @@ import type { Pool } from "pg";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
 import {
   answerTokensOf,
-  PREVIEW_PROVIDER_REF_MODELS,
   previewModelRow,
   readPromptFrame,
   replyWordCount,
@@ -38,6 +37,7 @@ import {
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
+  practiceModelOfRef,
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
@@ -217,9 +217,6 @@ function finiteOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function modelOfRef(providerRef: string): string {
-  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
-}
 
 function parsedJson(text: string): unknown {
   try { return JSON.parse(text) as unknown; } catch { return undefined; }
@@ -243,7 +240,7 @@ export function buildTranscriptAttempts(input: Readonly<{
   });
   return Object.freeze(ordered.map((entry): TranscriptAttempt => {
     const artifact = entry.rawArtifactRef === null ? undefined : input.artifacts.get(entry.rawArtifactRef);
-    const model = artifact?.modelId ?? modelOfRef(entry.actorRef);
+    const model = artifact?.modelId ?? practiceModelOfRef(entry.actorRef);
     const row = previewModelRow(model);
     const prompt = entry.attemptId === null ? undefined : input.prompts.get(entry.attemptId);
     const messages = prompt === undefined ? undefined : parsedJson(prompt.promptText);

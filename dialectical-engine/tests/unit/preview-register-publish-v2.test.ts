@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
   buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2, previewCheckerRoleRef,
   PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
-  PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
+  PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, assertPreviewEngineBootRows
 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
@@ -61,10 +62,10 @@ describe('publish kit v2: source closure', () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
-    expect(rows).toHaveLength(68);
+    expect(rows).toHaveLength(69);
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(v1.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect([...differing].sort()).toEqual([...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy', 'mapContractHash'].sort());
+    expect([...differing].sort()).toEqual([...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy', 'engineContractHash', 'mapContractHash'].sort());
     const value = (key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
     expect(value('answerRoleRotationPolicy')).toEqual({ kind: 'ANSWER_ROLE_ROTATION_POLICY', enabled: true, rule: 'LEAST_SHARE_SEEDED_TIE_V1' });
     expect(value('configuredProviderSet')).toEqual(REVIEWED_PROVIDER_SET);
@@ -92,9 +93,9 @@ describe('publish kit v2: composing from the current version', () => {
     const f = await fixture();
     const v1 = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     const v2 = compose(f.source, f.v8, '8');
-    expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
-    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash') expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
-    expect(v2.addedKeys).toEqual([ROTATION_KEY, 'consumerRecoveryPolicy', 'mapContractHash', 'publicationCheckPolicy', 'taxAuthorities']);
+    expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), ROTATION_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && row.rowKey !== 'engineContractHash') expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
+    expect(v2.addedKeys).toEqual([ROTATION_KEY, 'consumerRecoveryPolicy', 'engineContractHash', 'mapContractHash', 'publicationCheckPolicy', 'taxAuthorities']);
     expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
@@ -110,8 +111,8 @@ describe('publish kit v2: composing from the current version', () => {
     expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
     const plan = compose(f.source, f.v9);
-    expect(plan.rows).toHaveLength(70);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash']);
+    expect(plan.rows).toHaveLength(71);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'engineContractHash', 'mapContractHash']);
     expect(plan.rows.find(row => row.rowKey === ROTATION_KEY)).toEqual(f.source.find(row => row.rowKey === ROTATION_KEY));
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
@@ -135,7 +136,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.deltaSha256).toBe(previewDeltaSha256V2(plan.delta));
     expect(plan.baseRegisterVersion).toBe('9');
     // Every other row, the base-owned ones included, is the base row byte for byte.
-    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
+    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && row.rowKey !== 'engineContractHash' && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
     for (const key of ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef']) expect(plan.delta.map(entry => entry.rowKey)).not.toContain(key);
     expect(f.v9).toEqual(before);
   });
@@ -144,8 +145,8 @@ describe('publish kit v2: composing from the current version', () => {
     const f = await fixture();
     const base = f.v9.filter(row => row.rowKey !== 'taxAuthorities');
     const plan = compose(f.source, base);
-    expect(plan.rows).toHaveLength(70);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash', 'taxAuthorities']);
+    expect(plan.rows).toHaveLength(71);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'engineContractHash', 'mapContractHash', 'taxAuthorities']);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
   });
@@ -228,14 +229,14 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
     const f = await fixture();
     const source = await build(DEEPSEEK);
     const differing = source.filter(row => JSON.stringify(row) !== JSON.stringify(f.v1Source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
-    expect([...differing].sort()).toEqual([...DEEPSEEK_CHECKER_KEYS, ROTATION_KEY, 'mapContractHash'].sort());
+    expect([...differing].sort()).toEqual([...DEEPSEEK_CHECKER_KEYS, ROTATION_KEY, 'engineContractHash', 'mapContractHash'].sort());
     expect(ref(source, 'evaluatorRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'storyCheckerRoleRef')).toBe('preview:deepseek-v4-1-flash');
     expect(ref(source, 'synthesizerRoleRef')).toBe('preview:fixture-a');
     expect(ref(source, 'storytellerRoleRef')).toBe('preview:fixture-a');
     const plan = compose(source, f.v9);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...DEEPSEEK_CHECKER_KEYS]);
-    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'mapContractHash']);
+    expect(plan.addedKeys).toEqual([ROTATION_KEY, 'engineContractHash', 'mapContractHash']);
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.oldValueJsonText!).providerRef).toBe('preview:fixture-b');
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.newValueJsonText).providerRef).toBe('preview:deepseek-v4-1-flash');
   });
@@ -318,7 +319,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
@@ -332,7 +333,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
   it('composes with or without the row: a base without it and a plan without it give no row, as before', async () => {
     const f = await fixture();
     const given = compose(await build(policy), f.v9);
-    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(given.addedKeys).toEqual([ROTATION_KEY, CALL_CONCURRENCY_POLICY_ROW_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     const absent = compose(f.source, f.v9);
     expect(absent.rows.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(absent.delta.map(entry => entry.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
@@ -397,7 +398,7 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
@@ -410,7 +411,7 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
   it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
     const f = await fixture();
     const published = compose(await build(policy), f.v9);
-    expect(published.addedKeys).toEqual([ROTATION_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(published.addedKeys).toEqual([ROTATION_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     const base = [...published.rows] as Row[];
     const kept = compose(f.source, base, '10');
     expect(kept.rows.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(base.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY));
@@ -472,7 +473,7 @@ describe('publish kit v2: the optional questionLanguagePolicy row (absent by def
   it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
     const f = await fixture();
     const published = compose(await build(policy), f.v9);
-    expect(published.addedKeys).toEqual([ROTATION_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(published.addedKeys).toEqual([ROTATION_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     const base = [...published.rows] as Row[];
     const kept = compose(f.source, base, '10');
     expect(kept.rows.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY)).toEqual(base.find(row => row.rowKey === QUESTION_LANGUAGE_POLICY_ROW_KEY));
@@ -614,5 +615,78 @@ describe('publish kit v2: the base must be the current version', () => {
     }
     const v1Snapshot = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     await expect(publishPreviewRegisterV2(fakePool([]).pool, { publicationId: id, sourceRef: 'fixture', snapshot: v1Snapshot as any, approval })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+});
+
+describe('publish kit v2: the optional engineVersionPolicy row (engine redesign R1d, INTERFACE §1.6)', () => {
+  const engine = engineVersionPolicyStartValues();
+  const length = lengthGuidancePolicyStartValues();
+  /** v2's eighth argument is LG-C's length guidance and its ninth the engine row; no ninth = its default. */
+  const build = async (lengthGuidance: unknown, ...engineVersion: [] | [unknown]) =>
+    [...await (buildPreviewSourceRowsV2 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime,
+      undefined, undefined, null, null, null, lengthGuidance, ...engineVersion)] as Row[];
+  const engineRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === ENGINE_VERSION_POLICY_ROW_KEY);
+  const sealed = (rows: readonly Row[], hex: string) => rows.map(row => row.rowKey === ENGINE_CONTRACT_HASH_ROW_KEY ? { ...row, valueJsonText: canonical(hex) } : row);
+
+  it('adds exactly one row when supplied and nothing by default; optional, never in the closure; the seal is a required key', async () => {
+    const absent = await build(length), given = await build(length, engine);
+    expect(engineRow(absent)).toBeUndefined();
+    expect(await build(length, null)).toEqual(absent);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toContain(ENGINE_VERSION_POLICY_ROW_KEY);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(ENGINE_VERSION_POLICY_ROW_KEY);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).toContain(ENGINE_CONTRACT_HASH_ROW_KEY);
+    expect(given.filter(row => row.rowKey !== ENGINE_VERSION_POLICY_ROW_KEY)).toEqual(absent);
+    expect(JSON.parse(engineRow(given)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(engine)));
+    expect(JSON.parse(given.find(row => row.rowKey === ENGINE_CONTRACT_HASH_ROW_KEY)!.valueJsonText)).toBe(engineContractHash());
+  });
+  it('"off" builds the start values disabled', async () => {
+    expect(JSON.parse(engineRow(await build(length, 'off'))!.valueJsonText)).toEqual({ ...JSON.parse(JSON.stringify(engine)), enabled: false });
+  });
+  it('refuses a policy the register parser refuses, before building any row', async () => {
+    const bad = JSON.parse(JSON.stringify(engine));
+    bad.judges.count = 6;
+    await expect(build(length, bad)).rejects.toThrow('ENGINE_VERSION_POLICY_INVALID:judges.count');
+  });
+  it('composing asks the runner\'s engine boot: the row needs the length row and the code\'s seal, enabled or not', async () => {
+    const f = await fixture();
+    const published = compose(await build(length, engine), f.v9);
+    expect(published.addedKeys).toEqual([ROTATION_KEY, 'engineContractHash', ENGINE_VERSION_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, 'mapContractHash']
+      .sort((a, b) => a.localeCompare(b, 'en')));
+    for (const choice of [engine, 'off'] as const) {
+      const noLength = await build(null, choice);
+      expect(() => compose(noLength, f.v9)).toThrowError(expect.objectContaining({ code: 'ENGINE_REQUIRES_LENGTH_POLICY' }));
+    }
+    const foreign = sealed(await build(length, engine), 'e'.repeat(64));
+    expect(() => compose(foreign, f.v9)).toThrowError(expect.objectContaining({ code: 'ENGINE_CONTRACT_HASH_MISMATCH' }));
+    // No engine row = engine 1: the seal is never asked, even a foreign one.
+    const engineOneForeign = sealed(await build(length), 'e'.repeat(64));
+    expect(() => compose(engineOneForeign, f.v9)).not.toThrow();
+    expect(() => assertPreviewEngineBootRows([...published.rows].filter(row => row.rowKey !== ENGINE_CONTRACT_HASH_ROW_KEY)))
+      .toThrowError(expect.objectContaining({ code: 'ENGINE_CONTRACT_HASH_UNSEALED' }));
+  });
+  it('reads the seal only beside the length row, so its refusal is the runner\'s boot\'s (Task 8 review 1, final wave A5)', async () => {
+    const f = await fixture();
+    const published = compose(await build(length, engine), f.v9).rows;
+    const brokenSeal = (rows: typeof published) => rows.map(row => row.rowKey === ENGINE_CONTRACT_HASH_ROW_KEY
+      ? { ...row, valueJsonText: '"not a seal"' as typeof row.valueJsonText } : row);
+    // No length row: the runner's boot never reads the seal (readEngineRunnerSettings), so neither does the kit.
+    const noLength = brokenSeal(published.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY));
+    expect(() => assertPreviewEngineBootRows(noLength)).toThrowError(expect.objectContaining({ code: 'ENGINE_REQUIRES_LENGTH_POLICY' }));
+    // Beside the length row the same broken seal is refused by its own parser.
+    expect(() => assertPreviewEngineBootRows(brokenSeal(published))).toThrow('ENGINE_CONTRACT_HASH_INVALID');
+  });
+  it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
+    const f = await fixture();
+    const base = [...compose(await build(length, engine), f.v9).rows] as Row[];
+    const lengthOnly = await build(length);
+    const kept = compose(lengthOnly, base, '10');
+    expect(engineRow([...kept.rows] as Row[])).toEqual(engineRow(base));
+    expect(kept.delta.map(entry => entry.rowKey)).not.toContain(ENGINE_VERSION_POLICY_ROW_KEY);
+    const broken = base.map(row => row.rowKey === ENGINE_VERSION_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"ENGINE_VERSION_POLICY"', '"X"') } : row);
+    expect(() => compose(lengthOnly, broken, '10')).toThrow('ENGINE_VERSION_POLICY_INVALID:kind');
+    // A carried engine row with no length row anywhere is refused like a built one.
+    const lonely = base.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    const noRows = await build(null);
+    expect(() => compose(noRows, lonely, '10')).toThrowError(expect.objectContaining({ code: 'ENGINE_REQUIRES_LENGTH_POLICY' }));
   });
 });

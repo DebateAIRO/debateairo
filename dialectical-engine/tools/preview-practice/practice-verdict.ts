@@ -207,6 +207,12 @@ export type PracticeVerdictInput = Readonly<{
    * a failure: NOT_PROVEN, as the shape was not shown to work. Optional: none when absent.
    */
   shapeNotExercised?: readonly string[];
+  /**
+   * Pinned final writers (R1d, INTERFACE §15.2): the roles whose pin did not hold (the pinned model was not eligible on
+   * the debate's panel, or no rotation was picked). Not a failure: NOT_PROVEN, as the pinned model was not shown in that
+   * role. Optional: none when absent.
+   */
+  pinsNotHeld?: readonly string[];
   /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -249,7 +255,8 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
     ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),
-    ...[...(input.shapeNotExercised ?? [])].sort().map((why) => `SHAPE_NOT_EXERCISED:${why}`)
+    ...[...(input.shapeNotExercised ?? [])].sort().map((why) => `SHAPE_NOT_EXERCISED:${why}`),
+    ...[...(input.pinsNotHeld ?? [])].sort().map((role) => `PRACTICE_PIN_NOT_HELD:${role}`)
   ];
   if (input.interrupted === true) notProven.push("RUN_INTERRUPTED");
   const warn: string[] = [];

@@ -20,8 +20,10 @@ import {
   debateShapeInForce,
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
   readDebateShapePolicy,
+  readEngineVersionPolicy,
   readLengthGuidancePolicy,
   type CallConcurrencyPolicy,
+  type EngineVersionPolicy,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import {
@@ -42,11 +44,13 @@ import {
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
+  practiceModelOfRef,
   practiceReplyFormOf,
   practiceReviewEdgeCountOf,
   practiceStepOf,
   recheckReply,
   replyContentOf,
+  type PracticeCallFamily,
   type PracticeStep
 } from "./practice-lanes.js";
 import {
@@ -60,6 +64,13 @@ import {
 } from "./practice-language.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
+import {
+  practiceServedModels,
+  practiceServedStoryteller,
+  practiceWriterPinsBlock,
+  type PracticeWriterPins,
+  type PracticeWriterPinsBlock
+} from "./practice-pins.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
@@ -83,6 +94,8 @@ import {
   type PracticeShapeRowChange,
   type PracticeShapeSource
 } from "./practice-shape.js";
+import { collectPracticeStoryLength, type PracticeStoryLengthBlock } from "./practice-story-length.js";
+import { collectPracticeStoryEngine, type PracticeStoryEngineBlock } from "./practice-story-rounds.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
 import {
   practiceLengthRows,
@@ -227,6 +240,15 @@ export type PracticeDebateResult = Readonly<{
   length?: PracticeLengthBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
+  /**
+   * Pinned final writers (R1d): each pin, the model the run's own pin names, the models that served the step, whether it
+   * held (the pinned model served it); absent without a pin.
+   */
+  writerPins?: PracticeWriterPinsBlock;
+  /** Length guidance (LG-D): the storyteller's words per field and its unreadable replies; absent when it could not be read. */
+  storyLength?: PracticeStoryLengthBlock;
+  /** Engine row (R1d): the engine the run was admitted with, the story's rounds and backups, the stories by outcome. */
+  storyEngine?: PracticeStoryEngineBlock;
   /**
    * Hosted mode only (absent in local mode): the ask went through the room or the daily guard, billing as the register
    * says it and as the practice ran it (always off), the ceilings the run was held to (micro-dollars), and the names
@@ -382,9 +404,6 @@ export function practiceUnrepairedRows(tries: readonly PracticeTryRecord[]): rea
   return Object.freeze(rows);
 }
 
-function modelOfRef(providerRef: string): string {
-  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
-}
 
 function usageOf(metadata: unknown): { input: number; output: number } {
   const usage = typeof metadata === "object" && metadata !== null ? (metadata as { usage?: unknown }).usage : undefined;
@@ -401,7 +420,8 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
   "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
-  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
+  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">
+  & Readonly<{ answerWritersServed: readonly string[] }>> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
     `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text, thinking_level
@@ -421,7 +441,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
   let refusedCalls = 0;
   // Owner ruling 2026-10-12 ("Fixed slips = warning"): a call is one step on one maker (its call-site key and its actor)
   // with all its tries, in ledger order: its format repair, its one resend after an unbilled refusal, the final retry.
-  const calls = new Map<string, { model: string; tries: PracticeCallTry[] }>();
+  const calls = new Map<string, { model: string; family: PracticeCallFamily; tries: PracticeCallTry[] }>();
   const jsonRepairs: { model: string; repair: string }[] = [];
   const measured: PracticeMeasuredAttempt[] = [];
   /** Each failure's call (`calls` key), in `failures` order: a structure-repair try's failure is its original call's. */
@@ -469,7 +489,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
   const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
   for (const entry of entries) {
-    const model = modelOfRef(entry.actor_ref);
+    const model = practiceModelOfRef(entry.actor_ref);
     const site = callFamilyOf(entry.call_site_key);
     const key = `${entry.actor_ref}\u0000${site}`;
     const bucket = buckets.get(key) ?? { model, providerRef: entry.actor_ref, site, calls: 0, outcomes: {}, parse: {},
@@ -511,7 +531,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         thinkingTokens: artifact.thinking_tokens, cachedInputTokens: artifact.cached_input_tokens, actualWords: artifact.actual_words,
         guidedWords: artifact.guided_words }));
     }
-    const call = calls.get(callKey) ?? { model: callModel, tries: [] };
+    const call = calls.get(callKey) ?? { model: callModel, family: callFamilyOf(entry.call_site_key), tries: [] };
     calls.set(callKey, call);
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
@@ -570,7 +590,9 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
-    tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured) };
+    tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured),
+    // Ruling A1 (Task 21 review): the models that served the final writer, for the pins only (not a report member).
+    answerWritersServed: practiceServedModels(callList.map(([, call]) => call), "SYNTHESIZER") };
 }
 
 function codeOf(error: unknown): string {
@@ -599,6 +621,8 @@ export async function runPracticeDebate(input: Readonly<{
   /** Test seams: the runner's cooldown hold and the preview policy's resend wait. */
   wait?: (milliseconds: number) => Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
+  /** Test seam: the ask's `as_of` (ISO time; it seeds the role rotation). Absent: the time of the ask. */
+  asOf?: string;
   progress?: (line: string) => void;
   /** `--transcript`: the folder transcript.json is written to, before the throwaway database is deleted; null: none. */
   transcriptDirectory?: string | null;
@@ -606,6 +630,10 @@ export async function runPracticeDebate(input: Readonly<{
   shape?: PracticeShapeOverride;
   /** Length guidance (`--length-policy`, LG-C): the checked policy file; absent: the imported register's own row, if any. */
   length?: LengthGuidancePolicy;
+  /** Engine row (`--engine-policy`, R1d): put into the throwaway register only (or carried by --register-next's version). */
+  engine?: EngineVersionPolicy;
+  /** Pinned final writers (`--answer-writer-model`, `--storyteller-model`, R1d): absent: the rotation's own picks. */
+  pins?: PracticeWriterPins;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
 }>): Promise<PracticeDebateResult> {
@@ -652,8 +680,13 @@ export async function runPracticeDebate(input: Readonly<{
     // the live services would. The export file is only read; the live register is never reached.
     const shapePolicy = input.shape === undefined ? null : input.shape.policy;
     const lengthPolicy = input.length ?? null;
-    const overrideVersion: PracticeOverrideVersion | null = (shapePolicy === null && lengthPolicy === null) || receipt.codeNext !== undefined
-      ? null : await publishPracticeOverrideVersion(pool, input.register, receipt, { shape: shapePolicy, length: lengthPolicy });
+    // R1d: the engine row joins the same ONE throwaway version (never a second version on top). `engine` is passed
+    // only when given, so a run without --engine-policy hands over exactly LG-C's `{ shape, length }`.
+    const enginePolicy = input.engine ?? null;
+    const overrideVersion: PracticeOverrideVersion | null =
+      (shapePolicy === null && lengthPolicy === null && enginePolicy === null) || receipt.codeNext !== undefined ? null
+        : await publishPracticeOverrideVersion(pool, input.register, receipt,
+          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }) });
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     // The practice's own override version (no --register-next) keeps the settings' mode.
@@ -667,8 +700,9 @@ export async function runPracticeDebate(input: Readonly<{
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
-      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow]] as const) {
-        if (change !== null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
+      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
+        // `!= null`: a row the version did not touch is null (Task 20 review 2: a caller's double may leave it out).
+        if (change != null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
     }
@@ -696,6 +730,12 @@ export async function runPracticeDebate(input: Readonly<{
     const lengthRow = await readLengthGuidancePolicy(pool, settings.runner.REGISTER_VERSION);
     if (lengthPolicy !== null && lengthRow === null) {
       throw new PracticeRefusal("PRACTICE_LENGTH_POLICY_NOT_PUBLISHED", "the code's next version was composed without --length-policy");
+    }
+    // Engine row (R1d): read RAW, as the runner reads it (INTERFACE §1.3). A flag whose row is not in the version the
+    // debate runs on would silently run engine 1: refused before any AI is asked.
+    const engineRow = await readEngineVersionPolicy(pool, settings.runner.REGISTER_VERSION);
+    if (enginePolicy !== null && engineRow === null) {
+      throw new PracticeRefusal("PRACTICE_ENGINE_POLICY_NOT_PUBLISHED", "the code's next version was composed without --engine-policy");
     }
     // FLAG only: what the length row did in that version (with --register-next, as the code's next version's delta).
     const lengthRowChange: PracticeLengthBlock["row"] = overrideVersion !== null ? overrideVersion.lengthRow
@@ -753,6 +793,7 @@ export async function runPracticeDebate(input: Readonly<{
       settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress,
       onQuestionLanguage: (outcome) => { languageOutcomes.push(outcome); },
+      ...(input.pins === undefined ? {} : { pins: input.pins }),
       // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
       ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
@@ -767,7 +808,7 @@ export async function runPracticeDebate(input: Readonly<{
       question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
       risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "asker-declaration:preview-practice", composition_budget_tier: "high", plan_tier: "premium",
-      depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: new Date().toISOString(),
+      depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: input.asOf ?? new Date().toISOString(),
       steering_presets: [], steering_annotations: []
     } as unknown as AskRequest;
     const session = { asker_id: `owner:${ownerRef}`, session_id: sessionId, caller_scope: "ASKER",
@@ -824,6 +865,7 @@ export async function runPracticeDebate(input: Readonly<{
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
         ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
+        ...(input.pins === undefined ? {} : { writerPins: practiceWriterPinsBlock(input.pins, null, null) }),
         // Length guidance: where the row came from, with no frozen numbers (no run was admitted).
         ...(lengthSource === null ? {} : { length: practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange, frozen: null }) }),
         ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
@@ -905,7 +947,36 @@ export async function runPracticeDebate(input: Readonly<{
         progress(`transcript could not be written: ${codeOf(error)}`);
       }
     }
-    const collected = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    const { answerWritersServed, ...collected } = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    // Pinned final writers (R1d; Task 21 review ruling A1): which models the run's own pin names, and which actually
+    // served each step (the answered final-writer calls; the stored story's storyteller), beside the pins (codes and
+    // model ids only). A cost fallback or a backup storyteller serving instead: not held.
+    const writerPins = input.pins === undefined ? undefined : practiceWriterPinsBlock(input.pins, rotation,
+      { answerWriter: answerWritersServed, storyteller: practiceServedStoryteller(storedStory) });
+    if (writerPins !== undefined) {
+      for (const [name, entry] of [["answer writer", writerPins.answerWriter], ["storyteller", writerPins.storyteller]] as const) {
+        if (entry !== null) progress(`pinned ${name} ${entry.pinnedModel}: ${entry.held ? "held" : `not held (${entry.wroteModel ?? "no rotation"}`
+          + `, served by ${entry.servedBy.length === 0 ? "none" : entry.servedBy.join(", ")})`}`);
+      }
+    }
+    // Length guidance (LG-D): the story's words per field and its unreadable replies, read before the database goes.
+    // A reading that breaks costs only this block, never the report.
+    let storyLength: PracticeStoryLengthBlock | undefined;
+    try {
+      storyLength = await collectPracticeStoryLength(pool, job.runId) ?? undefined;
+      if (storyLength === undefined) progress("story length: the run's row is absent");
+    } catch (error) {
+      progress(`story length: could not be read (${codeOf(error)})`);
+    }
+    // Engine row (R1d): the engine from the run's own receipt, the story's rounds and backups, the stories by outcome
+    // (the stored story's backup record comes from the story the practice already read). Same rule: only this block.
+    let storyEngine: PracticeStoryEngineBlock | undefined;
+    try {
+      storyEngine = await collectPracticeStoryEngine(pool, job.runId, storedStory) ?? undefined;
+      if (storyEngine === undefined) progress("story rounds: the run's row is absent");
+    } catch (error) {
+      progress(`story rounds: could not be read (${codeOf(error)})`);
+    }
     // Debate shape: what the shape run did, read before the database goes. A reading that breaks costs only this block
     // (NOT_PROVEN: the shape was not shown to run), never the report.
     let shape: PracticeShapeBlock | undefined;
@@ -957,12 +1028,15 @@ export async function runPracticeDebate(input: Readonly<{
       }),
       run: Object.freeze({ runId: job.runId, workItemOutcome, failureCode, answer, story }),
       ...collected, probes: Object.freeze(probes), remaining,
+      ...(storyLength === undefined ? {} : { storyLength }),
+      ...(storyEngine === undefined ? {} : { storyEngine }),
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
       parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript }),
       ...(shape === undefined ? {} : { shape }),
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
+      ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })
     });
   } finally {

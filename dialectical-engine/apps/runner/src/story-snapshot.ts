@@ -1,9 +1,11 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
 import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
-import type { LengthGuidance } from "@debateai/register";
+import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
+  type StoryBackupCandidate,
+  type StoryBackupMaker,
   type StoryCostFallback,
   type StoryRoleMaker,
   type StoryRoleResolver,
@@ -152,6 +154,24 @@ export interface StorySnapshotSource {
   readonly answersNote?: StoryAnswersNoteKind | undefined;
   /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers, only when the receipt carries them. */
   readonly lengthGuidance?: LengthGuidance | undefined;
+  /**
+   * Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §3.3, §5.1): the run's receipt `engine` member
+   * (`engineOfRun(envelopeBasis)` when it is engine 2). With the length table above, the story is told v4. Null or
+   * absent: an engine-1 debate, whose story keeps today's bytes.
+   */
+  readonly engine?: EngineSettings | null;
+  /**
+   * R1d (spec §7.2 item 11): the backup storyteller's candidates, the run's claim-eligible members in its stored panel's
+   * order (`storyBackupCandidatesFrom`), without the members the preview's sit-out book has benched. The runner hands
+   * them over only for an engine-2 debate.
+   */
+  readonly backupCandidates?: readonly StoryBackupCandidate[];
+  /**
+   * R1d (whole-branch review Minor 1, ruling W1): every claim-eligible member's maker, BEFORE the sit-out filter
+   * (`storyBackupMakersFrom`), out-of-panel register refs included, so the backup's maker rule knows the resolved roles'
+   * makers even when their refs are not candidates. Handed over only for an engine-2 debate.
+   */
+  readonly backupMakers?: readonly StoryBackupMaker[];
 }
 
 /**
@@ -176,6 +196,24 @@ export function storySeatRoleMaker(
 }
 
 /**
+ * The run's claim-eligible members in its STORED panel's order (`discoveredPanel`), each once; a claim-eligible member
+ * that is not on the panel is never taken. The one ordering the story's rotated roles and its backup storytellers share.
+ */
+function claimEligibleInPanelOrder<T extends Readonly<{ providerRef: string }>>(
+  panelRefs: readonly string[],
+  claimEligible: readonly T[]
+): readonly T[] {
+  const eligibleByRef = new Map(claimEligible.map((member) => [member.providerRef, member] as const));
+  const seen = new Set<string>();
+  return panelRefs.flatMap((ref) => {
+    const member = eligibleByRef.get(ref);
+    if (member === undefined || seen.has(ref)) return [];
+    seen.add(ref);
+    return [member];
+  });
+}
+
+/**
  * Role rotation, Task 12 (spec 2026-10-11 Part 6, "Story roles"; the orchestrator's "always an answer"): a rotated
  * run's story pair. A pinned story member that is claim-eligible keeps its role. One that is not hands it to another
  * claim-eligible member of the run's STORED panel (`discoveredPanel`), in that panel's order, skipping every member not
@@ -194,14 +232,7 @@ export function storyRotationRoleMakers(input: Readonly<{
   storytellerRef: string;
   storyCheckerRef: string;
 }>): StoryRunRoleMakers {
-  const eligibleByRef = new Map(input.claimEligible.map((member) => [member.providerRef, member] as const));
-  const seen = new Set<string>();
-  const inPanelOrder = input.panelRefs.flatMap((ref) => {
-    const member = eligibleByRef.get(ref);
-    if (member === undefined || seen.has(ref)) return [];
-    seen.add(ref);
-    return [member];
-  });
+  const inPanelOrder = claimEligibleInPanelOrder(input.panelRefs, input.claimEligible);
   const pinnedStoryteller = inPanelOrder.find((member) => member.providerRef === input.storytellerRef);
   const pinnedChecker = inPanelOrder.find((member) => member.providerRef === input.storyCheckerRef);
   const storyteller = pinnedStoryteller
@@ -213,6 +244,31 @@ export function storyRotationRoleMakers(input: Readonly<{
   const roleMaker = (member: (typeof inPanelOrder)[number] | undefined): StoryRoleMaker | null =>
     member === undefined ? null : Object.freeze({ provider: member.provider, providerRef: member.providerRef });
   return Object.freeze({ storyteller: roleMaker(storyteller), checker: roleMaker(checker) });
+}
+
+/**
+ * Engine redesign R1d (spec 2026-10-15 §7.2 item 11, "the next AI in the story rotation"): the backup storyteller's
+ * candidates — the run's claim-eligible members in its stored panel's order, each with its own gateway and maker. The
+ * story package picks the first whose maker is neither the first storyteller's nor the checker's
+ * (`pickBackupStoryteller`). Pure.
+ */
+export function storyBackupCandidatesFrom(input: Readonly<{
+  panelRefs: readonly string[];
+  claimEligible: readonly Readonly<{ provider: StoryRoleMaker["provider"]; providerRef: string; maker: string }>[];
+}>): readonly StoryBackupCandidate[] {
+  return Object.freeze(claimEligibleInPanelOrder(input.panelRefs, input.claimEligible)
+    .map((member) => Object.freeze({ provider: member.provider, providerRef: member.providerRef, maker: member.maker })));
+}
+
+/**
+ * Engine redesign R1d (whole-branch review Minor 1, ruling W1): the backup's maker rule's makers — every claim-eligible
+ * member of the run, in the order given, BEFORE the sit-out filter, out-of-panel register refs included, each as its ref
+ * and maker only (no gateway: none of them is offered). Pure.
+ */
+export function storyBackupMakersFrom(
+  claimEligible: readonly Readonly<{ providerRef: string; maker: string }>[]
+): readonly StoryBackupMaker[] {
+  return Object.freeze(claimEligible.map((member) => Object.freeze({ providerRef: member.providerRef, maker: member.maker })));
 }
 
 /**
@@ -343,6 +399,10 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),
     ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
     ...(source.lengthGuidance === undefined ? {} : { lengthGuidance: source.lengthGuidance }),
-    ...(source.languageLocked === true ? { languageLocked: true as const } : {})
+    ...(source.languageLocked === true ? { languageLocked: true as const } : {}),
+    // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
+    ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
+    ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),
+    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) })
   });
 }

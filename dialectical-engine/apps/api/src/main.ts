@@ -94,6 +94,8 @@ import {
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
   debateShapeInForce,
+  readEngineVersionPolicy,
+  engineInForce,
   readLengthGuidancePolicy,
   lengthGuidedFirstCallCeiling,
   readRecoveryPolicy,
@@ -205,6 +207,7 @@ import { PostgresSupportIncidentRepository } from "./support/incidents.js";
 import { readLimits } from "./support/limits.js";
 import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
+import { assertEngineHasLengthPolicy } from "./engine-ask.js";
 
 const environment = loadApiEnvironment();
 // NETOPIA spec 2026-10-05 §2.17.1: a removed card-processor setting still in api.env is named once, never its value.
@@ -641,6 +644,12 @@ const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
 // Length guidance (spec 2026-10-15 §3.1): the optional row; absent = today's asks byte for byte, a malformed row refuses
 // the boot (LENGTH_GUIDANCE_POLICY_INVALID). Only the ask side reads it; the runner reads each run's receipt.
 const lengthGuidancePolicy = await boot.run("length-guidance-policy", () => readLengthGuidancePolicy(pool, environment.REGISTER_VERSION));
+// Engine redesign (R1d; spec 2026-10-15 §3.1, §3.3): the optional engine row; absent or `enabled: false` = engine 1 for
+// every ask, byte for byte; malformed = the boot refuses (ENGINE_VERSION_POLICY_INVALID:<path>); in force without the length
+// row = the boot refuses (ENGINE_REQUIRES_LENGTH_POLICY). Only the ask side reads it; the runner reads each run's receipt.
+const engineVersionPolicy = await boot.run("engine-version-policy", () => readEngineVersionPolicy(pool, environment.REGISTER_VERSION));
+const engineInForcePolicy = engineInForce(engineVersionPolicy);
+boot.runSync("engine-requires-length-policy", () => assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy));
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
 // the debate targets take above. Hosted refuses a relay target here exactly as
 // it refuses one there; local keeps today's relay path. Parsed HERE, above the
@@ -1076,6 +1085,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
   // Length guidance (spec 2026-10-15 §3.1): admission freezes the numbers on the receipt only with the row.
   ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
+  // Engine redesign (R1d): admission freezes engine 2 on the receipt only with the row in force.
+  ...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),
   // Question language (spec 2026-10-13): the decider, composed above only with the shape row in force.
   ...(questionLanguage === undefined ? {} : { questionLanguage }),
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
@@ -1095,7 +1106,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
     ...(input.shape === null ? {} : { shape: input.shape }),
     // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
-    ...(input.length === null ? {} : { length: input.length })
+    ...(input.length === null ? {} : { length: input.length }),
+    // Engine redesign (R1d): engine 2's settings admission resolved for this panel, or none (today's receipt).
+    ...(input.engine === null ? {} : { engine: input.engine })
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({

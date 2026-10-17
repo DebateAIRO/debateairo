@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
 import { buildFramedPrompt } from "@debateai/providers";
 import {
-  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY
+  DEBATE_SHAPE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, debateShapePolicyStartValues, engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY
 } from "@debateai/register";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import {
@@ -11,7 +12,7 @@ import {
   practiceLengthOverrideFromArgs
 } from "../../tools/preview-practice/practice-length.js";
 import {
-  PRACTICE_LENGTH_SOURCE_REF, PRACTICE_SHAPE_SOURCE_REF, parsePracticeNextRegisterInputs, parsePracticeRegisterExport,
+  PRACTICE_ENGINE_SOURCE_REF, PRACTICE_LENGTH_SOURCE_REF, PRACTICE_SHAPE_SOURCE_REF, parsePracticeNextRegisterInputs, parsePracticeRegisterExport,
   practiceOverrideVersionRows, publishPracticeLengthVersion, publishPracticeOverrideVersion
 } from "../../tools/preview-practice/practice-register-import.js";
 import { buildTranscriptAttempts, type TranscriptArtifact } from "../../tools/preview-practice/practice-transcript.js";
@@ -119,6 +120,17 @@ describe("the throwaway version holds the overrides and this code's hashes", () 
     expect(published.keys).toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
     expect(published.keys).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(published.sourceRef).toBe(PRACTICE_LENGTH_SOURCE_REF);
+  });
+
+  // Task 20 review 1 (final wave B14): --engine-policy alone (beside the export's own length row) has its own source line.
+  it("the engine override alone: ONE publication with the engine row, under the engine's source line", async () => {
+    const { pool, calls } = capturingPool();
+    await expect(publishPracticeOverrideVersion(pool, document, { registerVersion: "5", steps: [] },
+      { shape: null, length: null, engine: engineVersionPolicyStartValues() })).rejects.toThrow("captured");
+    const published = publication(calls);
+    expect(published.keys).toContain(ENGINE_VERSION_POLICY_ROW_KEY);
+    expect(published.keys).not.toContain(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+    expect(published.sourceRef).toBe(PRACTICE_ENGINE_SOURCE_REF);
   });
 
   it("both overrides: ONE publication with both rows, under the shape's source line", async () => {

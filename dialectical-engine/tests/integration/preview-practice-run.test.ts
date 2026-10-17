@@ -1032,7 +1032,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 �
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect("shape" in report).toBe(false);
     expect("language" in report).toBe(false);
-    expect(report.ask).toEqual({ questionId: "ro", depth: 1, planTier: "premium" });
+    // R1d (Task 22, PF-D8.11): every admitted debate's ask names the engine from its own receipt; no engine row: engine 1.
+    expect(report.ask).toEqual({ questionId: "ro", depth: 1, planTier: "premium", engine: { engine: 1 } });
     expect(report.byModelAndSite.some((row) => row.site === "MAP")).toBe(false);
     expect(stubs.requests.some((request) => request.kind === "MAP")).toBe(false);
     // Without the row the ask builds, calls and reads nothing new (P2L): no fast language check either.
@@ -1173,4 +1174,325 @@ describe("preview practice: language mode, the question language (P2L)", () => {
     const markdown = readFileSync(join(out, "report.md"), "utf8");
     expect(markdown).toContain(`original «${MIX.questionLine}»; rewrite «${PRACTICE_LANGUAGE_DRY_REWRITES["lang-ro-en-mix"]!}»`);
   }, 300_000);
+});
+
+/**
+ * Engine row + story v4 (spec 2026-10-15 engine redesign §7, §14; plan R1d Task 24): a whole practice debate against the
+ * scripted gates. With the length row AND the engine row the story is engine 2's (storyteller v4 and checker v4, each
+ * told its targets, no shape asked, the pack default stored); with the length row alone, or with neither, it is
+ * today's v3. A checker that finds round 1 misleading starts round 2, which revises its own draft.
+ */
+describe("engine 2's story (R1d)", () => {
+  const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
+  const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
+  type PinOutcome = { pinnedModel: string; wroteModel: string | null; servedBy: string[]; held: boolean };
+  type EngineReport = {
+    verdict: string; reasons: string[]; ask: { engine?: { engine: number } };
+    register: { registerVersion: string; codeNext?: { addedKeys: string[] } };
+    run: { story: { outcome: string } };
+    storyRounds?: { model: string; round: number; misleading: boolean | null; wordingNoteOnly: boolean; revisedOwnDraft: boolean; outcome: string }[];
+    storyBackups?: unknown[];
+    storyReadyRate?: { ready: number; readyWithReservation: number; failed: number };
+    storyLengthByField?: { field: string; guidedWords: number | null }[];
+    storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
+    writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
+    admission: { panel: { providerRef: string; modelId: string }[];
+      rotation: { answerWriter: string; answerChecker: string; storyteller: string; storyChecker: string } | null };
+  };
+  /**
+   * Carried from Task 22: the report's new blocks are PRESENT and in report.md. Their two database readers
+   * (collectPracticeStoryLength, collectPracticeStoryEngine) swallow a failure into a progress line and leave the block
+   * out, so a reader that broke on the real database would otherwise go unseen.
+   */
+  const expectStoryBlocks = (report: EngineReport, out: string, engine: 1 | 2, storytellers?: readonly string[]) => {
+    expect(report.ask.engine).toEqual({ engine });
+    expect(report.storyRounds?.length).toBeGreaterThan(0);
+    expect(report.storyBackups).toBeDefined();
+    expect(report.storyReadyRate).toBeDefined();
+    expect(report.storyLengthByField?.length).toBeGreaterThan(0);
+    // One row per storyteller AI; the stand-ins always answer readable JSON.
+    expect(report.storyJsonBreaks?.length).toBeGreaterThan(0);
+    expect(report.storyJsonBreaks!.every((row) => row.replies > 0 && row.parseFailed === 0)).toBe(true);
+    if (storytellers !== undefined) expect(report.storyJsonBreaks!.map((row) => row.model).sort()).toEqual([...storytellers].sort());
+    const markdown = readFileSync(join(out, "report.md"), "utf8");
+    expect(markdown).toContain(engine === 2 ? "Engine: 2 (the engine row; the story is told with story v4)." : "Engine: 1 (today's engine; story v3).");
+    expect(markdown).toContain("Story rounds (codes only;");
+    expect(markdown).toContain(`Story outcomes: READY ${String(report.storyReadyRate!.ready)}, `);
+    expect(markdown).toContain("Story length per AI and field");
+  };
+  const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
+  const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>
+    requests.filter((request) => request.kind === kind && request.answer === "OK");
+  const ownTurnOf = (request: GateRecord) => wirePacket(stubChatBody(request.provider, request.body)).messages
+    .find((message) => message.role === "assistant")?.content;
+  /** The story's own calls carry no `length` field and keep today's v3 contracts. */
+  const expectStoryV3 = (requests: readonly GateRecord[]) => {
+    const calls = [...answered(requests, "STORYTELLER"), ...answered(requests, "STORY_CHECKER")];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      const framed = framedOf(call);
+      expect(["story.storyteller.v3", "story.checker.v3"]).toContain(framed.contractId);
+      expect(framed.fields.map((field) => field.name)).not.toContain("length");
+    }
+  };
+  /** A v4 checker reply that finds the story misleading (in the practice question's language, Romanian). */
+  const OBJECTION = "Rezumatul spune că toate pozițiile au rezistat, dar materialul arată că a doua poziție a căzut în fața obiecției sale.";
+  const MISLEADING_V4 = JSON.stringify({ satisfied: false, misleading: true, objection: OBJECTION, criteria: {
+    faithful_to_material: false, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
+    citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
+  } });
+
+  // Task 20 review 1 (final wave B14): engine 2 needs the length row; the export has none and no --length-policy is given,
+  // so runPractice refuses at its argument checks, before the throwaway database starts and before any gate is asked.
+  it("--engine-policy without any length row: PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY before the database starts (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const lines: string[] = [];
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--engine-policy", ENGINE_POLICY_START], env, { ...quiet, log: (line: string) => { lines.push(line); } });
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY"]);
+    expect(lines.some((line) => line.includes("practice database started"))).toBe(false);
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 60_000);
+
+  it("R1d-1 --register-next --length-policy --engine-policy: storyteller v4 and checker v4 with their targets, no shape asked, the pack default stored, ask.engine 2: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--transcript"], env, quiet);
+    const report = outcome.report as unknown as EngineReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    // The kit's own source build carried both rows into the code's next version (Task 20's --register-next path).
+    expect(report.register.codeNext?.addedKeys).toEqual(expect.arrayContaining(["engineVersionPolicy", "lengthGuidancePolicy"]));
+    expect(report.ask.engine).toEqual({ engine: 2 });
+    expect(report.run.story.outcome).toBe("READY");
+    const tellers = answered(stubs.requests, "STORYTELLER");
+    const checkers = answered(stubs.requests, "STORY_CHECKER");
+    expect(tellers.length).toBeGreaterThan(0);
+    expect(checkers.length).toBeGreaterThan(0);
+    for (const teller of tellers) {
+      const framed = framedOf(teller);
+      expect(framed.contractId).toBe("story.storyteller.v4");
+      expect(framed.fields.find((field) => field.name === "length")?.content).toMatch(/^short\.headline: about 15 words\n/u);
+      // Decision 2: the AI is never asked for a shape id; code sets it.
+      expect(stubChatBody(teller.provider, teller.body)).not.toContain("shape_id");
+    }
+    for (const checker of checkers) {
+      const framed = framedOf(checker);
+      expect(framed.contractId).toBe("story.checker.v4");
+      expect(framed.fields.find((field) => field.name === "length")?.content).toMatch(/\nobjection: about 250 words$/u);
+    }
+    // The one shape (R1d: the pack default) is stored on the row and in the body.
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as {
+      structure: { story: { shapeId: string | null; body: { shape_id: string } | null } | null } };
+    expect(PACK.defaultShape).toBe("general");
+    expect(transcript.structure.story?.shapeId).toBe("general");
+    expect(transcript.structure.story?.body?.shape_id).toBe("general");
+    expectStoryBlocks(report, out, 2);
+    expect(report.storyRounds).toHaveLength(1);
+    expect(report.storyRounds?.[0]).toMatchObject({ round: 1, outcome: "SATISFIED", misleading: false, revisedOwnDraft: false });
+    expect(report.storyBackups).toEqual([]);
+    expect(report.storyReadyRate).toEqual({ ready: 1, readyWithReservation: 0, failed: 0 });
+    expect(report.storyLengthByField!.find((row) => row.field === "headline")?.guidedWords).toBe(15);
+    expect(report.storyLengthByField!.find((row) => row.field === "long")?.guidedWords).toBeNull();
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+  }, 900_000);
+
+  it("R1d-2 --length-policy alone: the story stays v3 with no length field, the other calls are told their lengths, ask.engine 1: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--length-policy", LENGTH_POLICY_START], env, quiet);
+    const report = outcome.report as unknown as EngineReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.ask.engine).toEqual({ engine: 1 });
+    expectStoryV3(stubs.requests);
+    // LG-C's own calls are lengthed with the length row (decision 1 changes only the story).
+    const others = stubs.requests.filter((request) => request.answer === "OK"
+      && !["PROBE", "STORYTELLER", "STORY_CHECKER", "UNKNOWN"].includes(request.kind));
+    expect(others.some((request) => framedOf(request).fields.some((field) => field.name === "length" || field.name === "answer_length"))).toBe(true);
+    // The story was told without targets: the table shows its words with none.
+    expect(report.storyLengthByField!.length).toBeGreaterThan(0);
+    expect(report.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
+    expect(report.storyRounds!.every((row) => row.misleading === null)).toBe(true);
+    expectStoryBlocks(report, out, 1);
+    expect(report.storyBackups).toEqual([]);
+    expect(report.storyReadyRate).toEqual({ ready: 1, readyWithReservation: 0, failed: 0 });
+  }, 900_000);
+
+  it("R1d-3 neither row, the answer writer and the storyteller pinned: today's v3 story, ask.engine 1, both pins held: PASS (exit 0)", async () => {
+    const { stubs, env, common, quiet, out } = await scenario();
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--answer-writer-model", HAIKU, "--storyteller-model", MIMO], env, quiet);
+    const report = outcome.report as unknown as EngineReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.ask.engine).toEqual({ engine: 1 });
+    expectStoryV3(stubs.requests);
+    expect(report.writerPins).toEqual({
+      // Ruling A1 (Task 21 review): held = the pinned model SERVED the step (the answered final-writer calls; the stored story).
+      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU], held: true },
+      storyteller: { pinnedModel: MIMO, wroteModel: MIMO, servedBy: [MIMO], held: true }
+    });
+    expect(new Set(answered(stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([MIMO]));
+    expect(new Set(stubs.requests.filter((request) => request.kind === "COMPOSE" && request.answer === "OK").map((request) => request.model)))
+      .toEqual(new Set([HAIKU]));
+    expect(report.storyBackups).toEqual([]);
+    expect(report.storyReadyRate).toEqual({ ready: 1, readyWithReservation: 0, failed: 0 });
+    expectStoryBlocks(report, out, 1, [MIMO]);
+    expect(report.storyRounds!.every((row) => row.model === MIMO && row.misleading === null)).toBe(true);
+    expect(report.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, served by ${MIMO}, held: yes`);
+  }, 900_000);
+
+  it("R1d-4 --length-policy --engine-policy, round 1's checker finds the story misleading: round 2 sends the storyteller its own draft as its own turn and the problems, and the story is READY: PASS (exit 0)", async () => {
+    let checkerCalls = 0;
+    const misleadingFirst = (request: GateRequest): GateOverride | null =>
+      request.kind === "STORY_CHECKER" && ++checkerCalls === 1 ? { content: MISLEADING_V4 } : null;
+    const { stubs, env, common, quiet, out } = await scenario(misleadingFirst);
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START], env, quiet);
+    const report = outcome.report as unknown as EngineReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(outcome.exitCode).toBe(0);
+    // The practice's own throwaway version (no --register-next) carried both rows (Task 20's override path).
+    expect(report.register.registerVersion).toBe("6");
+    expect(report.ask.engine).toEqual({ engine: 2 });
+    const tellers = answered(stubs.requests, "STORYTELLER");
+    expect(tellers).toHaveLength(2);
+    expect(ownTurnOf(tellers[0]!)).toBeUndefined();
+    // Round 2: a fresh call, the round-1 material unchanged, the accepted draft as the model's own turn, then the problems.
+    const ownTurn = ownTurnOf(tellers[1]!);
+    expect(ownTurn).toBeDefined();
+    expect(ownTurn).not.toContain("shape_id");
+    expect(JSON.parse(ownTurn!)).toHaveProperty("short");
+    const revision = framedOf(tellers[1]!);
+    expect(revision.contractId).toBe("story.storyteller.v4");
+    expect(revision.fields.at(-1)).toMatchObject({ name: "machine_reply_form", content: "REVISION" });
+    expect(revision.fields.find((field) => field.name === "revision_problems")?.content).toBe(OBJECTION);
+    expect(revision.fields.map((field) => field.name)).not.toContain("prior_objection");
+    expect(report.storyRounds).toEqual([
+      expect.objectContaining({ round: 1, misleading: true, wordingNoteOnly: false, revisedOwnDraft: false, outcome: "MISLEADING" }),
+      expect.objectContaining({ round: 2, misleading: false, revisedOwnDraft: true, outcome: "SATISFIED" })
+    ]);
+    expect(report.run.story.outcome).toBe("READY");
+    // Carried: the blocks are present; the draft's own maker revised it; the table shows engine 2's targets.
+    expectStoryBlocks(report, out, 2, [tellers[0]!.model]);
+    expect(tellers[1]!.model).toBe(tellers[0]!.model);
+    expect(report.storyRounds![1]!.model).toBe(report.storyRounds![0]!.model);
+    expect(report.storyBackups).toEqual([]);
+    expect(report.storyReadyRate).toEqual({ ready: 1, readyWithReservation: 0, failed: 0 });
+    expect(report.storyLengthByField!.find((row) => row.field === "headline")?.guidedWords).toBe(15);
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+  }, 900_000);
+
+  it("R1d-5 formats --lanes STORYTELLER,STORY_CHECKER --story-length: every AI is asked engine 2's story (v4) and check with their targets; without the switch, today's v3 ids and no length field: PASS", async () => {
+    type FormatsStoryReport = { verdict: string; reasons: string[];
+      byModelAndLane: { model: string; lane: string; statuses: Record<string, number> }[];
+      storyLengthByField?: { model: string; field: string; guidedWords: number | null }[] };
+    const args = ["--samples", "1", "--gap-ms", "0", "--lanes", "STORYTELLER,STORY_CHECKER"];
+    const v4 = await scenario();
+    const told = await runPractice(["formats", ...v4.common, ...args, "--story-length"], v4.env, v4.quiet);
+    const toldReport = told.report as unknown as FormatsStoryReport;
+    expect({ verdict: toldReport.verdict, reasons: toldReport.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(toldReport.byModelAndLane).toHaveLength(10);
+    expect(toldReport.byModelAndLane.every((row) => JSON.stringify(row.statuses) === JSON.stringify({ PARSED: 1 }))).toBe(true);
+    const tellers = answered(v4.stubs.requests, "STORYTELLER");
+    const checkers = answered(v4.stubs.requests, "STORY_CHECKER");
+    // One story job and one check job per AI; the other half of each job is the practice's local stand-in.
+    expect(new Set(tellers.map((request) => request.model))).toEqual(new Set(FIVE));
+    expect(new Set(checkers.map((request) => request.model))).toEqual(new Set(FIVE));
+    expect(tellers).toHaveLength(5);
+    expect(checkers).toHaveLength(5);
+    for (const teller of tellers) {
+      const framed = framedOf(teller);
+      expect(framed.contractId).toBe("story.storyteller.v4");
+      expect(framed.fields.find((field) => field.name === "length")?.content).toMatch(/^short\.headline: about 15 words\n/u);
+      expect(stubChatBody(teller.provider, teller.body)).not.toContain("shape_id");
+    }
+    for (const checker of checkers) {
+      const framed = framedOf(checker);
+      expect(framed.contractId).toBe("story.checker.v4");
+      expect(framed.fields.find((field) => field.name === "length")?.content).toMatch(/\nobjection: about 250 words$/u);
+    }
+    const toldHeadlines = (toldReport.storyLengthByField ?? []).filter((row) => row.field === "headline");
+    expect(new Set(toldHeadlines.map((row) => row.model))).toEqual(new Set(FIVE));
+    expect(toldHeadlines.every((row) => row.guidedWords === 15)).toBe(true);
+    expect(v4.stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+
+    const v3 = await scenario();
+    const today = await runPractice(["formats", ...v3.common, ...args], v3.env, v3.quiet);
+    const todayReport = today.report as unknown as FormatsStoryReport;
+    expect({ verdict: todayReport.verdict, reasons: todayReport.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(todayReport.byModelAndLane).toHaveLength(10);
+    expect(todayReport.byModelAndLane.every((row) => JSON.stringify(row.statuses) === JSON.stringify({ PARSED: 1 }))).toBe(true);
+    expect(answered(v3.stubs.requests, "STORYTELLER")).toHaveLength(5);
+    expect(answered(v3.stubs.requests, "STORY_CHECKER")).toHaveLength(5);
+    expectStoryV3(v3.stubs.requests);
+    expect(todayReport.storyLengthByField?.length).toBeGreaterThan(0);
+    expect(todayReport.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
+    expect(v3.stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+  }, 600_000);
+
+  /**
+   * Task 18's filter (controller ruling "backup vs sit-out book"; until now pinned by source text only): a maker the
+   * preview's sit-out book has benched is never the backup storyteller. The control run finds the AI the backup goes
+   * to when nobody sits out; the second run makes that AI sit out (its first call ends in the vendor's gate-proven
+   * unbilled refusal, the call and its resend) and the backup goes to another maker, which tells the story.
+   * Fix round 1: the role rotation is seeded by the ask's `as_of` and question, so both runs ask with the SAME fixed
+   * `as_of` and draw the same roles; the benched AI (the control's backup) is then never the planned story checker,
+   * whom the picker skips anyway, and the case can only pass through Task 18's filter (asserted below).
+   */
+  it("R1d-6 --length-policy --engine-policy, the pinned storyteller unreachable: a backup of another maker tells the story; a maker the sit-out book benched is never the backup", async () => {
+    type BackupRow = { firstModel: string; signal: string; backupModel: string | null; outcome: string };
+    const storytellerDown = (request: GateRequest): GateOverride | null =>
+      request.model === MIMO && request.kind === "STORYTELLER" ? { gateRefuses: "PROVIDER_ERROR_UNBILLED" } : null;
+    const args = ["--register-export", registerExportPath, "--depth", "1", "--length-policy", LENGTH_POLICY_START,
+      "--engine-policy", ENGINE_POLICY_START, "--storyteller-model", MIMO];
+    const asOf = "2026-10-17T06:00:00.000Z";
+    const modelOf = (report: EngineReport, providerRef: string | undefined) =>
+      report.admission.panel.find((member) => member.providerRef === providerRef)?.modelId;
+    const control = await scenario(storytellerDown);
+    const first = (await runPractice(["debate", ...control.common, ...args], control.env, { ...control.quiet, asOf })).report as unknown as EngineReport;
+    // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story. Final wave A1
+    // (Task 21 ruling): the pin did not hold, because the backup, not the pinned model, served the story: NOT_PROVEN.
+    expect({ verdict: first.verdict, reasons: first.reasons })
+      .toEqual({ verdict: "NOT_PROVEN", reasons: ["PRACTICE_PIN_NOT_HELD:STORYTELLER", "UNBILLED_REFUSALS:2"] });
+    expect(first.ask.engine).toEqual({ engine: 2 });
+    expect(first.run.story.outcome).toBe("READY");
+    const [controlBackup] = first.storyBackups as BackupRow[];
+    expect(first.storyBackups).toHaveLength(1);
+    expect(controlBackup).toMatchObject({ firstModel: MIMO, signal: "UNREACHABLE", outcome: "READY" });
+    const benched = controlBackup!.backupModel!;
+    expect(benched).not.toBe(MIMO);
+    expect(new Set(answered(control.stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([benched]));
+    expect(first.writerPins?.storyteller).toEqual({ pinnedModel: MIMO, wroteModel: MIMO, servedBy: [benched], held: false });
+
+    const benchedBusy = (request: GateRequest): GateOverride | null =>
+      request.model === benched && request.kind !== "PROBE" ? { unbilled: true } : storytellerDown(request);
+    const second = await scenario(benchedBusy);
+    const report = (await runPractice(["debate", ...second.common, ...args], second.env, { ...second.quiet, asOf })).report as unknown as EngineReport;
+    expect(report.ask.engine).toEqual({ engine: 2 });
+    // Precondition: the same roles in both runs, and the benched AI is not the planned story checker (whom the picker
+    // skips without any filter), so only Task 18's filter can keep the backup away from it.
+    expect(report.admission.rotation).not.toBeNull();
+    expect(report.admission.rotation).toEqual(first.admission.rotation);
+    const plannedChecker = modelOf(report, report.admission.rotation!.storyChecker);
+    expect(plannedChecker).toBeDefined();
+    expect(plannedChecker).not.toBe(benched);
+    expect(modelOf(report, report.admission.rotation!.storyteller)).toBe(MIMO);
+    expect(new Set(answered(second.stubs.requests, "STORY_CHECKER").map((request) => request.model))).toEqual(new Set([plannedChecker]));
+    // The benched AI is named busy (it sat out the rest of the run): NOT_PROVEN, as every run with a busy AI.
+    expect(report.reasons).toContain(`MODEL_BUSY:${benched}`);
+    expect(second.stubs.requests.some((request) => request.model === benched && request.answer === "UNBILLED")).toBe(true);
+    expect(second.stubs.requests.some((request) => request.model === benched && request.answer === "OK" && request.kind !== "PROBE")).toBe(false);
+    const [backup] = report.storyBackups as BackupRow[];
+    expect(report.storyBackups).toHaveLength(1);
+    expect(backup).toMatchObject({ firstModel: MIMO, signal: "UNREACHABLE", outcome: "READY" });
+    expect([benched, MIMO, null]).not.toContain(backup!.backupModel);
+    expect(second.stubs.requests.some((request) => request.model === benched && request.kind === "STORYTELLER")).toBe(false);
+    expect(new Set(answered(second.stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([backup!.backupModel]));
+    expect(report.run.story.outcome).toBe("READY");
+  }, 900_000);
 });

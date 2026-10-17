@@ -46,6 +46,7 @@ import {
   type MapReplySalvage
 } from "@debateai/map";
 import {
+  PREVIEW_PROVIDER_REF_MODELS,
   decodedRepairsOf,
   decodeModelJson,
   fixReplyStructure,
@@ -85,8 +86,10 @@ import {
 } from "@debateai/serve";
 import {
   STORY_CHECKER_CONTRACT_ID,
+  STORY_CHECKER_V4_CONTRACT_ID,
   STORY_FIXER_OPTIONS,
   STORYTELLER_CONTRACT_ID,
+  STORYTELLER_V4_CONTRACT_ID,
   StoryWriter,
   classifyCheckerContent,
   type StoryPack,
@@ -97,8 +100,9 @@ import { TypedDomainError, exhaustive, lengthCallStepOf, type LengthCallStep, ty
 // The runner's own story snapshot builder (not on the runner package's export list; practice.ts reads the runner's
 // dev register module the same way).
 import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { REVISION_REPLY_FORM, readPromptFrame, type PromptPacket } from "@debateai/providers";
 import type { PracticeQuestion } from "./practice-questions.js";
+import type { PracticeStoryV4Settings } from "./practice-story-length.js";
 import type { PracticeReplyForm } from "./practice-verdict.js";
 
 export const PRACTICE_LANES = [
@@ -158,6 +162,11 @@ export function replyContentOf(rawText: string): string {
     }
   } catch { /* not a vendor body: the text itself */ }
   return rawText;
+}
+
+/** The preview model a provider ref names, as every practice table reports it; a ref the preview does not review is named as such. */
+export function practiceModelOfRef(providerRef: string): string {
+  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
 }
 
 export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER"
@@ -360,6 +369,22 @@ export function practiceReviewEdgeCountOf(messages: PromptPacket["messages"]): n
 }
 
 /**
+ * Engine row, story v4 (R1d; spec 2026-10-15 engine redesign §7.2 item 8): a round-2 storyteller request that revises
+ * its own draft. It carries the model's accepted round-1 draft as its own (assistant) turn, then one fenced block whose
+ * last field is `machine_reply_form` REVISION (packages/providers/src/prompt-frame.ts buildFramedRevisionPrompt), read
+ * through the door. A patch follow-up also carries an assistant turn, but its form is PATCH.
+ */
+export function practiceIsRevisionPrompt(messages: PromptPacket["messages"]): boolean {
+  if (!messages.some((message) => message.role === "assistant")) return false;
+  try {
+    const last = readPromptFrame({ messages }).fields.at(-1);
+    return last?.name === "machine_reply_form" && last.content === REVISION_REPLY_FORM;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Patch follow-up (owner design, 2026-10-12): which form one attempt sent (`PracticeReplyForm`), read from the attempt's
  * own recorded prompt (the `messages` the gateway hands `persistCallPrompt` just before it sends, the same value
  * ledger.call_prompt keeps), through the frame reader the gateway's door runs:
@@ -369,6 +394,15 @@ export function practiceReviewEdgeCountOf(messages: PromptPacket["messages"]): n
  * Null when the frame cannot be read (never the case for a prompt the gateway sent).
  */
 export function practiceReplyFormOf(messages: PromptPacket["messages"]): PracticeReplyForm | null {
+  // A revision (story v4 round 2) is that round's own packet (ORIGINAL), or its full re-ask once it carries the
+  // rejection fields (FULL); never a patch, though it carries the model's own draft as an assistant turn.
+  if (practiceIsRevisionPrompt(messages)) {
+    try {
+      return readPromptFrame({ messages }).fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";
+    } catch {
+      return null;
+    }
+  }
   if (messages.some((message) => message.role === "assistant")) return "PATCH";
   try {
     return readPromptFrame({ messages }).fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";
@@ -467,6 +501,11 @@ export type PracticeLaneContext = Readonly<{
   /** Which sample of the job this is (1-based): the review job varies its edges by sample. Default 1. */
   sample?: number;
   workItemId: string;
+  /**
+   * Formats `--story-length` (LG-D, R1d): the story jobs are asked as engine 2's story (contracts v4), with the length
+   * row's targets and engine 2's start values. Absent: today's story v3.
+   */
+  storyLength?: PracticeStoryV4Settings;
 }>;
 
 /** What one job reports beyond the gateway's own record: a failure of the check that runs AFTER the gateway accepted. */
@@ -650,6 +689,27 @@ const CANNED_CHECKER = JSON.stringify({ satisfied: true, objection: null, criter
   citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
 } });
 
+/** Story v4 (R1d): the v4 checker's form carries `misleading`; a satisfied verdict sets it false. v3 keeps CANNED_CHECKER. */
+const CANNED_CHECKER_V4 = JSON.stringify({ satisfied: true, misleading: false, objection: null, criteria: {
+  faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
+  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
+} });
+
+/** Length guidance (LG-D) and story v4 (R1d): the stand-in answers the other story job by either version of its contract. */
+const STANDIN_STORYTELLER_IDS: ReadonlySet<string> = new Set<string>([STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID]);
+const STANDIN_CHECKER_IDS: ReadonlySet<string> = new Set<string>([STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID]);
+
+/**
+ * What the stand-in answers a story request with, by its contract id: the canned story for either storyteller version
+ * (under v4 code sets shape_id on the decoded story, and the canned one is the pack default anyway), the satisfied
+ * verdict in the checker's own version's form, and "{}" for anything else.
+ */
+export function practiceStandInStoryContent(pack: StoryPack, question: PracticeQuestion, contractId: string): string {
+  if (STANDIN_STORYTELLER_IDS.has(contractId)) return practiceCannedStory(pack, question);
+  if (!STANDIN_CHECKER_IDS.has(contractId)) return "{}";
+  return contractId === STORY_CHECKER_V4_CONTRACT_ID ? CANNED_CHECKER_V4 : CANNED_CHECKER;
+}
+
 /** A local stand-in for the OTHER story job, so each story job is tested on its own and costs one call. No network. */
 function cannedStoryGateway(pack: StoryPack, question: PracticeQuestion): ProviderGateway {
   let calls = 0;
@@ -657,8 +717,7 @@ function cannedStoryGateway(pack: StoryPack, question: PracticeQuestion): Provid
     async call(request: ProviderCallRequest) {
       calls += 1;
       const contractId = readPromptFrame(request.packet).contractId;
-      const content = contractId === STORYTELLER_CONTRACT_ID ? practiceCannedStory(pack, question)
-        : contractId === STORY_CHECKER_CONTRACT_ID ? CANNED_CHECKER : "{}";
+      const content = practiceStandInStoryContent(pack, question, contractId);
       return { rawArtifactRef: `practice:canned:${String(calls)}`, ledgerEntryRef: `practice:canned:${String(calls)}`, content,
         provider: "openai-compatible-http" as const, model: "practice/canned", maker: "practice", modelVersion: "practice/canned" };
     }
@@ -681,7 +740,10 @@ async function runStoryLane(context: PracticeLaneContext): Promise<PracticeLaneO
     repository: { insert: async (record) => { records.push(record); return "INSERTED" as const; } },
     readEnrichment: async () => new Map()
   });
-  await writer.writeAfterSettle(practiceStorySnapshot({ question: context.question, runId: context.runId, workItemId: context.workItemId }));
+  const snapshot = practiceStorySnapshot({ question: context.question, runId: context.runId, workItemId: context.workItemId });
+  // R1d: story v4 is told exactly when the writer has engine 2 AND the length targets (Task 17's switch).
+  await writer.writeAfterSettle(context.storyLength === undefined ? snapshot
+    : { ...snapshot, lengthGuidance: context.storyLength.lengthGuidance, engine: context.storyLength.engine });
   const record = records.at(-1);
   if (record === undefined) return { postCheckError: "STORY_NOT_RECORDED", detail: logs.join(",") };
   return { postCheckError: null, detail: `${record.outcome}${record.failureCode === null ? "" : `:${record.failureCode}`}` };

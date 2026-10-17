@@ -73,10 +73,10 @@ function recorder(script: {
   readonly checkFails?: (round: number) => unknown;
 }): {
   readonly deps: StoryLoopDependencies;
-  readonly writes: { round: number; priorObjection: string | null }[];
+  readonly writes: { round: number; priorObjection: string | null; priorDraft: StoryBody | null }[];
   readonly checks: { round: number; candidate: StoryBody }[];
 } {
-  const writes: { round: number; priorObjection: string | null }[] = [];
+  const writes: { round: number; priorObjection: string | null; priorDraft: StoryBody | null }[] = [];
   const checks: { round: number; candidate: StoryBody }[] = [];
   const verdicts = script.verdicts ?? [SATISFIED];
   return {
@@ -139,7 +139,7 @@ describe("verdict story — the loop's outcomes", () => {
         objection: null
       }]
     });
-    expect(double.writes).toEqual([{ round: 1, priorObjection: null }]);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }]);
     expect(double.checks).toEqual([{ round: 1, candidate: storyFor(1) }]);
   });
 
@@ -147,7 +147,7 @@ describe("verdict story — the loop's outcomes", () => {
     const objection = "The summary calls the answer settled; the label says it is not.";
     const double = recorder({ verdicts: [unsatisfied(objection), SATISFIED] });
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
-    expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: objection }]);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: objection, priorDraft: null }]);
     expect(double.checks.map((check) => check.candidate)).toEqual([storyFor(1), storyFor(2)]);
     expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), reservation: null, servedRound: 2, laterFailure: null });
     expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
@@ -173,7 +173,7 @@ describe("verdict story — the loop's outcomes", () => {
       { artifactRef: "artifact:checker:1", callSiteKey: "STORY:CHECKER:1", lineage: CHECKER_LINEAGE },
       { artifactRef: "artifact:checker:2", callSiteKey: "STORY:CHECKER:2", lineage: CHECKER_LINEAGE }
     ]);
-    expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: "First objection." }]);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: "First objection.", priorDraft: null }]);
   });
 
   it("stops after one round when one round is all it has", async () => {
@@ -357,7 +357,7 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       laterFailure: { failureCode: "STORY_ENVELOPE_EXHAUSTED", cause: "STORY_COST_ENVELOPE_REACHED" },
       rounds: [{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: "Fix the summary." }]
     });
-    expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: "Fix the summary." }]);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: "Fix the summary.", priorDraft: null }]);
     expect(double.checks).toHaveLength(1);
   });
 
@@ -414,5 +414,134 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       laterFailure: { failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" }
     });
     expect(outcome.rounds.map((round) => round.round)).toEqual([1, 2]);
+  });
+});
+
+/**
+ * Story v4 (R1d, spec §7.2 items 7-8): only a misleading problem starts round 2, and round 2 revises its own draft.
+ * A wording note (not satisfied, not misleading) is served READY with no reservation; its objection stays in the
+ * round record for the owner.
+ */
+function v4Verdict(objection: string | null, misleading: boolean): StoryCheckerVerdict {
+  return objection === null
+    ? Object.freeze({ ...SATISFIED, misleading: false })
+    : Object.freeze({ satisfied: false, misleading, objection, criteria: Object.freeze({ ...SATISFIED.criteria, no_overstatement: false }) });
+}
+const PROBLEM = "The summary presents the disputed fare model as settled.";
+const NOTE = "Say fares rather than tickets in the headline.";
+
+describe("story v4 — only a misleading problem starts round 2", () => {
+  it("serves a wording note READY with no reservation, and keeps the objection in the round record", async () => {
+    const double = recorder({ verdicts: [v4Verdict(NOTE, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(outcome).toEqual({
+      outcome: "READY", body: storyFor(1), reservation: null, servedRound: 1, laterFailure: null,
+      rounds: [{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: NOTE, misleading: false }]
+    });
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }]);
+  });
+
+  it("is READY on a satisfied first draft, its record saying misleading false", async () => {
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, recorder({ verdicts: [v4Verdict(null, false)] }).deps);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(1), servedRound: 1, reservation: null });
+    expect(outcome.rounds).toEqual([{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: true, objection: null, misleading: false }]);
+  });
+
+  it("hands round 2 its own round-1 draft and the problem when round 1 is misleading", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict(null, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(double.writes).toEqual([
+      { round: 1, priorObjection: null, priorDraft: null },
+      { round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) }
+    ]);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), reservation: null, servedRound: 2, laterFailure: null });
+    expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection, round.misleading])).toEqual([
+      [1, false, PROBLEM, true], [2, true, null, false]
+    ]);
+  });
+
+  it("serves a wording note found in round 2 READY, with round 2's draft", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict(NOTE, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), reservation: null, servedRound: 2, laterFailure: null });
+  });
+
+  it("is READY_WITH_RESERVATION when the last round is still misleading", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict("The winner is misnamed.", true)] });
+    const twice = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(twice).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(2), reservation: "The winner is misnamed.", servedRound: 2, laterFailure: null
+    });
+    // Task 15 review 1 (final wave B9): round 2 revised round 1's own draft, and both records say misleading.
+    expect(double.writes[1]).toEqual({ round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) });
+    expect(twice.rounds.map((round) => round.misleading)).toEqual([true, true]);
+    const once = await runStoryLoop({ maxRounds: 1, v4: true }, recorder({ verdicts: [v4Verdict(PROBLEM, true)] }).deps);
+    expect(once).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: PROBLEM, servedRound: 1 });
+  });
+
+  it("keeps the misleading round-1 draft with its problem when round 2's write fails", async () => {
+    const double = recorder({
+      verdicts: [v4Verdict(PROBLEM, true)],
+      writeFails: (round) => (round === 2 ? transportDied() : undefined)
+    });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(outcome).toEqual({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: PROBLEM, servedRound: 1,
+      laterFailure: { failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" },
+      rounds: [{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: PROBLEM, misleading: true }]
+    });
+    expect(double.writes).toEqual([
+      { round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) }
+    ]);
+  });
+
+  // Task 15 review 2 (final wave B9): a v4 check that fails is FAILED, and its round has no verdict, so no misleading member.
+  it("a v4 check that fails is FAILED, and that round's record carries no misleading member", async () => {
+    const double = recorder({ checkFails: () => transportDied() });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, double.deps);
+    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" });
+    expect(outcome.rounds).toEqual([{ round: 1, writer: writerRecord(1), checker: null, satisfied: false, objection: null }]);
+    expect(Object.hasOwn(outcome.rounds[0]!, "misleading")).toBe(false);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null, priorDraft: null }]);
+  });
+
+  it("v3 ignores misleading: an objection starts round 2 as before, with no draft, and no record carries misleading", async () => {
+    const double = recorder({ verdicts: [v4Verdict(NOTE, false), SATISFIED] });
+    const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
+    expect(double.writes).toEqual([
+      { round: 1, priorObjection: null, priorDraft: null }, { round: 2, priorObjection: NOTE, priorDraft: null }
+    ]);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), servedRound: 2 });
+    for (const round of outcome.rounds) expect(Object.hasOwn(round, "misleading")).toBe(false);
+  });
+});
+
+describe("the loop's first round (the backup storyteller runs rounds 3 and 4)", () => {
+  it("numbers the rounds from firstRound, call keys included", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict(null, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true, firstRound: 3 }, double.deps);
+    expect(double.writes.map((write) => write.round)).toEqual([3, 4]);
+    expect(double.writes[1]).toEqual({ round: 4, priorObjection: PROBLEM, priorDraft: storyFor(3) });
+    expect(double.checks.map((check) => check.round)).toEqual([3, 4]);
+    expect(outcome.rounds.map((round) => [round.writer.callSiteKey, round.checker?.callSiteKey])).toEqual([
+      [storyCallSiteKey("STORYTELLER", 3), storyCallSiteKey("CHECKER", 3)],
+      [storyCallSiteKey("STORYTELLER", 4), storyCallSiteKey("CHECKER", 4)]
+    ]);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(4), servedRound: 4 });
+  });
+
+  it("allows a last round of 8", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true), v4Verdict(null, false)] });
+    await expect(runStoryLoop({ maxRounds: 2, v4: true, firstRound: 7 }, double.deps)).resolves.toMatchObject({ servedRound: 8 });
+  });
+
+  it.each([
+    ["a last round of 9", 2, 8], ["a first round of 9", 1, 9], ["a first round of 0", 1, 0], ["a fractional first round", 1, 1.5],
+    ["a first round that is not a number", 1, Number.NaN]
+  ] as const)("refuses %s before any call", async (_name, maxRounds, firstRound) => {
+    const double = recorder({});
+    await expect(runStoryLoop({ maxRounds, v4: true, firstRound }, double.deps))
+      .rejects.toMatchObject({ code: "STORY_LOOP_ROUNDS_INVALID" });
+    expect(double.writes).toEqual([]);
   });
 });

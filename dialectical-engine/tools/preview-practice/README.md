@@ -445,6 +445,50 @@ echo "exit: $?"
   numbers being compared, one run at a time, within the daily test budget. Results are judged by the owners' private
   method, outside this repository, plus cost and time from the report.
 
+### The engine row (debate mode, `--engine-policy`)
+
+- `--engine-policy FILE` puts the engine row (`engineVersionPolicy`, spec 2026-10-15 engine redesign §3.3) from FILE
+  into the practice's own throwaway database, and only there, in the same throwaway version as the `--shape-policy` and
+  `--length-policy` rows (with `--register-next`: into the code's next version, as the server's plan would carry it).
+  The file is checked by the register's own parser before anything is spent; a refusal names only the place that is
+  wrong (`PRACTICE_ENGINE_POLICY_INVALID <path>`, `PRACTICE_ENGINE_POLICY_UNREADABLE`). A file with `"enabled": false`
+  is refused too (`PRACTICE_ENGINE_POLICY_INVALID enabled`): it would run today's engine.
+- Engine 2 reads its word targets from the length row, so `--engine-policy` needs `--length-policy` or a length row in
+  the exported register; without either it is refused before anything is spent
+  (`PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY`). If the row is not in the version the debate runs on, the debate is
+  refused before any AI is asked (`PRACTICE_ENGINE_POLICY_NOT_PUBLISHED`).
+- `tools/preview-practice/engine-policy-start.json` holds the owners' start values (spec §3.4).
+- In this phase the engine row changes only the story: it is told with story v4 (one shape, the pack's default; the
+  checker says whether a problem is misleading; only a misleading problem starts round 2, which revises its own draft;
+  a backup storyteller when the first cannot write at all). The rest of the debate is today's until the later phases.
+- Example (S-6's debate command plus): `--length-policy tools/preview-practice/length-policy-start.json --engine-policy tools/preview-practice/engine-policy-start.json`.
+- Every debate report now says which engine the run was admitted with (`report.json` `ask.engine`, from the run's own
+  receipt) and, counts and codes only: `storyRounds` (per story round: the storyteller's model, `MISLEADING`,
+  `WORDING_NOTE_ONLY`, `SATISFIED`, `NOT_SATISFIED` for today's checker, `NO_DRAFT`, `NO_VERDICT` or `VERDICT_UNREAD` (the
+  checker answered through the short follow-up and its earlier reply could not be read), and whether the round revised
+  its own draft), `storyBackups` (the first storyteller's model, the signal `UNREACHABLE`, `TOO_SLOW`,
+  `OUT_OF_ROOM` or `UNUSABLE`, the backup's model, the outcome) and `storyReadyRate` (the stored stories by outcome, to
+  sum over runs). The story tables `storyLengthByField` and `storyJsonBreaks` are described under "The story in words".
+- A story or checker reply that Haiku's structure repair rescued counts for its own round (and its words for the AI
+  whose call it repaired). The words table's `storyteller` row is the short story's sum; `storyLengthByField` splits it
+  per field and adds the long version.
+
+### Pinning the answer writer and the storyteller (debate mode)
+
+- `--answer-writer-model <model>` and `--storyteller-model <model>` name the AI that writes the answer and the one that
+  tells the story in this practice debate (one practice run is one question, so a pin per question is a flag per run).
+  Each must be one of the preview's premium models (`PRACTICE_PIN_MODEL_INVALID <flag>` otherwise; the value typed is
+  never repeated). Debate mode only.
+- The pin works through the role rotation: the counts the rotation reads are shaped so it picks the pinned model; the
+  checkers are still picked from another maker. The run's own role table is never written by the practice. With role
+  rotation off in the practice register the run is refused before any AI is asked (`PRACTICE_PIN_NEEDS_ROLE_ROTATION`;
+  with `--register-next`, give `--role-rotation on`).
+- `report.json` gains `writerPins`: per pinned role, the pinned model, the model the run's pin names, the models that
+  actually served the step (`servedBy`: the answered final-writer calls; the stored story's storyteller), and whether the
+  pin held: only when the run's pin names the pinned model and the pinned model served the step. A pinned model that
+  sat out cannot be picked, and a cost fallback or a backup storyteller serving instead is not the pinned model: either
+  way the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
@@ -541,6 +585,26 @@ scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --register-next --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question lang-ro-en-mix --site-language ro --language-choice use --shape-policy tools/preview-practice/shape-policy-start.json --transcript --out "$P/language-debate"
 echo "exit: $?"
 ```
+
+### The story in words (formats `--story-length`, and the story tables)
+
+A debate run with `--length-policy` AND `--engine-policy` asks engine 2's story (v4): the storyteller and the story
+checker are asked with story contracts v4; each short text of the story (the headline, the summary, the confidence
+sentence, each path line, the "what would change it" text and each reason) gets a target length in words, the long
+PDF version gets none, and the long version comes last after an empty example of the exact nesting. The story checker
+is told the same targets. With `--length-policy` alone the story keeps today's v3, with no targets, except that the
+also-raised claims are sent whole (LG-C part 2, Task 15).
+
+- `formats --story-length` asks the formats mode's story jobs (`STORYTELLER`, `STORY_CHECKER`) as engine 2's story (v4),
+  with the owners' start values (the length row's, for the premium plan at Standard, and the engine row's). It is the
+  cheapest way to have every AI write and check one v4 story: `--lanes STORYTELLER,STORY_CHECKER --samples 2` gives each
+  AI one English and one Romanian story and check. It is refused in every other mode.
+- Every report with a story call has two more blocks, counts only: "Story length per AI and field" (the words each
+  accepted story wrote in each short field and in the long version, beside its target; `-` without one) and
+  "Storyteller replies that were not readable JSON" (by where they broke: after the long version began, before it, or
+  unknown). `report.json` holds them as `storyLengthByField` and `storyJsonBreaks`.
+- A story try sent as the short follow-up (its recorded form is PATCH: it holds only the parts the AI was asked to fix,
+  not a whole story) is left out of both blocks: its words are not counted and it is not counted as a reply.
 
 ## Safety rules built in
 
@@ -958,6 +1022,15 @@ Haiku's STORYTELLER sample answered, its first try asking 128,000 tokens at `med
 after a "lower" retry; and the two tables filled for every AI that answered. The A/B has no pass bar of its own: it is
 what the owner reads before the server's `story_writer` levels change.
 
+### S-6d, Mac: engine 2's story in words (formats `--story-length`)
+
+For the end-of-program practice (R1d Task 26, deferred); it spends real money.
+
+From the worktree's `dialectical-engine` folder, with `D` and `P` as in S-5, after a fresh S-3:
+
+    PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --lanes STORYTELLER,STORY_CHECKER --samples 2 --story-length --out "$P/story-length-formats"
+    echo "exit: $?"
+
 ### S-8, Mac: the whole-debate comparison (today's shape and the new shape)
 
 What it is, in plain words:
@@ -1138,6 +1211,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
 - `length-policy-start.json`: the owners' start values for `--length-policy`.
+- `practice-pins.ts`: `--answer-writer-model`, `--storyteller-model` (the report's `writerPins`).
+- `practice-story-length.ts`, `practice-story-rounds.ts`: the story tables (`storyLengthByField`, `storyJsonBreaks`) and
+  the engine and story-round blocks (`ask.engine`, `storyRounds`, `storyBackups`, `storyReadyRate`).
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
@@ -1159,6 +1235,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
+  `tests/unit/preview-practice-pins.test.ts`,
+  `tests/unit/practice-story-length.test.ts`,
+  `tests/unit/practice-story-rounds.test.ts`,
   `tests/unit/lg-a-practice-repairs.test.ts` (the two LG-A tables, the step keys, a structure-repair try read as its step),
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

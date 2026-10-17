@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
@@ -374,5 +375,54 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(preCheck).toBeGreaterThan(-1);
     expect(body.indexOf('publisher.publishPreviewRegisterV3(')).toBeGreaterThan(preCheck);
     expect(body.indexOf('publisher.publishPreviewRegisterV2(')).toBeGreaterThan(preCheck);
+  });
+});
+
+describe('publish kit v3: the optional engineVersionPolicy row and the engine seal (engine redesign R1d)', () => {
+  const engine = engineVersionPolicyStartValues();
+  const length = lengthGuidancePolicyStartValues();
+  /** v3's ninth argument is LG-C's length guidance and its tenth the engine row; no tenth = its default. */
+  const v3 = async (lengthGuidance: unknown, ...engineVersion: [] | [unknown]) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON,
+      undefined, undefined, null, null, null, lengthGuidance, ...engineVersion)] as Row[];
+  const v2 = async (lengthGuidance: unknown, engineVersion: unknown) =>
+    [...await (buildPreviewSourceRowsV2 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime,
+      undefined, undefined, null, null, null, lengthGuidance, engineVersion)] as Row[];
+  const engineRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === ENGINE_VERSION_POLICY_ROW_KEY);
+  const edit = (rows: Row[], key: string, change: (value: any) => any) => rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical(change(JSON.parse(row.valueJsonText))) } : row);
+
+  it('passes the policy through to kit v2: the same row v2 builds; off = the start values disabled; null or nothing = no row', async () => {
+    const given = await v3(length, engine);
+    expect(engineRow(given)).toEqual(engineRow(await v2(length, engine)));
+    expect(JSON.parse(engineRow(await v3(length, 'off'))!.valueJsonText)).toEqual({ ...JSON.parse(JSON.stringify(engine)), enabled: false });
+    const absent = await v3(length);
+    expect(engineRow(absent)).toBeUndefined();
+    expect(await v3(length, null)).toEqual(absent);
+    expect(given.filter(row => row.rowKey !== ENGINE_VERSION_POLICY_ROW_KEY)).toEqual(absent);
+  });
+
+  it('the source always holds the code\'s engine seal; a malformed one is refused when composing', async () => {
+    const f = await fixture();
+    for (const rows of [await v3(null), await v3(length, engine)]) {
+      expect(JSON.parse(rows.find(row => row.rowKey === ENGINE_CONTRACT_HASH_ROW_KEY)!.valueJsonText)).toBe(engineContractHash());
+    }
+    const malformed = edit(await v3(null), ENGINE_CONTRACT_HASH_ROW_KEY, () => 'not-a-hash');
+    expect(refusal(() => compose(malformed, f.v12))).toContain('ENGINE_CONTRACT_HASH_INVALID');
+  });
+
+  it('asks the hosted runner\'s engine boot refusals before anything is sealed', async () => {
+    const f = await fixture();
+    const rows = [...compose(await v3(length, engine), f.v12).rows] as Row[];
+    expect(engineRow(rows)).toBeDefined();
+    expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
+    expect(refusal(() => assertHostedPreviewBootRows(edit(rows, ENGINE_CONTRACT_HASH_ROW_KEY, () => 'e'.repeat(64)) as any))).toContain('ENGINE_CONTRACT_HASH_MISMATCH');
+    expect(refusal(() => assertHostedPreviewBootRows(rows.filter(row => row.rowKey !== ENGINE_CONTRACT_HASH_ROW_KEY) as any))).toContain('ENGINE_CONTRACT_HASH_UNSEALED');
+    expect(refusal(() => assertHostedPreviewBootRows(rows.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY) as any))).toContain('ENGINE_REQUIRES_LENGTH_POLICY');
+    // A disabled row still needs the length row and its seal (the runner finishes the engine-2 runs admitted before the switch).
+    const off = [...compose(await v3(length, 'off'), f.v12).rows] as Row[];
+    expect(refusal(() => assertHostedPreviewBootRows(off.filter(row => row.rowKey !== ENGINE_CONTRACT_HASH_ROW_KEY) as any))).toContain('ENGINE_CONTRACT_HASH_UNSEALED');
+    // No engine row = engine 1: the seal is never read.
+    const today = [...compose(await v3(null), f.v12).rows] as Row[];
+    expect(() => assertHostedPreviewBootRows(edit(today, ENGINE_CONTRACT_HASH_ROW_KEY, () => 'e'.repeat(64)) as any)).not.toThrow();
   });
 });

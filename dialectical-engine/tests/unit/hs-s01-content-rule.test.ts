@@ -92,6 +92,8 @@ describe("S01 placement and contract coverage", () => {
     judgePromptContract("cross-root", "unknown"), reviewPromptContract(2), PANEL_PROMPT_CONTRACT,
     SYNTHESIZER_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_LENGTH_PROMPT_CONTRACT,
     buildStorytellerContract(pack), buildStoryCheckerContract(pack),
+    // Story v4 (R1d): the v4 pair carries the content rule once, like every other contract.
+    buildStorytellerContract(pack, false, { shapeId: "general" }), buildStoryCheckerContract(pack, false, { shapeId: "general" }),
     BLIND_JUDGE_GRADE_PROMPT_CONTRACT, DOMAIN_TAGGER_PROMPT_CONTRACT,
     CONSUMER_AGGREGATE_PROMPT_CONTRACT,
     supportAnswerPromptContract("bounded"), supportDraftAnswerPromptContract("bounded"),

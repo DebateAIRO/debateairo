@@ -18,26 +18,40 @@ import {
   type ProviderGateway,
   type TypedRole
 } from "@debateai/providers";
-import type { LengthGuidance, StoryPolicy } from "@debateai/register";
+import type { EngineSettings, LengthGuidance, StoryPolicy } from "@debateai/register";
+import {
+  STORY_BACKUP_UNAVAILABLE,
+  STORY_BACKUP_USED,
+  pickBackupStoryteller,
+  storyBackupSignalOf,
+  type StoryBackupCandidate,
+  type StoryBackupMaker,
+  type StoryBackupRecord
+} from "./backup.js";
 import {
   buildStoryCheckerContract,
   buildStorytellerContract,
+  storyCheckerLengthField,
   storyContractHash,
-  storyContractInArgumentLanguage
+  storyContractInArgumentLanguage,
+  storyLengthField
 } from "./contracts.js";
 import { readStoryEnrichment } from "./enrichment.js";
-import { runStoryLoop, storyCallSiteKey, type StoryLoopOutcome } from "./loop.js";
+import { storyActualWords, storyGuidedBound, storyGuidedWords } from "./length.js";
+import { runStoryLoop, storyCallSiteKey, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
 import {
   buildStoryMaterial,
+  buildStoryRevisionPrompt,
   pointNumbersFrom,
   restoreStoryRefs,
   storyMaterialHasMapFields,
+  storyDraftText,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
   type StoryNodeEnrichment,
   type StoryRunSnapshot
 } from "./material.js";
-import type { StoryPack } from "./pack.js";
+import { storyShapeOf, type StoryPack, type StoryV4Options } from "./pack.js";
 import { StoryRepository, isPrivateContentErased, type StoryRecordInput } from "./repository.js";
 import {
   STORY_BODY_PROSE,
@@ -174,6 +188,24 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * LG-C reads only its presence (the also-raised claims whole); LG-D reads the story's targets. Absent: today's story.
    */
   readonly lengthGuidance?: LengthGuidance;
+  /**
+   * Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §3.3, §5.1): the run's receipt `engine` member, set by the runner
+   * only for an engine-2 debate. With the length table (`lengthGuidance`) it switches the story to v4: contracts v4, one
+   * shape set by code, a `length` field, allowances and guided words from the table, round 2 only for a misleading
+   * problem and as a revision of its own draft, and the backup storyteller. Alone it changes nothing. Absent: today's story.
+   */
+  readonly engine?: EngineSettings;
+  /**
+   * R1d (spec §7.2 item 11): the run's claim-eligible members in its stored panel's order, the backup storyteller's
+   * candidates. Read only under v4. Absent or none of another maker: no backup (STORY_BACKUP_UNAVAILABLE is logged).
+   */
+  readonly backupCandidates?: readonly StoryBackupCandidate[];
+  /**
+   * R1d (whole-branch review Minor 1, ruling W1): every claim-eligible member's maker, before the sit-out filter, so the
+   * backup's maker rule knows the first storyteller's and the checker's makers even when their refs are not candidates.
+   * Read only under v4. Absent: the makers are read from the candidates alone.
+   */
+  readonly backupMakers?: readonly StoryBackupMaker[];
 };
 
 /**
@@ -198,6 +230,15 @@ export interface StorySnapshotFailure {
 }
 
 const BARE_STEP: StoryStepLease = (use) => use();
+
+/**
+ * R1d: the story gateway accepts rounds 1..8 only (`STORY_CALL_SITE`, apps/runner/src/index.ts, and the loop's own
+ * limit, read from the loop: Task 17 review 2), so a backup loop whose last round would pass it is not started.
+ */
+const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: storyLoopLastRound() });
+
+/** Story v4 round 2 (R1d decision 3): the accepted round-1 draft as the model's own turn, and the checker's problems. */
+type StoryRevisionTurn = Readonly<{ ownDraft: string; problems: string }>;
 
 /** The story's two call sites and the named role each one carries (the gateway checks the pair). */
 type StoryCallSite = "STORYTELLER" | "CHECKER";
@@ -273,8 +314,21 @@ function storyCallRequest(input: {
   readonly contractHash: string;
   readonly material: readonly FramedMaterialField[];
   readonly classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
+  /** Length guidance (LG-D, v4 only): set only with the run's table; the gateway logs them, nothing decides by them. */
+  readonly guidedWords?: number;
+  readonly actualWordsOf?: (content: string) => number | null;
+  /**
+   * Story v4 round 2 (R1d decision 3; spec 2026-10-15 §7.2 item 8): a fresh call — the material exactly as round 1 sent it,
+   * framed anew (a new fence), then the model's own accepted draft as its turn and one fenced `revision_problems` block.
+   * Its repair packet is the same revision packet with the rejection's machine fields, under the same fence.
+   */
+  readonly revision?: StoryRevisionTurn;
 }): ProviderCallRequest {
-  const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
+  const turn = input.revision ?? null;
+  const revision = turn === null ? null : buildStoryRevisionPrompt({
+    contract: input.contract, material: input.material, ownDraft: turn.ownDraft, problems: turn.problems
+  });
+  const framed = revision === null ? buildFramedPrompt({ contract: input.contract, material: input.material }) : revision.framed;
   const request: ProviderCallRequest = {
     runId: input.story.runId,
     subjectItemId: input.story.workItemId,
@@ -285,11 +339,21 @@ function storyCallRequest(input: {
     bound: input.bound,
     contractHash: input.contractHash,
     providerRef: input.providerRef,
-    packet: framed.packet,
+    packet: revision === null ? framed.packet : revision.packet,
     classifyContent: input.classifyContent,
-    buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
+    // A revision's full re-ask is the revision's own (`buildStoryRevisionPrompt`), under the same fence (Task 17 review 1).
+    buildRepairPacket: revision === null
+      ? (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
+      : revision.buildRepairPacket,
+    ...(input.guidedWords === undefined ? {} : { guidedWords: input.guidedWords }),
+    ...(input.actualWordsOf === undefined ? {} : { actualWordsOf: input.actualWordsOf })
   };
   return Object.freeze(request);
+}
+
+/** Length guidance (LG-D, v4 only): the `length` field after the material (and after candidate_story), before the language field. */
+function withLengthField(material: readonly FramedMaterialField[], length: FramedMaterialField | null): readonly FramedMaterialField[] {
+  return length === null ? material : Object.freeze([...material, length]);
 }
 
 /**
@@ -344,7 +408,8 @@ function recordFromOutcome(
   pack: StoryPack,
   outcome: StoryLoopOutcome,
   refMap: ReadonlyMap<string, string>,
-  storytellerRepairs: number
+  storytellerRepairs: number,
+  backup: StoryBackupRecord | null
 ): StoryRecordInput {
   // The lineage is the SERVED round's: under the earlier-draft fallback that is
   // the earlier round, whose writer wrote and whose checker judged the story
@@ -373,7 +438,9 @@ function recordFromOutcome(
     languageTag: storyLanguageTag(input),
     // Role rotation (spec 2026-10-11 Part 3): the rounds whose storyteller reply needed the repair try. A loop
     // that recorded no round got no storyteller reply at all (the round-1 write failed), so its count is null.
-    storytellerRepairs: outcome.rounds.length === 0 ? null : storytellerRepairs
+    storytellerRepairs: outcome.rounds.length === 0 ? null : storytellerRepairs,
+    // R1d (spec §7.2 item 11): a story a backup storyteller wrote (or tried to) carries the sealed record; no other does.
+    ...(backup === null ? {} : { backup })
   };
   if (outcome.outcome === "FAILED") {
     const failed: StoryRecordInput = {
@@ -528,12 +595,24 @@ export class StoryWriter {
         judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null
       }))
     }));
+    // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1; R1d decision 1): story v4 exactly when the run's receipt
+    // carries engine 2 AND its length table — `input.engine?.engine === 2 && input.lengthGuidance !== undefined`. The
+    // length table alone keeps the v3 story: today's contracts, no `length` field, today's bounds, no guided words (the
+    // material differs only by LG-C's whole also-raised claims, ruling L19) (pre-flight PF-D6.3).
+    const guidance = input.engine?.engine === 2 && input.lengthGuidance !== undefined ? input.lengthGuidance : null;
+    // One shape (decision 2): R1d sends the pack default (no question kinds until R2 passes the judges'). The model never
+    // writes shape_id: the material's index sets it on the decoded body, and the stored row carries it.
+    const v4: StoryV4Options | null = guidance === null
+      ? null
+      : Object.freeze({ shapeId: storyShapeOf({ questionKinds: [], pack }) });
     const built = buildStoryMaterial({
       snapshot,
       enrichment: enrichmentWithoutNodeIds(enrichment),
       budgetBytes: policy.materialBudget[input.compositionBudgetTier],
       shapeIds: new Set(pack.shapes.map((shape) => shape.id)),
-      ...(input.lengthGuidance === undefined ? {} : { alsoRaisedWhole: true })
+      ...(input.lengthGuidance === undefined ? {} : { alsoRaisedWhole: true }),
+      // R1d decision 6: under v4, each position once and review reasons only for disputed points; the index fixes the shape.
+      ...(v4 === null ? {} : { v4 })
     });
     if (built.kind === "TOO_LARGE") {
       this.#log("STORY_MATERIAL_TOO_LARGE", () => ({
@@ -554,10 +633,26 @@ export class StoryWriter {
     // Debate shape (ruling W-STORY): the pack's map passages ride only with a material that sends a map field; every
     // other story gets the instructions it got before the debate shape, byte for byte.
     const mapFields = storyMaterialHasMapFields(built.material);
-    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack, mapFields), languageName, lock);
-    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack, mapFields), languageName, lock);
+    // R1d: v4 contracts under engine 2 with the table; `null` builds today's v3 contracts byte for byte.
+    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack, mapFields, v4), languageName, lock);
+    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack, mapFields, v4), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
+    // Length guidance under v4 only (LG-D Task 4, spec 2026-10-15 §3.4): a `length` field before the language field, the
+    // allowances from the table and its guided words. `guidance` is null under v3, so every story request keeps today's
+    // bytes and its bound objects (`storyGuidedBound` returns the policy's own object for null).
+    const languageTag = input.argumentLanguage?.tag ?? null;
+    const storytellerLength = guidance === null ? null
+      : storyLengthField(guidance.story, languageTag, guidance.charactersPerWord);
+    const checkerLength = guidance === null ? null
+      : storyCheckerLengthField(guidance.story, guidance.steps.story_checker, languageTag, guidance.charactersPerWord);
+    const storytellerBound = storyGuidedBound(policy.storytellerBound, "STORYTELLER", guidance);
+    const checkerBound = storyGuidedBound(policy.checkerBound, "CHECKER", guidance);
+    const storytellerWords = guidance === null ? {} : {
+      guidedWords: storyGuidedWords(guidance.story),
+      actualWordsOf: (content: string) => storyActualWords(content, guidance.charactersPerWord)
+    };
+    const checkerWords = guidance === null ? {} : { guidedWords: guidance.steps.story_checker };
     /**
      * Engine money rule, Task M7 (spec §14.4.6): one story call, with the
      * run's cost fallback when the runner handed one over. Each try is one
@@ -571,15 +666,23 @@ export class StoryWriter {
     const callStoryRole = async (
       planned: StoryRoleMaker,
       request: ProviderCallRequest,
-      preferNot: string | null
+      preferNot: string | null,
+      /**
+       * R1d (pre-flight PF-D6.2; spec §7.2 items 8 and 11): the backup storyteller's calls and a v4 revision keep their
+       * maker. They never go through the cost fallback, which could move them to the first storyteller's or the checker's
+       * maker; a money refusal there is today's money stop (the loop's STORY_ENVELOPE_EXHAUSTED), never a silent move.
+       */
+      keepMaker = false
     ): Promise<Readonly<{ result: ProviderCallResult; servedBy: StoryRoleMaker }>> => {
       const send = (maker: StoryRoleMaker, sent: ProviderCallRequest) => stepLease(() => maker.provider.call(sent));
       const costFallback = input.costFallback;
-      if (costFallback === undefined) return { result: await send(planned, request), servedBy: planned };
+      if (costFallback === undefined || keepMaker) return { result: await send(planned, request), servedBy: planned };
       return costFallback({ planned, preferNot, request, refusedForMoney: isStoryMoneyRefusal, call: send });
     };
     /** Who actually wrote each round's draft: its checker prefers another maker. */
     const draftWriterByRound = new Map<number, string>();
+    /** R1d (PF-D6.2): who wrote each round's draft, as a role maker. A v4 revision revises ITS OWN draft, so it goes there. */
+    const draftTellerByRound = new Map<number, StoryRoleMaker>();
     /**
      * Role rotation (spec 2026-10-11 Part 3): the rounds whose storyteller reply was accepted only after the
      * format repair try. Rounds, not repair packets; a gateway that reports no count reported none.
@@ -588,72 +691,169 @@ export class StoryWriter {
     // Reply language (2026-10-12): each draft and each objection is checked against the question's language.
     const storyInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_BODY_PROSE);
     const checkerInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_CHECKER_PROSE);
-    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
-      writeStory: async ({ round, priorObjection }) => {
-        const reading = rememberingAcceptedReply((content, reply) =>
-          classifyStoryContent(content, built.index, reply, storyInQuestionLanguage));
-        const request = storyCallRequest({
-          story: input,
-          site: "STORYTELLER",
-          round,
-          providerRef: storyteller.providerRef,
-          bound: policy.storytellerBound,
-          contract: storytellerContract,
-          contractHash: storytellerHash,
-          material: withQuestionLanguageField(toStoryPromptMaterial(built.material, priorObjection), lock),
-          classifyContent: reading.classifyContent
+    /**
+     * R1d decision 5: the FIRST storyteller's round-1 write error, kept for the backup's signal. A holder object, not a
+     * `let`, so the closure's write is seen after the loop. The backup loop starts at round maxRounds + 1, so it never
+     * writes here.
+     */
+    const firstWrite: { failed: boolean; error: unknown } = { failed: false, error: null };
+    /**
+     * `backupLoop` (pre-flight PF-D6.2): true for the backup storyteller's loop, whose every call goes straight to
+     * `teller`. The first loop's round 1 keeps today's cost fallback (M7); its v4 revision goes straight to the round-1
+     * draft's own writer.
+     */
+    const writeStoryWith = (teller: StoryRoleMaker, backupLoop: boolean): StoryLoopDependencies["writeStory"] =>
+      async ({ round, priorObjection, priorDraft }) => {
+        try {
+          const reading = rememberingAcceptedReply((content, reply) =>
+            classifyStoryContent(content, built.index, reply, storyInQuestionLanguage));
+          // Story v4 round 2 (R1d decision 3; spec §7.2 item 8): the round-1 material unchanged (no prior_objection
+          // field), the accepted round-1 draft as the model's own turn, the checker's problems in one fenced block.
+          // v3 keeps today's prior_objection field.
+          const revision: StoryRevisionTurn | null = v4 !== null && priorDraft !== null && priorObjection !== null
+            ? Object.freeze({ ownDraft: storyDraftText(priorDraft), problems: priorObjection })
+            : null;
+          // R1d (PF-D6.2): a revision is sent to the maker that wrote the draft it revises (round 1 may have been served
+          // by a cheaper maker), and neither it nor a backup call is handed to the cost fallback.
+          const author = revision === null ? teller : (draftTellerByRound.get(round - 1) ?? teller);
+          const keepMaker = backupLoop || revision !== null;
+          const request = storyCallRequest({
+            story: input,
+            site: "STORYTELLER",
+            round,
+            providerRef: author.providerRef,
+            bound: storytellerBound,
+            contract: storytellerContract,
+            contractHash: storytellerHash,
+            material: withQuestionLanguageField(withLengthField(
+              toStoryPromptMaterial(built.material, revision === null ? priorObjection : null), storytellerLength), lock),
+            classifyContent: reading.classifyContent,
+            ...(revision === null ? {} : { revision }),
+            ...storytellerWords
+          });
+          // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
+          // first, the planned checker's maker included. Both calls spend ONE
+          // story total, so a dearer storyteller could leave the checker unpaid
+          // and fail a story cheapest-first would have made READY. Diversity is
+          // preferred on the checker's side only; the lineage shows one maker
+          // doing both jobs.
+          const { result, servedBy } = await callStoryRole(author, request, null, keepMaker);
+          draftWriterByRound.set(round, servedBy.providerRef);
+          draftTellerByRound.set(round, servedBy);
+          // Short refs on purpose: the checker judges this body against the SAME
+          // material the storyteller read. Real ids are restored only for storage.
+          const accepted = reading.acceptedAs(result.content);
+          const body: StoryBody = parseStoryBody(result.content, built.index, accepted.reply);
+          this.#logRepair("STORYTELLER", round, accepted.repairs, input);
+          if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
+          return {
+            artifactRef: result.rawArtifactRef,
+            callSiteKey: request.callSiteKey,
+            // The maker ACTUALLY used, so "Written by" names a fallback model.
+            lineage: lineageOf(result, servedBy.providerRef),
+            body
+          };
+        } catch (error) {
+          if (round === 1) {
+            firstWrite.failed = true;
+            firstWrite.error = error;
+          }
+          throw error;
+        }
+      };
+    const checkStory: StoryLoopDependencies["checkStory"] = async ({ round, candidate }) => {
+      // R1d: the v4 checker form carries `misleading`; the v3 reading is today's call, unchanged.
+      const reading = rememberingAcceptedReply((content, reply) => (v4 === null
+        ? classifyCheckerContent(content, reply, checkerInQuestionLanguage)
+        : classifyCheckerContent(content, reply, checkerInQuestionLanguage, true)));
+      const request = storyCallRequest({
+        story: input,
+        site: "CHECKER",
+        round,
+        providerRef: checker.providerRef,
+        bound: checkerBound,
+        contract: checkerContract,
+        contractHash: checkerHash,
+        material: withQuestionLanguageField(withLengthField(toCheckerPromptMaterial(built.material, candidate), checkerLength), lock),
+        classifyContent: reading.classifyContent,
+        ...checkerWords
+      });
+      // Task M7: the planned checker is always asked first; a fallback checker
+      // prefers a maker other than the one that wrote this round's draft.
+      const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+      const accepted = reading.acceptedAs(result.content);
+      const verdict = v4 === null
+        ? parseCheckerVerdict(result.content, accepted.reply)
+        : parseCheckerVerdict(result.content, accepted.reply, true);
+      this.#logRepair("CHECKER", round, accepted.repairs, input);
+      return {
+        artifactRef: result.rawArtifactRef,
+        callSiteKey: request.callSiteKey,
+        lineage: lineageOf(result, servedBy.providerRef),
+        verdict
+      };
+    };
+    const outcome = await runStoryLoop(
+      v4 === null ? { maxRounds: policy.loopMaxRounds } : { maxRounds: policy.loopMaxRounds, v4: true as const },
+      { writeStory: writeStoryWith(storyteller, false), checkStory }
+    );
+    this.#logLoopOutcome(outcome, input);
+    // R1d decision 5 (spec §7.2 item 11): under v4 only, when the first loop ended FAILED with no draft because round 1's
+    // write failed with one of the four signals, ONE more loop with a backup storyteller of another maker, the same
+    // checker, rounds maxRounds+1.. (STORY:STORYTELLER:3/4 with 2 rounds) and its own tries.
+    let served: StoryLoopOutcome = outcome;
+    let backup: StoryBackupRecord | null = null;
+    if (v4 !== null && outcome.outcome === "FAILED" && outcome.rounds.length === 0 && firstWrite.failed) {
+      const signal = storyBackupSignalOf(firstWrite.error);
+      if (signal !== null) {
+        const chosen = pickBackupStoryteller({
+          candidates: input.backupCandidates ?? [],
+          firstRef: storyteller.providerRef,
+          checkerRef: checker.providerRef,
+          makers: input.backupMakers
         });
-        // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
-        // first, the planned checker's maker included. Both calls spend ONE
-        // story total, so a dearer storyteller could leave the checker unpaid
-        // and fail a story cheapest-first would have made READY. Diversity is
-        // preferred on the checker's side only; the lineage shows one maker
-        // doing both jobs.
-        const { result, servedBy } = await callStoryRole(storyteller, request, null);
-        draftWriterByRound.set(round, servedBy.providerRef);
-        // Short refs on purpose: the checker judges this body against the SAME
-        // material the storyteller read. Real ids are restored only for storage.
-        const accepted = reading.acceptedAs(result.content);
-        const body: StoryBody = parseStoryBody(result.content, built.index, accepted.reply);
-        this.#logRepair("STORYTELLER", round, accepted.repairs, input);
-        if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
-        return {
-          artifactRef: result.rawArtifactRef,
-          callSiteKey: request.callSiteKey,
-          // The maker ACTUALLY used, so "Written by" names a fallback model.
-          lineage: lineageOf(result, servedBy.providerRef),
-          body
-        };
-      },
-      checkStory: async ({ round, candidate }) => {
-        const reading = rememberingAcceptedReply((content, reply) =>
-          classifyCheckerContent(content, reply, checkerInQuestionLanguage));
-        const request = storyCallRequest({
-          story: input,
-          site: "CHECKER",
-          round,
-          providerRef: checker.providerRef,
-          bound: policy.checkerBound,
-          contract: checkerContract,
-          contractHash: checkerHash,
-          material: withQuestionLanguageField(toCheckerPromptMaterial(built.material, candidate), lock),
-          classifyContent: reading.classifyContent
-        });
-        // Task M7: the planned checker is always asked first; a fallback checker
-        // prefers a maker other than the one that wrote this round's draft.
-        const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
-        const accepted = reading.acceptedAs(result.content);
-        const verdict = parseCheckerVerdict(result.content, accepted.reply);
-        this.#logRepair("CHECKER", round, accepted.repairs, input);
-        return {
-          artifactRef: result.rawArtifactRef,
-          callSiteKey: request.callSiteKey,
-          lineage: lineageOf(result, servedBy.providerRef),
-          verdict
-        };
+        const firstRound = policy.loopMaxRounds + 1;
+        const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;
+        if (chosen === null || !fits) {
+          this.#log(STORY_BACKUP_UNAVAILABLE, () => ({
+            answerId: input.answerId,
+            answerVersion: input.answerVersion,
+            signal,
+            reason: chosen === null ? "NO_CANDIDATE" : "NO_ROUND_LEFT"
+          }));
+        } else {
+          backup = Object.freeze({ code: STORY_BACKUP_USED, signal, firstModel: storyteller.providerRef });
+          this.#log(STORY_BACKUP_USED, () => ({
+            answerId: input.answerId,
+            answerVersion: input.answerVersion,
+            signal,
+            firstModel: storyteller.providerRef,
+            backupModel: chosen.providerRef
+          }));
+          served = await runStoryLoop(
+            { maxRounds: policy.loopMaxRounds, v4: true, firstRound },
+            { writeStory: writeStoryWith(chosen, true), checkStory }
+          );
+          this.#logLoopOutcome(served, input);
+        }
       }
-    });
-    // Why a story failed, or why an earlier draft is the one served: codes only.
+    }
+    // R1d decision 4: a wording note (not satisfied, not misleading) is served READY with no reservation and never shown
+    // to a reader; the checker's own artifact holds its text. Logged by code and round only.
+    if (v4 !== null) {
+      for (const round of served.rounds) {
+        if (round.checker !== null && !round.satisfied && round.misleading === false) {
+          this.#log("STORY_WORDING_NOTE_ONLY", () => ({
+            answerId: input.answerId, answerVersion: input.answerVersion, round: round.round
+          }));
+        }
+      }
+    }
+    return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup);
+  }
+
+  /** Why a story failed, or why an earlier draft is the one served: codes only (today's two logs, one loop at a time). */
+  #logLoopOutcome(outcome: StoryLoopOutcome, input: StoryWriteInput): void {
     if (outcome.outcome === "FAILED") {
       this.#log("STORY_LOOP_FAILED", () => ({
         answerId: input.answerId,
@@ -672,6 +872,5 @@ export class StoryWriter {
         cause: laterFailure.cause
       }));
     }
-    return recordFromOutcome(input, pack, outcome, built.refMap, repairedRounds.size);
   }
 }

@@ -8,8 +8,18 @@ import {
   type StoryVerdictBasis
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import type { FramedMaterialField } from "@debateai/providers";
+import {
+  buildFramedPrompt,
+  buildFramedRevisionPrompt,
+  schemaFailureLocator,
+  type FramedMaterialField,
+  type FramedPrompt,
+  type PromptContract,
+  type PromptPacket,
+  type RejectedProviderContent
+} from "@debateai/providers";
 import type { StoryMaterialIndex } from "./validate.js";
+import type { StoryV4Options } from "./pack.js";
 
 /**
  * THE STORY MATERIAL (spec §5.2) — everything the storyteller and the checker
@@ -144,6 +154,17 @@ export interface StoryMaterialPosition {
    * "which option made it close" is a field, never an inference.
    */
   readonly within_tie_margin?: true;
+  /**
+   * Story v4 (R1d, spec §7.2 item 1): a position appears once, here. Its way of knowing and its judge texts (best case,
+   * strongest objection and what it argues against, which is the position itself, its review, and the review's reasons
+   * only on a dispute) ride on this entry instead of a point entry. Absent in v3, whose `points` list the position too.
+   */
+  readonly known_by?: "LOOKED_UP" | "RAN" | "REASONING";
+  readonly best_case?: string;
+  readonly objection?: string;
+  readonly objection_to?: string;
+  readonly review?: "agree" | "dispute" | "cannot-assess";
+  readonly review_reasons?: readonly string[];
 }
 
 export interface StoryMaterialPoint {
@@ -258,7 +279,10 @@ const STORY_POINT_KEYS: StoryKeyList<StoryMaterialPoint> = {
   judge_spread: true, leverage: true
 };
 const STORY_POSITION_KEYS: StoryKeyList<StoryMaterialPosition> = {
-  id: true, place: true, claim: true, author: true, final: true, won: true, within_tie_margin: true
+  id: true, place: true, claim: true, author: true, final: true, won: true, within_tie_margin: true,
+  // Story v4 (R1d): the position's own judge texts. Each is a point key already, so STORY_MATERIAL_KEYS and
+  // STORY_ENGINE_TOKENS keep their exact values (pinned in tests/unit/story-material.test.ts).
+  known_by: true, best_case: true, objection: true, objection_to: true, review: true, review_reasons: true
 };
 const STORY_VERDICT_KEYS: StoryKeyList<StoryMaterialVerdict> = {
   label: true, rule_in_words: true, rung: true, trigger: true, winner_id: true, winner_final: true, runner_up_id: true,
@@ -440,7 +464,12 @@ function storyEngineTokens(material: StoryMaterial): ReadonlySet<string> {
 function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
   const stated = storyStatedFigures([
     material.question,
-    ...material.positions.map((position) => position.claim),
+    ...material.positions.flatMap((position) => [
+      position.claim,
+      // Story v4 (R1d): a position's own judge texts ride on its positions entry; like a point's, they are the person's
+      // side of the debate, so a figure they state is freed. In v3 these members are absent: nothing changes.
+      position.best_case ?? "", position.objection ?? "", ...(position.review_reasons ?? [])
+    ]),
     ...material.points.flatMap((point) => [
       point.claim, point.best_case ?? "", point.objection ?? "", ...(point.review_reasons ?? [])
     ]),
@@ -641,6 +670,9 @@ function storyStanceTowardPosition(nodeId: string, tree: ReadonlyMap<string, Sto
   return supports ? "support" : "attack";
 }
 
+/** A node's judge texts, as a point entry has always listed them (best_case through review_reasons). */
+type StoryJudgeTexts = Pick<StoryMaterialPoint, "best_case" | "objection" | "objection_to" | "review" | "review_reasons">;
+
 type StoryMaterialCore = Omit<StoryMaterial, "bytes">;
 
 function storyCoreFields(core: StoryMaterialCore): FramedMaterialField[] {
@@ -734,11 +766,17 @@ export function buildStoryMaterial(input: {
   readonly shapeIds: ReadonlySet<string>;
   /** Length guidance (L19): the also-raised claims are not clipped to 240 characters. Absent: today's material. */
   readonly alsoRaisedWhole?: boolean;
+  /**
+   * Story v4 (R1d; Task 17 passes it under engine 2 only): each position once, reasons only for disputed points, and the
+   * index carries the one shape code chose (`fixedShapeId`). Absent or undefined: today's material, byte for byte.
+   */
+  readonly v4?: StoryV4Options | undefined;
 }): StoryMaterialResult {
   const { snapshot, enrichment, budgetBytes } = input;
   if (!Number.isInteger(budgetBytes) || budgetBytes <= 0) {
     throw new TypedDomainError("STORY_MATERIAL_BUDGET_INVALID", `A material budget is a positive whole number of bytes, not ${String(budgetBytes)}`);
   }
+  const v4 = input.v4 !== undefined;
   const nodeIds = new Set(snapshot.nodes.map((node) => node.nodeId));
   const positionNodes = snapshot.nodes
     .filter((node) => node.isPosition)
@@ -825,16 +863,14 @@ export function buildStoryMaterial(input: {
     const visible = new Set(nodesInRefOrder
       .filter((node) => !step.keepOnlySpine || spine.has(node.nodeId))
       .map((node) => node.nodeId));
-    const positions = positionNodes.map((node, index): StoryMaterialPosition => Object.freeze({
-      id: ref(node.nodeId),
-      place: index + 1,
-      claim: storyClip(node.claim, step.claimChars),
-      ...(node.authorModel === null ? {} : { author: node.authorModel }),
-      ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
-      won: node.nodeId === basis.winner_node_id,
-      ...(withinTieMargin.has(node.nodeId) ? { within_tie_margin: true as const } : {})
-    }));
-    const points = nodesInRefOrder.filter((node) => visible.has(node.nodeId)).map((node): StoryMaterialPoint => {
+    /**
+     * A node's judge texts at this step, in the order a point entry has always listed them: its best case, its strongest
+     * objection and what that objection argues against, its review and the review's reasons. Step 1 cuts them outside the
+     * top-10 points, step 2 cuts every one, step 6 drops them outside the kept points; a position's are never dropped and
+     * are cut only from step 2 on. Story v4 (R1d, spec §7.2 item 1): a review's reasons ride only with a dispute; an
+     * agreeing or cannot-assess review keeps its outcome alone.
+     */
+    const judgeTextsOf = (node: StorySnapshotNode, objectionTo: string | null): StoryJudgeTexts => {
       const judgeDropped = step.dropJudgeOutsideKept && !keptLeverage.has(node.nodeId) && !positionIds.has(node.nodeId);
       // Step 1 spares the top-10 points and the positions; step 2 cuts every judge text.
       const judgeChars = step.judgeChars
@@ -843,35 +879,56 @@ export function buildStoryMaterial(input: {
       const bestCase = judgeDropped ? null : enriched?.judgeBestCase ?? null;
       const objection = judgeDropped ? null : enriched?.judgeObjection ?? node.criticSummary;
       const reviewOutcome = enriched?.reviewOutcome ?? null;
-      const reviewReasons = judgeDropped ? [] : enriched?.reviewReasons ?? [];
-      const spread = enriched?.dispersion ?? node.panelDispersion;
-      const link = links.get(node.nodeId);
-      const supports = (link?.supports ?? []).filter((target) => visible.has(target)).map(ref);
-      const attacks = (link?.attacks ?? []).filter((target) => visible.has(target)).map(ref);
-      // What the author's objection argues against: the position itself, else the point it attacks, else the one it
-      // supports (the leg it was written for: an attack or a cross-root reply attacks; a support leg only supports).
-      const objectionTo = positionIds.has(node.nodeId) ? ref(node.nodeId) : attacks[0] ?? supports[0] ?? null;
-      const nodeLeverage = leverage.get(node.nodeId);
-      return Object.freeze({
-        id: ref(node.nodeId),
-        ...(positionIds.has(node.nodeId) ? { position: true as const } : {}),
-        ...(supports.length === 0 ? {} : { supports: Object.freeze(supports) }),
-        ...(attacks.length === 0 ? {} : { attacks: Object.freeze(attacks) }),
-        claim: storyClip(node.claim, step.claimChars),
-        known_by: node.wayOfKnowing,
-        ...(node.baseScore === null ? {} : { base: storyNumber(node.baseScore) }),
-        ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
-        ...(node.excludedReason === null ? {} : { set_aside: node.excludedReason }),
+      const reviewReasons = judgeDropped || (v4 && reviewOutcome !== "dispute") ? [] : enriched?.reviewReasons ?? [];
+      return {
         ...(bestCase === null ? {} : { best_case: storyClip(bestCase, judgeChars) }),
         ...(objection === null ? {} : { objection: storyClip(objection, judgeChars) }),
         ...(objection === null || objectionTo === null ? {} : { objection_to: objectionTo }),
         ...(reviewOutcome === null ? {} : { review: reviewOutcome }),
-        ...(reviewReasons.length === 0 ? {} : { review_reasons: Object.freeze(reviewReasons.map((reason) => storyClip(reason, judgeChars))) }),
-        ...(node.authorModel === null ? {} : { author: node.authorModel }),
-        ...(spread === null ? {} : { judge_spread: storyNumber(spread) }),
-        ...(nodeLeverage === undefined ? {} : { leverage: storyNumber(nodeLeverage) })
+        ...(reviewReasons.length === 0 ? {} : { review_reasons: Object.freeze(reviewReasons.map((reason) => storyClip(reason, judgeChars))) })
+      };
+    };
+    const positions = positionNodes.map((node, index): StoryMaterialPosition => Object.freeze({
+      id: ref(node.nodeId),
+      place: index + 1,
+      claim: storyClip(node.claim, step.claimChars),
+      ...(v4 ? { known_by: node.wayOfKnowing } : {}),
+      ...(node.authorModel === null ? {} : { author: node.authorModel }),
+      ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
+      won: node.nodeId === basis.winner_node_id,
+      ...(withinTieMargin.has(node.nodeId) ? { within_tie_margin: true as const } : {}),
+      // Story v4: the position's own judge texts, here once (its objection is about itself); its point entry leaves `points`.
+      ...(v4 ? judgeTextsOf(node, ref(node.nodeId)) : {})
+    }));
+    // Story v4: each position appears once, in `positions`. v3 lists it in `points` too, as it always has.
+    const points = nodesInRefOrder
+      .filter((node) => visible.has(node.nodeId) && !(v4 && positionIds.has(node.nodeId)))
+      .map((node): StoryMaterialPoint => {
+        const enriched = enrichment.get(node.nodeId);
+        const spread = enriched?.dispersion ?? node.panelDispersion;
+        const link = links.get(node.nodeId);
+        const supports = (link?.supports ?? []).filter((target) => visible.has(target)).map(ref);
+        const attacks = (link?.attacks ?? []).filter((target) => visible.has(target)).map(ref);
+        // What the author's objection argues against: the position itself, else the point it attacks, else the one it
+        // supports (the leg it was written for: an attack or a cross-root reply attacks; a support leg only supports).
+        const objectionTo = positionIds.has(node.nodeId) ? ref(node.nodeId) : attacks[0] ?? supports[0] ?? null;
+        const nodeLeverage = leverage.get(node.nodeId);
+        return Object.freeze({
+          id: ref(node.nodeId),
+          ...(positionIds.has(node.nodeId) ? { position: true as const } : {}),
+          ...(supports.length === 0 ? {} : { supports: Object.freeze(supports) }),
+          ...(attacks.length === 0 ? {} : { attacks: Object.freeze(attacks) }),
+          claim: storyClip(node.claim, step.claimChars),
+          known_by: node.wayOfKnowing,
+          ...(node.baseScore === null ? {} : { base: storyNumber(node.baseScore) }),
+          ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
+          ...(node.excludedReason === null ? {} : { set_aside: node.excludedReason }),
+          ...judgeTextsOf(node, objectionTo),
+          ...(node.authorModel === null ? {} : { author: node.authorModel }),
+          ...(spread === null ? {} : { judge_spread: storyNumber(spread) }),
+          ...(nodeLeverage === undefined ? {} : { leverage: storyNumber(nodeLeverage) })
+        });
       });
-    });
 
     const omittedCounts = new Map<string | null, { supports: number; attacks: number }>();
     for (const node of nodesInRefOrder) {
@@ -943,7 +1000,9 @@ export function buildStoryMaterial(input: {
           // The site shows at most this many path lines (spec §5.3); one cap, shared with the schema.
           pathCap: STORY_BODY_LIMITS.maxPaths,
           scoreTexts: storyScoreTexts(material),
-          engineTokens: storyEngineTokens(material)
+          engineTokens: storyEngineTokens(material),
+          // Story v4 (R1d, design decision 2): the one shape code chose; the reader sets it on the decoded story.
+          ...(input.v4 === undefined ? {} : { fixedShapeId: input.v4.shapeId })
         }),
         refMap,
         compressionStep: step
@@ -1019,4 +1078,43 @@ export function toStoryPromptMaterial(material: StoryMaterial, priorObjection: s
 export function toCheckerPromptMaterial(material: StoryMaterial, candidate: StoryBody): readonly FramedMaterialField[] {
   const fields = [...storyCoreFields(material), { name: "candidate_story", content: JSON.stringify(candidate) }];
   return Object.freeze(fields.map((field) => Object.freeze(field)));
+}
+
+/**
+ * Story v4 round 2 (R1d, spec §7.2 item 8): the accepted round-1 draft as the storyteller's own answer, in the v4 form's
+ * order (short, why, reviewer_note, long last) and without `shape_id`, which the v4 form never asks for (code sets it).
+ * Its references are the material's short ones, as the model wrote them.
+ */
+export function storyDraftText(body: StoryBody): string {
+  return JSON.stringify({ short: body.short, why: body.why, reviewer_note: body.reviewer_note, long: body.long });
+}
+
+/** A v4 round-2 request: its fresh frame, the packet to send, and its full re-ask under the same fence. */
+export interface FramedRevision {
+  readonly framed: FramedPrompt;
+  readonly packet: PromptPacket;
+  readonly buildRepairPacket: (rejected: RejectedProviderContent) => PromptPacket;
+}
+
+/**
+ * Story v4 round 2 (R1d, design decision 3): a FRESH call (a new fence, owner answer Q3) whose material is round 1's,
+ * unchanged (no `prior_objection`, so the material block is round 1's bytes apart from the fence; the system message's
+ * stable prefix caches, the material does not, because of the fresh fence, owner answer Q3),
+ * then the draft as the model's own turn and the checker's problems in one revision block (`buildFramedRevisionPrompt`).
+ * A content refusal of this call is re-asked by `buildRepairPacket`, which keeps this call's fence.
+ */
+export function buildStoryRevisionPrompt(input: Readonly<{
+  contract: PromptContract;
+  material: readonly FramedMaterialField[];
+  ownDraft: string;
+  problems: string;
+}>): FramedRevision {
+  const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
+  const packet = buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems);
+  return Object.freeze({
+    framed,
+    packet,
+    buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket =>
+      buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems, schemaFailureLocator(rejected))
+  });
 }

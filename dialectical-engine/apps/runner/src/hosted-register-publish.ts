@@ -43,6 +43,9 @@
  *    Likewise optional, the `lengthGuidancePolicy` (spec 2026-10-15, length guidance): the policy without its kind,
  *    sealed as the ADDITIVE `lengthGuidancePolicy` row under the file's sourceRef; left out, no such row is sealed and
  *    every request keeps today's bytes.
+ *    Likewise optional, the `engineVersionPolicy` (engine redesign spec 2026-10-15 §3): the policy without its kind, sealed
+ *    as the ADDITIVE `engineVersionPolicy` row under the file's sourceRef, and only beside the `lengthGuidancePolicy` member;
+ *    left out, no such row is sealed and every debate is engine 1. Engine 2's seal (`engineContractHash`) is a code-owned row.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -126,6 +129,10 @@ import {
   debateShapePolicyRow,
   parseDebateShapePolicy,
   type DebateShapePolicy,
+  ENGINE_VERSION_POLICY_ROW_KEY,
+  engineVersionPolicyRow,
+  parseEngineVersionPolicy,
+  type EngineVersionPolicy,
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
   answerJobTokenCeilings,
   lengthGuidancePolicyRow,
@@ -199,6 +206,7 @@ import {
 import type { DevelopmentConfiguredProvider } from "./dev-provider-panel.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
+import { readEngineRunnerSettings } from "./engine-boot.js";
 
 /** The operator file's declared shape. A new shape is a new format string, never a silent change. */
 export const HOSTED_REGISTER_FILE_FORMAT = "debateai.hosted-register.v1" as const;
@@ -246,7 +254,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Question language (spec 2026-10-13): OPTIONAL. Left out, no row is sealed (the code's start values apply).
   "questionLanguagePolicy",
   // Length guidance (spec 2026-10-15): OPTIONAL. Left out, no row is sealed and every request keeps today's bytes.
-  "lengthGuidancePolicy"
+  "lengthGuidancePolicy",
+  // Engine redesign (spec 2026-10-15 §3): OPTIONAL, and only with lengthGuidancePolicy. Left out, every debate is engine 1.
+  "engineVersionPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -446,6 +456,8 @@ export type HostedRegisterFile = Readonly<{
   questionLanguagePolicy?: unknown;
   /** Optional (spec 2026-10-15): the length guidance policy without its kind; absent = no row. */
   lengthGuidancePolicy?: unknown;
+  /** Optional (engine redesign 2026-10-15): the engine row's policy without its kind; absent = no engineVersionPolicy row. */
+  engineVersionPolicy?: unknown;
 }>;
 
 /**
@@ -510,7 +522,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
     ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {}),
-    ...(Object.hasOwn(record, "lengthGuidancePolicy") ? { lengthGuidancePolicy: record.lengthGuidancePolicy } : {})
+    ...(Object.hasOwn(record, "lengthGuidancePolicy") ? { lengthGuidancePolicy: record.lengthGuidancePolicy } : {}),
+    ...(Object.hasOwn(record, "engineVersionPolicy") ? { engineVersionPolicy: record.engineVersionPolicy } : {})
   });
 }
 
@@ -855,6 +868,26 @@ function debateShapeRowOf(member: unknown, sourceRef: string): Readonly<{
 }
 
 /**
+ * The engineVersionPolicy row for the file's optional member (engine redesign, INTERFACE §1.6), exactly as debateShapeRowOf:
+ * the member is the policy without its `kind`; a member that is not an object, is an array, carries `kind`, or that the
+ * register's own parser refuses is refused with the file's own code (never the parser's message), so a malformed member
+ * can never seal a malformed row.
+ */
+function engineVersionRowOf(member: unknown, sourceRef: string): Readonly<{
+  row: ReturnType<typeof engineVersionPolicyRow>; policy: EngineVersionPolicy;
+}> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_ENGINE_VERSION_INVALID");
+  }
+  try {
+    const policy = parseEngineVersionPolicy({ kind: "ENGINE_VERSION_POLICY", ...member });
+    return Object.freeze({ row: engineVersionPolicyRow(policy, sourceRef), policy });
+  } catch {
+    return refuse("HOSTED_REGISTER_ENGINE_VERSION_INVALID");
+  }
+}
+
+/**
  * The lengthGuidancePolicy row for the file's optional member (spec 2026-10-15 §3.1): the policy without its `kind`. A
  * member that is not an object, carries `kind`, or that the register's own parser refuses is refused with the file's own
  * code (never the parser's message), so a malformed member can never seal a malformed row.
@@ -968,6 +1001,12 @@ export async function planHostedRegisterPublication(
   // Length guidance (spec 2026-10-15): the optional member; absent = no row (today's requests).
   const lengthGuidance = file.lengthGuidancePolicy === undefined ? null
     : lengthGuidanceRowOf(file.lengthGuidancePolicy, file.sourceRef);
+  // Engine redesign (R1d; INTERFACE §1.5, §1.6): the optional engineVersionPolicy member. Absent = no row (engine 1 for every
+  // debate). Present (enabled or not) it needs the file's lengthGuidancePolicy member too: the runner refuses to boot on a
+  // version that seals the engine row without the length row (ENGINE_REQUIRES_LENGTH_POLICY), and a sealed version is never edited.
+  const engineVersion = file.engineVersionPolicy === undefined ? null
+    : engineVersionRowOf(file.engineVersionPolicy, file.sourceRef);
+  if (engineVersion !== null && lengthGuidance === null) refuse("HOSTED_REGISTER_ENGINE_REQUIRES_LENGTH");
   // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
   const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
     : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
@@ -1135,6 +1174,15 @@ export async function planHostedRegisterPublication(
     valueJsonText: lengthGuidance.row.valueJsonText,
     sourceRef: lengthGuidance.row.sourceRef
   })];
+  // Engine redesign (R1d) is ADDITIVE too, for the same reason; its seal (engineContractHash) is one of the code-owned rows.
+  if (engineVersion !== null && codeOwnedRows.some((row) => row.rowKey === ENGINE_VERSION_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const engineVersionRows: readonly RegisterPublicationRow[] = engineVersion === null ? [] : [Object.freeze({
+    rowKey: engineVersion.row.rowKey,
+    valueJsonText: engineVersion.row.valueJsonText,
+    sourceRef: engineVersion.row.sourceRef
+  })];
   const rows = Object.freeze([
     ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
     ...scorecardRows,
@@ -1142,7 +1190,8 @@ export async function planHostedRegisterPublication(
     ...callConcurrencyRows,
     ...debateShapeRows,
     ...questionLanguageRows,
-    ...lengthGuidanceRows
+    ...lengthGuidanceRows,
+    ...engineVersionRows
   ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
@@ -1369,6 +1418,10 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     ...(plan.rows.some((row) => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)
       ? ["length_guidance=present (every debate admitted on this version is told target lengths)"]
       : []),
+    // Engine redesign (R1d): said BEFORE sealing, so the operator sees the version carries the engine row (on or disabled).
+    ...(plan.rows.some((row) => row.rowKey === ENGINE_VERSION_POLICY_ROW_KEY)
+      ? ["engine_version=present (also needs lengthGuidancePolicy; engineContractHash is code-owned)"]
+      : []),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
 }
@@ -1505,6 +1558,11 @@ export async function verifyHostedRegisterBootReadiness(
   await assertHostedQuestionLanguageBootReady(pool, version);
   // Length guidance (spec 2026-10-15 §3.1): optional (ABSENT = today's requests), but a malformed row refuses the API's boot.
   await readLengthGuidancePolicy(pool, version);
+  // Engine redesign (R1d; INTERFACE §1.5, §2.3): the runner's own engine boot read. No engineVersionPolicy row = engine 1 (the
+  // seal is never read); a row, enabled or not, needs the length row and this code's engineContractHash, so a version the
+  // runner would refuse (ENGINE_REQUIRES_LENGTH_POLICY / ENGINE_CONTRACT_HASH_UNSEALED / _MISMATCH) is never reported ready.
+  // It covers the API's engine boot rule too (the API asks it of the row in force, a narrower case).
+  await readEngineRunnerSettings(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

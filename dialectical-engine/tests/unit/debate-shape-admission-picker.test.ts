@@ -26,7 +26,10 @@ vi.mock("@debateai/scorecard", async (importOriginal) => ({
 import { AskRefusal, evaluateAskAdmission, type AskModelPickerSettings, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
-import { computeStructuralCeilingBasis, debateShapePolicyStartValues } from "@debateai/register";
+import {
+  computeStructuralCeilingBasis, debateShapePolicyStartValues, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues,
+  type EngineSettings
+} from "@debateai/register";
 import { normaliseAskForDebateShape } from "../../apps/api/src/debate-shape-ask.js";
 
 const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1,
@@ -145,5 +148,32 @@ describe("a shaped receipt the strict reader refuses never reaches the caller as
     const failure = await evaluateAskAdmission(settings({ policy: true, mangle: wrongReserve }), shaped).then(() => null, (error: unknown) => error);
     expect(failure).toMatchObject({ code: "ASK_MODEL_ASSIGNMENT_INVALID" });
     expect(failure).not.toBeInstanceOf(AskRefusal);
+  });
+});
+
+// Engine redesign R1d, Task 6 review 1 (final wave B4): on the picker path the comparing judges are counted from the
+// SEATED debaters' makers, not the planned ones: min(judges.count, seated makers).
+describe("engine 2 on the picker path: the seated makers size the comparing judges", () => {
+  it("three makers planned, two seated: the planned basis has 3 comparing judges, the admitted receipt 2", async () => {
+    picker.outcome = assigned(TWO);
+    const lengthPolicy = lengthGuidancePolicyStartValues();
+    const engines: (EngineSettings | null)[] = [];
+    const base = settings({ policy: false });
+    const engineSettings: RunCreationSettings = {
+      ...base,
+      lengthGuidancePolicy: lengthPolicy,
+      engineVersionPolicy: engineVersionPolicyStartValues(),
+      resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, length, engine }) => {
+        engines.push(engine);
+        return computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned,
+          ...(length === null ? {} : { length }), ...(engine === null ? {} : { engine }) });
+      }
+    };
+    // The premium roster seats three debaters from the panel's three makers; the picker seats two of them.
+    const premiumAsk = normaliseAskForDebateShape({ ...ASK, plan_tier: "premium" as const }, null, "premium", lengthPolicy);
+    const admitted = await evaluateAskAdmission(engineSettings, premiumAsk);
+    expect(engines.map((engine) => engine?.sites.comparingJudges)).toEqual([3, 2]);
+    expect((admitted.envelopeBasis.engine as { sites: { comparing_judges: number } }).sites.comparing_judges).toBe(2);
+    expect(admitted.envelopeBasis.panel_size).toBe(2);
   });
 });

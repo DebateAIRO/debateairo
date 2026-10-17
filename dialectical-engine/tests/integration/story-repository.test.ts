@@ -253,6 +253,34 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       .resolves.toBeNull();
   });
 
+  it("seals the backup storyteller's record with the content and reads it back; a story without one reads none (R1d)", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story backup ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    // Task 16 review 1 (final wave B10): a first model no other column could hold, so the readable-column check sees it.
+    const firstModel = `provider:first-${mark}`;
+    const backup = { code: "STORY_BACKUP_USED", signal: "TOO_SLOW", firstModel } as const;
+    const repository = new StoryRepository(database.pool);
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), backup })).resolves.toBe("INSERTED");
+    const ownership = { ownerRef: theOwner().ownerRef };
+    const read = await repository.readForAnswer({ answerId, answerVersion: null, ownership });
+    expect(read?.backup).toEqual(backup);
+    // Sealed with the content (deviation 13): no readable column names the code, the signal or the first model.
+    const row = await database.pool.query<{ row_text: string }>(
+      "SELECT to_jsonb(story)::text AS row_text FROM serve.answer_story AS story WHERE story.answer_id = $1", [answerId]
+    );
+    expect(row.rows[0]!.row_text).not.toMatch(/STORY_BACKUP_USED|TOO_SLOW/u);
+    expect(row.rows[0]!.row_text).not.toContain(firstModel);
+    // A story stored without the member (every row before R1d) reads back with none.
+    const otherMark = marker();
+    const otherRunId = await createEncryptedStoryRun(database.pool, theOwner(), `story no backup ${otherMark}`);
+    const otherAnswerId = await answerFor(otherRunId, otherMark);
+    await expect(repository.insert(readyRecord(otherRunId, otherAnswerId, otherMark))).resolves.toBe("INSERTED");
+    const old = await repository.readForAnswer({ answerId: otherAnswerId, answerVersion: null, ownership });
+    expect(old).not.toBeNull();
+    expect(Object.hasOwn(old!, "backup")).toBe(false);
+  });
+
   it("keeps a story stored without a language tag, and refuses a tag no BCP-47 tag could be", async () => {
     const mark = marker();
     const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story no language ${mark}`);

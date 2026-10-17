@@ -16,6 +16,13 @@ import type { StoryCheckerVerdict } from "./validate.js";
  * is a FAILED outcome with a code and a cause, so the caller can store it and
  * the site stops waiting. It throws only on a programming error (fewer than one
  * round, or a round count that is not an integer).
+ *
+ * Story v4 (R1d, spec §7.2 items 7-8; `input.v4`): only a MISLEADING problem starts another round. A verdict that is
+ * not satisfied but not misleading is a wording note: the draft is served READY with no reservation, and the note stays
+ * in the round record for the owner. A misleading round hands the next its own draft (`priorDraft`) and the problem,
+ * so the storyteller revises what it wrote; misleading on the last round is READY_WITH_RESERVATION. `firstRound` lets
+ * a second loop (the backup storyteller) number its rounds after the first loop's; the last round is at most 8, the
+ * story call-site keys' range.
  */
 
 export const STORY_LOOP_FAILURE_CODES = Object.freeze({
@@ -39,6 +46,14 @@ const STORY_CAUSE_UNKNOWN = "UNKNOWN";
 /** A cause is a typed code or an error class name, never a message or model text. */
 const STORY_CAUSE_SHAPE = /^[A-Za-z][A-Za-z0-9_]{0,95}$/u;
 
+/** The last round a story call-site key names (`STORY:STORYTELLER:1` to `:8`; the register caps the rounds at 8). */
+const STORY_LOOP_LAST_ROUND = 8;
+
+/** The loop's last round (`STORY_LOOP_LAST_ROUND`), for the writer's backup loop (Task 17 review 2): one number, one place. */
+export function storyLoopLastRound(): number {
+  return STORY_LOOP_LAST_ROUND;
+}
+
 /** `STORY:STORYTELLER:{round}` or `STORY:CHECKER:{round}`: the only call sites the story gateway accepts. */
 export function storyCallSiteKey(role: "STORYTELLER" | "CHECKER", round: number): string {
   return `STORY:${role}:${String(round)}`;
@@ -51,7 +66,15 @@ export interface StoryCallRecord {
 }
 
 export interface StoryLoopDependencies {
-  writeStory(input: { readonly round: number; readonly priorObjection: string | null }): Promise<StoryCallRecord & { readonly body: StoryBody }>;
+  /**
+   * `priorDraft` (story v4): the draft the checker found misleading, which this round revises as the model's own turn
+   * (`buildStoryRevisionPrompt`). Always null under v3, and in a loop's first round.
+   */
+  writeStory(input: {
+    readonly round: number;
+    readonly priorObjection: string | null;
+    readonly priorDraft: StoryBody | null;
+  }): Promise<StoryCallRecord & { readonly body: StoryBody }>;
   checkStory(input: { readonly round: number; readonly candidate: StoryBody }): Promise<StoryCallRecord & { readonly verdict: StoryCheckerVerdict }>;
 }
 
@@ -61,6 +84,8 @@ export interface StoryRoundRecord {
   readonly checker: StoryCallRecord | null;
   readonly satisfied: boolean;
   readonly objection: string | null;
+  /** Story v4 only, on a round whose checker answered: whether the objection named a misleading problem. */
+  readonly misleading?: boolean;
 }
 
 /** A later round's failure, when the loop kept an earlier checked draft instead (spec §6). */
@@ -116,8 +141,11 @@ function isCheckedStory(value: unknown): value is StoryCallRecord & { readonly v
   if (!isStoryCallRecord(value)) return false;
   const verdict = (value as { readonly verdict?: unknown }).verdict;
   if (typeof verdict !== "object" || verdict === null) return false;
-  const { satisfied, objection } = verdict as { readonly satisfied?: unknown; readonly objection?: unknown };
-  return typeof satisfied === "boolean" && (objection === null || typeof objection === "string");
+  const { satisfied, objection, misleading } = verdict as {
+    readonly satisfied?: unknown; readonly objection?: unknown; readonly misleading?: unknown
+  };
+  return typeof satisfied === "boolean" && (objection === null || typeof objection === "string")
+    && (misleading === undefined || typeof misleading === "boolean");
 }
 
 function dependencyResultInvalid(dependency: "writeStory" | "checkStory"): TypedDomainError {
@@ -151,14 +179,24 @@ function storyFailureCode(error: unknown, stage: "WRITE" | "CHECK"): string {
 }
 
 export async function runStoryLoop(
-  input: { readonly maxRounds: number },
+  input: { readonly maxRounds: number; readonly v4?: true; readonly firstRound?: number },
   deps: StoryLoopDependencies
 ): Promise<StoryLoopOutcome> {
   if (!Number.isInteger(input.maxRounds) || input.maxRounds < 1) {
     throw new TypedDomainError("STORY_LOOP_ROUNDS_INVALID", `The story loop needs at least one round, not ${String(input.maxRounds)}`);
   }
+  const firstRound = input.firstRound ?? 1;
+  const lastRound = firstRound + input.maxRounds - 1;
+  if (!Number.isInteger(firstRound) || firstRound < 1 || lastRound > STORY_LOOP_LAST_ROUND) {
+    throw new TypedDomainError(
+      "STORY_LOOP_ROUNDS_INVALID",
+      `The story loop's rounds lie within 1 to ${String(STORY_LOOP_LAST_ROUND)}, not ${String(firstRound)} to ${String(lastRound)}`
+    );
+  }
+  const v4 = input.v4 === true;
   const rounds: StoryRoundRecord[] = [];
   let priorObjection: string | null = null;
+  let priorDraft: StoryBody | null = null;
   type ObjectedDraft = { readonly round: number; readonly body: StoryBody; readonly objection: string };
   let lastUnsatisfied: ObjectedDraft | null = null;
   const reserved = (draft: ObjectedDraft, laterFailure: StoryLaterFailure | null): StoryLoopOutcome =>
@@ -176,14 +214,22 @@ export async function runStoryLoop(
     if (earlierDraft !== null) return reserved(earlierDraft, Object.freeze({ failureCode, cause }));
     return Object.freeze({ outcome: "FAILED" as const, failureCode, cause, rounds: Object.freeze([...rounds]) });
   };
+  const ready = (round: number, body: StoryBody): StoryLoopOutcome => Object.freeze({
+    outcome: "READY" as const,
+    body,
+    reservation: null,
+    servedRound: round,
+    laterFailure: null,
+    rounds: Object.freeze([...rounds])
+  });
 
-  for (let round = 1; round <= input.maxRounds; round += 1) {
+  for (let round = firstRound; round <= lastRound; round += 1) {
     // Every read of a dependency's result stays inside its guarded region, so a
     // malformed result becomes a named failure instead of a thrown TypeError.
     let writer: StoryCallRecord;
     let body: StoryBody;
     try {
-      const written: unknown = await deps.writeStory({ round, priorObjection });
+      const written: unknown = await deps.writeStory({ round, priorObjection, priorDraft });
       if (!isWrittenStory(written)) throw dependencyResultInvalid("writeStory");
       writer = storyCallRecord(written);
       body = written.body;
@@ -194,30 +240,28 @@ export async function runStoryLoop(
     let checker: StoryCallRecord;
     let satisfied: boolean;
     let objection: string | null;
+    let misleading: boolean;
     try {
       const checked: unknown = await deps.checkStory({ round, candidate: body });
       if (!isCheckedStory(checked)) throw dependencyResultInvalid("checkStory");
       checker = storyCallRecord(checked);
       ({ satisfied, objection } = checked.verdict);
+      misleading = checked.verdict.misleading === true;
     } catch (error) {
       rounds.push(Object.freeze({ round, writer, checker: null, satisfied: false, objection: null }));
       return stopped(storyFailureCode(error, "CHECK"), storyFailureCause(error));
     }
-    rounds.push(Object.freeze({ round, writer, checker, satisfied, objection }));
-    if (satisfied) {
-      return Object.freeze({
-        outcome: "READY" as const,
-        body,
-        reservation: null,
-        servedRound: round,
-        laterFailure: null,
-        rounds: Object.freeze([...rounds])
-      });
-    }
+    rounds.push(Object.freeze({ round, writer, checker, satisfied, objection, ...(v4 ? { misleading } : {}) }));
+    if (satisfied) return ready(round, body);
     // The parser refuses an unsatisfied verdict without an objection; a checker
     // double that returns one anyway has broken its contract.
     if (objection === null) return stopped(STORY_LOOP_FAILURE_CODES.checkUnavailable, STORY_CHECKER_OBJECTION_REQUIRED);
+    // Story v4: a wording note is no reason to rewrite. The draft is served as it is, with no reservation; the note
+    // stays in this round's record (and in the checker's own artifact) for the owner, never for the reader.
+    if (v4 && !misleading) return ready(round, body);
     priorObjection = objection;
+    // Story v4: the next round revises this draft as the model's own turn. v3 starts again from the material.
+    if (v4) priorDraft = body;
     lastUnsatisfied = { round, body, objection };
   }
 

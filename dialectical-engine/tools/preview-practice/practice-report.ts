@@ -20,7 +20,10 @@ import {
 } from "./practice-language.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
+import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
+import { practiceStoryLengthFromSamples, practiceStoryLengthLines, type PracticeStoryJsonBreakRow, type PracticeStoryLengthRow } from "./practice-story-length.js";
+import { practiceStoryEngineLines, type PracticeStoryBackupRow, type PracticeStoryReadyRate, type PracticeStoryRoundRow } from "./practice-story-rounds.js";
 import { practiceLengthLines, practiceTokenLines, type PracticeLengthRow, type PracticeTokenRow } from "./practice-tokens.js";
 import {
   latencySummary,
@@ -361,6 +364,8 @@ export function formatsReport(input: Readonly<{
       ...repairTotals(repairKinds),
       jsonRepairs: jsonRepairs.length
     }),
+    // Length guidance (LG-D): the story jobs' words per field and unreadable replies (absent without a story job).
+    ...(practiceStoryLengthFromSamples(samples) ?? {}),
     failures: samples.filter((sample) => formatStatuses.has(sample.status) || sample.status === "CALL_FAILED"
       || sample.status === "VENDOR_ERROR_UNBILLED"
       || sample.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED"))
@@ -397,6 +402,7 @@ export function debateReport(input: Readonly<{
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
     busyModels: busyDuringRun,
     shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
+    pinsNotHeld: r.writerPins === undefined ? [] : practicePinsNotHeld(r.writerPins),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -412,7 +418,9 @@ export function debateReport(input: Readonly<{
     register: r.register,
     // Hosted mode only: the room or the daily guard, billing (register / practice), the ceilings, the settings set aside.
     ...(r.deployment === undefined ? {} : { deployment: r.deployment }),
-    ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium" }),
+    // Engine row (R1d): the engine the run was admitted with, from its own receipt (absent when it could not be read).
+    ask: Object.freeze({ questionId: r.questionId, depth: r.depth, planTier: "premium",
+      ...(r.storyEngine === undefined ? {} : { engine: Object.freeze({ engine: r.storyEngine.engine }) }) }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
     // Length guidance: only when the debate ran with a length row; absent otherwise (today's keys).
@@ -428,6 +436,16 @@ export function debateReport(input: Readonly<{
     // Parallel AI calls: the setting, each gate's slots at the start, how many calls really went at once, the waits.
     ...(r.parallel === undefined ? {} : { parallel: r.parallel }),
     byModelAndSite: r.byModelAndSite,
+    // Pinned final writers (R1d): absent without a pin, so today's report keeps its keys.
+    ...(r.writerPins === undefined ? {} : { writerPins: r.writerPins }),
+    // Length guidance (LG-D): the story's words per field and its unreadable replies (absent when they could not be read).
+    ...(r.storyLength === undefined ? {} : {
+      storyLengthByField: r.storyLength.storyLengthByField, storyJsonBreaks: r.storyLength.storyJsonBreaks
+    }),
+    // Engine row (R1d): the story's rounds, backups and outcomes (absent when they could not be read).
+    ...(r.storyEngine === undefined ? {} : {
+      storyRounds: r.storyEngine.storyRounds, storyBackups: r.storyEngine.storyBackups, storyReadyRate: r.storyEngine.storyReadyRate
+    }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, r.remaining[gate])])),
     totals: Object.freeze({
       calls: r.byModelAndSite.reduce((sum, row) => sum + row.calls, 0),
@@ -559,6 +577,24 @@ export function reportMarkdown(report: PracticeReport): string {
         + `${row.recovered ? " · recovered" : " · not recovered"}`);
     }
     lines.push("");
+  }
+  if (report.mode === "debate" && typeof report.writerPins === "object" && report.writerPins !== null) {
+    lines.push(...practiceWriterPinsLines(report.writerPins as PracticeWriterPinsBlock));
+  }
+  const askEngine = report.mode === "debate" && typeof report.ask === "object" && report.ask !== null
+    ? (report.ask as { engine?: { engine: 1 | 2 } }).engine : undefined;
+  if (askEngine !== undefined && Array.isArray(report.storyRounds) && Array.isArray(report.storyBackups)
+    && typeof report.storyReadyRate === "object" && report.storyReadyRate !== null) {
+    lines.push(...practiceStoryEngineLines({ engine: askEngine.engine,
+      storyRounds: report.storyRounds as readonly PracticeStoryRoundRow[],
+      storyBackups: report.storyBackups as readonly PracticeStoryBackupRow[],
+      storyReadyRate: report.storyReadyRate as PracticeStoryReadyRate }));
+  }
+  if (Array.isArray(report.storyLengthByField) && Array.isArray(report.storyJsonBreaks)) {
+    lines.push(...practiceStoryLengthLines({
+      storyLengthByField: report.storyLengthByField as readonly PracticeStoryLengthRow[],
+      storyJsonBreaks: report.storyJsonBreaks as readonly PracticeStoryJsonBreakRow[]
+    }));
   }
   const byArm = report.byArm as readonly Readonly<{ arm: string; questions: number; calls: number; costUsd: string; wallSeconds: number;
     unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;

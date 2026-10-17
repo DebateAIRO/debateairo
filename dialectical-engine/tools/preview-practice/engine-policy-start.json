@@ -1,0 +1,26 @@
+{
+  "kind": "ENGINE_VERSION_POLICY",
+  "version": 1,
+  "engine": 2,
+  "scoring": {
+    "terms": [
+      { "metric": "steelman_fidelity", "coefficient": 0.142857 },
+      { "metric": "counter_resilience", "coefficient": 0.142857 },
+      { "metric": "evidence_quality", "coefficient": 0.142857 },
+      { "metric": "evidence_relevance", "coefficient": 0.142857 },
+      { "metric": "context_fit", "coefficient": 0.142857 },
+      { "metric": "clarity", "coefficient": 0.142857 },
+      { "metric": "fallacy_resilience", "coefficient": 0.142857 }
+    ],
+    "clarityDecayPerAmbiguity": 0.1,
+    "fatalCap": { "minFlagSeverity": 0.5, "to": 0.3 },
+    "fidelityFloor": { "below": 0.5, "to": 0.5 },
+    "combine": "MEDIAN",
+    "disputedWeight": 0.7
+  },
+  "links": { "cannotAssessWeight": 0.66, "ownReplyCountsAsSupport": false, "rivalReplies": "EQUAL" },
+  "investigate": { "maxPerDebate": 2 },
+  "judges": { "count": 3, "makerRule": "PREFER_NON_ARGUING_ELSE_IGNORE_OWN" },
+  "label": { "clearAgreeing": 3, "closeCallAgreeing": 2 },
+  "answerCheck": { "candidates": 3 }
+}

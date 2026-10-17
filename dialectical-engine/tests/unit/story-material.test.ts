@@ -5,6 +5,7 @@ import {
   STORY_ENGINE_TOKENS,
   buildStoryMaterial,
   classifyStoryContent,
+  parseStoryBody,
   pointNumbersFrom,
   restoreStoryRefs,
   toCheckerPromptMaterial,
@@ -19,6 +20,7 @@ import {
   type StorySnapshotArrow,
   type StorySnapshotNode
 } from "@debateai/story";
+import { STORY_MATERIAL_KEYS } from "../../packages/story/src/material.js";
 
 /**
  * Verdict story, Task 3 — the material builder (spec §5.2): what the
@@ -1210,5 +1212,202 @@ describe("verdict story — large debates against the tier budgets", () => {
     const refused = classifyStoryContent(JSON.stringify(storyWithPaths(skipsOne)), result.index);
     expect(refused.parseStatus).toBe("SCHEMA_FAILED");
     expect(refused.parseError).toContain("STORY_PATH_NOT_AMONG_STRONGEST");
+  });
+});
+
+/**
+ * Story v4 (R1d, spec §7.2 item 1; INTERFACE §5.3): today's material with each position once (its judge texts on its
+ * `positions` entry, its point entry gone from `points`) and review reasons only for disputed points. v3 stays byte
+ * for byte (the story request byte pin, tests/unit/debate-shape-story-request-bytes.test.ts, is the outer guard).
+ */
+const V4 = Object.freeze({ shapeId: "general" });
+const V4_ENRICHMENT: ReadonlyMap<string, StoryNodeEnrichment> = new Map([
+  ...ENRICHMENT,
+  ["point:d", { judgeBestCase: null, judgeObjection: null, reviewOutcome: "cannot-assess", reviewReasons: ["The source would not open."], dispersion: null }],
+  ["position:b", { judgeBestCase: "Debt service would crowd out bus funding.", judgeObjection: null, reviewOutcome: "dispute",
+    reviewReasons: ["The debt figures are from an older budget."], dispersion: null }]
+]);
+
+describe("story v4 — the material: each position once, reasons only for disputed points", () => {
+  const v4 = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, v4: V4 }));
+  const v3 = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+  const v4Fields = toStoryPromptMaterial(v4.material, null);
+
+  it("lists no position among the points", () => {
+    const points = field(v4Fields, "points") as StoryMaterialPoint[];
+    expect(points.map((point) => point.id)).toEqual(["P3", "P4", "P5"]);
+    expect(points.some((point) => point.position === true)).toBe(false);
+    expect(JSON.stringify(points)).not.toContain("\"position\":true");
+    // The numbering is today's: positions first, and both stay citable.
+    expect([...v4.refMap.entries()]).toEqual([...v3.refMap.entries()]);
+    expect([...v4.index.nodeIds].sort()).toEqual(["P1", "P2", "P3", "P4", "P5"]);
+    expect(v4.index.positionOrder).toEqual(["P1", "P2"]);
+  });
+
+  it("puts each position's way of knowing, best case, objection and review on its positions entry", () => {
+    expect(field(v4Fields, "positions") as StoryMaterialPosition[]).toEqual([
+      { id: "P1", place: 1, claim: "The city should fund it.", known_by: "LOOKED_UP", author: "model:alpha", final: 0.6123, won: true,
+        best_case: "Ridership has grown every year for a decade.", objection: "The growth forecast is the operator's own.",
+        objection_to: "P1", review: "agree" },
+      { id: "P2", place: 2, claim: "The city should not fund it.", known_by: "REASONING", author: "model:beta", final: 0.4, won: false,
+        best_case: "Debt service would crowd out bus funding.", review: "dispute",
+        review_reasons: ["The debt figures are from an older budget."] }
+    ]);
+  });
+
+  it("keeps a disputed point's reasons and drops an agreeing or cannot-assess review's reasons", () => {
+    const points = field(v4Fields, "points") as StoryMaterialPoint[];
+    expect(points.find((point) => point.id === "P3")).toEqual({
+      id: "P3", supports: ["P1"], claim: "Fares cover running costs by year nine.", known_by: "REASONING", base: 0.5, final: 0.45,
+      best_case: "The fare model is published.", review: "dispute",
+      review_reasons: ["Year nine assumes full ridership.", "No sensitivity was run."],
+      author: "model:alpha", judge_spread: 0.1, leverage: 0.3
+    });
+    expect(points.find((point) => point.id === "P4")).toEqual({
+      id: "P4", supports: ["P2"], attacks: ["P1"], claim: "Construction overruns are common.", known_by: "REASONING", base: 0.5,
+      final: 0.45, objection: "Overruns were priced into the budget.", objection_to: "P1", review: "cannot-assess",
+      author: "model:alpha", judge_spread: 0.1, leverage: 0.2
+    });
+  });
+
+  it("v3 for the same snapshot is today's: positions also as points, every review's reasons kept, no new member", () => {
+    expect(field(toStoryPromptMaterial(v3.material, null), "positions") as StoryMaterialPosition[]).toEqual([
+      { id: "P1", place: 1, claim: "The city should fund it.", author: "model:alpha", final: 0.6123, won: true },
+      { id: "P2", place: 2, claim: "The city should not fund it.", author: "model:beta", final: 0.4, won: false }
+    ]);
+    expect(pointFor(v3, "position:a")).toMatchObject({ id: "P1", position: true, review: "agree",
+      review_reasons: ["The source is cited and resolves."] });
+    expect(pointFor(v3, "point:d")).toMatchObject({ review: "cannot-assess", review_reasons: ["The source would not open."] });
+    expect(v3.material.points).toHaveLength(5);
+    // An explicit `v4: undefined` is the same call as no v4 at all (compiles because the member is
+    // `v4?: StoryV4Options | undefined`, pre-flight PF-D5.2).
+    expect(buildStoryMaterial({ snapshot: snapshot(), enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, v4: undefined }))
+      .toEqual(v3);
+  });
+
+  it("sets the index's fixedShapeId only with v4, and the classifier reads a shapeless story with it", () => {
+    expect(v4.index.fixedShapeId).toBe("general");
+    expect(Object.hasOwn(v3.index, "fixedShapeId")).toBe(false);
+    const { shape_id: _shape, ...shapeless } = storyWithPaths(["P1", "P2"]);
+    expect(parseStoryBody(JSON.stringify(shapeless), v4.index).shape_id).toBe("general");
+  });
+
+  it("is smaller than v3 for the same debate, and counts its bytes the same way", () => {
+    expect(v4.material.bytes).toBeLessThan(v3.material.bytes);
+    expect(v4.material.bytes).toBe(v4Fields.reduce((total, entry) => total + Buffer.byteLength(entry.content, "utf8"), 0));
+  });
+
+  it("reads a position's own judge texts as the person's stated figures, as v3 reads them on its point entry", () => {
+    const stating = new Map(V4_ENRICHMENT);
+    stating.set("position:a", { ...ENRICHMENT.get("position:a")!, judgeBestCase: "Ridership reached 0,61 of capacity last year." });
+    const v4Stated = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: stating, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, v4: V4 }));
+    const v3Stated = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: stating, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+    expect(v4Stated.index.scoreTexts.has("0,61")).toBe(false);
+    expect(v4Stated.index.scoreTexts.has("0.6123")).toBe(true);
+    // Equal here because every fixture node's base is 0.5; v4 drops a position's own base, which the material no longer
+    // shows (pre-flight PF-D5.12): the case below gives a position its own base and proves the drop.
+    expect(v4Stated.index.scoreTexts).toEqual(v3Stated.index.scoreTexts);
+  });
+
+  // Task 13 review 1 (final wave B7), the reviewer's exact PF-D5.12 case: a position whose base is not the points' 0.5.
+  it("drops a position's own base from the score texts in v4, as its positions entry no longer shows it (PF-D5.12)", () => {
+    const based = snapshot({ nodes: snapshot().nodes.map((entry) => entry.nodeId === "position:a" ? { ...entry, baseScore: 0.37 } : entry) });
+    const v4Based = built(buildStoryMaterial({ snapshot: based, enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES, v4: V4 }));
+    const v3Based = built(buildStoryMaterial({ snapshot: based, enrichment: V4_ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+    // v3 lists the position as a point with its base: a reply may not print it, in either decimal form.
+    expect(v3Based.index.scoreTexts.has("0.37")).toBe(true);
+    expect(v3Based.index.scoreTexts.has("0,37")).toBe(true);
+    // v4 shows no base for a position, so it holds neither.
+    expect(v4Based.index.scoreTexts.has("0.37")).toBe(false);
+    expect(v4Based.index.scoreTexts.has("0,37")).toBe(false);
+    const positions = field(toStoryPromptMaterial(v4Based.material, null), "positions");
+    expect(JSON.stringify(positions)).not.toContain("0.37");
+    expect((positions as StoryMaterialPosition[]).every((entry) => !Object.hasOwn(entry, "base"))).toBe(true);
+  });
+});
+
+describe("story v4 — the material's key lists keep their exact values", () => {
+  it("STORY_MATERIAL_KEYS and STORY_ENGINE_TOKENS equal their literal copies at 48586d527", () => {
+    // The positions' new members are all point keys already, so neither list moves. These literals are today's lists:
+    // this case PASSES before the change (Step 2) and must pass after it.
+    expect(STORY_MATERIAL_KEYS).toEqual([
+      "id", "position", "supports", "attacks", "claim", "known_by", "base", "final", "set_aside", "best_case", "objection",
+      "objection_to", "review", "review_reasons", "author", "judge_spread", "leverage", "place", "won", "within_tie_margin",
+      "label", "rule_in_words", "rung", "trigger", "winner_id", "winner_final", "runner_up_id", "runner_up_final", "margin",
+      "disagreement", "thresholds", "confidence_band", "marks", "positions_argued", "tie_margin", "low_cut", "high_cut",
+      "position_ref", "reason", "question", "verdict", "served_statement", "positions", "points", "hinges", "omitted",
+      "also_raised", "answers_note", "prior_objection"
+    ]);
+    expect(STORY_ENGINE_TOKENS).toEqual([
+      "SUPPORTED", "CONTESTED", "UNSUPPORTED", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE", "LOOKED_UP", "RAN", "REASONING",
+      "known_by", "set_aside", "best_case", "objection_to", "review_reasons", "judge_spread", "within_tie_margin",
+      "rule_in_words", "winner_id", "winner_final", "runner_up_id", "runner_up_final", "confidence_band", "positions_argued",
+      "tie_margin", "low_cut", "high_cut", "position_ref", "served_statement", "also_raised", "answers_note", "prior_objection"
+    ]);
+  });
+});
+
+describe("story v4 — the shrink ladder still fits the budget", () => {
+  // Two positions and 24 points, built as the v3 ladder case builds them: node:03-06 argue with a position directly,
+  // every later node:k argues with node:(k-4); leverage falls with k (node:03-12 the top 10, node:03-22 the top 20).
+  // The positions carry disputed reviews (so their reasons ride), every point an agreeing one (so none does).
+  const ids = Array.from({ length: 26 }, (_, index) => `node:${String(index + 1).padStart(2, "0")}`);
+  const id = (k: number): string => ids[k - 1] ?? "node:??";
+  const arrows: StorySnapshotArrow[] = [
+    { sourceNodeId: id(3), targetNodeId: id(1), polarity: "support" },
+    { sourceNodeId: id(4), targetNodeId: id(1), polarity: "attack" },
+    { sourceNodeId: id(5), targetNodeId: id(2), polarity: "support" },
+    { sourceNodeId: id(6), targetNodeId: id(2), polarity: "attack" },
+    ...Array.from({ length: 20 }, (_, index): StorySnapshotArrow => ({
+      sourceNodeId: id(index + 7), targetNodeId: id(index + 3), polarity: (index + 7) % 2 === 1 ? "support" : "attack"
+    }))
+  ];
+  const ladderSnapshot = snapshot({
+    verdictBasis: { ...BASIS, winner_node_id: id(1), runner_up_node_id: id(2) },
+    nodes: ids.map((nodeId, index) => node({ nodeId, isPosition: index < 2, claim: text(`Claim ${nodeId}`, 700) })),
+    arrows,
+    sensitivity: ids.slice(2).map((nodeId, index) => ({ removedNodeId: nodeId, leverage: (40 - index) / 100 })),
+    setAside: []
+  });
+  const ladderEnrichment: ReadonlyMap<string, StoryNodeEnrichment> = new Map(ids.map((nodeId, index) => [nodeId, {
+    judgeBestCase: text(`Best ${nodeId}`, 600),
+    judgeObjection: text(`Objection ${nodeId}`, 600),
+    reviewOutcome: index < 2 ? "dispute" as const : "agree" as const,
+    reviewReasons: [text(`Reason ${nodeId}`, 500)],
+    dispersion: 0.1
+  }]));
+  const at = (budgetBytes: number, v4?: typeof V4): StoryMaterialResult => buildStoryMaterial({
+    snapshot: ladderSnapshot, enrichment: ladderEnrichment, budgetBytes, shapeIds: SHAPES, ...(v4 === undefined ? {} : { v4 })
+  });
+  const positionsOf = (result: BuiltMaterial): StoryMaterialPosition[] =>
+    field(toStoryPromptMaterial(result.material, null), "positions") as StoryMaterialPosition[];
+
+  it("walks steps 0 to 7 in order; a position's judge texts are whole until step 2, cut to 240 after, never dropped", () => {
+    let result = built(at(10_000_000, V4));
+    const seen: number[] = [];
+    for (;;) {
+      const whole = result.compressionStep < 2;
+      for (const position of positionsOf(result)) {
+        expect(characters(position.best_case)).toBe(whole ? 600 : 240);
+        expect(characters(position.objection)).toBe(whole ? 600 : 240);
+        expect(characters(position.review_reasons?.[0])).toBe(whole ? 500 : 240);
+        expect(position.review).toBe("dispute");
+      }
+      expect(result.material.points.some((point) => point.position === true)).toBe(false);
+      expect(result.material.points.some((point) => point.review_reasons !== undefined)).toBe(false);
+      seen.push(result.compressionStep);
+      if (result.compressionStep === 7) break;
+      const budget = result.material.bytes - 1;
+      result = built(at(budget, V4));
+      expect(result.material.bytes).toBeLessThanOrEqual(budget);
+    }
+    expect(seen).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    // Step 7 keeps the 20 spine points (v3 lists 22 entries: these and the two positions).
+    expect(result.material.points).toHaveLength(20);
+    expect(result.index.nodeIds.size).toBe(22);
+  });
+
+  it("needs fewer bytes than v3 at the uncut budget", () => {
+    expect(built(at(10_000_000, V4)).material.bytes).toBeLessThan(built(at(10_000_000)).material.bytes);
   });
 });

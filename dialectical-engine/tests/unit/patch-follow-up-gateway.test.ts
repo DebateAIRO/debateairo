@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Judge, classifyStructuredArtifact, judgeArtifactSchema } from "@debateai/judgement";
 import {
+  CONTENT_FOLLOW_UP_SENTENCES,
   OpenAICompatibleProviderGateway,
   PreviewVendorRefusedUnbilled,
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  buildFramedRevisionPrompt,
   createPreviewGuardedFetch,
   parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets,
@@ -361,3 +363,77 @@ function positionRequest(): ProviderCallRequest {
     buildRepairPacket: (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
   };
 }
+
+/**
+ * Story v4 round 2 (R1d): a revision request already carries the model's own turn, so the gateway's short follow-up
+ * cannot apply (`buildFramedPatchPrompt` refuses a packet with an answer turn and `#patchPacket` returns null): a content
+ * refusal goes to the request's own repair builder, which rebuilds the revision with the refusal's fields under the same
+ * fence. Unrouted (hosted, local and every double): today's loop, on the native gateway.
+ */
+describe("a revision request's content refusal goes to its own repair builder, never to a PATCH", () => {
+  const DRAFT = JSON.stringify({ short: { headline: "Rezumatul nostru." }, why: { reasons: [] }, reviewer_note: null, long: { sections: [] } });
+  const PROBLEMS = "Rezumatul prezintă un punct disputat ca sigur.";
+  const ACCEPTED = JSON.stringify({ satisfied: false, objection: PROBLEMS, criteria: CRITERIA });
+  const revisionRequest = (): ProviderCallRequest => {
+    const framed = buildFramedPrompt({ contract: { contractId: "story.storyteller.v4", instruction: "Tell the story.", answerForm: "Return one JSON object." },
+      material: [{ name: "question", content: "Synthetic question." }] });
+    return { runId: "run:synthetic", subjectItemId: "story:synthetic", callSiteKey: "STORY:STORYTELLER:2", role: "SYNTHESIZER", lane: "story",
+      preferredResponseFormat: "json_object", bound: { maxAttempts: 2, tokenCeiling: 8192, deadlineMs: 600_000 },
+      contractHash: "contract:synthetic", providerRef: "preview:fixture-a",
+      packet: buildFramedRevisionPrompt(framed.packet, DRAFT, PROBLEMS),
+      // The gateway's mechanics only: any step's own check serves, here the checker's, so the real DeepSeek slip (a
+      // verdict without criteria) is refused at a named member, which is what would make a patch possible.
+      classifyContent: classifyCheckerContent,
+      buildRepairPacket: (rejected) => buildFramedRevisionPrompt(framed.packet, DRAFT, PROBLEMS, schemaFailureLocator(rejected)) };
+  };
+
+  it("sends the revision packet as built: the draft as the model's own turn, then the one revision block", async () => {
+    const { native, executions } = deepInfraHarness([{ content: ACCEPTED }]);
+    const request = revisionRequest();
+    const result = await native.call({ ...request, thinkingLevel: "high" });
+    expect(executions).toHaveLength(1);
+    expect(bodyOf(executions[0]!).messages).toEqual(request.packet.messages);
+    expect(result.repairForm).toBeUndefined();
+  });
+
+  it("a slip a patch could name is re-asked in full through the request's own builder, under the same fence", async () => {
+    const { native, executions, artifacts, ledger } = deepInfraHarness([{ content: CHECKER_SLIP }, { content: ACCEPTED }]);
+    const result = await native.call({ ...revisionRequest(), thinkingLevel: "high" });
+    expect(executions).toHaveLength(2);
+    const [first, second] = [bodyOf(executions[0]!), bodyOf(executions[1]!)];
+    expect(second.messages.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(second.messages.slice(0, 3)).toEqual(first.messages.slice(0, 3));
+    const fields = readPromptFrame({ messages: second.messages as never }).fields;
+    expect(fields.slice(-4)).toEqual([
+      { name: "revision_problems", content: PROBLEMS },
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_path", content: "criteria" },
+      { name: "machine_reply_form", content: "REVISION" }
+    ]);
+    expect(fields.some((entry) => entry.name === "machine_rejection_paths")).toBe(false);
+    expect(fields.filter((entry) => entry.name === "machine_reply_form").map((entry) => entry.content)).toEqual(["REVISION"]);
+    expect(result.repairForm).toBe("FULL");
+    expect(artifacts.map((artifact) => artifact.parseStatus)).toEqual(["SCHEMA_FAILED", "PARSED"]);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "OK"]);
+  });
+
+  // Pre-flight PF-D5.4: on the preview every story call is routed (LG-A), so the revision's full re-ask carries
+  // machine_rejection_reason too; the door reads it through readRevisionRequestBlock (Review Focus 4's injection path).
+  it("routed: the full re-ask also carries the plain-word reason, under the same fence, and the door admits it", async () => {
+    const { native, executions, artifacts } = deepInfraHarness([{ content: CHECKER_SLIP }, { content: ACCEPTED }]);
+    const result = await native.call({ ...revisionRequest(), structureRepairRouted: true, thinkingLevel: "high" });
+    expect(executions).toHaveLength(2);
+    const [first, second] = [bodyOf(executions[0]!), bodyOf(executions[1]!)];
+    expect(second.messages.slice(0, 3)).toEqual(first.messages.slice(0, 3));
+    expect(readPromptFrame({ messages: second.messages as never }).fields.slice(-5)).toEqual([
+      { name: "revision_problems", content: PROBLEMS },
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_path", content: "criteria" },
+      { name: "machine_rejection_reason", content: CONTENT_FOLLOW_UP_SENTENCES.SCHEMA_FAILED },
+      { name: "machine_reply_form", content: "REVISION" }
+    ]);
+    expect(result.repairForm).toBe("FULL");
+    // A missing member is class CONTENT (never the structure-repair route): the gateway's own re-ask, not a STRUCTURE end.
+    expect(artifacts.map((artifact) => [artifact.replyForm, artifact.replyFailureClass])).toEqual([["ORIGINAL", "CONTENT"], ["FULL", null]]);
+  });
+});

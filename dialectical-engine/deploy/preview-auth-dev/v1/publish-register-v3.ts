@@ -30,6 +30,9 @@
 // v2's builder the same way (v2's seventh argument); a carried questionLanguagePolicy row is parsed; and when the
 // composed rows hold the debate shape in force, the hosted API's own question-language boot refusals (an owner text
 // carrying a frame token, a fast-check model the preview's Anthropic gate does not review) are asked before sealing.
+// Engine redesign (R1d): the operator's optional engineVersionPolicy row passes through to v2's builder (v2's ninth argument);
+// the sealed engineContractHash (a required v2 key) is parsed; a carried engineVersionPolicy row is parsed; and with an
+// engine row (enabled or not) the hosted runner's own engine boot refusals are asked before anything is sealed.
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
@@ -43,6 +46,8 @@ import {
   DEBATE_SHAPE_POLICY_ROW_KEY, parseDebateShapePolicy, MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, debateShapeInForce,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, parseQuestionLanguagePolicy,
   LENGTH_GUIDANCE_POLICY_ROW_KEY, parseLengthGuidancePolicy,
+  ENGINE_CONTRACT_HASH_ROW_KEY, parseEngineContractHash, ENGINE_VERSION_POLICY_ROW_KEY, parseEngineVersionPolicy,
+  type EngineVersionPolicy,
   type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type LengthGuidancePolicy, type QuestionLanguagePolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { costEnvelopeGuardPolicy } from '@debateai/budget';
@@ -56,7 +61,7 @@ import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot } from './publish-register.js';
 import {
-  buildPreviewSourceRowsV2, previewCheckerRoleRef, previewDeltaSha256V2, assertBaseIsCurrent,
+  buildPreviewSourceRowsV2, previewCheckerRoleRef, previewDeltaSha256V2, assertBaseIsCurrent, assertPreviewEngineBootRows,
   PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, PREVIEW_SYNTHESIZER_ROLE_REF,
   type PreviewCheckerChoice, type PreviewRoleRotationChoice, type SnapshotDeltaV2
 } from './publish-register-v2.js';
@@ -125,11 +130,12 @@ const withSuffix = (sourceRef:string,suffix:string) => {
  * inputs), then v2 runs its own checks (runtime gate, checker, rotation, call-concurrency policy, debate shape,
  * question language). `debateShape` is v2's sixth argument, passed through (default null: no row; 'off': the start
  * values disabled); `questionLanguage` is v2's seventh (default null: no row, the code's start values); `lengthGuidance`
- * is v2's eighth (default null: no row; LG-C).
+ * is v2's eighth (default null: no row; LG-C); `engineVersion` is v2's ninth (default null: no row; 'off': the start values
+ * disabled; R1d).
  */
-export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
   const choice=previewHostedBillingChoice(hosted);
-  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage,lengthGuidance);
+  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage,lengthGuidance,engineVersion);
   const byKey=new Map(local.map(row=>[row.rowKey,row]));
   // The hosted builder's story rows: every one but the money row must be v2's, so the hosted build differs by that row alone.
   const story=buildDevelopmentStoryRegisterRows({synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:previewCheckerRoleRef(checker)},'hosted')
@@ -269,6 +275,10 @@ export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow
     resolveDebateShapeRunnerSettings({policy:parseDebateShapePolicy(JSON.parse(shape.valueJsonText)),
       mapContractHash:hash===undefined?null:parseMapContractHash(JSON.parse(hash.valueJsonText)),codeMapContractHash:mapPromptContractHash()});
   }
+  // Engine redesign (R1d): the hosted runner's own engine boot read (apps/runner/src/engine-boot.ts): with an engine row
+  // (enabled or not), the length row and this code's engineContractHash, or the runner's typed refusal. No engine row =
+  // engine 1: the seal is never read.
+  assertPreviewEngineBootRows(rows);
   // The API's question-language boot step (main.ts "question-language"): only with the shape row in force. The preview
   // route is the strictest one the API can take (L-ROUTE: never hosted): the fast-check model must be a reviewed row of
   // the preview's Anthropic gate, and the owner text must frame. No shape in force = the row is never read at boot.
@@ -299,9 +309,12 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===DEBATE_SHAPE_POLICY_ROW_KEY)parseDebateShapePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
   }
   // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
   parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));
+  // Engine redesign (R1d): engine 2's seal, a required source key (v2's builder makes it), parsed by the register's own reader.
+  parseEngineContractHash(JSON.parse(sourceMap.get(ENGINE_CONTRACT_HASH_ROW_KEY)!.valueJsonText));
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
   assertProviderRows(baseMap,'base');

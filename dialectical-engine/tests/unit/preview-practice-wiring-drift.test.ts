@@ -260,6 +260,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
     expect(runnerMain).toContain(shapeRead);
     expect(practiceRunner).toContain(shapeRead);
+    // Engine redesign (R1d Task 5): the runner's engine boot read, in both modes, on both sides.
+    const engineRead = "const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);";
+    expect(runnerMain).toContain(engineRead);
+    expect(practiceRunner).toContain(engineRead);
     expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
     expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
     expect(practiceRunner).toContain("storyPolicy, debateShape, log:");
@@ -269,6 +273,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const practiceAsk = flat(PRACTICE_ASK);
     for (const source of [apiMain, practiceAsk]) {
       expect(source).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+      // Engine redesign (R1d Task 6): the row in force for the ask side, on both sides.
+      expect(source).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
       expect(source).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
       expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
       expect(source).toContain("route: questionLanguageRouteFor({");
