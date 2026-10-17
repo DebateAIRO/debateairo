@@ -39,6 +39,7 @@ import {
 } from "@debateai/providers";
 import {
   JUDGE_WAYS_OF_KNOWING,
+  JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS,
   JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS,
   JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
@@ -46,6 +47,7 @@ import {
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_LENGTH_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
+  judgeAssignedRootV2PromptContract,
   judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
@@ -268,7 +270,14 @@ export type JudgeLeg =
    * maker must make the strongest case for; `mapPoints` is the map's points as
    * one JSON text. Both are material, fenced like every other statement.
    */
-  | { readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string }
+  | {
+      readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string;
+      /**
+       * Engine 2 (spec 2026-10-15 §5.2 items 2, 6): present = the fixed-words contract (`judge.assigned-root.*.v2`) with
+       * the unsided points raised and the answer's assumptions, each a JSON text. Absent = today's leg, byte for byte.
+       */
+      readonly engine?: Readonly<{ pointsRaised: string; assumptions: string }> | undefined;
+    }
   /**
    * `consideration` (debate shape) is the one map point the reply is built on.
    * Absent = today's leg, byte for byte; present = the consideration variant
@@ -451,7 +460,9 @@ export interface ReviewedNode {
  * closed material table it may send: a support or attack leg WITH a
  * consideration takes the debate shape's variant (`judgeConsiderationPromptContract`
  * + `JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS`); every other leg, a support or
- * attack leg without one included, takes today's contract and table. The framer
+ * attack leg without one included, takes today's contract and table. An
+ * assigned root WITH `engine` (engine redesign R3) takes the fixed-words
+ * contract (`judgeAssignedRootV2PromptContract` + its table), lengthed only. The framer
  * and the moment replay both read it, so the two cannot disagree.
  */
 export function judgeLegFrameSpec(
@@ -459,6 +470,11 @@ export function judgeLegFrameSpec(
   claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   lengthed = false
 ): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  if (leg.kind === "assigned-root" && leg.engine !== undefined) {
+    // Engine-2 contracts are always lengthed (engine INTERFACE §0): an untold length is a wiring defect, never sent.
+    if (!lengthed) throw new TypedDomainError("JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED", "An engine-2 position is always told its length");
+    return Object.freeze({ contract: judgeAssignedRootV2PromptContract(claim), materialFields: JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS });
+  }
   if ((leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined) {
     return Object.freeze({
       contract: judgeConsiderationPromptContract(leg.kind, claim, lengthed),
@@ -494,7 +510,11 @@ function judgeLegMaterial(
       ? [
           { name: "question_line", content: questionLine },
           { name: "assigned_answer", content: leg.assignedAnswer },
-          { name: "map_points", content: leg.mapPoints }
+          { name: "map_points", content: leg.mapPoints },
+          ...(leg.engine === undefined ? [] : [
+            { name: "points_raised", content: leg.engine.pointsRaised },
+            { name: "assumptions", content: leg.engine.assumptions }
+          ])
         ]
       : leg.kind === "support" || leg.kind === "attack"
         ? [
@@ -639,7 +659,12 @@ type RootPositionBoundInput = Readonly<{
   questionLine: string;
   argumentLanguageName: string;
   completionTokenCeiling: number;
-  assignedMaterialChars: Readonly<{ answer: number; points: number }>;
+  /**
+   * `pointsRaised` and `assumptions` (engine redesign R3, both or neither): the engine-2 fixed-words leg is framed too.
+   * `pointsRaised` is the ONE room its sided `map_points` and its `points_raised` list share (Ruling PF-R35.4 (a)): the
+   * two together hold at most `pointsRaised + 2` characters, which the runner's shaping keeps (`shapeEngineRootMaterial`).
+   */
+  assignedMaterialChars: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
   questionLanguage?: QuestionLanguage | null;
   /** Length guidance (spec 2026-10-15 §3.2): frame the lengthed variant with this target; absent or null, today's bytes. */
   length?: LengthGuide | null;
@@ -662,15 +687,30 @@ function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (fr
     || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
     throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
   }
+  const { pointsRaised, assumptions } = input.assignedMaterialChars;
+  const validSize = (size: number | undefined): boolean => size === undefined || (Number.isSafeInteger(size) && size >= 1);
+  if ((pointsRaised === undefined) !== (assumptions === undefined) || !validSize(pointsRaised) || !validSize(assumptions)) {
+    throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
+  }
   const legs: readonly JudgeLeg[] = [
     Object.freeze({ kind: "primary-root" }),
     Object.freeze({ kind: "assigned-root", assignedAnswer: "\u0001".repeat(answer), mapPoints: "\u0001".repeat(points) })
   ];
-  return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
+  // Engine 2 (R3): the fixed-words leg, framed with the bound length guide (it is always lengthed), so root 0's room is
+  // never below a real engine-2 position call (spec §10: never under-count). The sided points and the points raised
+  // share one room (Ruling PF-R35.4 (a)): it is framed at both extreme splits (all of it sided, the raised list empty;
+  // the sided list empty, all of it raised). Every character of the shared room frames at the same 7 bytes, so no split
+  // in between frames longer; the larger of the two is kept with the rest.
+  const fill = (chars: number): string => "\u0001".repeat(chars);
+  const engineLeg = (sided: number, raised: number, assumed: number): JudgeLeg => Object.freeze({ kind: "assigned-root",
+    assignedAnswer: fill(answer), mapPoints: fill(sided), engine: Object.freeze({ pointsRaised: fill(raised), assumptions: fill(assumed) }) });
+  const engineLegs: readonly JudgeLeg[] = pointsRaised === undefined || assumptions === undefined ? []
+    : [engineLeg(pointsRaised, 2, assumptions), engineLeg(2, pointsRaised, assumptions)];
+  return Math.max(...[...legs, ...engineLegs].flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
     model: "",
     max_tokens: input.completionTokenCeiling,
     messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim, input.questionLanguage ?? null,
-      input.length ?? null)).messages
+      leg.kind === "assigned-root" && leg.engine !== undefined ? (input.length ?? lengthGuideForBounds()) : (input.length ?? null))).messages
   }), "utf8"))));
 }
 
