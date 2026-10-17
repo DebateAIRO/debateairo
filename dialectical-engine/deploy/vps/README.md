@@ -1114,6 +1114,16 @@ publish the new version from this release as for any release. R2b adds no migrat
 
 The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 only), listed with its other lines under "What the runner's log says about answers and stories" below.
 
+### Upgrading to the engine redesign R3 (the engine seal and migration 0122)
+
+This release adds one migration, `migrations/0122_engine_map_check.sql` (after `0121_engine_verdict.sql`): two
+append-only code tables, what each engine-2 map point rests on and the answer check's codes. Apply it BEFORE the new
+code runs (every map read of the new code joins the first table, engine 1 included), as step 1 of the debate-shape
+upgrade above does (open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart
+the API and the runner. No new environment key; nothing a debate does changes (engine 2 stays off while no register
+version carries the engine row). Rolling back the code needs no database step: the two tables stay, and the older code
+never reads them.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,

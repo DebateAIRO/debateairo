@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth and the engine verdict (0121, below) the eleventh. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh and the engine's map answer step (0122, below) the twelfth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0121: 0121,
-   `engine-verdict-forward0121.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0121 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0122: 0122,
+   `engine-map-check-forward0122.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0122 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -194,6 +194,18 @@ checked by the file's closing block and pinned by tests, not digested, so a late
 `origin/dev` takes 0121 first, renumber this step by C1's recipe (rename every file and constant that carries the
 number, recompute the manifest, re-pin the chain lists).
 
+## The engine's map answer step (0122)
+
+The twelfth chain step, after the engine verdict's 0121 (engine redesign R3, spec
+`docs/superpowers/specs/2026-10-15-engine-redesign-design.md` §5.7): `0122_engine_map_check.sql`,
+`engine-map-check-forward0122.json`, `packages/db/src/migration-forward0122.ts` (`loadForward0122`, appended last to
+`STEPS`, `MIGRATION_FORWARD0122_*` refusals). Two new append-only code tables, `core.map_item_rests_on` and
+`core.map_answer_check` (0040's erasure barrier, 0056's truncate guard, codes only, not content carriers); 0117's
+tables are not altered (their digest is 0117's; see 0119's note). No billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force; no supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the two tables whole. If `origin/dev` takes 0122 first, renumber this step
+(rename every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -202,9 +214,10 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0121: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0122: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
-the reclaim resume, the reply measures and the engine verdict keep) still runs at the end of every `migrate()`.
+the reclaim resume, the reply measures, the engine verdict and the engine's map answer step keep) still runs at the end
+of every `migrate()`.
 
 ## Merge order: check the preview first
 

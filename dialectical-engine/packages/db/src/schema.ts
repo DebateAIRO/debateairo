@@ -436,6 +436,23 @@ export const mapPositionRepoint = core.table("map_position_repoint", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
+// Engine redesign R3 (0122): what each engine-2 point rests on, and the answer check's codes. Codes only, append-only.
+export const mapItemRestsOn = core.table("map_item_rests_on", {
+  runId: uuid("run_id").notNull(),
+  itemId: text("item_id").notNull(),
+  restsOn: text("rests_on").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+export const mapAnswerCheck = core.table("map_answer_check", {
+  runId: uuid("run_id").primaryKey(),
+  answerCheck: text("answer_check").array().notNull(),
+  checkerMaker: text("checker_maker"),
+  // Ruling (premiseExempt storage): the check ids the checker exempted from the third test (pre-flight consistency).
+  premiseExempt: text("premise_exempt").array().notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),

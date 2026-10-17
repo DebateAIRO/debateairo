@@ -1,0 +1,17 @@
+{
+  "version": "engine-map-check-forward0122-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0121_engine_verdict.sql",
+    "manifestSha256": "2b1707000320a5c074806d232fb67d94371a181ea4e41cc961598e0b3bedc2b7",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0122_engine_map_check.sql",
+    "sha256": "7b76586226ddf7eae1c09faf6bad632132c50f661e4ae855adc20d026a9cf136"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}
