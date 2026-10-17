@@ -52,8 +52,8 @@ describe("length guidance: the step words", () => {
     expect(lengthCallStepOf("STORY:CHECKER:1", "served")).toBeNull();
   });
 
-  // Keys the parity block adds: the role keys with a seat suffix on each seat, and the verdict, repair, story and map
-  // keys that the suffix must not reach. Both readers see every one of them.
+  // Keys the parity block adds: the role keys with a seat suffix on each seat, the verdict keys, on which the suffix is
+  // ignored (R2 A2), and the repair, story and map keys that the suffix must not reach. Both readers see every one of them.
   const EXTRA_PARITY_KEYS = [
     "JUDGE:root:2:seat:runnerUp", "JUDGE:defender:root0:r1:p3:seat:runnerUp", "JUDGE:cross-root:1->2:seat:main",
     "JUDGE:review:8d823b58-05b3-4c47-abe9-dc7b18e061b1:seat:main", "COMPOSER:SYNTHESIZER:INITIAL:1:seat:main",
@@ -75,10 +75,10 @@ describe("length guidance: the step words", () => {
   }>[] = [
     { why: "the map's calls: the kernel names the map step; the preview table runs them at the opening level",
       matches: key => key.startsWith("MAP:"), kernel: "map", preview: "opening" },
-    { why: "the comparing judges have no word in the preview table yet",
-      matches: key => /^VERDICT:judge:[1-5]$/u.test(key), kernel: "comparing_judge", preview: null },
-    { why: "the investigator has no word in the preview table yet",
-      matches: key => /^VERDICT:investigate:[1-5]$/u.test(key), kernel: "investigator", preview: null },
+    { why: "the comparing judges: the kernel names their own length step; the preview table runs them at judge_panel (R2 A2)",
+      matches: key => /^VERDICT:judge:[1-5](?::seat:(?:main|runnerUp))?$/u.test(key), kernel: "comparing_judge", preview: "judge_panel" },
+    { why: "the investigator: the kernel names its own length step; the preview table runs it at reviewer (R2 A2)",
+      matches: key => /^VERDICT:investigate:[1-5](?::seat:(?:main|runnerUp))?$/u.test(key), kernel: "investigator", preview: "reviewer" },
     { why: "the structure-repair call: the kernel names its own step; the preview table runs it at slip_fix (LG-A Task 12)",
       matches: key => key.startsWith(STRUCTURE_REPAIR_CALL_SITE_PREFIX), kernel: "structure_repair", preview: "slip_fix" },
     { why: "a storyteller key with no lane: the kernel reads the story lane (the brief's rule); the preview table needs lane \"story\"",

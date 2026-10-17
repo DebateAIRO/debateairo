@@ -69,8 +69,9 @@ const STEP_OF_ROLE: Readonly<Record<DebateRole, LengthGuidanceStep>> = Object.fr
 
 /**
  * The step a call belongs to, from its call-site key and, for the two story sites, its lane. The `:seat:main|runnerUp`
- * suffix is ignored for a role key (as `debateRoleFromCallSiteKey` does); the story and verdict keys match only without
- * it, and the map and repair keys match by prefix. A story key on another lane is no story call, and an omitted lane
+ * suffix is ignored for a role key (as `debateRoleFromCallSiteKey` does); the verdict keys ignore it too (R2 A2: an
+ * assigned run's comparing judge or investigation keeps its step); the story keys match only without it, and the map
+ * and repair keys match by prefix. A story key on another lane is no story call, and an omitted lane
  * reads as the story lane. Null for every other call (health checks, the dormant evaluator lane, the STOPPING row).
  */
 export function lengthCallStepOf(callSiteKey: string, lane?: string): LengthCallStep | null {
@@ -79,8 +80,9 @@ export function lengthCallStepOf(callSiteKey: string, lane?: string): LengthCall
   if (STORYTELLER_KEY.test(callSiteKey)) return storyLane ? "story_writer" : null;
   if (STORY_CHECKER_KEY.test(callSiteKey)) return storyLane ? "story_checker" : null;
   if (callSiteKey.startsWith("MAP:")) return "map";
-  if (COMPARING_JUDGE_KEY.test(callSiteKey)) return "comparing_judge";
-  if (INVESTIGATOR_KEY.test(callSiteKey)) return "investigator";
+  const seatless = callSiteKey.replace(/:seat:(?:main|runnerUp)$/u, "");
+  if (COMPARING_JUDGE_KEY.test(seatless)) return "comparing_judge";
+  if (INVESTIGATOR_KEY.test(seatless)) return "investigator";
   const role = debateRoleFromCallSiteKey(callSiteKey);
   return role === null ? null : STEP_OF_ROLE[role];
 }

@@ -39,6 +39,12 @@ export type ModelStrength = typeof MODEL_STRENGTHS[number];
 
 /** Task P4's seat-aware keys end in this suffix; the role never depends on it. */
 const SEAT_SUFFIX = /:seat:(?:main|runnerUp)$/u;
+/**
+ * Engine redesign R2 (spec 2026-10-15 §4.9): a comparing judge (`VERDICT:judge:<1-5>`) and a point investigation
+ * (`VERDICT:investigate:<1-5>`; the kernel's engine.ts mints both). Exact keys, so any other `VERDICT:` text stays no role.
+ */
+const COMPARING_JUDGE_KEY = /^VERDICT:judge:[1-5]$/u;
+const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-5]$/u;
 
 /**
  * The role of a LEGACY call, read from its call_site_key (rows written before migration 0090
@@ -49,6 +55,10 @@ const SEAT_SUFFIX = /:seat:(?:main|runnerUp)$/u;
  */
 export function debateRoleFromCallSiteKey(key: string): DebateRole | null {
   const base = key.replace(SEAT_SUFFIX, "");
+  // A comparing judge is a JUDGE; an investigation stands in for the review its point lacked, so it is a REVIEWER.
+  // No new role: migration 0090's role CHECK is untouched.
+  if (COMPARING_JUDGE_KEY.test(base)) return "JUDGE";
+  if (POINT_INVESTIGATION_KEY.test(base)) return "REVIEWER";
   if (base.startsWith("PANEL:")) return "JUDGE";
   if (base === "JUDGE" || base.startsWith("JUDGE:root:")) return "POSITION";
   if (base.startsWith("JUDGE:defender:") || base.startsWith("JUDGE:critic:")) return "SUPPORT_ATTACK";
