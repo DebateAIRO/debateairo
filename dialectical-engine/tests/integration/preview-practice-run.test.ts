@@ -1455,8 +1455,10 @@ describe("engine 2's story (R1d)", () => {
       report.admission.panel.find((member) => member.providerRef === providerRef)?.modelId;
     const control = await scenario(storytellerDown);
     const first = (await runPractice(["debate", ...control.common, ...args], control.env, { ...control.quiet, asOf })).report as unknown as EngineReport;
-    // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story.
-    expect({ verdict: first.verdict, reasons: first.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: ["UNBILLED_REFUSALS:2"] });
+    // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story. Final wave A1
+    // (Task 21 ruling): the pin did not hold, because the backup, not the pinned model, served the story: NOT_PROVEN.
+    expect({ verdict: first.verdict, reasons: first.reasons })
+      .toEqual({ verdict: "NOT_PROVEN", reasons: ["PRACTICE_PIN_NOT_HELD:STORYTELLER", "UNBILLED_REFUSALS:2"] });
     expect(first.ask.engine).toEqual({ engine: 2 });
     expect(first.run.story.outcome).toBe("READY");
     const [controlBackup] = first.storyBackups as BackupRow[];
@@ -1465,6 +1467,7 @@ describe("engine 2's story (R1d)", () => {
     const benched = controlBackup!.backupModel!;
     expect(benched).not.toBe(MIMO);
     expect(new Set(answered(control.stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([benched]));
+    expect(first.writerPins?.storyteller).toEqual({ pinnedModel: MIMO, wroteModel: MIMO, servedBy: [benched], held: false });
 
     const benchedBusy = (request: GateRequest): GateOverride | null =>
       request.model === benched && request.kind !== "PROBE" ? { unbilled: true } : storytellerDown(request);
