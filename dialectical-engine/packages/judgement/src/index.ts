@@ -76,6 +76,7 @@ import {
 
 export * from "./s04.js";
 export * from "./prompts.js";
+export * from "./honest-score.js";
 
 /**
  * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. The constant that
