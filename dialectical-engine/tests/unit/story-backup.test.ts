@@ -127,4 +127,31 @@ describe("the backup storyteller's pick", () => {
     // Neither is a candidate: the first candidate serves.
     expect(pick([A, B], "provider:off-panel", "provider:sealed-checker")?.providerRef).toBe("provider:a");
   });
+
+  // Whole-branch review Minor 1 (ruling W1; Review Focus 5): the maker rule reads the RESOLVED roles' makers from every
+  // claim-eligible member of the run, before the sit-out filter, so a role whose ref the filter (or the panel) left out of
+  // the candidates still excludes its maker.
+  const makersOf = (members: readonly StoryBackupCandidate[]) =>
+    members.map((candidate) => Object.freeze({ providerRef: candidate.providerRef, maker: candidate.maker }));
+
+  it("the first storyteller benched: a second ref of the same maker, not benched, is never picked", () => {
+    // The sit-out book benched A (the first storyteller): the runner leaves A out of the candidates, not out of the makers.
+    const chosen = pickBackupStoryteller({
+      candidates: [B, A2, C], firstRef: A.providerRef, checkerRef: B.providerRef, makers: makersOf([A, B, A2, C])
+    });
+    expect(chosen?.providerRef).toBe("provider:c");
+    expect(pickBackupStoryteller({
+      candidates: [B, A2], firstRef: A.providerRef, checkerRef: B.providerRef, makers: makersOf([A, B, A2])
+    })).toBeNull();
+  });
+
+  it("a role ref outside the panel (rotation off: the register's checker ref) still excludes its maker", () => {
+    // The register's checker ref is claim-eligible but not a panel member: never a candidate, still a known maker.
+    const sealedChecker = Object.freeze({ providerRef: "provider:sealed-checker", maker: "maker y" });
+    const chosen = pickBackupStoryteller({
+      candidates: [A, B, C], firstRef: A.providerRef, checkerRef: sealedChecker.providerRef,
+      makers: [...makersOf([A, B, C]), sealedChecker]
+    });
+    expect(chosen?.providerRef).toBe("provider:c");
+  });
 });

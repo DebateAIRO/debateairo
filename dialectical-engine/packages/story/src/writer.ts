@@ -25,6 +25,7 @@ import {
   pickBackupStoryteller,
   storyBackupSignalOf,
   type StoryBackupCandidate,
+  type StoryBackupMaker,
   type StoryBackupRecord
 } from "./backup.js";
 import {
@@ -199,6 +200,12 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * candidates. Read only under v4. Absent or none of another maker: no backup (STORY_BACKUP_UNAVAILABLE is logged).
    */
   readonly backupCandidates?: readonly StoryBackupCandidate[];
+  /**
+   * R1d (whole-branch review Minor 1, ruling W1): every claim-eligible member's maker, before the sit-out filter, so the
+   * backup's maker rule knows the first storyteller's and the checker's makers even when their refs are not candidates.
+   * Read only under v4. Absent: the makers are read from the candidates alone.
+   */
+  readonly backupMakers?: readonly StoryBackupMaker[];
 };
 
 /**
@@ -801,7 +808,8 @@ export class StoryWriter {
         const chosen = pickBackupStoryteller({
           candidates: input.backupCandidates ?? [],
           firstRef: storyteller.providerRef,
-          checkerRef: checker.providerRef
+          checkerRef: checker.providerRef,
+          makers: input.backupMakers
         });
         const firstRound = policy.loopMaxRounds + 1;
         const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;

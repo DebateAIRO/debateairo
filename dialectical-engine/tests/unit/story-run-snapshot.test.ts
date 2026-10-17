@@ -8,7 +8,7 @@ import {
 } from "@debateai/register";
 import type { StoryBackupCandidate, StoryCostFallback, StoryStepLease } from "@debateai/story";
 import {
-  buildStoryRunSnapshot, storyBackupCandidatesFrom, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
+  buildStoryRunSnapshot, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
 } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -169,6 +169,28 @@ describe("buildStoryRunSnapshot", () => {
     const today = buildStoryRunSnapshot(source());
     for (const member of ["engine", "lengthGuidance", "backupCandidates"]) expect(Object.hasOwn(today, member)).toBe(false);
     expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), engine: null }), "engine")).toBe(false);
+  });
+
+  it("hands the backup's maker rule every claim-eligible member's maker, unfiltered, as its own frozen copy (ruling W1)", () => {
+    // Whole-branch review Minor 1: the sit-out filter thins the candidates only; the makers of the resolved roles (a
+    // benched first storyteller, an out-of-panel register checker) stay known.
+    // The runner's claim-eligible members carry their gateways; the makers keep only ref and maker.
+    const claimEligible: readonly StoryBackupCandidate[] = [
+      { provider, providerRef: "provider:a", maker: "maker x" },
+      { provider, providerRef: "provider:sealed-checker", maker: "maker y" }
+    ];
+    const makers = storyBackupMakersFrom(claimEligible);
+    expect(makers).toEqual([
+      { providerRef: "provider:a", maker: "maker x" },
+      { providerRef: "provider:sealed-checker", maker: "maker y" }
+    ]);
+    expect(Object.isFrozen(makers)).toBe(true);
+    expect(makers.every((entry) => Object.isFrozen(entry) && !Object.hasOwn(entry, "provider"))).toBe(true);
+    const made = buildStoryRunSnapshot({ ...source(), backupMakers: makers });
+    expect(made.backupMakers).toEqual(makers);
+    expect(made.backupMakers).not.toBe(makers);
+    expect(Object.isFrozen(made.backupMakers)).toBe(true);
+    expect(Object.hasOwn(buildStoryRunSnapshot(source()), "backupMakers")).toBe(false);
   });
 
   // Task 15 review (a): the receipt's numbers pass to the story's input, and no key without them.

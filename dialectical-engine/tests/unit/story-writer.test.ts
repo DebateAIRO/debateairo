@@ -1618,6 +1618,19 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     }
   });
 
+  it("the first storyteller benched: its maker's second ref is never the backup (whole-branch Minor 1, ruling W1)", async () => {
+    // The runner leaves the benched first storyteller out of the candidates (the sit-out filter) but hands every
+    // claim-eligible member's maker over unfiltered (`backupMakers`), so maker-a stays excluded: TWIN is never asked.
+    const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    const benchedOut = world.candidates.filter((candidate) => candidate.providerRef !== FIRST);
+    const makers = world.candidates.map((candidate) => Object.freeze({ providerRef: candidate.providerRef, maker: candidate.maker }));
+    await writer.writeAfterSettle({ ...V4, backupCandidates: benchedOut, backupMakers: makers });
+    expect(world.twin.calls).toEqual([]);
+    expect(world.backup.calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([["STORY:STORYTELLER:3", BACKUP]]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE", firstModel: FIRST } });
+  });
+
   it("v3 never backs up, even with the length table and candidates", async () => {
     const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow") });
     const { writer, inserted, events } = harness({ resolveProvider: world.resolveProvider });

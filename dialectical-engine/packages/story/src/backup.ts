@@ -22,8 +22,10 @@ import type { StoryRoleMaker } from "./writer.js";
  * wall, so no backup is asked. A money stop the structure-repair call met keeps its name (structure-repair.ts passed
  * stops), so it is no signal either. The picker then names the first candidate, in the order the runner hands them over
  * (the run's stored panel order, already without the makers the sit-out book has benched, Task 18), whose maker is
- * neither the first storyteller's nor the checker's. Pure; codes only. (Pre-flight PF-D6.1, PF-D6.4, PF-D6.5; controller
- * ruling "backup vs sit-out book".)
+ * neither the first storyteller's nor the checker's. Those two makers are read from every claim-eligible member of the
+ * run BEFORE the sit-out filter (`makers`), so a benched first storyteller or an out-of-panel register checker still
+ * excludes its maker: the maker exclusion comes first, the sit-out filter after it. Pure; codes only. (Pre-flight
+ * PF-D6.1, PF-D6.4, PF-D6.5; controller rulings "backup vs sit-out book" and W1.)
  */
 
 export const STORY_BACKUP_SIGNALS = Object.freeze(["UNREACHABLE", "TOO_SLOW", "OUT_OF_ROOM", "UNUSABLE"] as const);
@@ -44,6 +46,13 @@ export type StoryBackupRecord = Readonly<{
  * leaves out the makers its sit-out book has benched (Task 18, controller ruling "backup vs sit-out book").
  */
 export type StoryBackupCandidate = Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>;
+
+/**
+ * One claim-eligible member's maker, as the runner hands every one over BEFORE the sit-out filter (whole-branch review
+ * Minor 1, ruling W1): the backup's maker rule reads the resolved roles' makers here, even when their refs are not
+ * candidates (benched, or a register ref outside the panel).
+ */
+export type StoryBackupMaker = Readonly<{ providerRef: string; maker: string }>;
 
 /** Spec §7.2 item 11 (c): out of room thinking TWICE, the second time at the lowest level (pre-flight PF-D6.5). */
 const STORY_OUT_OF_ROOM_RULE = Object.freeze({ cutOffs: 2 });
@@ -66,16 +75,17 @@ export function storyBackupSignalOf(error: unknown): StoryBackupSignal | null {
 
 /**
  * The backup storyteller: the first candidate, in the given order, whose maker is neither the first storyteller's maker nor
- * the checker's maker. A maker is known only for a ref among the candidates: a ref that is not one (a register ref outside
- * the panel) excludes only that ref. None: null.
+ * the checker's maker. A role's maker is read from `makers` (every claim-eligible member, before the sit-out filter),
+ * then from the candidates; a ref found in neither excludes only that ref. None: null.
  */
 export function pickBackupStoryteller(input: Readonly<{
   candidates: readonly StoryBackupCandidate[];
   firstRef: string;
   checkerRef: string;
+  makers?: readonly StoryBackupMaker[] | undefined;
 }>): StoryRoleMaker | null {
-  const makerOf = (ref: string): string | null =>
-    input.candidates.find((candidate) => candidate.providerRef === ref)?.maker ?? null;
+  const known: readonly StoryBackupMaker[] = [...(input.makers ?? []), ...input.candidates];
+  const makerOf = (ref: string): string | null => known.find((member) => member.providerRef === ref)?.maker ?? null;
   const excludedMakers = new Set([makerOf(input.firstRef), makerOf(input.checkerRef)].filter((maker): maker is string => maker !== null));
   const chosen = input.candidates.find((candidate) => candidate.providerRef !== input.firstRef
     && candidate.providerRef !== input.checkerRef

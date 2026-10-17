@@ -96,6 +96,7 @@ export {
   pickBackupStoryteller,
   storyBackupSignalOf,
   type StoryBackupCandidate,
+  type StoryBackupMaker,
   type StoryBackupRecord,
   type StoryBackupSignal
 } from "./backup.js";
