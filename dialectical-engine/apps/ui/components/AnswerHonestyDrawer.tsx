@@ -1,7 +1,7 @@
 "use client";
 
 import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from "@debateai/contract";
-import { DEBATE_SHAPE_MARKS } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
@@ -37,8 +37,10 @@ import composeEnglish from "@/messages/en/compose.json";
  * Debate shape P2c (ruling C-DRAWER): the eight shape marks show only their words here. Their
  * records' scope, subject (a run id, `<run>:<n>`, or a node id), reason code (`MAP_MERGE_FALLBACK:MERGE`,
  * `SCRUTINY_EXTENDED:3`) and lift path are engine internals, and their chips carry no raw mark as a tooltip.
+ * R2a (Ruling W1): engine 2's four marks are label-only the same way — an UNASSESSED-AT-REDUCED-WEIGHT
+ * record's reason (`UNASSESSED_AT_REDUCED_WEIGHT:<weight>`) and node id never reach the reader.
  */
-const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
+const SHAPE_MARKS: ReadonlySet<string> = new Set<string>([...DEBATE_SHAPE_MARKS, ...ENGINE_MARKS]);
 
 /**
  * Debate shape P2c, ruling C-ONCE: a shape mark's record shows its label only (C-DRAWER), and the runner writes one
