@@ -346,7 +346,12 @@ export class LedgerRepository {
      * T10 (goal 188-195): the served-root decision — which root won, on what
      * rule, by what MARGIN over the runner-up, and whether the documented
      * tiebreak was applied. `null` on the DR-184 review catch-up path, which
-     * re-propagates without re-selecting a root.
+     * re-propagates without re-selecting a root. Under the comparing judges'
+     * rule (engine 2, `comparing-judges-votes-honest-strength-tiebreak`) the
+     * judges' votes chose the root: `runnerUp`, `margin` and `tiebreak` then
+     * describe the honest final strengths (the strongest other root, the served
+     * root's strength minus its, which may be negative, and whether the two were
+     * equal), never the vote.
      */
     readonly servedRootSelection?: Readonly<Record<string, unknown>> | null;
     readonly sensitivityRecords?: readonly {

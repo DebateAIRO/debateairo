@@ -21,6 +21,8 @@ export function storyLabelWords(label: StoryLabel, catalog: MessageCatalog): str
     case "SUPPORTED": return t(catalog, "public.story.label.supported");
     case "CONTESTED": return t(catalog, "public.story.label.contested");
     case "UNSUPPORTED": return t(catalog, "public.story.label.unsupported");
+    // R2 (ruling E8): the comparing judges found no majority. Since R2, "Contested" names only this state (Q1).
+    case "SPLIT": return t(catalog, "public.story.label.split");
   }
 }
 

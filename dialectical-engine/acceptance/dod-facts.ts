@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { Answer } from "@debateai/contract";
+import type { Answer, VerdictState as ContractVerdictState } from "@debateai/contract";
 import { SYNTHESIS_OBJECTION_STANDING_MARK } from "@debateai/serve";
 
 /**
@@ -75,7 +75,8 @@ export const ACCEPTANCE_DOD_VERDICT_LABEL_PROJECTION_INVALID = "ACCEPTANCE_DOD_V
 /* -------------------------------------------------------------- the inputs */
 
 export type SynthesizerStage = "INITIAL" | "RETRY";
-export type VerdictState = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+/** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
+export type VerdictState = ContractVerdictState;
 export type AnswerTerminal = "SERVED" | "DOWNGRADED" | "BLOCKED" | "COMPONENTS_ONLY";
 export type AnswerServeState = "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
 export type EdgeMagnitudeStatus = "MEASURED" | "UNKNOWN";

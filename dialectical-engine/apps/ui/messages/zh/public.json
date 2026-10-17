@@ -100,6 +100,7 @@
   "public.story.label.supported": "答案明确",
   "public.story.label.contested": "难分高下",
   "public.story.label.unsupported": "最佳推测，证据较弱",
+  "public.story.label.split": "有争议",
   "public.story.writing": "正在撰写这场辩论的完整经过…",
   "public.story.writingNote": "通常需要几分钟。页面会自动更新。",
   "public.story.unavailable": "此辩论无法提供完整经过。以下改为显示辩论摘要。",

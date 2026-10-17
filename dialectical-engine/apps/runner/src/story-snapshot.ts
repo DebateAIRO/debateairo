@@ -1,4 +1,5 @@
-import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
+import type { VerdictState } from "@debateai/contract";
 import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
@@ -74,8 +75,10 @@ export interface StorySnapshotSource {
   readonly languageLocked?: boolean;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
-    readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
-    readonly rung: 0 | 1 | 2 | 3 | 4;
+    /** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
+    readonly label: VerdictState;
+    /** 0-4: engine 1's ladder rung; 5: the comparing judges (engine 2). */
+    readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
     readonly trigger: string;
   };
   readonly servedRootNodeId: string;
@@ -160,6 +163,8 @@ export interface StorySnapshotSource {
    * absent: an engine-1 debate, whose story keeps today's bytes.
    */
   readonly engine?: EngineSettings | null;
+  /** R2 (INTERFACE §9.9): the comparing judges' question kinds, handed on to the story; the runner sets it under engine 2 only. */
+  readonly questionKinds?: readonly EngineQuestionKind[];
   /**
    * R1d (spec §7.2 item 11): the backup storyteller's candidates, the run's claim-eligible members in its stored panel's
    * order (`storyBackupCandidatesFrom`), without the members the preview's sit-out book has benched. The runner hands
@@ -394,6 +399,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     stepLease: source.stepLease,
     costFallback: source.costFallback,
     ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers }),
+    ...(source.questionKinds === undefined ? {} : { questionKinds: Object.freeze([...source.questionKinds]) }),
     ...(source.alsoRaised === undefined
       ? {}
       : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),

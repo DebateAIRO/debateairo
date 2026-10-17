@@ -332,6 +332,8 @@ export function previewDebateHarness(input: Readonly<{
        * `readEngineRunnerSettings`' answer. Absent: no engine settings, so an engine-2 receipt is refused (R1d B3).
        */
       engine?: EngineRunnerSettings;
+      /** R2 (B12): every composition budget's bound at one byte, so no digest can exist and the answer ends at its floor. */
+      noDigest?: boolean;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -452,6 +454,11 @@ export function previewDebateHarness(input: Readonly<{
       callScheduler,
       ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
       ...(options.engine === undefined ? {} : { engine: options.engine }),
+      ...(options.noDigest === true ? { servePolicy: { ...fixture.servePolicy!, compositionBudgets: {
+        low: { ...fixture.servePolicy!.compositionBudgets.low, bound: 1 },
+        medium: { ...fixture.servePolicy!.compositionBudgets.medium, bound: 1 },
+        high: { ...fixture.servePolicy!.compositionBudgets.high, bound: 1 }
+      } } } : {}),
       ...(options.money === undefined ? {} : { providerPrices: options.money.providerPrices }),
       ...(options.money?.structureRepairCeiling === undefined ? {} : { structureRepairCeiling: options.money.structureRepairCeiling }),
       ...(options.structureRepair !== true || options.money?.structureRepairCeiling !== undefined ? {}

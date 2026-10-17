@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
-import { POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
+import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
 import { ENGINE_CONTRACT_HASH_ROW_KEY, loadBootstrapRegister, parseEngineContractHash, readEngineContractHash } from "@debateai/register";
 import {
   ENGINE_CONTRACT_FINGERPRINT_HEADER, ENGINE_SEALED_CONTRACT_IDS, engineContractFingerprintText, engineContractHash, engineSealedContracts
@@ -17,7 +17,7 @@ import { buildPreviewSourceRows } from "../../deploy/preview-auth-dev/v1/publish
 import { buildPreviewSourceRowsV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 
 /** The sealed ids in phase order (INTERFACE §2.2, §2.5): R2a seals the investigation; R2b (B1) appends verdict.judge.v1. */
-const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1"];
+const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict.judge.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -27,7 +27,7 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
  * The code's seal now: sha256 of engineContractFingerprintText() over ENGINE_SEALED_IDS. Written by Step 4's command from
  * the code's own output (never typed); the zeros are the red-first value Step 4 replaces.
  */
-const ENGINE_CONTRACT_HASH_SEALED = "bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a";
+const ENGINE_CONTRACT_HASH_SEALED = "8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };
@@ -86,14 +86,16 @@ describe("engine 2's sealed contracts, code side (INTERFACE §2.2)", () => {
     expect(parseEngineContractHash(engineContractHash([]))).toBe(R1D_ENGINE_CONTRACT_HASH);
   });
 
-  it("seals verdict.investigate.v1 first (R2a; verdict.judge.v1 follows in R2b), and the code's seal is its sha256", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS).toEqual(["verdict.investigate.v1"]);
-    expect(engineSealedContracts()).toEqual([POINT_INVESTIGATION_PROMPT_CONTRACT]);
+  it("seals verdict.investigate.v1, then verdict.judge.v1 (R2a, R2b), and the code's seal is their sha256", () => {
+    expect(ENGINE_SEALED_CONTRACT_IDS).toEqual(ENGINE_SEALED_IDS);
+    expect(engineSealedContracts()).toEqual([POINT_INVESTIGATION_PROMPT_CONTRACT, COMPARING_JUDGE_PROMPT_CONTRACT]);
     expect(engineContractFingerprintText()).toBe([ENGINE_CONTRACT_FINGERPRINT_HEADER,
-      promptContractFingerprintText(POINT_INVESTIGATION_PROMPT_CONTRACT)].join("\n---\n"));
+      promptContractFingerprintText(POINT_INVESTIGATION_PROMPT_CONTRACT),
+      promptContractFingerprintText(COMPARING_JUDGE_PROMPT_CONTRACT)].join("\n---\n"));
     expect(engineContractHash()).toBe(createHash("sha256").update(engineContractFingerprintText()).digest("hex"));
     expect(engineContractHash()).toBe(ENGINE_CONTRACT_HASH_SEALED);
     expect(engineContractHash()).not.toBe(R1D_ENGINE_CONTRACT_HASH);
+    expect(engineContractHash()).not.toBe(engineContractHash([POINT_INVESTIGATION_PROMPT_CONTRACT]));
     expect(parseEngineContractHash(engineContractHash())).toBe(ENGINE_CONTRACT_HASH_SEALED);
   });
 

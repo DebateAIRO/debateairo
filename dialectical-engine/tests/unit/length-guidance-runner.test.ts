@@ -75,8 +75,9 @@ describe("the runner's length call sites (source pins)", () => {
   const count = (text: string): number => RUNNER.split(text).length - 1;
 
   // Engine redesign R2a A14: the investigator's call is the ninth sized site.
-  it("nine guided bounds beside the definition, one per sized call site", () => {
-    expect(count("guidedCallBound(")).toBe(10);
+  it("eleven guided bounds: the definition and one per sized call site (ten)", () => {
+    // R2a A14 added the investigator's site, R2b B5 the comparing judges'.
+    expect(count("guidedCallBound(")).toBe(11);
     for (const site of [
       "guidedCallBound(input.judgeBound, \"reviewer\", catchUpLength)",
       "guidedCallBound(this.settings.judgeBound, \"judge_panel\", lengthGuidance)",
@@ -86,7 +87,8 @@ describe("the runner's length call sites (source pins)", () => {
       "guidedCallBound(this.settings.judgeBound, \"reviewer\", lengthGuidance)",
       "\"answer_writer\", lengthGuidance),",
       "guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, \"investigator\", lengthGuidance)"
+      "guidedCallBound(this.settings.judgeBound, \"investigator\", lengthGuidance)",
+      "guidedCallBound(this.settings.judgeBound, \"comparing_judge\", lengthGuidance)"
     ]) expect(count(site), site).toBe(1);
   });
 

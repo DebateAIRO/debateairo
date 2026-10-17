@@ -603,6 +603,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  "JUDGES_VERDICT_INPUT_INVALID",
   // FW-B / F-I2: the judgement package's closed leg table refuses an undeclared
   // material name (packages/judgement/src/index.ts) on the way INTO the frame,
   // so the refusal travels the same path a schema failure does.
@@ -781,6 +782,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SEQUENCE_ALLOCATION_FAILED",
   "SERVED_NUMBER_NOT_FOUND",
   "SERVED_ROOT_JUDGEMENT_UNRESOLVED",
+  "SERVED_ROOT_JUDGES_WINNER_UNSERVABLE",
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
@@ -870,6 +872,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "VALUE_CRITERIA_EMPTY",
   "VALUE_OPTIONS_INSUFFICIENT",
   "VALUE_PHASE_NOT_READY",
+  "VERDICT_LABEL_BASIS_AMBIGUOUS",
   "VERDICT_LABEL_BASIS_UNRESOLVED",
   "VERDICT_LABEL_CONTROLS_INVALID",
   "VERDICT_LABEL_CONTROLS_PROVENANCE_MISSING",

@@ -1,4 +1,5 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import type { VerdictState } from "./verdict-state.js";
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
 import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
@@ -407,7 +408,7 @@ export interface ContractClient {
       author_pseudonym: string;
       question: string;
       published_at: string;
-      verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+      verdict: VerdictState | null;
       confidence_band: string | null;
     }>[];
     total: number;

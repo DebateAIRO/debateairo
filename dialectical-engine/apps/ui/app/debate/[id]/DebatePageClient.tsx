@@ -2002,6 +2002,7 @@ export default function DebatePageClient({
           catalog={miscCatalog}
           debateChromeCatalog={debateChromeCatalog}
           composeCatalog={composeCatalog}
+          publicCatalog={publicCatalog}
           floorShown={floorView !== null}
         />
       ) : null}

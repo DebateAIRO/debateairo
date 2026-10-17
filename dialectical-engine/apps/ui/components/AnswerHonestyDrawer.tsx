@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from "@debateai/contract";
 import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { LiveRunState } from "@/lib/v3/liveEvents";
@@ -20,9 +21,11 @@ import { ModelMetaLine } from "@/components/ModelPresentation";
 import { modelAssignmentJobs } from "@/lib/modelStrength";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { storyLabelWords } from "@/lib/v3/storyWords";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import publicEnglish from "@/messages/en/public.json";
 import { useDialogSurface } from "@/components/dialogSurface";
 
 /**
@@ -115,6 +118,29 @@ function backupRecordKeysFor(record: { readonly mark: string; readonly subject_r
   return record.mark === "BACKUP-MODEL-USED" ? BACKUP_RECORD_KEYS[record.subject_ref] ?? null : null;
 }
 
+/** R2 honesty panel: an answer of the comparison, by its own statement (the node's claim), or nothing when it is gone. */
+function comparisonStatement(answer: Answer, rootNodeId: string): string | null {
+  return answer.nodes.find((node) => node.node_id === rootNodeId)?.claim ?? null;
+}
+
+type ComparisonEntry = NonNullable<Answer["judges_comparison"]>["answers"][number];
+
+/**
+ * Ruling W1 (R2b whole-branch review I1): answers the judges' count treated as the same answer, kept together in the
+ * list's order (the count's order, the served answer's group first); a group's choices are shown as one count.
+ */
+function comparisonGroups(answers: readonly ComparisonEntry[]): readonly (readonly ComparisonEntry[])[] {
+  const placed = new Set<string>();
+  const groups: ComparisonEntry[][] = [];
+  for (const entry of answers) {
+    if (placed.has(entry.root_node_id)) continue;
+    const members = [entry, ...answers.filter((other) => other !== entry && entry.same_answer_as.includes(other.root_node_id))];
+    for (const member of members) placed.add(member.root_node_id);
+    groups.push(members);
+  }
+  return groups;
+}
+
 export function AnswerHonestyDrawer({
   answer,
   live,
@@ -134,6 +160,7 @@ export function AnswerHonestyDrawer({
   catalog = miscEnglish,
   debateChromeCatalog = debateChromeEnglish,
   composeCatalog = composeEnglish,
+  publicCatalog = publicEnglish,
   floorShown = false
 }: {
   answer: Answer;
@@ -156,6 +183,11 @@ export function AnswerHonestyDrawer({
   debateChromeCatalog?: MessageCatalog;
   /** The interface locale's `compose` catalogue: the projection that decides leftover edges. */
   composeCatalog?: MessageCatalog;
+  /**
+   * The interface locale's `public` catalogue: the verdict's label words (R2 B8, pre-flight PF-R2b4.8), the words the
+   * story pill and the floor answer say on this page. The raw state stays only as a data attribute, never shown or spoken.
+   */
+  publicCatalog?: MessageCatalog;
   /**
    * The page shows this components-only answer's floor as its answer (spec
    * 2026-09-26 §14.4.4): the drawer keeps "Verdict unavailable", the true
@@ -227,7 +259,9 @@ export function AnswerHonestyDrawer({
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.verdict")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.verdict")}</div>
             {answer.verdict_state !== null ? (
-              <div className="drawerFindingText" data-ai-generated="true">{answer.verdict_state}</div>
+              <div className="drawerFindingText" data-ai-generated="true" data-verdict-state={answer.verdict_state}>
+                {storyLabelWords(answer.verdict_state, publicCatalog)}
+              </div>
             ) : (
               <div className="drawerFindingText">
                 {t(catalog, "misc.answerHonesty.verdictUnavailable", {
@@ -255,6 +289,61 @@ export function AnswerHonestyDrawer({
               </div>
             ) : null}
           </section>
+          {answer.judges_comparison !== undefined ? (
+            // R2 (spec §4.4): how the comparing judges' choices fell. The case's strength is a bar, never a number.
+            // Its spoken value is the strength sentence, never the number (ruling PF-R2b4.7 (b)).
+            // OWNER WORDING — approve before switch-on: the eight misc.answerHonesty.comparison.* sentences (option 1;
+            // sameAnswer and the group case of notCounted added by ruling W1) and the bar's spoken word (aria-valuetext).
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.comparison.title")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.comparison.title")}</div>
+              <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.intro")}</div>
+              <div className="drawerFindingText">
+                {t(catalog, "misc.answerHonesty.comparison.counted", {
+                  counted: answer.judges_comparison.judges_counted,
+                  seated: answer.judges_comparison.judges_seated
+                })}
+              </div>
+              {answer.judges_comparison.judges_counted === 0 ? (
+                <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.noneCounted")}</div>
+              ) : answer.judges_comparison.judges_counted < answer.judges_comparison.judges_seated ? (
+                <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.notCounted")}</div>
+              ) : null}
+              <ul className="drawerFindingList">
+                {comparisonGroups(answer.judges_comparison.answers).map((group) => (
+                  <li key={group[0]!.root_node_id} className="drawerFindingItem">
+                    {group.map((entry) => (
+                      <Fragment key={entry.root_node_id}>
+                        {comparisonStatement(answer, entry.root_node_id) === null ? null : (
+                          <div className="drawerFindingText" data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
+                        )}
+                        {entry.honest_score === null ? null : (
+                          <meter
+                            className="drawerComparisonMeter"
+                            min={0}
+                            max={1}
+                            value={entry.honest_score}
+                            aria-label={t(catalog, "misc.answerHonesty.comparison.strength")}
+                            aria-valuetext={t(catalog, "misc.answerHonesty.comparison.strength")}
+                          />
+                        )}
+                      </Fragment>
+                    ))}
+                    {group.length > 1 ? (
+                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.sameAnswer")}</div>
+                    ) : null}
+                    <div className="drawerFindingMeta">
+                      <span>
+                        {t(catalog, "misc.answerHonesty.comparison.chosen", {
+                          chose: group.reduce((sum, entry) => sum + entry.judges_chose, 0),
+                          counted: answer.judges_comparison!.judges_counted
+                        })}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.conditionMarks")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.conditionMarks")}</div>

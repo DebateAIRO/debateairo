@@ -51,7 +51,8 @@ function publicRow(verdict: PublicDebateSummary["verdict"], index: number): Publ
 const VERDICTS = [
   ["SUPPORTED", "home.verdict.supported"],
   ["CONTESTED", "home.verdict.contested"],
-  ["UNSUPPORTED", "home.verdict.unsupported"]
+  ["UNSUPPORTED", "home.verdict.unsupported"],
+  ["SPLIT", "home.verdict.split"]
 ] as const;
 
 async function renderLibrary(locale: "en" | "ro"): Promise<string> {
@@ -93,7 +94,8 @@ describe("public library rows name the verdict from the locale catalogue", () =>
           ...chrome,
           "home.verdict.supported": "SUP-ro",
           "home.verdict.contested": "CON-ro",
-          "home.verdict.unsupported": "UNS-ro"
+          "home.verdict.unsupported": "UNS-ro",
+          "home.verdict.split": "SPL-ro"
         }}
         timeCatalog={time}
         locale="ro"
@@ -101,16 +103,17 @@ describe("public library rows name the verdict from the locale catalogue", () =>
       />
     );
     // MUT: restore `verdict.charAt(0) + verdict.slice(1).toLowerCase()` -> RED.
-    for (const word of ["SUP-ro", "CON-ro", "UNS-ro"]) expect(marked).toContain(word);
-    for (const word of ["Supported", "Contested", "Unsupported"]) expect(marked).not.toContain(`>${word}<`);
+    for (const word of ["SUP-ro", "CON-ro", "UNS-ro", "SPL-ro"]) expect(marked).toContain(word);
+    for (const word of ["Supported", "Contested", "Unsupported", "Close call"]) expect(marked).not.toContain(`>${word}<`);
   });
 
-  it("keeps the English row's words byte-identical to the old title-cased enum", async () => {
+  it("keeps Supported and Unsupported as the old title-cased enum; CONTESTED reads Close call and SPLIT Contested (R2, Q1)", async () => {
     const html = await renderLibrary("en");
-    for (const word of ["Supported", "Contested", "Unsupported"]) expect(html).toContain(word);
-    for (const [verdict, key] of VERDICTS) {
-      expect(catalogValue("en", "home", key)).toBe(verdict.charAt(0) + verdict.slice(1).toLowerCase());
-    }
+    for (const word of ["Supported", "Close call", "Unsupported", "Contested"]) expect(html).toContain(word);
+    expect(catalogValue("en", "home", "home.verdict.supported")).toBe("Supported");
+    expect(catalogValue("en", "home", "home.verdict.unsupported")).toBe("Unsupported");
+    expect(catalogValue("en", "home", "home.verdict.contested")).toBe("Close call");
+    expect(catalogValue("en", "home", "home.verdict.split")).toBe("Contested");
   });
 });
 

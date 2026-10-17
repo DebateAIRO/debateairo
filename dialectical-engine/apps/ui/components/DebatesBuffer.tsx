@@ -10,10 +10,25 @@ import composeEnglish from "@/messages/en/compose.json";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
+// OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1: CONTESTED's word becomes the locale's
+// close-call word, and SPLIT takes the old "Contested" word.
 const VERDICT_KEYS: Readonly<Record<NonNullable<PublicDebateSummary["verdict"]>, string>> = {
   SUPPORTED: "home.verdict.supported",
   CONTESTED: "home.verdict.contested",
-  UNSUPPORTED: "home.verdict.unsupported"
+  UNSUPPORTED: "home.verdict.unsupported",
+  SPLIT: "home.verdict.split"
+};
+
+/*
+ * The row's status pill state per verdict: total over the contract's states, so a new state fails typecheck here.
+ * Named for the pill, not the contract's own `VERDICT_STATES` list (B4, @debateai/contract): pre-flight PF-R2b5.12.
+ */
+const VERDICT_PILL_STATES: Readonly<Record<NonNullable<PublicDebateSummary["verdict"]>, "complete" | "contested" | "unsupported" | "split">> = {
+  SUPPORTED: "complete",
+  CONTESTED: "contested",
+  UNSUPPORTED: "unsupported",
+  // R2: no majority is never "complete".
+  SPLIT: "split"
 };
 
 function joinMeta(parts: readonly (string | null | undefined)[]): string {
@@ -41,7 +56,7 @@ function LibraryRow({
   meta: ReactNode;
   models: readonly string[];
   status: string;
-  state: "complete" | "generating" | "failed" | "contested" | "unsupported";
+  state: "complete" | "generating" | "failed" | "contested" | "unsupported" | "split";
   generatedStatus?: boolean;
   confidenceBand?: string | null;
   catalog: MessageCatalog;
@@ -178,13 +193,7 @@ export function PublicDebatesBuffer({
         models={debate.models ?? []}
         status={verdict}
         generatedStatus={label !== null}
-        state={label === null
-          ? "generating"
-          : label === "CONTESTED"
-            ? "contested"
-            : label === "UNSUPPORTED"
-              ? "unsupported"
-              : "complete"}
+        state={label === null ? "generating" : VERDICT_PILL_STATES[label]}
         catalog={catalog}
         composeCatalog={composeCatalog}
       />

@@ -19,6 +19,8 @@ import {
   type PracticeLanguageNotRun
 } from "./practice-language.js";
 import { practiceInvestigationLines, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { practiceJudgeOrderLines } from "./practice-judge-order.js";
+import { practiceJudgesLines, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
 import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
@@ -430,6 +432,8 @@ export function debateReport(input: Readonly<{
     ...(r.language === undefined ? {} : { language: r.language }),
     // R2 (E12, E13): the "cannot assess" reviews and the investigations; absent only when the debate was never admitted.
     ...(r.investigations === undefined ? {} : { investigations: r.investigations }),
+    // Engine redesign R2 (B11): the four members, only when the debate ran on engine 2; absent otherwise (today's keys).
+    ...(r.judges === undefined ? {} : r.judges),
     admission: r.admission,
     busyDuringRun,
     slipsByModel: slipBlocks(r.callsByModel ?? {}, r.jsonRepairs ?? [], r.repairKindsByModel ?? {}),
@@ -521,10 +525,21 @@ export function reportMarkdown(report: PracticeReport): string {
   const investigations = report.mode === "debate" && typeof report.investigations === "object" && report.investigations !== null
     ? report.investigations as PracticeInvestigationBlock : undefined;
   if (investigations !== undefined) lines.push(...practiceInvestigationLines(investigations, usd));
+  // Engine redesign R2 (B11): the comparing judges' block, only when the report has it (engine 2).
+  if (report.mode === "debate" && Array.isArray(report.judgeVotes)) {
+    lines.push(...practiceJudgesLines({
+      judgeVotes: report.judgeVotes as PracticeJudgesBlocks["judgeVotes"],
+      labels: (report.labels ?? null) as PracticeJudgesBlocks["labels"],
+      judgesSeconds: typeof report.judgesSeconds === "number" ? report.judgesSeconds : null,
+      conditionalWinner: typeof report.conditionalWinner === "boolean" ? report.conditionalWinner : null
+    }));
+  }
   if (report.mode === "language" && Array.isArray(report.cases)) {
     lines.push(...practiceLanguageLines(report.cases as readonly PracticeLanguageCaseRecord[],
       Array.isArray(report.notRun) ? report.notRun as readonly PracticeLanguageNotRun[] : []));
   }
+  // R2b (D3): the judges' order table.
+  if (report.mode === "judge-order") lines.push(...practiceJudgeOrderLines(report));
   const gates = report.gates as Record<string, GateBlock> | undefined;
   if (gates !== undefined) {
     lines.push("Gates:", "");
@@ -670,8 +685,9 @@ export function reportMarkdown(report: PracticeReport): string {
   }
   const failures = report.failures as readonly unknown[] | undefined;
   // Openings keep reply text in "failures" only for a call whose format never passed; the formats wording is unchanged.
-  // The language mode keeps no "failures" (a planner's failed call is its case's planner status and code).
-  if (report.mode !== "language") lines.push(report.mode === "openings"
+  // The language mode keeps no "failures" (a planner's failed call is its case's planner status and code); nor does
+  // judge-order (a reading that did not come back is its ask's status and code).
+  if (report.mode !== "language" && report.mode !== "judge-order") lines.push(report.mode === "openings"
     ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
       + "reply text only for calls whose format never passed)."
     : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");

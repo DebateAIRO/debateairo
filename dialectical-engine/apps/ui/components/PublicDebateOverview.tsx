@@ -22,7 +22,8 @@ function verdictLabel(
   verdict: PublicDebate["answer"]["verdict"],
   catalog: MessageCatalog
 ): string {
-  return verdict ?? t(catalog, "public.overview.verdictUnavailable");
+  // R2 B8 fix 1: the label in words, as the story pill says it; the state's code never reaches the reader.
+  return verdict === null ? t(catalog, "public.overview.verdictUnavailable") : storyLabelWords(verdict, catalog);
 }
 
 function ArgumentCard({

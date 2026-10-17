@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
-import { Judge } from "@debateai/judgement";
+import { Judge, askComparingJudge } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
@@ -170,13 +170,35 @@ const BUILDERS = [
         length: { words: 60, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }
       })).rejects.toBeDefined();
     }
+  },
+  {
+    name: "askComparingJudge",
+    framing: null,
+    material: [QUESTION_LINE, STATEMENT, TARGET_STATEMENT],
+    render: async (_judge: Judge, gateway: ProviderGateway): Promise<void> => {
+      await expect(askComparingJudge(gateway, {
+        runId: SUBJECT.runId, subjectItemId: SUBJECT.subjectItemId, callSiteKey: SUBJECT.callSiteKey,
+        providerRef: SUBJECT.providerRef, contractHash: SUBJECT.contractHash, bound: BOUND,
+        argumentLanguageName: ARGUMENT_LANGUAGE_NAME, seat: 1,
+        material: {
+          question: QUESTION_LINE,
+          answers: [
+            { letter: "A", rootNodeId: "node:guard-a", words: STATEMENT, caseText: null, supports: [], objections: [], assumptions: [] },
+            { letter: "B", rootNodeId: "node:guard-b", words: TARGET_STATEMENT, caseText: null, supports: [], objections: [], assumptions: [] }
+          ],
+          disputed: []
+        },
+        length: { words: 80, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }
+      })).rejects.toBeDefined();
+    }
   }
 ] as const;
 
 async function captureAll(): Promise<Capture[]> {
   const captures: Capture[] = [];
   for (const builder of BUILDERS) {
-    await builder.render(new Judge(capturingGateway(builder.name, captures)));
+    const gateway = capturingGateway(builder.name, captures);
+    await builder.render(new Judge(gateway), gateway);
   }
   return captures;
 }

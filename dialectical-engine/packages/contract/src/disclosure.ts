@@ -1,14 +1,13 @@
 import { z } from "zod";
 import { MakerLineageSchema } from "./lineage.js";
+import { VerdictStateSchema } from "./verdict-state.js";
 
 /**
  * ENGINE MONEY RULE (spec 2026-09-26 §14.4.4 and §14.4.5), TASK M5 — what the
  * owner's side record (`serve.serve_disclosure`, migration 0076) lets the
- * answer's owner read. It imports only zod and ./lineage.js (never ./index.js),
- * for the same module-cycle reason story.ts does.
+ * answer's owner read. It imports only zod, ./lineage.js and ./verdict-state.js
+ * (never ./index.js), for the same module-cycle reason story.ts does.
  */
-
-const VerdictStateSchema = z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]);
 
 /**
  * THE FLOOR (§14.4.4): an answer that ended components-only while its

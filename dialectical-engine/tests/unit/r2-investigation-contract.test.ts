@@ -8,7 +8,7 @@ import {
   POINT_INVESTIGATION_OUTCOMES, POINT_INVESTIGATION_PROMPT_CONTRACT, POINT_INVESTIGATION_READING,
   POINT_INVESTIGATION_RESULTS, classifyStructuredArtifact, orderPointInvestigations, pickPointInvestigator,
   pointInvestigationContentIssues, pointInvestigationMaterialFields, pointInvestigationReplySchema,
-  pointInvestigationResultOf, pointInvestigationStatus, type PointInvestigationCandidate
+  pointInvestigationResultOf, type PointInvestigationCandidate
 } from "@debateai/judgement";
 import {
   ProviderContentUnacceptedError, readPromptFrame, type ProviderCallRequest, type ProviderGateway
@@ -167,10 +167,9 @@ describe("engine 2: the investigation contract (spec §4.2b, INTERFACE §8)", ()
     }
   });
 
-  it("reads each outcome as the review the point lacked, and names its row result", () => {
-    expect(pointInvestigationStatus("holds")).toBe("AGREE");
-    expect(pointInvestigationStatus("fails")).toBe("DISPUTE");
-    expect(pointInvestigationStatus("dead_end")).toBe("CANNOT_ASSESS");
+  // R2b final wave P15: the unused outcome-to-status helper is retired; the runner reads a stored result as the review
+  // the point lacked through `investigatedStatusOf` (apps/runner/src/engine-investigations.ts).
+  it("names each outcome's row result", () => {
     expect(POINT_INVESTIGATION_RESULTS).toEqual(["HOLDS", "FAILS", "DEAD_END", "INVESTIGATION_UNAVAILABLE",
       "INVESTIGATION_SKIPPED", "INVESTIGATION_CAPPED"]);
     expect(["holds", "fails", "dead_end"].map((outcome) => pointInvestigationResultOf(outcome as never)))

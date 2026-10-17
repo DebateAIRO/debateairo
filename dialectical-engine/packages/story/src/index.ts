@@ -57,6 +57,7 @@ export {
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
   STORY_ANSWERS_NOTE_MAP_UNAVAILABLE,
   STORY_ENGINE_TOKENS,
+  STORY_ENGINE_TRIGGER_RULES,
   buildStoryMaterial,
   buildStoryRevisionPrompt,
   pointNumbersFrom,
@@ -109,6 +110,7 @@ export {
 export { readStoryEnrichment } from "./enrichment.js";
 export {
   StoryWriter,
+  storyV4ShapeId,
   withoutStoryNodeIds,
   type StoryCostFallback,
   type StoryRecordSink,

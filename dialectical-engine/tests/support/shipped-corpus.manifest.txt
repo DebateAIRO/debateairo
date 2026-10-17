@@ -338,6 +338,7 @@ apps/runner/src/dev-ui-process.ts
 apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
 apps/runner/src/engine-investigations.ts
+apps/runner/src/engine-judging.ts
 apps/runner/src/engine-links.ts
 apps/runner/src/engine-material-reader.ts
 apps/runner/src/engine-reduce.ts
@@ -877,6 +878,7 @@ packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
 packages/contract/src/story.ts
+packages/contract/src/verdict-state.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
@@ -952,6 +954,7 @@ packages/geo/src/ip.ts
 packages/geo/src/lookup.ts
 packages/graph/src/index.ts
 packages/invoice-smartbill/src/index.ts
+packages/judgement/src/comparing-judges.ts
 packages/judgement/src/engine-repository.ts
 packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
@@ -1096,7 +1099,9 @@ packages/scorecard/src/picker.ts
 packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/role-rotation.ts
 packages/scorecard/src/schema.ts
+packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
+packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts

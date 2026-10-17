@@ -33,7 +33,7 @@ describe("data export readable page", () => {
       expect(html).toContain(`MARK-Q${n}`);
       expect(html).toContain(n === 1 ? "Oct 8, 2026" : "Oct 9, 2026");
       expect(html).toContain(n === 1 ? "Published" : "Private");
-      expect(html).toContain(n === 1 ? "Supported" : "Contested");
+      expect(html).toContain(n === 1 ? "Supported" : "Close call");
       for (const path of ["headline", "summary", "confidence", "paths.line", "change.text", "why.reasons.text", "long.sections.title", "long.sections.paragraphs.text", "reviewer_note.text"]) {
         expect(html).toContain(`MARK-STORY-${path}-${n}`);
       }
@@ -61,7 +61,7 @@ describe("data export readable page", () => {
     expect(archiveHtml).toMatch(/<header>[\s\S]*?<h1>[^<]+<\/h1>[\s\S]*?<\/header>/);
     expect(archiveHtml).toMatch(/<section class="account-section">[\s\S]*?<div class="account-card">[\s\S]*?<dl>/);
     expect(archiveHtml).toMatch(/<p class="label">Question<\/p>\s*<h3>MARK-Q2<\/h3>\s*<p class="meta">/);
-    expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested">Contested<\/span>/);
+    expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested">Close call<\/span>/);
     expect(archiveHtml).toMatch(/<footer>[^<]*README\.txt[^<]*<\/footer>/);
     for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "#D9C8A9", "#705A33"]) {
       expect(archiveHtml).toContain(token);

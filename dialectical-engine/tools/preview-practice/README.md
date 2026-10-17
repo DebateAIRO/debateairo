@@ -172,6 +172,20 @@ aside after a crash is not counted (the time and money still include that copy's
 engine 1 only the "cannot assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the
 comparing judges (`VERDICT_JUDGE`) as their own steps.
 
+A debate on engine 2 also carries the comparing judges' block (`judgeVotes`, `labels`, `judgesSeconds`,
+`conditionalWinner`, R2): each judge's vote (which AI, the answer letter it chose, conditional or not, counted or why
+not, the kind of question it named), the label and what triggered it, what today's label ladder would have said over the
+same final strengths, and how long the judging took. Counts and codes only, never a judge's reasons. Which votes count is
+counted again from the stored votes by the same code that chose the served answer (each answer lettered by its place in
+the debate's plan; the stored "counted" column is only a hint and is never read); when that cannot be done honestly a
+vote shows "not recounted" and `conditionalWinner` is null. Counts for the comparison (D1): `labels.label` is this
+debate's label (add them up across reports for the label mix) and `conditionalWinner` says whether a conditional answer
+won: a majority of the counted judges who chose the winning answer (the answers the judges grouped with it included)
+called it conditional. That is a count, not the label rule: one conditional voter already makes a unanimous vote a
+"Close call". Answer-check rejections and assumptions per answer come with R3, the reach check with R4. On engine 1 the
+block is absent. A refused judge's or investigator's reply is re-checked with its own step's reading in the format
+tables (the judge's letter checks need the letters it was shown, and are not re-run).
+
 ### The openings record (openings mode)
 
 Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
@@ -341,11 +355,47 @@ letters only): which answer leads by honest final strength, the gaps, whether th
 and from the start setting, and per debate how many investigations held, failed or stayed a dead end (`holds/fails/dead
 end`: what the "applied" rows applied). At 1.0 a point an investigation found to hold and a dead end weigh the same (both
 links at full weight); only a point found to fail still weighs less there (its disputed score). The comparing judges are not
-asked (that needs AI calls). A transcript written before R2 has no
+asked (that needs AI calls). Under engine 2 the served answer is the comparing judges' choice, so the first check takes the
+recorded served answer as theirs (never requiring it to lead by honest strength), and a change of the strength lead in the
+sweep is not a change of the served answer (rescore.md says so too). A transcript written before R2 has no
 engine graph: it is rebuilt from its answer and its calls when it can be, else listed as
 `PRACTICE_RESCORE_INPUT_INCOMPLETE <what>`. `--engine-policy FILE` picks the settings the sweep starts from (default
 `tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
 a debate's served numbers could not be given back, 30 when nothing could be rescored.
+
+### The judges' order (judge-order mode, R2b, owner ruling D3)
+
+Do the comparing judges lean on the order they read the answers in? `judge-order` takes saved engine-2 debates (debate
+mode with `--transcript`; their `transcript.json` holds the judges' recorded votes) and asks each judge that voted the
+very prompt it was sent, once more, with the answers in reverse order (each keeps its letter):
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --transcripts "$P" --out "$P/judge-order" \
+  --settings "$S" --gate-status-deepinfra "$D" --gate-status-anthropic "$A"
+```
+
+It spends real money: one judge call per recorded vote (about half a cent to a cent each), two with `--control`, which
+also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time, plus
+the repairs and retries a call may need (a reply in the wrong form is asked once more, a busy AI is tried again). Spend
+stays inside the owner's test budget in force that day, and the paid run waits for the owner's go. `--dry` answers from
+a script (every scripted judge picks the first answer shown) and spends nothing:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --dry --transcripts "$P" --out "$P/judge-order-dry"
+```
+
+Only the very prompt the judge read is sent again: a saved prompt that was redacted, no longer matches the fingerprint
+recorded when it was sent, or does not show the recorded letter is not asked (its code is listed under "Not asked"). Any
+vote not asked for a reason other than a judge that recorded no vote makes the verdict PASS_WITH_WARNINGS. A
+`transcript.json` right under `--transcripts` is listed under that folder's name.
+
+Per maker of the judge, `report.md` gives: the flip rate (the choice changed when the order was reversed; a move to
+another answer inside the judge's own same-answer group, `same_as`, counts as a flip too), the same with
+the order unchanged (`--control`), how often the choice was among the longest answers shown (both orders) beside the
+rate chance alone would give, and how often the judge called its choice conditional (both orders). An answer's length
+is the words of its answer, its case and its supporting points. Counts and codes only. These numbers go to the owner
+before any rule that asks the judges in both orders; nothing here changes how a debate is judged, and `rescore` never
+runs it.
 
 ### Tokens and words per AI and step (every debate, length guidance LG-B)
 
@@ -1235,7 +1285,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (the four modes, the start checks, the report).
+- `practice.ts`: the command (the seven modes: formats, debate, openings, language, report, rescore and judge-order; the
+  start checks; the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview, in local or hosted mode (hosted: the money wiring, with billing kept off
   in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
@@ -1247,6 +1298,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   rescore mode (`rescore.json`, `rescore.md`).
 - `practice-investigations.ts`: the report's investigations block (`investigations`, R2: the "cannot assess" reviews and
   what was done about them).
+- `practice-judges.ts`: the report's comparing judges block (`judgeVotes`, `labels`, `judgesSeconds`,
+  `conditionalWinner`, R2).
+- `practice-judge-order.ts`: the judges' order practice (D3).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
@@ -1277,6 +1331,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-language.test.ts`,
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
+  `tests/unit/r2-practice-judge-order.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/unit/preview-practice-pins.test.ts`,
   `tests/unit/practice-story-length.test.ts`,

@@ -113,6 +113,8 @@ describe("S02 owner/public affordance drift pins", () => {
       ["misc.answerHonesty.answerState", "Answer state"],
       // PUBLIC DRAWER — rendered from verdict/confidence fields.
       ["misc.answerHonesty.verdict", "Verdict"],
+      // OWNER DRAWER — the judges' comparison (R2 B6) is the asker's own record; not in the public envelope.
+      ["misc.answerHonesty.comparison.title", "How the answers compared"],
       // NODE DRAWER — public contract nodes retain condition marks.
       ["misc.answerHonesty.conditionMarks", "Condition marks"],
       // NODE DRAWER — public contract nodes retain redacted abstention records.
@@ -158,6 +160,6 @@ describe("S02 owner/public affordance drift pins", () => {
     for (const [key, english] of expectedSections) {
       expect(miscEnglish[key], `${key} English catalogue value`).toBe(english);
     }
-    expect(sections).toHaveLength(21);
+    expect(sections).toHaveLength(22);
   });
 });

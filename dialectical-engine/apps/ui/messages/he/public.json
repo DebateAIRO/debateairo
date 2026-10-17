@@ -100,6 +100,7 @@
   "public.story.label.supported": "תשובה ברורה",
   "public.story.label.contested": "הכרעה צמודה",
   "public.story.label.unsupported": "ההערכה הסבירה ביותר, ראיות חלשות",
+  "public.story.label.split": "שנוי במחלוקת",
   "public.story.writing": "כותבים את הסיפור המלא של הדיון הזה…",
   "public.story.writingNote": "בדרך כלל זה נמשך כמה דקות. הדף יתעדכן מעצמו.",
   "public.story.unavailable": "הסיפור המלא אינו זמין לדיון הזה. במקומו מוצג כאן סיכום הדיון.",

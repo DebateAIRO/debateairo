@@ -14,13 +14,19 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { StoryBodySchema } from "@debateai/contract";
 import {
+  COMPARING_JUDGE_READING,
   Judge,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   JUDGE_ARTIFACT_READING,
+  POINT_INVESTIGATION_READING,
+  classifyStructuredArtifact,
+  comparingJudgeReplySchema,
   judgeArtifactSchema,
   judgeAssessmentSchema,
   nodeReviewArtifactSchema,
   parseStructuredArtifact,
+  pointInvestigationContentIssues,
+  pointInvestigationReplySchema,
   REVIEW_ARTIFACT_READING,
   parsedStructuredRepairs,
   type JudgeAssessment,
@@ -500,6 +506,13 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       return { family, issues: fromZod(read) };
     }
     case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed) };
+    // R2 (B11; A17 review Minor 4): the investigator and the comparing judges, through their step's own schema and
+    // reading. The investigator's one content rule needs nothing but the reply; the judges' letter and group checks need
+    // the letters that judge was shown, and the language check the question: not re-run here (the stored detail names them).
+    case "INVESTIGATOR": return { family, issues: fromClassification(classifyStructuredArtifact(content,
+      pointInvestigationReplySchema, undefined, POINT_INVESTIGATION_READING, pointInvestigationContentIssues)) };
+    case "VERDICT_JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, comparingJudgeReplySchema,
+      undefined, COMPARING_JUDGE_READING)) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }

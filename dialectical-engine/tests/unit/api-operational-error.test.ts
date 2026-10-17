@@ -235,6 +235,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  "JUDGES_VERDICT_INPUT_INVALID",
   // FW-B / F-I2: the judgement package's own closed-table refusal
   // (packages/judgement/src/index.ts) and the five door refusals below reach
   // this boundary through the gateway, so they belong in the alphabet.
@@ -415,6 +416,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SEQUENCE_ALLOCATION_FAILED",
   "SERVED_NUMBER_NOT_FOUND",
   "SERVED_ROOT_JUDGEMENT_UNRESOLVED",
+  "SERVED_ROOT_JUDGES_WINNER_UNSERVABLE",
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
@@ -504,6 +506,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "VALUE_CRITERIA_EMPTY",
   "VALUE_OPTIONS_INSUFFICIENT",
   "VALUE_PHASE_NOT_READY",
+  "VERDICT_LABEL_BASIS_AMBIGUOUS",
   "VERDICT_LABEL_BASIS_UNRESOLVED",
   "VERDICT_LABEL_CONTROLS_INVALID",
   "VERDICT_LABEL_CONTROLS_PROVENANCE_MISSING",

@@ -215,6 +215,10 @@ describe("label, fate and plural words come from the catalogue handed in", () =>
       .toEqual(["Răspuns clar", "Decizie strânsă", "Cea mai bună presupunere, dovezi slabe"]);
   });
 
+  it("words SPLIT with the word CONTESTED used before R2 (Q1 option 1)", () => {
+    expect([storyLabelWords("SPLIT" as never, en), storyLabelWords("SPLIT" as never, ro)]).toEqual(["Contested", "Contestat"]);
+  });
+
   it("words each fate from the catalogue", () => {
     expect(["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].map((fate) => storyFateWords(fate as never, en)))
       .toEqual(["Held up", "Partly held", "Fell", "Set aside"]);

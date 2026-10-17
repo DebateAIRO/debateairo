@@ -63,6 +63,7 @@ import {
   type PracticeMapLanguage
 } from "./practice-language.js";
 import { readPracticeInvestigations, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { practiceJudgesBlocks, readPracticeJudges, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
 import {
@@ -243,6 +244,8 @@ export type PracticeDebateResult = Readonly<{
   language?: PracticeDebateLanguageBlock;
   /** R2 (E12, E13): the "cannot assess" reviews and the investigations, counts, money and time (practice-investigations.ts). */
   investigations?: PracticeInvestigationBlock;
+  /** Engine redesign R2: the comparing judges' votes, the label and its trigger, today's ladder, the judging time, D1's conditional winner (engine 2 only). */
+  judges?: PracticeJudgesBlocks;
   /**
    * Pinned final writers (R1d): each pin, the model the run's own pin names, the models that served the step, whether it
    * held (the pinned model served it); absent without a pin.
@@ -960,6 +963,15 @@ export async function runPracticeDebate(input: Readonly<{
     } catch (error) {
       progress(`investigations: could not be read (${codeOf(error)})`);
     }
+    // R2 B11: the comparing judges, read before the database goes. Engine 1: absent (today's report keys). A reading
+    // that breaks costs only this block, never the report.
+    let judges: PracticeJudgesBlocks | undefined;
+    try {
+      const facts = await readPracticeJudges(pool, job.runId);
+      if (facts !== null) judges = practiceJudgesBlocks(facts);
+    } catch (error) {
+      progress(`comparing judges: the votes could not be read (${codeOf(error)})`);
+    }
     // Pinned final writers (R1d; Task 21 review ruling A1): which models the run's own pin names, and which actually
     // served each step (the answered final-writer calls; the stored story's storyteller), beside the pins (codes and
     // model ids only). A cost fallback or a backup storyteller serving instead: not held.
@@ -1049,6 +1061,7 @@ export async function runPracticeDebate(input: Readonly<{
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
       ...(investigations === undefined ? {} : { investigations }),
+      ...(judges === undefined ? {} : { judges }),
       ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })
     });

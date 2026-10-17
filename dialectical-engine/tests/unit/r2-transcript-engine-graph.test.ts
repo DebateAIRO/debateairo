@@ -209,6 +209,10 @@ describe("R2 transcript: the engine graph (INTERFACE §15.3)", () => {
     const engineTwo = buildTranscriptEngineGraph(source({ engine: 2, engineReceipt: { version: 1, engine: 2 }, scoring: START_SCORING }))!;
     expect(engineTwo.engine).toBe(2);
     expect(engineTwo.engineReceipt).toEqual({ version: 1, engine: 2 });
+    // R2b B12 (ruling R2b-B12.1): the receipt's served-root rule rides with the served root; none recorded, none kept.
+    const ruled = buildTranscriptEngineGraph(source({ served: { ...source().served!, servedRootRule: "comparing-judges-votes-honest-strength-tiebreak" } }))!;
+    expect(ruled.served.servedRootRule).toBe("comparing-judges-votes-honest-strength-tiebreak");
+    expect(Object.hasOwn(buildTranscriptEngineGraph(source({ served: { ...source().served!, servedRootRule: null } }))!.served, "servedRootRule")).toBe(false);
   });
 
   // Pre-flight PF-R2a2.9 (spec §4.2 "What is recorded": the dispute factor when applied), by A6's rule on the recorded reviews.

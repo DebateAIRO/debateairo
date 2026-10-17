@@ -17,6 +17,7 @@ import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
@@ -1065,13 +1066,13 @@ export const PublicDebateSummarySchema = z.object({
   question: z.string().trim().min(1),
   published_at: z.iso.datetime(),
   models: z.array(z.string().trim().min(1)).optional(),
-  verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict: VerdictStateSchema.nullable(),
   confidence_band: z.string().trim().min(1).nullable(),
   // Engine money rule, Task M6 (spec §14.4.4): a components-only snapshot's
   // floor label (`PublicDebate.floor.verdict_state`), so the public library row
   // shows the label the page shows instead of "verdict unavailable". Absent
   // for every other snapshot; the floor's position and cause never ride here.
-  floor_verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).optional()
+  floor_verdict: VerdictStateSchema.optional()
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
@@ -1190,7 +1191,7 @@ export const AnswerSummarySchema = z.object({
   run_ref: z.string().min(1),
   answer_version: z.number().int().positive(),
   question_line: z.string().min(1),
-  verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict_state: VerdictStateSchema.nullable(),
   abstention: AbstentionSchema.nullable(),
   serve_state: z.enum(["COMPOSED", "RECOMPOSED_ONCE", "COMPONENTS_ONLY"]),
   staleness_state: StalenessStateSchema,
@@ -1339,6 +1340,13 @@ export const ConditionMarkRecordSchema = z.object({
     || record.excluded_from_served_number !== false
     || record.judged_basis_count === null || record.affected_node_ids.length === 0
   )) context.addIssue({ code: "custom", message: "Class D requires unjudged-review provenance and a positive judged basis" });
+  // Engine 2 (R2a; spec §4.2a rule 3): the read side of serve's UNASSESSED_CONDITION_MARK_RECORD_INVALID. A point kept
+  // at a reduced weight names its landed cannot-assess review and nothing else: no transport outcome, no call site, no
+  // served-number exclusion and no judged basis count (it is neither class H nor D).
+  if (record.mark === "UNASSESSED-AT-REDUCED-WEIGHT" && (
+    record.review_outcome !== "cannot-assess" || record.terminal_transport_outcome !== null || record.call_site_key !== null
+    || record.excluded_from_served_number !== null || record.judged_basis_count !== null
+  )) context.addIssue({ code: "custom", message: "A reduced-weight record names its cannot-assess review and nothing else" });
   if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
     record.call_site_key === null || record.planned_leg_count === null
     || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0
@@ -1352,7 +1360,7 @@ export const PublicDebateSchema = z.object({
   published_at: z.iso.datetime(),
   answer: z.object({
     terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
-    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+    verdict: VerdictStateSchema.nullable(),
     verdict_available: z.boolean(),
     confidence_band: z.string().trim().min(1).nullable(),
     summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
@@ -1421,13 +1429,52 @@ export const AnswerModelAssignmentSchema = z.object({
 }).strict();
 export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
 
+/**
+ * R2 (spec §4.4, INTERFACE §9.8): how the comparing judges' choices fell, for the owner's honesty panel. Read when the
+ * answer is read (`judgesComparisonOf`, @debateai/serve), from the stored votes and the answer's own nodes; absent on
+ * every engine-1 answer. Each answer is a position of the debate, named by its root node; `honest_score` is its
+ * latest final strength (a review catch-up refreshes it), shown as a bar, never printed; `judges_chose` counts the
+ * counted choices that picked it. No letters: they exist only in the judges' material.
+ *
+ * Ruling W1 (R2b whole-branch review I1): `same_answer_as` names the other answers the judges' count treated as the
+ * same answer as this one (its group, ruling R2b-B2.1; empty when none). The count decides on a group's combined
+ * choices, so the panel shows a group together with one combined count. The list is in the count's order: groups by
+ * their combined counted choices, the served answer's group first, a group's answers side by side.
+ */
+export const JudgesComparisonSchema = z.object({
+  judges_seated: z.number().int().min(1).max(5),
+  judges_counted: z.number().int().min(0),
+  answers: z.array(z.object({
+    root_node_id: z.string().min(1),
+    honest_score: z.number().min(0).max(1).nullable(),
+    judges_chose: z.number().int().min(0),
+    same_answer_as: z.array(z.string().min(1))
+  }).strict()).min(1)
+}).strict().superRefine((comparison, context) => {
+  if (comparison.judges_counted > comparison.judges_seated) {
+    context.addIssue({ code: "custom", message: "judges_counted cannot exceed judges_seated" });
+  }
+  if (comparison.answers.reduce((sum, entry) => sum + entry.judges_chose, 0) > comparison.judges_counted) {
+    context.addIssue({ code: "custom", message: "the answers' choices cannot exceed judges_counted" });
+  }
+  // A group is named from each of its answers: another listed answer, never itself, and both ways.
+  const sameOf = new Map(comparison.answers.map((entry) => [entry.root_node_id, entry.same_answer_as] as const));
+  for (const entry of comparison.answers) {
+    if (entry.same_answer_as.some((other) => other === entry.root_node_id
+      || !(sameOf.get(other) ?? []).includes(entry.root_node_id))) {
+      context.addIssue({ code: "custom", message: "same_answer_as must name other listed answers, each naming this one back" });
+    }
+  }
+});
+export type JudgesComparison = z.infer<typeof JudgesComparisonSchema>;
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
   run_ref: z.string().min(1),
   question_line: z.string().min(1),
   terminal: z.enum(["SERVED", "DOWNGRADED", "BLOCKED", "COMPONENTS_ONLY"]),
-  verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict_state: VerdictStateSchema.nullable(),
   verdict_unavailable: z.object({ reason_ref: z.string().trim().min(1) }).strict().nullable(),
   confidence_band: z.string().min(1).nullable(),
   band_ceiling: BandCeilingSchema.nullable(),
@@ -1493,7 +1540,9 @@ export const AnswerSchema = z.object({
   staleness_state: StalenessStateSchema,
   relevant_as_of: z.iso.datetime(),
   // A21: optional, so every stored and fixture answer without it still parses.
-  model_assignment: AnswerModelAssignmentSchema.optional()
+  model_assignment: AnswerModelAssignmentSchema.optional(),
+  // R2: engine 2 only (INTERFACE §9.8); optional, so every engine-1 and older answer parses unchanged.
+  judges_comparison: JudgesComparisonSchema.optional()
 }).strict().superRefine((answer, context) => {
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });
