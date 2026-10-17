@@ -697,7 +697,8 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     expect(kernel.CONDITION_MARKS).not.toContain(SANDBOX_PROFILE_UNAVAILABLE);
     // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
     // Debate shape (Phase 2b) minted eight marks mid-list: 38 -> 46.
-    expect(kernel.CONDITION_MARKS).toHaveLength(46);
+    // R2 (engine redesign, INTERFACE §13) minted four engine marks mid-list: 46 -> 50.
+    expect(kernel.CONDITION_MARKS).toHaveLength(50);
   });
 });
 

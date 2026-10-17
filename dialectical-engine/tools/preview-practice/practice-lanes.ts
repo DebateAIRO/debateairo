@@ -23,6 +23,7 @@ import {
   parseStructuredArtifact,
   REVIEW_ARTIFACT_READING,
   parsedStructuredRepairs,
+  type JudgeAssessment,
   type JudgeLeg
 } from "@debateai/judgement";
 import {
@@ -169,13 +170,19 @@ export function practiceModelOfRef(providerRef: string): string {
   return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
 }
 
-export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER"
-  | "STRUCTURE_REPAIR" | "UNMAPPED";
+export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "INVESTIGATOR" | "VERDICT_JUDGE" | "SYNTHESIZER" | "EVALUATOR"
+  | "STORYTELLER" | "STORY_CHECKER" | "STRUCTURE_REPAIR" | "UNMAPPED";
+
+/** R2 (INTERFACE §15.4): the engine-2 verdict calls' key prefixes (A2's `pointInvestigationCallSiteKey`, `comparingJudgeCallSiteKey`). */
+const PRACTICE_VERDICT_KEY_PREFIXES = Object.freeze({ investigate: "VERDICT:investigate:", judge: "VERDICT:judge:" } as const);
 
 /** Which job a debate call was, from its call-site key (apps/runner/src/index.ts and packages/story naming). */
 export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   // LG-A (L32): the structure-repair call, on the repair model, for any step.
   if (callSiteKey.startsWith("REPAIR:STRUCTURE:")) return "STRUCTURE_REPAIR";
+  // R2: the investigator of a "cannot assess" point and the comparing judges (their keys never start with JUDGE).
+  if (callSiteKey.startsWith(PRACTICE_VERDICT_KEY_PREFIXES.investigate)) return "INVESTIGATOR";
+  if (callSiteKey.startsWith(PRACTICE_VERDICT_KEY_PREFIXES.judge)) return "VERDICT_JUDGE";
   if (callSiteKey.startsWith("MAP:")) return "MAP";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
@@ -351,6 +358,29 @@ function structuredReadingOf(callSiteKey: string, content: string, ending: Model
     }
     default: return null;
   }
+}
+
+/** R2 (E12): an author's or a grader's accepted reply, read again exactly as its step read it. */
+export type PracticeJudgeReading = Readonly<{ statement: string | null; assessment: JudgeAssessment }>;
+
+/**
+ * The statement (author calls only) and the seven-measure assessment of an accepted JUDGE or PANEL reply, through the
+ * step's own reader and repairs (`structuredReadingOf`); null for any other call or a reply that reader refuses.
+ */
+export function practiceJudgeReadingOf(callSiteKey: string, content: string, finishReason: unknown): PracticeJudgeReading | null {
+  const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
+  const family = callFamilyOf(callSiteKey);
+  if (family === "JUDGE") {
+    const read = parseStructuredArtifact(content, judgeArtifactSchema, ending, JUDGE_ARTIFACT_READING);
+    if (read.kind !== "PARSED") return null;
+    const { statement, steelman, critic, evidence, context, fallacy } = read.value;
+    return Object.freeze({ statement, assessment: Object.freeze({ steelman, critic, evidence, context, fallacy }) });
+  }
+  if (family === "PANEL") {
+    const read = parseStructuredArtifact(content, judgeAssessmentSchema, ending, JUDGE_ARTIFACT_READING);
+    return read.kind === "PARSED" ? Object.freeze({ statement: null, assessment: read.value }) : null;
+  }
+  return null;
 }
 
 /**

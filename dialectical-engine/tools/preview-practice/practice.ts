@@ -7,7 +7,7 @@
  * gates on the server (they hold the keys; this computer never sees one), reached through SSH-forwarded sockets and a
  * small relay on the server (gate-relay.py). It spends real money, a little: see the README.
  *
- * Four modes, and a fifth command:
+ * Four modes, and two more commands (report and rescore):
  *  - formats: every model asked to do every job a few times; each reply checked by that job's real format check. The
  *    models work at the same time (one call each at a time); --sequential sends one call at a time. Every finished job
  *    is written to <out>/samples.jsonl at once (practice-samples-log.ts), and the report is built from it.
@@ -30,6 +30,11 @@
  *  - report:  builds report.json and report.md again from <out>/openings.jsonl when the folder holds one, else from
  *             <out>/samples.jsonl (sends nothing, needs no gate). With --side-by-side <samples.jsonl> it writes
  *             <out>/side-by-side.html instead (spec 2026-10-12 §4.8).
+ *  - rescore: (R2, E12) reads every transcript.json under --transcripts again with no AI call: first the engine's own
+ *             arithmetic must give back exactly the strengths it served, then each debate is scored with engine 2's honest
+ *             scores and link rules, a "cannot assess" link at 0.5 / 0.66 / 0.75 / 1.0, investigations applied and not;
+ *             <out>/rescore.json and rescore.md (practice-rescore.ts). --engine-policy picks the settings the sweep
+ *             starts from (default tools/preview-practice/engine-policy-start.json).
  *
  * The exact commands are in tools/preview-practice/README.md. Exit codes: 0 PASS, 10 PASS_WITH_WARNINGS, 20 FAIL,
  * 30 NOT_PROVEN, 40 HARNESS_ERROR, 50 ABORTED.
@@ -90,9 +95,11 @@ import {
   debateReport,
   defaultReportDirectory,
   harnessErrorReport,
+  PRACTICE_REPORT_SCHEMA,
   writeReport,
   type PracticeReport
 } from "./practice-report.js";
+import { PRACTICE_RESCORE_FILES, PRACTICE_RESCORE_START_POLICY_FILE, runPracticeRescore } from "./practice-rescore.js";
 import {
   parsePracticeSampleLog,
   PracticeSampleLog,
@@ -124,7 +131,7 @@ export function repositoryRoot(): string {
   }
 }
 
-type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "language" | "report"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
+type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "language" | "report" | "rescore"; flags: ReadonlyMap<string, string>; switches: ReadonlySet<string> }>;
 
 /**
  * The server plan's inputs for `--register-next` (release-artifacts.mjs native-plan --operation plan): the owner's
@@ -138,7 +145,7 @@ const REGISTER_NEXT_INPUT_FLAGS = Object.freeze(["--hosted-billing", "--checker"
 const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
-  "--answer-length", "--site-language", "--language-choice", "--length-policy", "--engine-policy",
+  "--answer-length", "--site-language", "--language-choice", "--transcripts", "--length-policy", "--engine-policy",
   "--answer-writer-model", "--storyteller-model",
   ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next", "--story-length"]);
@@ -153,6 +160,8 @@ const OPENINGS_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--ga
 /** The flags language reads (practice-language.ts); every other flag is refused there. A dry run reads no settings, gate status or export. */
 const LANGUAGE_FLAGS: ReadonlySet<string> = new Set(["--out", "--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export", "--dry"]);
 const LANGUAGE_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export"]);
+/** The flags rescore reads (practice-rescore.ts); every other flag is refused there. It reads no settings, gate or socket. */
+const RESCORE_FLAGS: ReadonlySet<string> = new Set(["--transcripts", "--out", "--engine-policy"]);
 
 /** What the interrupt messages say the report is written from: openings' finished calls, the other modes' samples. */
 export function practiceFinishedUnit(mode: string | undefined): "calls" | "samples" {
@@ -161,8 +170,8 @@ export function practiceFinishedUnit(mode: string | undefined): "calls" | "sampl
 
 export function parsePracticeArgs(argv: readonly string[]): Args {
   const [mode, ...rest] = argv;
-  if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "language" && mode !== "report") {
-    throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate, openings, language or report");
+  if (mode !== "formats" && mode !== "debate" && mode !== "openings" && mode !== "language" && mode !== "report" && mode !== "rescore") {
+    throw new PracticeRefusal("PRACTICE_MODE_REQUIRED", "formats, debate, openings, language, report or rescore");
   }
   const flags = new Map<string, string>();
   const switches = new Set<string>();
@@ -244,7 +253,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   const startedAt = new Date();
   const log = options.log ?? ((line: string) => { process.stderr.write(`${line}\n`); });
   let mode = argv[0] === "debate" ? "debate" : argv[0] === "report" ? "report" : argv[0] === "language" ? "language"
-    : argv[0] === "openings" ? "openings" : "formats";
+    : argv[0] === "openings" ? "openings" : argv[0] === "rescore" ? "rescore" : "formats";
   let directory: string | null = null;
   let observer: PracticeGateObserver | null = null;
   // Formats: the samples log, open from just before the first paid call to the end line.
@@ -378,6 +387,27 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
   try {
     const args = parsePracticeArgs(argv);
     mode = args.mode;
+    if (args.mode === "rescore") {
+      // R2 (E12): the free re-scoring of saved transcripts. No AI call, no gate, no socket, no settings, no database. Checked
+      // and run here, before every debate-only flag check (R1d refuses --engine-policy outside a debate; here it names the
+      // settings the sweep starts from). On a refusal nothing is written (`directory` stays null).
+      for (const flag of [...args.flags.keys(), ...args.switches]) {
+        if (!RESCORE_FLAGS.has(flag)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (not read by rescore)`);
+      }
+      const folder = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
+      let policyText: string;
+      try { policyText = readFileSync(args.flags.get("--engine-policy") ?? PRACTICE_RESCORE_START_POLICY_FILE, "utf8"); } catch {
+        throw new PracticeRefusal("PRACTICE_ENGINE_POLICY_UNREADABLE");
+      }
+      const rescored = runPracticeRescore({ transcripts: required(args, "--transcripts"), out: folder, enginePolicyText: policyText });
+      log(`rescore: ${join(folder, PRACTICE_RESCORE_FILES.json)}`);
+      log(`summary: ${join(folder, PRACTICE_RESCORE_FILES.markdown)}`);
+      log(`PRACTICE_VERDICT ${rescored.verdict} exit ${String(rescored.exitCode)}`);
+      return Object.freeze({ exitCode: rescored.exitCode, directory: folder, report: Object.freeze({
+        schema: PRACTICE_REPORT_SCHEMA, mode: "rescore", verdict: rescored.verdict, exitCode: rescored.exitCode,
+        reasons: rescored.reasons, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString()
+      }) });
+    }
     // Parallel AI calls: the debate's runner only; checked before anything is read or sent.
     const callConcurrencyText = args.flags.get("--call-concurrency");
     if (callConcurrencyText !== undefined && args.mode !== "debate") {

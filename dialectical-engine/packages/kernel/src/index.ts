@@ -9,6 +9,7 @@ export type * from "./provider-funding.js";
 export * from "./region.js";
 export * from "./mail-address.js";
 export * from "./engine.js";
+export * from "./engine-material.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 
@@ -148,6 +149,15 @@ export const CONDITION_MARKS = [
   "BACKUP-MODEL-USED",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
+  // Engine 2 (spec 2026-10-15 §4.7, §4.2a rule 3; INTERFACE §13): the comparing judges' three answer-scope disclosures
+  // (a judge failed after repairs; no judge could run; every vote was for the judge's own maker's answer) and the
+  // node-scope disclosure of a "cannot assess" point that stays in the graph at a reduced weight (engine 1 hides it,
+  // HIDDEN-UNJUDGEABLE). Placed HERE, mid-list beside the panel marks, NOT appended: the DR-176 tail is read
+  // positionally by `CONDITION_MARKS.slice(-4)`, and the shape marks are read right after PANEL-DEGRADED-SINGLE-VOICE.
+  "VERDICT-JUDGE-MISSING",
+  "VERDICT-JUDGES-UNAVAILABLE",
+  "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT",
   // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation
   // disclosures. PANEL-PARTIAL — some non-author members failed, the node was reduced on
   // the voices that parsed. PANEL-DEGRADED-SINGLE-VOICE — every non-author member failed,
@@ -244,6 +254,11 @@ export type ConditionMark = typeof CONDITION_MARKS[number];
 export const DEBATE_SHAPE_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
   "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
 export type DebateShapeMark = typeof DEBATE_SHAPE_MARKS[number];
+
+/** Engine 2's marks (INTERFACE §13), in their CONDITION_MARKS order. Engine 1 never mints one. */
+export const ENGINE_MARKS = Object.freeze(["VERDICT-JUDGE-MISSING", "VERDICT-JUDGES-UNAVAILABLE", "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT"] as const satisfies readonly ConditionMark[]);
+export type EngineMark = typeof ENGINE_MARKS[number];
 
 export const RISK_TIERS = ["casual", "standard", "high-stakes"] as const;
 export type RiskTier = typeof RISK_TIERS[number];

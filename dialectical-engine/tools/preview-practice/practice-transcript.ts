@@ -27,6 +27,7 @@ import {
   structureRepairOriginalKey,
   type PromptPacket
 } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -41,6 +42,7 @@ import {
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
+import { buildTranscriptEngineGraph, readEngineGraphSource, type TranscriptEngineGraph } from "./practice-engine-graph.js";
 import { practiceGuidedWordsOfFields } from "./practice-length.js";
 import { redactNamedKeyShapes } from "./practice-redaction.js";
 import { practiceTryTier } from "./practice-tokens.js";
@@ -208,6 +210,12 @@ export type PracticeTranscript = Readonly<{
      * item (each point and candidate answer with the AI that wrote it), as P2b's readers return them, decrypted.
      */
     map?: unknown;
+    /**
+     * R2 (E12, INTERFACE §15.3), both engines: every node (hidden ones too), edge, review, grader's assessment and
+     * investigation, and the served base and final strengths, for the `rescore` mode. Absent when the run served no
+     * propagation (then `unavailable` says so).
+     */
+    engineGraph?: TranscriptEngineGraph;
   }>;
   /** What this file could not hold, and why. */
   unavailable: readonly string[];
@@ -399,6 +407,7 @@ export function buildPracticeTranscript(input: Readonly<{
   story: unknown;
   unavailable: readonly string[];
   map?: unknown;
+  engineGraph?: TranscriptEngineGraph;
   now?: Date;
 }>): PracticeTranscript {
   const bytes = (text: string | null | undefined) => (text === null || text === undefined ? 0 : Buffer.byteLength(text, "utf8"));
@@ -416,7 +425,8 @@ export function buildPracticeTranscript(input: Readonly<{
     }),
     attempts: input.attempts,
     structure: Object.freeze({ answer: input.answer, inspection: input.inspection, story: input.story,
-      ...(input.map === undefined ? {} : { map: input.map }) }),
+      ...(input.map === undefined ? {} : { map: input.map }),
+      ...(input.engineGraph === undefined ? {} : { engineGraph: input.engineGraph }) }),
     unavailable: Object.freeze([...input.unavailable])
   });
 }
@@ -450,6 +460,15 @@ export function writePracticeTranscript(directory: string, transcript: PracticeT
     throw error;
   }
   return Object.freeze({ path, bytes: Buffer.byteLength(text, "utf8"), blanked });
+}
+
+/**
+ * R2a final wave (Ruling (A15 Minors) 1): how an `unavailable` line names what broke a block: a typed refusal by its code
+ * (ENGINE_FACTS_INVALID, not "TypedDomainError"), any other error by its class, never its message.
+ */
+export function practiceUnavailableName(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error ? error.name : "UNKNOWN";
 }
 
 /**
@@ -497,10 +516,23 @@ export async function recordPracticeTranscript(input: Readonly<{
       }
     } catch (error) {
       map = null;
-      unavailable.push(`structure.map: ${error instanceof Error ? error.name : "UNKNOWN"}`);
+      unavailable.push(`structure.map: ${practiceUnavailableName(error)}`);
     }
   }
+  // R2 (E12): the graph `rescore` reads. A reading that breaks costs only this block, never the transcript.
+  let engineGraph: TranscriptEngineGraph | null = null;
+  try {
+    engineGraph = buildTranscriptEngineGraph(await readEngineGraphSource(input.pool, input.run.runId,
+      input.run.panel.map((member) => member.providerRef)));
+    if (engineGraph === null) unavailable.push("structure.engineGraph: the run served no propagation, so there is nothing to rescore");
+    else if (engineGraph.unreadVoices.length > 0) {
+      unavailable.push(`structure.engineGraph.voices: ${String(engineGraph.unreadVoices.length)} grader replies could not be read `
+        + "again by their step's reader (listed in structure.engineGraph.unreadVoices)");
+    }
+  } catch (error) {
+    unavailable.push(`structure.engineGraph: ${practiceUnavailableName(error)}`);
+  }
   const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable,
-    ...(input.map === undefined ? {} : { map }) });
+    ...(input.map === undefined ? {} : { map }), ...(engineGraph === null ? {} : { engineGraph }) });
   return Object.freeze({ ...writePracticeTranscript(input.directory, transcript), attempts: attempts.length });
 }

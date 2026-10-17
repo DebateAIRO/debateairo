@@ -243,6 +243,10 @@ Rolling the CODE back to R18 (the release before these seals) also needs `REGIST
 runner refuses a version with the new seals (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, the other way). Never roll the
 code back while a debate admitted with the length row runs: the older code refuses a receipt that carries `length`.
 
+**R2a moves the engine seal.** A register version for this code carries `engineContractHash` `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` (was
+`b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`, R1d's seal over no contract). Nothing reads it
+without an `engineVersionPolicy` row, so the runner boots either way.
+
 There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
 changed row: stop and ask.
 

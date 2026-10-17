@@ -74,8 +74,9 @@ describe("the runner's length call sites (source pins)", () => {
   const RUNNER = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
   const count = (text: string): number => RUNNER.split(text).length - 1;
 
-  it("eight guided bounds beside the definition, one per sized call site", () => {
-    expect(count("guidedCallBound(")).toBe(9);
+  // Engine redesign R2a A14: the investigator's call is the ninth sized site.
+  it("nine guided bounds beside the definition, one per sized call site", () => {
+    expect(count("guidedCallBound(")).toBe(10);
     for (const site of [
       "guidedCallBound(input.judgeBound, \"reviewer\", catchUpLength)",
       "guidedCallBound(this.settings.judgeBound, \"judge_panel\", lengthGuidance)",
@@ -84,7 +85,8 @@ describe("the runner's length call sites (source pins)", () => {
       "guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance)",
       "guidedCallBound(this.settings.judgeBound, \"reviewer\", lengthGuidance)",
       "\"answer_writer\", lengthGuidance),",
-      "guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)"
+      "guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)",
+      "guidedCallBound(this.settings.judgeBound, \"investigator\", lengthGuidance)"
     ]) expect(count(site), site).toBe(1);
   });
 
@@ -94,7 +96,8 @@ describe("the runner's length call sites (source pins)", () => {
   });
 
   it("every target names the run's own language tag", () => {
-    expect(count("languageCode: run.argumentLanguageTag")).toBe(2); // the writer's and the checker's RoleLength
+    // The writer's and the checker's RoleLength, and (R2a A14) the investigator's guide.
+    expect(count("languageCode: run.argumentLanguageTag")).toBe(3);
     expect(count("lengthGuideFrom(lengthGuidance, step, run.argumentLanguageTag)")).toBe(1); // judge, panel, review
     expect(count("lengthGuideFrom(catchUpLength, \"reviewer\", catchUpTag)")).toBe(1);
   });

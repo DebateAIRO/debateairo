@@ -28,7 +28,7 @@ describe("A16 · R6 — the BACKUP-MODEL-USED mark", () => {
     expect(CONDITION_MARKS.slice(-4)).toEqual([
       "HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]);
-    expect(CONDITION_MARKS).toHaveLength(46);
+    expect(CONDITION_MARKS).toHaveLength(50);
   });
 
   it("is accepted by the wire schema and has its own plain-words label", () => {

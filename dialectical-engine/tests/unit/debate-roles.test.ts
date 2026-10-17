@@ -35,6 +35,13 @@ const KEYS: readonly { readonly key: string; readonly role: DebateRole | null }[
   { key: "COMPOSER:SYNTHESIZER:INITIAL:1:seat:runnerUp", role: "ANSWER_WRITER" },
   { key: "POST_COMPOSE_R9:EVALUATOR:2:seat:main", role: "ANSWER_CHECKER" },
   { key: "PANEL:JUDGE:seat:runnerUp:provider:x", role: "JUDGE" },
+  // Engine redesign R2 (spec 2026-10-15 §4.9): the comparing judges and the point investigations, 1 to 5.
+  { key: "VERDICT:judge:1", role: "JUDGE" },
+  { key: "VERDICT:judge:3:seat:main", role: "JUDGE" },
+  { key: "VERDICT:investigate:2", role: "REVIEWER" },
+  { key: "VERDICT:judge:9", role: null },
+  { key: "VERDICT:investigate:0", role: null },
+  { key: "VERDICT", role: null },
   { key: "STOPPING:round:1", role: null },
   { key: "SYNTHESIZER:provider:x", role: null },
   { key: "evaluator.panel.member", role: null },

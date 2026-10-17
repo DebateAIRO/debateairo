@@ -495,6 +495,23 @@ export function parseJudgeAssessment(content: string, reply?: ModelReplyFacts): 
 
 export type CompositionMetric = "steelman_fidelity" | "counter_resilience" | "evidence_quality" | "evidence_relevance" | "context_fit" | "clarity" | "fallacy_resilience";
 
+/**
+ * The seven measures of one grader's assessment, each 0..1, in the composition row's order. Engine 1's composition
+ * (`reduceAssessment`) and engine 2's honest grade (honest-score.ts; spec 2026-10-15 §4.2 item 1) read these same
+ * numbers. Clarity loses `clarityDecayPerAmbiguity` per ambiguity flag and never goes below 0.
+ */
+export function compositionMetricsOf(assessment: JudgeAssessment, clarityDecayPerAmbiguity: number): Readonly<Record<CompositionMetric, number>> {
+  return Object.freeze({
+    steelman_fidelity: assessment.steelman.fidelity,
+    counter_resilience: 1 - assessment.critic.counterargumentStrength,
+    evidence_quality: assessment.evidence.quality,
+    evidence_relevance: assessment.evidence.relevance,
+    context_fit: assessment.context.fit,
+    clarity: Math.max(0, 1 - clarityDecayPerAmbiguity * assessment.context.ambiguityFlags.length),
+    fallacy_resilience: 1 - assessment.fallacy.severity
+  });
+}
+
 interface Provenance { readonly rowKey: string; readonly registerVersion: number; readonly sourceRef: string }
 function assertUnitInterval(value: number, label: string): void {
   if (!Number.isFinite(value) || value < 0 || value > 1) throw new TypeError(`${label} must be in [0,1]`);
@@ -511,15 +528,7 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
   const composition = input.compositionRow.value.entries[input.claimType];
   if (composition === undefined) return Object.freeze({ kind: "UNAVAILABLE", reason: "COMPOSITION_UNRESOLVED", claimType: input.claimType, compositionProvenance });
   assertUnitInterval(composition.clarityDecayPerAmbiguity, "clarity decay");
-  const metrics: Readonly<Record<CompositionMetric, number>> = Object.freeze({
-    steelman_fidelity: input.assessment.steelman.fidelity,
-    counter_resilience: 1 - input.assessment.critic.counterargumentStrength,
-    evidence_quality: input.assessment.evidence.quality,
-    evidence_relevance: input.assessment.evidence.relevance,
-    context_fit: input.assessment.context.fit,
-    clarity: Math.max(0, 1 - composition.clarityDecayPerAmbiguity * input.assessment.context.ambiguityFlags.length),
-    fallacy_resilience: 1 - input.assessment.fallacy.severity
-  });
+  const metrics = compositionMetricsOf(input.assessment, composition.clarityDecayPerAmbiguity);
   let tau = 0;
   for (const term of composition.terms) {
     assertUnitInterval(term.coefficient, `coefficient ${term.metric}`);

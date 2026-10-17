@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 // UNION of both lanes: S06 needs the served-root rule vocabularies and the
 // retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
-import type { DebateShapeMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import type { DebateShapeMark, EngineMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
 import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import {
@@ -1617,7 +1617,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark;
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark | EngineMark;
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1695,7 +1695,13 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "ANSWERS_FILLED",
   "CHOOSE_QUOTA_FILLED",
   "PANEL-CLOSE-CALL-EXTENDED",
-  "SCRUTINY-EXTENDED"
+  "SCRUTINY-EXTENDED",
+  // Engine 2 (INTERFACE §13): each verdict mark names the served root in its record; the reduced-weight mark names its
+  // point and the cannot-assess review behind it.
+  "VERDICT-JUDGE-MISSING",
+  "VERDICT-JUDGES-UNAVAILABLE",
+  "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -1749,6 +1755,18 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError(
         "DERIVED_STANDING_RECORD_INVALID",
         "Class D requires unjudged-review provenance, presentation inclusion, and a positive judged basis count"
+      );
+    }
+    // Engine 2 (spec §4.2a rule 3): a point kept at a reduced weight because its review LANDED as cannot-assess. The
+    // review arm only (its provenance is resolved from the ledger, `resolveTrueUnjudgedReasons`); no transport outcome,
+    // no call site, nothing excluded from the served number and no derived-standing count: it is neither class H nor D.
+    if (record.mark === "UNASSESSED-AT-REDUCED-WEIGHT" && (
+      record.reviewOutcome !== "cannot-assess" || record.terminalTransportOutcome != null || record.callSiteKey != null
+      || record.excludedFromServedNumber != null || record.judgedBasisCount != null
+    )) {
+      throw new TypedDomainError(
+        "UNASSESSED_CONDITION_MARK_RECORD_INVALID",
+        "A reduced-weight record names its cannot-assess review and nothing else"
       );
     }
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
@@ -1832,8 +1850,10 @@ export async function resolveTrueUnjudgedReasons(
   // being unrepresentable at T6's call site.
   records: readonly PersistableConditionMarkRecord[]
 ): Promise<readonly UnjudgedReasonProvenance[]> {
+  // Engine 2: the reduced-weight record names a landed cannot-assess review too, so its provenance is resolved the same way.
   const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
-    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED";
+    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED"
+    || record.mark === "UNASSESSED-AT-REDUCED-WEIGHT";
   const subjects = [...new Set(records.filter(carriesUnjudgedReason).map((record) => record.subjectRef))];
   const landed = new Map<string, { readonly nodeReviewId: string; readonly outcome: string }>();
   if (subjects.length > 0) {

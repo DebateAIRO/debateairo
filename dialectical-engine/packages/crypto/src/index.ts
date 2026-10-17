@@ -2407,7 +2407,10 @@ export const CONTENT_CARRIERS = Object.freeze([
   "ledger.call_prompt",
   // Debate shape (migration 0117): the map's points and candidate answers, and the chosen answers with their notes.
   "core.map_item",
-  "core.map_choice"
+  "core.map_choice",
+  // Engine verdict (migration 0121): an investigation's missing piece, what it found and its reason; a judge's reasons.
+  "ledger.point_investigation",
+  "ledger.verdict_vote"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

@@ -8517,8 +8517,8 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
    * so nothing is rewritten; the historical version is appended.
    *
    * The live CHECK is lifted for that one write and restored by RE-APPLYING THE
-   * SHIPPED MIGRATION, never by re-typing its DDL here, so this helper cannot
-   * drift away from whatever 0055 actually ships.
+   * SHIPPED MIGRATIONS (0055, then R2's 0121), never by re-typing its DDL here,
+   * so this helper cannot drift away from whatever 0055 actually ships.
    */
   async function sealedBeforeMigration0055(label: string): Promise<{
     readonly runId: string;
@@ -8555,6 +8555,8 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
       )));
     } finally {
       await database.pool.query(await readFile("migrations/0055_t10_served_root_selection.sql", "utf8"));
+      // R2's 0121 re-adds this CHECK with the judges' rule after 0055 (and is replay-safe): restore the chain's version.
+      await database.pool.query(await readFile("migrations/0121_engine_verdict.sql", "utf8"));
     }
     const subject = source.answer.condition_mark_records
       .find((record) => record.mark === "UNSERVED-MAKER-POSITION")!.subject_ref;
@@ -8690,6 +8692,8 @@ describe("T10/B3 · a pre-0055 answer stays readable, parseable and catch-up-abl
     // ...and it really is the DECLARED HISTORY, both members present.
     expect(constraint.rows[0]!.condef).toContain("max-propagated-strength-lexicographic-tiebreak");
     expect(constraint.rows[0]!.condef).toContain("first-configured-provider");
+    // R2 (0121): the comparing judges' rule joined the declared history.
+    expect(constraint.rows[0]!.condef).toContain("comparing-judges-votes-honest-strength-tiebreak");
 
     // The live rule and the DECLARED retired rule are both storable — the second
     // is the write DR-184 catch-up performs when it carries an old record forward.

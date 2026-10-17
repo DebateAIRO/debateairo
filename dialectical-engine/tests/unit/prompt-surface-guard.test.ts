@@ -155,6 +155,21 @@ const BUILDERS = [
     render: async (judge: Judge): Promise<void> => {
       await expect(judge.assess({ ...SUBJECT })).rejects.toBeDefined();
     }
+  },
+  {
+    name: "Judge.investigatePoint",
+    framing: null,
+    material: [QUESTION_LINE, STATEMENT, TARGET_STATEMENT],
+    render: async (judge: Judge): Promise<void> => {
+      await expect(judge.investigatePoint({
+        runId: SUBJECT.runId, subjectItemId: SUBJECT.subjectItemId, callSiteKey: SUBJECT.callSiteKey,
+        providerRef: SUBJECT.providerRef, contractHash: SUBJECT.contractHash, bound: BOUND,
+        argumentLanguageName: ARGUMENT_LANGUAGE_NAME,
+        material: { question: QUESTION_LINE, answer: STATEMENT, point: STATEMENT, targetPoint: TARGET_STATEMENT,
+          targetRelation: "ATTACKS", restsOn: null, reviewerReason: "The reviewer named no source." },
+        length: { words: 60, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord }
+      })).rejects.toBeDefined();
+    }
   }
 ] as const;
 

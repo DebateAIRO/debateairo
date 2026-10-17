@@ -563,6 +563,25 @@ export class LedgerRepository {
     return result.rows.map((row) => Object.freeze({ nodeId: row.node_id, strength: Number(row.strength) }));
   }
 
+  /**
+   * R2 A8 (OVERVIEW §4 item 1: the review catch-up keeps the receipt's engine): the judgement-selection rule the run's
+   * latest propagation version recorded, or null when the run has none. The review catch-up reads it before it writes
+   * the next version, so an engine-2 debate's later versions carry the run's own rule, never the catch-up's boot rule.
+   * Only the run and the catch-up write `ledger.propagation_run`, so the latest one is the previous version's.
+   */
+  async readLatestJudgementSelectionRule(runId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const result = await this.pool.query<{ judgement_selection_rule: Record<string, unknown> }>(
+      `SELECT propagation.judgement_selection_rule
+       FROM ledger.propagation_run AS propagation
+       WHERE propagation.run_id = $1
+       ORDER BY propagation.at_seq DESC
+       LIMIT 1`,
+      [runId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({ ...row.judgement_selection_rule });
+  }
+
   async resumePartial(runId: string): Promise<{
     readonly ready: readonly { readonly subjectItemId: string; readonly rawArtifactId: string }[];
     readonly missingSubjectItemIds: readonly string[];

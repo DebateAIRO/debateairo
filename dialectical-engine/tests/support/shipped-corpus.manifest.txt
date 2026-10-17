@@ -337,6 +337,10 @@ apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
 apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
+apps/runner/src/engine-investigations.ts
+apps/runner/src/engine-links.ts
+apps/runner/src/engine-material-reader.ts
+apps/runner/src/engine-reduce.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts
 apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
@@ -907,6 +911,7 @@ packages/db/src/migration-forward0117.ts
 packages/db/src/migration-forward0118.ts
 packages/db/src/migration-forward0119.ts
 packages/db/src/migration-forward0120.ts
+packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -947,12 +952,16 @@ packages/geo/src/ip.ts
 packages/geo/src/lookup.ts
 packages/graph/src/index.ts
 packages/invoice-smartbill/src/index.ts
+packages/judgement/src/engine-repository.ts
+packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
+packages/judgement/src/investigation.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
+packages/kernel/src/engine-material.ts
 packages/kernel/src/engine.ts
 packages/kernel/src/index.ts
 packages/kernel/src/length-guidance.ts

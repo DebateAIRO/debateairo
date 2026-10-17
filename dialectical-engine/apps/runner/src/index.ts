@@ -48,7 +48,11 @@ import {
   type JudgeFamily,
   type JudgeLeg,
   type JudgementSelectionRule,
-  type WayOfKnowingDowngradeRecord
+  type HonestSelectionRule,
+  type EngineReviewStatus,
+  type WayOfKnowingDowngradeRecord,
+  PointInvestigationRepository,
+  type PointInvestigationSeat
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
@@ -61,6 +65,7 @@ import {
   readVerdictLabelControls,
   resolveScoringOperator,
   type AdaptiveStoppingControls,
+  type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
 import {
@@ -198,6 +203,8 @@ import {
   type LengthCallStep,
   type LengthGuide,
   type LengthGuidanceStep,
+  ENGINE2_REDUCER_VERSION,
+  pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
   exhaustive,
@@ -260,6 +267,17 @@ import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
+import {
+  assertFairInvestigator, engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates,
+  investigatedStatusEntry, pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations,
+  type PointInvestigationRow
+} from "./engine-investigations.js";
+import { engineMaterialGraphOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
+import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
+import {
+  engineCatchUpSelectionRule, engineLinkedGraph, engineNodeFactsOf, engineOwnReplyEdgeIdsOf, engineUnassessedRecords,
+  pointInvestigationStandings, type EngineLinkedGraph, type EngineNodeFacts
+} from "./engine-links.js";
 import {
   createRunSitOutBook,
   runPanelRevisedReason,
@@ -510,6 +528,59 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
     return Object.freeze({ kind: "RETHROW" as const });
   }
   return Object.freeze({ kind: "UNAVAILABLE" as const });
+}
+
+/**
+ * Engine 2 (spec §4.2b, E13): what one failed investigation call means. The keep-alive's refusal and a stopped lane
+ * leave as they arrived (the debate must make no further call). No answer or vendor failure fails the debate: a reply
+ * still refused after LG-A's repairs, a vendor error or a spend refusal leaves the point at the reduced weight
+ * (INVESTIGATION_UNAVAILABLE), and none is a run-body stop. A code defect does fail it (below).
+ */
+export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "UNAVAILABLE" {
+  if (keepAliveStop(error)) return "RETHROW";
+  if (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED) return "RETHROW";
+  // A14 fix round 1 (PF-R2a8.17): a code defect fails the debate, as a defect should. A seat with no eligible member,
+  // and a TypeError the code NAMED (its message is a code: POINT_INVESTIGATION_*, LENGTH_*, ENGINE_MATERIAL_INVALID:…)
+  // inside the call's builders. Decided by the code, never by the class: fetch's own network failure is a TypeError
+  // ("fetch failed") and stays unavailable.
+  if (error instanceof TypedDomainError && error.code === "DEBATE_MAKER_UNRESOLVED") return "RETHROW";
+  // R2a final wave (re-review Minor 3): a reply refused after the repairs is unavailable BY NAME, whatever carries it,
+  // before the code-shape rule below could read it as a defect.
+  if (error instanceof Error && POINT_INVESTIGATION_REPLY_REFUSALS.has(error instanceof TypedDomainError ? error.code : error.message)) {
+    return "UNAVAILABLE";
+  }
+  if (error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message)) return "RETHROW";
+  return "UNAVAILABLE";
+}
+
+/** The investigator's reply refusals (packages/judgement's reader): a reply, never a code defect. */
+const POINT_INVESTIGATION_REPLY_REFUSALS: ReadonlySet<string> = new Set(["POINT_INVESTIGATION_PARSE_FAILURE", "POINT_INVESTIGATION_SCHEMA_FAILURE"]);
+
+/** A TypeError the code raised by name: an upper-case code of two or more words, optionally `:<field path>`. */
+const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
+/** A content-free code (a domain code or a system one such as ECONNRESET). */
+const FAILURE_CODE_SHAPE = /^[A-Z][A-Z0-9_]{0,63}$/u;
+
+/**
+ * Engine 2 (A14 fix round 1): what an unavailable investigation call is named in the runner's line: its typed code, or
+ * a code-shaped `code` property (ECONNRESET), else its class name. Never its message: it may carry vendor or AI text.
+ */
+export function pointInvestigationFailureCode(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  if (typeof error !== "object" || error === null) return "UNKNOWN";
+  const code = (error as { readonly code?: unknown }).code;
+  if (typeof code === "string" && FAILURE_CODE_SHAPE.test(code)) return code;
+  // R2a final wave (re-review Minor 4): Node's fetch throws TypeError("fetch failed") with the socket's code on its cause.
+  const cause: unknown = (error as { readonly cause?: unknown }).cause;
+  const causeCode = typeof cause === "object" && cause !== null ? (cause as { readonly code?: unknown }).code : undefined;
+  if (typeof causeCode === "string" && FAILURE_CODE_SHAPE.test(causeCode)) return causeCode;
+  const name: unknown = (error as { readonly constructor?: { readonly name?: unknown } }).constructor?.name;
+  return typeof name === "string" && /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(name) ? name : "UNKNOWN";
+}
+
+/** Engine 2 (A14 fix round 1): the runner's content-free investigation line. Codes and ids only, never debate or model text. */
+export function logPointInvestigation(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_POINT_INVESTIGATION", event }));
 }
 
 /**
@@ -2154,8 +2225,30 @@ export function createPostgresReviewCatchUpDependencies(input: {
         throw new TypedDomainError("CATCH_UP_SOURCE_VERSION_CHANGED", `${answerId}@${fromVersion}`);
       }
       const fullSnapshot = await resolveSnapshot(runId);
-      const standing = projectJudgedStanding(fullSnapshot, await judgements.readReviewedNodeIds(runId));
+      const reviewedNodeIds = await judgements.readReviewedNodeIds(runId);
+      // Engine 2 (spec §4.2a; INTERFACE §7.2): the catch-up scores the graph with the link rules, as the run did; the
+      // own-reply links are read from the graph (the save sites' record died with the run), and the investigations
+      // from their record (A14).
+      const engine = engineOfRun(await budget.readPinnedBasis(runId));
+      const linked = engine.engine !== 2 ? null : engineLinkedGraph({
+        engine, snapshot: fullSnapshot, reviewedNodeIds,
+        disputedNodeIds: await judgements.readDisputedNodeIds(runId),
+        cannotAssessNodeIds: await judgements.readCannotAssessNodeIds(runId),
+        ownReplyEdgeIds: engineOwnReplyEdgeIdsOf(fullSnapshot),
+        // A14: the run's investigation outcomes, read back (HOLDS = AGREE; FAILS = DISPUTE, its links still at the
+        // cannot-assess weight; a dead end stays cannot-assess). R2a W4: codes only, nothing decrypted.
+        investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationResultsForRun(runId))
+          .flatMap(investigatedStatusEntry))
+      });
+      const standing = projectJudgedStanding(linked === null ? fullSnapshot : linked.snapshot,
+        linked === null ? reviewedNodeIds : linked.reviewedNodeIds);
       const propagation = evaluate(standing.snapshot);
+      // Engine 2 (OVERVIEW §4 item 1): this version keeps the run's own judgement-selection rule, read from the previous
+      // propagation version before this one is written; engine 1 records the boot rule, byte for byte, and reads nothing.
+      const catchUpSelectionRule = engineCatchUpSelectionRule({
+        engine, bootRule: input.judgementSelectionRule,
+        previousRule: engine.engine === 2 ? await ledger.readLatestJudgementSelectionRule(runId) : null
+      });
       const lineage = await judgements.readJudgementLineage(runId);
       const propagationRunId = await ledger.recordPropagation({
         runId,
@@ -2167,7 +2260,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         operatorResolutions: propagation.operatorResolutions,
         transmissionReductions: propagation.transmissionReductions,
         liftRecords: propagation.liftRecords,
-        judgementSelectionRule: input.judgementSelectionRule,
+        judgementSelectionRule: catchUpSelectionRule,
         sensitivityRecords: propagation.sensitivityRecords,
         strengths: propagation.strengths.map((strength) => {
           const own = lineage[strength.nodeId];
@@ -2192,7 +2285,9 @@ export function createPostgresReviewCatchUpDependencies(input: {
       // actually chosen. The preserved shape is the only one that may hold a
       // retired rule, and only a superseding persist accepts it.
       const preservedRecords: PreservedConditionMarkRecord[] = source.answer.condition_mark_records
-        .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED")
+        .filter((record) => record.mark !== "HIDDEN-UNJUDGEABLE" && record.mark !== "DERIVED-STANDING-UNREVIEWED"
+          // Engine 2: the reduced-weight records are rebuilt below from this propagation's own reading.
+          && (linked === null || record.mark !== "UNASSESSED-AT-REDUCED-WEIGHT"))
         .map((record) => ({
           mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope,
           subjectRef: record.subject_ref, reason: record.reason, liftPath: record.lift_path,
@@ -2248,14 +2343,18 @@ export function createPostgresReviewCatchUpDependencies(input: {
           servedRootRule: null,
           affectedNodeIds: Object.freeze([nodeId]), ...unjudgedDisclosure(nodeId, "derived"),
           excludedFromServedNumber: false, judgedBasisCount: standing.judgedBasisCounts[nodeId]!
-        }))
+        })),
+        // Engine 2: one record per cannot-assess point no investigation settled.
+        ...(linked === null ? [] : engineUnassessedRecords(linked))
       ];
       const records = Object.freeze([...preservedRecords, ...reviewRecords]);
       const conditionMarks = Object.freeze([...new Set([
         ...source.answer.condition_marks.filter((mark) =>
-          mark !== "HIDDEN-UNJUDGEABLE" && mark !== "DERIVED-STANDING-UNREVIEWED"),
+          mark !== "HIDDEN-UNJUDGEABLE" && mark !== "DERIVED-STANDING-UNREVIEWED"
+          && (linked === null || mark !== "UNASSESSED-AT-REDUCED-WEIGHT")),
         ...(standing.hiddenNodeIds.length === 0 ? [] : ["HIDDEN-UNJUDGEABLE"]),
-        ...(standing.derivedStandingNodeIds.length === 0 ? [] : ["DERIVED-STANDING-UNREVIEWED"])
+        ...(standing.derivedStandingNodeIds.length === 0 ? [] : ["DERIVED-STANDING-UNREVIEWED"]),
+        ...(linked === null || linked.unassessedNodeIds.length === 0 ? [] : ["UNASSESSED-AT-REDUCED-WEIGHT"])
       ])]);
       const currentNumber = source.servedNumber;
       const nextStrength = currentNumber === null ? null
@@ -4723,6 +4822,7 @@ export class WalkingSkeletonRunner {
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
   readonly #mapChoices: Pick<MapChoiceRepository, "writeMapRun" | "writeMapPosition" | "readMapResultForRun">;
+  readonly #pointInvestigations: Pick<PointInvestigationRepository, "recordPointInvestigation" | "readPointInvestigationsForRun">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -4752,6 +4852,7 @@ export class WalkingSkeletonRunner {
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
     this.#mapChoices = settings.mapChoices?.store ?? new MapChoiceRepository(pool);
+    this.#pointInvestigations = new PointInvestigationRepository(pool);
     const critique = settings.critique === undefined ? undefined
       : { ...settings.critique, provider: keepAliveProviderGateway(settings.critique.provider) };
     this.#configuredMakers = Object.freeze([
@@ -6284,7 +6385,7 @@ export class WalkingSkeletonRunner {
       readonly selectedJudgementRef: string;
       readonly tau: number;
       readonly selectionScore: number;
-      readonly rule: JudgementSelectionRule;
+      readonly rule: JudgementSelectionRule | HonestSelectionRule;
       readonly dispersion: number | null;
       readonly panelContractHashes: readonly string[];
       readonly disagreement: Readonly<Record<string, unknown>>;
@@ -6305,6 +6406,10 @@ export class WalkingSkeletonRunner {
       readonly closeCallAdded: number;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
+      // Engine redesign R2 (INTERFACE §6.2): engine 2's selection rule names the engine row, on the register version and
+      // source today's rule was read from (the receipt carries no register version). Null on engine 1. Built in
+      // engine-reduce.ts so this file never names the engine row (runner-engine-wiring.test.ts, R1d).
+      const honestRule = engine.engine === 2 ? engineHonestSelectionRule(judgementPolicy.selectionRule) : null;
       const authorOnlySelection = (): {
         readonly selectedJudgementRef: string;
         readonly tau: number;
@@ -6329,6 +6434,28 @@ export class WalkingSkeletonRunner {
 
       // S2-2: the walking-skeleton literal is reachable at M=1 ONLY.
       if (effectiveMakerCount <= 1) {
+        // Engine redesign R2 (spec §4.2 item 5): a one-maker debate rests on its author's honest grade, the last resort,
+        // disclosed as today's one-maker debate is (the single-lineage band cap), never as a degraded panel: there is no
+        // panel here, and no panel rows to step a band down with.
+        if (honestRule !== null && engine.engine === 2) {
+          const author = honestAuthorOnly({
+            authorJudgementRef: input.authorJudgementRef, authorMaker: input.authorMaker,
+            authorAssessment: input.authorAssessment, engine, rule: honestRule
+          });
+          return Object.freeze({
+            selectedJudgementRef: author.selectedJudgementRef,
+            tau: author.tau,
+            selectionScore: author.selectionScore,
+            rule: author.rule,
+            dispersion: null,
+            panelContractHashes: Object.freeze([judgeContractHash]),
+            disagreement: Object.freeze({ ...createUnmeasuredDisagreement(), honest: author.honest }),
+            marks: Object.freeze([]),
+            panelFailureReason: null,
+            spendStop: null,
+            closeCallAdded: 0
+          });
+        }
         return Object.freeze({
           ...authorOnlySelection(),
           dispersion: null,
@@ -6513,6 +6640,14 @@ export class WalkingSkeletonRunner {
       // Task 11: today's reduction, statement for statement, as one local function — the close-call extension
       // re-reduces every voice heard through it.
       const reduceHeard = (voices: typeof panel.judgements) => {
+        // Engine redesign R2 (spec §4.2, INTERFACE §6.2): engine 2 reduces the same voices by the honest median
+        // (engine-reduce.ts); the close-call extension below re-reduces through here, so its extras enter the median too.
+        if (honestRule !== null && engine.engine === 2) {
+          return reduceHonest({
+            voices, authorJudgementRef: input.authorJudgementRef, engine, panel: panelPolicy,
+            earnedWeight: judgementPolicy.earnedWeight, rule: honestRule
+          });
+        }
         // Each member's assessment is reduced through the SAME ratified
         // composition as the author's, so the taus are commensurable.
         const reducedMembers = voices.flatMap((entry) => {
@@ -6637,6 +6772,8 @@ export class WalkingSkeletonRunner {
       // Pre-flight PF-B32: the stop that cut this panel short — the base panel's, else its extension's.
       const panelStop = spendStop ?? closeCallStop;
       const { reducedMembers, dispersion, weighted, selection } = reduced;
+      /** Engine 2's honest grades, median and source (INTERFACE §6.2); null on engine 1. */
+      const honestRecord = "honest" in reduced ? reduced.honest : null;
 
       // confirm-item 5. The author is always judgement[0]; every other entry is
       // a non-author voice that actually parsed.
@@ -6697,7 +6834,9 @@ export class WalkingSkeletonRunner {
             notes: panelNoteRecords(notes),
             // Task M2: present only on a panel a spend stop cut short.
             ...(panelStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[panelStop] })
-          })
+          }),
+          // Engine redesign R2 (INTERFACE §6.2): present only on engine 2, after `panel`; engine 1's record keeps its bytes.
+          ...(honestRecord === null ? {} : { honest: honestRecord })
         }),
         spendStop: panelStop,
         closeCallAdded
@@ -7141,12 +7280,12 @@ export class WalkingSkeletonRunner {
       : shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut));
     const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
       : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
-        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
       : shapeMapArgued ? shapeMapPositions
-        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer });
+        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
     const shapePlan: ShapePlan | null = shapeRun === null || shapePositions === null ? null : buildShapePlan({
       positions: shapePositions, depth: expansionDepth,
       scrutiny: { roundsPerPoint: shapeRun.shape.scrutinyRoundsPerPoint, pointsPerDebate: shapeRun.shape.scrutinyPointsPerDebate }
@@ -7442,6 +7581,36 @@ export class WalkingSkeletonRunner {
       readonly callSiteKey: string;
       readonly outcome: "cannot-assess";
     }> = [];
+    /**
+     * Engine 2 (spec §4.2a rule 2; INTERFACE §7.2): each cross-reply's support link to its own answer, recorded where
+     * the cross-reply is saved (`argueShapeCross`, `crossChain`, the serial cross-exchange). It stays in the graph and
+     * on record; the link rules give it no weight. Empty on engine 1.
+     */
+    const ownReplyEdgeIds = new Map<string, readonly string[]>();
+    /**
+     * A14's investigation calls fill this (a cannot-assess point's investigation outcome as a review status) before
+     * `engineServeLinked` is read; A14 writes its investigation rows only after the serve decision, on the served graph.
+     */
+    const engineInvestigated = new Map<string, EngineReviewStatus>();
+    const noteOwnReplyEdges = (saved: AuthoredDebateNode): void => {
+      if (engine.engine !== 2) return;
+      ownReplyEdgeIds.set(saved.nodeId, Object.freeze(
+        saved.sourcedEdges.filter((edge) => edge.polarity === "support").map((edge) => edge.edgeId)));
+    };
+    /**
+     * Engine 2: the link rules on a materialised graph, read from the reviews recorded so far (a disputed point counts
+     * for less, an own reply is not support, a cannot-assess point keeps its links at the reduced weight and its
+     * standing). Null on engine 1: the caller keeps today's graph and seed.
+     */
+    const engineLinkedGraphNow = async (graph: EvaluationSnapshot, reviewedNodeIds: readonly string[]):
+      Promise<EngineLinkedGraph | null> => {
+      if (engine.engine !== 2) return null;
+      const [disputedNodeIds, cannotAssessNodeIds] = effectiveMakerCount <= 1
+        ? [[], []] as const
+        : await Promise.all([this.#judgements.readDisputedNodeIds(run.runId), this.#judgements.readCannotAssessNodeIds(run.runId)]);
+      return engineLinkedGraph({ engine, snapshot: graph, reviewedNodeIds, disputedNodeIds, cannotAssessNodeIds,
+        ownReplyEdgeIds, investigated: engineInvestigated });
+    };
 
     /** One authoring leg: the seat that writes it, what it is asked, and where its node goes. */
     interface AuthorPositionInput {
@@ -7691,7 +7860,7 @@ export class WalkingSkeletonRunner {
         scoreCaps: childReduced.caps,
         holes: childReduced.holes,
         branchIdentifier: childReduced.branch,
-        reducerVersion: childReduced.reducerVersion,
+        reducerVersion: engine.engine === 2 ? ENGINE2_REDUCER_VERSION : childReduced.reducerVersion,
         judgeWeightVersion: judgementPolicy.judgeWeightVersion,
         selectedJudgementRef: childSelection.selectedJudgementRef,
         dispersion: childSelection.dispersion,
@@ -8307,9 +8476,12 @@ export class WalkingSkeletonRunner {
         return false;
       }
       const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
+      const roundReviewedNodeIds = await this.#judgements.readReviewedNodeIds(run.runId);
+      // Engine 2: the round's stopping reads the same link-weighted graph the answer is served from (null on engine 1).
+      const roundLinked = await engineLinkedGraphNow(roundSnapshot, roundReviewedNodeIds);
       const roundStanding = projectJudgedStanding(
-        roundSnapshot,
-        await this.#judgements.readReviewedNodeIds(run.runId)
+        roundLinked === null ? roundSnapshot : roundLinked.snapshot,
+        roundLinked === null ? roundReviewedNodeIds : roundLinked.reviewedNodeIds
       );
       const scoredNodeIds = new Set(roundStanding.snapshot.nodes.map((node) => node.nodeId));
       // codex B1 / J15 ADDENDUM-2: the AUTHORITATIVE maker-root scope, NEVER
@@ -8682,6 +8854,7 @@ export class WalkingSkeletonRunner {
         });
         savedNodes[position]!.resolve(saved);
         if (saved === null) return;
+        noteOwnReplyEdges(saved);
         stage.rank = reviewRank(position);
         await reviewInChain(reviewSlot(position), saved);
       };
@@ -8744,6 +8917,7 @@ export class WalkingSkeletonRunner {
         });
         savedNodes[position]!.resolve(saved);
         if (saved === null) return;
+        noteOwnReplyEdges(saved);
         stage.rank = reviewRank(position);
         await reviewInChain(reviewSlot(position), saved);
       };
@@ -8996,6 +9170,7 @@ export class WalkingSkeletonRunner {
         }
         // A saved exchange is already in `authoredNodes`, at its plan position (after every expansion leg's).
         if (authored.kind === "HALTED") haltedExpansionRecords.push(authored.record);
+        else noteOwnReplyEdges(authored.value);
       }
       await reviewPendingAuthoredNodes();
     }
@@ -9075,14 +9250,189 @@ export class WalkingSkeletonRunner {
      * merged into the CRITIQUE-UNAVAILABLE record below); null on every other run.
      */
     const panelRevisedDuringRun = runPanelRevisedReason(sitOut, configuredMakers.map((maker) => maker.providerRef));
+    /**
+     * A10's PointInvestigationRecord is nested (`investigator`, `standings`); this is the one mapping. A row that never
+     * reached a reply (UNAVAILABLE, a money stop included) names the planned member's model id, as B5 does for a failed
+     * judge (`panelModelIds`, the run's discovered panel, apps/runner/src/index.ts:5824 (at 1bc8f549b)). The repository
+     * answers INSERTED / ALREADY_PRESENT / RUN_ERASED. A RUN_ERASED is deliberately ignored here (pre-flight PF-R2a8.7).
+     * An ALREADY_PRESENT (another write stored this point first; open question 8) hands back the STORED row, read back,
+     * which stands in for this copy's own in every later reading (A10's write-once rule, as the map's stored result
+     * does in `resolveShapeMap`); never this copy's fresh outcome.
+     */
+    const recordPointInvestigationRow = async (row: PointInvestigationRow): Promise<PointInvestigationRow | undefined> => {
+      const outcome = await this.#pointInvestigations.recordPointInvestigation({
+        runId: run.runId, nodeId: row.nodeId, investigationOrder: row.investigationOrder, result: row.result,
+        basis: row.basis,
+        investigator: row.maker === null || row.providerRef === null ? null : Object.freeze({
+          maker: row.maker, providerRef: row.providerRef,
+          modelId: row.modelId ?? panelModelIds.get(row.providerRef) ?? row.providerRef
+        }),
+        rawArtifactRef: row.rawArtifactRef,
+        standings: row.standingsMoved === null || row.leaderWithoutRootNodeId === null || row.leaderWithRootNodeId === null
+          ? null
+          : Object.freeze({ leaderWithoutRootNodeId: row.leaderWithoutRootNodeId,
+            leaderWithRootNodeId: row.leaderWithRootNodeId, moved: row.standingsMoved }),
+        content: row.content
+      });
+      if (outcome !== "ALREADY_PRESENT") return undefined;
+      const stored = (await this.#pointInvestigations.readPointInvestigationsForRun(run.runId))
+        .find((entry) => entry.nodeId.toLowerCase() === row.nodeId.toLowerCase());
+      // The stored row, under this copy's spelling of the node id (the ledger hands ids back lower-case).
+      // Unreachable today: a reclaim sets earlier copies' nodes aside, so a second record for one (run, node) cannot arise.
+      return stored === undefined ? undefined : Object.freeze({ ...pointInvestigationRowOfStored(stored), nodeId: row.nodeId });
+    };
+    /**
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
+     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
+     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
+     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this.
+     */
+    const investigateCannotAssessPoints = async (
+      settings: EngineSettings,
+      facts: ReadonlyMap<string, EngineNodeFacts>,
+      materialisedSnapshot: EvaluationSnapshot
+    ): Promise<Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }>> => {
+      const rootIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
+      const ownNodeIds = new Set(authoredNodeList.map((node) => node.nodeId));
+      const cannotAssess = [...facts.values()]
+        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
+        .map((entry) => entry.nodeId);
+      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
+      if (lengthGuidance === null) {
+        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
+      }
+      const engineSeal = this.settings.engine?.engineContractHash;
+      if (engineSeal === undefined) {
+        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
+      }
+      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
+      // they order the candidates; the investigator's material carries no number.
+      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
+      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
+      const source = engineMaterialSourceOf(engineMaterialGraphOf({
+        question: run.questionLine,
+        rootCount,
+        authored: authoredNodes,
+        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
+        snapshot: materialisedSnapshot,
+        facts,
+        honestFinalStrength: honestScores
+      }), reviews, new Map());
+      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord });
+      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
+      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
+      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
+        member.maker !== authorMaker && member.maker !== reviewerMaker;
+      const investigated = await runPointInvestigations({
+        engine: settings,
+        facts,
+        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
+        spendStopped: runBodyBudgetStop !== null,
+        arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker)),
+        seatsFor: (candidate, callSiteKey) => {
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          return seatBook.reviewer.flatMap((seat) => {
+            if (seatSitsOut(seat)) return [];
+            const first = seatCaller.plan(seat, callSiteKey, { eligible: fair });
+            if (first === null) return [];
+            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
+            investigatorSeat.set(identity, seat);
+            return [identity];
+          });
+        },
+        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey }),
+        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
+        call: async ({ callSiteKey, investigator, candidate, material }) => {
+          const seat = investigatorSeat.get(investigator);
+          if (seat === undefined) {
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
+          movedCallBars.set(callSiteKey, fair);
+          try {
+            const answered = await seatCaller.callSeat({
+              seat,
+              callSiteKey,
+              eligible: fair,
+              fair,
+              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey: memberCallSiteKey,
+                providerRef: member.providerRef,
+                contractHash: engineSeal,
+                bound: guidedCallBound(this.settings.judgeBound, "investigator", lengthGuidance),
+                material,
+                length: lengthGuide,
+                argumentLanguageName: run.argumentLanguageName,
+                ...shapeLanguageInput,
+              })
+            });
+            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
+            assertFairInvestigator(answered.value.maker, candidate);
+            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
+              reply: answered.value.reply,
+              rawArtifactRef: answered.value.provenanceRef,
+              maker: answered.value.maker,
+              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
+              modelId: answered.value.model
+            }) });
+          } catch (error) {
+            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+        }
+      });
+      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
+      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
+      // weight on its score (pre-flight PF-R2a8.11).
+      return Object.freeze({
+        statuses: engineInvestigatedStatuses(investigated.rows),
+        facts: investigated.facts,
+        rows: investigated.rows
+      });
+    };
+    /** A14: the investigations' facts and rows, kept for the record after the serve decision (null: none ran). */
+    let engineInvestigation: Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }> | null = null;
+    if (engine.engine === 2 && effectiveMakerCount > 1) {
+      const investigationFacts = engineNodeFactsOf({
+        reviewedNodeIds: await this.#judgements.readReviewedNodeIds(run.runId),
+        disputedNodeIds: await this.#judgements.readDisputedNodeIds(run.runId),
+        cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId),
+        ownReplyEdgeIds
+      });
+      engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      for (const [nodeId, status] of engineInvestigation.statuses) engineInvestigated.set(nodeId, status);
+    }
+    /**
+     * Engine 2 (spec §4.2a; INTERFACE §7.2): the link rules on the graph the answer is served from. Null on engine 1:
+     * the decision below reads today's graph and seed, value for value. R2a interim (practice registers only): the
+     * served root is `selectServedRootByStrength` over these honest final strengths and the label today's ladder; B5
+     * replaces both with the comparing judges.
+     */
+    const engineServeLinked = engine.engine === 2
+      ? await engineLinkedGraphNow(snapshot, effectiveMakerCount <= 1 ? [] : await this.#judgements.readReviewedNodeIds(run.runId))
+      : null;
     const makerPositionServe = decideMakerPositionServe({
       // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M.
       effectiveMakerCount: rootCount,
       runBodyBudgetStop,
       authoredMakerPositions,
-      snapshot,
+      snapshot: engineServeLinked === null ? snapshot : engineServeLinked.snapshot,
       materialisedNodeIds: materialised.nodes.map((node) => node.nodeId),
-      reviewedNodeIds: effectiveMakerCount <= 1
+      reviewedNodeIds: engineServeLinked !== null ? engineServeLinked.reviewedNodeIds : effectiveMakerCount <= 1
         ? []
         : await this.#judgements.readReviewedNodeIds(run.runId),
       unjudgedReviewNodeIds: [
@@ -9094,6 +9444,32 @@ export class WalkingSkeletonRunner {
       // Fix (d): the arguing that ended because too few members were left is not money, and says why.
       ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {})
     });
+    /**
+     * Engine 2 (spec §4.2b "Measured"; INTERFACE §8.6): the investigation rows, written now that the serve decision has
+     * named the served graph. "Standings moved" is read on that graph (the operator-resolved snapshot projected on the
+     * decision's own seed, BEFORE the link weights: projection and the link weights commute, A6's test) with every
+     * outcome applied, over the servable roots only, so the record names the leader the served propagation names. The
+     * rows as recorded (a row another write stored first stands in for this copy's own) then decide every later reading:
+     * the investigation's facts, its statuses and `engineInvestigated`.
+     */
+    if (engine.engine === 2 && engineInvestigation !== null && engineInvestigation.rows.length > 0) {
+      const investigation = engineInvestigation;
+      const servedGraph = projectJudgedStanding(operatorResolvedSnapshot, makerPositionServe.judgedStandingSeed).snapshot;
+      const servableRootIds = makerPositionServe.servableMakerPositions.map((root) => root.nodeId);
+      const recordedRows = await recordPointInvestigationRows({
+        rows: investigation.rows,
+        facts: investigation.facts,
+        standingsOf: (nodeId, finalFacts) => pointInvestigationStandings({
+          snapshot: servedGraph, facts: finalFacts, engine, nodeId, servableRootIds
+        }),
+        record: recordPointInvestigationRow
+      });
+      const recordedFacts = engineFactsWithInvestigations(investigation.facts, recordedRows);
+      const recordedStatuses = engineInvestigatedStatuses(recordedRows);
+      engineInvestigation = Object.freeze({ statuses: recordedStatuses, facts: recordedFacts, rows: recordedRows });
+      engineInvestigated.clear();
+      for (const [nodeId, status] of recordedStatuses) engineInvestigated.set(nodeId, status);
+    }
     // Task M3 (spec §14.4.5): what the arguing left for the owner's disclosure
     // row, taken HERE, where the body ends and the serve decision reads the same
     // stop. Nothing from the serve gate on reads the stop itself
@@ -9318,6 +9694,8 @@ export class WalkingSkeletonRunner {
       }
       return Object.freeze([...affected].filter((nodeId) => classHNodeIds.has(nodeId)));
     };
+    /** Engine 2: every cannot-assess point no investigation settled, disclosed at its reduced weight (never hidden). */
+    const engineLinkRecords: readonly ConditionMarkRecord[] = engineServeLinked === null ? [] : engineUnassessedRecords(engineServeLinked);
     const hiddenConditionMarks = Object.freeze([
       ...(absentAtClaim.length > 0 || panelRevisedDuringRun !== null ? ["CRITIQUE-UNAVAILABLE" as const] : []),
       ...(classHReviewRecords.length > 0 ? ["HIDDEN-UNJUDGEABLE" as const] : []),
@@ -9333,7 +9711,9 @@ export class WalkingSkeletonRunner {
       // the node's receipt is not disclosed to the reader of the answer.
       ...new Set(panelDegradations.map((record) => record.mark)),
       // Debate shape: the map's fallbacks and fills, and the two extensions — each mark with its record (below).
-      ...new Set(shapeRecords.map((record) => record.mark))
+      ...new Set(shapeRecords.map((record) => record.mark)),
+      // Engine 2: the reduced-weight mark with its records (below); none on engine 1.
+      ...new Set(engineLinkRecords.map((record) => record.mark))
     ]);
     /**
      * RE-REVIEW 2(a) / ROUND 4: the maker-position disclosure is the serve
@@ -9415,6 +9795,8 @@ export class WalkingSkeletonRunner {
       ...branchFrozenRecords,
       // Debate shape: one record per shape mark (map, close call, scrutiny); none on today's run.
       ...shapeRecords,
+      // Engine 2: one UNASSESSED-AT-REDUCED-WEIGHT record per unsettled cannot-assess point; none on engine 1.
+      ...engineLinkRecords,
       // Run resilience (fix (d), R-b): the members that sat out during the arguing join the claim-time revision in
       // the ONE record; with none, the reason is today's to the byte.
       ...((absentAtClaim.length === 0 && panelRevisedDuringRun === null) || effectiveMakerCount === 1 ? [] : [Object.freeze({
@@ -10981,6 +11363,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "EMPTY_PROPAGATION",
   "ENGINE_RUNNER_UNCONFIGURED",
   "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
+  "ENGINE_CATCH_UP_RULE_MISSING",
+  "ENGINE_RECORD_INVALID",
+  "ENGINE_ROW_INVALID",
+  "ENGINE_SCORING_COMBINE_UNSUPPORTED",
   "ENVELOPE_FORMULA_INPUTS_INVALID",
   "ENVELOPE_FORMULA_INPUTS_PROVENANCE_MISSING",
   "ENVELOPE_FORMULA_INPUTS_UNRESOLVED",
@@ -11039,6 +11425,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "GRAPH_RUN_MISMATCH",
   "HIDDEN_CONDITION_MARK_RECORD_INVALID",
   "HONESTY_FIELD_MISSING",
+  "HONEST_MEDIAN_EMPTY",
   "INCONSISTENT_PRE_COMPOSITION_EVIDENCE",
   "INDEPENDENT_BUDGET_MARKS_CONFLATED",
   "INSTRUMENT_REF_REQUIRED",

@@ -162,6 +162,16 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
+A debate's report also counts the "cannot assess" reviews and what was done about them (`investigations`, R2): how many
+points one more AI was asked to look into ("asked") and what it found (holds, fails, dead end), or that its answer was
+unavailable ("unavailable (call failed or money)": the call failed, or the money had run out; counted in "asked" too);
+how many could not be looked into (no AI of another maker was left, the debate's cap was reached; an answer itself is
+never investigated, nor a point that bears on no answer, so these add up to at most the "cannot assess" count); how
+many investigations changed which answer leads ("standings moved"); and their money and time. A point a later copy set
+aside after a crash is not counted (the time and money still include that copy's calls: that money was spent). On
+engine 1 only the "cannot assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the
+comparing judges (`VERDICT_JUDGE`) as their own steps.
+
 ### The openings record (openings mode)
 
 Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
@@ -230,6 +240,13 @@ deleted a moment later), and it holds one JSON object:
   text), `story` (as stored; the story text when it is READY).
 - `unavailable`: what the file could not hold and why (for example: the site's reader lists only positions that got a
   judgement, so a position with none is seen only in `attempts`).
+
+`transcript.json` also holds `structure.engineGraph` (R2, both engines): every point the debate argued, the hidden
+ones too; every link with the bearing its reviewer measured (null when not measured) and whether it is a cross-reply's
+own support of its position; every review; every grader's own seven measures (`voices`, the author marked); each
+investigation's result; whether engine 2's dispute factor lowered each point's score; and the base and final strengths
+the engine served. It is what the `rescore` mode reads (no AI call). A grader reply its step's reader could not read
+again is listed in `unreadVoices`, and `rescore` then leaves that debate out and says why.
 
 Nothing is cut and model text is not blanked (the 64 KiB cap and the redaction of `report.json` do not apply). As a
 safety net, every string still goes through the named key shapes (a PEM block, a bearer or authorization header, a
@@ -307,6 +324,28 @@ calls that really went at once in the debate (`peakInFlight`), per model (`peakB
 how long each model's calls waited for a free slot in all (`waitedMsByModel`, milliseconds), the calls (`calls`), and
 how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
 it (`busyProbesByModel`).
+
+### The free re-scoring (rescore mode, R2)
+
+`rescore` reads every `transcript.json` under a folder again and asks no AI, spends nothing and opens no database:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts rescore --transcripts "$P" --out "$P/rescore"
+```
+
+First it checks that the engine's own arithmetic gives back exactly the strengths each debate served (no more than
+0.000000001 apart); a debate where it does not is listed as `PRACTICE_RESCORE_ENGINE1_MISMATCH` and not used. Then it scores
+each debate with engine 2's honest scores and link rules, a "cannot assess" link counting at 0.5, 0.66, 0.75 and 1.0, each
+with the investigations' outcomes applied and not, and writes `rescore.json` (every row) and `rescore.md` (counts and
+letters only): which answer leads by honest final strength, the gaps, whether the lead differs from what engine 1 served
+and from the start setting, and per debate how many investigations held, failed or stayed a dead end (`holds/fails/dead
+end`: what the "applied" rows applied). At 1.0 a point an investigation found to hold and a dead end weigh the same (both
+links at full weight); only a point found to fail still weighs less there (its disputed score). The comparing judges are not
+asked (that needs AI calls). A transcript written before R2 has no
+engine graph: it is rebuilt from its answer and its calls when it can be, else listed as
+`PRACTICE_RESCORE_INPUT_INCOMPLETE <what>`. `--engine-policy FILE` picks the settings the sweep starts from (default
+`tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
+a debate's served numbers could not be given back, 30 when nothing could be rescored.
 
 ### Tokens and words per AI and step (every debate, length guidance LG-B)
 
@@ -1204,6 +1243,10 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode (`practice-debate.ts` also builds the
   report's two LG-A tables, `repairsByKind` and `unrepaired`); `practice-transcript.ts`: its `--transcript` file.
+- `practice-engine-graph.ts`: the transcript's engine graph (A15, `structure.engineGraph`); `practice-rescore.ts`: the
+  rescore mode (`rescore.json`, `rescore.md`).
+- `practice-investigations.ts`: the report's investigations block (`investigations`, R2: the "cannot assess" reviews and
+  what was done about them).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it

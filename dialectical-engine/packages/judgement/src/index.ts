@@ -15,6 +15,7 @@ import {
   withQuestionLanguageField,
   type DebateRole,
   type LengthGuide,
+  type PointInvestigationMaterial,
   type QuestionLanguage,
   type ReviewOutcome,
   type WayOfKnowing
@@ -73,9 +74,21 @@ import {
   type JudgeAssessment,
   type NormalizedClaim
 } from "./s04.js";
+import {
+  POINT_INVESTIGATION_PROMPT_CONTRACT,
+  POINT_INVESTIGATION_PROSE,
+  POINT_INVESTIGATION_READING,
+  pointInvestigationContentIssues,
+  pointInvestigationMaterialFields,
+  pointInvestigationReplySchema,
+  type PointInvestigationReply
+} from "./investigation.js";
 
 export * from "./s04.js";
 export * from "./prompts.js";
+export * from "./investigation.js";
+export * from "./engine-repository.js";
+export * from "./honest-score.js";
 
 /**
  * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. The constant that
@@ -371,6 +384,33 @@ export interface NodeReviewInput extends JudgeSubjectInput {
    * edges silently reproduces the all-UNKNOWN skeleton T5 repeals.
    */
   readonly edges: readonly ReviewedEdgeSubject[];
+}
+
+/** Engine 2 (spec §4.2b; INTERFACE §8.1): one investigation call. The material is AI-written text only. */
+export interface PointInvestigationInput {
+  readonly runId: string | null;
+  readonly subjectItemId: string;
+  /** `VERDICT:investigate:<n>` (a seat marker added by the seat caller on an assigned run). */
+  readonly callSiteKey: string;
+  readonly providerRef: string;
+  /** The engine seal (`engineContractHash`) that covers `verdict.investigate.v1`. */
+  readonly contractHash: string;
+  readonly bound: CallBound;
+  readonly material: PointInvestigationMaterial;
+  /** The receipt's `investigator` words (60 at the start values) and the run's language tag. */
+  readonly length: LengthGuide;
+  readonly argumentLanguageName?: string;
+  readonly questionLanguage?: QuestionLanguage;
+}
+
+export interface InvestigatedPoint {
+  readonly reply: PointInvestigationReply;
+  readonly provenanceRef: string;
+  readonly providerLedgerRef: string;
+  /** The model and maker that answered (the gateway's record, so a moved call names its real author). */
+  readonly model: string;
+  readonly maker: string;
+  readonly parseStrategy: StructuredParseStrategy;
 }
 
 /**
@@ -885,6 +925,61 @@ export class Judge {
   }
 
   /**
+   * Engine 2 (spec §4.2b, E13): one investigation of a "cannot assess" point. It stands in for the review the point
+   * lacked, so it is a REVIEWER call (`VERDICT:investigate:` reads as REVIEWER, at the `reviewer` thinking level) on the
+   * served lane, under the engine seal. The request carries the framed answer form and `classifyContent`, so LG-A's
+   * repair order and the salvage apply: the code fixer; on an unreadable reply, A1's code rescue, then one
+   * structure-repair call, then B's short PATCH follow-up to the original AI (never a full re-ask); on a content
+   * refusal, one follow-up (pre-flight PF-R2a8.14). A reply still refused after that is
+   * POINT_INVESTIGATION_SCHEMA_FAILURE. No answer or vendor failure fails the debate (the runner reads it as
+   * INVESTIGATION_UNAVAILABLE and goes on); a code defect does (a named TypeError, rethrown by the runner's rule).
+   */
+  async investigatePoint(input: PointInvestigationInput): Promise<InvestigatedPoint> {
+    const framed = buildFramedPrompt({
+      contract: promptContractInArgumentLanguage(POINT_INVESTIGATION_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+      material: withQuestionLanguageField(pointInvestigationMaterialFields(input.material, input.length), input.questionLanguage)
+    });
+    const inQuestionLanguage = replyLanguageCheckFor(input.material.question, input.questionLanguage, POINT_INVESTIGATION_PROSE);
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, pointInvestigationReplySchema,
+      reply, POINT_INVESTIGATION_READING, (value) => [...pointInvestigationContentIssues(value), ...inQuestionLanguage(value)]));
+    let response;
+    try {
+      response = await this.provider.call({
+        runId: input.runId,
+        subjectItemId: input.subjectItemId,
+        callSiteKey: input.callSiteKey,
+        role: "JUDGE",
+        lane: "served",
+        modelRole: "REVIEWER",
+        bound: input.bound,
+        contractHash: input.contractHash,
+        providerRef: input.providerRef,
+        packet: framed.packet,
+        guidedWords: input.length.words,
+        buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
+        classifyContent: reading.classifyContent
+      });
+    } catch (error) {
+      if (error instanceof ProviderContentUnacceptedError) {
+        throw new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", error.lastParseError);
+      }
+      throw error;
+    }
+    const parsed = parseStructuredArtifact(response.content, pointInvestigationReplySchema,
+      reading.acceptedAs(response.content).reply, POINT_INVESTIGATION_READING);
+    if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("POINT_INVESTIGATION_PARSE_FAILURE", parsed.message);
+    if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", parsed.message);
+    return Object.freeze({
+      reply: Object.freeze({ ...parsed.value }),
+      provenanceRef: response.rawArtifactRef,
+      providerLedgerRef: response.ledgerEntryRef,
+      model: response.model,
+      maker: response.maker,
+      parseStrategy: parsed.strategy
+    });
+  }
+
+  /**
    * S2-2 / T3 — one PANEL member's assessment of a node ANOTHER maker authored.
    *
    * This is deliberately NOT `review` (S4-1): the review call asks for a typed
@@ -1232,6 +1327,24 @@ export class JudgementRepository {
        FROM ledger.node_review AS review
        JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
        WHERE review.run_id=$1 AND review.outcome = 'dispute'
+       ORDER BY review.at_seq`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /**
+   * Engine 2 (spec 2026-10-15 §4.2a rule 3, ruling E6(3)) — the nodes whose cross-maker review came back
+   * `cannot-assess`. Engine 1 gives them no judged basis (`readReviewedNodeIds` leaves them out on purpose); engine 2
+   * keeps them in the graph at a reduced weight and discloses them, so it must name them. A separate read for the
+   * reason `readDisputedNodeIds` is one: each question gets its own positive predicate.
+   */
+  async readCannotAssessNodeIds(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT review.node_id::text
+       FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+       WHERE review.run_id=$1 AND review.outcome = 'cannot-assess'
        ORDER BY review.at_seq`,
       [runId]
     );

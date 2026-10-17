@@ -24,7 +24,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Answer } from "@debateai/contract";
-import { DEBATE_SHAPE_MARKS } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { ContractNode } from "@/lib/v3/adapter";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
@@ -48,6 +48,17 @@ function isSetAsidePath(node: DebateNode): boolean {
 
 /** Debate shape P2c (rulings C-TONE, C-DRAWER): the eight shape marks are information, not a dispute. */
 const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
+
+/**
+ * R2a (Ruling W1, Ruling (A7 Minors) 1): engine 2's four marks carry no raw code as a tooltip either. A point a
+ * second AI model could not check reads like an under-explored one (gold); the three verdict marks are information.
+ */
+const ENGINE_MARK_TONES: Readonly<Record<string, "gold" | "neutral">> = Object.freeze({
+  "VERDICT-JUDGE-MISSING": "neutral",
+  "VERDICT-JUDGES-UNAVAILABLE": "neutral",
+  "VERDICT-VOTES-IGNORED": "neutral",
+  "UNASSESSED-AT-REDUCED-WEIGHT": "gold"
+} satisfies Record<(typeof ENGINE_MARKS)[number], "gold" | "neutral">);
 
 const DECISION_KIND_LABEL_KEYS: Record<string, string> = {
   continue: "debateDrawers.node.decisionContinue",
@@ -488,15 +499,18 @@ function NodeHonestyDetails({
         <div className="drawerConditionPills">
           {v3.condition_marks.map((mark) => {
             const shape = SHAPE_MARKS.has(mark);
+            const engineTone = Object.hasOwn(ENGINE_MARK_TONES, mark) ? ENGINE_MARK_TONES[mark] : undefined;
             const tone = shape
               ? "neutral"
-              : mark === "UNFALSIFIED-AFTER-ROTATION"
-                ? "agree"
-                : mark === "UNDER-EXPLORED"
-                  ? "gold"
-                  : "dispute";
+              : engineTone !== undefined
+                ? engineTone
+                : mark === "UNFALSIFIED-AFTER-ROTATION"
+                  ? "agree"
+                  : mark === "UNDER-EXPLORED"
+                    ? "gold"
+                    : "dispute";
             return (
-              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={shape ? undefined : mark}>
+              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={shape || engineTone !== undefined ? undefined : mark}>
                 {markLabelFromRecords(mark, conditionRecords, debateChromeCatalog)}
               </span>
             );
