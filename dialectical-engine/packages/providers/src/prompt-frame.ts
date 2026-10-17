@@ -38,8 +38,10 @@ import type { ReplyFailureClass } from "./reply-fixer.js";
  *     used to feed a model its own output back as an instruction (L4-F11,
  *     DL4-F4). The patch follow-up (owner design, 2026-10-12) hands a model
  *     its own earlier answer back ONLY as its own assistant turn, right before
- *     a block of machine fields (`buildFramedPatchPrompt`); the door admits an
- *     assistant turn in that one place and nowhere else.
+ *     a block of machine fields (`buildFramedPatchPrompt`); story v4's round 2
+ *     (R1d) hands the storyteller its own draft the same way, right before one
+ *     revision block (`buildFramedRevisionPrompt`). The door admits an
+ *     assistant turn in those two places and nowhere else.
  *
  * Caching before the upload (owner, 2026-10-12): the per-call fence and canary
  * are the system message's LAST lines (`perCallMarkers`), so the instruction
@@ -713,6 +715,114 @@ export function buildFramedPatchPrompt(packet: PromptPacket, ownReply: string, l
   return patched;
 }
 
+/**
+ * STORY v4 ROUND 2 (R1d, spec §7.2 item 8, design decision 3): the storyteller revises its OWN draft. `packet` is a
+ * FRESH call's (`buildFramedPrompt` with round 1's material unchanged, so a new fence and canary, owner answer Q3), then
+ * the accepted round-1 draft as the model's own assistant turn, verbatim, then ONE fenced block whose fields are exactly:
+ *  · revision_problems — the checker's problems: model text, so evidence inside the fence like every material field;
+ *  · on this call's full re-ask only: machine_rejection_code, machine_rejection_path, machine_rejection_limit when the
+ *    value broke a size limit, and machine_rejection_reason on a routed call (LG-A), in that order;
+ *  · machine_reply_form — "REVISION", always the block's LAST field.
+ * What to do with such a block is code text in the v4 storyteller's answer form (`STORY_REVISION_FOLLOW_UP`,
+ * packages/story/src/contracts.ts), because the safety frame makes every fenced block evidence; the frame itself is
+ * unchanged. The draft never enters the instruction compartment or a user block (L4-F11 / DL4-F4).
+ */
+export const REVISION_REPLY_FORM = "REVISION" as const;
+
+/** What a revision block carries: the checker's problems, and on the call's full re-ask the refusal it answers. */
+export interface FramedRevisionLocator {
+  readonly problems: string;
+  readonly rejection?: FramedRepairLocator;
+}
+
+/** A revision's refusal is a machine locator only: the same rule as the full re-ask's (`appendFramedRejection`). */
+function revisionRejectionValid(rejection: FramedRepairLocator): boolean {
+  return REPAIR_CODE.test(rejection.code) && REPAIR_PATH.test(rejection.path)
+    && (rejection.limit === undefined || (sizeLimitValid(rejection.limit) && rejection.limit.path === rejection.path))
+    && (rejection.reason === undefined || isContentFollowUpSentence(rejection.reason));
+}
+
+/** The fields of a revision request, exactly, in this order, read back; or null for anything the builder would not write. */
+function readRevisionRequestBlock(fields: readonly FramedMaterialField[]): FramedRevisionLocator | null {
+  if (fields.length < 2 || fields.length > 6) return null;
+  const problems = fields[0]!;
+  const form = fields[fields.length - 1]!;
+  if (problems.name !== "revision_problems" || problems.content.trim() === ""
+    || form.name !== "machine_reply_form" || form.content !== REVISION_REPLY_FORM) return null;
+  const middle = fields.slice(1, -1);
+  if (middle.length === 0) return Object.freeze({ problems: problems.content });
+  const [code, path, ...rest] = middle;
+  if (code?.name !== "machine_rejection_code" || path?.name !== "machine_rejection_path" || rest.length > 2) return null;
+  let limit: FramedSizeLimit | undefined;
+  let reason: string | undefined;
+  for (const [index, field] of rest.entries()) {
+    if (index === 0 && field.name === "machine_rejection_limit") {
+      const read = readSizeLimit(field.content);
+      if (read === null) return null;
+      limit = read;
+    } else if (index === rest.length - 1 && field.name === "machine_rejection_reason") {
+      reason = field.content;
+    } else {
+      return null;
+    }
+  }
+  const rejection: FramedRepairLocator = {
+    code: code.content, path: path.content, ...(limit === undefined ? {} : { limit }), ...(reason === undefined ? {} : { reason })
+  };
+  return revisionRejectionValid(rejection) ? Object.freeze({ problems: problems.content, rejection: Object.freeze(rejection) }) : null;
+}
+
+/** The door's test for the block after an answer turn, beside `isPatchRequestBlock`. */
+function isRevisionRequestBlock(fields: readonly FramedMaterialField[]): boolean {
+  return readRevisionRequestBlock(fields) !== null;
+}
+
+/**
+ * The revision packet: `packet` (a fresh call's, as built) + the model's own draft as an assistant turn + one fenced
+ * revision block. Refused (PROMPT_REPAIR_NOT_A_LOCATOR) for a rejection that is not a machine locator, and
+ * (PROMPT_REVISION_NOT_APPLICABLE) for a packet that already carries an answer turn, an empty draft or empty problems,
+ * or a draft or problems containing the boundary marker. It goes through the door before it is returned.
+ */
+export function buildFramedRevisionPrompt(packet: PromptPacket, ownDraft: string, problems: string,
+  rejection?: FramedRepairLocator): PromptPacket {
+  if (rejection !== undefined && !revisionRejectionValid(rejection)) {
+    throw new TypedDomainError(
+      "PROMPT_REPAIR_NOT_A_LOCATOR",
+      `A revision's repair carries a typed code and a machine path only (${String(rejection.code).slice(0, 48)})`
+    );
+  }
+  const frame = assertFramedPrompt(packet);
+  if (packet.messages.some((message) => message.role === "assistant")
+    || typeof ownDraft !== "string" || ownDraft.trim() === "" || ownDraft.includes(frame.fence)
+    || typeof problems !== "string" || problems.trim() === "" || problems.includes(frame.fence)) {
+    throw new TypedDomainError(
+      "PROMPT_REVISION_NOT_APPLICABLE",
+      "A revision answers a fresh packet with the model's own non-empty draft and the checker's non-empty problems"
+    );
+  }
+  const revision: PromptPacket = Object.freeze({
+    messages: Object.freeze([
+      ...packet.messages,
+      Object.freeze({ role: "assistant" as const, content: ownDraft }),
+      Object.freeze({
+        role: "user" as const,
+        content: renderMaterialBlock(frame.fence, [
+          { name: "revision_problems", content: problems },
+          ...(rejection === undefined ? [] : [
+            { name: "machine_rejection_code", content: rejection.code },
+            { name: "machine_rejection_path", content: rejection.path },
+            ...(rejection.limit === undefined ? [] : [{ name: "machine_rejection_limit", content: renderSizeLimit(rejection.limit) }]),
+            ...(rejection.reason === undefined ? [] : [{ name: "machine_rejection_reason", content: rejection.reason }])
+          ]),
+          { name: "machine_reply_form", content: REVISION_REPLY_FORM }
+        ])
+      })
+    ])
+  });
+  assertFramedPrompt(revision);
+  return revision;
+}
+
 /** One fenced material block's fields, checked exactly as the door checks every block. */
 function readMaterialBlock(content: string, declared: string): readonly FramedMaterialField[] {
   const lines = content.split("\n");
@@ -877,16 +987,17 @@ export function assertFramedPrompt(packet: PromptPacket): PromptFramePresence {
     throw new TypedDomainError("PROMPT_FRAME_ABSENT", "A framed packet carries at least one fenced material block");
   }
   /**
-   * Patch follow-up (owner design, 2026-10-12): ONE assistant turn is admitted, and only in the patch shape — the
-   * model's own earlier answer, after at least one material block and directly before a final block that carries the
-   * three machine fields of a PATCH request and nothing else (`buildFramedPatchPrompt`). The model's text therefore
-   * travels only as its own turn: never in the instruction compartment, never in a user block.
+   * Patch follow-up (owner design, 2026-10-12) and story v4's revision (R1d): ONE assistant turn is admitted, and only
+   * in those two shapes — the model's own earlier answer (or draft), after at least one material block and directly
+   * before a final block that carries a PATCH request's machine fields (`buildFramedPatchPrompt`) or a revision
+   * request's fields (`buildFramedRevisionPrompt`) and nothing else. The model's text therefore travels only as its own
+   * turn: never in the instruction compartment, never in a user block.
    */
   const assistantAt = rest.findIndex((message) => message.role === "assistant");
   if (assistantAt >= 0 && (assistantAt === 0 || assistantAt !== rest.length - 2)) {
     throw new TypedDomainError(
       "PROMPT_FRAME_FOREIGN_TURN",
-      "A framed packet carries an answer turn only right before a patch block"
+      "A framed packet carries an answer turn only right before a patch block or a revision block"
     );
   }
   const fields: FramedMaterialField[] = [];
@@ -907,10 +1018,10 @@ export function assertFramedPrompt(packet: PromptPacket): PromptFramePresence {
       );
     }
     const blockFields = readMaterialBlock(message.content, declared);
-    if (assistantAt >= 0 && index === rest.length - 1 && !isPatchRequestBlock(blockFields)) {
+    if (assistantAt >= 0 && index === rest.length - 1 && !isPatchRequestBlock(blockFields) && !isRevisionRequestBlock(blockFields)) {
       throw new TypedDomainError(
         "PROMPT_FRAME_FOREIGN_TURN",
-        "An answer turn may only be followed by a block carrying a patch request's machine fields"
+        "An answer turn may only be followed by a block carrying a patch request's or a revision request's fields"
       );
     }
     fields.push(...blockFields);

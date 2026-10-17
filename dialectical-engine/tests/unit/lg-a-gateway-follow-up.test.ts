@@ -5,12 +5,12 @@ import { classifyStructuredArtifact } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   CONTENT_FOLLOW_UP_SENTENCES, OpenAICompatibleProviderGateway, PreviewVendorRefusedUnbilled, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
-  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, isContentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
+  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, isContentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, buildFramedRevisionPrompt, createPreviewGuardedFetch,
   parsePreviewProviderTestConfig, planPatchFollowUp, previewTargetGatewayControls, readPromptFrame, schemaFailureLocator, withPreviewProviderCallPolicy,
   type ModelReplyFacts, type PatchFollowUpPlan, type PreviewBudgetExecution, type ProviderCallRequest, type ProviderLedgerInput, type RawArtifactInput,
   type StructureFirstReply
 } from "@debateai/providers";
-import { BASE, PANEL_KEY, PATCH_REPLY, WRAPPED, WRAPPED_QUALITY, classifyPanel, panelRequest } from "../support/structure-salvage-shapes.js";
+import { BASE, PANEL_KEY, PATCH_REPLY, WRAPPED, WRAPPED_QUALITY, classifyPanel, panelFramed, panelRequest } from "../support/structure-salvage-shapes.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
@@ -378,6 +378,29 @@ describe("B: the routed call's second POST, sent alone", () => {
     expect(harness.executions).toHaveLength(1);
     expect(harness.ledger).toHaveLength(1);
     expect(refusal).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", lastLedgerEntryRef: error.lastLedgerEntryRef });
+  });
+
+  // R1d Task 14 (pre-flight PF-D5.3, controller ruling: accept). A story v4 round-2 revision packet already carries the
+  // storyteller's own draft as its answer turn, so B's PATCH cannot be built for it (`#patchPacket` →
+  // `buildFramedPatchPrompt` refuses a packet with an answer turn, PROMPT_PATCH_NOT_APPLICABLE, and returns null): nothing
+  // is sent, and the call ends as today's refusal with the first reply's facts. Known limit: round 2 gets no B.
+  it("a routed revision whose structure repair did not do sends no B and ends PROVIDER_CONTENT_UNACCEPTED with the first reply's facts", async () => {
+    const DRAFT = JSON.stringify(BASE);
+    const PROBLEMS = "The evidence score is presented as settled.";
+    const h = harness([{ content: WRAPPED_QUALITY }]);
+    const revision: ProviderCallRequest = { ...panelRequest(request(false)), structureRepairRouted: true,
+      packet: buildFramedRevisionPrompt(panelFramed.packet, DRAFT, PROBLEMS),
+      buildRepairPacket: (rejected) => buildFramedRevisionPrompt(panelFramed.packet, DRAFT, PROBLEMS, schemaFailureLocator(rejected)) };
+    const caught = await h.gateway.call(revision).catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(ProviderStructureUnrepairedError);
+    const first = caught as ProviderStructureUnrepairedError;
+    const refusal = await h.gateway.call({ ...revision,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(first) } }).catch((error: unknown) => error);
+    expect(h.executions).toHaveLength(1);
+    expect(h.ledger).toHaveLength(1);
+    expect(refusal).toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED",
+      lastRawArtifactRef: first.lastRawArtifactRef, lastLedgerEntryRef: first.lastLedgerEntryRef });
   });
 
   it("B runs at the repair thinking level", async () => {

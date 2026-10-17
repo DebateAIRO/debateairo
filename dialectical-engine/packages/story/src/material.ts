@@ -8,7 +8,16 @@ import {
   type StoryVerdictBasis
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import type { FramedMaterialField } from "@debateai/providers";
+import {
+  buildFramedPrompt,
+  buildFramedRevisionPrompt,
+  schemaFailureLocator,
+  type FramedMaterialField,
+  type FramedPrompt,
+  type PromptContract,
+  type PromptPacket,
+  type RejectedProviderContent
+} from "@debateai/providers";
 import type { StoryMaterialIndex } from "./validate.js";
 import type { StoryV4Options } from "./pack.js";
 
@@ -1069,4 +1078,43 @@ export function toStoryPromptMaterial(material: StoryMaterial, priorObjection: s
 export function toCheckerPromptMaterial(material: StoryMaterial, candidate: StoryBody): readonly FramedMaterialField[] {
   const fields = [...storyCoreFields(material), { name: "candidate_story", content: JSON.stringify(candidate) }];
   return Object.freeze(fields.map((field) => Object.freeze(field)));
+}
+
+/**
+ * Story v4 round 2 (R1d, spec §7.2 item 8): the accepted round-1 draft as the storyteller's own answer, in the v4 form's
+ * order (short, why, reviewer_note, long last) and without `shape_id`, which the v4 form never asks for (code sets it).
+ * Its references are the material's short ones, as the model wrote them.
+ */
+export function storyDraftText(body: StoryBody): string {
+  return JSON.stringify({ short: body.short, why: body.why, reviewer_note: body.reviewer_note, long: body.long });
+}
+
+/** A v4 round-2 request: its fresh frame, the packet to send, and its full re-ask under the same fence. */
+export interface FramedRevision {
+  readonly framed: FramedPrompt;
+  readonly packet: PromptPacket;
+  readonly buildRepairPacket: (rejected: RejectedProviderContent) => PromptPacket;
+}
+
+/**
+ * Story v4 round 2 (R1d, design decision 3): a FRESH call (a new fence, owner answer Q3) whose material is round 1's,
+ * unchanged (no `prior_objection`, so the material block is round 1's bytes apart from the fence; the system message's
+ * stable prefix caches, the material does not, because of the fresh fence, owner answer Q3),
+ * then the draft as the model's own turn and the checker's problems in one revision block (`buildFramedRevisionPrompt`).
+ * A content refusal of this call is re-asked by `buildRepairPacket`, which keeps this call's fence.
+ */
+export function buildStoryRevisionPrompt(input: Readonly<{
+  contract: PromptContract;
+  material: readonly FramedMaterialField[];
+  ownDraft: string;
+  problems: string;
+}>): FramedRevision {
+  const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
+  const packet = buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems);
+  return Object.freeze({
+    framed,
+    packet,
+    buildRepairPacket: (rejected: RejectedProviderContent): PromptPacket =>
+      buildFramedRevisionPrompt(framed.packet, input.ownDraft, input.problems, schemaFailureLocator(rejected))
+  });
 }
