@@ -242,10 +242,13 @@ import {
   type DebateShapeCeilingInput,
   type DebateShapePlanKey,
   type DebateShapePolicy,
+  type EngineSettings,
+  type EngineVersionPolicy,
   type LengthGuidance,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
+import { engineForAsk } from "./engine-ask.js";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
@@ -1891,6 +1894,7 @@ const ASK_REFUSALS_WITH_OPERATOR_FIGURES: ReadonlySet<string> = new Set([
   "DAILY_COST_ENVELOPE_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "STRUCTURAL_CEILING_SHAPE_INVALID",
+  "STRUCTURAL_CEILING_ENGINE_INVALID",
   ASK_MODEL_ASSIGNMENT_INVALID
 ]);
 
@@ -4082,6 +4086,8 @@ export interface RunCreationSettings {
     readonly shape: DebateShapeCeilingInput | null;
     /** Length guidance (spec 2026-10-15 §3.1): the debate's numbers (`lengthGuidanceForAsk`), or null without the row. */
     readonly length: LengthGuidance | null;
+    /** Engine redesign (INTERFACE §1.4): engine 2's settings for this panel (`engineForAsk`), or null without the row in force. */
+    readonly engine: EngineSettings | null;
   }) => Promise<Readonly<Record<string, unknown>>>;
   readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
@@ -4111,6 +4117,11 @@ export interface RunCreationSettings {
    * Absent: no receipt carries `length`, and the answer-length choice is kept only with the shape row, as today.
    */
   readonly lengthGuidancePolicy?: LengthGuidancePolicy;
+  /**
+   * Engine redesign (spec 2026-10-15 §3.2): present only when the register's optional engineVersionPolicy row is in force
+   * (absent or `enabled: false` = none). Absent: no receipt carries `engine`, every debate is engine 1, byte for byte.
+   */
+  readonly engineVersionPolicy?: EngineVersionPolicy;
   /** Question language (spec 2026-10-13): read only with `debateShapePolicy`; the first step of submit. */
   readonly questionLanguage?: QuestionLanguagePort;
 }
@@ -4244,15 +4255,20 @@ async function admitWithScorecard(input: Readonly<{
     makers: number
   ): Promise<Readonly<Record<string, unknown>>> => {
     try {
+      // Debate shape (spec 2026-10-12 §3.6): on this path each debater is a distinct maker (debaterSeatCount).
+      const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers);
+      // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
+      const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan);
       return await settings.resolveEnvelopeBasis({
         depthParams: ask.depth_params,
         riskTier: risk.effectiveRiskTier,
         panelSize,
         backupSequencesProvisioned,
-        // Debate shape (spec 2026-10-12 §3.6): on this path each debater is a distinct maker (debaterSeatCount).
-        shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers),
-        // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
-        length: lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan)
+        shape,
+        length,
+        // Engine redesign (R1d; INTERFACE §1.4): engine 2's settings for this panel's makers, frozen on the receipt; null
+        // without the row in force (engine 1, today's receipt). The answer check is a site only when the map opens the debate.
+        engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -4355,7 +4371,8 @@ async function admitWithScorecard(input: Readonly<{
     // 2026-09-05 ruling). The receipt names the formula it was minted with.
     const backupSequencesProvisioned = backupSequencesFor(outcome.assignment);
     // Debate shape: the seated debaters' own makers size the shape, so a shaped basis is always minted for them.
-    const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0 && settings.debateShapePolicy === undefined
+    // Engine redesign (R1d): so are the comparing judges (min(judges.count, makers)).
+    const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0 && settings.debateShapePolicy === undefined && settings.engineVersionPolicy === undefined
       ? plannedBasis
       : await resolveBasis(debaters.length, backupSequencesProvisioned, new Set(debaters.map((seat) => seat.maker)).size);
     // Carry 15 (A20.2 review m3): a required input field does not force a
@@ -4536,16 +4553,20 @@ export async function evaluateAskAdmission(
   }
   let envelopeBasis: Readonly<Record<string, unknown>>;
   try {
+    const makers = new Set(filteredPanel.map((entry) => entry.maker)).size;
+    const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan, makers);
+    // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
+    const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan);
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
       panelSize: filteredPanel.length,
       // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
       backupSequencesProvisioned: 0,
-      shape: debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan,
-        new Set(filteredPanel.map((entry) => entry.maker)).size),
-      // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
-      length: lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan)
+      shape,
+      length,
+      // Engine redesign (R1d; INTERFACE §1.4): as admitWithScorecard's resolveBasis.
+      engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
     });
   } catch (error) {
     markAskRefusal(error);

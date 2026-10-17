@@ -109,6 +109,7 @@ apps/api/src/email-mfa-mail.ts
 apps/api/src/email-mfa-recovery.ts
 apps/api/src/email-mfa-risk.ts
 apps/api/src/email-mfa-routes.ts
+apps/api/src/engine-ask.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
