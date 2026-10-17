@@ -185,6 +185,26 @@ describe("a drawer beside a floor answer says what the page shows (fix round 1)"
     expect(publicDrawer(false)).toContain("Spending and attempt limits: not included in this public snapshot.");
     expect(publicDrawer(false)).not.toContain("Cost envelope");
   });
+
+  // R2 B8 fix 1: the public drawer words the verdict as the story pill does; no reader sees the state's code.
+  it("words the public drawer's verdict, never its code (SPLIT and CONTESTED)", () => {
+    for (const [state, key] of [["SPLIT", "public.story.label.split"], ["CONTESTED", "public.story.label.contested"]] as const) {
+      const answer = {
+        terminal: "SERVED" as const,
+        verdict: state,
+        verdict_available: true,
+        confidence_band: null,
+        summary_segments: [],
+        badges: [],
+        residual_objections: [],
+        reversal_point: "A cheaper flat in Cluj.",
+        as_of: "2026-09-26T09:00:00.000Z"
+      };
+      const html = renderToStaticMarkup(<PublicHonestyDrawer answer={answer} catalog={publicEn} locale="en" onClose={noop} />);
+      expect(visible(html)).toContain(words(publicEn, key));
+      expect(visible(html)).not.toContain(state);
+    }
+  });
 });
 
 describe("a panel a spend stop cut short gets a remedy that fits", () => {

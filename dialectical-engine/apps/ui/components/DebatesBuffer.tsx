@@ -10,8 +10,8 @@ import composeEnglish from "@/messages/en/compose.json";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
-// OWNER WORDING — approve before switch-on (Q1 option 1: CONTESTED's word becomes the locale's close-call word, SPLIT takes the old
-// "Contested" word; this rename ships live at R2b's upload, engine 1 included).
+// OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1: CONTESTED's word becomes the locale's
+// close-call word, and SPLIT takes the old "Contested" word.
 const VERDICT_KEYS: Readonly<Record<NonNullable<PublicDebateSummary["verdict"]>, string>> = {
   SUPPORTED: "home.verdict.supported",
   CONTESTED: "home.verdict.contested",

@@ -77,15 +77,20 @@ describe("R2 SPLIT in the UI (ruling E8, Q1 option 1)", () => {
 
   it("styles SPLIT like the other contested states on every pill", () => {
     const css = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
-    for (const selector of ['.libStatus[data-state="split"]', '.publicVerdictPill[data-verdict="split"]',
-      '.storyPanelLabel[data-verdict="split"]', '.floorAnswerLabel[data-verdict="split"]']) {
-      expect(css).toContain(selector);
+    // B8 fix 1: the split selector sits in the SAME rule as its contested twin, so the two pills always look alike.
+    for (const [pill, attribute] of [[".libStatus", "data-state"], [".publicVerdictPill", "data-verdict"],
+      [".storyPanelLabel", "data-verdict"], [".floorAnswerLabel", "data-verdict"]] as const) {
+      const split = `${pill}[${attribute}="split"]`;
+      expect(css.split(split), split).toHaveLength(2);
+      const at = css.indexOf(split);
+      const rule = css.slice(css.lastIndexOf("}", at) + 1, css.indexOf("{", at)).replace(/\/\*[\s\S]*?\*\//gu, "");
+      expect(rule.split(",").map((selector) => selector.trim()), split).toEqual(expect.arrayContaining([split, `${pill}[${attribute}="contested"]`]));
     }
   });
 
-  // Pre-flight PF-R2b4.8 (ruling option (a)): the owner's honesty drawer words the verdict as the story pill does;
-  // the raw state stays only as the line's title, so no reader sees "SPLIT" or "CONTESTED" as a code.
-  it.each(["en", "ro"] as const)("%s: the honesty drawer words the verdict, the raw state only as its title", (code) => {
+  // Pre-flight PF-R2b4.8 (ruling option (a)) and B8 fix 1: the owner's honesty drawer words the verdict as the story
+  // pill does; the raw state stays only as a data attribute (never shown or spoken), so no reader sees a code.
+  it.each(["en", "ro"] as const)("%s: the honesty drawer words the verdict, the raw state only as a data attribute", (code) => {
     const noop = () => {};
     const words: ReadonlyArray<readonly [NonNullable<Answer["verdict_state"]>, string]> = [
       ["SPLIT", SPLIT_WORDS[code]!],
@@ -104,8 +109,9 @@ describe("R2 SPLIT in the UI (ruling E8, Q1 option 1)", () => {
           composeCatalog={catalog(code, "compose")} publicCatalog={catalog(code, "public")}
         />
       );
-      const verdictLine = container.querySelector(`.drawerFindingText[title="${state}"]`);
+      const verdictLine = container.querySelector(`.drawerFindingText[data-verdict-state="${state}"]`);
       expect(verdictLine?.textContent).toBe(word);
+      expect(verdictLine?.hasAttribute("title")).toBe(false);
       expect([...container.querySelectorAll(".drawerFindingText")].map((line) => line.textContent)).not.toContain(state);
     }
   });

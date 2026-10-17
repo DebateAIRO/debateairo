@@ -121,8 +121,29 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
     expect(text).toContain("The old two-paragraph summary.");
     expect(text).not.toContain(ro("public.story.changeLead"));
     expect(container.querySelector(".publicStory")).toBeNull();
-    expect(container.querySelector("#public-verdict-label")?.textContent).toBe("CONTESTED");
+    // R2 B8 fix 1: the label in words (the reader's catalogue), never the state's code.
+    expect(container.querySelector("#public-verdict-label")?.textContent).toBe(publicEnglish["public.story.label.contested"]);
     expect(container.querySelector(".publicThresholdLabel")?.textContent).toBe("confidence · capped");
+  });
+
+  it("words every state's label without a story, and never prints the state's code (R2 B8 fix 1)", async () => {
+    const words = publicEnglish as Record<string, string>;
+    for (const [state, key] of [
+      ["SUPPORTED", "public.story.label.supported"], ["CONTESTED", "public.story.label.contested"],
+      ["UNSUPPORTED", "public.story.label.unsupported"], ["SPLIT", "public.story.label.split"]
+    ] as const) {
+      const debate = PublicDebateSchema.parse({ ...BASE, answer: { ...BASE.answer, verdict: state } });
+      const container = await mount(
+        <PublicDebateOverview debate={debate} catalog={publicEnglish} storyCatalog={publicRomanian} storyLocale="ro"
+          onDetails={() => undefined} onRead={() => undefined} />
+      );
+      expect(container.querySelector("#public-verdict-label")?.textContent).toBe(words[key]);
+      expect(container.querySelector("#public-verdict-label")?.getAttribute("data-verdict")).toBe(state.toLowerCase());
+      expect(container.textContent).not.toContain(state);
+      await act(async () => root!.unmount());
+      root = null;
+      document.body.replaceChildren();
+    }
   });
 
   it("leaves out the note box when the story has none, and shows no reservation for a story without the flag", async () => {

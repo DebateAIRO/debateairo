@@ -166,7 +166,7 @@ export function AnswerHonestyDrawer({
   composeCatalog?: MessageCatalog;
   /**
    * The interface locale's `public` catalogue: the verdict's label words (R2 B8, pre-flight PF-R2b4.8), the words the
-   * story pill and the floor answer say on this page. The raw state stays only as the line's title.
+   * story pill and the floor answer say on this page. The raw state stays only as a data attribute, never shown or spoken.
    */
   publicCatalog?: MessageCatalog;
   /**
@@ -240,7 +240,7 @@ export function AnswerHonestyDrawer({
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.verdict")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.verdict")}</div>
             {answer.verdict_state !== null ? (
-              <div className="drawerFindingText" data-ai-generated="true" title={answer.verdict_state}>
+              <div className="drawerFindingText" data-ai-generated="true" data-verdict-state={answer.verdict_state}>
                 {storyLabelWords(answer.verdict_state, publicCatalog)}
               </div>
             ) : (

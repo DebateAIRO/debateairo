@@ -1,4 +1,4 @@
-// OWNER WORDING — approve before switch-on (ruling Q1, option 1; this rename ships live at R2b's upload, engine 1 included).
+// OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Ruling Q1, option 1.
 /**
  * R2, ruling Q1 option 1: each locale's word for SPLIT is the word it used for CONTESTED before R2
  * (`home.verdict.contested` = `debateDrawers.verdict.contested` = `archive.verdictContested`, identical in all 35

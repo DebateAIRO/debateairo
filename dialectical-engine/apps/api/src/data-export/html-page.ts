@@ -40,7 +40,7 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
   }
   const verdict = words(object(entry.run_answer).verdict_state);
   // R2 (ruling E8, Q1): SPLIT, "no majority", says the locale's "Contested"; CONTESTED now says its "Close call".
-  // OWNER WORDING — approve before switch-on (Q1 option 1: this rename ships live at R2b's upload, engine 1 included).
+  // OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1.
   const verdictKey = ({ SUPPORTED: "archive.verdictSupported", CONTESTED: "archive.verdictContested", UNSUPPORTED: "archive.verdictUnsupported", SPLIT: "archive.verdictSplit" } as Record<string, string>)[verdict];
   const answer = entry.answers?.[0];
   const latest = answer?.versions.at(-1);

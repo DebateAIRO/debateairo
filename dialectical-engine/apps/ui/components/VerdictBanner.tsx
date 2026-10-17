@@ -6,8 +6,8 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 
-// OWNER WORDING — approve before switch-on (Q1 option 1: CONTESTED's word becomes the locale's close-call word, SPLIT takes the old
-// "Contested" word; this rename ships live at R2b's upload, engine 1 included).
+// OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1: CONTESTED's word becomes the locale's
+// close-call word, and SPLIT takes the old "Contested" word.
 const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
   supported: "debateDrawers.verdict.stronglySupported",
   contested: "debateDrawers.verdict.contested",
