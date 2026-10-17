@@ -97,7 +97,7 @@
   "misc.answerHonesty.verdict": "Oordeel",
   "misc.answerHonesty.verdictUnavailable": "Oordeel niet beschikbaar · {reason}",
   "misc.answerHonesty.comparison.title": "Hoe de antwoorden werden vergeleken",
-  "misc.answerHonesty.comparison.intro": "AI-modellen vergeleken de antwoorden naast elkaar, en elk koos het antwoord dat het best onderbouwd vond.",
+  "misc.answerHonesty.comparison.intro": "AI-modellen vergeleken de antwoorden naast elkaar, en elk koos het antwoord dat het het best onderbouwd vond.",
   "misc.answerHonesty.comparison.counted": "Getelde keuzes: {counted} van {seated}",
   "misc.answerHonesty.comparison.notCounted": "Een keuze telt niet mee als een model het antwoord koos dat het model van zijn eigen maker verdedigde, of geen bruikbaar antwoord gaf.",
   "misc.answerHonesty.comparison.noneCounted": "Geen enkele keuze kon worden meegeteld, dus werd het antwoord gekozen waarvan de onderbouwing het best standhield tegen de bezwaren.",

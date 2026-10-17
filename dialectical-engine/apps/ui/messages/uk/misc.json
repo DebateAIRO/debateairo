@@ -98,7 +98,7 @@
   "misc.answerHonesty.verdictUnavailable": "Вердикт недоступний · {reason}",
   "misc.answerHonesty.comparison.title": "Як порівнювали відповіді",
   "misc.answerHonesty.comparison.intro": "Моделі ШІ порівняли відповіді пліч-о-пліч, і кожна обрала ту, яку вважала найкраще обґрунтованою.",
-  "misc.answerHonesty.comparison.counted": "Враховані вибори: {counted} з {seated}",
+  "misc.answerHonesty.comparison.counted": "Враховані рішення: {counted} з {seated}",
   "misc.answerHonesty.comparison.notCounted": "Вибір не враховується, якщо модель обрала відповідь, яку відстоювала модель її власного розробника, або не дала придатної відповіді.",
   "misc.answerHonesty.comparison.noneCounted": "Жоден вибір не вдалося врахувати, тому було обрано відповідь, аргументи якої найкраще витримали заперечення.",
   "misc.answerHonesty.comparison.chosen": "Обрано: {chose} з {counted}",

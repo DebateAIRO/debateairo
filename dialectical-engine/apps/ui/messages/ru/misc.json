@@ -98,7 +98,7 @@
   "misc.answerHonesty.verdictUnavailable": "Вердикт недоступен · {reason}",
   "misc.answerHonesty.comparison.title": "Как сравнивались ответы",
   "misc.answerHonesty.comparison.intro": "Модели ИИ сравнили ответы бок о бок, и каждая выбрала тот, который сочла наиболее обоснованным.",
-  "misc.answerHonesty.comparison.counted": "Учтённые выборы: {counted} из {seated}",
+  "misc.answerHonesty.comparison.counted": "Учтённые решения: {counted} из {seated}",
   "misc.answerHonesty.comparison.notCounted": "Выбор не учитывается, если модель выбрала ответ, который отстаивала модель её собственного разработчика, или не дала пригодного ответа.",
   "misc.answerHonesty.comparison.noneCounted": "Ни один выбор не удалось учесть, поэтому был выбран ответ, доводы которого лучше всего выдержали возражения.",
   "misc.answerHonesty.comparison.chosen": "Выбран: {chose} из {counted}",

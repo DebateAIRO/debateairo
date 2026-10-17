@@ -27,7 +27,7 @@ import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-as
 import { judgesComparisonOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
-export { judgesComparisonOf, type ComparisonVote } from "./judges-comparison.js"; // pre-flight PF-R2b4.4
+export { judgesComparisonOf, type ComparisonVote, type RootCallSite } from "./judges-comparison.js"; // pre-flight PF-R2b4.4
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -2773,11 +2773,13 @@ export class ServeRepository {
       role_assignment_row: PinnedRoleAssignmentRow | null;
       // R2 (INTERFACE §9.8), like F20: the plain vote columns ride this one SELECT; the reasons stay sealed.
       // An empty array for every engine-1 run (no vote row). (pre-flight PF-R2b4.5) The stored `counted` column is a
-      // hint and is never read: the projection recounts (controller ruling R2b-B5.1).
+      // hint and is not selected: the projection recounts (controller ruling R2b-B5.1).
       verdict_votes: Array<{
-        judge_seat: number; maker: string; counted: boolean; chosen_root_node_id: string | null; chosen_letter: string | null;
+        judge_seat: number; maker: string; chosen_root_node_id: string | null; chosen_letter: string | null;
         conditional: boolean | null; same_as: string[][]; question_kind: string | null;
       }>;
+      // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
+      root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
       `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
@@ -2810,12 +2812,21 @@ export class ServeRepository {
                  FROM core.run_role_assignment AS pinned
                 WHERE pinned.run_id = run.run_id) AS role_assignment_row,
               (SELECT COALESCE(jsonb_agg(jsonb_build_object(
-                        'judge_seat', vote.judge_seat, 'maker', vote.maker, 'counted', vote.counted,
+                        'judge_seat', vote.judge_seat, 'maker', vote.maker,
                         'chosen_root_node_id', vote.chosen_root_node_id::text,
                         'chosen_letter', vote.chosen_letter, 'conditional', vote.conditional,
                         'same_as', vote.same_as, 'question_kind', vote.question_kind) ORDER BY vote.judge_seat), '[]'::jsonb)
                  FROM ledger.verdict_vote AS vote
-                WHERE vote.run_id = run.run_id) AS verdict_votes
+                WHERE vote.run_id = run.run_id) AS verdict_votes,
+              (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'node_id', root.node_id::text, 'call_site_key', entry.call_site_key)
+                        ORDER BY root.created_at_seq, entry.sequence), '[]'::jsonb)
+                 FROM core.node AS root
+                 JOIN ledger.ledger_entry AS entry
+                   ON entry.run_id = root.run_id AND entry.raw_artifact_ref = root.provenance_ref
+                  AND entry.action_kind = 'MODEL_CALL'
+                WHERE root.run_id = run.run_id AND root.parent_node_id IS NULL AND root.generation_status <> 'stale'
+                  AND EXISTS (SELECT 1 FROM ledger.verdict_vote AS seated WHERE seated.run_id = run.run_id)) AS root_sites
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
@@ -2871,13 +2882,15 @@ export class ServeRepository {
       this.readEdgesForRun(row.run_id)
     ]);
     // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
-    // (controller ruling R2b-B5.1); undefined for engine 1 (no vote row). (pre-flight PF-R2b4.5)
+    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
+    // vote row). (pre-flight PF-R2b4.5)
     const judgesComparison = judgesComparisonOf(
       row.verdict_votes.map((vote) => ({
-        judgeSeat: vote.judge_seat, maker: vote.maker, counted: vote.counted, chosenRootNodeId: vote.chosen_root_node_id,
+        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
         chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
       })),
-      nodes, edges
+      nodes, edges,
+      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key }))
     );
     const numbers = await this.pool.query<{
       value: number;

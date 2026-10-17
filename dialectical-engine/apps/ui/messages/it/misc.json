@@ -104,7 +104,7 @@
   "misc.answerHonesty.comparison.counted": "Scelte conteggiate: {counted} su {seated}",
   "misc.answerHonesty.comparison.notCounted": "Una scelta non viene conteggiata quando un modello ha scelto la risposta sostenuta dal modello della propria casa produttrice, o non ha dato una risposta utilizzabile.",
   "misc.answerHonesty.comparison.noneCounted": "Nessuna scelta ha potuto essere conteggiata, quindi è stata scelta la risposta le cui argomentazioni hanno retto meglio alle obiezioni.",
-  "misc.answerHonesty.comparison.chosen": "Scelta: {chose} su {counted}",
+  "misc.answerHonesty.comparison.chosen": "Preferita: {chose} su {counted}",
   "misc.answerHonesty.comparison.strength": "Quanto bene le sue argomentazioni hanno retto alle obiezioni",
   "misc.answerHonesty.weights": "pesi {source}",
   "misc.answerHonesty.weightsBy": "pesi {source} di {owner}",
