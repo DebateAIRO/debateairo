@@ -327,6 +327,24 @@ export class PointInvestigationRepository {
       }
     });
   }
+
+  /**
+   * Codes only (R2a final wave, Ruling W4): each investigation's node and result, from plain columns, with the same
+   * stale join and order as `readPointInvestigationsForRun`. No lease and no decryption: the review catch-up reads the
+   * statuses alone and never the AI's words.
+   */
+  async readPointInvestigationResultsForRun(runId: string): Promise<readonly Readonly<{ nodeId: string; result: PointInvestigationResult }>[]> {
+    const rows = (await this.pool.query<{ node_id: string; result: string }>(
+      `SELECT investigation.node_id::text AS node_id, investigation.result
+         FROM ledger.point_investigation AS investigation
+         JOIN core.node AS node ON node.run_id = investigation.run_id AND node.node_id = investigation.node_id
+        WHERE investigation.run_id = $1 AND node.generation_status IS DISTINCT FROM 'stale'
+        ORDER BY investigation.investigation_order, investigation.node_id`, [runId.toLowerCase()])).rows;
+    return Object.freeze(rows.map((row) => {
+      if (!RESULTS.has(row.result)) throw rowInvalid("ledger.point_investigation result");
+      return Object.freeze({ nodeId: row.node_id, result: row.result as PointInvestigationResult });
+    }));
+  }
 }
 
 export class VerdictVoteRepository {

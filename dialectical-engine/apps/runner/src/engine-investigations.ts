@@ -125,6 +125,19 @@ export function engineInvestigatedStatuses(rows: readonly Readonly<{ nodeId: str
 }
 
 /**
+ * R2a final wave (Ruling W3): the maker that actually answered an investigation is neither the point's author's nor its
+ * reviewer's. The seat caller's eligibility filter already keeps both off the call (a moved call too), so a breach is a
+ * code defect: a named TypeError, which the runner's failure rule rethrows and the debate fails, never an unavailable
+ * investigation. The code names no maker.
+ */
+export function assertFairInvestigator(answeredMaker: string,
+  candidate: Readonly<{ authorMaker: string; reviewerMaker: string }>): void {
+  if (answeredMaker === candidate.authorMaker || answeredMaker === candidate.reviewerMaker) {
+    throw new TypeError("POINT_INVESTIGATION_INVESTIGATOR_UNFAIR");
+  }
+}
+
+/**
  * A code defect, never a debate's state: only a point whose own review said "cannot assess" is investigated, gets
  * investigation material (A11) or a "standings moved" record (A6). The code names no node and no text.
  */

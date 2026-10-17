@@ -258,6 +258,37 @@ describe("PointInvestigationRepository and VerdictVoteRepository (0121)", () => 
     expect((await new VerdictVoteRepository(database.pool).readVerdictVotesForRun(runId)).map((row) => row.choice?.letter)).toEqual(["A"]);
   });
 
+  // R2a final wave, Ruling W4: the review catch-up's codes-only reader — node and result from plain columns, the same
+  // stale join and order as the full reader, no lease and no decryption.
+  it.each(["legacy", "encrypted"] as const)("reads a %s run's investigation results as codes only, in order, without set-aside nodes", async (mode) => {
+    const runId = await newRun(mode);
+    const [first, second, stalePoint, third, rootA, rootB] = [await node(runId, mode), await node(runId, mode),
+      await node(runId, mode), await node(runId, mode), await node(runId, mode), await node(runId, mode)];
+    const reply = await artifact(runId);
+    const repository = new PointInvestigationRepository(database.pool);
+    // Written out of order: the reader orders by investigation_order.
+    await repository.recordPointInvestigation({ ...capped(runId, third), investigationOrder: 4 });
+    await repository.recordPointInvestigation(holds(runId, first, reply, rootA, rootB));
+    await repository.recordPointInvestigation({ ...moneyStopped(runId, second, 2) });
+    await repository.recordPointInvestigation({ ...capped(runId, stalePoint), investigationOrder: 3 });
+    await database.pool.query(`UPDATE core.node SET generation_status = 'stale' WHERE run_id = $1 AND node_id = $2`, [runId, stalePoint]);
+    const codes = await repository.readPointInvestigationResultsForRun(runId.toUpperCase());
+    expect(codes).toEqual([
+      { nodeId: first, result: "HOLDS" },
+      { nodeId: second, result: "INVESTIGATION_UNAVAILABLE" },
+      { nodeId: third, result: "INVESTIGATION_CAPPED" }
+    ]);
+    // The same rows, in the same order, as the reader that decrypts the AI's words.
+    expect((await repository.readPointInvestigationsForRun(runId)).map((row) => ({ nodeId: row.nodeId, result: row.result }))).toEqual(codes);
+    // Codes only: nothing else is handed back.
+    for (const row of codes) expect(Object.keys(row).sort()).toEqual(["nodeId", "result"]);
+    // A result outside 0121's list cannot be stored (its CHECKs), so the reader's own refusal is a defence only.
+    if (mode === "legacy") {
+      await expect(database.pool.query(`INSERT INTO ledger.point_investigation (run_id, node_id, investigation_order, result, content)
+         VALUES ($1,$2,9,'MAYBE','{}'::jsonb)`, [runId, rootA])).rejects.toThrowError(/violates check constraint "point_investigation_/u);
+    }
+  });
+
   it("an erased run reads as empty and refuses new rows as RUN_ERASED", async () => {
     const runId = await newRun("encrypted");
     const [point, rootA, rootB] = [await node(runId, "encrypted"), await node(runId, "encrypted"), await node(runId, "encrypted")];

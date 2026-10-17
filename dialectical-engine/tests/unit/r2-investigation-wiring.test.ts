@@ -32,7 +32,9 @@ describe("engine 2: the investigation step's place in the runner", () => {
     expect(recordBlock).toContain("projectJudgedStanding(operatorResolvedSnapshot, makerPositionServe.judgedStandingSeed).snapshot");
     expect(recordBlock).toContain("makerPositionServe.servableMakerPositions.map((root) => root.nodeId)");
     // The catch-up reads the recorded outcomes back (pre-flight PF-R2a8.8: over the catch-up's own `input.pool`).
-    expect(source).toContain("investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationsForRun(runId))");
+    // R2a W4: through the codes-only reader (no lease, no decryption), never the reader that decrypts the AI's words.
+    expect(source).toContain("investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationResultsForRun(runId))");
+    expect(source).not.toContain("new PointInvestigationRepository(input.pool).readPointInvestigationsForRun(");
   });
 
   it("sends each investigation under the engine seal and the investigator's bound, keeps it off the author's and the reviewer's makers, never stops the debate for money", async () => {
@@ -60,6 +62,12 @@ describe("engine 2: the investigation step's place in the runner", () => {
     expect(start).toBeGreaterThan(0);
     expect(body).toContain("const answered = await seatCaller.callSeat({");
     expect(body).toContain("call: (member, memberCallSiteKey) => member.judge.investigatePoint({");
+    // R2a W3: right after the seat call, before the answer is used, the maker that answered is checked.
+    const called = body.indexOf("const answered = await seatCaller.callSeat({");
+    const check = body.indexOf("assertFairInvestigator(answered.value.maker, candidate);", called);
+    expect(check).toBeGreaterThan(called);
+    expect(check).toBeLessThan(body.indexOf("return Object.freeze({ kind: \"ANSWERED\" as const, answer: Object.freeze({", called));
+    expect(body.match(/assertFairInvestigator\(/gu)).toHaveLength(1);
     expect(body).not.toMatch(/cooldownAttempt\(|withCooldownRetry\(/u);
     // The members the seat caller calls are lane-wrapped where they are built (the legacy book and the assigned one).
     const sitOutAt = source.indexOf("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
@@ -96,7 +104,7 @@ describe("engine 2: the investigation step's place in the runner", () => {
     ]);
     expect(body).toContain("statuses: engineInvestigatedStatuses(investigated.rows),");
     expect(source).toContain("const recordedStatuses = engineInvestigatedStatuses(recordedRows);");
-    expect(source).toContain("readPointInvestigationsForRun(runId))\n          .flatMap(investigatedStatusEntry))");
+    expect(source).toContain("readPointInvestigationResultsForRun(runId))\n          .flatMap(investigatedStatusEntry))");
     expect(source.match(/row\.result === "HOLDS"/gu)).toBeNull();
     const tool = await readFile(new URL("../../tools/preview-practice/practice-engine-graph.ts", import.meta.url), "utf8");
     expect(tool).toContain("investigated: engineInvestigatedStatuses(source.investigations.filter((row) => inGraph.has(row.nodeId)))");

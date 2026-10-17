@@ -268,8 +268,9 @@ import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSu
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
-  engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates, investigatedStatusEntry,
-  pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations, type PointInvestigationRow
+  assertFairInvestigator, engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates,
+  investigatedStatusEntry, pointInvestigationRowOfStored, recordPointInvestigationRows, runPointInvestigations,
+  type PointInvestigationRow
 } from "./engine-investigations.js";
 import { engineMaterialGraphOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
 import { engineHonestSelectionRule, honestAuthorOnly, reduceHonest } from "./engine-reduce.js";
@@ -2223,8 +2224,8 @@ export function createPostgresReviewCatchUpDependencies(input: {
         cannotAssessNodeIds: await judgements.readCannotAssessNodeIds(runId),
         ownReplyEdgeIds: engineOwnReplyEdgeIdsOf(fullSnapshot),
         // A14: the run's investigation outcomes, read back (HOLDS = AGREE; FAILS = DISPUTE, its links still at the
-        // cannot-assess weight; a dead end stays cannot-assess).
-        investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationsForRun(runId))
+        // cannot-assess weight; a dead end stays cannot-assess). R2a W4: codes only, nothing decrypted.
+        investigated: new Map((await new PointInvestigationRepository(input.pool).readPointInvestigationResultsForRun(runId))
           .flatMap(investigatedStatusEntry))
       });
       const standing = projectJudgedStanding(linked === null ? fullSnapshot : linked.snapshot,
@@ -9362,6 +9363,8 @@ export class WalkingSkeletonRunner {
                 ...shapeLanguageInput,
               })
             });
+            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
+            assertFairInvestigator(answered.value.maker, candidate);
             return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
               reply: answered.value.reply,
               rawArtifactRef: answered.value.provenanceRef,

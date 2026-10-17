@@ -23,6 +23,8 @@ import {
   engineInvestigatedStatuses, investigatedStatusEntry, investigatedStatusOf
 } from "../../apps/runner/src/engine-investigations.js";
 import { logPointInvestigation, pointInvestigationFailureCode } from "../../apps/runner/src/index.js";
+// R2a final wave W3: the maker that answered is neither the author's nor the reviewer's.
+import { assertFairInvestigator } from "../../apps/runner/src/engine-investigations.js";
 
 const ENGINE: EngineSettings = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 4, mapOpening: false });
 const SEAL = "e".repeat(64);
@@ -84,6 +86,8 @@ function investigate(input: Readonly<{
   spendStopped?: boolean;
   seats?: readonly PointInvestigationSeat[];
   stepOnly?: boolean;
+  /** R2a W3: the maker the gateway says answered, when it is not the planned seat's. */
+  answeredAs?: string;
 }>) {
   const seen: ProviderCallRequest[] = [];
   const recorded: PointInvestigationRow[] = [];
@@ -99,12 +103,15 @@ function investigate(input: Readonly<{
     seatsFor,
     rotationOffsetOf: () => 0,
     materialOf: materialFor,
-    call: async ({ callSiteKey, investigator, material }): Promise<PointInvestigationCallOutcome> => {
+    call: async ({ callSiteKey, investigator, candidate: planned, material }): Promise<PointInvestigationCallOutcome> => {
       try {
         const answered = await judge.investigatePoint({ runId: "run-1", subjectItemId: "work-1", callSiteKey,
           providerRef: investigator.providerRef, contractHash: SEAL, bound: BOUND, material, length: GUIDE });
+        const maker = input.answeredAs ?? answered.maker;
+        // As the runner does right after its seat call (R2a W3).
+        assertFairInvestigator(maker, planned);
         return { kind: "ANSWERED", answer: { reply: answered.reply, rawArtifactRef: answered.provenanceRef,
-          maker: answered.maker, providerRef: investigator.providerRef, modelId: answered.model } };
+          maker, providerRef: investigator.providerRef, modelId: answered.model } };
       } catch (error) {
         if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
         return { kind: "UNAVAILABLE" };
@@ -474,5 +481,30 @@ describe("engine 2: the investigation step, A14 fix round 1", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("engine 2: the investigation step, R2a final wave W3", () => {
+  it.each([
+    ["the point's author", "m-a"], ["the point's reviewer", "m-b"]
+  ] as const)("refuses an answer from %s's maker as a code defect", (_who, maker) => {
+    expect(() => assertFairInvestigator(maker, { authorMaker: "m-a", reviewerMaker: "m-b" }))
+      .toThrow(new TypeError("POINT_INVESTIGATION_INVESTIGATOR_UNFAIR"));
+    let thrown: unknown;
+    try { assertFairInvestigator(maker, { authorMaker: "m-a", reviewerMaker: "m-b" }); } catch (error) { thrown = error; }
+    // The runner's failure rule fails the debate on it: never an unavailable investigation.
+    expect(pointInvestigationFailureOutcome(thrown)).toBe("RETHROW");
+  });
+
+  it("takes an answer from a third maker", () => {
+    expect(() => assertFairInvestigator("m-d", { authorMaker: "m-a", reviewerMaker: "m-b" })).not.toThrow();
+  });
+
+  it("fails the step when the maker that answered is the point's author's, after every sent call settled, recording nothing", async () => {
+    // p2's author is m-a: an answer that says m-a made it breaks the seat caller's own filter.
+    const run = investigate({ answeredAs: "m-a", replies: { "VERDICT:investigate:1": reply("holds"), "VERDICT:investigate:2": reply("fails") } });
+    await expect(run.result).rejects.toThrow("POINT_INVESTIGATION_INVESTIGATOR_UNFAIR");
+    expect(run.seen).toHaveLength(2);
+    expect(run.recorded).toEqual([]);
   });
 });
