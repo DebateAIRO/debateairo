@@ -100,6 +100,7 @@
   "public.story.label.supported": "명확한 답",
   "public.story.label.contested": "박빙의 결론",
   "public.story.label.unsupported": "최선의 추정, 근거는 약함",
+  "public.story.label.split": "논쟁 중",
   "public.story.writing": "이 토론의 전체 흐름을 정리하고 있습니다…",
   "public.story.writingNote": "보통 몇 분 정도 걸립니다. 페이지는 자동으로 업데이트됩니다.",
   "public.story.unavailable": "이 토론의 전체 흐름은 제공되지 않습니다. 대신 토론 요약을 보여 드립니다.",

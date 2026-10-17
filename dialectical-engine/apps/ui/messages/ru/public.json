@@ -100,6 +100,7 @@
   "public.story.label.supported": "Ясный ответ",
   "public.story.label.contested": "Спорный случай",
   "public.story.label.unsupported": "Скорее всего, но доказательства слабые",
+  "public.story.label.split": "Спорный",
   "public.story.writing": "Пишем полную историю этих дебатов…",
   "public.story.writingNote": "Обычно это занимает несколько минут. Страница обновится сама.",
   "public.story.unavailable": "Полная история для этих дебатов недоступна. Вместо неё показано краткое изложение дебатов.",

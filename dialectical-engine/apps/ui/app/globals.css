@@ -7605,7 +7605,8 @@ a:focus-visible {
   background: var(--dispute-bg);
   color: var(--dispute-text);
 }
-.libStatus[data-state="contested"] {
+.libStatus[data-state="contested"],
+.libStatus[data-state="split"] {
   border-color: var(--dispute-border);
   background: var(--dispute-bg);
   color: var(--dispute-text);
@@ -8849,6 +8850,7 @@ a:focus-visible {
 }
 
 .publicVerdictPill[data-verdict="contested"],
+.publicVerdictPill[data-verdict="split"],
 .publicVerdictPill[data-verdict="unsupported"] {
   border-color: var(--dispute-border);
   background: var(--dispute-bg);
@@ -9367,6 +9369,7 @@ a:focus-visible {
 }
 .storyPanelLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
 .storyPanelLabel[data-verdict="contested"],
+.storyPanelLabel[data-verdict="split"],
 .storyPanelLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
 /* A soft shade at the top or bottom edge shows that more text is there to
    scroll to; the local covers hide it at either end. */
@@ -9487,6 +9490,7 @@ a:focus-visible {
 }
 .floorAnswerLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
 .floorAnswerLabel[data-verdict="contested"],
+.floorAnswerLabel[data-verdict="split"],
 .floorAnswerLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
 .floorAnswerLead { margin: 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
 .floorAnswerStatement { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }

@@ -100,6 +100,7 @@
   "public.story.label.supported": "Răspuns clar",
   "public.story.label.contested": "Decizie strânsă",
   "public.story.label.unsupported": "Cea mai bună presupunere, dovezi slabe",
+  "public.story.label.split": "Contestat",
   "public.story.writing": "Scriem povestea completă a acestei dezbateri…",
   "public.story.writingNote": "De obicei durează câteva minute. Pagina se actualizează singură.",
   "public.story.unavailable": "Povestea completă nu este disponibilă pentru această dezbatere. Iată în schimb rezumatul dezbaterii.",

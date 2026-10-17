@@ -6,9 +6,12 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 
+// OWNER WORDING — approve before switch-on (Q1 option 1: CONTESTED's word becomes the locale's close-call word, SPLIT takes the old
+// "Contested" word; this rename ships live at R2b's upload, engine 1 included).
 const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
   supported: "debateDrawers.verdict.stronglySupported",
   contested: "debateDrawers.verdict.contested",
+  split: "debateDrawers.verdict.split",
   unsupported: "debateDrawers.verdict.weaklySupported",
   unavailable: "debateDrawers.verdict.analysisUnavailable",
   insufficient_scoring: "debateDrawers.verdict.insufficientScoring",
@@ -32,6 +35,7 @@ const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
  *   NOT a statement about whether evidence was looked up -- the sentence this
  *   replaced said exactly that, and it was false.
  * - "supported" needs no sentence: the band label already says it.
+ * - "split" (R2, ruling E8) carries no sentence: the coordinator's summary never holds it.
  *
  * The record is total over the union, so every state the mapping can produce
  * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
@@ -40,7 +44,9 @@ const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
 const STATE_SENTENCE_KEYS: Record<LiveVerdictState, string | null> = {
   supported: null,
   contested: "debateDrawers.verdict.contestedExplanation",
-  unsupported: "debateDrawers.verdict.unsupportedExplanation"
+  unsupported: "debateDrawers.verdict.unsupportedExplanation",
+  // R2: SPLIT ("no majority") never reaches this V2 banner; its badge says the word and no sentence is invented.
+  split: null
 };
 
 function formatConvergence(

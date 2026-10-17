@@ -20,9 +20,11 @@ import { ModelMetaLine } from "@/components/ModelPresentation";
 import { modelAssignmentJobs } from "@/lib/modelStrength";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { storyLabelWords } from "@/lib/v3/storyWords";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import publicEnglish from "@/messages/en/public.json";
 import { useDialogSurface } from "@/components/dialogSurface";
 
 /**
@@ -139,6 +141,7 @@ export function AnswerHonestyDrawer({
   catalog = miscEnglish,
   debateChromeCatalog = debateChromeEnglish,
   composeCatalog = composeEnglish,
+  publicCatalog = publicEnglish,
   floorShown = false
 }: {
   answer: Answer;
@@ -161,6 +164,11 @@ export function AnswerHonestyDrawer({
   debateChromeCatalog?: MessageCatalog;
   /** The interface locale's `compose` catalogue: the projection that decides leftover edges. */
   composeCatalog?: MessageCatalog;
+  /**
+   * The interface locale's `public` catalogue: the verdict's label words (R2 B8, pre-flight PF-R2b4.8), the words the
+   * story pill and the floor answer say on this page. The raw state stays only as the line's title.
+   */
+  publicCatalog?: MessageCatalog;
   /**
    * The page shows this components-only answer's floor as its answer (spec
    * 2026-09-26 §14.4.4): the drawer keeps "Verdict unavailable", the true
@@ -232,7 +240,9 @@ export function AnswerHonestyDrawer({
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.verdict")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.verdict")}</div>
             {answer.verdict_state !== null ? (
-              <div className="drawerFindingText" data-ai-generated="true">{answer.verdict_state}</div>
+              <div className="drawerFindingText" data-ai-generated="true" title={answer.verdict_state}>
+                {storyLabelWords(answer.verdict_state, publicCatalog)}
+              </div>
             ) : (
               <div className="drawerFindingText">
                 {t(catalog, "misc.answerHonesty.verdictUnavailable", {
