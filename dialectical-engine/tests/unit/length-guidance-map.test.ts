@@ -128,20 +128,24 @@ describe("a lengthed map call", () => {
   });
 
   /**
-   * Ruling "PF-C5 root-0 bound" (a), pre-flight PF-C5.9, and its re-rule "root-0 Free test" (2026-10-16): with the row, root
-   * 0's material bound is the runaway limits (no trims, L19): the material bound grows about 7x and root 0's kept room about
-   * 3x. These two cases pin the HONEST outcome on a Free run (pre-flight consistency, re-ruled):
-   * - at the preview's 8,192 judge ceiling, root 0's room plus the first lengthed map list call crosses Free's body ceiling,
-   *   so the money seam refuses that call ROOM-ONLY (`RUN_COST_ENVELOPE_ROOM_KEPT`: the call alone would fit). What a
-   *   room-only refusal does next is already pinned and is run by this plan: the map stops, the debate argues on with today's
-   *   opening (`MAP_UNAVAILABLE_TODAYS_OPENING`, no spend stop), never a crash: `tests/unit/map-root-zero-room.test.ts` case
-   *   "(a) a refusal only because of the room stops the MAP, never the arguing" (Step 11) and
-   *   `tests/integration/debate-shape-run.test.ts` "a map call refused only to keep root 0's room …" (Task 17 Step 5);
-   * - at a 4,096 judge ceiling the same call fits beside the room and is admitted.
-   * Plan "Known limits" names this; the follow-up (size Free's ceiling or root 0's room) is the owner's, before the new shape
-   * is switched on for Free.
+   * Ruling "PF-C5 root-0 bound" (a), pre-flight PF-C5.9, its re-rule "root-0 Free test" (2026-10-16), and the whole-branch
+   * review's Ruling I1 (2026-10-17, after the refused-repair salvage merged): with the row, root 0's material bound is the
+   * runaway limits (no trims, L19), and on a routed run root 0's kept room is the salvage's sum rule (first + retry + the
+   * routed repair). These cases pin the MEASURED outcome:
+   * - on Free, at either judge ceiling (the preview's 8,192 and 4,096), the first lengthed map list call is refused ROOM-ONLY
+   *   (`RUN_COST_ENVELOPE_ROOM_KEPT`: the call alone would fit), never a money stop; at 8,192 root 0's room alone is larger
+   *   than Free's body ceiling;
+   * - at the dev paid start body ceiling (the site's start per-run ceiling, cut to a paid plan's credit, its body share), at
+   *   4,096 the room plus one lengthed list call fits and the call is admitted; at 8,192 it does not, and the refusal is
+   *   room-only.
+   * What a room-only refusal does next is already pinned: the map stops, the debate argues on with today's opening
+   * (`MAP_UNAVAILABLE_TODAYS_OPENING`, no spend stop), never a crash: `tests/unit/map-root-zero-room.test.ts` case
+   * "(a) a refusal only because of the room stops the MAP, never the arguing" and `tests/integration/debate-shape-run.test.ts`
+   * "a map call refused only to keep root 0's room …". Plan "Known limits" names this; sizing the plan ceilings for lengthed
+   * debates (or a tighter root-0 frame, or accepting the skip) is the owner's decision before shape and length are switched
+   * on together.
    * How the numbers are built:
-   * - Free's run ceiling: the site's per-run ceiling (the cost-envelope row's start value) cut to Free's whole monthly
+   * - A plan's run ceiling: the site's per-run ceiling (the cost-envelope row's start value) cut to the plan's whole monthly
    *   credit, as `pickerMoneyLimits` cuts a person's room (apps/api/src/person-room-picker.ts), then the BODY share (the
    *   map and root 0 both spend from the body; the serve reserve is held back).
    * - Root 0's seat: any of the preview's four DeepInfra seats (the dearest per attempt, as `rootZeroKeepRoomMicros` prices
@@ -149,25 +153,32 @@ describe("a lengthed map call", () => {
    * - Root 0's and the list call's token ceiling: the judge bound (the preview's is `previewCallBound`: the sealed JUDGE bound
    *   raised to PREVIEW_GLM_GENERATION_TOKEN_FLOOR, 8,192); the list call raised by `guidedMapBound`.
    * - One lengthed map list call: an angle list whose angle is at the runaway angle limits, at the dearest seat.
-   * - The seam: a Free run's BODY seam with nothing spent yet, built as `tests/unit/map-root-zero-room.test.ts` builds its
+   * - The seam: the plan's BODY seam with nothing spent yet, built as `tests/unit/map-root-zero-room.test.ts` builds its
    *   `seamAt` (`CostEnvelopeGuard(...).providerSeam(...)`), the room named as `keepRoomMicros`.
    */
-  describe("with the row on a Free run: root 0's room and one lengthed map list call (re-ruled)", () => {
-    const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "free", answerLength: "standard" });
+  describe("with the row: root 0's kept room and one lengthed map list call, on Free and at the paid start ceiling (Ruling I1)", () => {
     const site = COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value;
-    const free = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((plan) => plan.plan_id === "FREE")!;
-    const freePolicy = Object.freeze({ perRunCeilingMicros: Math.min(site.per_run_ceiling_micros, free.monthly_credit_micros),
-      dailyCeilingMicros: site.daily_ceiling_micros, serveReserveBasisPoints: site.serve_reserve_basis_points,
-      serveOverrunBasisPoints: site.serve_overrun_basis_points });
-    const freeBody = costEnvelopeCeilings({ perRunCeilingMicros: freePolicy.perRunCeilingMicros,
-      serveReserveBasisPoints: freePolicy.serveReserveBasisPoints }).bodyMicros;
+    /** A plan's run policy: the site's start per-run ceiling cut to the plan's monthly credit; and its BODY ceiling. */
+    const planMoney = (planId: "FREE" | "PLUS") => {
+      const plan = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.plans.find((row) => row.plan_id === planId)!;
+      const policy = Object.freeze({ perRunCeilingMicros: Math.min(site.per_run_ceiling_micros, plan.monthly_credit_micros),
+        dailyCeilingMicros: site.daily_ceiling_micros, serveReserveBasisPoints: site.serve_reserve_basis_points,
+        serveOverrunBasisPoints: site.serve_overrun_basis_points });
+      const body = costEnvelopeCeilings({ perRunCeilingMicros: policy.perRunCeilingMicros,
+        serveReserveBasisPoints: policy.serveReserveBasisPoints }).bodyMicros;
+      return Object.freeze({ policy, body });
+    };
+    const free = planMoney("FREE");
+    const paid = planMoney("PLUS");
     const price = (model: string) => {
       const row = previewModelRow(model)!;
       return Object.freeze({ inputMicrosPerMillionTokens: row.inputPriceMicrosPerMillion, outputMicrosPerMillionTokens: row.outputPriceMicrosPerMillion });
     };
     const seats = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"].map(price);
-    /** Root 0's kept room and the first lengthed list call (dearest seat) at one judge ceiling. */
-    const at = (judgeTokenCeiling: number) => {
+    const previewJudgeCeiling = Math.max(DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR);
+    /** Root 0's kept room and the first lengthed list call (dearest seat) at one judge ceiling, on one plan's guidance. */
+    const at = (judgeTokenCeiling: number, plan: "free" | "plus") => {
+      const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan, answerLength: "standard" });
       const room = rootZeroKeepRoomMicros({ prices: seats, ...rootZeroRoomAttempts({ questionLine: "Should cities price congestion?",
         argumentLanguageName: "English", questionLanguage: questionLanguageForBounds(), tokenCeiling: judgeTokenCeiling, lengthed: true,
         materialChars: rootZeroMapMaterialCharsFor(mapLimitsFor(true)) }),
@@ -183,32 +194,49 @@ describe("a lengthed map call", () => {
       const dearest = priced.reduce((most, next) => (next.micros > most.micros ? next : most));
       return { room, listCall: dearest.micros, dearestSeat: dearest.seat, projection };
     };
-    /** What a Free run's BODY seam, nothing spent yet, decides for that list call with root 0's room named. */
-    const seamDecision = async (state: ReturnType<typeof at>): Promise<string> => {
+    /** What a plan's BODY seam, nothing spent yet, decides for that list call with root 0's room named. */
+    const seamDecision = async (state: ReturnType<typeof at>, money: ReturnType<typeof planMoney>): Promise<string> => {
       const store: ModelSpendStore = {
         recordSpend: async () => undefined, readRunSpentMicros: async () => 0, readRunStorySpentMicros: async () => 0,
         readDaySpentMicros: async () => 0, admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
       };
-      const seam = new CostEnvelopeGuard({ store, policy: freePolicy, clock: () => new Date("2026-10-16T00:00:00.000Z") })
-        .providerSeam({ runId: "run-free", price: state.dearestSeat, requireReportedUsage: true, phase: "BODY" });
+      const seam = new CostEnvelopeGuard({ store, policy: money.policy, clock: () => new Date("2026-10-16T00:00:00.000Z") })
+        .providerSeam({ runId: "run-plan", price: state.dearestSeat, requireReportedUsage: true, phase: "BODY" });
       return Promise.resolve(seam.assertCallAllowed({ ...state.projection, keepRoomMicros: state.room })).then(
         () => "ADMITTED", (error: unknown) => (error instanceof TypedDomainError ? error.code : "UNTYPED"));
     };
 
-    it("at the preview's 8,192 judge ceiling the first lengthed list call is refused room-only (RUN_COST_ENVELOPE_ROOM_KEPT), never a money stop", async () => {
-      const judgeTokenCeiling = Math.max(DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR);
-      expect(judgeTokenCeiling).toBe(8192);
-      const preview = at(judgeTokenCeiling);
-      expect(preview.room).toBeLessThan(freeBody); // root 0 alone always fits: the debate still gets its answer
-      expect(preview.listCall).toBeLessThanOrEqual(freeBody); // the call alone would fit, so the refusal is the room's own
-      expect(preview.room + preview.listCall).toBeGreaterThan(freeBody); // but not beside root 0's room
-      expect(await seamDecision(preview)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    it("the preview's judge ceiling is 8,192 and the paid start body ceiling is above Free's", () => {
+      expect(previewJudgeCeiling).toBe(8192);
+      expect(paid.body).toBeGreaterThan(free.body);
     });
 
-    it("at a 4,096 judge ceiling the same call fits beside root 0's room", async () => {
-      const smaller = at(4096);
-      expect(smaller.room + smaller.listCall).toBeLessThanOrEqual(freeBody);
-      expect(await seamDecision(smaller)).toBe("ADMITTED");
+    it("on Free at the preview's 8,192: root 0's room alone is larger than Free's body; the first lengthed list call is refused room-only, never a money stop", async () => {
+      const state = at(previewJudgeCeiling, "free");
+      expect(state.room).toBeGreaterThan(free.body); // root 0's room alone does not fit Free
+      expect(state.listCall).toBeLessThanOrEqual(free.body); // the call alone would fit, so the refusal is the room's own
+      expect(await seamDecision(state, free)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    });
+
+    it("on Free at a 4,096 judge ceiling the first lengthed list call is refused room-only too, never a money stop", async () => {
+      const state = at(4096, "free");
+      expect(state.listCall).toBeLessThanOrEqual(free.body);
+      expect(state.room + state.listCall).toBeGreaterThan(free.body);
+      expect(await seamDecision(state, free)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    });
+
+    it("at the paid start ceiling and a 4,096 judge ceiling, root 0's room plus one lengthed list call fits: admitted", async () => {
+      const state = at(4096, "plus");
+      expect(state.room + state.listCall).toBeLessThanOrEqual(paid.body);
+      expect(await seamDecision(state, paid)).toBe("ADMITTED");
+    });
+
+    it("at the paid start ceiling and the preview's 8,192, root 0's room fits but not with one lengthed list call: refused room-only", async () => {
+      const state = at(previewJudgeCeiling, "plus");
+      expect(state.room).toBeLessThan(paid.body);
+      expect(state.listCall).toBeLessThanOrEqual(paid.body);
+      expect(state.room + state.listCall).toBeGreaterThan(paid.body);
+      expect(await seamDecision(state, paid)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
     });
   });
 });
