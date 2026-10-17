@@ -202,6 +202,23 @@ export function mapMergeAlsoRaised<T extends Readonly<{ claim: string; makers: r
 }
 
 /**
+ * Engine 2's members of `mapAlsoRaisedOf`, all or none (Task 9 fix round 1): the flag switches three behaviours, so it
+ * cannot be set without engine 2's word list, and engine 1 can pass none of them.
+ */
+type MapAlsoRaisedEngine =
+  | Readonly<{ unchosenAnswers?: false; checkFailed?: never; checkFailedMergedAnswerIds?: never; internalNames?: never }>
+  | Readonly<{
+    /** Engine 2 (spec §5.2 item 8): also list unchosen merged answers some AI raised blind (never a code-filled one). */
+    unchosenAnswers: true;
+    /** Engine 2 (deviation 8): words the answer check failed (`mapCheckFailedStatements`), never listed. */
+    checkFailed?: readonly string[];
+    /** Ruling R3-T9.1 (deviation 8 by id): merged answers behind failed answers (`mapCheckFailedMergedAnswerIds`), never listed. */
+    checkFailedMergedAnswerIds?: readonly string[];
+    /** Engine 2: the internal words the skip reads (MAP_ENGINE_INTERNAL_FIELD_NAMES); required with the flag. */
+    internalNames: readonly string[];
+  }>;
+
+/**
  * Whole-branch review m-3, ruling W-CUT: what a map run lists as "also raised, not debated", once `arguedAnswers` of
  * the chosen answers are argued. A chosen answer past that count (a maker sat out after the map chose) was raised and
  * never debated, so it is listed, with the key points only such answers took, beside the choice's own also-raised
@@ -213,13 +230,7 @@ export function mapAlsoRaisedOf(input: Readonly<{
   keyPoints: readonly MapKeyPoint[];
   mergedAnswers: readonly MapMergedAnswer[];
   arguedAnswers: number;
-  /** Engine 2 (spec §5.2 item 8): also list unchosen merged answers some AI raised blind (never a code-filled one). */
-  unchosenAnswers?: boolean;
-  /** Engine 2 (deviation 8): words the answer check failed (`mapCheckFailedStatements`), never listed. */
-  checkFailed?: readonly string[];
-  /** Engine 2: the internal words the skip reads. */
-  internalNames?: readonly string[];
-}>): readonly MapAlsoRaisedEntry[] {
+} & MapAlsoRaisedEngine>): readonly MapAlsoRaisedEntry[] {
   if (input.choice === null) return Object.freeze([]);
   const engine = input.unchosenAnswers === true;
   const argued = Math.max(0, Math.trunc(input.arguedAnswers));
@@ -237,8 +248,11 @@ export function mapAlsoRaisedOf(input: Readonly<{
       ...(engine ? { kind: "ANSWER" as const } : {}) }));
   const failed = new Set((input.checkFailed ?? []).map(mapNormaliseText));
   const chosenKeys = new Set(input.choice.answers.map((answer) => mapNormaliseText(answer.statement)));
+  // Ruling R3-T9.1: by id first (a chooser may reuse a merged answer in new words), the words as a second guard.
+  const leftOut = new Set([...input.choice.answers.flatMap((answer) => (answer.mergedAnswerId === undefined ? [] : [answer.mergedAnswerId])),
+    ...(input.checkFailedMergedAnswerIds ?? [])]);
   const unchosen = !engine ? [] : mapRankMergedAnswers(input.mergedAnswers)
-    .filter((answer) => answer.blindMakers.length >= 1)
+    .filter((answer) => answer.blindMakers.length >= 1 && !leftOut.has(answer.answerId))
     .filter((answer) => { const key = mapNormaliseText(answer.answer); return key !== "" && !chosenKeys.has(key) && !failed.has(key); })
     .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.answer, makers: answer.makers, kind: "ANSWER" }));
   const pointIds = [...new Set([...cut.flatMap(pointsOf).filter((id) => !arguedPoints.has(id)), ...input.choice.alsoRaised])];

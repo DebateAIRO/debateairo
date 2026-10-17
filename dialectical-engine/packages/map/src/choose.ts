@@ -97,6 +97,8 @@ type MapAnswerDraft = {
   assumptions: string[];
   /** Engine 2: key point ids dealt to this answer UNSIDED ("points raised"); always [] under engine 1. */
   raised: string[];
+  /** Ruling R3-T9.1: the merged answer it reuses (written only under engine 2), or null. */
+  mergedAnswerId: string | null;
 };
 
 const mapSideOf = (keyPoint: MapKeyPoint): "for" | "against" =>
@@ -177,16 +179,18 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       (answer) => answer.answer).slice(0, Math.max(1, maxAnswers));
     candidates.forEach((answer, index) => {
       drafts.push({ answerId: `a${String(index + 1)}`, statement: answer.answer, forIds: [], againstIds: [], rival: null, filled: false,
-        opposite: isOpposite(answer.answer), assumptions: [], raised: [] });
+        opposite: isOpposite(answer.answer), assumptions: [], raised: [], mergedAnswerId: answer.answerId });
     });
   } else {
     // The choose check refuses such a statement (MAP_ANSWER_NAMES_FIELD); one that reached here anyway is dropped, never shown.
     // Typed as either reply's answer, so the engine-2 `assumptions` member below is read by narrowing, never by a cast.
     const replyAnswers: readonly MapChooseReplyAnswer[] = input.reply.answers.filter((answer) => !named(answer.statement));
+    const mergedIds = new Set(input.mergedAnswers.map((answer) => answer.answerId));
     for (const answer of mapFirstOfEachStatement(replyAnswers, (entry) => entry.statement).slice(0, maxAnswers)) {
       drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: shownKeyPoints(answer.for), againstIds: shownKeyPoints(answer.against),
         rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement),
-        assumptions: noSiding && "assumptions" in answer ? (answer.assumptions ?? []).filter(readable) : [], raised: [] });
+        assumptions: noSiding && "assumptions" in answer ? (answer.assumptions ?? []).filter(readable) : [], raised: [],
+        mergedAnswerId: mergedIds.has(answer.answer_id) ? answer.answer_id : null });
     }
   }
 
@@ -210,7 +214,7 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       : fromOpposite !== undefined ? [fromOpposite.answer, "OPPOSITE_CASE_LIST"]
         : [mapOppositeTemplate(first?.statement ?? "", input.languageTag, input.claimMaxChars ?? MAP_LIMITS.claimMaxChars), "TEMPLATE"];
     drafts.push({ answerId: mintFilledId(), statement, forIds: [], againstIds: [], rival: first?.answerId ?? null, filled: true,
-      opposite: source === "OPPOSITE_CASE_LIST" || isOpposite(statement), assumptions: [], raised: [] });
+      opposite: source === "OPPOSITE_CASE_LIST" || isOpposite(statement), assumptions: [], raised: [], mergedAnswerId: fromMap?.answerId ?? null });
     marks.push(Object.freeze({ mark: "ANSWERS_FILLED", step: "CHOOSE", detail: source }));
   }
 
@@ -269,7 +273,8 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
       againstKeyPointIds: Object.freeze([...draft.againstIds]),
       strongestRival: mapChosenAnswerCodeId(rival),
       filled: draft.filled,
-      ...(noSiding ? { assumptions: Object.freeze([...draft.assumptions]), pointsRaised: Object.freeze([...draft.raised]) } : {})
+      ...(noSiding ? { assumptions: Object.freeze([...draft.assumptions]), pointsRaised: Object.freeze([...draft.raised]) } : {}),
+      ...(noSiding && draft.mergedAnswerId !== null ? { mergedAnswerId: draft.mergedAnswerId } : {})
     });
   });
   const finalChosen = chosenIds();

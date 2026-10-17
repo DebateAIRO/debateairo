@@ -124,6 +124,10 @@ export function mapCheckReadingOf(reply: MapCheckReply, checker: MapSeat): MapAn
 
 type Replacement = MapAnswerCheckResult["replacements"][number];
 
+/** Ruling R3-T9.1: a failed answer's merged-answer id goes with its replacement record; never written as undefined. */
+const mergedOf = (answer: MapChosenAnswer): Readonly<{ mergedAnswerId?: string }> =>
+  (answer.mergedAnswerId === undefined ? {} : { mergedAnswerId: answer.mergedAnswerId });
+
 /**
  * Applies one reading (spec §5.5). Null reading (no seat, a stop, the call failed after LG-A's repairs): the answers stand
  * unchecked, one MAP_CHECK_UNAVAILABLE. Else, for each chosen answer the checker failed, in answer order: the first passing
@@ -171,14 +175,17 @@ export function mapApplyAnswerCheck(input: Readonly<{
         answerId: original.answerId, statement: candidate.statement, forKeyPointIds: keptKnown(candidate.forKeyPointIds),
         againstKeyPointIds: keptKnown(candidate.againstKeyPointIds), strongestRival: original.strongestRival, filled: false,
         assumptions: Object.freeze([...candidate.assumptions]), pointsRaised: Object.freeze([]) })));
-      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: candidate.checkId, action: "REPLACED" }));
+      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: candidate.checkId, action: "REPLACED",
+        ...mergedOf(original) }));
       marks.push(Object.freeze({ mark: "MAP_ANSWER_REPLACED", step: "CHECK", detail: `${original.answerId}>${candidate.checkId}` }));
     } else if (answers.length - 1 >= MAP_LIMITS.chooseDistinctAnswersMin) {
       answers = answers.filter((answer) => answer.answerId !== original.answerId);
-      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: null, action: "DROPPED" }));
+      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: null, action: "DROPPED",
+        ...mergedOf(original) }));
       marks.push(Object.freeze({ mark: "MAP_ANSWER_DROPPED", step: "CHECK", detail: original.answerId }));
     } else {
-      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: null, action: "KEPT_UNCHECKED" }));
+      replacements.push(Object.freeze({ answerId: original.answerId, statement: original.statement, replacedBy: null, action: "KEPT_UNCHECKED",
+        ...mergedOf(original) }));
       marks.push(Object.freeze({ mark: "MAP_ANSWER_KEPT_UNCHECKED", step: "CHECK", detail: original.answerId }));
     }
   }
@@ -202,6 +209,21 @@ export function mapAnswerCheckCodes(result: MapAnswerCheckResult): readonly stri
   const order = (id: string): number => (id.startsWith("a") ? 0 : 10) + Number(id.slice(1));
   return Object.freeze(Object.keys(result.outcomes).sort((left, right) => order(left) - order(right))
     .map((id) => `${id}:${result.outcomes[id]!}${after.get(id) ?? ""}`));
+}
+
+/**
+ * The merged-answer ids the chooser's choice kept (ruling R3-T9.1): each chosen answer's `mergedAnswerId`, after choose's
+ * own drops. Such an answer is debated, so it is never a candidate nor listed as "also raised, not debated".
+ */
+export function mapKeptMergedAnswerIds(choice: MapChoice): readonly string[] {
+  return Object.freeze(choice.answers.flatMap((answer) => (answer.mergedAnswerId === undefined ? [] : [answer.mergedAnswerId])));
+}
+
+/** Ruling R3-T9.1 (deviation 8 by id): the merged answers behind replaced or dropped answers, never listed as "also raised". */
+export function mapCheckFailedMergedAnswerIds(result: MapAnswerCheckResult | undefined): readonly string[] {
+  if (result === undefined) return Object.freeze([]);
+  return Object.freeze(result.replacements.flatMap((entry) =>
+    (entry.action === "KEPT_UNCHECKED" || entry.mergedAnswerId === undefined ? [] : [entry.mergedAnswerId])));
 }
 
 /** Deviation 8: the words the check failed (replaced or dropped answers, failed candidates), never listed as "also raised". */

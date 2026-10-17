@@ -1,5 +1,5 @@
 import { MAP_CHECK_CALL_SITE_KEY, TypedDomainError, lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpectation } from "@debateai/kernel";
-import { mapApplyAnswerCheck, mapCheckCandidatesOf, mapCheckEntriesOf, mapCheckReadingOf } from "./check.js";
+import { mapApplyAnswerCheck, mapCheckCandidatesOf, mapCheckEntriesOf, mapCheckReadingOf, mapKeptMergedAnswerIds } from "./check.js";
 import { mapFinishChoice, mapInternalWordsSkipped } from "./choose.js";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES } from "./internal-words.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
@@ -352,9 +352,9 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
   if (engine !== undefined && choice.answers.length > 0) {
     const candidates = mapCheckCandidatesOf({ choice, mergedAnswers: merged.mergedAnswers, max: engine.answerCheckCandidates,
       internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES,
-      // Pre-flight PF-R33.8 (pre-flight consistency: Task 8's member, passed here): the merged answers the chooser's ACCEPTED
-      // reply reused (its answer ids name merged answers) are never candidates, even reworded; empty under the choose fallback.
-      keptMergedAnswerIds: new Set(reply?.answers.map((answer) => answer.answer_id) ?? []) });
+      // Pre-flight PF-R33.8 (Task 8's member, passed here) as ruled R3-T9.1: the merged answers the choice ACTUALLY kept
+      // (after choose's own drops) are never candidates, even reworded; one choose dropped stays available.
+      keptMergedAnswerIds: new Set(mapKeptMergedAnswerIds(choice)) });
     const entries = mapCheckEntriesOf(choice, candidates);
     const checker = mapPickChecker(order, run.out, chooser);
     const checked = checker === null ? null

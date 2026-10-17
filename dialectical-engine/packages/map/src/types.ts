@@ -186,6 +186,13 @@ export type MapChosenAnswer = Readonly<{
    * most-raised points for an answer with no sided points, and the quota fills. Never for or against by code.
    */
   pointsRaised?: readonly string[];
+  /**
+   * Engine 2 only (ruling R3-T9.1): the merged answer this answer reuses, by its id — the chooser's own answer_id when it
+   * names a merged answer (maybe reworded, PF-R33.8), or the merged answer code chose or filled from. Absent for an answer
+   * that reuses none (a new one, a template fill, a replacement by the check) and always under engine 1. It is what makes
+   * "also raised, not debated" and the check's candidates leave a debated answer out by id, not only by its words.
+   */
+  mergedAnswerId?: string;
 }>;
 
 /** Engine 2 only (spec §5.2 item 3): a reserve answer choose named, in its order (`r1`, `r2`, minted by code). */
@@ -243,6 +250,8 @@ export type MapAnswerCheckResult = Readonly<{
     /** A check id (`c<n>`), or null when dropped or kept. */
     replacedBy: string | null;
     action: "REPLACED" | "DROPPED" | "KEPT_UNCHECKED";
+    /** Ruling R3-T9.1: the failed answer's `mergedAnswerId`, when it reused one; absent otherwise. */
+    mergedAnswerId?: string;
   }>[];
 }>;
 

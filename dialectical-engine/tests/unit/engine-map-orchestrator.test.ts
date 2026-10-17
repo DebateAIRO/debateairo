@@ -5,7 +5,9 @@ import {
   MAP_ENGINE_CONTRACT_IDS, mapAlsoRaisedOf, mapProviderPieces, mapRunAngleMap, type MapCallOutcome, type MapCallRequest, type MapCaller,
   type MapLength, type MapRunInput,
   // Review carries (the last describe).
-  MAP_ENGINE_INTERNAL_FIELD_NAMES, MAP_INTERNAL_FIELD_NAMES, type MapKeyPoint, type MapPointItem
+  MAP_ENGINE_INTERNAL_FIELD_NAMES, MAP_INTERNAL_FIELD_NAMES, type MapKeyPoint, type MapPointItem,
+  // Fix round 1.
+  mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapFinishChoice, type MapResult
 } from "@debateai/map";
 import { readPromptFrame } from "@debateai/providers";
 import { engineMapScriptedContent, type EngineMapScriptOptions } from "../support/engine-map-script.js";
@@ -100,7 +102,8 @@ describe("engine 2: 'also raised' lists the unchosen answers some AI raised (spe
   const mergedAnswers = [merged("an01", "Yes.", ["m1"]), merged("an02", "Only at night.", ["m1", "m2"]), merged("an03", "It depends.", ["m3"]),
     merged("an04", "Shown later only.", [])];
   it("lists an unchosen merged answer raised blind, as ANSWER; never a chosen one, a failed one or one raised only when shown", () => {
-    const listed = mapAlsoRaisedOf({ choice, keyPoints: [], mergedAnswers, arguedAnswers: 2, unchosenAnswers: true, checkFailed: ["It depends."] });
+    const listed = mapAlsoRaisedOf({ choice, keyPoints: [], mergedAnswers, arguedAnswers: 2, unchosenAnswers: true, checkFailed: ["It depends."],
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
     expect(listed).toEqual([{ keyPointId: "an02", claim: "Only at night.", makers: ["m1", "m2"], kind: "ANSWER" }]);
   });
   it("without the flag, today's list", () => {
@@ -195,11 +198,129 @@ describe("engine 2: the orchestrator's wiring of Tasks 5-8 (review carries)", ()
     const keyPoints = [keyPoint("kp01", "The city budget is tight.", "assumption"), keyPoint("kp02", "Riders are few at night.", "question")];
     const choice = { answers: [{ answerId: "a1", statement: "Yes.", forKeyPointIds: [], againstKeyPointIds: [], strongestRival: "a2", filled: false },
       { answerId: "a2", statement: "No.", forKeyPointIds: [], againstKeyPointIds: [], strongestRival: "a1", filled: false }], alsoRaised: ["kp01", "kp02"] };
-    const engine = mapAlsoRaisedOf({ choice, keyPoints, mergedAnswers: [], arguedAnswers: 2, unchosenAnswers: true });
+    const engine = mapAlsoRaisedOf({ choice, keyPoints, mergedAnswers: [], arguedAnswers: 2, unchosenAnswers: true,
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
     expect(engine).toEqual([{ keyPointId: "kp01", claim: "The city budget is tight.", makers: ["m1"], restsOn: "assumption" },
       { keyPointId: "kp02", claim: "Riders are few at night.", makers: ["m1"], restsOn: "question" }]);
     // Engine 1: no such key at all (toEqual would not see an undefined one).
     const today = mapAlsoRaisedOf({ choice, keyPoints, mergedAnswers: [], arguedAnswers: 2 });
     expect(today.map((entry) => Object.keys(entry).sort())).toEqual([["claim", "keyPointId", "makers"], ["claim", "keyPointId", "makers"]]);
+  });
+});
+
+// Task 9 fix round 1 (ruling R3-T9.1, review Minors 1, 3, 4).
+describe("engine 2: 'also raised' leaves out debated and failed answers by id (ruling R3-T9.1)", () => {
+  const fieldOf = (request: MapCallRequest<unknown>, name: string) => frameOf(request).fields.find((entry) => entry.name === name)?.content ?? "";
+  const edited = (request: MapCallRequest<unknown>, edit: (value: Record<string, unknown>) => void): MapCallOutcome<unknown> => {
+    const frame = frameOf(request);
+    const value = JSON.parse(engineMapScriptedContent(frame.contractId, frame.fields)!) as Record<string, unknown>;
+    edit(value);
+    const reply = JSON.stringify(value);
+    if (request.spec.classify(reply, STOP).parseStatus !== "PARSED") return { kind: "FAILED", code: "TEST_UNPARSED" };
+    return { kind: "OK", value: request.spec.read(reply, STOP) };
+  };
+  const REWORDED = "Yes, but only on weekday mornings.";
+  const rewordFirst = (request: MapCallRequest<unknown>) => (request.callSiteKey !== "MAP:choose" ? null
+    : edited(request, (value) => { (value.answers as { statement: string }[])[0]!.statement = REWORDED; }));
+  const alsoRaisedOf = (result: MapResult, arguedAnswers = 2) => mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints,
+    mergedAnswers: result.mergedAnswers, arguedAnswers, unchosenAnswers: true, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES,
+    checkFailed: mapCheckFailedStatements(result.answerCheck), checkFailedMergedAnswerIds: mapCheckFailedMergedAnswerIds(result.answerCheck) });
+  const shownAnswers = (requests: readonly MapCallRequest<unknown>[]) =>
+    JSON.parse(fieldOf(requests.find((request) => request.callSiteKey === "MAP:choose")!, "answers")) as { answer_id: string; answer: string }[];
+
+  it("a chosen answer the chooser reworded is debated: its merged words are never listed as not debated", async () => {
+    const { caller, requests } = scripted({}, rewordFirst);
+    const result = await mapRunAngleMap(input(caller));
+    const kept = shownAnswers(requests)[0]!;
+    expect(result.choice!.answers[0]).toMatchObject({ statement: REWORDED, mergedAnswerId: kept.answer_id });
+    const claims = alsoRaisedOf(result).map((entry) => entry.claim);
+    expect(claims).not.toContain(kept.answer);
+    // The other unchosen merged answers some AI raised blind are still listed.
+    expect(claims.length).toBeGreaterThan(0);
+  });
+
+  it("a reworded answer that failed the check is never listed (deviation 8)", async () => {
+    const { caller, requests } = scripted({ failChecks: ["a1"] }, rewordFirst);
+    const result = await mapRunAngleMap(input(caller));
+    const kept = shownAnswers(requests)[0]!;
+    expect(result.answerCheck!.replacements).toEqual([{ answerId: "a1", statement: REWORDED, replacedBy: "c1", action: "REPLACED",
+      mergedAnswerId: kept.answer_id }]);
+    // The replacement's words are the reserve's, so the answer now debated reuses no merged answer.
+    expect("mergedAnswerId" in result.choice!.answers[0]!).toBe(false);
+    expect(mapCheckFailedMergedAnswerIds(result.answerCheck)).toEqual([kept.answer_id]);
+    const claims = alsoRaisedOf(result).map((entry) => entry.claim);
+    expect(claims).not.toContain(kept.answer);
+    expect(claims).not.toContain(REWORDED);
+  });
+
+  it("review Minor 1: a reply answer choose itself dropped (past P) stays a candidate for the check", async () => {
+    const { caller, requests } = scripted({}, (request) => (request.callSiteKey !== "MAP:choose" ? null : edited(request, (value) => {
+      const shown = JSON.parse(fieldOf(request, "answers")) as { answer_id: string; answer: string }[];
+      const answers = value.answers as Record<string, unknown>[];
+      answers.push({ answer_id: shown[2]!.answer_id, statement: shown[2]!.answer, for: [], against: [], strongest_rival: shown[0]!.answer_id,
+        assumptions: [] });
+    })));
+    const result = await mapRunAngleMap(input(caller));
+    const dropped = shownAnswers(requests)[2]!;
+    expect(result.choice!.answers).toHaveLength(2);
+    expect(result.answerCheck!.candidates.map((candidate) => candidate.statement)).toContain(dropped.answer);
+  });
+
+  it("fix round 1, review Minor 3: the flag cannot be set without engine 2's word list (pinned by the typecheck)", () => {
+    // @ts-expect-error internalNames is required with unchosenAnswers: true
+    expect(mapAlsoRaisedOf({ choice: null, keyPoints: [], mergedAnswers: [], arguedAnswers: 0, unchosenAnswers: true })).toEqual([]);
+  });
+
+  it("engine 1 gains no new key: a choice without siding NONE names no merged answer", () => {
+    const keyPoint: MapKeyPoint = { keyPointId: "kp01", claim: "Riders are few at night.", memberItemIds: ["pt01"], blindMakers: ["m1"], gapMakers: [],
+      makers: ["m1"], fixedAngleKinds: [], leansAgainst: false };
+    const merged = (answerId: string, answer: string) => ({ answerId, answer, memberItemIds: ["ca01"], blindMakers: ["m1"], makers: ["m1"], fromOppositeCase: false });
+    const reply = { answers: [{ answer_id: "an01", statement: "Yes, reworded.", for: ["kp01"], against: [], strongest_rival: "an02" },
+      { answer_id: "an02", statement: "No.", for: [], against: [], strongest_rival: "an01" }] };
+    const base = { reply, keyPoints: [keyPoint], mergedAnswers: [merged("an01", "Yes."), merged("an02", "No.")], items: [], languageTag: "en",
+      maxAnswers: 2, pointsPerAnswer: 2 };
+    for (const answer of mapFinishChoice(base).choice.answers) expect("mergedAnswerId" in answer).toBe(false);
+    const engine = mapFinishChoice({ ...base, siding: "NONE", internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES }).choice.answers;
+    expect(engine.map((answer) => answer.mergedAnswerId)).toEqual(["an01", "an02"]);
+    // Under the fallback the code chooses merged answers, so it names them too (engine 2 only).
+    const fallback = mapFinishChoice({ ...base, reply: null, siding: "NONE", internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES }).choice.answers;
+    expect(fallback.map((answer) => answer.mergedAnswerId)).toEqual(["an01", "an02"]);
+    for (const answer of mapFinishChoice({ ...base, reply: null }).choice.answers) expect("mergedAnswerId" in answer).toBe(false);
+  });
+});
+
+describe("engine 2: the check's edges at the orchestrator (review Minor 4)", () => {
+  it("no seat left to check: no MAP:check call, the answers stand unchecked with the mark", async () => {
+    // maker-b merges and goes busy; only maker-a is left, and the chooser is maker-a.
+    const seats = [Object.freeze({ aiRef: "preview:a0", maker: "maker-a" }), Object.freeze({ aiRef: "preview:b1", maker: "maker-b" }),
+      Object.freeze({ aiRef: "preview:a2", maker: "maker-a" })];
+    const { caller, requests } = scripted({}, (request) => (request.callSiteKey === "MAP:merge" ? { kind: "BUSY", code: "TEST_BUSY" } : null));
+    const result = await mapRunAngleMap(input(caller, { seats }));
+    expect(requests.find((request) => request.callSiteKey === "MAP:choose")!.seat.maker).toBe("maker-a");
+    expect(requests.some((request) => request.callSiteKey === "MAP:check")).toBe(false);
+    expect(result.marks).toContainEqual({ mark: "MAP_CHECK_UNAVAILABLE", step: "CHECK", detail: "no seat to check" });
+    expect(result.answerCheck!.checker).toBeNull();
+    expect(Object.values(result.answerCheck!.outcomes).every((outcome) => outcome === "UNCHECKED")).toBe(true);
+  });
+
+  it("an unavailable engine-2 map asks no check and has no answerCheck key", async () => {
+    const { caller, requests } = scripted({}, (request) => (request.step === "LIST" ? { kind: "FAILED", code: "TEST_FAILED" } : null));
+    const result = await mapRunAngleMap(input(caller));
+    expect(result.kind).toBe("UNAVAILABLE");
+    expect(requests.some((request) => request.callSiteKey === "MAP:check")).toBe(false);
+    expect("answerCheck" in result).toBe(false);
+  });
+
+  it("a cut answer is listed with kind ANSWER under engine 2, and with no kind key under engine 1", async () => {
+    const { caller } = scripted({});
+    const result = await mapRunAngleMap(input(caller));
+    const cut = result.choice!.answers[1]!;
+    const engine = mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints, mergedAnswers: result.mergedAnswers, arguedAnswers: 1,
+      unchosenAnswers: true, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
+    expect(engine.find((entry) => entry.keyPointId === cut.answerId)).toMatchObject({ claim: cut.statement, kind: "ANSWER" });
+    const today = mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints, mergedAnswers: result.mergedAnswers, arguedAnswers: 1 });
+    const entry = today.find((listed) => listed.keyPointId === cut.answerId)!;
+    expect(entry.claim).toBe(cut.statement);
+    expect("kind" in entry).toBe(false);
   });
 });
