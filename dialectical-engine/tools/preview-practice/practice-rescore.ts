@@ -219,8 +219,14 @@ export function reproduceServedPropagation(graph: TranscriptEngineGraph): Readon
   const ok = worstDelta <= PRACTICE_RESCORE_SWEEP.tolerance;
   if (!ok) return Object.freeze({ ok, worstDelta, what: `${graph.engine === 1 ? "" : "engine2 "}delta ${String(worstDelta)}` });
   // R2b B12 (ruling R2b-B12.1): under the comparing judges' rule the judges chose the served answer, so the recorded root
-  // is taken as their choice and is never required to be the honest-strength leader. Every other rule: the check below.
-  if (graph.served.servedRootRule === SERVED_ROOT_SELECTION_RULE_JUDGES) return Object.freeze({ ok, worstDelta, what: "" });
+  // is taken as their choice and is never required to be the honest-strength leader; it must still be an answer that
+  // could be served, a root with a served final strength (R2b final wave P14, B12 Minor 4). Every other rule: below.
+  if (graph.served.servedRootRule === SERVED_ROOT_SELECTION_RULE_JUDGES) {
+    const chosen = graph.served.servedRootNodeId;
+    const servableChoice = chosen !== null && Object.hasOwn(served, chosen)
+      && graph.nodes.some((node) => node.kind === "ROOT" && node.nodeId === chosen);
+    return Object.freeze(servableChoice ? { ok, worstDelta, what: "" } : { ok: false, worstDelta, what: "served-root" });
+  }
   // R2a final wave (Ruling (A16 Important 1) Minor 1): the served answer, by the runner's own rule over the answers that
   // could be served (those with a served final strength); one that is not given back would make every "lead changed
   // from engine 1" in the sweep spurious.

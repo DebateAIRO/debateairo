@@ -66,8 +66,11 @@ const RECOUNT_LABEL = Object.freeze({ clearAgreeing: 1, closeCallAgreeing: 1 });
 /** The runner's root call sites (apps/runner rootCallSiteKey, FIRST_POSITION_CALL_SITE_KEY): the root's plan place. */
 const ROOT_SITES = Object.freeze({ first: "JUDGE", second: "JUDGE:root:secondary", numbered: /^JUDGE:root:(\d+)$/u });
 
-/** The plan place a root's author call names (a structure repair is filed under the key it repairs), or null. */
-function rootIndexOfCallSite(key: string): number | null {
+/**
+ * The plan place a root's author call names (a structure repair is filed under the key it repairs), or null. Exported for
+ * the practice report, which keeps only the root sites it reads (R2b final wave P11).
+ */
+export function rootIndexOfCallSite(key: string): number | null {
   const unrepaired = key.startsWith(STRUCTURE_REPAIR_CALL_SITE_PREFIX) ? key.slice(STRUCTURE_REPAIR_CALL_SITE_PREFIX.length) : key;
   const base = seatBaseCallSiteKey(unrepaired);
   if (base === ROOT_SITES.first) return 0;

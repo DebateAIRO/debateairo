@@ -87,6 +87,9 @@ describe("R2 B11: the comparing judges' block of the practice report", () => {
 
   it("never selects the stored counted hint or the reasons; skips a set-aside copy's answers", () => {
     expect(PRACTICE_JUDGE_VOTES_SQL).not.toMatch(/counted|content|reasons/u);
+    // R2b final wave P11 (B11 Minor 2): votes are read whole, one row per seat: never joined to the nodes, never
+    // stale-filtered (a reused vote names a dead copy's root, lettered by plan place).
+    expect(PRACTICE_JUDGE_VOTES_SQL).not.toMatch(/core\.node|stale/u);
     expect(PRACTICE_JUDGE_ROOTS_SQL).toContain("root.generation_status IS DISTINCT FROM 'stale'");
     expect(PRACTICE_JUDGE_ROOTS_SQL).toContain("root.parent_node_id IS NULL");
   });
@@ -137,6 +140,19 @@ describe("R2 B11: the comparing judges' block of the practice report", () => {
     expect(practiceJudgesBlocks(ownMaker).judgeVotes.map((vote) => [vote.counted, vote.notCountedReason]))
       .toEqual([[false, "OWN_MAKER"], [false, "OWN_MAKER"]]);
     expect(practiceJudgesBlocks(ownMaker).conditionalWinner).toBe(false);
+  });
+
+  // R2b final wave P11 (B11 Minor 3): the answers A and C (B sat out); the join also finds another call for A's artifact.
+  // Only a root author call's key is read as a plan place, so A stays letter A and C letter C, and the votes count.
+  it("reads only root author calls' keys as plan places, so another call for a root's artifact cannot hide the count", () => {
+    const votes = VOTES.map((vote) => vote.chosen_letter === null ? vote : { ...vote, chosen_letter: "C" });
+    const facts = { ...FACTS, votes, roots: Object.freeze([
+      { node_id: OTHER, maker: "zhipu", call_site_key: "JUDGE" },
+      { node_id: OTHER, maker: "zhipu", call_site_key: "JUDGE:critic:0:seat:main" },
+      { node_id: SERVED, maker: "moonshot", call_site_key: "JUDGE:root:2" }
+    ]) };
+    expect(practiceJudgesBlocks(facts).judgeVotes.map((vote) => [vote.letter, vote.counted]))
+      .toEqual([["C", true], ["C", true], [null, false]]);
   });
 
   it("follows the recount, never a stored counted hint that drifted after a resume", () => {

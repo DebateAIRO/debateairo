@@ -53,26 +53,25 @@ export const PRACTICE_TRANSCRIPT_FILE = "transcript.json";
 /**
  * Engine redesign R2b (B11b, D3): the comparing judges' recorded votes, content-free columns only (the reasons are
  * encrypted content and are not needed): the judges' order practice re-asks each judge from the saved transcript, after
- * the throwaway database is gone. `counted` / `not_counted_reason` are the stored hint, kept as recorded; nothing reads
- * them as which votes counted (controller ruling R2b-B5.1: a reader that needs that recounts with recountJudgesVotes).
+ * the throwaway database is gone. The stored `counted` / `not_counted_reason` hint is not selected (controller ruling
+ * R2b-B5.1, R2b final wave P12): a reader that needs which votes counted recounts with recountJudgesVotes.
  */
 export const PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL = `SELECT judge_seat, maker, provider_ref, model_id, chosen_letter, conditional,
-       counted, not_counted_reason, question_kind, same_as FROM ledger.verdict_vote WHERE run_id=$1 ORDER BY judge_seat`;
+       question_kind, same_as FROM ledger.verdict_vote WHERE run_id=$1 ORDER BY judge_seat`;
 
 export type TranscriptJudgeVote = Readonly<{
   seat: number; maker: string; providerRef: string; modelId: string; letter: string | null; conditional: boolean | null;
-  /** The stored hint as recorded (ruling R2b-B5.1: never read as which votes counted). */
-  counted: boolean; notCountedReason: string | null; questionKind: string | null; sameAs: readonly (readonly string[])[];
+  questionKind: string | null; sameAs: readonly (readonly string[])[];
 }>;
 
 /** The run's recorded votes in seat order (none on engine 1, or when no judge was seated). */
 export async function readTranscriptJudgeVotes(pool: Pick<Pool, "query">, runId: string): Promise<readonly TranscriptJudgeVote[]> {
   const rows = (await pool.query<{ judge_seat: number; maker: string; provider_ref: string; model_id: string;
-    chosen_letter: string | null; conditional: boolean | null; counted: boolean; not_counted_reason: string | null;
-    question_kind: string | null; same_as: unknown }>(PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL, [runId])).rows;
+    chosen_letter: string | null; conditional: boolean | null; question_kind: string | null; same_as: unknown }>(
+    PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL, [runId])).rows;
   return Object.freeze(rows.map((row) => Object.freeze({
     seat: row.judge_seat, maker: row.maker, providerRef: row.provider_ref, modelId: row.model_id, letter: row.chosen_letter,
-    conditional: row.conditional, counted: row.counted, notCountedReason: row.not_counted_reason, questionKind: row.question_kind,
+    conditional: row.conditional, questionKind: row.question_kind,
     sameAs: Object.freeze(Array.isArray(row.same_as)
       ? row.same_as.filter((group): group is string[] => Array.isArray(group) && group.every((letter) => typeof letter === "string"))
         .map((group) => Object.freeze([...group]))

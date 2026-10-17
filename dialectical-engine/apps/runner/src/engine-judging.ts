@@ -167,7 +167,9 @@ export function comparingJudgeVoteLettersStand(
  * judgement, or it abstained; `evaluate` gives such a node no strength) sorts last at the bottom of the scale, as A8's
  * links and A14's material read it. Only a point that should have propagated (in the standing snapshot, a base, not
  * abstained: `propagatableNodeIds`) and still has no strength is a code defect (controller carry 7; B5 fix 1, Important
- * 1). A rival reply is named only when it came from a servable answer (pre-flight PF-R2b3.19).
+ * 1). A rival reply is named only when it came from a servable answer (pre-flight PF-R2b3.19). A kept point that is
+ * neither in the standing snapshot nor hidden by the standing projection was built from another graph than the one this
+ * pass propagated: a source/snapshot mismatch, a named code defect (R2b final wave P5, B5 re-review Minor 1).
  */
 export function comparingJudgesSourceOf(input: Readonly<{
   source: EngineMaterialSource;
@@ -175,6 +177,10 @@ export function comparingJudgesSourceOf(input: Readonly<{
   honestFinalStrength: ReadonlyMap<string, number>;
   /** The standing snapshot's nodes with a base strength that did not abstain: each one must have propagated. */
   propagatableNodeIds: ReadonlySet<string>;
+  /** Every node of the standing snapshot. */
+  standingNodeIds: ReadonlySet<string>;
+  /** The nodes the standing projection hid (no judged basis). */
+  hiddenNodeIds: ReadonlySet<string>;
 }>): EngineMaterialSource {
   const servableLetters = new Set(input.source.answers.filter((answer) => input.servableRootIds.has(answer.rootNodeId))
     .map((answer) => answer.letter));
@@ -182,6 +188,9 @@ export function comparingJudgesSourceOf(input: Readonly<{
     ...input.source,
     answers: Object.freeze(input.source.answers.filter((answer) => servableLetters.has(answer.letter))),
     points: Object.freeze(input.source.points.filter((point) => servableLetters.has(point.answerLetter)).map((point) => {
+      if (!input.standingNodeIds.has(point.nodeId) && !input.hiddenNodeIds.has(point.nodeId)) {
+        throw new TypeError("ENGINE_MATERIAL_INVALID:sourceSnapshot");
+      }
       const strength = input.honestFinalStrength.get(point.nodeId);
       if (strength === undefined && input.propagatableNodeIds.has(point.nodeId)) {
         throw new TypeError("ENGINE_MATERIAL_INVALID:honestFinalStrength");

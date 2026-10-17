@@ -127,14 +127,15 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
   });
 
   it("words every state's label without a story, and never prints the state's code (R2 B8 fix 1)", async () => {
-    const words = publicEnglish as Record<string, string>;
-    for (const [state, key] of [
+    // R2b final wave P8 (B8 re-review Minor 1): an English interface and a Romanian one, each in its own words.
+    for (const interfaceCatalog of [publicEnglish, publicRomanian]) for (const [state, key] of [
       ["SUPPORTED", "public.story.label.supported"], ["CONTESTED", "public.story.label.contested"],
       ["UNSUPPORTED", "public.story.label.unsupported"], ["SPLIT", "public.story.label.split"]
     ] as const) {
+      const words = interfaceCatalog as Record<string, string>;
       const debate = PublicDebateSchema.parse({ ...BASE, answer: { ...BASE.answer, verdict: state } });
       const container = await mount(
-        <PublicDebateOverview debate={debate} catalog={publicEnglish} storyCatalog={publicRomanian} storyLocale="ro"
+        <PublicDebateOverview debate={debate} catalog={interfaceCatalog} storyCatalog={publicRomanian} storyLocale="ro"
           onDetails={() => undefined} onRead={() => undefined} />
       );
       expect(container.querySelector("#public-verdict-label")?.textContent).toBe(words[key]);

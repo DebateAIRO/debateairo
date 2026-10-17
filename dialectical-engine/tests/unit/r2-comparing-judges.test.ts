@@ -242,6 +242,8 @@ describe("reading a judge's reply", () => {
     expect(classify({ ...REPLY, best: 0.7 }).parseStatus).toBe("SCHEMA_FAILED");
     expect(classify({ ...REPLY, question_kind: "politics" }).parseStatus).toBe("SCHEMA_FAILED");
     expect(classify({ ...REPLY, reasons: "" }).parseStatus).toBe("SCHEMA_FAILED");
+    // B1 Minor 4 (R2b final wave P1): reasons of only spaces, tabs and line breaks are no reasons.
+    expect(classify({ ...REPLY, reasons: " \t\n  " }).parseStatus).toBe("SCHEMA_FAILED");
   });
 });
 
@@ -283,6 +285,9 @@ describe("who judges: pickComparingJudges", () => {
       expect(() => pickComparingJudges({ seats: SEATS, arguingMakers: ARGUING, ...bad }))
         .toThrowError(expect.objectContaining({ code: "COMPARING_JUDGE_SEATS_INVALID" }));
     }
+    // B1 Minor 2 (R2b final wave P1): the offset is checked before the empty-seats return.
+    expect(() => pickComparingJudges({ seats: [], arguingMakers: ARGUING, count: 3, rotationOffset: -1 }))
+      .toThrowError(expect.objectContaining({ code: "COMPARING_JUDGE_SEATS_INVALID" }));
   });
 });
 
@@ -339,6 +344,12 @@ describe("asking one judge", () => {
       expect(field.content, field.name).not.toMatch(/\d/u);
       expect(field.content, field.name).not.toMatch(NUMBER_WORD);
     }
+  });
+
+  // B1 Minor 4 (R2b final wave P1): the reasons come back trimmed.
+  it("returns the judge's reasons trimmed", async () => {
+    const answer = await askComparingJudge(scripted(JSON.stringify({ ...REPLY, reasons: `  ${REPLY.reasons}\n ` }), []), INPUT);
+    expect(answer.reply.reasons).toBe(REPLY.reasons);
   });
 
   it("names a reply that never passed as COMPARING_JUDGE_REPLY_REFUSED, with codes and paths only", async () => {

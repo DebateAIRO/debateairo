@@ -166,8 +166,8 @@ export function comparingJudgeOrder(answerCount: number, seat: number): readonly
 }
 
 // OWNER WORDING — approve before switch-on (the material's keys below and in `comparingJudgeMaterialFields` are new
-// words the AI reads: answer, case, supporting_points, objections, assumptions, disputed, not_yet_checked, rests_on,
-// from_rival_reply, investigation, reviewer_reasons, disputed_points).
+// words the AI reads: answers, letter, answer, case, supporting_points, objections, assumptions, disputed,
+// not_yet_checked, rests_on, from_rival_reply, investigation, reviewer_reasons, disputed_points).
 /** One point as a judge reads it: its words and its labels; never its node id, its maker or a number. */
 function pointForJudge(point: EngineMaterialPoint) {
   return Object.freeze({

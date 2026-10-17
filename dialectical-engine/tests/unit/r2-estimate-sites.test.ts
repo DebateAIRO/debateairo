@@ -150,6 +150,28 @@ describe("R2 B10: engine calls at their own steps' allowance (never under-counte
     expect(previewOutputTokensForBasis(OUT, roomy(true)).debate).toBe(judge);
     expect(previewOutputTokensForBasis(OUT, roomy(false)).debate).toBeLessThan(judge);
   });
+  // R2b final wave P10 (B10 Minor 1): when the investigator thinks longer than the judge, the investigator's allowance
+  // prices the debate calls (PREVIEW_ENGINE_DEBATE_STEPS' "investigator" is read, not only the judge).
+  it("the preview prices an engine receipt's debate calls at the investigator's allowance when it is the largest", () => {
+    const INVESTIGATOR_ROOMIER = Object.freeze({ ...LENGTH, thinkingRoom: Object.freeze({ ...LENGTH.thinkingRoom,
+      comparing_judge: 16 * 1024, investigator: 24 * 1024 }) });
+    const basis = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, length: INVESTIGATOR_ROOMIER,
+      engine: engineSettingsOf(POLICY, { makers: 2, mapOpening: false }) });
+    const investigator = lengthGuidanceAllowanceTokens(INVESTIGATOR_ROOMIER, "investigator", OUT.debate);
+    expect(investigator).toBeGreaterThan(lengthGuidanceAllowanceTokens(INVESTIGATOR_ROOMIER, "comparing_judge", OUT.debate));
+    expect(previewOutputTokensForBasis(OUT, basis).debate).toBe(investigator);
+  });
+
+  // R2b final wave P10 (B10 Minor 2): a receipt with neither the shape nor the length member keeps the sealed table
+  // before anything reads the engine member (the same object back; the engine reader is never reached).
+  it("returns today's table for a receipt without shape and length before reading any engine member", () => {
+    const CEILINGS = Object.freeze({ POSITION: 4096, SUPPORT_ATTACK: 4096, CROSS_EXCHANGE: 4096, JUDGE: 4096,
+      REVIEWER: 4096, ANSWER_WRITER: 8192, ANSWER_CHECKER: 4096 });
+    const { length: _length, ...noLength } = roomy(true);
+    expect(() => admittedEngineOf(noLength)).toThrow(/malformed engine member/u);
+    expect(answerTokenCeilingsForBasis(CEILINGS, noLength)).toBe(CEILINGS);
+  });
+
   it("the picker's JUDGE and REVIEWER bounds hold the judge's and the investigator's allowance", () => {
     const CEILINGS = Object.freeze({ POSITION: 4096, SUPPORT_ATTACK: 4096, CROSS_EXCHANGE: 4096, JUDGE: 4096,
       REVIEWER: 4096, ANSWER_WRITER: 8192, ANSWER_CHECKER: 4096 });

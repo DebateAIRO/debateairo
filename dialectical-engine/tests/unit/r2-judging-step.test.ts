@@ -359,6 +359,22 @@ describe("the controller's carries on the judging step", () => {
 
     // Rows are immutable: a row an earlier copy wrote keeps ITS counted value. The step never reads that column (the
     // recorded vote type has none); readers recount through deriveJudgesVerdict from the letters, groups and makers.
+    // R2b final wave P5 (B5 re-review Minor 2): a re-read row for a seat this copy did not pick is the seat's vote: it is
+    // counted and reused, never written again, and this copy's own seats are still asked and written.
+    it("counts a re-read row for a seat this copy did not pick, as reused", async () => {
+      const theirs: RecordedComparingJudgeVote = Object.freeze({ judgeSeat: 4, maker: "zhipu", providerRef: "glm",
+        modelId: "glm-5.1", rawArtifactRef: "stored-4", chosenLetter: "C", conditional: false, sameAs: Object.freeze([]),
+        questionKind: "general", reasons: "Because C held up best." });
+      const { run, records, asks } = step({ readRecorded: async () => [theirs] });
+      const result = await run();
+      expect(asks.map((seat) => seat.seat)).toEqual([1, 2, 3]);
+      expect(records.map((vote) => vote.judgeSeat)).toEqual([1, 2, 3]);
+      expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "anthropic"], [2, "xiaomi"], [3, "deepseek"], [4, "zhipu"]]);
+      expect(result.verdict).toMatchObject({ judgesSeated: 4, winnerRootNodeId: ROOT.A, winnerVotes: 2 });
+      expect(result.ballots.at(-1)).toEqual({ seat: 4, letter: "C", counted: true });
+      expect(result).toMatchObject({ asked: 3, reused: 1 });
+    });
+
     it("never reads a reused row's stored counted value: the verdict recounts it", async () => {
       const staleRow = Object.freeze({ judgeSeat: 3, maker: "deepseek", providerRef: "ds", modelId: "deepseek-v4.1",
         rawArtifactRef: "earlier-3", chosenLetter: "A" as const, conditional: false, sameAs: Object.freeze([]),
@@ -485,9 +501,11 @@ describe("the judges' servable source", () => {
   const strengths = new Map([["p-a", 0.2], ["p-b", 0.3], ["p-c", 0.4]]);
   // The standing snapshot's nodes with a base that did not abstain: neither the hidden point nor the null-base one.
   const propagatable = new Set([ROOT.A, ROOT.B, ROOT.C, "p-a", "p-b", "p-c"]);
+  // P5 (B5 re-review Minor 1): the standing snapshot holds the null-base point; the projection hid "p-hidden".
+  const snapshotIds = { standingNodeIds: new Set([...propagatable, "p-null-base"]), hiddenNodeIds: new Set(["p-hidden"]) };
 
   it("keeps the servable answers only, this pass's strengths, and a rival reply only from a servable answer", () => {
-    const built = comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
+    const built = comparingJudgesSourceOf({ ...snapshotIds, source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
       propagatableNodeIds: propagatable });
     expect(built.answers.map((entry) => entry.letter)).toEqual(["A", "B"]);
     expect(built.points.map((entry) => [entry.nodeId, entry.honestFinalStrength, entry.fromRivalReply])).toEqual([
@@ -495,14 +513,23 @@ describe("the judges' servable source", () => {
   });
 
   it("builds the material when a point that is not hidden never propagated (a null base): it sorts last", () => {
-    const built = comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B, ROOT.C]),
+    const built = comparingJudgesSourceOf({ ...snapshotIds, source, servableRootIds: new Set([ROOT.A, ROOT.B, ROOT.C]),
       honestFinalStrength: new Map([...strengths, ["p-hidden", 0.1]]), propagatableNodeIds: new Set([...propagatable, "p-hidden"]) });
     const material = engineMaterialOf(built);
     expect(material.answers[0]!.objections.map((entry) => entry.pointRef)).toEqual(["p-a", "p-hidden", "p-null-base"]);
   });
 
+  it("refuses a kept point that is neither in the standing snapshot nor hidden (a source/snapshot mismatch defect)", () => {
+    const stranger = { ...source, points: Object.freeze([...source.points, point("p-other-graph", "B", ROOT.B, null)]) };
+    const build = () => comparingJudgesSourceOf({ ...snapshotIds, source: stranger, servableRootIds: new Set([ROOT.A, ROOT.B]),
+      honestFinalStrength: strengths, propagatableNodeIds: propagatable });
+    expect(build).toThrowError(new TypeError("ENGINE_MATERIAL_INVALID:sourceSnapshot"));
+    expect(comparingJudgeCodeDefect(new TypeError("ENGINE_MATERIAL_INVALID:sourceSnapshot"))).toBe(true);
+    // A hidden point and a standing point that never propagated stay allowed (the cases above).
+  });
+
   it("refuses a point that should have propagated and has no strength (a code defect)", () => {
-    expect(() => comparingJudgesSourceOf({ source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
+    expect(() => comparingJudgesSourceOf({ ...snapshotIds, source, servableRootIds: new Set([ROOT.A, ROOT.B]), honestFinalStrength: strengths,
       propagatableNodeIds: new Set([...propagatable, "p-null-base"]) }))
       .toThrowError(new TypeError("ENGINE_MATERIAL_INVALID:honestFinalStrength"));
   });

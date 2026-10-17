@@ -222,6 +222,12 @@ describe("R2 rescore: engine 1 through the runner's own projection (R2a final wa
     const moved = { ...judgesChoice, served: { ...judgesChoice.served, finalStrength: { ...judgesChoice.served.finalStrength,
       [B]: judgesChoice.served.finalStrength[B]! + 1e-6 } } };
     expect(reproduceServedPropagation(moved)).toMatchObject({ ok: false, what: expect.stringMatching(/^engine2 delta /u) });
+    // R2b final wave P14 (B12 Minor 4): the judges' choice must still be an answer that could be served: a root with a
+    // served final strength. A recorded root that is not one, a point, or none at all is not given back.
+    for (const servedRootNodeId of ["root-of-another-debate", judgesChoice.nodes.find((node) => node.kind !== "ROOT")!.nodeId, null]) {
+      const notServable = { ...judgesChoice, served: { ...judgesChoice.served, servedRootNodeId } };
+      expect(reproduceServedPropagation(notServable), String(servedRootNodeId)).toMatchObject({ ok: false, what: "served-root" });
+    }
     // Any other rule, or none recorded (a graph written before B12): the strength leader is still required.
     expect(reproduceServedPropagation(engineTwoGraph("NOT_LEADER", SERVED_ROOT_SELECTION_RULE))).toMatchObject({ ok: false, what: "served-root" });
     expect(reproduceServedPropagation(engineTwoGraph("NOT_LEADER"))).toMatchObject({ ok: false, what: "served-root" });

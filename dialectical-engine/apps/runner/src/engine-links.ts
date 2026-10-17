@@ -153,7 +153,7 @@ export type EngineReviewFacts = Readonly<{
   disputedNodeIds: readonly string[];
   cannotAssessNodeIds: readonly string[];
   ownReplyEdgeIds: ReadonlyMap<string, readonly string[]>;
-  /** A14: a cannot-assess point's investigation outcome as a review status (`pointInvestigationStatus`). */
+  /** A14: a cannot-assess point's investigation result as the review it lacked (`investigatedStatusOf`). */
   investigated?: ReadonlyMap<string, EngineReviewStatus>;
 }>;
 

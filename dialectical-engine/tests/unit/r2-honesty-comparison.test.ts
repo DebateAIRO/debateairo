@@ -176,6 +176,19 @@ describe("R2 honesty panel: the comparison read from the votes", () => {
     });
   });
 
+  // R2b final wave P6 (B6 re-review Minor 2): a bare root key and a structure repair's key read the same plan places.
+  it("reads a bare JUDGE key as root 0 and a structure repair's key as the root it repairs", () => {
+    const answer = rootsAandC();
+    expect(judgesComparisonOf(gapVotes(), answer.nodes, answer.edges, [
+      { nodeId: "node:position", callSiteKey: "JUDGE" },
+      { nodeId: "node:position-c", callSiteKey: "REPAIR:STRUCTURE:JUDGE:root:2:seat:main" }
+    ])).toEqual(judgesComparisonOf(gapVotes(), answer.nodes, answer.edges, SITES_A_AND_C));
+    expect(judgesComparisonOf(gapVotes(), answer.nodes, answer.edges, [
+      { nodeId: "node:position", callSiteKey: "REPAIR:STRUCTURE:JUDGE" },
+      { nodeId: "node:position-c", callSiteKey: "JUDGE:root:2" }
+    ])!.judges_counted).toBe(3);
+  });
+
   it("shows no section when a root's plan place cannot be read and a letter shows a gap", () => {
     const answer = rootsAandC();
     // No call site read: the letters could only be guessed, and C sits past the two saved roots.

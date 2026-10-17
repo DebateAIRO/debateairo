@@ -538,7 +538,11 @@ function storyNamed(ref: string | null): string {
  *   (R2b-B2.1), so JUDGES_NO_MAJORITY speaks of the counted choices (the answer most judges chose can lose) and
  *   JUDGES_MAJORITY and JUDGES_VOTES_IGNORED name that case;
  * - JUDGES_MAJORITY also covers every seated judge choosing this answer when fewer were seated than a clear answer needs;
- * - JUDGES_NO_MAJORITY stays true with one seated judge (one counted choice never settles it).
+ * - JUDGES_NO_MAJORITY stays true with one seated judge: a lone counted choice settles nothing when the row asks more
+ *   than one agreeing judge for a close call (with a row asking one, it settles it: JUDGES_MAJORITY);
+ * - JUDGES_NO_MAJORITY's tie clause follows the count's tie-break (ruling R2b-B9.2): an even count goes to the answer
+ *   whose strongest case, among it and the answers counted as the same, held up best, and an exact tie of that to the
+ *   first in a fixed order (the node id), never to a claim that this answer's own case was the best.
  * Not covered: a resumed one-answer debate handing in recorded votes (B2 gives JUDGES_UNAVAILABLE; a new debate with fewer
  * than two answers asks no judge, so it is not reachable). tests/unit/r2-story-engine.test.ts checks each sentence's
  * claims against every verdict B2 gives for one to five seated judges, own makers' judges included.
@@ -547,7 +551,7 @@ export const STORY_ENGINE_TRIGGER_RULES: Readonly<Record<string, string>> = Obje
   JUDGES_UNANIMOUS: "The label is SUPPORTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, and none of them found that it holds only in some cases.",
   JUDGES_CONDITIONAL: "The label is CONTESTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, but at least one found that it holds in some cases and not in others.",
   JUDGES_MAJORITY: "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer, or one the judges counted as the same, to settle it, but not clearly: too few judges could take part for the answer to be called clear, or at least one judge chose another answer, gave no usable choice, or chose an answer that its own maker had argued or that the judges counted as the same as one its maker had argued, which does not count.",
-  JUDGES_NO_MAJORITY: "The label is SPLIT because, among the choices of the judges who compared the answers side by side, no single answer got enough of those that counted to settle it (a choice does not count when the judge's own maker argued that answer or one counted as the same), and this answer, together with any answer the judges counted as the same, is the one the counted choices named most often or, where that was even, the one whose case held up best against the objections.",
+  JUDGES_NO_MAJORITY: "The label is SPLIT because, among the choices of the judges who compared the answers side by side, no single answer got enough of those that counted to settle it (a choice does not count when the judge's own maker argued that answer or one counted as the same), and this answer, together with any answer the judges counted as the same, is the one the counted choices named most often or, where that was even, the one whose strongest case (with the answers counted as the same) held up best against the objections, or, where even that was even, the first in a fixed order.",
   JUDGES_UNAVAILABLE: "The label is CONTESTED because no judge could compare the answers side by side, so this answer was chosen as the one whose case held up best against the objections, and without that comparison it cannot be called clear.",
   JUDGES_VOTES_IGNORED: "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, or one the judges counted as the same as such an answer, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."
 });

@@ -82,11 +82,15 @@ export function VerdictBanner({
 }) {
   if (!verdict) return null;
 
-  // Unknown/future bands must never crash the banner: fall back to rendering
-  // the raw band value verbatim (honest, never a fabricated label).
-  const bandLabelKey = BAND_LABEL_KEYS[verdict.verdictBand];
-  const bandLabel = bandLabelKey ? t(catalog, bandLabelKey) : verdict.verdictBand;
-  const stateSentenceKey = verdict.verdictState ? STATE_SENTENCE_KEYS[verdict.verdictState] : null;
+  // Unknown/future bands must never crash the banner, and never print a code (the owner's "no codes in reader text";
+  // R2b final wave P8): a band outside the record reads as "analysis unavailable", never a fabricated label. Only the
+  // record's own keys count, so an inherited member's name ("constructor") is unknown too.
+  const bandLabelKey = Object.hasOwn(BAND_LABEL_KEYS, verdict.verdictBand)
+    ? BAND_LABEL_KEYS[verdict.verdictBand]
+    : BAND_LABEL_KEYS.unavailable;
+  const bandLabel = t(catalog, bandLabelKey);
+  const stateSentenceKey = verdict.verdictState && Object.hasOwn(STATE_SENTENCE_KEYS, verdict.verdictState)
+    ? STATE_SENTENCE_KEYS[verdict.verdictState] : null;
   const stateSentence = stateSentenceKey ? t(catalog, stateSentenceKey) : null;
 
   return (

@@ -64,6 +64,8 @@ type Before = (request: GateRequest, chat: string) => GateOverride | null;
 /** One engine-2 debate, admitted with the receipt's length and engine members, argued to a completed answer. */
 async function argueEngine2(input: Readonly<{
   label: string; shaped?: boolean; panelRefs?: readonly string[]; pin?: RotatedRoles; before?: Before; noDigest?: boolean;
+  /** A fixed question line: the role rotation is seeded from it, so the debate (and who leads by strength) is the same every run. */
+  question?: string;
 
   /** Models the gates refuse unbilled after their claim probe (the run-resilience script); absent: none. */
   unbilled?: readonly string[];
@@ -74,6 +76,7 @@ async function argueEngine2(input: Readonly<{
   const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers, mapOpening: shape !== undefined });
   const debate = await harness.admittedRun(input.label, {
     panelRefs, depth: 1, length: LENGTH, engine,
+    ...(input.question === undefined ? {} : { question: input.question }),
     ...(shape === undefined ? {} : { shape, settings: STANDARD }),
     ...(input.pin === undefined ? {} : { pin: input.pin })
   });
@@ -130,6 +133,9 @@ describe("engine 2 end to end (spec §14.2)", () => {
     "%s: an answer, a label from the judges (rung 5, the judges' rule), every vote stored, a story", async (_name, shaped) => {
       const run = await argueEngine2({
         label: shaped ? "e2-shape" : "e2-today", shaped,
+        // Ruling W4: a fixed question (digits only, so it reads as no named language), so the rotation, and with it the
+        // strength leader, is the same on every run: the judges' A is not the leader.
+        ...(shaped ? { question: "preview-busy-model-e2-shape-1003" } : {}),
         // The new shape: every judge names the kind "factual", so the story's one shape is the judges' (B9).
         ...(shaped ? { before: (request: GateRequest) => request.kind === "VERDICT_JUDGE"
           ? { content: stubComparingJudgeVote("A", { questionKind: "factual" }) } : null } : {})
@@ -224,6 +230,9 @@ describe("engine 2 end to end (spec §14.2)", () => {
     expect(["SERVED", "DOWNGRADED"]).toContain(answer!.terminal);
     expect(answer!.verdict_state).toBe("CONTESTED");
     expect(marksOf(answer!)).toContain("VERDICT-JUDGES-UNAVAILABLE");
+    // R2b final wave P14 (B12 Minor 3): a refusal DURING judging is the judges all failing, never a stop before judging.
+    expect(answer!.condition_mark_records.filter((record) => record.mark === "VERDICT-JUDGES-UNAVAILABLE").map((record) => record.reason))
+      .toEqual(["VERDICT_JUDGES_UNAVAILABLE:ALL_JUDGES_FAILED"]);
     expect((await receiptOf(runId)).verdictLabel).toMatchObject({ label: "CONTESTED", rung: 5, trigger: "JUDGES_UNAVAILABLE" });
     const votes = await votesOf(runId);
     expect(votes).toHaveLength(3);
@@ -301,8 +310,10 @@ describe("engine 2 end to end (spec §14.2)", () => {
     expect(shown.length).toBeGreaterThan(0);
     for (const letters of shown) expect(letters).toEqual(["A", "C", "D", "E"]);
     const votes = await votesOf(runId);
-    expect(votes.length).toBeGreaterThan(0);
+    // R2b final wave P14 (B12 Minor 2): three judges seated, and at most one of them argued E, so two or more count.
+    expect(votes).toHaveLength(3);
     const counted = votes.filter((vote) => vote.counted);
+    expect(counted.length).toBeGreaterThanOrEqual(2);
     const { answer } = await harness.servedAnswer(run.debate, run.result.answerId);
     expect(["SERVED", "DOWNGRADED"]).toContain(answer!.terminal);
     const receipt = await receiptOf(runId);
@@ -315,7 +326,7 @@ describe("engine 2 end to end (spec §14.2)", () => {
     const rootE = answeredE[0]!.chosen_root_node_id!;
     expect(answer!.judges_comparison!.answers.find((entry) => entry.root_node_id === rootE)?.judges_chose).toBe(counted.length);
     expect(answer!.judges_comparison!.answers).toHaveLength(4);
-    if (counted.length > 0) expect(receipt.servedNodeId).toBe(rootE);
+    expect(receipt.servedNodeId).toBe(rootE);
   }, 15 * 60 * 1000);
 
   // (pre-flight PF-R2b7.7) "fails" too: the controller-corrected weighting (holds 1 > dead end 0.66 > fails about 0.46,

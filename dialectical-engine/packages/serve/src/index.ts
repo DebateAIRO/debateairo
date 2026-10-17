@@ -22,13 +22,14 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
-  judgesComparisonOf, recountJudgesVotes, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition, type RootCallSite
+  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
+  type RootCallSite
 } from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
@@ -2186,7 +2187,8 @@ export class ServeRepository {
         composed_text_id: string | null;
         conformance_record_id: string | null;
         serve_state: "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
-        verdict_state: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT" | null;
+        // B4 Minor 2 (R2b final wave P2): the contract's closed list, so a fifth state cannot be missed here.
+        verdict_state: VerdictState | null;
         verdict_unavailable: { readonly reason_ref: string } | null;
       }>(
         `SELECT answer_id, answer_version, run_id, work_item_id,

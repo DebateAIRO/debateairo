@@ -4,7 +4,7 @@ import { ARCHIVE_KEYS, loadArchiveCatalog } from "../../apps/api/src/data-export
 import { renderYourDataHtml } from "../../apps/api/src/data-export/html-page.js";
 // pre-flight PF-R2b4.1: the class's own list type; the PublicationApplication interface's items have no floor_verdict.
 import type { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
-import { DATA_EXPORT_LOCALES } from "../../packages/contract/src/index.js";
+import { AnswerFloorSchema, DATA_EXPORT_LOCALES, VerdictStateSchema } from "../../packages/contract/src/index.js";
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
 import { SPLIT_WORDS } from "../support/r2-split-words.js";
 
@@ -47,5 +47,19 @@ describe("R2 SPLIT in the data export (Q1 option 1)", () => {
     const verdict: ListedVerdict = "SPLIT";
     const floor: ListedFloor = "SPLIT";
     expect([verdict, floor]).toEqual(["SPLIT", "SPLIT"]);
+    // B7 Important 1 (R2b final wave P7): the runtime check beside the type lines: the schemas parse SPLIT.
+    expect(VerdictStateSchema.safeParse("SPLIT").success).toBe(true);
+    expect(AnswerFloorSchema.shape.verdict_state.safeParse("SPLIT").success).toBe(true);
+  });
+
+  // B7 Minor 2 (R2b final wave P7): the verdict's archive key is read only from the four states, never from the object's
+  // inherited members (a stored "constructor" printed an empty pill).
+  it("prints no pill for a stored state that is not one of the four, an inherited member's name included", () => {
+    const [first] = snapshotA.debates.debates;
+    for (const state of ["constructor", "toString", "__proto__", "MAYBE"]) {
+      const odd = { ...first!, run_answer: { ...(first!.run_answer as Record<string, unknown>), verdict_state: state } };
+      const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [odd] } }, loadArchiveCatalog("en"));
+      expect(html, state).not.toContain('class="pill');
+    }
   });
 });

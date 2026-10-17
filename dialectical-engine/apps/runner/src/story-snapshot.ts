@@ -1,4 +1,5 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
+import type { VerdictState } from "@debateai/contract";
 import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
@@ -74,7 +75,8 @@ export interface StorySnapshotSource {
   readonly languageLocked?: boolean;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
-    readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
+    /** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
+    readonly label: VerdictState;
     /** 0-4: engine 1's ladder rung; 5: the comparing judges (engine 2). */
     readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
     readonly trigger: string;

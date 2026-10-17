@@ -10,19 +10,20 @@
  * --control the prompt also goes once more unchanged, so an order effect can be told from an AI that simply answers
  * differently each time. The numbers go to the owner; nothing here changes how a debate is judged (no both-orders rule
  * until the owner has seen them). It is never part of `rescore`, which asks no AI: this mode spends a little real money,
- * one judge call per recorded vote (two with --control). Counts and codes only in the report, no reply text; the
+ * one judge call per recorded vote (two with --control), plus the repairs and retries a call may need. A move to another
+ * answer inside the judge's own same-answer group counts as a flip. Counts and codes only in the report, no reply text; the
  * judge-order.jsonl log holds the same. An answer's length is the words of its answer, its case and its supporting
  * points, words being runs of characters between spaces.
  */
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   COMPARING_JUDGE_CONTRACT_ID, COMPARING_JUDGE_LIMITS, COMPARING_JUDGE_READING, classifyComparingJudgeReply,
   comparingJudgeReplySchema, parseStructuredArtifact
 } from "@debateai/judgement";
 import {
-  ENGINE_ANSWER_LETTERS, QUESTION_LANGUAGE_FIELD, comparingJudgeCallSiteKey, questionLanguageFromRun,
+  ENGINE_ANSWER_LETTERS, QUESTION_LANGUAGE_FIELD, SEAT_SUFFIX, comparingJudgeCallSiteKey, questionLanguageFromRun,
   type EngineAnswerLetter, type QuestionLanguage
 } from "@debateai/kernel";
 import {
@@ -30,6 +31,7 @@ import {
   structureRepairOriginalKey, type CallBound, type PreviewBudgetPort, type PreviewBudgetPorts, type PreviewProviderTestConfig,
   type PromptPacket, type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { errorCodeOf, practiceJobGateway } from "./practice-formats.js";
 import type { PracticeGateObserver } from "./practice-gate-observer.js";
@@ -61,6 +63,9 @@ function shownAnswersOf(packet: PromptPacket): readonly JudgeAnswerShown[] {
   let answers: unknown;
   try { answers = JSON.parse(content); } catch { return unreadable(); }
   if (!Array.isArray(answers) || answers.length < 2) return unreadable();
+  // R2b final wave P13 (B11b Minor 2): the list must re-read byte for byte, so the reversed list is written exactly as
+  // the judge's own was (no spacing or escaping of its own).
+  if (JSON.stringify(answers) !== content) return unreadable();
   if (!answers.every((entry) => typeof entry === "object" && entry !== null
     && (ENGINE_ANSWER_LETTERS as readonly unknown[]).includes((entry as { letter?: unknown }).letter))) return unreadable();
   return Object.freeze(answers as JudgeAnswerShown[]);
@@ -123,7 +128,7 @@ export type PracticeJudgeOrderAsk = Readonly<{
 
 /** The seat a judge call-site key names (its repair and runner-up keys included), 1..B1's seat limit; null otherwise. */
 const seatOf = (callSiteKey: string): number | null => {
-  const base = structureRepairOriginalKey(callSiteKey).replace(/:seat:(main|runnerUp)$/u, "");
+  const base = structureRepairOriginalKey(callSiteKey).replace(SEAT_SUFFIX, "");
   for (let seat = 1; seat <= COMPARING_JUDGE_LIMITS.maxSeats; seat += 1) if (base === comparingJudgeCallSiteKey(seat)) return seat;
   return null;
 };
@@ -146,6 +151,10 @@ export function practiceJudgeOrderPlan(debate: string, transcript: PracticeTrans
     if (first === undefined) { skipped.push(Object.freeze({ debate, seat: vote.seat, code: "PRACTICE_JUDGE_ORDER_NO_PROMPT" })); continue; }
     try {
       const packet = Object.freeze({ messages: first.prompt!.messages as PromptPacket["messages"] });
+      // R2b final wave P13 (B11b Minor 1): a saved prompt the transcript redacted, or one that no longer matches the
+      // fingerprint recorded when it was sent, is not the prompt the judge read: it is never sent again.
+      if (JSON.stringify(packet.messages).includes("[REDACTED:")
+        || canonicalPromptFingerprint(packet.messages) !== first.prompt!.fingerprint) throw new JudgeOrderSkip(UNREADABLE);
       reversedJudgePacket(packet);                               // refused here, before anything is sent
       const fields = readPromptFrame(packet).fields;
       const shown = shownAnswersOf(packet);
@@ -208,7 +217,10 @@ export function practiceJudgeOrderByMaker(asks: readonly PracticeJudgeOrderAsk[]
   }));
 }
 
-/** No ask: NOT_PROVEN; a stopped gate or an interrupt before every ask: NOT_PROVEN; a reading that did not come back: a warning. */
+/**
+ * No ask: NOT_PROVEN; a stopped gate or an interrupt before every ask: NOT_PROVEN; a reading that did not come back, or
+ * any vote not asked for a reason other than a judge that recorded no vote (R2b final wave P13, B11b Minor 5): a warning.
+ */
 export function practiceJudgeOrderVerdict(input: Readonly<{ planned: number; asks: readonly PracticeJudgeOrderAsk[];
   skipped: readonly PracticeJudgeOrderSkipped[]; stopped: string | null }>): Readonly<{ verdict: PracticeVerdict; exitCode: number; reasons: readonly string[] }> {
   const verdictOf = (verdict: PracticeVerdict, reasons: readonly string[]) =>
@@ -217,7 +229,9 @@ export function practiceJudgeOrderVerdict(input: Readonly<{ planned: number; ask
   if (input.stopped !== null || input.asks.length < input.planned) return verdictOf("NOT_PROVEN", [input.stopped ?? "PRACTICE_INTERRUPTED"]);
   const unanswered = practiceJudgeOrderByMaker(input.asks).filter((row) => row.answered < row.asked)
     .map((row) => `PRACTICE_JUDGE_ORDER_UNANSWERED:${row.maker}=${String(row.asked - row.answered)}`);
-  return unanswered.length === 0 ? verdictOf("PASS", []) : verdictOf("PASS_WITH_WARNINGS", unanswered);
+  const notAsked = [...new Set(input.skipped.filter((entry) => entry.code !== "PRACTICE_JUDGE_ORDER_NO_VOTE").map((entry) => entry.code))];
+  const warnings = [...unanswered, ...notAsked];
+  return warnings.length === 0 ? verdictOf("PASS", []) : verdictOf("PASS_WITH_WARNINGS", warnings);
 }
 
 const percent = (value: number | null): string => value === null ? "-" : `${(value * 100).toFixed(0)}%`;
@@ -281,7 +295,9 @@ export async function runPracticeJudgeOrderMode(input: PracticeJudgeOrderRunInpu
   const planned: PracticeJudgeOrderPlanned[] = [];
   const skipped: PracticeJudgeOrderSkipped[] = [];
   for (const file of files) {
-    const debate = dirname(file).split(sep).join("/");
+    // A transcript.json right under --transcripts is named by that folder, never ".".
+    const where = dirname(file).split(sep).join("/");
+    const debate = where === "." ? basename(resolve(input.transcripts)) : where;
     let transcript: PracticeTranscript;
     try { transcript = JSON.parse(readFileSync(join(input.transcripts, file), "utf8")) as PracticeTranscript; } catch {
       skipped.push(Object.freeze({ debate, seat: null, code: "PRACTICE_JUDGE_ORDER_NO_VOTES" }));

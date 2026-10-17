@@ -17,7 +17,7 @@
 import type { Pool } from "pg";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { engineOfRun } from "@debateai/register";
-import { recountJudgesVotes, type ComparisonVote, type JudgesRecount, type RootCallSite } from "@debateai/serve";
+import { recountJudgesVotes, rootIndexOfCallSite, type ComparisonVote, type JudgesRecount, type RootCallSite } from "@debateai/serve";
 
 export type PracticeJudgeVoteRow = Readonly<{
   model: string;
@@ -123,8 +123,11 @@ function recountOf(facts: PracticeJudgesFacts): JudgesRecount | null {
   }));
   const positions = [...new Map(facts.roots.map((row) => [row.node_id, row.maker] as const))]
     .map(([nodeId, maker]) => Object.freeze({ nodeId, maker, strength: null }));
+  // R2b final wave P11 (B11 Minor 3): only a root author call's key is a plan place; any other call the join finds for
+  // the same artifact is left out, so it can never make a root's place unreadable.
   const sites: readonly RootCallSite[] = facts.roots.flatMap((row) =>
-    row.call_site_key === null ? [] : [Object.freeze({ nodeId: row.node_id, callSiteKey: row.call_site_key })]);
+    row.call_site_key === null || rootIndexOfCallSite(row.call_site_key) === null ? []
+      : [Object.freeze({ nodeId: row.node_id, callSiteKey: row.call_site_key })]);
   return recountJudgesVotes(votes, positions, sites);
 }
 

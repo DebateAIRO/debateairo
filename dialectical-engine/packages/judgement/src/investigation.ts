@@ -15,7 +15,6 @@
 import { z } from "zod";
 import { LENGTH_SENTENCE_WRITING, lengthGuidanceField, type LengthGuide, type PointInvestigationMaterial } from "@debateai/kernel";
 import type { FramedMaterialField, PromptContract } from "@debateai/providers";
-import type { EngineReviewStatus } from "./honest-score.js";
 import type { StructuredReadingOptions } from "./s04.js";
 // A10 declared the two stored lists (its table CHECKs read them); this file re-uses them and never redeclares them.
 import { POINT_INVESTIGATION_BASES, type PointInvestigationResult } from "./engine-repository.js";
@@ -116,20 +115,9 @@ export const POINT_INVESTIGATION_PROSE = Object.freeze(["missing", "found", "rea
 
 const RESULT_OF_OUTCOME: Readonly<Record<PointInvestigationOutcome, PointInvestigationResult>> =
   Object.freeze({ holds: "HOLDS", fails: "FAILS", dead_end: "DEAD_END" });
-const STATUS_OF_OUTCOME: Readonly<Record<PointInvestigationOutcome, EngineReviewStatus>> =
-  Object.freeze({ holds: "AGREE", fails: "DISPUTE", dead_end: "CANNOT_ASSESS" });
 
 export function pointInvestigationResultOf(outcome: PointInvestigationOutcome): PointInvestigationResult {
   return RESULT_OF_OUTCOME[outcome];
-}
-
-/**
- * holds -> "AGREE"; fails -> "DISPUTE"; dead_end -> "CANNOT_ASSESS" (the review the point lacked). A FAILS point keeps
- * `cannotAssessReview` in its facts, so A6 keeps its links at the cannot-assess weight and puts the dispute weight on its
- * score (pre-flight PF-R2a8.11).
- */
-export function pointInvestigationStatus(outcome: PointInvestigationOutcome): EngineReviewStatus {
-  return STATUS_OF_OUTCOME[outcome];
 }
 
 export type PointInvestigationCandidate = Readonly<{

@@ -65,6 +65,23 @@ describe("R2 SPLIT in the UI (ruling E8, Q1 option 1)", () => {
     expect(html).not.toContain("The run did not settle this either way");
   });
 
+  // R2b final wave P8 (B8 re-review Minor 3): a band outside the union never prints its code; it reads as the
+  // "analysis unavailable" words, an inherited member's name included.
+  it("words a band it does not know, never printing the code", () => {
+    const words = catalog("en", "debateDrawers")["debateDrawers.verdict.analysisUnavailable"]!;
+    for (const band of ["SOME_FUTURE_BAND", "constructor"]) {
+      const summary = {
+        verdictBand: band, claimLanguage: "A future band.",
+        basis: { dialecticalStrength: 0.5, verificationStatus: null, convergence: null },
+        verdictThresholdsVersion: "test-layer:r2", verdictState: liveVerdictState("CONTESTED")
+      } as unknown as VerdictSummary;
+      const html = renderToStaticMarkup(<VerdictBanner verdict={summary} />);
+      const text = html.replace(/<[^>]*>/gu, " ");
+      expect(text, band).not.toContain(band);
+      expect(text, band).toContain(words);
+    }
+  });
+
   it.each(LOCALES.map(({ code }) => code).filter((code) => reportSupportedForLocale(code)))(
     "%s: the PDF cover words SPLIT with the moved word",
     async (code) => {

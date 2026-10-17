@@ -375,7 +375,8 @@ node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --transcrip
 ```
 
 It spends real money: one judge call per recorded vote (about half a cent to a cent each), two with `--control`, which
-also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time. Spend
+also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time, plus
+the repairs and retries a call may need (a reply in the wrong form is asked once more, a busy AI is tried again). Spend
 stays inside the owner's test budget in force that day, and the paid run waits for the owner's go. `--dry` answers from
 a script (every scripted judge picks the first answer shown) and spends nothing:
 
@@ -383,7 +384,13 @@ a script (every scripted judge picks the first answer shown) and spends nothing:
 node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --dry --transcripts "$P" --out "$P/judge-order-dry"
 ```
 
-Per maker of the judge, `report.md` gives: the flip rate (the choice changed when the order was reversed), the same with
+Only the very prompt the judge read is sent again: a saved prompt that was redacted, no longer matches the fingerprint
+recorded when it was sent, or does not show the recorded letter is not asked (its code is listed under "Not asked"). Any
+vote not asked for a reason other than a judge that recorded no vote makes the verdict PASS_WITH_WARNINGS. A
+`transcript.json` right under `--transcripts` is listed under that folder's name.
+
+Per maker of the judge, `report.md` gives: the flip rate (the choice changed when the order was reversed; a move to
+another answer inside the judge's own same-answer group, `same_as`, counts as a flip too), the same with
 the order unchanged (`--control`), how often the choice was among the longest answers shown (both orders) beside the
 rate chance alone would give, and how often the judge called its choice conditional (both orders). An answer's length
 is the words of its answer, its case and its supporting points. Counts and codes only. These numbers go to the owner
@@ -1278,7 +1285,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (the four modes, the start checks, the report).
+- `practice.ts`: the command (the seven modes: formats, debate, openings, language, report, rescore and judge-order; the
+  start checks; the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview, in local or hosted mode (hosted: the money wiring, with billing kept off
   in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.

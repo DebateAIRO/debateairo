@@ -3,7 +3,7 @@
 // saved engine-2 debate is asked again with the answers in reverse order (letters kept, every other byte of the prompt
 // kept); the report gives per maker the flip rate, the longest-answer rate beside chance, and the conditional rate.
 // It is its own mode: never part of rescore (which asks no AI).
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Socket } from "node:net";
@@ -13,11 +13,14 @@ import {
 } from "@debateai/judgement";
 import { LENGTH_GUIDANCE_START, type EngineDebateMaterial } from "@debateai/kernel";
 import { buildFramedPrompt, readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
   practiceJudgeOrderByMaker, practiceJudgeOrderDryPorts, practiceJudgeOrderPlan, reversedJudgePacket,
   runPracticeJudgeOrderMode, type PracticeJudgeOrderAsk
 } from "../../tools/preview-practice/practice-judge-order.js";
-import { buildPracticeTranscript, type TranscriptJudgeVote } from "../../tools/preview-practice/practice-transcript.js";
+import {
+  PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL, buildPracticeTranscript, type TranscriptJudgeVote
+} from "../../tools/preview-practice/practice-transcript.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
 import { openingsDryConfig, openingsDryTargets } from "../../tools/preview-practice/practice-openings-dry.js";
 import { practiceRunnerPolicy } from "../../tools/preview-practice/practice-formats.js";
@@ -65,11 +68,11 @@ describe("R2 B11b: the reversed prompt (only the answers' order changes)", () =>
 const vote = (seat: number, letter: string | null, extra: Partial<TranscriptJudgeVote> = {}): TranscriptJudgeVote => Object.freeze({
   seat, maker: ["deepseek", "xiaomi", "anthropic"][seat - 1]!, providerRef: `preview:m${String(seat)}`,
   modelId: ["deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "claude-haiku-5-5"][seat - 1]!,
-  letter, conditional: letter === null ? null : false, counted: letter !== null,
-  notCountedReason: letter === null ? "JUDGE_FAILED" : null, questionKind: letter === null ? null : "general", sameAs: [], ...extra });
+  letter, conditional: letter === null ? null : false, questionKind: letter === null ? null : "general", sameAs: [], ...extra });
 const attempt = (seat: number, replyForm: string, packet: PromptPacket | null, sequence: number) => ({
   sequence, callSiteKey: `VERDICT:judge:${String(seat)}`, providerRef: `preview:m${String(seat)}`, replyForm,
-  metadata: { token_ceiling: 6000 }, guidedWords: 80, prompt: packet === null ? null : { fingerprint: "f", messages: packet.messages, text: null }
+  metadata: { token_ceiling: 6000 }, guidedWords: 80,
+  prompt: packet === null ? null : { fingerprint: canonicalPromptFingerprint(packet.messages), messages: packet.messages, text: null }
 });
 function transcriptOf(votes: readonly TranscriptJudgeVote[], attempts: readonly unknown[]) {
   return buildPracticeTranscript({ run: { runId: "run-1" } as never, attempts: attempts as never, answer: null, inspection: null,
@@ -88,6 +91,42 @@ describe("R2 B11b: what is asked again", () => {
       { debate: "q1", seat: 3, code: "PRACTICE_JUDGE_ORDER_NO_VOTE" }
     ]);
   });
+  // R2b final wave P13 (B11b Minors 1-3): only the very prompt the judge read is sent again.
+  it("never sends a redacted prompt, one that no longer matches its fingerprint, a list that does not re-read, or one without the vote's letter", () => {
+    const original = packetFor(1);
+    const redacted = { messages: original.messages.map((message, index) => index === 1
+      ? { ...message, content: message.content.replace("Should a city build nuclear power?", "[REDACTED:long-run]") } : message) };
+    const reAttempt = (seat: number, packet: PromptPacket, fingerprint: string) =>
+      ({ ...attempt(seat, "ORIGINAL", packet, seat), prompt: { fingerprint, messages: packet.messages, text: null } });
+    // The answers' list written with its own spacing: the frame reads it, but it does not re-read byte for byte.
+    const frame = readPromptFrame(original);
+    const userLines = original.messages[1]!.content.split("\n");
+    const block = JSON.parse(userLines[1]!) as { fields: { name: string; content: string }[] };
+    const spaced = { messages: [original.messages[0]!, { ...original.messages[1]!, content: [frame.fence, JSON.stringify({ ...block,
+      fields: block.fields.map((field) => field.name === "answers" ? { ...field, content: JSON.stringify(JSON.parse(field.content), null, 1) } : field) }),
+    frame.fence].join("\n") }] } as PromptPacket;
+    const transcript = transcriptOf([vote(1, "A"), vote(2, "A"), vote(3, "A"), vote(4, "D" as string, { maker: "qwen", modelId: "qwen" })], [
+      reAttempt(1, redacted as PromptPacket, canonicalPromptFingerprint(redacted.messages)),
+      reAttempt(2, original, canonicalPromptFingerprint(packetFor(3).messages)),
+      reAttempt(3, spaced, canonicalPromptFingerprint(spaced.messages)),
+      attempt(4, "ORIGINAL", packetFor(4), 4)
+    ]);
+    const plan = practiceJudgeOrderPlan("q2", transcript);
+    expect(plan.planned).toEqual([]);
+    expect(plan.skipped).toEqual([
+      { debate: "q2", seat: 1, code: "PRACTICE_JUDGE_ORDER_PROMPT_UNREADABLE" },
+      { debate: "q2", seat: 2, code: "PRACTICE_JUDGE_ORDER_PROMPT_UNREADABLE" },
+      { debate: "q2", seat: 3, code: "PRACTICE_JUDGE_ORDER_PROMPT_UNREADABLE" },
+      // The recorded letter D was never shown by seat 4's prompt (A, B and C): not the prompt the vote answered.
+      { debate: "q2", seat: 4, code: "PRACTICE_JUDGE_ORDER_NO_PROMPT" }
+    ]);
+  });
+
+  // R2b final wave P12 (B11b concern 1, ruling R2b-B5.1): the transcript keeps no stored counted hint.
+  it("never selects the stored counted hint into the transcript", () => {
+    expect(PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL).not.toMatch(/counted/u);
+  });
+
   it("an engine-1 transcript (no votes) is listed, never skipped silently; its structure keeps today's keys", () => {
     const today = buildPracticeTranscript({ run: { runId: "run-1" } as never, attempts: [], answer: null, inspection: null,
       story: null, unavailable: [] });
@@ -150,6 +189,25 @@ describe("R2 B11b: the mode, dry (scripted gates, nothing spent)", () => {
       ports: { deepinfra: dry.deepinfra, anthropic: dry.anthropic }, observer, bound: practiceRunnerPolicy(config).bounds.JUDGE,
       transcripts, control: false, folder: out, dry: true, startedAt: new Date(0) })).rejects.toMatchObject({ code: "PRACTICE_OUT_ALREADY_HOLDS_JUDGE_ORDER" });
   });
+  // R2b final wave P13 (B11b Minors 5 and 7): a vote not asked for any reason but a missing vote is a warning; a
+  // transcript right under --transcripts is named by that folder, never ".".
+  it("warns for a vote it could not ask, and names a top-level transcript by its folder", async () => {
+    const transcripts = folder();
+    writeFileSync(join(transcripts, "transcript.json"), JSON.stringify(transcriptOf([vote(1, "A"), vote(2, "A"), vote(3, null)],
+      [attempt(1, "ORIGINAL", packetFor(1), 1)])));
+    const config = openingsDryConfig();
+    const observer = new PracticeGateObserver();
+    const dry = practiceJudgeOrderDryPorts();
+    const report = await runPracticeJudgeOrderMode({ config, targets: openingsDryTargets(config),
+      ports: { deepinfra: dry.deepinfra, anthropic: dry.anthropic }, observer, bound: practiceRunnerPolicy(config).bounds.JUDGE,
+      transcripts, control: false, folder: folder(), dry: true, startedAt: new Date(0), sleep: async () => undefined });
+    expect(report).toMatchObject({ verdict: "PASS_WITH_WARNINGS", reasons: ["PRACTICE_JUDGE_ORDER_NO_PROMPT"] });
+    const name = transcripts.split("/").at(-1)!;
+    expect((report.skipped as { debate: string; seat: number; code: string }[])).toEqual([
+      { debate: name, seat: 2, code: "PRACTICE_JUDGE_ORDER_NO_PROMPT" }, { debate: name, seat: 3, code: "PRACTICE_JUDGE_ORDER_NO_VOTE" }]);
+    expect((report.asks as { debate: string }[]).map((entry) => entry.debate)).toEqual([name]);
+  });
+
   it("no transcript under --transcripts is a refusal; a folder of engine-1 transcripts is NOT_PROVEN", async () => {
     const config = openingsDryConfig();
     const observer = new PracticeGateObserver();
@@ -176,6 +234,22 @@ describe("R2 B11b: the mode, dry (scripted gates, nothing spent)", () => {
       const refused = await runPractice([...argv, "--out", join(folder(), "out")], {}, quiet);
       expect(refused.report.reasons[0]).toMatch(/^HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID/u);
     }
+  });
+
+  // R2b final wave P13 (B11b Minor 4): the command, run twice into one --out folder: the second is refused and leaves
+  // the first run's files byte for byte.
+  it("the command refuses an --out folder that already holds a judge-order run and leaves its files untouched", async () => {
+    const quiet = { log: () => undefined, sleep: async () => undefined };
+    const transcripts = savedDebate();
+    const out = join(folder(), "out");
+    const argv = ["judge-order", "--dry", "--transcripts", transcripts, "--out", out];
+    expect((await runPractice(argv, {}, quiet)).report).toMatchObject({ mode: "judge-order", verdict: "PASS" });
+    const bytesOf = () => Object.fromEntries(readdirSync(out).sort().map((file) => [file, readFileSync(join(out, file), "utf8")]));
+    const before = bytesOf();
+    expect(Object.keys(before)).toEqual(expect.arrayContaining(["judge-order.jsonl"]));
+    const again = await runPractice(argv, {}, quiet);
+    expect(again.report.reasons[0]).toMatch(/PRACTICE_OUT_ALREADY_HOLDS_JUDGE_ORDER/u);
+    expect(bytesOf()).toEqual(before);
   });
 
   // Controller (B11b dispatch): --dry makes no network call and spends nothing. No socket is opened and the global fetch

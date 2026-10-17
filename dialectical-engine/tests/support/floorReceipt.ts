@@ -1,4 +1,4 @@
-import type { Pool } from "@debateai/db";
+import type { Pool, ServeDisclosureFloorState } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
 
 /**
@@ -11,7 +11,7 @@ import { LedgerRepository } from "@debateai/ledger";
 export async function recordFloorLabelReceipt(pool: Pool, input: Readonly<{
   runId: string;
   servedNodeId: string;
-  label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
+  label: ServeDisclosureFloorState;
   basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
   /** Engine 2 (R2b): a floor the comparing judges chose; absent: today's rule and ladder. */
   servedRootRule?: "max-propagated-strength-lexicographic-tiebreak" | "comparing-judges-votes-honest-strength-tiebreak";

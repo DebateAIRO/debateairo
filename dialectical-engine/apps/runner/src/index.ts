@@ -3971,6 +3971,11 @@ export type ServedRootMargin =
   | Readonly<{ kind: "MEASURED"; value: number }>
   | Readonly<{ kind: "ABSENT"; reason: "SINGLE_SERVABLE_ROOT" }>;
 
+/**
+ * The served-root decision as the propagation receipt records it. Under the comparing judges' rule (engine 2) the votes
+ * chose `root`; `runnerUp`, `margin` and `tiebreak` describe the honest final strengths (the strongest other servable
+ * root, the served root's strength minus its, which may be negative, and whether the two were equal), never the vote.
+ */
 export interface ServedRootSelection<T> {
   readonly rule: ServedRootRule;
   readonly root: T;
@@ -9614,7 +9619,9 @@ export class WalkingSkeletonRunner {
         servableRootIds: servable,
         honestFinalStrength: strengthOf,
         propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes
-          .filter((node) => node.baseStrength !== null && node.abstained !== true).map((node) => node.nodeId))
+          .filter((node) => node.baseStrength !== null && node.abstained !== true).map((node) => node.nodeId)),
+        standingNodeIds: new Set(strengthDecision.standing.snapshot.nodes.map((node) => node.nodeId)),
+        hiddenNodeIds: new Set(strengthDecision.standing.hiddenNodeIds)
       });
       const material = engineMaterialOf(servableSource);
       const judgeLength = lengthGuideOf("comparing_judge").length;

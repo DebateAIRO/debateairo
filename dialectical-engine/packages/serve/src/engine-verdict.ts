@@ -242,8 +242,10 @@ export function deriveJudgesVerdict(input: JudgesVerdictInput): JudgesVerdict {
 
 /**
  * The judges' verdict as the label record every served answer, receipt and story reads (INTERFACE §9.5): rung 5 ("decided
- * by the comparing judges"), its trigger, no basis absence and no LABEL-BASIS-INCOMPLETE mark (the judges' own marks are
- * the runner's typed records). `deriveVerdictLabel` stays engine 1's and is not touched.
+ * under the comparing judges' rule"), its trigger, no basis absence and no LABEL-BASIS-INCOMPLETE mark (the judges' own
+ * marks are the runner's typed records). Rung 5 also when no judge could compare (JUDGES_UNAVAILABLE): the honest final
+ * strengths chose the answer then, but the rule and its label cap ("Close call" at most) are still the judges'.
+ * `deriveVerdictLabel` stays engine 1's and is not touched.
  */
 export function verdictDerivationOfJudges(verdict: JudgesVerdict): VerdictLabelDerivation {
   return Object.freeze({

@@ -27,7 +27,7 @@ const SENTENCES: Readonly<Record<EngineVerdictTrigger, readonly [StoryVerdictBas
   JUDGES_UNANIMOUS: ["SUPPORTED", "The label is SUPPORTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, and none of them found that it holds only in some cases."],
   JUDGES_CONDITIONAL: ["CONTESTED", "The label is CONTESTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, but at least one found that it holds in some cases and not in others."],
   JUDGES_MAJORITY: ["CONTESTED", "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer, or one the judges counted as the same, to settle it, but not clearly: too few judges could take part for the answer to be called clear, or at least one judge chose another answer, gave no usable choice, or chose an answer that its own maker had argued or that the judges counted as the same as one its maker had argued, which does not count."],
-  JUDGES_NO_MAJORITY: ["SPLIT", "The label is SPLIT because, among the choices of the judges who compared the answers side by side, no single answer got enough of those that counted to settle it (a choice does not count when the judge's own maker argued that answer or one counted as the same), and this answer, together with any answer the judges counted as the same, is the one the counted choices named most often or, where that was even, the one whose case held up best against the objections."],
+  JUDGES_NO_MAJORITY: ["SPLIT", "The label is SPLIT because, among the choices of the judges who compared the answers side by side, no single answer got enough of those that counted to settle it (a choice does not count when the judge's own maker argued that answer or one counted as the same), and this answer, together with any answer the judges counted as the same, is the one the counted choices named most often or, where that was even, the one whose strongest case (with the answers counted as the same) held up best against the objections, or, where even that was even, the first in a fixed order."],
   JUDGES_UNAVAILABLE: ["CONTESTED", "The label is CONTESTED because no judge could compare the answers side by side, so this answer was chosen as the one whose case held up best against the objections, and without that comparison it cannot be called clear."],
   JUDGES_VOTES_IGNORED: ["SPLIT", "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, or one the judges counted as the same as such an answer, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."]
 };
@@ -180,13 +180,21 @@ describe("R2 B9: the story under engine 2", () => {
       { letter: "B", rootNodeId: "root-b", arguedByMaker: "maker-b" },
       { letter: "C", rootNodeId: "root-c", arguedByMaker: "maker-c" }
     ] as const;
-    const strength = new Map([["root-a", 0.5], ["root-b", 0.6], ["root-c", 0.4]]);
+    // R2b final wave P9 (ruling R2b-B9.2): three sets of strengths: distinct; an exact tie (the node id decides); and
+    // A < C < B, so the group {A, B} can win an even count against C through B while the answer named is A.
+    const strengths = [
+      new Map([["root-a", 0.5], ["root-b", 0.6], ["root-c", 0.4]]),
+      new Map([["root-a", 0.5], ["root-b", 0.5], ["root-c", 0.5]]),
+      new Map([["root-a", 0.3], ["root-b", 0.6], ["root-c", 0.5]])
+    ];
     const letterOf = new Map<string, string>(answers.map((answer) => [answer.rootNodeId, answer.letter] as const));
     type Reply = ComparingJudgeVote["reply"];
     const replies: readonly Reply[] = [null,
       { best: "A", conditional: false, sameAs: [], questionKind: "general" },
       { best: "A", conditional: true, sameAs: [], questionKind: "general" },
       { best: "B", conditional: false, sameAs: [["A", "B"]], questionKind: "health" },
+      // P9: a choice of A that groups it with B, so a group can win through B while the answer named is A.
+      { best: "A", conditional: false, sameAs: [["A", "B"]], questionKind: "general" },
       { best: "C", conditional: false, sameAs: [], questionKind: "legal" }];
     // A judge of a maker that argued no answer, or of the makers that argued A or C (an own-maker choice, directly or
     // through the A+B group, is not counted). Never two judges of one maker (ruling W2): each seating is a set of
@@ -195,8 +203,12 @@ describe("R2 B9: the story under engine 2", () => {
     const reached = new Set<string>();
     const false_: string[] = [];
     let rawLeaderLost = false;
-    for (let seats = 1; seats <= 5; seats += 1) {
-      for (const label of [{ clearAgreeing: 3, closeCallAgreeing: 2 }, { clearAgreeing: seats, closeCallAgreeing: 1 }]) {
+    let tieByFixedOrder = false;
+    let groupWonThroughStrongerMember = false;
+    for (const strength of strengths) for (let seats = 1; seats <= 5; seats += 1) {
+      // One seat is also walked with a close call at one agreeing judge and a clear answer above one (P9).
+      for (const label of [{ clearAgreeing: 3, closeCallAgreeing: 2 }, { clearAgreeing: seats, closeCallAgreeing: 1 },
+        { clearAgreeing: seats + 1, closeCallAgreeing: 1 }]) {
         const check = (votes: readonly ComparingJudgeVote[]): void => {
           const verdict = deriveJudgesVerdict({ votes, answers, honestFinalStrength: strength, label });
           reached.add(verdict.trigger);
@@ -228,6 +240,21 @@ describe("R2 B9: the story under engine 2", () => {
             case "JUDGES_NO_MAJORITY": {
               // "the counted choices named most often" (classes counted together), or an even count.
               claim(classes.every((group) => countedFor(group) <= countedFor(winning)), "the counted choices named it most often");
+              // "where that was even, the one whose strongest case (with the answers counted as the same) held up best,
+              // or, where even that was even, the first in a fixed order" (ruling R2b-B9.2).
+              const rootOf = (letter: string): string => answers.find((answer) => answer.letter === letter)!.rootNodeId;
+              const strongest = (group: readonly string[]): number => Math.max(...group.map((letter) => strength.get(rootOf(letter))!));
+              const tied = classes.filter((group) => group.join("+") !== winning.join("+") && countedFor(group) === countedFor(winning));
+              claim(tied.every((group) => strongest(group) <= strongest(winning)), "its strongest case held up best");
+              const firstOf = (group: readonly string[]): string => group.filter((letter) => strength.get(rootOf(letter)) === strongest(group))
+                .map(rootOf).sort()[0]!;
+              const evenStill = tied.filter((group) => strongest(group) === strongest(winning));
+              claim(evenStill.every((group) => firstOf(winning) < firstOf(group)), "the first in a fixed order");
+              if (evenStill.length > 0) tieByFixedOrder = true;
+              const named = strength.get(verdict.winnerRootNodeId)!;
+              if (winning.length > 1 && tied.some((group) => strongest(group) > named && strongest(group) < strongest(winning))) {
+                groupWonThroughStrongerMember = true;
+              }
               const raw = (group: readonly string[]): number => ballots.filter((ballot) => ballot.best !== null && group.includes(ballot.best)).length;
               if (classes.some((group) => raw(group) > raw(winning))) rawLeaderLost = true;
               break;
@@ -256,6 +283,9 @@ describe("R2 B9: the story under engine 2", () => {
     expect([...reached].sort()).toEqual([...ENGINE_VERDICT_TRIGGERS].sort());
     // Why the sentence says "counted choices": with own makers' judges seated, the answer most judges chose can lose.
     expect(rawLeaderLost).toBe(true);
+    // Why it says "strongest case (with the answers counted as the same)" and "the first in a fixed order" (P9).
+    expect(tieByFixedOrder).toBe(true);
+    expect(groupWonThroughStrongerMember).toBe(true);
   });
 
   it("keeps engine 1's sentences (MID_BAND as today)", () => {

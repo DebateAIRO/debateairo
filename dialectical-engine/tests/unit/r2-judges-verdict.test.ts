@@ -277,19 +277,21 @@ describe("input checks and frozen members (fix round 1, Minors 3 and 4)", () => 
 /**
  * Fix round 1, Minor 3: which label each maker count can reach in today's shape (every maker argues one answer; the
  * seats are min(3, makers) arguing makers; start values 3 / 2). Every vote combination is tried: each seated judge fails
- * or names any letter, conditional or not, with the same-answer groups the row lists (all pairs and A+B+C up to 3 makers,
- * a cheap set beyond). The owner's decision 6 reads these lines.
+ * or names any letter, conditional or not, with the same-answer groups the row lists (all pairs and A+B+C up to 3 makers).
+ * Four makers: every one of the 15 valid same-answer lists per judge, no conditional flag (a conditional flag only ever
+ * takes "Clear answer" away). Five makers: each of the 52 final groupings of the five answers, named by every judge, times
+ * every vote (R2b final wave P3, B2 re-review Minor 1). The owner's decision 6 reads these lines.
  */
 describe("what each maker count can reach (owner decision 6, after ruling R2b-B2.1)", () => {
   const LETTERS = ["A", "B", "C", "D", "E"] as const;
   type Option = Readonly<{ best: string; conditional: boolean; sameAs: readonly (readonly string[])[] }> | null;
-  const reach = (makers: number, groupings: readonly (readonly (readonly string[])[])[]) => {
+  const reach = (makers: number, groupings: readonly (readonly (readonly string[])[])[], conditionals: readonly boolean[] = [false, true]) => {
     const letters = LETTERS.slice(0, makers);
     const answers = letters.map((letter, index) => ({ letter, rootNodeId: `root-${letter}`, arguedByMaker: `maker-${index}` }));
     const strength = new Map(answers.map((answer, index) => [answer.rootNodeId, (index + 1) / 10] as const));
     const seats = makers === 1 ? 0 : Math.min(3, makers);
     const options: Option[] = [null];
-    for (const best of letters) for (const conditional of [false, true]) for (const sameAs of groupings) {
+    for (const best of letters) for (const conditional of conditionals) for (const sameAs of groupings) {
       options.push({ best, conditional, sameAs });
     }
     const verdicts: ReturnType<typeof deriveJudgesVerdict>[] = [];
@@ -305,6 +307,33 @@ describe("what each maker count can reach (owner decision 6, after ruling R2b-B2
   };
   const pairsOf = (letters: readonly string[]) =>
     letters.flatMap((left, index) => letters.slice(index + 1).map((right) => [[left, right]] as const));
+  /** Every way to split the letters into blocks (set partitions, in letter order). */
+  const partitionsOf = (letters: readonly string[]): string[][][] => {
+    if (letters.length === 0) return [[]];
+    const [first, ...rest] = letters as [string, ...string[]];
+    return partitionsOf(rest).flatMap((partition) => [
+      [[first], ...partition],
+      ...partition.map((_block, index) => partition.map((block, at) => (at === index ? [first, ...block] : block)))
+    ]);
+  };
+  /** A same-answer list as a judge writes it: the blocks of two or more letters of a partition. */
+  const sameAsOf = (partition: readonly (readonly string[])[]) => partition.filter((block) => block.length >= 2);
+  /** Every valid same-answer list over the letters: disjoint groups of at least two letters, in any combination. */
+  const sameAsListsOf = (letters: readonly string[]) => {
+    const seen = new Map<string, readonly (readonly string[])[]>();
+    for (const partition of partitionsOf(letters)) {
+      const list = sameAsOf(partition);
+      for (let mask = 0; mask < 2 ** list.length; mask += 1) {
+        const chosen = list.filter((_block, index) => (mask >> index) & 1);
+        seen.set(JSON.stringify(chosen), chosen);
+      }
+    }
+    return [...seen.values()];
+  };
+  it("enumerates 15 same-answer lists over four answers and 52 groupings of five", () => {
+    expect(sameAsListsOf(["A", "B", "C", "D"])).toHaveLength(15);
+    expect(partitionsOf(["A", "B", "C", "D", "E"])).toHaveLength(52);
+  });
 
   it("1 maker: Close call only", () => {
     expect(new Set(reach(1, [[]]).map((verdict) => `${verdict.label}/${verdict.trigger}`))).toEqual(new Set(["CONTESTED/JUDGES_UNAVAILABLE"]));
@@ -324,9 +353,13 @@ describe("what each maker count can reach (owner decision 6, after ruling R2b-B2
 
   it.each([4, 5])("%i makers: Clear answer only when the winning group holds only unseated makers' answers", (makers) => {
     const seated = new Set(["A", "B", "C"]);
-    const groupings = makers === 4 ? [[], ...pairsOf(["A", "B", "C", "D"])] : [[], [["D", "E"]], [["A", "D"]], [["C", "E"]]];
+    const letters = LETTERS.slice(0, makers);
+    const verdicts = makers === 4
+      ? reach(4, sameAsListsOf(letters), [false])
+      : partitionsOf(letters).flatMap((partition) => reach(5, [sameAsOf(partition)], [false]));
+    expect(verdicts).toHaveLength(makers === 4 ? (1 + 4 * 15) ** 3 : 52 * (1 + 5) ** 3);
     let clear = 0;
-    for (const verdict of reach(makers, groupings)) {
+    for (const verdict of verdicts) {
       if (verdict.label !== "SUPPORTED") continue;
       clear += 1;
       const winner = verdict.winnerRootNodeId.slice("root-".length) as "A";
