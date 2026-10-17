@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.3
+endMarker: SĄLYGŲ PABAIGA · v2.4
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.3 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -70,7 +70,7 @@ Paskelbtus debatus gali skaityti bet kas. Norint juos skaityti paskyros nereikia
 
 Jūs pateikiate klausimą arba teiginį. Dialectical Engine siunčia jį keliems trečiųjų šalių DI modeliams, kurie aplink jį sudaro argumentų schemą: teiginius, kontrargumentus, kritiką, nuorodas į įrodymus, įverčius ir verdiktą su pasitikėjimo lygiu. Galite ginčyti atskirus teiginius, prašyti išsamiau ištirti konkretų klausimą ir nuspręsti, ar paskelbti rezultatą.
 
-**Visas debatų turinys sugeneruotas DI.** Argumentai, kritika, nuorodos į įrodymus, įverčiai, verdiktai ir pagalbos asistento atsakymai sugeneruoti mašinos. Jie gali būti neteisingi, neišsamūs ar pasenę, taip pat klaidingi, nors ir pateikti užtikrintai, be to, gali atspindėti modelių šališkumą. Prieš parodant jums ar paskelbiant jų neperžiūri joks žmogus, ir joks įvardytas asmuo už juos neprisiima redakcinės atsakomybės. Sugeneruotas turinys produkte, paskelbtuose puslapiuose ir eksportuotuose duomenyse pažymimas kaip sugeneruotas DI.
+**Visas debatų turinys sugeneruotas DI.** Argumentai, kritika, nuorodos į įrodymus, įverčiai, verdiktai ir pagalbos asistento atsakymai sugeneruoti mašinos. Jie gali būti neteisingi, neišsamūs ar pasenę, taip pat klaidingi, nors ir pateikti užtikrintai, be to, gali atspindėti modelių šališkumą. Prieš parodant jums jų neperžiūri joks žmogus, o prieš paskelbiant jų neperžiūri joks žmogus, nebent mūsų patikra pažymi debatus ir paprašote mūsų pritarimo (9 skyrius); joks įvardytas asmuo už juos neprisiima redakcinės atsakomybės. Sugeneruotas turinys produkte, paskelbtuose puslapiuose ir eksportuotuose duomenyse pažymimas kaip sugeneruotas DI.
 
 **Dialectical Engine nėra konsultacija.** Ji nėra teisinė, medicininė, finansinė, mokestinė, psichologinė, saugumo ar kitokia profesinė konsultacija, o verdiktas nėra fakto nustatymas. Nenaudokite debatų kaip pagrindo sprendimui, svarbiam jūsų ar kitų asmenų sveikatai, saugumui, finansams, teisinei padėčiai ar gerovei, nepatikrinę pirminių šaltinių ir, kai tinkama, nepasikonsultavę su kvalifikuotu specialistu. Aukštas pasitikėjimo lygis reiškia, kad modeliai, remdamiesi matyta medžiaga, vertinimą laikė tvirtai pagrįstu; tai nėra jo teisingumo garantija.
 
@@ -98,6 +98,12 @@ Savo paskyrą galite bet kada uždaryti pasirinkę **Nustatymai → Paskyra**. U
 
 **Nepateikite ir neskelbkite neteisėto turinio**, įskaitant šmeižikišką, smurtą ar neapykantą kurstantį, priekabiaujantį ar grasinantį turinį, be sutikimo bendrinamus intymius atvaizdus, intelektinę nuosavybę ar konfidencialumą pažeidžiantį turinį, komercines paslaptis atskleidžiantį turinį, seksualinės prievartos prieš vaikus medžiagą arba sankcijas ar eksporto kontrolę pažeidžiantį turinį.
 
+**Draudžiama bet kokios rūšies neapykantos kalba.** Nepateikite ir neskelbkite bet kokios rūšies neapykantos kalbos.
+
+**Draudžiamos ginklų ar narkotikų gaminimo instrukcijos.** Nepateikite ir neskelbkite ginklų ar narkotikų gaminimo instrukcijų.
+
+**Draudžiamas turinys, skatinantis savižudybę arba kenkimą kitiems žmonėms.** Nepateikite ir neskelbkite turinio, skatinančio savižudybę arba kenkimą kitiems žmonėms.
+
 **Nenaudokite Dialectical Engine apgaulei.** Nepateikite sugeneruoto rezultato kaip parašyto žmogaus, kai tai klaidintų, nepašalinkite žymos, kad turinys sugeneruotas DI, ir nenaudokite jo tariamam sutarimui, melagingiems įrodymams ar apsimetimui kitu asmeniu sukurti.
 
 **Neatakuokite paslaugos.** Įprastas paieškos sistemų vykdomas paskelbtų debatų indeksavimas leidžiamas, tačiau kitai automatizuotai prieigai, duomenų rinkimui, naršymui robotais ar masiniam išgavimui reikia mūsų rašytinio leidimo; draudžiama apeiti dažnio ribojimą, autentifikavimą ar paskelbimo kontrolės priemones; bandyti išgauti raginimus ar sistemos nurodymus; naudoti raginimų injekciją siekiant priversti variklį nepaisyti apribojimų; be rašytinio mūsų leidimo ieškoti pažeidžiamumų ar atlikti apkrovos bandymus.
@@ -116,7 +122,7 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 
 **Jūsų turinio nenaudojame mokymui.** DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada.
 
-**Kaip jūsų turinys pasiekia DI paslaugų teikėjus.** Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų.
+**Kaip jūsų turinys pasiekia DI paslaugų teikėjus.** Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų. Kai debatai pasibaigia, jų apibendrinimą taip pat siunčiame modeliui, kuris jį tikrina pagal keturias kategorijas — galimas terorizmas, bet kokios rūšies neapykantos kalba, polinkiai į savižudybę arba kenkimą kitiems žmonėms ir ginklų ar narkotikų gaminimas — kaip paaiškinta 9 skyriuje.
 
 **Ką siunčia pagalbos pokalbis.** Pagalbos asistentas taip pat yra DI modelis. Kai jam rašote, jūsų žinutę kartu su pagalbos straipsniais, kuriais jis grindžia atsakymą, siunčiame išoriniam modelių teikėjui, kad modelis galėtų atsakyti. Prieš siųsdami užmaskuojame viską, kas atrodo kaip slaptažodis, vienkartinis kodas ar raktas. Jei paprašote pasikalbėti su žmogumi, modeliui siunčiame ir pokalbį, užmaskuotą tokiu pačiu būdu, kad jis parašytų trumpą santrauką mūsų komandos nariui, perimančiam jūsų atvejį. Nepridedame jūsų el. pašto adreso, paskyros identifikatorių ar mokėjimo duomenų, tačiau modelis gauna visa kita, ką įrašote į pokalbį, todėl nerašykite ten nieko, ko nenorėtumėte, kad jis perskaitytų.
 
@@ -133,6 +139,8 @@ Pagal numatytuosius nustatymus debatai yra **privatūs**. Niekas, ką sukuriate,
 **Kas nutinka paskelbus.** Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Kai paskelbiate, sukuriame nekintamą debatų momentinę kopiją ir leidžiame ją skaityti visiems be paskyros. Paieškos sistemos gali ją indeksuoti. Momentinėje kopijoje rodomas jūsų **slapyvardis**, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas ir pasitikėjimo lygis bei aiškiai nurodoma, kad turinį sugeneravo DI. Joje nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija.
 
 **Praktiškai paskelbimo beveik neįmanoma atšaukti.** Kai debatai tampa vieši, kiti žmonės gali juos skaityti, cituoti, daryti ekrano kopijas, archyvuoti ir išsaugoti podėlyje. Atšaukus paskelbimą debatai pašalinami iš Dialectical Engine ir sunaikinamas mūsų kopijos raktas, tačiau kitur jau esančių kopijų pasiekti neįmanoma. Neskelbkite nieko, ko nenorėtumėte visam laikui susieti su savo slapyvardžiu.
+
+**Pažymėtiems debatams reikia mūsų pritarimo.** Kai debatai pasibaigia, automatizuota patikra perskaito jų apibendrinimą pagal keturias 8 skyriuje nurodytas kategorijas. Debatus, kuriuos patikra pažymi, galima paskelbti tik gavus mūsų pritarimą, o žymę mato tik jūs. Jei paprašote mūsų pritarimo debatų puslapyje, mūsų komandos narys, turintis konkretų leidimą peržiūrėti paskelbimus, gali perskaityti debatus tokius, kokie būtų paskelbti. Jei pritariame, mygtukas „Paskelbti“ jums vėl tampa prieinamas, o patikra, kurią praeina kiekvienas paskelbimas, vis tiek taikoma. Jei atsisakome, debatai lieka privatūs ir pateikiame jums motyvų pareiškimą (10 skyrius). Po atsisakymo galite paprašyti dar kartą, ir sprendimą priima mūsų komandos narys, nepriėmęs sprendimo dėl pirmojo prašymo; taip pat galite pasinaudoti 10 skyriuje nurodyta skundų teikimo tvarka. Po antrojo atsisakymo daugiau prašyti negalite, tačiau sprendimą vis tiek galite perduoti neteisminio ginčų sprendimo įstaigai arba teismui (10 skyrius). Pritarimas apima apibendrinimą, kurį perskaitė peržiūrėtojas, įskaitant bet kurią vėlesnę debatų versiją, žodis žodin jį kartojančią; perrašytas apibendrinimas tikrinamas dar kartą, kai skelbiate, ir, jei jis pažymimas, jam reikia atskiro pritarimo. Jei pažymėtus debatus paskelbiate gavę mūsų pritarimą, galite juos vėl nuimti naudodami „Nuimti“ jų kortelėje skiltyje „Jūsų debatai“.
 
 **Paskelbti debatai, kai uždarote paskyrą.** Planuodami paskyros uždarymą pasirenkate, kas nutiks jūsų paskelbtiems debatams. Jei pažymėsite **„Taip pat ištrinti mano viešus debatus“**, uždarymo metu kiekvienus iš jų pašalinsime iš Dialectical Engine ir sunaikinsime savo kopijos raktą, kaip atšaukiant paskelbimą, nebent įstatymai įpareigoja išsaugoti konkretų elementą. Jei langelio nepažymėsite, debatai liks vieši su jūsų nebenaudojamu slapyvardžiu. Kitų asmenų iki pašalinimo padarytų kopijų nekontroliuojame. Jei norite išsaugoti šalinamus debatus sau, pirmiausia juos atsisiųskite.
 
@@ -153,6 +161,8 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 - **Variklio sprendimai.** Variklis priima automatizuotus sprendimus dėl *argumentų*: jis gali atsisakyti atsakyti į klausimą, sustoti galutinėje būsenoje — pavyzdžiui, kai klausimas grindžiamas klaidinga prielaida arba yra vertybinis, o ne empirinis — apriboti pasitikėjimo lygį, kai nebuvo galima atlikti nepriklausomos kritikos, arba pažymėti atsakymą kaip netinkamą, kai sugeneruotas tekstas neišlaikė atitikties patikros. Tai numatytas produkto veikimas; šie sprendimai jums matomi debatuose ir nėra sprendimai dėl jūsų.
 - **Moderavimo sprendimai dėl turinio ir paskyrų.** Paskelbtų debatų pašalinimas ar prieigos prie jų apribojimas arba paskyros sustabdymas ar uždarymas yra mūsų pagal šias Sąlygas ar įstatymus priimamas sprendimas. Priimant kiekvieną tokį jūsų paskyrai poveikį darantį sprendimą dalyvauja žmogus. Pagrindai aprašyti 11 skyriuje.
 
+**Kur priklauso debatų pabaigos patikra.** 9 skyriuje nurodyta patikra nėra variklio viduje priimamas sprendimas. Tai automatizuota priemonė, kuri veikia jūsų turinį: debatų, kuriuos ji pažymi, negalima paskelbti, nebent jiems pritartų žmogus. Kiekvieną atsisakymą priima žmogus, o motyvų pareiškime nurodoma, kad buvo naudotos automatizuotos priemonės.
+
 **Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą: pasinaudodami toliau aprašyta skundų teikimo tvarka, kreipdamiesi į pagal ES Skaitmeninių paslaugų aktą sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą.
 
 **Skundas dėl sprendimo.** Jei nesutinkate su moderavimo sprendimu, per **šešis mėnesius** atsakykite į motyvų pareiškimą arba rašykite adresu office@dezbatere.ro. Sprendimą peržiūrės priimant pirminį sprendimą nedalyvavęs žmogus, o mes pranešime jums motyvuotą rezultatą. Tai neturi įtakos jūsų teisei kreiptis į teismą ar naudotis alternatyviu ginčų sprendimu pagal 18 skyrių. Pagal skundų teikimo tvarką taip pat galima skųstis dėl to, kad nesiėmėme veiksmų gavę pranešimą, kad turinys buvo pašalintas neteisingai, kad paskyra buvo nepagrįstai apribota arba kad automatizuota priemonė netinkamai paveikė jūsų turinį.
@@ -163,7 +173,7 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 
 **Teroristinis turinys.** Teroristinis turinys yra neteisėtas ir Dialectical Engine jo skelbti neleidžiama (7 skyrius). Europos Sąjungos kompetentingos institucijos per 1 skyriuje nurodytą kontaktinį punktą gali mums siųsti nurodymus pašalinti turinį pagal Reglamentą (ES) 2021/784. Gavę tokį nurodymą, per vieną valandą pašaliname turinį arba panaikiname prieigą prie jo visose ES šalyse. Turinį paskelbusiam asmeniui pranešame, kad turinys buvo pašalintas, o jam paprašius — kodėl ir kaip galima apskųsti nurodymą, išskyrus atvejus, kai institucija nusprendžia, kad dėl visuomenės saugumo informacija ribotą laiką neturi būti atskleidžiama. Kaip reikalauja Reglamentas, pašalintą turinį ir susijusius duomenis saugome šešis mėnesius, kad pašalinimą būtų galima peržiūrėti ir, jei jis buvo neteisingas, atšaukti. Turinį paskelbęs asmuo gali apskųsti nurodymą tos šalies, kurios institucija jį išdavė, teismuose, taip pat gali pasinaudoti mūsų skundų teikimo tvarka. Jokia institucija nėra pareikalavusi, kad pagal šį Reglamentą imtumės konkrečių priemonių kovai su teroristiniu turiniu; jei kuri nors institucija to pareikalaus, šias priemones, įskaitant bet kokius automatizuotus įrankius, aprašysime čia.
 
-**Didelis pavojus gyvybei ar saugumui.** Sužinoję informaciją, leidžiančią manyti, kad daroma nusikalstama veika, kelianti grėsmę kieno nors gyvybei ar saugumui, informuojame kompetentingas institucijas.
+**Didelis pavojus gyvybei ar saugumui.** Sužinoję informaciją, leidžiančią manyti, kad daroma nusikalstama veika, kelianti grėsmę kieno nors gyvybei ar saugumui, informuojame kompetentingas institucijas. 9 skyriuje nurodyta automatizuota patikra pati savaime nesukelia to, kad kuris nors asmuo perskaitytų debatus. Tai, ką peržiūrėtojas skaito debatuose, kurių savininkas paprašė mūsų pritarimo, reglamentuoja ši pastraipa.
 
 ## 11. Sustabdymas ir nutraukimas
 

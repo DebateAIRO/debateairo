@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.3
+endMarker: KOŞULLARIN SONU · v2.4
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.3 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -70,7 +70,7 @@ Yayımlanmış bir tartışmayı herkes okuyabilir. Okumak için hesap gerekmez;
 
 Bir soru veya iddia gönderirsiniz. Dialectical Engine bunu, çevresinde iddialar, karşı iddialar, eleştiriler, kanıt atıfları, puanlar ve güven aralığı içeren bir hükümden oluşan bir argüman grafiği kuran çeşitli üçüncü taraf yapay zekâ modellerine gönderir. Tek tek iddialara itiraz edebilir, bir hususun daha ayrıntılı incelenmesini isteyebilir ve sonucu yayımlayıp yayımlamamaya karar verebilirsiniz.
 
-**Bir tartışmadaki her şey yapay zekâ tarafından üretilir.** Argümanlar, eleştiriler, kanıt atıfları, puanlar, hükümler ve destek asistanının yanıtları makine tarafından üretilir. Bunlar yanlış, eksik, güncelliğini yitirmiş veya kendinden emin biçimde hatalı olabilir ve modellerdeki önyargıları yansıtabilir. Size gösterilmeden veya yayımlanmadan önce hiçbir kişi bunları incelemez ve adı belirtilmiş hiçbir kişi bunlar için editoryal sorumluluk taşımaz. Üretilen içerik; ürün içinde, yayımlanan sayfalarda ve dışa aktarımlarda yapay zekâ tarafından üretilmiş olarak etiketlenir.
+**Bir tartışmadaki her şey yapay zekâ tarafından üretilir.** Argümanlar, eleştiriler, kanıt atıfları, puanlar, hükümler ve destek asistanının yanıtları makine tarafından üretilir. Bunlar yanlış, eksik, güncelliğini yitirmiş veya kendinden emin biçimde hatalı olabilir ve modellerdeki önyargıları yansıtabilir. Size gösterilmeden önce hiçbir kişi bunları incelemez ve kontrolümüz bir tartışmayı işaretleyip siz de onayımızı istemedikçe yayımlanmadan önce de hiçbir kişi bunları incelemez (9. bölüm); adı belirtilmiş hiçbir kişi bunlar için editoryal sorumluluk taşımaz. Üretilen içerik; ürün içinde, yayımlanan sayfalarda ve dışa aktarımlarda yapay zekâ tarafından üretilmiş olarak etiketlenir.
 
 **Dialectical Engine tavsiye değildir.** Hukuki, tıbbi, mali, vergisel, psikolojik, güvenlikle ilgili veya başka türde mesleki tavsiye değildir; bir hüküm de maddi vakıa tespiti değildir. Bir tartışmayı, birincil kaynakları ve uygun olduğu durumlarda yetkin bir uzmanı kontrol etmeksizin sağlığınız, güvenliğiniz, paranız, hukuki durumunuz veya başkalarının esenliği açısından önem taşıyan bir kararın dayanağı olarak kullanmayın. Yüksek güven aralığı, modellerin gördükleri materyal temelinde yorumun yerleşik olduğunu saptadığı anlamına gelir; bunun doğru olduğuna dair güvence değildir.
 
@@ -98,6 +98,12 @@ Bu kurallar gönderdiklerinize, hizmeti kullanma biçiminize ve yayımladıklar�
 
 İftira niteliğinde olan, şiddet veya nefrete teşvik eden, taciz veya tehdit içeren, rıza olmaksızın paylaşılan mahrem görüntülerden oluşan, fikrî mülkiyeti veya gizliliği ihlal eden, ticari sırları açıklayan, çocukların cinsel istismarına ilişkin materyal teşkil eden ya da yaptırımları veya ihracat kontrollerini ihlal eden içerikler dahil olmak üzere **hukuka aykırı içerik göndermeyin veya yayımlamayın**.
 
+**Her türlü nefret söylemi yasaktır.** Her türlü nefret söylemini göndermeyin veya yayımlamayın.
+
+**Silah veya uyuşturucu yapımına ilişkin talimat yasaktır.** Silah veya uyuşturucu yapımına ilişkin talimat göndermeyin veya yayımlamayın.
+
+**İntihara veya başkalarına zarar vermeye teşvik eden içerik yasaktır.** İntihara veya başkalarına zarar vermeye teşvik eden içerik göndermeyin veya yayımlamayın.
+
 **Dialectical Engine'i aldatma amacıyla kullanmayın.** Yanıltıcı olacağı durumlarda üretilen çıktıyı insan tarafından yazılmış gibi sunmayın, yapay zekâ tarafından üretildiği etiketini kaldırmayın ve görünürde uzlaşma, sahte kanıt veya kimliğe bürünme oluşturmak için kullanmayın.
 
 **Hizmete saldırmayın.** Arama motorları yayımlanmış tartışmaları olağan şekilde dizine ekleyebilir. Bunlara başka türlü otomatik erişim, veri kazıma, tarama veya toplu çıkarım için yazılı iznimiz gerekir. Hız sınırlarını, kimlik doğrulamayı veya yayımlama kontrollerini aşmayın; istemleri ya da sistem talimatlarını çıkarmaya çalışmayın; motorun kısıtlarını aşması için istem enjeksiyonu yapmayın; yazılı iznimiz olmadan yoklama veya yük testi gerçekleştirmeyin.
@@ -116,7 +122,7 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 **İçeriğinizle eğitim yapmayız.** Yapay zekâ sağlayıcılarını yalnızca içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sağlayıcı Sicilimiz, her sağlayıcı için bunu doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir.
 
-**İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır.** Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz.
+**İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır.** Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz. Bir tartışma bittiğinde sentezini, dört kategori bakımından — olası terörizm, her türlü nefret söylemi, intihara veya başkalarına zarar vermeye yönelik eğilimler ve silah veya uyuşturucu yapımı — kontrol eden bir modele de göndeririz; bunu 9. bölüm açıklar.
 
 **Destek sohbeti neleri gönderir.** Destek asistanı da bir yapay zekâ modelidir. Ona yazdığınızda, modelin yanıt verebilmesi için mesajınızı, modelin yanıtını dayandırdığı yardım makaleleriyle birlikte harici bir model sağlayıcısına göndeririz. Göndermeden önce parolaya, tek kullanımlık koda veya anahtara benzeyen her şeyi maskeleriz. Bir kişiyle görüşmeyi talep ederseniz, modelin talebinizi devralan ekip üyemiz için kısa bir özet yazabilmesi amacıyla konuşmayı da aynı şekilde maskelenmiş olarak modele göndeririz. E-posta adresinizi, hesap tanımlayıcılarınızı veya ödeme bilgilerinizi eklemeyiz, ancak model sohbete yazdığınız diğer her şeyi alır; bu nedenle orada modelin okumasını istemeyeceğiniz hiçbir şey yazmayın.
 
@@ -133,6 +139,8 @@ Tartışmalar **varsayılan olarak özeldir**. Oluşturduğunuz hiçbir şey, si
 **Yayımlama ne yapar.** Yayımlama, ayrı olarak teyit edilen bilinçli bir işlemdir. Yayımladığınızda tartışmanın sabit bir anlık görüntüsünü alır ve hesap gerekmeksizin herkesin okuyabileceği hâle getiririz. Arama motorları bunu dizine ekleyebilir. Anlık görüntü; **takma adınızı**, sorunuzu yazdığınız şekliyle, argüman ağacını, puanları, hükmü ve güven aralığını gösterir ve içeriğin yapay zekâ tarafından üretildiğine ilişkin görünür bir etiket taşır. E-posta adresinizi, oturum kayıtlarınızı veya hesap geçmişinizi göstermez.
 
 **Yayımlama uygulamada fiilen geri alınamaz.** Bir tartışma kamuya açıldığında başkaları onu okuyabilir, alıntılayabilir, ekran görüntüsünü alabilir, arşivleyebilir ve önbelleğe kaydedebilir. Yayımdan kaldırmak, içeriği Dialectical Engine'den kaldırır ve bizdeki kopyanın anahtarını yok eder; ancak başka yerlerde hâlihazırda bulunan kopyalara ulaşamaz. Takma adınızla kalıcı olarak ilişkilendirilmesini istemeyeceğiniz hiçbir şeyi yayımlamayın.
+
+**İşaretlenmiş bir tartışma onayımızı gerektirir.** Bir tartışma bittiğinde otomatik bir kontrol, sentezini 8. bölümdeki dört kategori bakımından okur. Kontrolün işaretlediği bir tartışma yalnızca onayımızla yayımlanabilir ve işaret yalnızca size gösterilir. Onayımızı tartışmanın sayfasından isterseniz, ekibimizden yayımları incelemeye ilişkin belirli bir yetkiye sahip bir üye tartışmayı yayımlanacağı hâliyle okuyabilir. Onaylarsak Yayımla seçeneği yeniden kullanımınıza açılır ve her yayımlamanın tabi olduğu kontrol yine uygulanır. Reddedersek tartışma özel kalır ve size bir gerekçe bildirimi sunarız (10. bölüm). Retten sonra bir kez daha talepte bulunabilirsiniz ve ilk talebe karar vermemiş bir ekip üyemiz karar verir; ayrıca 10. bölümdeki şikâyet yolunu da kullanabilirsiniz. İkinci retten sonra yeniden talepte bulunamazsınız, ancak kararı yine de mahkeme dışı bir uyuşmazlık çözüm organına veya mahkemeye taşıyabilirsiniz (10. bölüm). Onay, inceleme görevlisinin okuduğu sentezi ve onu kelimesi kelimesine tekrar eden tartışmanın sonraki her sürümünü kapsar; yeniden yazılmış bir sentez yayımladığınızda yeniden kontrol edilir ve işaretlenirse kendi onayına ihtiyaç duyar. İşaretlenmiş bir tartışmayı onayımızdan sonra yayımlarsanız, Tartışmalarınız bölümünde kartındaki Yayından kaldır düğmesiyle onu yeniden yayından kaldırabilirsiniz.
 
 **Hesabınızı kapattığınızda yayımlanmış tartışmalar.** Hesabınızın kapatılmasını planladığınızda yayımladığınız tartışmalara ne olacağını seçersiniz. **"Herkese açık tartışmalarımı da sil"** kutusunu işaretlerseniz, kapatma işlemi yapıldığında her birini Dialectical Engine’den kaldırır ve tıpkı yayından kaldırmada olduğu gibi kopyamızın anahtarını yok ederiz; yasaların belirli bir öğeyi saklamamızı gerektirmesi bunun istisnasıdır. Kutuyu işaretlemezseniz tartışmalar kullanımdan kaldırılmış takma adınız altında herkese açık kalır. Kaldırılmadan önce başkalarının yaptığı kopyalar kontrolümüz dışındadır. Kaldırdığınız bir tartışmaya erişiminiz sürsün istiyorsanız önce indirin.
 
@@ -153,6 +161,8 @@ Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildir
 - **Motor içindeki kararlar.** Motor, *argümanlar* hakkında makine kararları verir: bir soruyu yanıtlamayı reddedebilir; örneğin bir sorunun yanlış bir ön kabule dayanması veya ampirik değil değer yargısına dayalı olması hâlinde nihai bir rotada durabilir; bağımsız bir eleştirinin mevcut olmadığı durumlarda güven aralığına üst sınır koyabilir veya üretilen metin uygunluk kontrolünden geçemediğinde bir yanıtı kusurlu olarak işaretleyebilir. Bunlar ürünün tasarlandığı gibi çalışmasının sonucudur; tartışmada size görünür ve sizin hakkınızda alınmış kararlar değildir.
 - **İçerik ve hesaplar hakkındaki moderasyon kararları.** Yayımlanmış bir tartışmanın kaldırılması veya kısıtlanması ya da bir hesabın askıya alınması veya kapatılması, bu Koşullara veya hukuka göre verdiğimiz bir karardır. Hesabınızı etkileyen bu tür her kararda bir kişi görev alır. Gerekçeler 11. bölümde açıklanmıştır.
 
+**Tartışma sonu kontrolünün yeri.** 9. bölümdeki kontrol, motorun içindeki bir karar değildir. İçeriğinizi etkileyen otomatik bir araçtır: işaretlediği bir tartışma, bir kişi onaylamadıkça yayımlanamaz. Her reddi bir kişi verir ve gerekçe bildirimi otomatik araçların kullanıldığını belirtir.
+
 **Gerekçe bildirimi.** İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz — aşağıda açıklanan şikâyet yolumuz, AB Dijital Hizmetler Yasası kapsamında sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organı veya mahkeme yoluyla.
 
 **Bir karara ilişkin şikâyet.** Bir moderasyon kararına katılmıyorsanız gerekçe bildirimine yanıt verin veya **altı ay** içinde office@dezbatere.ro adresine yazın. İlk kararda görev almamış bir kişi kararı inceler ve sonucu gerekçeleriyle size bildiririz. Bu, mahkemeye başvurma veya 18. bölüm kapsamındaki alternatif uyuşmazlık çözümünü kullanma hakkınızı etkilemez. Şikâyet yolu; bir bildirim üzerine işlem yapmadığımız, içeriğin haksız biçimde kaldırıldığı, bir hesabın haksız biçimde kısıtlandığı veya otomatik bir aracın içeriğinizi haksız biçimde etkilediği yönündeki şikâyetleri de kabul eder.
@@ -163,7 +173,7 @@ Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildir
 
 **Terör içeriği.** Terör içeriği hukuka aykırıdır ve Dialectical Engine'de buna izin verilmez (7. bölüm). Avrupa Birliği'ndeki yetkili makamlar, 2021/784 sayılı (AB) Tüzük kapsamında kaldırma emirlerini 1. bölümde belirtilen irtibat noktamız aracılığıyla bize gönderebilir. Böyle bir emir aldığımızda bir saat içinde içeriği kaldırır veya tüm AB ülkelerinde içeriğe erişimi engelleriz. İçeriği yayımlayan kişiye içeriğin kaldırıldığını ve talep etmesi hâlinde nedenini ve emre nasıl itiraz edebileceğini bildiririz; makamın, kamu güvenliğinin sınırlı bir süre için bilgi verilmemesini gerektirdiğine karar vermesi hâli bunun dışındadır. Tüzüğün gerektirdiği üzere, kaldırmanın gözden geçirilebilmesi ve hatalı olması hâlinde geri alınabilmesi için kaldırılan içeriği ve ilgili verileri altı ay süreyle saklarız. İçeriği yayımlayan kişi, emri veren makamın bulunduğu ülkenin mahkemelerinde itiraz edebilir ve ayrıca şikâyet yolumuzu kullanabilir. Hiçbir makam, Tüzük kapsamında bizi terör içeriğine karşı belirli tedbirler almakla yükümlü tutmamıştır; bir makam bunu yaparsa, otomatik araçlar dahil bu tedbirleri burada açıklayacağız.
 
-**Yaşam veya güvenlik açısından ciddi risk.** Bir kişinin yaşamına veya güvenliğine yönelik tehdit içeren bir suça işaret eden bilgiden haberdar olursak yetkili makamları bilgilendiririz.
+**Yaşam veya güvenlik açısından ciddi risk.** Bir kişinin yaşamına veya güvenliğine yönelik tehdit içeren bir suça işaret eden bilgiden haberdar olursak yetkili makamları bilgilendiririz. 9. bölümdeki otomatik kontrol, tek başına hiçbir kişinin bir tartışmayı okumasına yol açmaz. Sahibinin onayımızı istediği bir tartışmada inceleme görevlisinin okudukları bu paragrafın kapsamındadır.
 
 ## 11. Askıya alma ve sona erdirme
 

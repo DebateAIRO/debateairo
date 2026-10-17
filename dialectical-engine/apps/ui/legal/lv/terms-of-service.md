@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.3
+endMarker: NOTEIKUMU BEIGAS · v2.4
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.3 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.4 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -70,7 +70,7 @@ Ikviens drīkst lasīt publicētas debates. Lasīšanai konts nav vajadzīgs, ta
 
 Jūs iesniedzat jautājumu vai apgalvojumu. Dialectical Engine to nosūta vairākiem trešo personu MI modeļiem, kas ap to izveido argumentu grafu: apgalvojumus, pretargumentus, kritiku, atsauces uz pierādījumiem, vērtējumus un spriedumu ar ticamības pakāpi. Varat apstrīdēt atsevišķus apgalvojumus, lūgt jautājumu izpētīt sīkāk un izlemt, vai rezultātu publicēt.
 
-**Visu debašu saturu ģenerē MI.** Argumentus, kritiku, atsauces uz pierādījumiem, vērtējumus, spriedumus un atbalsta asistenta atbildes ģenerē mašīna. Tie var būt nepareizi, nepilnīgi, novecojuši vai pārliecinoši kļūdaini, un tajos var izpausties modeļu aizspriedumi. Neviena persona tos nepārskata, pirms tie tiek parādīti jums vai publicēti, un neviena vārdā nosaukta persona neuzņemas par tiem redakcionālu atbildību. Ģenerētais saturs produktā, publicētajās lapās un eksportētajos materiālos ir marķēts kā MI ģenerēts.
+**Visu debašu saturu ģenerē MI.** Argumentus, kritiku, atsauces uz pierādījumiem, vērtējumus, spriedumus un atbalsta asistenta atbildes ģenerē mašīna. Tie var būt nepareizi, nepilnīgi, novecojuši vai pārliecinoši kļūdaini, un tajos var izpausties modeļu aizspriedumi. Neviena persona tos nepārskata, pirms tie tiek parādīti jums, un neviena persona tos nepārskata, pirms tie tiek publicēti, ja vien mūsu pārbaude neatzīmē debates un jūs nelūdzat mūsu apstiprinājumu (9. sadaļa); neviena vārdā nosaukta persona neuzņemas par tiem redakcionālu atbildību. Ģenerētais saturs produktā, publicētajās lapās un eksportētajos materiālos ir marķēts kā MI ģenerēts.
 
 **Dialectical Engine nav konsultācija.** Tā nav juridiska, medicīniska, finanšu, nodokļu, psiholoģiska, drošības vai cita profesionāla konsultācija, un spriedums nav fakta konstatējums. Neizmantojiet debates kā pamatu lēmumam, kas ir būtisks jūsu veselībai, drošībai, naudai, tiesiskajam stāvoklim vai citu personu labklājībai, nepārbaudot pirmavotus un attiecīgā gadījumā nekonsultējoties ar kvalificētu speciālistu. Augsta ticamības pakāpe nozīmē, ka modeļi, pamatojoties uz apskatīto materiālu, uzskatīja interpretāciju par labi nostiprinātu; tas negarantē tās patiesumu.
 
@@ -98,6 +98,12 @@ Jebkurā laikā varat slēgt kontu sadaļā **Iestatījumi → Konts**. Slēgša
 
 **Neiesniedziet un nepublicējiet nelikumīgu saturu**, tostarp saturu, kas ir neslavu ceļošs, mudina uz vardarbību vai naidu, aizskar vai draud, ir bez piekrišanas kopīgoti intīmi attēli, pārkāpj intelektuālā īpašuma tiesības vai konfidencialitāti, izpauž komercnoslēpumus, ir materiāls, kurā atspoguļota bērnu seksuāla izmantošana, vai pārkāpj sankcijas vai eksporta kontroli.
 
+**Nekādas jebkāda veida naida runas.** Neiesniedziet un nepublicējiet jebkāda veida naida runu.
+
+**Nekādu norādījumu par ieroču vai narkotiku izgatavošanu.** Neiesniedziet un nepublicējiet norādījumus par ieroču vai narkotiku izgatavošanu.
+
+**Nekāda satura, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem.** Neiesniedziet un nepublicējiet saturu, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem.
+
 **Neizmantojiet Dialectical Engine maldināšanai.** Neuzdodiet ģenerēto rezultātu par cilvēka rakstītu, ja tas maldinātu, nenoņemiet MI ģenerēta satura marķējumu un neizmantojiet to šķietamas vienprātības, viltotu pierādījumu vai citas personas atdarināšanas radīšanai.
 
 **Neuzbrūciet pakalpojumam.** Publicētās debates drīkst ierasti indeksēt meklētājprogrammas, taču citai automatizētai piekļuvei, datu izgūšanai, pārmeklēšanai vai masveida ieguvei nepieciešama mūsu rakstiska atļauja; nav atļauts apiet pieprasījumu biežuma ierobežojumus, autentifikāciju vai publicēšanas kontroli; mēģināt iegūt uzvednes vai sistēmas norādījumus; izmantot uzvedņu injekciju, lai panāktu, ka dzinējs ignorē ierobežojumus; veikt zondēšanu vai slodzes testēšanu bez mūsu rakstiskas atļaujas.
@@ -116,7 +122,7 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 
 **Mēs neapmācām modeļus ar jūsu saturu.** MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši, un kad.
 
-**Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem.** Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju.
+**Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem.** Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju. Kad debates noslēdzas, mēs arī nosūtām to sintēzi modelim, kas to pārbauda pēc četrām kategorijām — iespējams terorisms, jebkāda veida naida runa, tieksmes uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem un ieroču vai narkotiku izgatavošana —, kā paskaidrots 9. sadaļā.
 
 **Ko nosūta atbalsta tērzēšana.** Arī atbalsta asistents ir MI modelis. Kad jūs tam rakstāt, mēs nosūtām jūsu ziņojumu ārējam modeļu pakalpojumu sniedzējam, lai modelis varētu atbildēt, kopā ar palīdzības rakstiem, uz kuriem tas balsta atbildi. Pirms nosūtīšanas mēs maskējam visu, kas izskatās pēc paroles, vienreizēja koda vai atslēgas. Ja lūdzat sazināties ar cilvēku, mēs modelim nosūtām arī sarunu, maskētu tādā pašā veidā, lai tas uzrakstītu īsu kopsavilkumu mūsu komandas dalībniekam, kurš pārņem jūsu lietu. Mēs nepievienojam jūsu e-pasta adresi, konta identifikatorus vai maksājumu informāciju, taču modelis saņem visu pārējo, ko ierakstāt tērzēšanā, tāpēc nerakstiet tur neko, ko nevēlaties, lai tas izlasītu.
 
@@ -133,6 +139,8 @@ Debates **pēc noklusējuma ir privātas**. Nekas no jūsu izveidotā nav redzam
 **Ko dara publicēšana.** Publicēšana ir apzināta darbība, ko apstiprina atsevišķi. Kad publicējat, mēs izveidojam fiksētu debašu momentuzņēmumu un ļaujam ikvienam to lasīt bez konta. Meklētājprogrammas to var indeksēt. Momentuzņēmumā redzams jūsu **pseidonīms**, jūsu jautājums tādā formā, kādā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ģenerējis MI. Tajā nav redzama jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture.
 
 **Praksē publicēšana faktiski ir neatgriezeniska.** Kad debates kļūst publiskas, citas personas tās var lasīt, citēt, uzņemt to ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Publikācijas atcelšana noņem tās no Dialectical Engine un iznīcina mūsu kopijas atslēgu, taču nevar sasniegt kopijas, kas jau atrodas citviet. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
+
+**Atzīmētām debatēm nepieciešams mūsu apstiprinājums.** Kad debates noslēdzas, automatizēta pārbaude izlasa to sintēzi pēc četrām 8. sadaļā minētajām kategorijām. Debates, ko pārbaude atzīmē, drīkst publicēt tikai ar mūsu apstiprinājumu, un atzīme tiek parādīta tikai jums. Ja lūdzat mūsu apstiprinājumu debašu lapā, mūsu komandas dalībnieks, kuram ir īpaša atļauja pārskatīt publikācijas, var izlasīt debates tādā veidā, kādā tās tiktu publicētas. Ja apstiprinām, poga „Publicēt” jums atkal ir pieejama, un pārbaude, ko iziet katra publicēšana, joprojām tiek piemērota. Ja atsakām, debates paliek privātas, un mēs jums sniedzam pamatojumu (10. sadaļa). Pēc atteikuma varat lūgt vēlreiz, un lēmumu pieņem mūsu komandas dalībnieks, kas nepieņēma lēmumu par pirmo lūgumu; varat izmantot arī 10. sadaļā minēto sūdzību kārtību. Pēc otrā atteikuma vairs lūgt nevarat, taču joprojām varat nodot lēmumu izskatīšanai ārpustiesas strīdu izšķiršanas iestādei vai tiesai (10. sadaļa). Apstiprinājums attiecas uz sintēzi, ko izlasīja pārskatītājs, tostarp uz jebkuru vēlāku debašu versiju, kas to atkārto burtiski; pārrakstīta sintēze tiek pārbaudīta vēlreiz, kad publicējat, un, ja tā tiek atzīmēta, tai nepieciešams savs apstiprinājums. Ja atzīmētas debates publicējat pēc mūsu apstiprinājuma, varat tās atkal noņemt ar „Noņemt” to kartītē sadaļā „Jūsu debates”.
 
 **Publicētās debates, kad slēdzat kontu.** Plānojot konta slēgšanu, jūs izvēlaties, kas notiks ar jūsu publicētajām debatēm. Ja atzīmēsiet **„Dzēst arī manas publiskās debates”**, slēgšanas laikā katras debates noņemsim no Dialectical Engine un iznīcināsim savas kopijas atslēgu, kā tas notiek, atsaucot publikāciju, ja vien likums neliek saglabāt konkrētu vienumu. Ja lodziņu neatzīmēsiet, debates paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Kopijas, ko citi izveidojuši pirms noņemšanas, nav mūsu kontrolē. Ja vēlaties noņemamās debates saglabāt sev, vispirms tās lejupielādējiet.
 
@@ -153,6 +161,8 @@ Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs
 - **Lēmumi dzinēja iekšienē.** Dzinējs pieņem mašīnas lēmumus par *argumentiem*: tas var atteikties atbildēt uz jautājumu, noslēgt debates gala stāvoklī — piemēram, ja jautājums balstīts uz nepatiesu pieņēmumu vai ir vērtību jautājums, nevis empīrisks jautājums — ierobežot ticamības pakāpi, ja nebija pieejama neatkarīga kritika, vai atzīmēt atbildi kā defektīvu, ja ģenerētais teksts neizturēja atbilstības pārbaudi. Tā ir paredzētā produkta darbība; tā jums ir redzama debatēs, un tie nav lēmumi par jums.
 - **Moderēšanas lēmumi par saturu un kontiem.** Publicētu debašu noņemšana vai piekļuves ierobežošana, kā arī konta darbības apturēšana vai konta slēgšana ir lēmums, ko pieņemam saskaņā ar šiem Noteikumiem vai tiesību aktiem. Katrā šādā lēmumā, kas ietekmē jūsu kontu, piedalās persona. Šādu lēmumu pamati ir aprakstīti 11. sadaļā.
 
+**Kur pieder debašu beigu pārbaude.** 9. sadaļā minētā pārbaude nav lēmums dzinēja iekšienē. Tas ir automatizēts rīks, kas ietekmē jūsu saturu: debates, ko tas atzīmē, nedrīkst publicēt, ja vien cilvēks tās neapstiprina. Katru atteikumu pieņem cilvēks, un pamatojumā ir norādīts, ka tika izmantoti automatizēti līdzekļi.
+
 **Pamatojums.** Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt: izmantojot tālāk aprakstīto sūdzību kārtību, vēršoties saskaņā ar ES Digitālo pakalpojumu aktu sertificētā ārpustiesas strīdu izšķiršanas iestādē vai vēršoties tiesā.
 
 **Sūdzība par lēmumu.** Ja nepiekrītat moderēšanas lēmumam, atbildiet uz pamatojumu vai **sešu mēnešu** laikā rakstiet uz office@dezbatere.ro. Lēmumu pārskata persona, kura nepiedalījās sākotnējā lēmuma pieņemšanā, un mēs jums paziņojam iznākumu un tā pamatojumu. Tas neietekmē jūsu tiesības vērsties tiesā vai izmantot alternatīvu strīdu izšķiršanu saskaņā ar 18. sadaļu. Sūdzību kārtība attiecas arī uz sūdzībām, ka neesam rīkojušies pēc ziņojuma, saturs noņemts nepamatoti, konts ierobežots nepamatoti vai automatizēts rīks nepamatoti ietekmējis jūsu saturu.
@@ -163,7 +173,7 @@ Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs
 
 **Teroristisks saturs.** Teroristisks saturs ir nelikumīgs, un Dialectical Engine tas nav atļauts (7. sadaļa). Eiropas Savienības kompetentās iestādes var nosūtīt mums izņemšanas rīkojumus saskaņā ar Regulu (ES) 2021/784 uz 1. sadaļā norādīto kontaktpunktu. Saņēmuši šādu rīkojumu, mēs vienas stundas laikā izņemam saturu vai atspējojam piekļuvi tam visās ES valstīs. Mēs informējam personu, kura saturu publicēja, ka tas ir izņemts, un, ja tā pieprasa, kāpēc tas izņemts un kā rīkojumu var apstrīdēt, ja vien iestāde nenolemj, ka sabiedriskās drošības dēļ informāciju uz ierobežotu laiku nedrīkst izpaust. Kā to prasa Regula, izņemto saturu un ar to saistītos datus mēs glabājam sešus mēnešus, lai izņemšanu varētu pārskatīt un, ja tā bijusi nepamatota, atcelt. Persona, kura saturu publicēja, var apstrīdēt rīkojumu tās valsts tiesās, kuras iestāde rīkojumu izdevusi, kā arī izmantot mūsu sūdzību kārtību. Neviena iestāde nav pieprasījusi, lai mēs saskaņā ar šo Regulu veiktu konkrētus pasākumus pret teroristisku saturu; ja tas notiks, mēs šos pasākumus, tostarp jebkādus automatizētus rīkus, aprakstīsim šeit.
 
-**Nopietns dzīvības vai drošības apdraudējums.** Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes.
+**Nopietns dzīvības vai drošības apdraudējums.** Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes. 9. sadaļā minētā automatizētā pārbaude pati par sevi neizraisa to, ka kāds cilvēks izlasa debates. To, ko pārskatītājs lasa debatēs, kuru īpašnieks ir lūdzis mūsu apstiprinājumu, regulē šī rindkopa.
 
 ## 11. Darbības apturēšana un izbeigšana
 

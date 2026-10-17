@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.3 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.3
+endMarker: TINGIMUSTE LÕPP · v2.4
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.3 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -70,7 +70,7 @@ Avaldatud väitlust võib lugeda igaüks. Lugemiseks ei ole kontot vaja, kuid se
 
 Esitate küsimuse või väite. Dialectical Engine saadab selle mitmele kolmanda isiku tehisintellektimudelile, mis koostavad selle ümber argumendigraafi: väited, vastuväited, kriitika, tõendiviited, hinded ning otsuse koos kindlusastmega. Saate üksikuid väiteid vaidlustada, paluda mõnd punkti põhjalikumalt uurida ja otsustada, kas tulemus avaldada.
 
-**Kõik väitluses sisalduv on tehisintellekti loodud.** Argumendid, kriitika, tõendiviited, hinded, otsused ja kasutajatoe assistendi vastused on masinloodud. Need võivad olla valed, puudulikud, aegunud või veendunult ekslikud ning võivad kajastada mudelite kallutatust. Ükski inimene ei vaata neid enne teile näitamist või avaldamist üle ning ükski nimetatud isik ei kanna nende eest toimetusvastutust. Loodud sisu märgistatakse tootes, avaldatud lehtedel ja eksporditud failides tehisintellekti loodud sisuna.
+**Kõik väitluses sisalduv on tehisintellekti loodud.** Argumendid, kriitika, tõendiviited, hinded, otsused ja kasutajatoe assistendi vastused on masinloodud. Need võivad olla valed, puudulikud, aegunud või veendunult ekslikud ning võivad kajastada mudelite kallutatust. Ükski inimene ei vaata neid enne teile näitamist üle ega vaata neid enne avaldamist üle, välja arvatud juhul, kui meie kontroll märgistab väitluse ja te palute meie heakskiitu (jaotis 9); ükski nimetatud isik ei kanna nende eest toimetusvastutust. Loodud sisu märgistatakse tootes, avaldatud lehtedel ja eksporditud failides tehisintellekti loodud sisuna.
 
 **Dialectical Engine ei anna nõu.** See ei ole õigus-, meditsiini-, finants-, maksu-, psühholoogia-, ohutus- ega muu kutsealane nõuanne ning otsus ei ole faktilise asjaolu tuvastamine. Ärge kasutage väitlust oma tervise, ohutuse, raha, õigusliku seisundi või teiste heaolu seisukohast olulise otsuse alusena, kontrollimata algallikaid ja vajaduse korral kvalifitseeritud spetsialistiga konsulteerimata. Kõrge kindlusaste tähendab, et mudelid pidasid nähtud materjali põhjal tõlgendust kindlaks; see ei taga selle tõesust.
 
@@ -98,6 +98,12 @@ Need reeglid kehtivad teie esitatud sisu, teenuse kasutamise viisi ja avaldatava
 
 **Ärge esitage ega avaldage ebaseaduslikku sisu**, sealhulgas sisu, mis on laimav, õhutab vägivallale või vihkamisele, ahistab või ähvardab, kujutab nõusolekuta jagatud intiimkujutisi, rikub intellektuaalomandit või konfidentsiaalsust, avaldab ärisaladusi, kujutab laste seksuaalset väärkohtlemist või rikub sanktsioone või ekspordikontrolli.
 
+**Vihakõne mis tahes kujul on keelatud.** Ärge esitage ega avaldage vihakõnet mis tahes kujul.
+
+**Relvade või uimastite valmistamise juhised on keelatud.** Ärge esitage ega avaldage juhiseid relvade või uimastite valmistamiseks.
+
+**Enesetapule või teiste inimeste kahjustamisele õhutav sisu on keelatud.** Ärge esitage ega avaldage sisu, mis õhutab enesetapule või teiste inimeste kahjustamisele.
+
 **Ärge kasutage Dialectical Engine-d petmiseks.** Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks.
 
 **Ärge rünnake teenust.** Otsingumootorid võivad avaldatud väitlusi tavapäraselt indekseerida. Muu automatiseeritud juurdepääs, andmete kraapimine, roomamine või avaldatud väitluste massiline väljavõtmine nõuab meie kirjalikku luba. Keelatud on kiiruspiirangutest, autentimisest või avaldamiskontrollidest möödahiilimine; viipade või süsteemijuhiste väljavõtmise katsed; viipade sisestamine eesmärgiga panna mootor oma piiranguid eirama; ning teenuse sondeerimine või koormustestimine ilma meie kirjaliku loata.
@@ -116,7 +122,7 @@ Kui te ei ole kindel, kas miski on lubatud, küsige meilt enne selle postitamist
 
 **Me ei kasuta teie sisu mudelite treenimiseks.** Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud.
 
-**Kuidas teie sisu jõuab tehisintellekti pakkujateni.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid.
+**Kuidas teie sisu jõuab tehisintellekti pakkujateni.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid. Kui väitlus lõpeb, saadame selle sünteesi ka mudelile, mis kontrollib seda nelja kategooria suhtes — võimalik terrorism, vihakõne mis tahes kujul, kalduvused enesetapule või teiste inimeste kahjustamisele ning relvade või uimastite valmistamine —, nagu selgitatakse jaotises 9.
 
 **Mida kasutajatoe vestlus saadab.** Kasutajatoe assistent on samuti tehisintellekti mudel. Kui te talle kirjutate, saadame teie sõnumi koos abiartiklitega, millel tema vastus põhineb, välisele mudelipakkujale, et mudel saaks vastata. Enne saatmist maskeerime kõik, mis näeb välja nagu parool, ühekordne kood või võti. Kui palute inimesega rääkida, saadame mudelile ka vestluse, samamoodi maskeerituna, et see kirjutaks lühikese kokkuvõtte meie meeskonna liikmele, kes teie juhtumi üle võtab. Me ei lisa teie e-posti aadressi, konto tunnuseid ega makseandmeid, kuid mudel saab kõik muu, mida vestlusesse kirjutate, seega ärge kirjutage sinna midagi, mida te ei soovi, et mudel loeks.
 
@@ -133,6 +139,8 @@ Väitlused on **vaikimisi privaatsed**. Miski teie loodust ei ole teistele näht
 **Mida avaldamine teeb.** Avaldamine on tahtlik ja eraldi kinnitatav toiming. Avaldamisel loome väitluse fikseeritud hetktõmmise ja teeme selle kõigile ilma kontota loetavaks. Otsingumootorid võivad selle indekseerida. Hetktõmmisel näidatakse teie **pseudonüümi**, küsimust sellisel kujul, nagu te selle kirjutasite, argumendipuud, hindeid, otsust ja kindlusastet ning sellel on nähtav märgis, et sisu on tehisintellekti loodud. Sellel ei näidata teie e-posti aadressi, seansikirjeid ega konto ajalugu.
 
 **Avaldamine on praktikas sisuliselt pöördumatu.** Kui väitlus on avalik, saavad teised inimesed seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Avaldamise tühistamisel eemaldatakse see Dialectical Engine-st ja hävitatakse meie koopia võti, kuid juba mujal olevaid koopiaid ei saa sellega kõrvaldada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi.
+
+**Märgistatud väitlus vajab meie heakskiitu.** Kui väitlus lõpeb, loeb automatiseeritud kontroll selle sünteesi jaotises 8 nimetatud nelja kategooria suhtes. Väitluse, mille kontroll märgistab, saab avaldada ainult meie heakskiidul ning märgistust näidatakse ainult teile. Kui palute meie heakskiitu väitluse lehel, saab meie meeskonna liige, kellel on konkreetne luba avaldamisi läbi vaadata, lugeda väitlust sellisel kujul, nagu see avaldataks. Kui kiidame heaks, on nupp Avaldage teile jälle kättesaadav ning kontroll, mille iga avaldamine läbib, kehtib endiselt. Kui keeldume, jääb väitlus privaatseks ja esitame teile põhjenduse (jaotis 10). Pärast keeldumist võite paluda veel kord ning otsustab meie meeskonna liige, kes esimese taotluse üle ei otsustanud; võite kasutada ka jaotises 10 kirjeldatud kaebuste esitamise kanalit. Pärast teist keeldumist ei saa te enam paluda, kuid saate otsuse siiski viia vaidluste kohtuvälise lahendamise organi või kohtu ette (jaotis 10). Heakskiit hõlmab sünteesi, mille läbivaataja luges, sealhulgas väitluse hilisemat versiooni, mis seda sõna-sõnalt kordab; ümberkirjutatud süntees kontrollitakse avaldamisel uuesti ning kui see märgistatakse, vajab see oma heakskiitu. Kui avaldate märgistatud väitluse pärast meie heakskiitu, saate selle uuesti avalikust vaatest eemaldada nupuga Eemaldage avalikust vaatest selle kaardil jaotises Teie väitlused.
 
 **Avaldatud väitlused konto sulgemisel.** Kui kavandate oma konto sulgemise, valite, mis saab teie avaldatud väitlustest. Kui märgite **„Kustuta ka minu avalikud väitlused“**, eemaldame need kõik Dialectical Engine-st ja hävitame sulgemise ajal oma koopia võtme, nagu avaldamise lõpetamisel, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all. Teiste enne eemaldamist tehtud koopiad ei ole meie kontrolli all. Kui soovite eemaldatavat väitlust endale alles jätta, laadige see enne alla.
 
@@ -153,6 +161,8 @@ Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid 
 - **Mootorisisesed otsused.** Mootor teeb masinotsuseid *argumentide* kohta: see võib keelduda küsimusele vastamast, peatuda lõppmarsruudil — näiteks kui küsimus põhineb vääral eeldusel või on empiirilise küsimuse asemel väärtusküsimus —, piirata kindlusastet, kui sõltumatu kriitika ei olnud kättesaadav, või märkida vastuse vigaseks, kui loodud tekst ei läbinud vastavuskontrolli. Sellistel juhtudel töötab toode ettenähtud viisil; otsused on teile väitluses nähtavad ega ole teie kohta tehtud otsused.
 - **Sisu ja kontode modereerimisotsused.** Avaldatud väitluse eemaldamine või piiramine või konto peatamine või sulgemine on otsus, mille teeme nende Tingimuste või seaduse alusel. Igas teie kontot mõjutavas otsuses osaleb inimene. Jaotises 11 kirjeldatakse aluseid.
 
+**Kuhu väitluse lõpus tehtav kontroll kuulub.** Jaotise 9 kontroll ei ole otsus mootori sees. See on automatiseeritud tööriist, mis mõjutab teie sisu: väitlust, mille see märgistab, ei saa avaldada, kui inimene seda heaks ei kiida. Iga keeldumise teeb inimene ning põhjenduses on öeldud, et kasutati automatiseeritud vahendeid.
+
 **Põhjendus.** Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada: allpool kirjeldatud kaebuste esitamise kanali kaudu, ELi digiteenuste määruse alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi kaudu või kohtus.
 
 **Otsuse peale kaebamine.** Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage **kuue kuu** jooksul aadressil office@dezbatere.ro. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast alternatiivset vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult.
@@ -163,7 +173,7 @@ Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid 
 
 **Terroristlik sisu.** Terroristlik sisu on ebaseaduslik ja seda ei ole Dialectical Engine-s lubatud (jaotis 7). Euroopa Liidu pädevad asutused võivad saata meile eemaldamiskorraldusi määruse (EL) 2021/784 alusel jaotises 1 nimetatud kontaktpunktile. Sellise korralduse saamisel eemaldame sisu või blokeerime juurdepääsu sellele kõigis ELi riikides ühe tunni jooksul. Teavitame sisu avaldanud isikut selle eemaldamisest ning tema soovi korral ka sellest, miks see eemaldati ja kuidas korraldust vaidlustada, välja arvatud juhul, kui asutus otsustab, et avaliku julgeoleku huvides tuleb teabe avaldamisest piiratud ajaks loobuda. Nagu määrus nõuab, säilitame eemaldatud sisu ja sellega seotud andmed kuus kuud, et eemaldamist saaks kontrollida ja selle ekslikkuse korral tühistada. Sisu avaldanud isik võib korraldust vaidlustada selle riigi kohtutes, mille asutus korralduse tegi, ning võib samuti kasutada meie kaebuste esitamise kanalit. Ükski asutus ei ole nõudnud meilt määruse alusel konkreetsete meetmete võtmist terroristliku sisu vastu; kui nii juhtub, kirjeldame neid meetmeid siin, sealhulgas mis tahes automatiseeritud tööriistu.
 
-**Tõsine oht elule või turvalisusele.** Kui saame teada teabest, mis viitab kuriteole, millega kaasneb oht kellegi elule või turvalisusele, teavitame pädevaid asutusi.
+**Tõsine oht elule või turvalisusele.** Kui saame teada teabest, mis viitab kuriteole, millega kaasneb oht kellegi elule või turvalisusele, teavitame pädevaid asutusi. Jaotise 9 automatiseeritud kontroll iseenesest ei too kaasa seda, et mõni inimene väitlust loeb. Seda, mida läbivaataja loeb väitluses, mille omanik on meie heakskiitu palunud, hõlmab see lõik.
 
 ## 11. Peatamine ja lõpetamine
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.3 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.4 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.3
+endMarker: SLUT PÅ VILLKOREN · v2.4
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.3 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.4 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -70,7 +70,7 @@ Vem som helst får läsa en debatt som har publicerats. Det krävs inget konto f
 
 Du skickar in en fråga eller ett påstående. Dialectical Engine skickar det till flera AI-modeller från tredje part, vilka bygger en argumentgraf kring det: påståenden, motpåståenden, kritik, hänvisningar till belägg, poäng och ett utslag med en konfidensnivå. Du kan ifrågasätta enskilda påståenden, be att en punkt undersöks närmare och besluta om resultatet ska publiceras.
 
-**Allt i en debatt genereras av AI.** Argumenten, kritiken, hänvisningarna till belägg, poängen, utslagen och supportassistentens svar är maskingenererade. De kan vara felaktiga, ofullständiga eller inaktuella, också när de framförs med stor säkerhet, och de kan återspegla snedvridningar i modellerna. Ingen person granskar dem innan de visas för dig eller publiceras, och ingen namngiven person har redaktionellt ansvar för dem. Genererat innehåll märks som AI-genererat i produkten, på publicerade sidor och i exporter.
+**Allt i en debatt genereras av AI.** Argumenten, kritiken, hänvisningarna till belägg, poängen, utslagen och supportassistentens svar är maskingenererade. De kan vara felaktiga, ofullständiga eller inaktuella, också när de framförs med stor säkerhet, och de kan återspegla snedvridningar i modellerna. Ingen person granskar dem innan de visas för dig, och ingen person granskar dem innan de publiceras, om inte vår kontroll markerar en debatt och du ber om vårt godkännande (avsnitt 9); ingen namngiven person har redaktionellt ansvar för dem. Genererat innehåll märks som AI-genererat i produkten, på publicerade sidor och i exporter.
 
 **Dialectical Engine är inte rådgivning.** Tjänsten utgör inte juridisk, medicinsk, finansiell, skattemässig, psykologisk, säkerhetsrelaterad eller annan professionell rådgivning, och ett utslag är inte ett fastställande av faktiska omständigheter. Använd inte en debatt som grund för ett beslut som är viktigt för din hälsa, säkerhet, ekonomi, rättsliga ställning eller andras välbefinnande utan att kontrollera primärkällor och, när det är lämpligt, rådfråga en kvalificerad yrkesperson. En hög konfidensnivå innebär att modellerna bedömde tolkningen som väl etablerad utifrån det material de såg; det är ingen garanti för att den är sann.
 
@@ -98,6 +98,12 @@ Dessa regler gäller för vad du skickar in, hur du använder tjänsten och vad 
 
 **Skicka inte in eller publicera olagligt innehåll**, däribland innehåll som är ärekränkande, uppmanar till våld eller hat, trakasserar eller hotar, utgör intima bilder som delats utan samtycke, gör intrång i immateriella rättigheter eller sekretess, röjer företagshemligheter, utgör material med sexuella övergrepp mot barn eller bryter mot sanktioner eller exportkontroller.
 
+**Ingen hatretorik av alla slag.** Skicka inte in eller publicera hatretorik av alla slag.
+
+**Inga instruktioner för tillverkning av vapen eller droger.** Skicka inte in eller publicera instruktioner för tillverkning av vapen eller droger.
+
+**Inget innehåll som uppmuntrar till självmord eller till att skada andra människor.** Skicka inte in eller publicera innehåll som uppmuntrar till självmord eller till att skada andra människor.
+
 **Använd inte Dialectical Engine för att vilseleda.** Framställ inte genererat material som människoskapat när det skulle vara vilseledande, ta inte bort märkningen om AI-generering och använd inte materialet för att skapa skenbar enighet eller fabricerade bevis, eller för att utge dig för att vara någon annan.
 
 **Angrip inte tjänsten.** Sökmotorer får indexera publicerade debatter på vanligt sätt. Annan automatiserad åtkomst, skrapning, genomsökning eller massutvinning av debatterna kräver vårt skriftliga tillstånd. Du får inte kringgå hastighetsbegränsningar, autentisering eller publiceringskontroller; försöka extrahera promptar eller systeminstruktioner; injicera promptar för att få motorn att bortse från sina begränsningar; eller sondera eller belastningstesta utan vårt skriftliga tillstånd.
@@ -116,7 +122,7 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 
 **Vi tränar inte på ditt innehåll.** Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när.
 
-**Hur ditt innehåll når AI-leverantörer.** För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter.
+**Hur ditt innehåll når AI-leverantörer.** För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter. När en debatt är avslutad skickar vi också dess syntes till en modell som kontrollerar den avseende fyra kategorier — möjlig terrorism, hatretorik av alla slag, tendenser till självmord eller till att skada andra människor samt tillverkning av vapen eller droger — såsom avsnitt 9 förklarar.
 
 **Vad supportchatten skickar.** Supportassistenten är också en AI-modell. När du skriver till den skickar vi ditt meddelande till en extern modelleverantör så att modellen kan svara, tillsammans med de hjälpartiklar som den grundar sitt svar på. Innan vi skickar maskerar vi allt som ser ut som ett lösenord, en engångskod eller en nyckel. Om du ber att få tala med en person skickar vi även samtalet, maskerat på samma sätt, till modellen så att den kan skriva en kort sammanfattning till den medlem i vårt team som tar över ditt ärende. Vi bifogar inte din e-postadress, dina kontoidentifierare eller dina betalningsuppgifter, men modellen tar emot allt annat du skriver i chatten, så skriv inte något där som du inte vill att den ska läsa.
 
@@ -133,6 +139,8 @@ Debatter är **privata som standard**. Ingenting som du skapar är synligt för 
 **Vad publicering innebär.** Publicering är en avsiktlig åtgärd som bekräftas separat. När du publicerar tar vi en fryst ögonblicksbild av debatten och gör den läsbar för vem som helst utan konto. Sökmotorer kan indexera den. Ögonblicksbilden visar din **pseudonym**, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar inte din e-postadress, dina sessionsuppgifter eller din kontohistorik.
 
 **Publicering går i praktiken inte att göra ogjord.** När en debatt väl är offentlig kan andra personer läsa, citera, skärmbilda, arkivera och cachelagra den. När publiceringen återkallas tas debatten bort från Dialectical Engine och nyckeln till vår kopia förstörs, men detta påverkar inte kopior som redan finns på andra platser. Publicera inget som du inte vill ska förknippas med din pseudonym för all framtid.
+
+**En markerad debatt behöver vårt godkännande.** När en debatt är avslutad läser en automatiserad kontroll dess syntes avseende de fyra kategorierna i avsnitt 8. En debatt som kontrollen markerar kan publiceras bara med vårt godkännande, och markeringen visas bara för dig. Om du ber om vårt godkännande på debattens sida kan en medlem i vårt team som har en särskild behörighet att granska publiceringar läsa debatten såsom den skulle publiceras. Om vi godkänner blir knappen Publicera tillgänglig för dig igen, och kontrollen som varje publicering går igenom gäller fortfarande. Om vi avslår förblir debatten privat och vi ger dig en motivering (avsnitt 10). Efter ett avslag får du be en gång till, och en medlem i vårt team som inte beslutade om den första begäran beslutar; du kan också använda klagomålsvägen i avsnitt 10. Efter ett andra avslag kan du inte be igen, men du kan fortfarande ta beslutet till ett organ för tvistlösning utanför domstol eller till domstol (avsnitt 10). Ett godkännande gäller den syntes som granskaren har läst, inklusive varje senare version av debatten som upprepar den ord för ord; en omskriven syntes kontrolleras på nytt när du publicerar och behöver, om den markeras, ett eget godkännande. Om du publicerar en markerad debatt efter vårt godkännande kan du ta ned den igen med knappen Ta ned på dess kort i Dina debatter.
 
 **Publicerade debatter när du avslutar ditt konto.** När du schemalägger att ditt konto ska avslutas väljer du vad som händer med debatterna du har publicerat. Om du markerar **”Radera även mina offentliga debatter”** tar vi bort var och en från Dialectical Engine och förstör nyckeln till vår kopia när avslutandet genomförs, som när en publicering återtas, om inte lagen kräver att vi behåller ett visst objekt. Om du lämnar rutan omarkerad förblir debatterna offentliga under din avvecklade pseudonym. Kopior som andra gjort före borttagningen ligger utanför vår kontroll. Om du vill behålla tillgången till en debatt som du tar bort, ladda ned den först.
 
@@ -153,6 +161,8 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 - **Beslut i motorn.** Motorn fattar maskinella beslut om *argument*: den kan avstå från att besvara en fråga, stanna vid ett slutläge — till exempel om en fråga bygger på en falsk förutsättning eller är en värderingsfråga snarare än en empirisk fråga — sätta ett tak för konfidensnivån om en oberoende kritik inte var tillgänglig eller markera ett svar som bristfälligt om den genererade texten inte klarade sin överensstämmelsekontroll. Detta är en del av hur produkten är avsedd att fungera; besluten är synliga för dig i debatten och är inte beslut om dig.
 - **Moderering av innehåll och konton.** Att ta bort eller begränsa en publicerad debatt eller att stänga av eller avsluta ett konto är ett beslut som vi fattar med stöd av dessa villkor eller lagen. En person medverkar i varje sådant beslut som påverkar ditt konto. Grunderna beskrivs i avsnitt 11.
 
+**Var kontrollen vid debattens slut hör hemma.** Kontrollen i avsnitt 9 är inte ett beslut inne i motorn. Den är ett automatiserat verktyg som påverkar ditt innehåll: en debatt som det markerar kan inte publiceras om inte en person godkänner den. En person fattar varje avslag, och motiveringen anger att automatiserade metoder användes.
+
 **Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet: genom vår klagomålsväg nedan, genom ett organ för tvistlösning utanför domstol som är certifierat enligt EU:s förordning om digitala tjänster, eller i domstol.
 
 **Klagomål på ett beslut.** Om du inte håller med om ett modereringsbeslut ska du svara på motiveringen eller skriva till office@dezbatere.ro inom **sex månader**. En person som inte deltog i det ursprungliga beslutet granskar det, och vi meddelar dig resultatet med en motivering. Detta påverkar inte din rätt att vända dig till domstol eller använda alternativ tvistlösning enligt avsnitt 18. Klagomålsvägen tar även emot klagomål om att vi inte har agerat på en rapport, att innehåll felaktigt har tagits bort, att ett konto felaktigt har begränsats eller att ett automatiserat verktyg felaktigt har påverkat ditt innehåll.
@@ -163,7 +173,7 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 
 **Terrorisminnehåll.** Terrorisminnehåll är olagligt och är inte tillåtet på Dialectical Engine (avsnitt 7). Behöriga myndigheter i Europeiska unionen kan skicka oss avlägsnandeorder enligt förordning (EU) 2021/784 till kontaktpunkten i avsnitt 1. När vi tar emot en sådan order tar vi bort innehållet, eller blockerar åtkomsten till det i samtliga EU-länder, inom en timme. Vi informerar den person som publicerade innehållet om att det har tagits bort och, på begäran, om skälen och om hur ordern kan bestridas, såvida inte myndigheten beslutar att inga uppgifter får lämnas ut under en begränsad tid av hänsyn till allmän säkerhet. I enlighet med förordningens krav bevarar vi det borttagna innehållet och tillhörande uppgifter i sex månader, så att borttagningen kan granskas och, om den var felaktig, upphävas. Den person som publicerade innehållet kan bestrida ordern vid domstolarna i det land vars myndighet utfärdade den, och kan även använda vår klagomålsväg. Ingen myndighet har krävt att vi vidtar särskilda åtgärder mot terrorisminnehåll enligt förordningen; om någon gör det kommer vi att beskriva de åtgärderna här, inklusive eventuella automatiserade verktyg.
 
-**Allvarlig risk för liv eller säkerhet.** Om vi får kännedom om uppgifter som tyder på ett brott som innebär ett hot mot någons liv eller säkerhet underrättar vi de behöriga myndigheterna.
+**Allvarlig risk för liv eller säkerhet.** Om vi får kännedom om uppgifter som tyder på ett brott som innebär ett hot mot någons liv eller säkerhet underrättar vi de behöriga myndigheterna. Den automatiserade kontrollen i avsnitt 9 leder inte i sig till att någon person läser en debatt. Vad en granskare läser i en debatt vars ägare har bett om vårt godkännande omfattas av detta stycke.
 
 ## 11. Avstängning och uppsägning
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.3 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.4 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.3
+endMarker: KONIEC PODMIENOK · v2.4
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.3 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.4 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -70,7 +70,7 @@ Zverejnenú debatu môže čítať ktokoľvek. Čítanie nevyžaduje účet, pre
 
 Zadáte otázku alebo tvrdenie. Dialectical Engine ich odošle niekoľkým modelom umelej inteligencie tretích strán, ktoré okolo nich vytvoria graf argumentov: tvrdenia, protitvrdenia, kritiky, odkazy na dôkazy, hodnotenia a verdikt s pásmom spoľahlivosti. Jednotlivé tvrdenia môžete spochybniť, požiadať o ďalšie preskúmanie určitého bodu a rozhodnúť, či výsledok zverejníte.
 
-**Všetko v debate vytvára umelá inteligencia.** Argumenty, kritiky, odkazy na dôkazy, hodnotenia, verdikty a odpovede asistenta podpory sú generované strojovo. Môžu byť nesprávne, neúplné, zastarané alebo presvedčivo mylné a môžu odrážať skreslenia modelov. Pred zobrazením alebo zverejnením ich žiadny človek nekontroluje a žiadna konkrétna osoba za ne nenesie redakčnú zodpovednosť. Vygenerovaný obsah je v produkte, na zverejnených stránkach a v exportoch označený ako vytvorený umelou inteligenciou.
+**Všetko v debate vytvára umelá inteligencia.** Argumenty, kritiky, odkazy na dôkazy, hodnotenia, verdikty a odpovede asistenta podpory sú generované strojovo. Môžu byť nesprávne, neúplné, zastarané alebo presvedčivo mylné a môžu odrážať skreslenia modelov. Pred zobrazením ich žiadny človek nekontroluje a pred zverejnením ich žiadny človek nekontroluje, pokiaľ naša kontrola debatu neoznačí a vy nepožiadate o naše schválenie (časť 9); žiadna konkrétna osoba za ne nenesie redakčnú zodpovednosť. Vygenerovaný obsah je v produkte, na zverejnených stránkach a v exportoch označený ako vytvorený umelou inteligenciou.
 
 **Dialectical Engine neposkytuje poradenstvo.** Nejde o právne, lekárske, finančné, daňové, psychologické, bezpečnostné ani iné odborné poradenstvo a verdikt nie je skutkovým zistením. Debatu nepoužívajte ako základ rozhodnutia dôležitého pre vaše zdravie, bezpečnosť, financie, právne postavenie alebo blaho iných osôb bez overenia primárnych zdrojov a prípadnej konzultácie s kvalifikovaným odborníkom. Vysoké pásmo spoľahlivosti znamená, že modely na základe materiálov, ktoré mali k dispozícii, považovali výklad za ustálený; nezaručuje jeho pravdivosť.
 
@@ -98,6 +98,12 @@ Tieto pravidlá sa vzťahujú na to, čo zadávate, ako službu používate a č
 
 **Nezadávajte ani nezverejňujte nezákonný obsah**, vrátane obsahu, ktorý je hanlivý, podnecuje k násiliu alebo nenávisti, obťažuje či sa vyhráža, predstavuje intímne snímky zdieľané bez súhlasu, porušuje práva duševného vlastníctva alebo dôvernosť, vyzrádza obchodné tajomstvá, predstavuje materiál zobrazujúci sexuálne zneužívanie detí alebo porušuje sankcie či pravidlá kontroly vývozu.
 
+**Žiadne nenávistné prejavy akéhokoľvek druhu.** Nezadávajte ani nezverejňujte nenávistné prejavy akéhokoľvek druhu.
+
+**Žiadne návody na výrobu zbraní alebo drog.** Nezadávajte ani nezverejňujte návody na výrobu zbraní alebo drog.
+
+**Žiadny obsah podnecujúci k samovražde alebo k ubližovaniu iným ľuďom.** Nezadávajte ani nezverejňujte obsah, ktorý podnecuje k samovražde alebo k ubližovaniu iným ľuďom.
+
 **Nepoužívajte Dialectical Engine na klamanie.** Nevydávajte vygenerovaný výstup za text napísaný človekom, ak by to bolo zavádzajúce, neodstraňujte z neho označenie, že ho vytvorila umelá inteligencia, a nepoužívajte ho na vytváranie zdania konsenzu, falošných dôkazov alebo na vydávanie sa za inú osobu.
 
 **Nenapádajte službu.** Bežné indexovanie zverejnených debát vyhľadávačmi je dovolené. Iný automatizovaný prístup k nim, sťahovanie, prehľadávanie alebo hromadné získavanie vyžaduje náš písomný súhlas. Zakázané je: obchádzať obmedzenia frekvencie požiadaviek, overovanie alebo kontrolné mechanizmy zverejňovania; pokúšať sa získať zadania alebo systémové pokyny; používať prompt injection s cieľom prinútiť systém ignorovať jeho obmedzenia; vykonávať prieskumné či záťažové testy bez nášho písomného súhlasu.
@@ -116,7 +122,7 @@ Ak si nie ste istí, či je niečo dovolené, opýtajte sa nás pred zverejnení
 
 **Na vašom obsahu netrénujeme.** Poskytovateľov umelej inteligencie využívame len za podmienok, ktoré im nedovoľujú používať váš obsah na trénovanie alebo zlepšovanie ich modelov; Register poskytovateľov umelej inteligencie pri každom poskytovateľovi uvádza, či sme to overili, a kedy.
 
-**Ako sa váš obsah dostáva k poskytovateľom umelej inteligencie.** Na vedenie debaty posielame text jednému alebo viacerým externým poskytovateľom modelov. Poskytovateľ dostane vašu otázku, vami nastavené usmerňujúce poznámky a vyjadrenia, ktoré systém zostavuje v priebehu debaty — vidí teda text odvodený od toho, čo ste zadali, a vytvorený na tomto základe, nielen vaše pôvodné slová. Nikdy nedostane vašu e-mailovú adresu, identifikátory účtu, záznamy relácií ani platobné údaje.
+**Ako sa váš obsah dostáva k poskytovateľom umelej inteligencie.** Na vedenie debaty posielame text jednému alebo viacerým externým poskytovateľom modelov. Poskytovateľ dostane vašu otázku, vami nastavené usmerňujúce poznámky a vyjadrenia, ktoré systém zostavuje v priebehu debaty — vidí teda text odvodený od toho, čo ste zadali, a vytvorený na tomto základe, nielen vaše pôvodné slová. Nikdy nedostane vašu e-mailovú adresu, identifikátory účtu, záznamy relácií ani platobné údaje. Keď debata skončí, odosielame jej syntézu aj modelu, ktorý ju kontroluje z hľadiska štyroch kategórií — možný terorizmus, nenávistné prejavy akéhokoľvek druhu, sklony k samovražde alebo k ubližovaniu iným ľuďom a výroba zbraní alebo drog — ako vysvetľuje časť 9.
 
 **Čo posiela chat podpory.** Asistent podpory je tiež model umelej inteligencie. Keď mu napíšete, pošleme vašu správu externému poskytovateľovi modelov, aby model mohol odpovedať, spolu s článkami pomocníka, na ktorých zakladá svoju odpoveď. Pred odoslaním zamaskujeme všetko, čo vyzerá ako heslo, jednorazový kód alebo kľúč. Ak požiadate o rozhovor s človekom, pošleme modelu aj konverzáciu, zamaskovanú rovnakým spôsobom, aby napísal krátke zhrnutie pre člena nášho tímu, ktorý váš prípad prevezme. Neprikladáme vašu e-mailovú adresu, identifikátory účtu ani platobné údaje, model však dostane všetko ostatné, čo do chatu napíšete, preto tam nepíšte nič, čo by ste nechceli, aby si prečítal.
 
@@ -133,6 +139,8 @@ Debaty sú **v predvolenom nastavení súkromné**. Nič z toho, čo vytvoríte,
 **Čo zverejnenie spôsobí.** Zverejnenie je úmyselný, samostatne potvrdený úkon. Pri zverejnení vytvoríme nemennú snímku debaty a sprístupníme ju komukoľvek na čítanie bez účtu. Vyhľadávače ju môžu indexovať. Snímka zobrazuje váš **pseudonym**, otázku tak, ako ste ju napísali, strom argumentov, hodnotenia, verdikt a pásmo spoľahlivosti a nesie viditeľné označenie, že obsah vytvorila umelá inteligencia. Nezobrazuje vašu e-mailovú adresu, záznamy relácií ani históriu účtu.
 
 **Zverejnenie je v praxi fakticky nezvratné.** Keď sa debata stane verejnou, iné osoby ju môžu čítať, citovať, vytvárať z nej snímky obrazovky, archivovať ju a ukladať do vyrovnávacej pamäte. Zrušenie zverejnenia odstráni debatu z Dialectical Engine a zničí kľúč k našej kópii, nemôže však odstrániť kópie, ktoré už existujú inde. Nezverejňujte nič, čo by ste nechceli mať trvalo spojené so svojím pseudonymom.
+
+**Označená debata vyžaduje naše schválenie.** Keď debata skončí, automatizovaná kontrola prečíta jej syntézu z hľadiska štyroch kategórií uvedených v časti 8. Debatu, ktorú kontrola označí, možno zverejniť len s naším schválením a označenie sa zobrazí iba vám. Ak o naše schválenie požiadate na stránke debaty, člen nášho tímu, ktorý má osobitné oprávnenie posudzovať zverejnenia, si môže prečítať debatu v podobe, v akej by sa zverejnila. Ak schválime, tlačidlo Zverejniť vám bude opäť dostupné a kontrola, ktorou prechádza každé zverejnenie, naďalej platí. Ak zamietneme, debata zostane súkromná a poskytneme vám odôvodnenie (časť 10). Po zamietnutí môžete požiadať ešte raz a rozhodne člen nášho tímu, ktorý o prvej žiadosti nerozhodoval; môžete tiež využiť postup vybavovania sťažností podľa časti 10. Po druhom zamietnutí už nemôžete požiadať znova, ale rozhodnutie môžete stále predložiť orgánu mimosúdneho riešenia sporov alebo súdu (časť 10). Schválenie sa vzťahuje na syntézu, ktorú posudzovateľ prečítal, vrátane každej neskoršej verzie debaty, ktorá ju opakuje slovo od slova; prepísaná syntéza sa pri zverejnení znova skontroluje a ak sa označí, vyžaduje vlastné schválenie. Ak po našom schválení zverejníte označenú debatu, môžete ju znova stiahnuť tlačidlom Stiahnuť na jej karte v zobrazení Vaše debaty.
 
 **Zverejnené debaty pri odstránení účtu.** Keď naplánujete odstránenie účtu, vyberiete si, čo sa stane s debatami, ktoré ste zverejnili. Ak zaškrtnete **„Odstrániť aj moje verejné debaty“**, pri odstránení účtu každú z nich stiahneme z Dialectical Engine a zničíme kľúč k našej kópii, tak ako pri zrušení zverejnenia, pokiaľ nám zákon neprikazuje ponechať si konkrétnu položku. Ak políčko nezaškrtnete, debaty zostanú verejné pod vaším vyradeným pseudonymom. Kópie vytvorené inými pred odstránením nemáme pod kontrolou. Ak si chcete odstránenú debatu ponechať dostupnú, najprv si ju stiahnite.
 
@@ -153,6 +161,8 @@ Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme vča
 - **Rozhodnutia v rámci systému.** Systém prijíma strojové rozhodnutia o *argumentoch*: môže odmietnuť odpovedať na otázku, ukončiť spracovanie na koncovej trase — napríklad ak otázka vychádza z nepravdivého predpokladu alebo ide o hodnotovú, nie empirickú otázku — obmedziť pásmo spoľahlivosti, ak nebola k dispozícii nezávislá kritika, alebo označiť odpoveď za chybnú, ak vygenerovaný text neprešiel kontrolou súladu. Takto produkt funguje podľa návrhu; tieto rozhodnutia sú v debate viditeľné a nie sú rozhodnutiami o vás.
 - **Moderátorské rozhodnutia o obsahu a účtoch.** Odstránenie alebo obmedzenie zverejnenej debaty či pozastavenie alebo odstránenie účtu je rozhodnutie, ktoré prijímame na základe týchto Podmienok alebo zákona. Na každom takomto rozhodnutí ovplyvňujúcom váš účet sa podieľa človek. Dôvody opisuje časť 11.
 
+**Kam patrí kontrola po skončení debaty.** Kontrola v časti 9 nie je rozhodnutím v rámci systému. Je to automatizovaný nástroj, ktorý ovplyvňuje váš obsah: debatu, ktorú označí, nemožno zverejniť, ak ju človek neschváli. Každé zamietnutie vydá človek a odôvodnenie uvádza, že sa použili automatizované prostriedky.
+
 **Odôvodnenie.** Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť: prostredníctvom nášho postupu vybavovania sťažností nižšie, prostredníctvom orgánu mimosúdneho riešenia sporov certifikovaného podľa aktu EÚ o digitálnych službách alebo na súde.
 
 **Sťažnosť proti rozhodnutiu.** Ak nesúhlasíte s moderátorským rozhodnutím, odpovedzte na odôvodnenie alebo napíšte na office@dezbatere.ro do **šiestich mesiacov**. Rozhodnutie preskúma osoba, ktorá sa na pôvodnom rozhodnutí nepodieľala, a výsledok vám oznámime s odôvodnením. Tým nie je dotknuté vaše právo obrátiť sa na súd alebo využiť alternatívne riešenie sporov podľa časti 18. Postup vybavovania sťažností prijíma aj sťažnosti na to, že sme hlásenie nevybavili, že bol obsah odstránený nesprávne, že bol účet nesprávne obmedzený alebo že automatizovaný nástroj nesprávne ovplyvnil váš obsah.
@@ -163,7 +173,7 @@ Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme vča
 
 **Teroristický obsah.** Teroristický obsah je nezákonný a na Dialectical Engine nie je povolený (časť 7). Príslušné orgány v Európskej únii nám môžu zasielať príkazy na odstránenie podľa nariadenia (EÚ) 2021/784 na kontaktné miesto uvedené v časti 1. Keď príkaz dostaneme, obsah odstránime alebo k nemu znemožníme prístup vo všetkých krajinách EÚ do jednej hodiny. Osobu, ktorá obsah zverejnila, informujeme, že bol odstránený, a na jej žiadosť aj prečo a ako môže príkaz napadnúť, pokiaľ orgán nerozhodne, že verejná bezpečnosť vyžaduje, aby sme na obmedzený čas mlčali. Ako nariadenie vyžaduje, odstránený obsah a súvisiace údaje uchovávame počas šiestich mesiacov, aby bolo možné odstránenie preskúmať a, ak bolo chybné, zvrátiť. Osoba, ktorá obsah zverejnila, môže príkaz napadnúť na súdoch krajiny, ktorej orgán ho vydal, a môže tiež využiť náš postup vybavovania sťažností. Žiadny orgán nám doteraz neuložil prijať osobitné opatrenia proti teroristickému obsahu podľa tohto nariadenia; ak k tomu dôjde, tieto opatrenia tu opíšeme, vrátane prípadných automatizovaných nástrojov.
 
-**Vážne ohrozenie života alebo bezpečnosti.** Ak sa dozvieme informácie nasvedčujúce trestnému činu spojenému s ohrozením života alebo bezpečnosti určitej osoby, informujeme príslušné orgány.
+**Vážne ohrozenie života alebo bezpečnosti.** Ak sa dozvieme informácie nasvedčujúce trestnému činu spojenému s ohrozením života alebo bezpečnosti určitej osoby, informujeme príslušné orgány. Automatizovaná kontrola v časti 9 sama osebe nevedie k tomu, aby si nejaká osoba prečítala debatu. To, čo posudzovateľ číta v debate, ktorej vlastník požiadal o naše schválenie, upravuje tento odsek.
 
 ## 11. Pozastavenie a ukončenie
 

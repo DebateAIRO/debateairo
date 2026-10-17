@@ -317,11 +317,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(4);
+    expect(TERMS_VERSIONS).toHaveLength(5);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();
@@ -551,7 +551,7 @@ describe("the model providers page lists the model families the product runs", (
     }
   });
 
-  it("names the four jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the five jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -559,6 +559,7 @@ describe("the model providers page lists the model families the product runs", (
         "Debate text — to write the arguments",
         "Debate text — to judge and check the arguments",
         "The finished debate — to write the verdict story",
+        "The synthesis of a finished debate — to check it for four categories",
         "What you type in the support chat — to answer you"
       ].sort()
     );

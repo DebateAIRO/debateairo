@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.3 · VELJAVNI OD 12. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.4 · VELJAVNI OD 12. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.3
+endMarker: KONEC POGOJEV · v2.4
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.3 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.4 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -70,7 +70,7 @@ Objavljeno razpravo lahko prebere vsakdo. Za branje račun ni potreben, vendar g
 
 Pošljete vprašanje ali trditev. Dialectical Engine jo posreduje več modelom umetne inteligence tretjih oseb, ki okoli nje oblikujejo graf argumentov: trditve, nasprotne trditve, kritike, sklice na dokaze, ocene in razsodbo s pasom gotovosti. Posamezne trditve lahko izpodbijate, zahtevate nadaljnjo preučitev določene točke in se odločite, ali boste rezultat objavili.
 
-**Vse v razpravi ustvari umetna inteligenca.** Argumenti, kritike, sklici na dokaze, ocene, razsodbe in odgovori pomočnika za podporo so strojno ustvarjeni. Lahko so napačni, nepopolni, zastareli ali samozavestno zmotni in lahko odražajo pristranskosti modelov. Preden so prikazani vam ali objavljeni, jih ne pregleda nobena oseba, prav tako zanje nobena imenovana oseba ne prevzema uredniške odgovornosti. Ustvarjena vsebina je v izdelku, na objavljenih straneh in v izvoženih datotekah označena kot vsebina, ustvarjena z umetno inteligenco.
+**Vse v razpravi ustvari umetna inteligenca.** Argumenti, kritike, sklici na dokaze, ocene, razsodbe in odgovori pomočnika za podporo so strojno ustvarjeni. Lahko so napačni, nepopolni, zastareli ali samozavestno zmotni in lahko odražajo pristranskosti modelov. Preden so prikazani vam, jih ne pregleda nobena oseba, pred objavo pa jih ne pregleda nobena oseba, razen če naše preverjanje razpravo označi in vi zaprosite za našo odobritev (razdelek 9); nobena imenovana oseba zanje ne prevzema uredniške odgovornosti. Ustvarjena vsebina je v izdelku, na objavljenih straneh in v izvoženih datotekah označena kot vsebina, ustvarjena z umetno inteligenco.
 
 **Dialectical Engine ni nasvet.** Ne pomeni pravnega, zdravstvenega, finančnega, davčnega, psihološkega, varnostnega ali drugega strokovnega nasveta, razsodba pa ni ugotovitev dejstva. Razprave ne uporabljajte kot podlage za odločitev, ki je pomembna za vaše zdravje, varnost, denar, pravni položaj ali dobrobit drugih, ne da bi preverili primarne vire in se po potrebi posvetovali z usposobljenim strokovnjakom. Visok pas gotovosti pomeni, da so modeli na podlagi gradiva, ki so ga obravnavali, presodili, da je razlaga dobro uveljavljena; ne zagotavlja njene resničnosti.
 
@@ -98,6 +98,12 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 
 **Ne pošiljajte ali objavljajte nezakonite vsebine**, vključno z vsebino, ki je obrekljiva, spodbuja nasilje ali sovraštvo, nadleguje ali grozi, predstavlja intimne posnetke, objavljene brez privolitve, krši pravice intelektualne lastnine ali zaupnost, razkriva poslovne skrivnosti, pomeni gradivo s spolno zlorabo otrok ali krši sankcije oziroma nadzor izvoza.
 
+**Brez sovražnega govora katere koli vrste.** Ne pošiljajte ali objavljajte sovražnega govora katere koli vrste.
+
+**Brez navodil za izdelavo orožja ali drog.** Ne pošiljajte ali objavljajte navodil za izdelavo orožja ali drog.
+
+**Brez vsebine, ki spodbuja k samomoru ali škodovanju drugim ljudem.** Ne pošiljajte ali objavljajte vsebine, ki spodbuja k samomoru ali škodovanju drugim ljudem.
+
 **Ne uporabljajte Dialectical Engine za zavajanje.** Ustvarjenega rezultata ne predstavljajte kot človeško delo, kadar bi bilo to zavajajoče, ne odstranjujte oznake, da ga je ustvarila umetna inteligenca, in ga ne uporabljajte za ustvarjanje navideznega soglasja, lažnih dokazov ali lažnega predstavljanja.
 
 **Ne napadajte storitve.** Običajno indeksiranje objavljenih razprav v iskalnikih je dovoljeno. Za vsak drug avtomatiziran dostop, zajemanje ali pregledovanje spletnih strani ter množično pridobivanje objavljenih razprav potrebujete naše pisno dovoljenje. Prepovedani so: izogibanje omejitvam hitrosti, preverjanju pristnosti ali nadzoru objav; poskusi pridobivanja pozivov ali sistemskih navodil; vbrizgavanje pozivov, namenjeno temu, da bi sistem prezrl svoje omejitve; ter preizkušanje ali obremenitveno testiranje brez našega pisnega dovoljenja.
@@ -116,7 +122,7 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 
 **Na vaši vsebini ne učimo modelov.** Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register ponudnikov umetne inteligence za vsakega ponudnika prikaže, ali smo to potrdili, in kdaj.
 
-**Kako vaša vsebina doseže ponudnike umetne inteligence.** Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu.
+**Kako vaša vsebina doseže ponudnike umetne inteligence.** Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu. Ko se razprava zaključi, njeno sintezo pošljemo tudi modelu, ki jo preveri glede štirih kategorij — morebitni terorizem, sovražni govor katere koli vrste, nagnjenja k samomoru ali škodovanju drugim ljudem in izdelava orožja ali drog — kot pojasnjuje razdelek 9.
 
 **Kaj pošlje klepet s podporo.** Tudi pomočnik za podporo je model umetne inteligence. Ko mu pišete, vaše sporočilo pošljemo zunanjemu ponudniku modelov, da lahko model odgovori, skupaj s članki pomoči, na katerih temelji njegov odgovor. Pred pošiljanjem zakrijemo vse, kar je videti kot geslo, enkratna koda ali ključ. Če zaprosite za pogovor z osebo, modelu pošljemo tudi pogovor, zakrit na enak način, da napiše kratek povzetek za člana naše ekipe, ki prevzame vaš primer. Ne priložimo vašega e-poštnega naslova, identifikatorjev računa ali podatkov o plačilu, vendar model prejme vse drugo, kar vpišete v klepet, zato tja ne pišite ničesar, česar ne bi želeli, da prebere.
 
@@ -133,6 +139,8 @@ Razprave so **privzeto zasebne**. Nič, kar ustvarite, ni vidno drugim, razen č
 **Kaj povzroči objava.** Objava je namerno dejanje, ki ga potrdite ločeno. Ko objavite, ustvarimo nespremenljiv posnetek razprave in omogočimo, da ga brez računa prebere vsakdo. Iskalniki lahko indeksirajo ta posnetek. Posnetek prikazuje vaš **psevdonim**, vaše vprašanje, kot ste ga zapisali, drevo argumentov, ocene, razsodbo in pas gotovosti ter ima vidno oznako, da je vsebino ustvarila umetna inteligenca. Ne prikazuje vašega e-poštnega naslova, zapisov o sejah ali zgodovine računa.
 
 **Objava je v praksi dejansko nepovratna.** Ko razprava postane javna, jo lahko drugi berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Umik objave jo odstrani iz Dialectical Engine in uniči ključ do našega izvoda, vendar ne more doseči izvodov, ki že obstajajo drugje. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
+
+**Označena razprava potrebuje našo odobritev.** Ko se razprava zaključi, avtomatizirano preverjanje prebere njeno sintezo glede štirih kategorij iz razdelka 8. Razpravo, ki jo preverjanje označi, je mogoče objaviti samo z našo odobritvijo, oznaka pa je prikazana samo vam. Če za našo odobritev zaprosite na strani razprave, lahko član naše ekipe, ki ima posebno dovoljenje za pregledovanje objav, prebere razpravo v obliki, v kateri bi bila objavljena. Če odobrimo, je gumb Objavi spet na voljo, preverjanje, skozi katero gre vsaka objava, pa še vedno velja. Če zavrnemo, razprava ostane zasebna in vam zagotovimo obrazložitev (razdelek 10). Po zavrnitvi lahko zaprosite še enkrat, odloča pa član naše ekipe, ki o prvi zahtevi ni odločal; uporabite lahko tudi pritožbeni postopek iz razdelka 10. Po drugi zavrnitvi ne morete več zaprositi, odločitev pa lahko še vedno predložite organu za izvensodno reševanje sporov ali sodišču (razdelek 10). Odobritev zajema sintezo, ki jo je pregledovalec prebral, vključno z vsako poznejšo različico razprave, ki jo ponovi dobesedno; prepisana sinteza se ob objavi znova preveri in, če je označena, potrebuje lastno odobritev. Če po naši odobritvi objavite označeno razpravo, jo lahko znova umaknete z gumbom Umakni na njeni kartici v pogledu Vaše razprave.
 
 **Objavljene razprave ob zaprtju računa.** Ko načrtujete zaprtje računa, izberete, kaj se zgodi z razpravami, ki ste jih objavili. Če označite **»Izbriši tudi moje javne razprave«**, ob zaprtju vsako odstranimo iz Dialectical Engine in uničimo ključ do naše kopije, kot pri preklicu objave, razen če zakon zahteva, da ohranimo določeno vsebino. Če polja ne označite, razprave ostanejo javne pod umaknjenim psevdonimom. Kopije, ki so jih drugi naredili pred odstranitvijo, niso pod našim nadzorom. Če želite razpravo, ki jo odstranjujete, obdržati na voljo sebi, jo najprej prenesite.
 
@@ -153,6 +161,8 @@ Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravoč
 - **Odločitve znotraj sistema.** Sistem strojno odloča o *argumentih*: lahko zavrne odgovor na vprašanje, se ustavi na končni poti — na primer, kadar vprašanje temelji na napačni predpostavki ali gre za vrednostno in ne empirično vprašanje — omeji pas gotovosti, kadar neodvisna kritika ni bila na voljo, ali odgovor označi kot pomanjkljiv, kadar ustvarjeno besedilo ni uspešno prestalo preverjanja skladnosti. Tako izdelek deluje po svoji zasnovi; odločitve so vam vidne v razpravi in niso odločitve o vas.
 - **Odločitve o moderiranju vsebine in računov.** Odstranitev ali omejitev objavljene razprave oziroma začasna onemogočitev ali zaprtje računa je odločitev, ki jo sprejmemo na podlagi teh Pogojev ali zakona. Pri vsaki taki odločitvi, ki vpliva na vaš račun, sodeluje oseba. Razlogi so opisani v razdelku 11.
 
+**Kam spada preverjanje ob koncu razprave.** Preverjanje iz razdelka 9 ni odločitev znotraj sistema. Je avtomatizirano orodje, ki vpliva na vašo vsebino: razprave, ki jo označi, ni mogoče objaviti, razen če jo oseba odobri. Vsako zavrnitev izda oseba, obrazložitev pa navaja, da so bila uporabljena avtomatizirana sredstva.
+
 **Obrazložitev.** Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve: prek našega pritožbenega postopka spodaj, prek organa za izvensodno reševanje sporov, certificiranega v skladu z Aktom EU o digitalnih storitvah, ali na sodišču.
 
 **Pritožba zoper odločitev.** Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v **šestih mesecih** pišite na office@dezbatere.ro. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino.
@@ -163,7 +173,7 @@ Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravoč
 
 **Teroristična vsebina.** Teroristična vsebina je nezakonita in na Dialectical Engine ni dovoljena (razdelek 7). Pristojni organi v Evropski uniji nam lahko pošljejo odredbe o odstranitvi na podlagi Uredbe (EU) 2021/784 na kontaktno točko iz razdelka 1. Ko prejmemo tako odredbo, vsebino odstranimo ali onemogočimo dostop do nje v vseh državah EU v eni uri. Osebo, ki je vsebino objavila, obvestimo, da je bila odstranjena, in na njeno zahtevo tudi zakaj in kako lahko odredbo izpodbija, razen če organ odloči, da moramo zaradi javne varnosti za omejeno obdobje molčati. Kot zahteva Uredba, odstranjeno vsebino in povezane podatke hranimo šest mesecev, da je mogoče odstranitev pregledati in jo, če je bila napačna, razveljaviti. Oseba, ki je vsebino objavila, lahko odredbo izpodbija pred sodišči države, katere organ jo je izdal, in lahko uporabi tudi naš pritožbeni postopek. Noben organ od nas ni zahteval sprejetja posebnih ukrepov zoper teroristično vsebino na podlagi Uredbe; če to stori, bomo te ukrepe opisali tukaj, vključno z morebitnimi avtomatiziranimi orodji.
 
-**Resno tveganje za življenje ali varnost.** Če izvemo za informacije, ki kažejo na kaznivo dejanje, povezano z grožnjo življenju ali varnosti osebe, obvestimo pristojne organe.
+**Resno tveganje za življenje ali varnost.** Če izvemo za informacije, ki kažejo na kaznivo dejanje, povezano z grožnjo življenju ali varnosti osebe, obvestimo pristojne organe. Avtomatizirano preverjanje iz razdelka 9 samo po sebi ne povzroči, da bi katera koli oseba prebrala razpravo. Kar pregledovalec prebere v razpravi, katere lastnik je zaprosil za našo odobritev, ureja ta odstavek.
 
 ## 11. Začasna onemogočitev in prenehanje
 

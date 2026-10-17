@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.3 · GÆLDENDE FRA 12. OKTOBER 2026
+eyebrow: TJENESTEVILKÅR · v2.4 · GÆLDENDE FRA 12. OKTOBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.3
+endMarker: SLUT PÅ VILKÅRENE · v2.4
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.3 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.4 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -70,7 +70,7 @@ Alle kan læse en debat, der er blevet offentliggjort. Læsning kræver ikke en 
 
 Du indsender et spørgsmål eller en påstand. Dialectical Engine sender det til flere AI-modeller fra tredjeparter, som opbygger en argumentationsgraf omkring det: påstande, modpåstande, kritik, kildehenvisninger, bedømmelser og en konklusion med et konfidensinterval. Du kan anfægte enkelte påstande, bede om, at et punkt undersøges nærmere, og beslutte, om resultatet skal offentliggøres.
 
-**Alt i en debat genereres af AI.** Argumenterne, kritikken, kildehenvisningerne, bedømmelserne, konklusionerne og supportassistentens svar er maskingenererede. De kan være forkerte, ufuldstændige, forældede eller fremført med uberettiget sikkerhed, og de kan afspejle skævheder i modellerne. Ingen person gennemgår dem, før de vises for dig eller offentliggøres, og ingen navngiven person har redaktionelt ansvar for dem. Genereret indhold mærkes som AI-genereret i produktet, på offentliggjorte sider og i eksporter.
+**Alt i en debat genereres af AI.** Argumenterne, kritikken, kildehenvisningerne, bedømmelserne, konklusionerne og supportassistentens svar er maskingenererede. De kan være forkerte, ufuldstændige, forældede eller fremført med uberettiget sikkerhed, og de kan afspejle skævheder i modellerne. Ingen person gennemgår dem, før de vises for dig, og ingen person gennemgår dem, før de offentliggøres, medmindre vores kontrol markerer en debat, og du beder om vores godkendelse (afsnit 9); ingen navngiven person har redaktionelt ansvar for dem. Genereret indhold mærkes som AI-genereret i produktet, på offentliggjorte sider og i eksporter.
 
 **Dialectical Engine er ikke rådgivning.** Tjenesten udgør ikke juridisk, lægelig, finansiel, skattemæssig, psykologisk, sikkerhedsmæssig eller anden professionel rådgivning, og en konklusion er ikke en konstatering af faktiske forhold. Brug ikke en debat som grundlag for en beslutning, der har betydning for dit helbred, din sikkerhed, din økonomi, din retsstilling eller andres trivsel, uden at kontrollere primære kilder og, hvor det er relevant, rådføre dig med en kvalificeret fagperson. Et højt konfidensinterval betyder, at modellerne på grundlag af det materiale, de så, vurderede fortolkningen som veletableret; det er ingen garanti for, at den er sand.
 
@@ -98,6 +98,12 @@ Disse regler gælder for det, du indsender, den måde, du bruger tjenesten på, 
 
 **Indsend eller offentliggør ikke ulovligt indhold**, herunder indhold, der er ærekrænkende, tilskynder til vold eller had, chikanerer eller truer, udgør intime billeder delt uden samtykke, krænker immaterielle rettigheder eller fortrolighed, afslører forretningshemmeligheder, udgør materiale med seksuelt misbrug af børn eller overtræder sanktioner eller eksportkontrol.
 
+**Ingen hadtale af enhver art.** Indsend eller offentliggør ikke hadtale af enhver art.
+
+**Ingen vejledning i fremstilling af våben eller narkotika.** Indsend eller offentliggør ikke vejledning i fremstilling af våben eller narkotika.
+
+**Intet indhold, der tilskynder til selvmord eller til at skade andre mennesker.** Indsend eller offentliggør ikke indhold, der tilskynder til selvmord eller til at skade andre mennesker.
+
 **Brug ikke Dialectical Engine til at vildlede.** Præsenter ikke genereret output som menneskeskrevet, hvis det ville være vildledende, fjern ikke mærkningen som AI-genereret, og brug det ikke til at fremstille en tilsyneladende enighed, falske beviser eller identitetsefterligning.
 
 **Angrib ikke tjenesten.** Almindelig indeksering af offentliggjorte debatter i søgemaskiner er tilladt, men anden automatiseret adgang, scraping, crawling eller masseudtræk kræver vores skriftlige tilladelse; ingen omgåelse af hastighedsbegrænsninger, godkendelses- eller offentliggørelseskontroller; ingen forsøg på at udtrække prompts eller systeminstruktioner; ingen promptinjektion med henblik på at få motoren til at tilsidesætte sine begrænsninger; ingen sondering eller belastningstest uden vores skriftlige tilladelse.
@@ -116,7 +122,7 @@ Hvis du er i tvivl om, hvorvidt noget er tilladt, skal du spørge os, før du sl
 
 **Vi træner ikke på dit indhold.** Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; udbyderregisteret viser for hver udbyder, om vi har bekræftet dette, og hvornår.
 
-**Sådan når dit indhold frem til AI-udbydere.** For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger.
+**Sådan når dit indhold frem til AI-udbydere.** For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger. Når en debat er afsluttet, sender vi også dens syntese til en model, der kontrollerer den for fire kategorier — mulig terrorisme, hadtale af enhver art, tendenser til selvmord eller til at skade andre mennesker og fremstilling af våben eller narkotika — som afsnit 9 forklarer.
 
 **Hvad supportchatten sender.** Supportassistenten er også en AI-model. Når du skriver til den, sender vi din besked til en ekstern modeludbyder, så modellen kan svare, sammen med de hjælpeartikler, den baserer sit svar på. Før afsendelsen maskerer vi alt, der ligner en adgangskode, en engangskode eller en nøgle. Hvis du beder om at tale med en person, sender vi også samtalen, maskeret på samme måde, til modellen, så den kan skrive et kort resumé til det medlem af vores team, der overtager din sag. Vi vedhæfter ikke din e-mailadresse, dine kontoidentifikatorer eller dine betalingsoplysninger, men modellen modtager alt andet, du skriver i chatten, så skriv ikke noget der, som du ikke ønsker, at den skal læse.
 
@@ -133,6 +139,8 @@ Debatter er **private som standard**. Intet, du opretter, er synligt for andre, 
 **Hvad offentliggørelse indebærer.** Offentliggørelse er en bevidst handling, der bekræftes særskilt. Når du offentliggør, tager vi et fastlåst øjebliksbillede af debatten og gør det læsbart for alle uden en konto. Søgemaskiner kan indeksere den. Øjebliksbilledet viser dit **pseudonym**, dit spørgsmål, som du formulerede det, argumentationstræet, bedømmelserne, konklusionen og konfidensintervallet og har en synlig mærkning af, at indholdet er AI-genereret. Det viser ikke din e-mailadresse, dine sessionsregistreringer eller din kontohistorik.
 
 **Offentliggørelse er i praksis reelt uigenkaldelig.** Når en debat er offentlig, kan andre læse, citere, tage skærmbilleder af, arkivere og cache den. Hvis offentliggørelsen ophæves, fjernes den fra Dialectical Engine, og nøglen til vores kopi destrueres, men kopier, der allerede findes andre steder, kan ikke fjernes. Offentliggør ikke noget, som du ikke vil have permanent knyttet til dit pseudonym.
+
+**En markeret debat kræver vores godkendelse.** Når en debat er afsluttet, læser en automatiseret kontrol dens syntese for de fire kategorier i afsnit 8. En debat, som kontrollen markerer, kan kun offentliggøres med vores godkendelse, og markeringen vises kun for dig. Hvis du beder om vores godkendelse på debattens side, kan et medlem af vores team, der har en bestemt tilladelse til at gennemgå offentliggørelser, læse debatten, som den ville blive offentliggjort. Hvis vi godkender, er knappen Offentliggør igen tilgængelig for dig, og den kontrol, som enhver offentliggørelse gennemgår, gælder stadig. Hvis vi afviser, forbliver debatten privat, og vi giver dig en begrundelse (afsnit 10). Efter en afvisning kan du bede om det en gang til, og et medlem af vores team, der ikke traf afgørelse om den første anmodning, træffer afgørelsen; du kan også bruge klageordningen i afsnit 10. Efter en anden afvisning kan du ikke bede om det igen, men du kan stadig indbringe afgørelsen for et udenretsligt tvistbilæggelsesorgan eller for en domstol (afsnit 10). En godkendelse dækker den syntese, som den gennemgangsansvarlige har læst, herunder enhver senere version af debatten, der gentager den ord for ord; en omskrevet syntese kontrolleres igen, når du offentliggør, og kræver, hvis den markeres, sin egen godkendelse. Hvis du offentliggør en markeret debat efter vores godkendelse, kan du tage den ned igen med knappen Tag ned på dens kort i Dine debatter.
 
 **Offentliggjorte debatter, når du lukker din konto.** Når du planlægger lukning af din konto, vælger du, hvad der skal ske med de debatter, du har offentliggjort. Hvis du markerer **"Slet også mine offentlige debatter"**, fjerner vi hver af dem fra Dialectical Engine og ødelægger nøglen til vores kopi, når lukningen gennemføres, ligesom ved afpublicering, medmindre loven kræver, at vi beholder et bestemt element. Hvis du lader feltet være umarkeret, forbliver de offentlige under et udfaset pseudonym. Kopier, som andre lavede før fjernelsen, er uden for vores kontrol. Hvis du vil beholde adgang til en debat, du fjerner, skal du hente den først.
 
@@ -153,6 +161,8 @@ Vi bekræfter modtagelsen af enhver anmeldelse uden unødig forsinkelse. Vi beha
 - **Afgørelser i motoren.** Motoren træffer maskinelle afgørelser om *argumenter*: Den kan afvise at besvare et spørgsmål, stoppe ved en afsluttende rute — for eksempel hvis et spørgsmål bygger på en falsk forudsætning eller er et værdispørgsmål frem for et empirisk spørgsmål — begrænse et konfidensinterval, hvis en uafhængig kritik ikke var tilgængelig, eller markere et svar som mangelfuldt, hvis den genererede tekst ikke bestod overensstemmelseskontrollen. Dette er produktet, der fungerer som tilsigtet; afgørelserne er synlige for dig i debatten, og de er ikke afgørelser om dig.
 - **Moderationsafgørelser om indhold og konti.** Fjernelse af eller begrænsning af adgangen til en offentliggjort debat eller suspension eller lukning af en konto er en afgørelse, vi træffer i henhold til disse vilkår eller lovgivningen. En person medvirker ved enhver sådan afgørelse, der berører din konto. Afsnit 11 beskriver grundlagene.
 
+**Hvor kontrollen ved debattens afslutning hører hjemme.** Kontrollen i afsnit 9 er ikke en afgørelse i motoren. Den er et automatiseret værktøj, der påvirker dit indhold: En debat, som den markerer, kan ikke offentliggøres, medmindre en person godkender den. En person træffer enhver afvisning, og begrundelsen oplyser, at der er anvendt automatiserede midler.
+
 **Begrundelse.** Når vi fjerner eller begrænser synligheden af dit indhold eller suspenderer eller lukker din konto, giver vi dig en begrundelse: hvad vi gjorde, og hvor vidtgående det er; de faktiske omstændigheder, vi lagde til grund, og om de stammede fra en anmeldelse eller vores egne kontroller; om der blev anvendt automatiserede midler; det retlige eller kontraktlige grundlag; og hvordan du kan anfægte afgørelsen: gennem vores klageordning nedenfor, gennem et udenretsligt tvistbilæggelsesorgan, der er certificeret i henhold til EU's forordning om digitale tjenester, eller ved domstolene.
 
 **Klage over en afgørelse.** Hvis du er uenig i en moderationsafgørelse, skal du svare på begrundelsen eller skrive til office@dezbatere.ro inden for **seks måneder**. En person, der ikke medvirkede ved den oprindelige afgørelse, gennemgår den, og vi meddeler dig resultatet med en begrundelse. Dette berører ikke din ret til at indbringe sagen for en domstol eller benytte alternativ tvistbilæggelse efter afsnit 18. Klageordningen modtager også klager over, at vi ikke har reageret på en anmeldelse, at indhold fejlagtigt blev fjernet, at en konto fejlagtigt blev begrænset, eller at et automatiseret værktøj fejlagtigt påvirkede dit indhold.
@@ -163,7 +173,7 @@ Vi bekræfter modtagelsen af enhver anmeldelse uden unødig forsinkelse. Vi beha
 
 **Terrorrelateret indhold.** Terrorrelateret indhold er ulovligt og er ikke tilladt på Dialectical Engine (afsnit 7). Kompetente myndigheder i Den Europæiske Union kan sende os påbud om fjernelse i henhold til forordning (EU) 2021/784 til kontaktpunktet i afsnit 1. Når vi modtager et sådant påbud, fjerner vi indholdet eller blokerer adgangen til det i alle EU-lande inden for én time. Vi underretter den person, der offentliggjorde indholdet, om, at det er blevet fjernet, og oplyser på anmodning om begrundelsen og om, hvordan påbuddet kan anfægtes, medmindre myndigheden beslutter, at hensynet til den offentlige sikkerhed kræver, at der ikke gives oplysninger i en begrænset periode. Som krævet i forordningen opbevarer vi det fjernede indhold og de relaterede data i seks måneder, så fjernelsen kan efterprøves og, hvis den var forkert, omgøres. Den person, der offentliggjorde indholdet, kan anfægte påbuddet ved domstolene i det land, hvis myndighed udstedte det, og kan også benytte vores klageordning. Ingen myndighed har krævet, at vi træffer specifikke foranstaltninger mod terrorrelateret indhold i henhold til forordningen; hvis en myndighed gør det, vil vi beskrive disse foranstaltninger her, herunder eventuelle automatiserede værktøjer.
 
-**Alvorlig risiko for liv eller sikkerhed.** Hvis vi bliver bekendt med oplysninger, der tyder på en strafbar handling, som indebærer en trussel mod en persons liv eller sikkerhed, underretter vi de kompetente myndigheder.
+**Alvorlig risiko for liv eller sikkerhed.** Hvis vi bliver bekendt med oplysninger, der tyder på en strafbar handling, som indebærer en trussel mod en persons liv eller sikkerhed, underretter vi de kompetente myndigheder. Den automatiserede kontrol i afsnit 9 får ikke i sig selv nogen person til at læse en debat. Hvad en gennemgangsansvarlig læser i en debat, hvis ejer har bedt om vores godkendelse, er omfattet af dette stykke.
 
 ## 11. Suspension og ophør
 

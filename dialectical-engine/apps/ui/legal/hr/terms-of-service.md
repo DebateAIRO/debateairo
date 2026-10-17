@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.3 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.4 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.3
+endMarker: KRAJ UVJETA · v2.4
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.3 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.4 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -70,7 +70,7 @@ Svatko može pročitati objavljenu raspravu. Za čitanje nije potreban račun, a
 
 Šaljete pitanje ili tvrdnju. Dialectical Engine ih prosljeđuje većem broju modela umjetne inteligencije trećih strana, koji oko njih izrađuju graf argumenata: tvrdnje, protutvrdnje, kritike, upućivanja na dokaze, rezultate te presudu s rasponom pouzdanosti. Možete osporiti pojedine tvrdnje, zatražiti dodatno istraživanje neke točke i odlučiti hoćete li objaviti ishod.
 
-**Sve u raspravi generira umjetna inteligencija.** Argumenti, kritike, upućivanja na dokaze, rezultati, presude i odgovori pomoćnika za podršku strojno su generirani. Mogu biti pogrešni, nepotpuni, zastarjeli ili izneseni s neopravdanim uvjerenjem te mogu odražavati pristranosti modela. Nijedna ih osoba ne pregledava prije nego što vam se prikažu ili objave i nijedna imenovana osoba ne snosi uredničku odgovornost za njih. Generirani sadržaj u proizvodu, na objavljenim stranicama i u izvezenim datotekama označen je kao sadržaj generiran umjetnom inteligencijom.
+**Sve u raspravi generira umjetna inteligencija.** Argumenti, kritike, upućivanja na dokaze, rezultati, presude i odgovori pomoćnika za podršku strojno su generirani. Mogu biti pogrešni, nepotpuni, zastarjeli ili izneseni s neopravdanim uvjerenjem te mogu odražavati pristranosti modela. Nijedna ih osoba ne pregledava prije nego što vam se prikažu, a prije objave ih ne pregledava nijedna osoba, osim ako naša provjera označi raspravu i vi zatražite naše odobrenje (odjeljak 9.); nijedna imenovana osoba ne snosi uredničku odgovornost za njih. Generirani sadržaj u proizvodu, na objavljenim stranicama i u izvezenim datotekama označen je kao sadržaj generiran umjetnom inteligencijom.
 
 **Dialectical Engine nije savjet.** Nije pravni, medicinski, financijski, porezni, psihološki, sigurnosni ni drugi stručni savjet, a presuda nije utvrđenje činjenice. Nemojte raspravu upotrebljavati kao osnovu za odluku važnu za vaše zdravlje, sigurnost, novac, pravni položaj ili dobrobit drugih osoba bez provjere primarnih izvora i, prema potrebi, savjetovanja s kvalificiranim stručnjakom. Visok raspon pouzdanosti znači da su modeli na temelju materijala koji su vidjeli ocijenili tumačenje dobro utvrđenim; to nije jamstvo njegove istinitosti.
 
@@ -98,6 +98,12 @@ Ova se pravila primjenjuju na ono što šaljete, način na koji upotrebljavate u
 
 **Ne šaljite niti objavljujte nezakonit sadržaj**, uključujući sadržaj koji je klevetnički, potiče nasilje ili mržnju, uznemirava ili prijeti, predstavlja intimne snimke podijeljene bez privole, povređuje intelektualno vlasništvo ili povjerljivost, otkriva poslovne tajne, predstavlja materijal seksualnog zlostavljanja djece ili krši sankcije ili kontrolu izvoza.
 
+**Nikakav govor mržnje bilo koje vrste.** Ne šaljite niti objavljujte govor mržnje bilo koje vrste.
+
+**Nikakve upute za izradu oružja ili droga.** Ne šaljite niti objavljujte upute za izradu oružja ili droga.
+
+**Nikakav sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima.** Ne šaljite niti objavljujte sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima.
+
 **Ne upotrebljavajte Dialectical Engine za obmanjivanje.** Nemojte generirani izlazni sadržaj prikazivati kao ljudsko djelo ako bi to dovelo u zabludu, uklanjati s njega oznaku da je generiran umjetnom inteligencijom niti ga upotrebljavati za stvaranje privida suglasnosti, lažnih dokaza ili lažnog predstavljanja.
 
 **Ne napadajte uslugu.** Uobičajeno indeksiranje objavljenih rasprava u tražilicama dopušteno je. Za svaki drugi automatizirani pristup, prikupljanje podataka, pretraživanje robotima ili masovno izdvajanje trebate naše pisano dopuštenje. Ne smijete zaobilaziti ograničenja učestalosti, autentifikaciju ili kontrole objavljivanja, pokušavati izvlačiti upite ili sistemske upute, ubacivati zlonamjerne upite kako bi sustav zanemario ograničenja niti provoditi ispitivanje ili testiranje opterećenja bez našeg pisanog dopuštenja.
@@ -116,7 +122,7 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 
 **Ne treniramo modele na vašem sadržaju.** Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar pružatelja usluga umjetne inteligencije za svakog pružatelja navodi jesmo li to potvrdili i kada.
 
-**Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije.** Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju.
+**Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije.** Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju. Kada rasprava završi, njezinu sintezu šaljemo i modelu koji je provjerava s obzirom na četiri kategorije — mogući terorizam, govor mržnje bilo koje vrste, sklonosti samoubojstvu ili nanošenju štete drugim ljudima te izrada oružja ili droga — kako objašnjava odjeljak 9.
 
 **Što šalje chat za podršku.** Pomoćnik za podršku također je model umjetne inteligencije. Kada mu pišete, vašu poruku šaljemo vanjskom pružatelju modela kako bi model mogao odgovoriti, zajedno s člancima pomoći na kojima temelji odgovor. Prije slanja maskiramo sve što izgleda kao lozinka, jednokratni kôd ili ključ. Ako zatražite razgovor s osobom, modelu šaljemo i razgovor, maskiran na isti način, kako bi napisao kratak sažetak za člana našeg tima koji preuzima vaš slučaj. Ne prilažemo vašu adresu e-pošte, identifikatore računa ni podatke o plaćanju, ali model prima sve ostalo što upišete u chat, stoga ondje ne pišite ništa što ne biste htjeli da pročita.
 
@@ -133,6 +139,8 @@ Rasprave su **prema zadanim postavkama privatne**. Ništa što izradite nije vid
 **Što se događa objavljivanjem.** Objavljivanje je namjerna radnja koja se zasebno potvrđuje. Kada objavite raspravu, izrađujemo njezinu nepromjenjivu snimku i omogućujemo svakome da je pročita bez računa. Tražilice mogu indeksirati tu snimku. Snimka prikazuje vaš **pseudonim**, vaše pitanje onako kako ste ga napisali, stablo argumenata, rezultate, presudu i raspon pouzdanosti te nosi vidljivu oznaku da je sadržaj generiran umjetnom inteligencijom. Ne prikazuje vašu adresu e-pošte, zapise o sesijama ni povijest računa.
 
 **Objavljivanje je u praksi gotovo nepovratno.** Nakon što rasprava postane javna, drugi je mogu čitati, citirati, arhivirati i spremati u predmemoriju te izrađivati njezine snimke zaslona. Povlačenjem objave rasprava se uklanja s Dialectical Engine-a i uništava se ključ naše kopije, ali nije moguće dohvatiti kopije koje već postoje drugdje. Nemojte objavljivati ništa za što ne biste htjeli da bude trajno povezano s vašim pseudonimom.
+
+**Označena rasprava treba naše odobrenje.** Kada rasprava završi, automatizirana provjera čita njezinu sintezu s obzirom na četiri kategorije iz odjeljka 8. Raspravu koju provjera označi moguće je objaviti samo uz naše odobrenje, a oznaka se prikazuje samo vama. Ako naše odobrenje zatražite na stranici rasprave, član našeg tima koji ima posebno ovlaštenje za pregled objava može pročitati raspravu u obliku u kojem bi bila objavljena. Ako odobrimo, gumb Objavite ponovno vam je dostupan, a provjera kroz koju prolazi svaka objava i dalje se primjenjuje. Ako odbijemo, rasprava ostaje privatna i dajemo vam obrazloženje (odjeljak 10.). Nakon odbijanja možete zatražiti još jednom, a odlučuje član našeg tima koji nije odlučivao o prvom zahtjevu; možete se koristiti i postupkom za pritužbe iz odjeljka 10. Nakon drugog odbijanja ne možete ponovno zatražiti, ali odluku i dalje možete uputiti tijelu za izvansudsko rješavanje sporova ili sudu (odjeljak 10.). Odobrenje obuhvaća sintezu koju je pregledatelj pročitao, uključujući svaku kasniju verziju rasprave koja je ponavlja doslovno; prepisana se sinteza ponovno provjerava pri objavi i, ako se označi, treba vlastito odobrenje. Ako nakon našeg odobrenja objavite označenu raspravu, možete je ponovno povući gumbom Povucite na njezinoj kartici u prikazu Vaše rasprave.
 
 **Objavljene rasprave nakon zatvaranja računa.** Kada zakažete zatvaranje računa, birate što će se dogoditi s raspravama koje ste objavili. Ako označite **„Izbrišite i moje javne rasprave”**, svaku od njih uklanjamo s Dialectical Engine-a i uništavamo ključ svoje kopije kada se zatvaranje provede, kao pri povlačenju objave, osim ako zakon nalaže čuvanje određene stavke. Ako kućicu ne označite, rasprave ostaju javne pod pseudonimom koji se više ne upotrebljava. Kopije koje su drugi napravili prije uklanjanja izvan su našeg nadzora. Ako želite zadržati pristup raspravi koju uklanjate, najprije je preuzmite.
 
@@ -153,6 +161,8 @@ Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno
 - **Odluke unutar sustava.** Sustav donosi strojne odluke o *argumentima*: može odbiti odgovoriti na pitanje, zaustaviti se na završnoj putanji — primjerice ako se pitanje temelji na pogrešnoj pretpostavci ili se odnosi na vrijednosni sud, a ne na empirijsku činjenicu — ograničiti raspon pouzdanosti kada nije bila dostupna neovisna kritika ili označiti odgovor neispravnim ako generirani tekst nije prošao provjeru sukladnosti. To su obilježja proizvoda koji radi kako je zamišljen; vidljiva su vam u raspravi i nisu odluke o vama.
 - **Odluke o moderiranju sadržaja i računa.** Uklanjanje ili ograničavanje objavljene rasprave te suspenzija ili zatvaranje računa odluke su koje donosimo na temelju ovih Uvjeta ili zakona. U svakoj takvoj odluci koja utječe na vaš račun sudjeluje osoba. Odjeljak 11. opisuje osnove.
 
+**Kamo pripada provjera na kraju rasprave.** Provjera iz odjeljka 9. nije odluka unutar sustava. To je automatizirani alat koji utječe na vaš sadržaj: raspravu koju označi nije moguće objaviti ako je osoba ne odobri. Svako odbijanje donosi osoba, a obrazloženje navodi da su upotrijebljena automatizirana sredstva.
+
 **Obrazloženje.** Kad god uklonimo vaš sadržaj ili ograničimo njegovu vidljivost, odnosno suspendiramo ili zatvorimo vaš račun, dajemo vam obrazloženje: što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili i jesu li proizašle iz prijave ili naših provjera, jesu li upotrijebljena automatizirana sredstva, pravnu ili ugovornu osnovu te način na koji možete osporiti odluku: putem našeg postupka za pritužbe u nastavku, putem tijela za izvansudsko rješavanje sporova certificiranog prema Aktu EU-a o digitalnim uslugama ili na sudu.
 
 **Pritužba na odluku.** Ako se ne slažete s odlukom o moderiranju, odgovorite na obrazloženje ili pišite na office@dezbatere.ro u roku od **šest mjeseci**. Odluku preispituje osoba koja nije sudjelovala u njezinu prvotnom donošenju, a mi vam priopćujemo obrazloženi ishod. To ne utječe na vaše pravo da se obratite sudu ili upotrijebite alternativno rješavanje sporova prema odjeljku 18. Postupak za pritužbe prihvaća i pritužbe da nismo postupili po prijavi, da je sadržaj pogrešno uklonjen, da je račun pogrešno ograničen ili da je automatizirani alat pogrešno utjecao na vaš sadržaj.
@@ -163,7 +173,7 @@ Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno
 
 **Teroristički sadržaj.** Teroristički sadržaj nezakonit je i nije dopušten na Dialectical Engine-u (odjeljak 7.). Nadležna tijela u Europskoj uniji mogu nam slati naloge za uklanjanje prema Uredbi (EU) 2021/784 na kontaktnu točku navedenu u odjeljku 1. Kada primimo takav nalog, uklanjamo sadržaj ili onemogućujemo pristup tom sadržaju u svim državama EU-a u roku od jednog sata. Osobu koja je sadržaj objavila obavještavamo da je uklonjen te, na njezin zahtjev, zašto i kako može osporiti nalog, osim ako tijelo odluči da javna sigurnost zahtijeva šutnju tijekom ograničenog razdoblja. Kako Uredba zahtijeva, uklonjeni sadržaj i povezane podatke čuvamo šest mjeseci, kako bi uklanjanje moglo biti preispitano i, ako je bilo pogrešno, poništeno. Osoba koja je sadržaj objavila može osporiti nalog pred sudovima države čije ga je tijelo izdalo, a može se i koristiti našim postupkom za pritužbe. Nijedno tijelo od nas nije zahtijevalo poduzimanje posebnih mjera protiv terorističkog sadržaja na temelju Uredbe; ako to učini, te ćemo mjere ovdje opisati, uključujući sve automatizirane alate.
 
-**Ozbiljna opasnost za život ili sigurnost.** Ako saznamo za informacije koje upućuju na kazneno djelo koje uključuje prijetnju nečijem životu ili sigurnosti, obavještavamo nadležna tijela.
+**Ozbiljna opasnost za život ili sigurnost.** Ako saznamo za informacije koje upućuju na kazneno djelo koje uključuje prijetnju nečijem životu ili sigurnosti, obavještavamo nadležna tijela. Automatizirana provjera iz odjeljka 9. sama po sebi ne dovodi do toga da bilo koja osoba pročita raspravu. Ono što pregledatelj čita u raspravi čiji je vlasnik zatražio naše odobrenje uređeno je ovim odlomkom.
 
 ## 11. Suspenzija i prestanak
 

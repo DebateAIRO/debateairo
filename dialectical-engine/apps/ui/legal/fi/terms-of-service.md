@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.3
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.4
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.3 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.4 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -70,7 +70,7 @@ Kuka tahansa voi lukea julkaistun väittelyn. Lukeminen ei edellytä tiliä, mut
 
 Lähetät kysymyksen tai väitteen. Dialectical Engine lähettää sen useille kolmansien osapuolten tekoälymalleille, jotka muodostavat sen ympärille argumenttikaavion: väitteitä, vastaväitteitä, kritiikkiä, viittauksia näyttöön, pisteytyksiä ja tuomion luottamusväleineen. Voit kyseenalaistaa yksittäisiä väitteitä, pyytää jonkin seikan lisätutkimista ja päättää, julkaisetko tuloksen.
 
-**Kaikki väittelyn sisältö on tekoälyn tuottamaa.** Argumentit, kritiikki, viittaukset näyttöön, pisteytykset, tuomiot ja tukipalveluavustajan vastaukset ovat koneellisesti tuotettuja. Ne voivat olla virheellisiä, puutteellisia, vanhentuneita tai vakuuttavasti vääriä, ja ne voivat heijastaa mallien vinoumia. Kukaan ei tarkasta niitä ennen kuin ne näytetään sinulle tai julkaistaan, eikä kenelläkään nimetyllä henkilöllä ole niistä toimituksellista vastuuta. Tuotettu sisältö merkitään tekoälyn tuottamaksi tuotteessa, julkaistuilla sivuilla ja vienneissä.
+**Kaikki väittelyn sisältö on tekoälyn tuottamaa.** Argumentit, kritiikki, viittaukset näyttöön, pisteytykset, tuomiot ja tukipalveluavustajan vastaukset ovat koneellisesti tuotettuja. Ne voivat olla virheellisiä, puutteellisia, vanhentuneita tai vakuuttavasti vääriä, ja ne voivat heijastaa mallien vinoumia. Kukaan ei tarkasta niitä ennen kuin ne näytetään sinulle, eikä kukaan tarkasta niitä ennen kuin ne julkaistaan, ellei tarkistuksemme merkitse väittelyä ja sinä pyydä hyväksyntäämme (kohta 9); kenelläkään nimetyllä henkilöllä ei ole niistä toimituksellista vastuuta. Tuotettu sisältö merkitään tekoälyn tuottamaksi tuotteessa, julkaistuilla sivuilla ja vienneissä.
 
 **Dialectical Engine ei ole neuvontaa.** Se ei ole oikeudellista, lääketieteellistä, taloudellista, verotuksellista, psykologista, turvallisuutta koskevaa tai muuta ammatillista neuvontaa, eikä tuomio ole tosiseikan vahvistaminen. Älä käytä väittelyä terveytesi, turvallisuutesi, varojesi, oikeudellisen asemasi tai muiden hyvinvoinnin kannalta merkittävän päätöksen perusteena tarkistamatta ensisijaisia lähteitä ja tarvittaessa pätevän ammattilaisen näkemystä. Korkea luottamusväli tarkoittaa, että mallit pitivät tulkintaa näkemänsä aineiston perusteella vakiintuneena; se ei takaa tulkinnan paikkansapitävyyttä.
 
@@ -98,6 +98,12 @@ Näitä sääntöjä sovelletaan lähettämääsi sisältöön, palvelun käytt�
 
 **Älä lähetä tai julkaise lainvastaista sisältöä**, mukaan lukien sisältöä, joka on herjaavaa, yllyttää väkivaltaan tai vihaan, häiritsee tai uhkailee, sisältää ilman suostumusta jaettua intiimiä kuva-aineistoa, loukkaa immateriaalioikeuksia tai luottamuksellisuutta, paljastaa liikesalaisuuksia, sisältää lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa tai rikkoo pakotteita tai vientivalvontaa.
 
+**Ei vihapuhetta missä tahansa muodossa.** Älä lähetä tai julkaise vihapuhetta missä tahansa muodossa.
+
+**Ei ohjeita aseiden tai huumeiden valmistukseen.** Älä lähetä tai julkaise ohjeita aseiden tai huumeiden valmistukseen.
+
+**Ei sisältöä, joka kannustaa itsemurhaan tai muiden ihmisten vahingoittamiseen.** Älä lähetä tai julkaise sisältöä, joka kannustaa itsemurhaan tai muiden ihmisten vahingoittamiseen.
+
 **Älä käytä Dialectical Engine -palvelua harhaanjohtamiseen.** Älä esitä tuotettua sisältöä ihmisen kirjoittamana, jos se johtaisi harhaan, poista siitä tekoälyn tuottamaa sisältöä koskevaa merkintää äläkä käytä sitä näennäisen yhteisymmärryksen, väärennetyn näytön tai toisena henkilönä esiintymisen luomiseen.
 
 **Älä hyökkää palvelua vastaan.** Hakukoneet saavat indeksoida julkaistuja väittelyjä tavanomaisesti; muu automaattinen käyttö, tiedonharavointi, sivuston ryömintä tai massaluonteinen poiminta edellyttää kirjallista lupaamme; nopeusrajoituksia, tunnistautumista tai julkaisunhallintaa ei saa kiertää; kehotteita tai järjestelmäohjeita ei saa yrittää poimia; järjestelmän rajoitteiden sivuuttamiseen tähtäävä kehoteinjektio on kielletty; palvelua ei saa koestaa tai kuormitustestata ilman kirjallista lupaamme.
@@ -116,7 +122,7 @@ Jos et ole varma, onko jokin sallittua, kysy meiltä ennen sen julkaisemista.
 
 **Emme kouluta malleja sisällölläsi.** Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin.
 
-**Miten sisältösi päätyy tekoälypalveluntarjoajille.** Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi.
+**Miten sisältösi päätyy tekoälypalveluntarjoajille.** Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi. Kun väittely päättyy, lähetämme sen synteesin myös mallille, joka tarkistaa sen neljän luokan osalta — mahdollinen terrorismi, vihapuhe missä tahansa muodossa, taipumukset itsemurhaan tai muiden ihmisten vahingoittamiseen sekä aseiden tai huumeiden valmistus — kuten kohta 9 selittää.
 
 **Mitä tukipalvelun chat lähettää.** Tukipalveluavustaja on myös tekoälymalli. Kun kirjoitat sille, lähetämme viestisi ulkoiselle mallipalveluntarjoajalle, jotta malli voi vastata, yhdessä niiden ohjeartikkelien kanssa, joihin se perustaa vastauksensa. Ennen lähettämistä peitämme kaiken, mikä näyttää salasanalta, kertakäyttökoodilta tai avaimelta. Jos pyydät saada keskustella henkilön kanssa, lähetämme mallille myös keskustelun samalla tavalla peitettynä, jotta se voi kirjoittaa lyhyen yhteenvedon tapauksesi vastaanottavalle tiimimme jäsenelle. Emme liitä mukaan sähköpostiosoitettasi, tilitunnisteitasi tai maksutietojasi, mutta malli saa kaiken muun, mitä kirjoitat chattiin, joten älä kirjoita sinne mitään, mitä et halua sen lukevan.
 
@@ -133,6 +139,8 @@ Väittelyt ovat **oletusarvoisesti yksityisiä**. Mikään luomasi ei näy muill
 **Mitä julkaiseminen tekee.** Julkaiseminen on tarkoituksellinen, erikseen vahvistettava toimi. Kun julkaiset, otamme väittelystä muuttumattoman tilannevedoksen ja asetamme sen kaikkien luettavaksi ilman tiliä. Hakukoneet voivat indeksoida sen. Tilannevedoksessa näkyvät **nimimerkkisi**, kysymyksesi kirjoittamassasi muodossa, argumenttipuu, pisteytykset, tuomio ja luottamusväli, ja siinä on näkyvä merkintä sisällön tuottamisesta tekoälyllä. Siinä ei näy sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi.
 
 **Julkaiseminen on käytännössä tosiasiallisesti peruuttamatonta.** Kun väittely on julkinen, muut voivat lukea, lainata, kuvakaapata, arkistoida ja tallentaa sen välimuistiin. Julkaisun peruuttaminen poistaa sen Dialectical Engine -palvelusta ja tuhoaa hallussamme olevan jäljennöksen salausavaimen, mutta ei voi poistaa muualla jo olevia jäljennöksiä. Älä julkaise mitään, jonka et halua yhdistyvän pysyvästi nimimerkkiisi.
+
+**Merkitty väittely tarvitsee hyväksyntämme.** Kun väittely päättyy, automaattinen tarkistus lukee sen synteesin kohdan 8 neljän luokan osalta. Väittelyn, jonka tarkistus merkitsee, voi julkaista vain hyväksyntämme kanssa, ja merkintä näytetään vain sinulle. Jos pyydät hyväksyntäämme väittelyn sivulla, tiimimme jäsen, jolla on erityinen oikeus tarkastaa julkaisuja, voi lukea väittelyn sellaisena kuin se julkaistaisiin. Jos hyväksymme, Julkaise-painike on jälleen käytettävissäsi, ja tarkistus, jonka jokainen julkaisu läpäisee, on edelleen voimassa. Jos kieltäydymme, väittely pysyy yksityisenä ja annamme sinulle perustelut (kohta 10). Kieltäytymisen jälkeen voit pyytää vielä kerran, ja tiimimme jäsen, joka ei päättänyt ensimmäisestä pyynnöstä, päättää; voit myös käyttää kohdan 10 valitusreittiä. Toisen kieltäytymisen jälkeen et voi pyytää uudelleen, mutta voit edelleen viedä päätöksen tuomioistuinten ulkopuoliseen riidanratkaisuelimeen tai tuomioistuimeen (kohta 10). Hyväksyntä kattaa synteesin, jonka tarkastaja luki, mukaan lukien väittelyn myöhemmän version, joka toistaa sen sanasta sanaan; uudelleen kirjoitettu synteesi tarkistetaan uudelleen, kun julkaiset, ja jos se merkitään, se tarvitsee oman hyväksyntänsä. Jos julkaiset merkityn väittelyn hyväksyntämme jälkeen, voit poistaa sen taas näkyvistä painikkeella Poista näkyvistä sen kortissa kohdassa Omat väittelysi.
 
 **Julkaistut väittelyt sulkiessasi tilisi.** Kun ajoitat tilisi sulkemisen, valitset, mitä julkaisemillesi väittelyille tapahtuu. Jos valitset **"Poista myös julkiset väittelyni"**, poistamme jokaisen Dialectical Engine:sta ja tuhoamme oman kopiomme avaimen sulkemisen yhteydessä, kuten julkaisun perumisessa, ellei laki edellytä tietyn kohteen säilyttämistä. Jos jätät valintaruudun valitsematta, väittelyt pysyvät julkisina käytöstä poistetulla salanimellä. Muiden ennen poistamista tekemät kopiot eivät ole hallinnassamme. Jos haluat säilyttää itselläsi poistettavan väittelyn, lataa se ensin.
 
@@ -153,6 +161,8 @@ Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. 
 - **Järjestelmän sisäiset päätökset.** Järjestelmä tekee koneellisia päätöksiä *argumenteista*: se voi kieltäytyä vastaamasta kysymykseen, pysähtyä päättävään reittiin — esimerkiksi jos kysymys perustuu väärään ennakko-oletukseen tai on empiirisen kysymyksen sijaan arvokysymys — rajoittaa luottamusväliä, kun riippumatonta kritiikkiä ei ollut saatavilla, tai merkitä vastauksen virheelliseksi, jos tuotettu teksti ei läpäissyt vaatimustenmukaisuustarkastusta. Nämä ovat tuotteen suunniteltua toimintaa; ne näkyvät sinulle väittelyssä, eivätkä ne ole sinua koskevia päätöksiä.
 - **Sisältöä ja tilejä koskevat moderointipäätökset.** Julkaistun väittelyn poistaminen tai sen saatavuuden rajoittaminen taikka tilin keskeyttäminen tai sulkeminen on päätös, jonka teemme näiden käyttöehtojen tai lain perusteella. Henkilö osallistuu jokaiseen tällaiseen tiliisi vaikuttavaan päätökseen. Päätösten perusteet kuvataan kohdassa 11.
 
+**Mihin väittelyn päätteeksi tehtävä tarkistus kuuluu.** Kohdan 9 tarkistus ei ole päätös järjestelmän sisällä. Se on automatisoitu työkalu, joka vaikuttaa sisältöösi: sen merkitsemää väittelyä ei voi julkaista, ellei henkilö hyväksy sitä. Jokaisen kieltäytymisen tekee henkilö, ja perusteluissa todetaan, että käytettiin automatisoituja keinoja.
+
 **Perustelut.** Aina kun poistamme sisältösi tai rajoitamme sen näkyvyyttä taikka keskeytämme tai päätämme tilisi, annamme sinulle perustelut: mitä teimme ja kuinka laajalle toimi ulottuu, tosiseikat, joihin nojauduimme, ja olivatko ne peräisin ilmoituksesta vai omista tarkastuksistamme, käytettiinkö automatisoituja keinoja, oikeudellinen tai sopimukseen perustuva peruste sekä se, miten voit riitauttaa päätöksen: jäljempänä kuvatun valitusreittimme kautta, EU:n digipalvelusäädöksen nojalla sertifioidussa tuomioistuinten ulkopuolisessa riidanratkaisuelimessä tai tuomioistuimessa.
 
 **Päätöstä koskevan valituksen tekeminen.** Jos olet eri mieltä moderointipäätöksestä, vastaa perusteluihin tai kirjoita osoitteeseen office@dezbatere.ro **kuuden kuukauden** kuluessa. Alkuperäiseen päätökseen osallistumaton henkilö tarkastaa asian, ja ilmoitamme sinulle perustellun lopputuloksen. Tämä ei vaikuta oikeuteesi saattaa asia tuomioistuimeen tai käyttää kohdassa 18 tarkoitettua vaihtoehtoista riidanratkaisua. Valitusreittiä voi käyttää myös, jos emme ole toimineet ilmoituksen perusteella, sisältö on poistettu virheellisesti, tiliä on rajoitettu virheellisesti tai automatisoitu työkalu on virheellisesti vaikuttanut sisältöösi.
@@ -163,7 +173,7 @@ Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. 
 
 **Terroristinen sisältö.** Terroristinen sisältö on laitonta, ja se on kiellettyä Dialectical Engine -palvelussa (kohta 7). Euroopan unionin toimivaltaiset viranomaiset voivat lähettää meille poistamismääräyksiä asetuksen (EU) 2021/784 nojalla kohdassa 1 ilmoitettuun yhteyspisteeseen. Kun saamme tällaisen määräyksen, poistamme sisällön tai estämme pääsyn siihen kaikissa EU-maissa tunnin kuluessa. Ilmoitamme sisällön julkaisseelle henkilölle, että sisältö on poistettu, ja hänen pyynnöstään kerromme poistamisen syyt ja sen, miten määräyksen voi riitauttaa, paitsi jos viranomainen päättää, että yleinen turvallisuus edellyttää, ettei tietoja anneta rajoitettuna aikana. Asetuksen edellyttämällä tavalla säilytämme poistetun sisällön ja siihen liittyvät tiedot kuuden kuukauden ajan, jotta poistaminen voidaan tarkastaa ja peruuttaa, jos se oli virheellinen. Sisällön julkaissut henkilö voi riitauttaa määräyksen sen maan tuomioistuimissa, jonka viranomainen antoi määräyksen, ja voi myös käyttää valitusreittiämme. Mikään viranomainen ei ole edellyttänyt meiltä erityisiä toimenpiteitä terroristista sisältöä vastaan asetuksen nojalla; jos jokin viranomainen niin tekee, kuvaamme nämä toimenpiteet tässä, mukaan lukien mahdolliset automatisoidut työkalut.
 
-**Vakava henkeen tai turvallisuuteen kohdistuva riski.** Jos saamme tietoomme tietoja, jotka viittaavat jonkun henkeä tai turvallisuutta uhkaavaan rikokseen, ilmoitamme niistä toimivaltaisille viranomaisille.
+**Vakava henkeen tai turvallisuuteen kohdistuva riski.** Jos saamme tietoomme tietoja, jotka viittaavat jonkun henkeä tai turvallisuutta uhkaavaan rikokseen, ilmoitamme niistä toimivaltaisille viranomaisille. Kohdan 9 automaattinen tarkistus ei sellaisenaan saa ketään henkilöä lukemaan väittelyä. Se, mitä tarkastaja lukee väittelystä, jonka omistaja on pyytänyt hyväksyntäämme, kuuluu tämän kappaleen piiriin.
 
 ## 11. Keskeyttäminen ja päättäminen
 
