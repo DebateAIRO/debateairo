@@ -93,7 +93,9 @@ export type MapAnswerCheckOutcome = typeof MAP_ANSWER_CHECK_OUTCOMES[number];
 
 /** The marks the spec names (§1.1, §1.2). The kernel's CONDITION_MARKS lists them too (Phase 2), with typed records. */
 export const MAP_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
-  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"] as const);
+  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED",
+  // Engine redesign R3 (spec 2026-10-15 §5.5): the answer check's four outcomes that change or doubt the debated answers.
+  "MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED"] as const);
 export type MapMark = typeof MAP_MARKS[number];
 
 /** What happened along the way that is not a mark: kept for the practice record and the owners' reading. */

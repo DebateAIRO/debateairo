@@ -50,6 +50,10 @@ export function conditionMarkLabel(
     case "MAP_UNAVAILABLE_TODAYS_OPENING": return t(catalog, "debateChrome.condition.mapUnavailable");
     case "ANSWERS_FILLED": return t(catalog, "debateChrome.condition.answersFilled");
     case "CHOOSE_QUOTA_FILLED": return t(catalog, "debateChrome.condition.chooseQuotaFilled");
+    case "MAP_CHECK_UNAVAILABLE": return t(catalog, "debateChrome.condition.mapCheckUnavailable");
+    case "MAP_ANSWER_REPLACED": return t(catalog, "debateChrome.condition.mapAnswerReplaced");
+    case "MAP_ANSWER_DROPPED": return t(catalog, "debateChrome.condition.mapAnswerDropped");
+    case "MAP_ANSWER_KEPT_UNCHECKED": return t(catalog, "debateChrome.condition.mapAnswerKeptUnchecked");
     case "PANEL-CLOSE-CALL-EXTENDED": return t(catalog, "debateChrome.condition.closeCallExtended");
     case "SCRUTINY-EXTENDED": return t(catalog, "debateChrome.condition.scrutinyExtended");
     case "AMBIGUOUS_ATTRIBUTION": return t(catalog, "debateChrome.condition.ambiguousAttribution");

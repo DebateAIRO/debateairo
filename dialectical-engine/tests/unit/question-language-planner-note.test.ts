@@ -8,12 +8,12 @@ const RECORD = "LANGUAGE_PLANNER_DISAGREES" as const;
 const LOCALES = readdirSync(new URL("../../apps/ui/messages/", import.meta.url), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
 
 describe("the planner-disagreement record is operator-only (question-language spec 2026-10-13, L7; ruling CR-3)", () => {
-  it("is a map note, never a condition mark, a shape mark or a map mark; the kernel's list keeps its 50 (P2b's 46 + R2's four engine marks)", () => {
+  it("is a map note, never a condition mark, a shape mark or a map mark; the kernel's list keeps its 54 (P2b's 46 + R2's four engine marks + R3's four answer-check marks)", () => {
     expect(MAP_NOTES).toContain(RECORD);
     expect(CONDITION_MARKS as readonly string[]).not.toContain(RECORD);
     expect(DEBATE_SHAPE_MARKS as readonly string[]).not.toContain(RECORD);
     expect(MAP_MARKS as readonly string[]).not.toContain(RECORD);
-    expect(CONDITION_MARKS).toHaveLength(50);
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
   });
 
   it("never becomes a condition record on the answer", () => {

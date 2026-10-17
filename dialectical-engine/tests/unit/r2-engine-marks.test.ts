@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { ConditionMarkRecordSchema, ConditionMarkSchema } from "@debateai/contract";
 import { CONDITION_MARKS, ENGINE_MARKS } from "@debateai/kernel";
+import { MAP_MARKS } from "@debateai/map";
 import { assertRequiredConditionMarkRecords, resolveTrueUnjudgedReasons, type ConditionMarkRecord } from "@debateai/serve";
 import { conditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
 
@@ -40,11 +41,13 @@ describe("R2: the four engine marks (spec §4.7, §4.2a; INTERFACE §13)", () =>
     const at = CONDITION_MARKS.indexOf("PANEL-PARTIAL");
     expect(CONDITION_MARKS.slice(at - ENGINE_MARKS.length, at)).toEqual([...ENGINE_MARKS]);
     expect(CONDITION_MARKS.slice(-4)).toEqual(["HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"]);
-    expect(CONDITION_MARKS).toHaveLength(50);
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
   });
 
   it("engine 1 pin: every mark from before R2 keeps its relative order", () => {
-    expect(CONDITION_MARKS.filter((mark) => !(ENGINE_MARKS as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
+    // R3 (spec §5.5): the answer check's four marks are not engine-1 marks either.
+    expect(CONDITION_MARKS.filter((mark) => !(ENGINE_MARKS as readonly string[]).includes(mark)
+      && !(MAP_MARKS.slice(-4) as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
   });
 
   it("are wire vocabulary", () => {

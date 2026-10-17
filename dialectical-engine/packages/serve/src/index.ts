@@ -1723,6 +1723,10 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "MAP_UNAVAILABLE_TODAYS_OPENING",
   "ANSWERS_FILLED",
   "CHOOSE_QUOTA_FILLED",
+  "MAP_CHECK_UNAVAILABLE",
+  "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED",
+  "MAP_ANSWER_KEPT_UNCHECKED",
   "PANEL-CLOSE-CALL-EXTENDED",
   "SCRUTINY-EXTENDED",
   // Engine 2 (INTERFACE §13): each verdict mark names the served root in its record; the reduced-weight mark names its

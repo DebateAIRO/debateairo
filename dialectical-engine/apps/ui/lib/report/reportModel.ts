@@ -431,6 +431,11 @@ function pointNote(mark: ConditionMark): PointNote | null {
     case "MAP_UNAVAILABLE_TODAYS_OPENING":
     case "ANSWERS_FILLED":
     case "CHOOSE_QUOTA_FILLED":
+    // Engine redesign R3 (spec §5.5): the answer check's four marks are said once for the whole answer too.
+    case "MAP_CHECK_UNAVAILABLE":
+    case "MAP_ANSWER_REPLACED":
+    case "MAP_ANSWER_DROPPED":
+    case "MAP_ANSWER_KEPT_UNCHECKED":
     case "PANEL-CLOSE-CALL-EXTENDED":
     case "SCRUTINY-EXTENDED":
     // Engine 2 (R2): the three verdict marks describe how the verdict was reached, said once for the whole answer; the
