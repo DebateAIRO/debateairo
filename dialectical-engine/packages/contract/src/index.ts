@@ -1429,6 +1429,31 @@ export const AnswerModelAssignmentSchema = z.object({
 }).strict();
 export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
 
+/**
+ * R2 (spec §4.4, INTERFACE §9.8): how the comparing judges' choices fell, for the owner's honesty panel. Read when the
+ * answer is read (`judgesComparisonOf`, @debateai/serve), from the stored votes and the answer's own nodes; absent on
+ * every engine-1 answer. Each answer is a position of the debate, named by its root node; `honest_score` is its
+ * latest final strength (a review catch-up refreshes it), shown as a bar, never printed; `judges_chose` counts the
+ * counted choices that picked it. No letters: they exist only in the judges' material.
+ */
+export const JudgesComparisonSchema = z.object({
+  judges_seated: z.number().int().min(1).max(5),
+  judges_counted: z.number().int().min(0),
+  answers: z.array(z.object({
+    root_node_id: z.string().min(1),
+    honest_score: z.number().min(0).max(1).nullable(),
+    judges_chose: z.number().int().min(0)
+  }).strict()).min(1)
+}).strict().superRefine((comparison, context) => {
+  if (comparison.judges_counted > comparison.judges_seated) {
+    context.addIssue({ code: "custom", message: "judges_counted cannot exceed judges_seated" });
+  }
+  if (comparison.answers.reduce((sum, entry) => sum + entry.judges_chose, 0) > comparison.judges_counted) {
+    context.addIssue({ code: "custom", message: "the answers' choices cannot exceed judges_counted" });
+  }
+});
+export type JudgesComparison = z.infer<typeof JudgesComparisonSchema>;
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
@@ -1501,7 +1526,9 @@ export const AnswerSchema = z.object({
   staleness_state: StalenessStateSchema,
   relevant_as_of: z.iso.datetime(),
   // A21: optional, so every stored and fixture answer without it still parses.
-  model_assignment: AnswerModelAssignmentSchema.optional()
+  model_assignment: AnswerModelAssignmentSchema.optional(),
+  // R2: engine 2 only (INTERFACE §9.8); optional, so every engine-1 and older answer parses unchanged.
+  judges_comparison: JudgesComparisonSchema.optional()
 }).strict().superRefine((answer, context) => {
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });

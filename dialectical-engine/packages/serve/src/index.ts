@@ -24,8 +24,10 @@ import {
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+import { judgesComparisonOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+export { judgesComparisonOf, type ComparisonVote } from "./judges-comparison.js"; // pre-flight PF-R2b4.4
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -2769,6 +2771,13 @@ export class ServeRepository {
       // A21, ruling F20 (the one R2 exception): the pinned core.run_role_assignment row rides this
       // single SELECT as a subselect instead of a second readRunRoleAssignment query per answer read.
       role_assignment_row: PinnedRoleAssignmentRow | null;
+      // R2 (INTERFACE §9.8), like F20: the plain vote columns ride this one SELECT; the reasons stay sealed.
+      // An empty array for every engine-1 run (no vote row). (pre-flight PF-R2b4.5) The stored `counted` column is a
+      // hint and is never read: the projection recounts (controller ruling R2b-B5.1).
+      verdict_votes: Array<{
+        judge_seat: number; maker: string; counted: boolean; chosen_root_node_id: string | null; chosen_letter: string | null;
+        conditional: boolean | null; same_as: string[][]; question_kind: string | null;
+      }>;
     }>(
       `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
@@ -2799,7 +2808,14 @@ export class ServeRepository {
                         'strength', pinned.strength,
                         'stepped_down', pinned.stepped_down)
                  FROM core.run_role_assignment AS pinned
-                WHERE pinned.run_id = run.run_id) AS role_assignment_row
+                WHERE pinned.run_id = run.run_id) AS role_assignment_row,
+              (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'judge_seat', vote.judge_seat, 'maker', vote.maker, 'counted', vote.counted,
+                        'chosen_root_node_id', vote.chosen_root_node_id::text,
+                        'chosen_letter', vote.chosen_letter, 'conditional', vote.conditional,
+                        'same_as', vote.same_as, 'question_kind', vote.question_kind) ORDER BY vote.judge_seat), '[]'::jsonb)
+                 FROM ledger.verdict_vote AS vote
+                WHERE vote.run_id = run.run_id) AS verdict_votes
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
@@ -2854,6 +2870,15 @@ export class ServeRepository {
       this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
       this.readEdgesForRun(row.run_id)
     ]);
+    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
+    // (controller ruling R2b-B5.1); undefined for engine 1 (no vote row). (pre-flight PF-R2b4.5)
+    const judgesComparison = judgesComparisonOf(
+      row.verdict_votes.map((vote) => ({
+        judgeSeat: vote.judge_seat, maker: vote.maker, counted: vote.counted, chosenRootNodeId: vote.chosen_root_node_id,
+        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
+      })),
+      nodes, edges
+    );
     const numbers = await this.pool.query<{
       value: number;
       number_kind: string;
@@ -3085,7 +3110,8 @@ export class ServeRepository {
       as_of: row.as_of.toISOString(),
       staleness_state: staleness.state,
       relevant_as_of: staleness.relevantAsOf,
-      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment })
+      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment }),
+      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison })
     };
     });
   }

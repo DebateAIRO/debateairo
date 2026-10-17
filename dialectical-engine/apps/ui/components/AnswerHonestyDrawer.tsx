@@ -115,6 +115,11 @@ function backupRecordKeysFor(record: { readonly mark: string; readonly subject_r
   return record.mark === "BACKUP-MODEL-USED" ? BACKUP_RECORD_KEYS[record.subject_ref] ?? null : null;
 }
 
+/** R2 honesty panel: an answer of the comparison, by its own statement (the node's claim), or nothing when it is gone. */
+function comparisonStatement(answer: Answer, rootNodeId: string): string | null {
+  return answer.nodes.find((node) => node.node_id === rootNodeId)?.claim ?? null;
+}
+
 export function AnswerHonestyDrawer({
   answer,
   live,
@@ -255,6 +260,54 @@ export function AnswerHonestyDrawer({
               </div>
             ) : null}
           </section>
+          {answer.judges_comparison !== undefined ? (
+            // R2 (spec §4.4): how the comparing judges' choices fell. The case's strength is a bar, never a number.
+            // Its spoken value is the strength sentence, never the number (ruling PF-R2b4.7 (b)).
+            // OWNER WORDING — approve before switch-on: the seven misc.answerHonesty.comparison.* sentences (option 1) and
+            // the bar's spoken word (aria-valuetext).
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.comparison.title")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.comparison.title")}</div>
+              <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.intro")}</div>
+              <div className="drawerFindingText">
+                {t(catalog, "misc.answerHonesty.comparison.counted", {
+                  counted: answer.judges_comparison.judges_counted,
+                  seated: answer.judges_comparison.judges_seated
+                })}
+              </div>
+              {answer.judges_comparison.judges_counted === 0 ? (
+                <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.noneCounted")}</div>
+              ) : answer.judges_comparison.judges_counted < answer.judges_comparison.judges_seated ? (
+                <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.comparison.notCounted")}</div>
+              ) : null}
+              <ul className="drawerFindingList">
+                {answer.judges_comparison.answers.map((entry) => (
+                  <li key={entry.root_node_id} className="drawerFindingItem">
+                    {comparisonStatement(answer, entry.root_node_id) === null ? null : (
+                      <div className="drawerFindingText" data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
+                    )}
+                    {entry.honest_score === null ? null : (
+                      <meter
+                        className="drawerComparisonMeter"
+                        min={0}
+                        max={1}
+                        value={entry.honest_score}
+                        aria-label={t(catalog, "misc.answerHonesty.comparison.strength")}
+                        aria-valuetext={t(catalog, "misc.answerHonesty.comparison.strength")}
+                      />
+                    )}
+                    <div className="drawerFindingMeta">
+                      <span>
+                        {t(catalog, "misc.answerHonesty.comparison.chosen", {
+                          chose: entry.judges_chose,
+                          counted: answer.judges_comparison!.judges_counted
+                        })}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.conditionMarks")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.conditionMarks")}</div>

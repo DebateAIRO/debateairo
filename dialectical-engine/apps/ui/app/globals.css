@@ -4310,6 +4310,14 @@ a:focus-visible {
   color: var(--text-2);
 }
 
+/* R2 honesty panel: how well each answer's case held up, as a bar (the score is never printed). */
+.drawerComparisonMeter {
+  display: block;
+  inline-size: 100%;
+  block-size: 6px;
+  margin-top: 6px;
+}
+
 .recommendationsPanel {
   flex: 0 0 auto;
   display: grid;
