@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { honestGrade, honestMedian, honestPointScore, type EngineReviewStatus, type HonestVoice } from "@debateai/judgement";
-import { ENGINE_ANSWER_LETTERS, TypedDomainError, type EngineAnswerLetter } from "@debateai/kernel";
+import { ENGINE_ANSWER_LETTERS, SERVED_ROOT_SELECTION_RULE_JUDGES, TypedDomainError, type EngineAnswerLetter } from "@debateai/kernel";
 import { evaluate, type EvaluationSnapshot, type SnapshotArrow } from "@debateai/propagation";
 import {
   STRUCTURE_REPAIR_CALL_SITE_PREFIX,
@@ -218,6 +218,9 @@ export function reproduceServedPropagation(graph: TranscriptEngineGraph): Readon
   }
   const ok = worstDelta <= PRACTICE_RESCORE_SWEEP.tolerance;
   if (!ok) return Object.freeze({ ok, worstDelta, what: `${graph.engine === 1 ? "" : "engine2 "}delta ${String(worstDelta)}` });
+  // R2b B12 (ruling R2b-B12.1): under the comparing judges' rule the judges chose the served answer, so the recorded root
+  // is taken as their choice and is never required to be the honest-strength leader. Every other rule: the check below.
+  if (graph.served.servedRootRule === SERVED_ROOT_SELECTION_RULE_JUDGES) return Object.freeze({ ok, worstDelta, what: "" });
   // R2a final wave (Ruling (A16 Important 1) Minor 1): the served answer, by the runner's own rule over the answers that
   // could be served (those with a served final strength); one that is not given back would make every "lead changed
   // from engine 1" in the sweep spurious.
@@ -537,7 +540,8 @@ function engineGraphShaped(value: unknown): value is TranscriptEngineGraph {
   return (graph.engine === 1 || graph.engine === 2)
     && ["nodes", "edges", "reviews", "voices", "investigations", "unreadVoices"].every((key) => Array.isArray(graph[key]))
     && record(served) && record(served!.baseStrength) && record(served!.finalStrength)
-    && (served!.servedRootNodeId === null || typeof served!.servedRootNodeId === "string");
+    && (served!.servedRootNodeId === null || typeof served!.servedRootNodeId === "string")
+    && (served!.servedRootRule === undefined || typeof served!.servedRootRule === "string");
 }
 
 /** One transcript's graph: its own block (R2 and later), else rebuilt from an older transcript. */
@@ -602,7 +606,9 @@ export function rescoreMarkdown(result: PracticeRescoreResult): string {
   const yes = (value: boolean) => (value ? "yes" : "no");
   const lines = [`# Preview practice (rescore): ${result.verdict}`, "",
     `${String(result.transcripts)} transcript(s). Start setting: a "cannot assess" link at ${String(result.start.cannotAssessWeight)}, `
-      + "investigations applied. No AI was called and nothing was spent; the comparing judges are not asked here.", ""];
+      + "investigations applied. No AI was called and nothing was spent; the comparing judges are not asked here.", "",
+    "Under engine 2 the served answer is the comparing judges' choice, so a change of the strength lead below is not a change "
+      + "of the served answer.", ""];
   if (result.reasons.length > 0) lines.push("Why:", "", ...result.reasons.map((reason) => `- ${reason}`), "");
   lines.push("Per setting (the lead is the answer with the highest honest final strength):", "",
     "| cannot-assess weight | investigations applied | debates | lead changed from engine 1 | lead changed from start | median gap |",

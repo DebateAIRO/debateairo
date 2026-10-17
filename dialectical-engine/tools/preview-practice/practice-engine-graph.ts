@@ -114,6 +114,11 @@ export type TranscriptEngineGraph = Readonly<{
     baseStrength: Readonly<Record<string, number>>;
     finalStrength: Readonly<Record<string, number>>;
     servedRootNodeId: string | null;
+    /**
+     * R2b B12 (ruling R2b-B12.1): the rule the receipt says chose the served answer (`served_root_selection.rule`); under
+     * the comparing judges' rule the served answer is the judges' choice. Absent on a graph written before B12.
+     */
+    servedRootRule?: string;
   }>;
 }>;
 
@@ -145,7 +150,7 @@ export type EngineGraphSource = Readonly<{
   panelRefs: readonly string[];
   reviews: readonly Readonly<{ nodeId: string; outcome: string; reviewerMaker: string }>[];
   investigations: readonly Readonly<{ nodeId: string; result: string }>[];
-  served: Readonly<{ servedRootNodeId: string | null; finalStrength: Readonly<Record<string, number>> }> | null;
+  served: Readonly<{ servedRootNodeId: string | null; finalStrength: Readonly<Record<string, number>>; servedRootRule?: string | null }> | null;
 }>;
 
 const UNKNOWN_MAKER = "UNKNOWN";
@@ -332,7 +337,8 @@ export function buildTranscriptEngineGraph(source: EngineGraphSource): Transcrip
       Object.freeze({ nodeId: row.nodeId, result: row.result as PointInvestigationResult }))),
     unreadVoices: Object.freeze(unreadVoices),
     served: Object.freeze({ baseStrength: Object.freeze(baseStrength), finalStrength: Object.freeze({ ...finals }),
-      servedRootNodeId: source.served.servedRootNodeId })
+      servedRootNodeId: source.served.servedRootNodeId,
+      ...(typeof source.served.servedRootRule === "string" ? { servedRootRule: source.served.servedRootRule } : {}) })
   });
 }
 
@@ -397,7 +403,7 @@ export async function readEngineGraphSource(pool: Pool, runId: string, panelRefs
        JOIN core.node AS node ON node.run_id = investigation.run_id AND node.node_id = investigation.node_id
       WHERE investigation.run_id=$1 AND node.generation_status IS DISTINCT FROM 'stale'
       ORDER BY investigation.investigation_order, investigation.node_id`, [runId])).rows;
-  const servedRow = (await pool.query<{ propagation_run_id: string; served_root_selection: { servedNodeId?: unknown } | null }>(
+  const servedRow = (await pool.query<{ propagation_run_id: string; served_root_selection: { servedNodeId?: unknown; rule?: unknown } | null }>(
     `SELECT propagation_run_id::text, served_root_selection FROM ledger.propagation_run
       WHERE run_id=$1 AND served_root_selection IS NOT NULL ORDER BY at_seq DESC LIMIT 1`, [runId])).rows[0];
   const finals = servedRow === undefined ? [] : (await pool.query<{ node_id: string; strength: number }>(
@@ -418,6 +424,7 @@ export async function readEngineGraphSource(pool: Pool, runId: string, panelRefs
     investigations: investigations.map((row) => Object.freeze({ nodeId: row.node_id, result: row.result })),
     served: servedRow === undefined ? null : Object.freeze({
       servedRootNodeId: typeof servedRow.served_root_selection?.servedNodeId === "string" ? servedRow.served_root_selection.servedNodeId : null,
+      servedRootRule: typeof servedRow.served_root_selection?.rule === "string" ? servedRow.served_root_selection.rule : null,
       finalStrength: Object.freeze(Object.fromEntries(finals.map((row) => [row.node_id, Number(row.strength)])))
     })
   });

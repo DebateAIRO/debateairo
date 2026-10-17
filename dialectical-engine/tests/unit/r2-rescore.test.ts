@@ -8,10 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { reviewPromptContract } from "@debateai/judgement";
+import { SERVED_ROOT_SELECTION_RULE, SERVED_ROOT_SELECTION_RULE_JUDGES } from "@debateai/kernel";
 import { evaluate, type EvaluationSnapshot } from "@debateai/propagation";
 import { buildFramedPrompt } from "@debateai/providers";
-import { engineSettingsOf, engineVersionPolicyStartValues } from "@debateai/register";
-import { selectServedRootByStrength } from "@debateai/runner";
+import { engineReceipt, engineSettingsOf, engineVersionPolicyStartValues } from "@debateai/register";
+import { projectJudgedStanding, selectServedRootByStrength } from "@debateai/runner";
+import { engineLinkedGraph } from "../../apps/runner/src/engine-links.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
 import type { TranscriptEngineGraph } from "../../tools/preview-practice/practice-engine-graph.js";
 import {
@@ -79,6 +81,33 @@ function graph(investigations: TranscriptEngineGraph["investigations"] = []): Tr
     investigations, unreadVoices: [],
     served: { baseStrength: { ...ENGINE1_BASE }, finalStrength: served.finals, servedRootNodeId: served.root }
   };
+}
+/**
+ * R2b B12 (ruling R2b-B12.1): the same debate served by engine 2. Its final strengths come from the runner's own door (A8's
+ * link rules on the materialised graph, then the standing, then propagation), at the receipt's settings, as the runner
+ * serves them. `root` names the served answer and `rule` the receipt's served-root rule (absent: none recorded).
+ */
+function engineTwoGraph(root: "LEADER" | "NOT_LEADER", rule?: string): TranscriptEngineGraph {
+  const one = graph();
+  const nodes = one.nodes.map((node) => ({ ...node, hidden: false }));
+  const arrows = one.edges.map((edge) => ({ arrowId: edge.edgeId, sourceNodeId: edge.from, targetKind: edge.targetKind, targetNodeId: edge.to,
+    targetEdgeId: edge.targetEdgeId, polarity: edge.polarity, kind: edge.kind, strength: edge.bearing,
+    magnitudeStatus: edge.bearing === null ? "UNKNOWN" as const : "MEASURED" as const, strengthSource: edge.strengthSource, clusterKey: edge.clusterKey }));
+  const linked = engineLinkedGraph({
+    engine: SETTINGS,
+    snapshot: { nodes: nodes.map((node) => ({ nodeId: node.nodeId, baseStrength: one.served.baseStrength[node.nodeId] ?? null,
+      parentNodeId: node.parentNodeId, isFolder: node.isFolder })), arrows, arrowOrder: arrows.map((arrow) => arrow.arrowId),
+    operatorResolutions: [...new Set(arrows.flatMap((arrow) => arrow.targetNodeId === null ? [] : [arrow.targetNodeId]))].map((parentNodeId) =>
+      ({ parentNodeId, operator: "accumulate" as const, suppliedBy: "deployment" as const })), clusterRecords: [] },
+    reviewedNodeIds: one.reviews.filter((review) => review.outcome !== "cannot-assess").map((review) => review.nodeId),
+    disputedNodeIds: [], cannotAssessNodeIds: one.reviews.filter((review) => review.outcome === "cannot-assess").map((review) => review.nodeId),
+    ownReplyEdgeIds: new Map(), investigated: new Map()
+  })!;
+  const strengths = evaluate(projectJudgedStanding(linked.snapshot, linked.reviewedNodeIds).snapshot).strengths;
+  const leader = selectServedRootByStrength([{ nodeId: A }, { nodeId: B }], strengths).root.nodeId;
+  return { ...one, engine: 2, engineReceipt: engineReceipt(SETTINGS, 3), nodes,
+    served: { baseStrength: one.served.baseStrength, finalStrength: Object.fromEntries(strengths.map((row) => [row.nodeId, row.strength])),
+      servedRootNodeId: root === "LEADER" ? leader : leader === A ? B : A, ...(rule === undefined ? {} : { servedRootRule: rule }) } };
 }
 const transcriptText = (engineGraph: TranscriptEngineGraph | null, answer: unknown = null) => JSON.stringify({
   schema: "preview-practice-transcript-v1", writtenAt: "2026-10-16T00:00:00.000Z",
@@ -179,6 +208,24 @@ describe("R2 rescore: engine 1 through the runner's own projection (R2a final wa
       reviews: aHidden.reviews.map((review) => review.nodeId === A ? { ...review, outcome: "cannot-assess" as const } : review),
       served: { ...aHidden.served, finalStrength: Object.fromEntries(strengths.map((row) => [row.nodeId, row.strength])), servedRootNodeId: B } };
     expect(reproduceServedPropagation(onlyB)).toMatchObject({ ok: true });
+  });
+
+  // R2b B12 (ruling R2b-B12.1): the comparing judges chose the served answer; it need not lead by honest strength.
+  it("under the judges' rule, takes the recorded served answer as the judges' choice, never requiring the strength lead", () => {
+    expect(reproduceServedPropagation(engineTwoGraph("LEADER", SERVED_ROOT_SELECTION_RULE_JUDGES))).toMatchObject({ ok: true, what: "" });
+    const judgesChoice = engineTwoGraph("NOT_LEADER", SERVED_ROOT_SELECTION_RULE_JUDGES);
+    expect(reproduceServedPropagation(judgesChoice)).toMatchObject({ ok: true, what: "" });
+    const result = rescoreTranscripts([{ debate: "judged", text: transcriptText(judgesChoice) }], SETTINGS);
+    expect(result.notRescored).toEqual([]);
+    expect(result.rows.length).toBe(PRACTICE_RESCORE_SWEEP.cannotAssessWeights.length * PRACTICE_RESCORE_SWEEP.investigationsApplied.length);
+    // The strengths are still checked exactly under the judges' rule.
+    const moved = { ...judgesChoice, served: { ...judgesChoice.served, finalStrength: { ...judgesChoice.served.finalStrength,
+      [B]: judgesChoice.served.finalStrength[B]! + 1e-6 } } };
+    expect(reproduceServedPropagation(moved)).toMatchObject({ ok: false, what: expect.stringMatching(/^engine2 delta /u) });
+    // Any other rule, or none recorded (a graph written before B12): the strength leader is still required.
+    expect(reproduceServedPropagation(engineTwoGraph("NOT_LEADER", SERVED_ROOT_SELECTION_RULE))).toMatchObject({ ok: false, what: "served-root" });
+    expect(reproduceServedPropagation(engineTwoGraph("NOT_LEADER"))).toMatchObject({ ok: false, what: "served-root" });
+    expect(reproduceServedPropagation(engineTwoGraph("LEADER"))).toMatchObject({ ok: true });
   });
 
   it("lists a malformed engine graph as an input it lacks, never a batch-wide harness error", () => {
@@ -317,6 +364,8 @@ describe("R2 rescore: what it reads", () => {
     expect(markdown).toContain("ro/today");
     expect(markdown).toContain("| investigations (holds/fails/dead end) |");   // (pre-flight PF-R2a10.4)
     expect(markdown).toContain("| 0/0/0 |");
+    // R2b B12 (ruling R2b-B12.1): the summary says the strength lead is not the served answer under engine 2.
+    expect(markdown).toContain("Under engine 2 the served answer is the comparing judges' choice, so a change of the strength lead");
     expect(existsSync(join(out, "report.json"))).toBe(false);
     const source = readFileSync(new URL("../../tools/preview-practice/practice-rescore.ts", import.meta.url), "utf8");
     expect(source).not.toMatch(/createPreviewBudgetRpcPort|practiceSocketsFromEnvironment|readPracticeSettings|@debateai\/db|ProviderGateway/u);
