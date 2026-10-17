@@ -20,6 +20,7 @@ import {
 } from "@debateai/providers";
 import type { EngineSettings, LengthGuidance, StoryPolicy } from "@debateai/register";
 import {
+  STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   pickBackupStoryteller,
   storyBackupSignalOf,
@@ -814,7 +815,7 @@ export class StoryWriter {
         const firstRound = policy.loopMaxRounds + 1;
         const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;
         if (chosen === null || !fits) {
-          this.#log("STORY_BACKUP_UNAVAILABLE", () => ({
+          this.#log(STORY_BACKUP_UNAVAILABLE, () => ({
             answerId: input.answerId,
             answerVersion: input.answerVersion,
             signal,

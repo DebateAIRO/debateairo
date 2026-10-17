@@ -376,6 +376,8 @@ function readCheckerVerdict(value: unknown, schema: StoryCheckerSchema): StoryRe
  * read code's shape. Anything else, and every reply read against a v3 index, passes through untouched.
  */
 function withFixedShape(value: unknown, index: StoryMaterialIndex): unknown {
+  // Only the top-level member is set: a shape_id the AI nested inside another member is left there, and the strict
+  // schema refuses it as an extra key (Task 12 review Minor 1).
   if (index.fixedShapeId === undefined || typeof value !== "object" || value === null || Array.isArray(value)) return value;
   return { ...(value as Readonly<Record<string, unknown>>), shape_id: index.fixedShapeId };
 }

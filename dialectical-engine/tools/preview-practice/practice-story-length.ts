@@ -256,7 +256,9 @@ export type PracticeStorySample = Readonly<{
 
 /**
  * Formats: from the real model's own artifacts of a STORYTELLER job (the stand-in records none). A PATCH try (the short
- * follow-up, its recorded form PATCH: only the asked members) is skipped, as the debate tables skip it (PF-D8.12).
+ * follow-up, its recorded form PATCH: only the asked members) is skipped, as the debate tables skip it (PF-D8.12). The
+ * fields (and their words) come from the job's LAST accepted reply only; `replies` and `breaks` count every non-PATCH
+ * try (Task 23 review).
  */
 export function practiceStorySampleOf(artifacts: readonly Readonly<{ rawText: string; parseStatus: string; replyForm?: string | null }>[],
   guidance: LengthGuidance | null): PracticeStorySample {

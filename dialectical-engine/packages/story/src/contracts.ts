@@ -142,8 +142,10 @@ export const STORY_REVISION_FOLLOW_UP = "When a later block carries revision_pro
  * the real slips of 2026-10-14 were nesting slips; node_refs may cite a position as well as a point, because the v4
  * material carries each position once, in `positions` only (Task 13); and the round-2 revision sentence. The schema's
  * runaway limits (STORY_RUNAWAY_LIMITS) are not stated: they only stop a runaway reply.
- * OWNER WORDING — approve before switch-on: the order sentence, the "points field or the positions field" clause, the length
- * sentence and STORY_REVISION_FOLLOW_UP (option-1 drafts; LG-D's other sentences carried as LG-D wrote them).
+ * OWNER WORDING — approve before switch-on: every sentence new against v3 (Task 10 review 1) — the order sentence, the
+ * reviewer_note placement sentence, "long holds only sections", the empty-template line, the "points field or the
+ * positions field" clause, the length sentence and STORY_REVISION_FOLLOW_UP (option-1 drafts; LG-D's sentences among
+ * them carried as LG-D wrote them).
  */
 export const STORYTELLER_V4_ANSWER_FORM = `Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
 {

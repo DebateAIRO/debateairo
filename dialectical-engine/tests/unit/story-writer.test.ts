@@ -17,6 +17,7 @@ import {
 } from "@debateai/register";
 import {
   STORY_ANSWERS_NOTE_ANSWERS_FILLED,
+  STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   STORY_CHECKER_CONTRACT_ID,
   STORY_CHECKER_V4_CONTRACT_ID,
@@ -1604,6 +1605,7 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
   });
 
   it("no candidate of another maker: today's FAILED record, and STORY_BACKUP_UNAVAILABLE logged by code", async () => {
+    expect(STORY_BACKUP_UNAVAILABLE).toBe("STORY_BACKUP_UNAVAILABLE");
     for (const candidates of [undefined, "same makers only"] as const) {
       const world = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });
       const { writer, inserted, details } = harness({ resolveProvider: world.resolveProvider });
@@ -1612,8 +1614,8 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
       expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
       expect(world.twin.calls).toEqual([]);
       expect(world.backup.calls).toEqual([]);
-      expect(details.filter((detail) => detail.event === "STORY_BACKUP_UNAVAILABLE")).toEqual([{
-        event: "STORY_BACKUP_UNAVAILABLE", answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_CANDIDATE"
+      expect(details.filter((detail) => detail.event === STORY_BACKUP_UNAVAILABLE)).toEqual([{
+        event: STORY_BACKUP_UNAVAILABLE, answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_CANDIDATE"
       }]);
     }
   });
@@ -1628,8 +1630,8 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     expect(world.twin.calls).toEqual([]);
     expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", rounds: 0 });
     expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
-    expect(details.filter((detail) => detail.event === "STORY_BACKUP_UNAVAILABLE")).toEqual([{
-      event: "STORY_BACKUP_UNAVAILABLE", answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_ROUND_LEFT"
+    expect(details.filter((detail) => detail.event === STORY_BACKUP_UNAVAILABLE)).toEqual([{
+      event: STORY_BACKUP_UNAVAILABLE, answerId: SNAPSHOT.answerId, answerVersion: 1, signal: "UNREACHABLE", reason: "NO_ROUND_LEFT"
     }]);
     // Four rounds still fit (rounds 5..8): the backup is asked.
     const fits = backupWorld({ first: () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead") });

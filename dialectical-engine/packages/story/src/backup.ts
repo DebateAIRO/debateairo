@@ -34,6 +34,9 @@ export type StoryBackupSignal = typeof STORY_BACKUP_SIGNALS[number];
 /** The code stored on a story a backup storyteller wrote (sealed content member `backup`) and logged when one is asked. */
 export const STORY_BACKUP_USED = "STORY_BACKUP_USED" as const;
 
+/** The code logged when a signal was given but no backup could be asked (no candidate of another maker, or no round left). */
+export const STORY_BACKUP_UNAVAILABLE = "STORY_BACKUP_UNAVAILABLE" as const;
+
 /** The sealed record: the code, the signal, and the first storyteller's provider ref (`firstModel`). */
 export type StoryBackupRecord = Readonly<{
   code: typeof STORY_BACKUP_USED;
