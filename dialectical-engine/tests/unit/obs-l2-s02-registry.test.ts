@@ -422,7 +422,8 @@ describe("S02 severity and unordered condition marks", () => {
     // severity map is DERIVED from CONDITION_MARKS, so it grew with the
     // vocabulary; only this count pin is stated by hand.
     // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(46);
+    // R2 (engine redesign, INTERFACE §13) minted four engine marks mid-list: 46 -> 50.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(50);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );

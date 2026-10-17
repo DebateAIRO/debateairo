@@ -40,6 +40,10 @@ export function conditionMarkLabel(
     case "CRITIQUE-UNAVAILABLE": return t(catalog, "debateChrome.condition.critiqueUnavailable");
     case "PANEL-PARTIAL": return t(catalog, "debateChrome.condition.panelPartial");
     case "PANEL-DEGRADED-SINGLE-VOICE": return t(catalog, "debateChrome.condition.panelDegradedSingleVoice");
+    case "VERDICT-JUDGE-MISSING": return t(catalog, "debateChrome.condition.verdictJudgeMissing");
+    case "VERDICT-JUDGES-UNAVAILABLE": return t(catalog, "debateChrome.condition.verdictJudgesUnavailable");
+    case "VERDICT-VOTES-IGNORED": return t(catalog, "debateChrome.condition.verdictVotesIgnored");
+    case "UNASSESSED-AT-REDUCED-WEIGHT": return t(catalog, "debateChrome.condition.unassessedAtReducedWeight");
     case "MAP_ANGLES_FALLBACK": return t(catalog, "debateChrome.condition.mapAnglesFallback");
     case "MAP_MERGE_FALLBACK": return t(catalog, "debateChrome.condition.mapMergeFallback");
     case "MAP_CHOOSE_FALLBACK": return t(catalog, "debateChrome.condition.mapChooseFallback");

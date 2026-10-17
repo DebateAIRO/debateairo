@@ -433,6 +433,12 @@ function pointNote(mark: ConditionMark): PointNote | null {
     case "CHOOSE_QUOTA_FILLED":
     case "PANEL-CLOSE-CALL-EXTENDED":
     case "SCRUTINY-EXTENDED":
+    // Engine 2 (R2): the three verdict marks describe how the verdict was reached, said once for the whole answer; the
+    // reduced-weight mark is shown on the debate page's label (a report point note later, with R4).
+    case "VERDICT-JUDGE-MISSING":
+    case "VERDICT-JUDGES-UNAVAILABLE":
+    case "VERDICT-VOTES-IGNORED":
+    case "UNASSESSED-AT-REDUCED-WEIGHT":
       return null;
   }
 }
