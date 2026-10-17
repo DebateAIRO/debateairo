@@ -1041,10 +1041,30 @@ refuses to start on a register version that does not carry this code's fingerpri
 row), with or without the length member. Publish the new version from this release first, whether or not it carries the
 member.
 
-In this order, with no debate running across the switch: let running debates finish and admit none; publish the new version from this release
-(`pnpm register:publish-hosted`, with the member to switch length guidance on, without it to keep today's requests) and
-pin it in `REGISTER_VERSION`; restart the API, then the runner. Rollback: publish a version without the member and restart
-the API: every new debate is asked as today; debates admitted with the numbers finish with them.
+**Warning: hosted output limits.** Outside the preview, no gateway clamps a request to the model's own output limit: a
+debate step's raised allowance (up to 32,768 tokens) is sent as it is. Before publishing the member on a hosted
+deployment, set each hosted target's `maxOutputTokens` to its model's own output limit. The hosted provider targets
+(`PROVIDER_DISCOVERY_TARGETS_JSON`) have no such field yet, so until a release adds it, keep the member out of every
+hosted version (hosted mode is not deployed anywhere today).
+
+**Switching it on, in this order:**
+
+1. **The website first.** Deploy the website build of this release (the room read's new `answer_words` and
+   `length_settings` members) before any version carrying the member is published: an older page open in a browser
+   refuses a room read with members it does not know.
+2. **The new seals before a runner restart.** Let running debates finish and admit none; publish the new version from
+   this release (`pnpm register:publish-hosted`, with the member to switch length guidance on, without it to keep
+   today's requests) and pin it in `REGISTER_VERSION` in both the API's and the runner's environment. Never restart a
+   runner on this code before that version exists: it refuses to start on a version without this code's three seals.
+3. **Restart the API, then the runner,** on the pinned version.
+4. **No code rollback while lengthed debates run.** Older code refuses a debate whose receipt carries `length`, so a
+   debate admitted with the numbers must finish on this code.
+
+**Rollback.** To switch length guidance off: publish a version without the member, pin it in `REGISTER_VERSION` (API
+and runner), and restart the API, then the runner: every new debate is asked as today; debates admitted with the
+numbers finish with them. To roll the CODE back to the release before this one (R18): wait until no lengthed debate
+runs, then re-pin `REGISTER_VERSION` to the version published before the three new seals (on the preview: 14) as well,
+and restart both: the older runner refuses this release's seals the other way (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`).
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -1968,6 +1988,9 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
+| `HOSTED_REGISTER_CALL_CONCURRENCY_INVALID` | the file's optional `callConcurrencyPolicy` is not an object, carries `kind`, or the register's own parser refuses it (a number outside its bounds, no `default`). Nothing was sealed. |
+| `HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID` | the file's optional `questionLanguagePolicy` is not an object, carries `kind`, the register's own parser refuses it, or the hosted API would refuse it at start-up (an instruction carrying a token the safety frame reserves, a fast check whose model is not a priced Anthropic row). Nothing was sealed. The publish's boot check also refuses a sealed version so, while the debate shape is in force |
+| `HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID` | the file's optional `lengthGuidancePolicy` is not an object (an array, a string, `null`), carries `kind`, or the register's own parser refuses it (a number outside its bounds, a missing plan, an unknown field). Nothing was sealed. A sealed row that does not parse is refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:LENGTH_GUIDANCE_POLICY_INVALID:<path>`, and the API refuses to start on that version: pin nothing |
 | `DEBATE_SHAPE_MAP_HASH_UNSEALED` | the version seals a `debateShapePolicy` row without its `mapContractHash` row (a hand-made version, or one sealed by an older publisher): the runner refuses to start on it, and the publish's boot check refuses it as `HOSTED_REGISTER_BOOT_CHECK_FAILED:DEBATE_SHAPE_MAP_HASH_UNSEALED` after sealing (`HOSTED_REGISTER_NOT_BOOT_READY`): pin nothing; publish again from this code, whose plan seals `mapContractHash`. |
 | `MAP_CONTRACT_HASH_MISMATCH` / `MAP_CONTRACT_HASH_INVALID` | the version's sealed `mapContractHash` is not this runner's map prompts (a version published from other code), or is not a 64-character hex hash: the runner refuses to start, and the publish's boot check says so as `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`: pin nothing; deploy the runner that matches the version, or publish again from the deployed code. |
 | `DEBATE_SHAPE_RUNNER_UNCONFIGURED` | a run admitted with the debate shape was claimed by a runner without the shape settings (no sealed map hash, or no call scheduler): the run is refused. Restart the runner on the register version that seals the `debateShapePolicy` row (with `mapContractHash`), then ask again. |

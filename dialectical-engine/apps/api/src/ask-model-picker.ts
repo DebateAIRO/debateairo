@@ -143,7 +143,9 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
  * merge and choose calls are made by debaters (counted under POSITION, `expectedCallsByRoleFromBasis`) at the
  * receipt's map step bounds (ruling X1), so POSITION's bound becomes max(sealed bound, merge bound, choose bound):
  * a debater whose window cannot hold a merge would be refused by the gateway's window wall part-way through the
- * debate. A receipt without a shape keeps the sealed table (the same object).
+ * debate. Length guidance (spec 2026-10-15 §3.3): with the receipt's `length` member each role is then raised to the
+ * allowance the runner sends it (`lengthGuidanceAllowanceTokens`), and on a shaped run POSITION also to the map's
+ * (`mapLengthAllowanceTokens`). A receipt with neither member keeps the sealed table (the same object).
  */
 export function answerTokenCeilingsForBasis(
   ceilings: Readonly<Record<DebateRole, number>>,
@@ -295,8 +297,10 @@ export function askModelPickerSettings(input: Readonly<{
   }
   const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
   // Debate shape (P2b Task 6, pre-flight PF-B22): with a row in force a Free `detailed` answer asks the writer for up to
-  // the row's largest writer bound, and Free's writer has no fallback. Only this check reads it: `answerTokenCeilings`
-  // (the settings the picker seats with) keep the sealed bounds; a run's own writer bound comes from its receipt.
+  // the row's largest writer bound, and Free's writer has no fallback; with the length row, the writer and the checker
+  // ask up to the largest guided allowance any plan and answer length can ask (spec 2026-10-15 §3.10). Only this check
+  // reads the two rows: `answerTokenCeilings` (the settings the picker seats with) keep the sealed bounds; a run's own
+  // bounds come from its receipt (`answerTokenCeilingsForBasis`).
   const freeAnswerCeilings = answerJobTokenCeilings(
     { writer: answerTokenCeilings.ANSWER_WRITER, checker: answerTokenCeilings.ANSWER_CHECKER },
     input.debateShapePolicy ?? null, input.lengthGuidancePolicy ?? null);

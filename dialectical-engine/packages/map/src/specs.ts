@@ -75,7 +75,7 @@ export type MapSpecContext = Readonly<{
    * when the kernel's verdict is "OTHER".
    */
   replyLanguage: ReplyLanguageExpectation;
-  /** The owners' contracts; default the shipped text. */
+  /** The owners' contracts; default the shipped text. With `length`, their length variants (`mapLengthContractsOf`). */
   contracts?: MapPromptContractSet;
   /** Length guidance (spec 2026-10-15 §3.2): the run's map targets; absent = today's map. */
   length?: MapLength;

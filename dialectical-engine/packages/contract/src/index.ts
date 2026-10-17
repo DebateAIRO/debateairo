@@ -392,7 +392,8 @@ const AnswerWordsSchema = z.object({
 /**
  * Budget spec §2.7 / AMENDMENTS-R1 A16 — THE ROOM READ: a word, the limit it is
  * about, when that limit resets or the waiting question starts, the person's own
- * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
+ * waiting run, and their plan. Never a capacity figure (I6: figures about the room are a capacity oracle); its only
+ * numbers are the plan's answer-length targets (`answer_words`, length guidance), which say nothing about capacity.
  */
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
