@@ -49,11 +49,59 @@ export function shapeRoundOnePoints(forIds: readonly string[], againstIds: reado
 
 const nextRival = (index: number, count: number): number => (index + 1) % count;
 
-export function shapePositionsFromMap(input: Readonly<{ choice: MapChoice; keyPoints: readonly MapKeyPoint[]; answers: number; pointsPerAnswer: number }>): readonly ShapePositionPlan[] {
+/**
+ * ENGINE 2'S RIVAL-REPLY RING (spec 2026-10-15 §4.2a rule 1, ruling E6(1); INTERFACE §7.1): every answer replies to
+ * exactly one rival and receives exactly one reply, so no answer goes unanswered and none is answered twice. Built
+ * from the chooser's "strongest rival" names (`preferred[i]`: an index, or null for none). Answers are taken in index
+ * order: a named rival with no reply yet is kept; a taken name (or none) moves to the next answer after it, in index
+ * order and round the end, that has no reply yet and is not the answer itself. Only the last answer can be left with
+ * nobody but itself: it then swaps with the answer holding its own named rival (so its name is kept), or with answer 0
+ * when it named none. A name equal to the answer's own index, or out of range, reads as none. Pure; one reply per
+ * answer, so the cross-reply call count is unchanged.
+ */
+export function shapeRivalRing(preferred: readonly (number | null)[]): readonly number[] {
+  const count = preferred.length;
+  if (count < 2) throw new TypeError("SHAPE_RIVAL_RING_INVALID");
+  const named = (index: number): number | null => {
+    const name = preferred[index] ?? null;
+    return name !== null && Number.isSafeInteger(name) && name >= 0 && name < count && name !== index ? name : null;
+  };
+  const targets: number[] = [];
+  const received = new Set<number>();
+  for (let index = 0; index < count; index += 1) {
+    const name = named(index);
+    let pick: number | null = name !== null && !received.has(name) ? name : null;
+    for (let step = 1; pick === null && step <= count; step += 1) {
+      const candidate = ((name ?? index) + step) % count;
+      if (candidate !== index && !received.has(candidate)) pick = candidate;
+    }
+    if (pick === null) {
+      // The last answer, and the one answer without a reply is itself: swap, keeping its own name when it has one.
+      const swapWith = name === null ? 0 : targets.indexOf(name);
+      pick = targets[swapWith]!;
+      targets[swapWith] = index;
+    }
+    targets.push(pick);
+    received.add(pick);
+  }
+  return Object.freeze(targets);
+}
+
+/**
+ * The map's P answers as positions. `ring` (engine 2, INTERFACE §7.1): every rival comes from `shapeRivalRing`; absent or
+ * false (engine 1): the chooser's rival, else the next position, value for value as before R2.
+ */
+export function shapePositionsFromMap(input: Readonly<{ choice: MapChoice; keyPoints: readonly MapKeyPoint[]; answers: number;
+  pointsPerAnswer: number; ring?: boolean }>): readonly ShapePositionPlan[] {
   const claimOf = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint.claim] as const));
   const answers = input.choice.answers.slice(0, input.answers);
-  return Object.freeze(answers.map((answer, index): ShapePositionPlan => {
+  // The chooser's named rival as an index; an id not among the answers, or the answer itself, names none.
+  const named = answers.map((answer, index): number | null => {
     const rival = answers.findIndex((other) => other.answerId === answer.strongestRival);
+    return rival < 0 || rival === index ? null : rival;
+  });
+  const ring = input.ring === true && answers.length >= 2 ? shapeRivalRing(named) : null;
+  return Object.freeze(answers.map((answer, index): ShapePositionPlan => {
     const claims = (ids: readonly string[]) => ids.flatMap((id) => claimOf.get(id) ?? []);
     return Object.freeze({
       answerId: answer.answerId,
@@ -61,18 +109,24 @@ export function shapePositionsFromMap(input: Readonly<{ choice: MapChoice; keyPo
       mapPoints: JSON.stringify({ for: claims(answer.forKeyPointIds), against: claims(answer.againstKeyPointIds) }),
       points: Object.freeze(shapeRoundOnePoints(answer.forKeyPointIds, answer.againstKeyPointIds, input.pointsPerAnswer)
         .flatMap((point) => { const claim = claimOf.get(point.keyPointId); return claim === undefined ? [] : [Object.freeze({ ...point, consideration: claim })]; })),
-      rivalIndex: rival < 0 || rival === index ? nextRival(index, answers.length) : rival
+      rivalIndex: ring === null ? named[index] ?? nextRival(index, answers.length) : ring[index]!
     });
   }));
 }
 
-/** Spec §1.2 + P2a deviation 5: the map was unavailable — today's opening for the first P seats, at most K points each. */
-export function shapePositionsForTodaysOpening(input: Readonly<{ answers: number; pointsPerAnswer: number }>): readonly ShapePositionPlan[] {
+/**
+ * Spec §1.2 + P2a deviation 5: the map was unavailable — today's opening for the first P seats, at most K points each.
+ * Its rivals already form a ring (each replies to the next); `ring` (engine 2) builds the same one through
+ * `shapeRivalRing`, so both engines give the same rivals here.
+ */
+export function shapePositionsForTodaysOpening(input: Readonly<{ answers: number; pointsPerAnswer: number; ring?: boolean }>): readonly ShapePositionPlan[] {
+  const ring = input.ring === true && input.answers >= 2
+    ? shapeRivalRing(Array.from({ length: input.answers }, () => null)) : null;
   return Object.freeze(Array.from({ length: input.answers }, (_unused, index): ShapePositionPlan => Object.freeze({
     answerId: null, statement: null, mapPoints: null,
     points: Object.freeze(Array.from({ length: input.pointsPerAnswer }, (_point, at): ShapePointSpec =>
       Object.freeze({ polarity: at % 2 === 0 ? "attack" : "support", consideration: null, keyPointId: null }))),
-    rivalIndex: nextRival(index, input.answers)
+    rivalIndex: ring === null ? nextRival(index, input.answers) : ring[index]!
   })));
 }
 
