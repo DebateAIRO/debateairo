@@ -20,8 +20,10 @@ import {
   debateShapeInForce,
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
   readDebateShapePolicy,
+  readEngineVersionPolicy,
   readLengthGuidancePolicy,
   type CallConcurrencyPolicy,
+  type EngineVersionPolicy,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import {
@@ -606,6 +608,8 @@ export async function runPracticeDebate(input: Readonly<{
   shape?: PracticeShapeOverride;
   /** Length guidance (`--length-policy`, LG-C): the checked policy file; absent: the imported register's own row, if any. */
   length?: LengthGuidancePolicy;
+  /** Engine row (`--engine-policy`, R1d): put into the throwaway register only (or carried by --register-next's version). */
+  engine?: EngineVersionPolicy;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
 }>): Promise<PracticeDebateResult> {
@@ -652,8 +656,13 @@ export async function runPracticeDebate(input: Readonly<{
     // the live services would. The export file is only read; the live register is never reached.
     const shapePolicy = input.shape === undefined ? null : input.shape.policy;
     const lengthPolicy = input.length ?? null;
-    const overrideVersion: PracticeOverrideVersion | null = (shapePolicy === null && lengthPolicy === null) || receipt.codeNext !== undefined
-      ? null : await publishPracticeOverrideVersion(pool, input.register, receipt, { shape: shapePolicy, length: lengthPolicy });
+    // R1d: the engine row joins the same ONE throwaway version (never a second version on top). `engine` is passed
+    // only when given, so a run without --engine-policy hands over exactly LG-C's `{ shape, length }`.
+    const enginePolicy = input.engine ?? null;
+    const overrideVersion: PracticeOverrideVersion | null =
+      (shapePolicy === null && lengthPolicy === null && enginePolicy === null) || receipt.codeNext !== undefined ? null
+        : await publishPracticeOverrideVersion(pool, input.register, receipt,
+          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }) });
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     // The practice's own override version (no --register-next) keeps the settings' mode.
@@ -667,7 +676,7 @@ export async function runPracticeDebate(input: Readonly<{
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
-      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow]] as const) {
+      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
         if (change !== null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
@@ -696,6 +705,12 @@ export async function runPracticeDebate(input: Readonly<{
     const lengthRow = await readLengthGuidancePolicy(pool, settings.runner.REGISTER_VERSION);
     if (lengthPolicy !== null && lengthRow === null) {
       throw new PracticeRefusal("PRACTICE_LENGTH_POLICY_NOT_PUBLISHED", "the code's next version was composed without --length-policy");
+    }
+    // Engine row (R1d): read RAW, as the runner reads it (INTERFACE §1.3). A flag whose row is not in the version the
+    // debate runs on would silently run engine 1: refused before any AI is asked.
+    const engineRow = await readEngineVersionPolicy(pool, settings.runner.REGISTER_VERSION);
+    if (enginePolicy !== null && engineRow === null) {
+      throw new PracticeRefusal("PRACTICE_ENGINE_POLICY_NOT_PUBLISHED", "the code's next version was composed without --engine-policy");
     }
     // FLAG only: what the length row did in that version (with --register-next, as the code's next version's delta).
     const lengthRowChange: PracticeLengthBlock["row"] = overrideVersion !== null ? overrideVersion.lengthRow

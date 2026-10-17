@@ -445,6 +445,24 @@ echo "exit: $?"
   numbers being compared, one run at a time, within the daily test budget. Results are judged by the owners' private
   method, outside this repository, plus cost and time from the report.
 
+### The engine row (debate mode, `--engine-policy`)
+
+- `--engine-policy FILE` puts the engine row (`engineVersionPolicy`, spec 2026-10-15 engine redesign §3.3) from FILE
+  into the practice's own throwaway database, and only there, in the same throwaway version as the `--shape-policy` and
+  `--length-policy` rows (with `--register-next`: into the code's next version, as the server's plan would carry it).
+  The file is checked by the register's own parser before anything is spent; a refusal names only the place that is
+  wrong (`PRACTICE_ENGINE_POLICY_INVALID <path>`, `PRACTICE_ENGINE_POLICY_UNREADABLE`). A file with `"enabled": false`
+  is refused too (`PRACTICE_ENGINE_POLICY_INVALID enabled`): it would run today's engine.
+- Engine 2 reads its word targets from the length row, so `--engine-policy` needs `--length-policy` or a length row in
+  the exported register; without either it is refused before anything is spent
+  (`PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY`). If the row is not in the version the debate runs on, the debate is
+  refused before any AI is asked (`PRACTICE_ENGINE_POLICY_NOT_PUBLISHED`).
+- `tools/preview-practice/engine-policy-start.json` holds the owners' start values (spec §3.4).
+- In this phase the engine row changes only the story: it is told with story v4 (one shape, the pack's default; the
+  checker says whether a problem is misleading; only a misleading problem starts round 2, which revises its own draft;
+  a backup storyteller when the first cannot write at all). The rest of the debate is today's until the later phases.
+- Example (S-6's debate command plus): `--length-policy tools/preview-practice/length-policy-start.json --engine-policy tools/preview-practice/engine-policy-start.json`.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
