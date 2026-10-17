@@ -33,6 +33,13 @@ export {
   storyLengthField
 } from "./contracts.js";
 export {
+  STORY_GUIDED_BOUND_LIMITS,
+  storyActualWords,
+  storyGuidedBound,
+  storyGuidedWords,
+  type StoryLengthSite
+} from "./length.js";
+export {
   STORY_BODY_PROSE,
   STORY_CHECKER_PROSE,
   STORY_FIXER_OPTIONS,
