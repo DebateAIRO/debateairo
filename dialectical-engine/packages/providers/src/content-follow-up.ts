@@ -12,6 +12,8 @@ export const CONTENT_FOLLOW_UP_SENTENCES = Object.freeze({
   EMPTY: "The earlier answer arrived empty: no answer text was received.",
   CUT_OFF: "The earlier answer stopped before it was finished, so its end is missing.",
   SCHEMA_FAILED: "The earlier answer left out a value the answer form requires, or gave a value the form does not allow, at the listed place.",
+  // Used only by the full re-ask of an unreadable reply, which names it directly; no code or class selects it.
+  STRUCTURE_UNREAD: "The earlier answer could not be read as one JSON object in the answer form, so none of it could be used.",
   TEXT_NOT_IN_QUESTION_LANGUAGE: "Part of the earlier answer was written in a different language from the question.",
   COMPOSED_TEXT_NAMES_A_NODE: "The earlier answer's text names an internal point id, which a reader cannot use.",
   COMPOSED_REF_NOT_IN_DIGEST: "The earlier answer cites a point that is not in the material.",
@@ -27,7 +29,8 @@ export const CONTENT_FOLLOW_UP_SENTENCES = Object.freeze({
 });
 type ContentFollowUpCode = keyof typeof CONTENT_FOLLOW_UP_SENTENCES;
 const SENTENCES: ReadonlySet<string> = new Set(Object.values(CONTENT_FOLLOW_UP_SENTENCES));
-const CLASS_ONLY: ReadonlySet<string> = new Set(["EMPTY", "CUT_OFF", "DEFAULT"]);
+// Sentences never selected by a code (a class, the fallback, or the full re-ask names them).
+const CLASS_ONLY: ReadonlySet<string> = new Set(["EMPTY", "CUT_OFF", "DEFAULT", "STRUCTURE_UNREAD"]);
 
 /** The sentence for a refusal: the class's own for EMPTY and CUT_OFF, else the code's, else DEFAULT. */
 export function contentFollowUpSentence(code: string, failureClass?: ReplyFailureClass): string {

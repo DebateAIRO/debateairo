@@ -795,6 +795,7 @@ describe("LG-A — the structure-repair contract and the follow-up sentences", (
       EMPTY: "The earlier answer arrived empty: no answer text was received.",
       CUT_OFF: "The earlier answer stopped before it was finished, so its end is missing.",
       SCHEMA_FAILED: "The earlier answer left out a value the answer form requires, or gave a value the form does not allow, at the listed place.",
+      STRUCTURE_UNREAD: "The earlier answer could not be read as one JSON object in the answer form, so none of it could be used.",
       TEXT_NOT_IN_QUESTION_LANGUAGE: "Part of the earlier answer was written in a different language from the question.",
       COMPOSED_TEXT_NAMES_A_NODE: "The earlier answer's text names an internal point id, which a reader cannot use.",
       COMPOSED_REF_NOT_IN_DIGEST: "The earlier answer cites a point that is not in the material.",
@@ -808,6 +809,6 @@ describe("LG-A — the structure-repair contract and the follow-up sentences", (
       MAP_UNKNOWN_RIVAL: "The earlier answer names as its strongest rival an answer that is not one of its other answers.",
       DEFAULT: "The earlier answer did not meet the answer form at the listed place."
     });
-    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(14);
+    expect(Object.keys(CONTENT_FOLLOW_UP_SENTENCES)).toHaveLength(15);
   });
 });

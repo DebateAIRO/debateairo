@@ -710,8 +710,8 @@ export function previewStructureRepairRoute(targets: readonly Readonly<{ provide
  * so it never carries the policy's packetByteCap, and the gateway refuses a request body above
  * MAX_PROVIDER_REQUEST_PACKET_BYTES (256 KiB) before anything is sent: no larger repair is ever answered. (The guarded
  * fetch admits up to 1 MiB since LG-B, for the final writers' bodies only; it is no longer what holds the repair.)
- * Root 0's room prices its retry as this call too, at that target's own price (apps/runner/src/map-stage.ts
- * `rootZeroKeepRoomMicros`). Null for no route.
+ * Root 0's room adds this call, at that target's own price, to its first attempt and its retry: the sum
+ * (apps/runner/src/map-stage.ts `rootZeroKeepRoomMicros`). Null for no route.
  */
 export function previewStructureRepairCeiling(route: StructureRepairRoute | null):
   Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }> | null {

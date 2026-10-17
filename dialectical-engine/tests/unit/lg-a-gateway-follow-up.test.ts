@@ -2,12 +2,15 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { classifyStructuredArtifact } from "@debateai/judgement";
+import { TypedDomainError } from "@debateai/kernel";
 import {
-  CONTENT_FOLLOW_UP_SENTENCES, OpenAICompatibleProviderGateway, PreviewVendorRefusedUnbilled, ProviderStructureUnrepairedError,
-  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
-  parsePreviewProviderTestConfig, previewTargetGatewayControls, readPromptFrame, schemaFailureLocator, withPreviewProviderCallPolicy,
-  type ModelReplyFacts, type PreviewBudgetExecution, type ProviderCallRequest, type ProviderLedgerInput, type RawArtifactInput
+  CONTENT_FOLLOW_UP_SENTENCES, OpenAICompatibleProviderGateway, PreviewVendorRefusedUnbilled, ProviderContentUnacceptedError, ProviderStructureUnrepairedError,
+  appendFramedRejection, buildFramedPatchPrompt, contentFollowUpSentence, isContentFollowUpSentence, buildFramedPrompt, buildFramedRepairPrompt, createPreviewGuardedFetch,
+  parsePreviewProviderTestConfig, planPatchFollowUp, previewTargetGatewayControls, readPromptFrame, schemaFailureLocator, withPreviewProviderCallPolicy,
+  type ModelReplyFacts, type PatchFollowUpPlan, type PreviewBudgetExecution, type ProviderCallRequest, type ProviderLedgerInput, type RawArtifactInput,
+  type StructureFirstReply
 } from "@debateai/providers";
+import { BASE, PANEL_KEY, PATCH_REPLY, WRAPPED, WRAPPED_QUALITY, classifyPanel, panelRequest } from "../support/structure-salvage-shapes.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
@@ -251,5 +254,196 @@ describe("LG-A: the door admits the reason only as one of the code-owned sentenc
     expect(contentFollowUpSentence("MAP_ANGLE_KINDS_WRONG", "CONTENT")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
     expect(() => buildFramedPatchPrompt(framed.packet, "{\"answer\": \"It is so\"}",
       { code: "MAP_UNKNOWN_KEY_POINT_ID", paths: ["answer"], reason: CONTENT_FOLLOW_UP_SENTENCES.MAP_UNKNOWN_KEY_POINT_ID })).not.toThrow();
+  });
+
+  it("the unreadable-reply sentence is selected by no code or class; it is named only by the full re-ask, and the door admits it", () => {
+    expect(contentFollowUpSentence("PARSE_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
+    expect(contentFollowUpSentence("SCHEMA_FAILED", "STRUCTURE")).toBe(CONTENT_FOLLOW_UP_SENTENCES.SCHEMA_FAILED);
+    expect(contentFollowUpSentence("PARSE_FAILED", "CONTENT")).toBe(CONTENT_FOLLOW_UP_SENTENCES.DEFAULT);
+    for (const code of Object.keys(CONTENT_FOLLOW_UP_SENTENCES)) {
+      for (const failureClass of [undefined, "STRUCTURE", "CONTENT", "CUT_OFF", "EMPTY"] as const) {
+        expect(contentFollowUpSentence(code, failureClass)).not.toBe(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD);
+      }
+    }
+    expect(isContentFollowUpSentence(CONTENT_FOLLOW_UP_SENTENCES.STRUCTURE_UNREAD)).toBe(true);
+  });
+});
+
+describe("B: the routed call's second POST, sent alone", () => {
+  // Pre-flight PF-S8, PF-S21: the file's own `harness` (its `native`; `finish: "length"` for a cut-off step) and the shared
+  // panel request. `request` is the UNROUTED panel request: every call below adds `structureRepairRouted: true` itself.
+  // Bodies are read with the file's `sentMessages` / `lastBlock`, which parse `requestBody` (pre-flight PF-S6: there is no `execution.body`).
+  const STOP_FACTS = Object.freeze({ finishReason: "stop" });
+  async function routedCall(script: Step[]) {
+    const h = harness(script);
+    const sent = panelRequest(request(false));
+    const caught = await h.gateway.call({ ...sent, structureRepairRouted: true }).catch((error: unknown) => error);
+    if (!(caught instanceof ProviderStructureUnrepairedError)) throw new Error("the first reply must end as an unrepaired structure");
+    return { harness: h, error: caught, request: sent };
+  }
+  const firstOf = (error: ProviderStructureUnrepairedError): StructureFirstReply => ({ rejected: error.rejected,
+    rawArtifactRef: error.lastRawArtifactRef, ledgerEntryRef: error.lastLedgerEntryRef, materialMarked: error.materialMarked });
+  /** `planPatchFollowUp` on JSON.stringify(base) with the step's own refusal of it (here `evidence.quality`), reason the STRUCTURE sentence. */
+  const planFor = (base: Readonly<Record<string, unknown>>): PatchFollowUpPlan => {
+    const content = JSON.stringify(base);
+    const refused = classifyPanel(content, STOP_FACTS);
+    if (refused.parseStatus === "PARSED") throw new Error("planFor needs a base the step refuses");
+    const planned = planPatchFollowUp({ content, reply: STOP_FACTS, parseStatus: refused.parseStatus, parseError: refused.parseError });
+    if (planned === null) throw new Error("planFor needs a base whose refused members can be named");
+    return { ...planned, locator: { ...planned.locator, reason: contentFollowUpSentence(planned.locator.code, "STRUCTURE") } };
+  };
+  /**
+   * A native gateway with thinking levels ["high", "low"] and a recording plain fetch (as
+   * tests/unit/provider-repair-thinking-level.test.ts builds it): the routed first POST is caught, then B is sent (its
+   * own outcome caught too); returns the parsed request bodies.
+   */
+  async function nativeRoutedThenFollowUp(levels: Readonly<{ thinkingLevel: string; repairThinkingLevel: string }>) {
+    const bodies: Record<string, unknown>[] = [];
+    const replies = [WRAPPED_QUALITY, PATCH_REPLY];
+    const fetchImplementation = (async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify({ id: `fixture-${String(bodies.length)}`, model: GLM,
+        choices: [{ message: { content: replies.shift() ?? "{}" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 20 } }),
+        { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const gateway = new OpenAICompatibleProviderGateway({ endpoint: "https://relay.example/v1", model: GLM, maker: "Z.AI",
+      thinking: { parameter: "reasoning_effort", levels: ["high", "low"] }, fetchImplementation,
+      persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
+      assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
+    const sent: ProviderCallRequest = { ...panelRequest(request(false)), ...levels, structureRepairRouted: true };
+    const error = await gateway.call(sent).catch((caught: unknown) => caught);
+    if (!(error instanceof ProviderStructureUnrepairedError)) throw new Error("the first reply must end as an unrepaired structure");
+    await gateway.call({ ...sent, structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } }).catch(() => undefined);
+    return { bodies };
+  }
+
+  it("B asks only the missing members, merges, the step accepts; the packet prefix is byte-identical to the first POST", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: PATCH_REPLY }]);
+    const result = await harness.gateway.call({ ...request, structureRepairRouted: true,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } });
+    expect(result.content).toBe(JSON.stringify(BASE));
+    expect(result).toMatchObject({ repairForm: "PATCH", repairAttempts: 1, model: GLM });
+    const [first, second] = harness.executions.map((execution) => sentMessages(execution) as unknown[]);
+    expect(second!.slice(0, first!.length)).toEqual(first);
+    expect(second![first!.length]).toEqual({ role: "assistant", content: WRAPPED_QUALITY });
+    expect(lastBlock(harness.executions[1]!).slice(-4)).toEqual([
+      { name: "machine_rejection_code", content: "SCHEMA_FAILED" },
+      { name: "machine_rejection_paths", content: "evidence.quality" },
+      { name: "machine_rejection_reason", content: CONTENT_FOLLOW_UP_SENTENCES.SCHEMA_FAILED },
+      { name: "machine_reply_form", content: "PATCH" }
+    ]);
+    expect(harness.artifacts[1]).toMatchObject({ replyForm: "PATCH", metadata: { attempt: 2 } });
+    expect(harness.ledger.map((row) => [row.callSiteKey, row.outcome])).toEqual([[PANEL_KEY, "FAILED"], [PANEL_KEY, "OK"]]);
+  });
+
+  it("B's reply with an unrequested key ends as today's content refusal, with the first reply's facts", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: JSON.stringify(BASE) }]);
+    const refusal = await harness.gateway.call({ ...request, structureRepairRouted: true,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } })
+      .catch((caught: unknown) => caught);
+    expect(refusal).toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(refusal).toMatchObject({ lastRawArtifactRef: error.lastRawArtifactRef, lastLedgerEntryRef: error.lastLedgerEntryRef });
+  });
+
+  it("B's reply rewriting a member A kept is refused", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY },
+      { content: "{\"evidence.quality\": 0.5, \"steelman.fidelity\": 0.1}" }]);
+    await expect(harness.gateway.call({ ...request, structureRepairRouted: true,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } }))
+      .rejects.toBeInstanceOf(ProviderContentUnacceptedError);
+  });
+
+  it("a cut-off B ends the call: never a third POST, never a lower thinking level", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: "{\"evidence.quality\": 0.", finish: "length" }]);
+    await harness.gateway.call({ ...request, structureRepairRouted: true,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } }).catch(() => undefined);
+    expect(harness.executions).toHaveLength(2);
+  });
+
+  it("a follow-up over its packet cap sends nothing and ends with the first reply's refusal", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
+    const refusal = await harness.native.call({ ...request, packetByteCap: 1024, structureRepairRouted: true,
+      structureFollowUp: { form: "PATCH", plan: planFor(WRAPPED), first: firstOf(error) } })
+      .catch((caught: unknown) => caught);
+    expect(harness.executions).toHaveLength(1);
+    expect(harness.ledger).toHaveLength(1);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", lastLedgerEntryRef: error.lastLedgerEntryRef });
+  });
+
+  it("a FULL follow-up over its packet cap sends nothing and ends with the first reply's refusal (pre-flight PF-S7)", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
+    const refusal = await harness.native.call({ ...request, packetByteCap: 1024, structureRepairRouted: true,
+      structureFollowUp: { form: "FULL", first: firstOf(error) } })
+      .catch((caught: unknown) => caught);
+    expect(harness.executions).toHaveLength(1);
+    expect(harness.ledger).toHaveLength(1);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", lastLedgerEntryRef: error.lastLedgerEntryRef });
+  });
+
+  it("B runs at the repair thinking level", async () => {
+    const { bodies } = await nativeRoutedThenFollowUp({ thinkingLevel: "high", repairThinkingLevel: "low" });
+    expect(bodies.map((body) => body.reasoning_effort)).toEqual(["high", "low"]);
+  });
+
+  const NOT_ROUTED = "ProviderCallRequest.structureFollowUp needs a routed structured call";
+  it("a follow-up on a call that is not routed throws a TypeError; nothing more is sent", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
+    await expect(harness.native.call({ ...request, structureFollowUp: { form: "FULL", first: firstOf(error) } }))
+      .rejects.toThrow(new TypeError(NOT_ROUTED));
+    expect(harness.executions).toHaveLength(1);
+  });
+
+  // Task 4 review: the check's second branch — routed, but no content check to read B's reply with.
+  it("a follow-up on a routed call with no content check throws a TypeError; nothing more is sent", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }]);
+    const { classifyContent: _none, ...unchecked } = request;
+    await expect(harness.native.call({ ...unchecked, structureRepairRouted: true, structureFollowUp: { form: "FULL", first: firstOf(error) } }))
+      .rejects.toThrow(new TypeError(NOT_ROUTED));
+    expect(harness.executions).toHaveLength(1);
+  });
+
+  // Task 4 review (carried into Task 5): spec §6 step 3, "only if B cannot be sent, today's refusal". A FULL packet the step's
+  // builder refuses (a TypedDomainError) or the door refuses (not framed) is one that cannot be sent: no POST, no row.
+  it("a FULL follow-up the builder or the door refuses sends nothing and ends with the first reply's refusal", async () => {
+    const refusingBuilders = [
+      () => { throw new TypedDomainError("PROMPT_REPAIR_NOT_A_LOCATOR", "the builder refuses"); },
+      () => ({ messages: [{ role: "user" as const, content: "not framed" }] })
+    ];
+    for (const buildRepairPacket of refusingBuilders) {
+      const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: JSON.stringify(BASE) }]);
+      const refusal = await harness.gateway.call({ ...request, buildRepairPacket, structureRepairRouted: true,
+        structureFollowUp: { form: "FULL", first: firstOf(error) } }).catch((caught: unknown) => caught);
+      expect(harness.executions).toHaveLength(1);
+      expect(harness.ledger).toHaveLength(1);
+      expect(refusal).toBeInstanceOf(ProviderContentUnacceptedError);
+      expect(refusal).toMatchObject({ lastRawArtifactRef: error.lastRawArtifactRef, lastLedgerEntryRef: error.lastLedgerEntryRef });
+    }
+  });
+
+  // Task 4 review (carried into Task 5): A1 reads only a reply to the ORIGINAL packet, never B's, even when B's request
+  // carries it and B's reply is of class STRUCTURE.
+  it("A1 is never called on B's reply, PATCH or FULL, though B's request carries it", async () => {
+    for (const form of ["PATCH", "FULL"] as const) {
+      const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: WRAPPED_QUALITY }]);
+      let salvageCalls = 0;
+      const structureSalvage = () => { salvageCalls += 1; return { content: JSON.stringify(BASE), classification: classifyPanel(JSON.stringify(BASE)) }; };
+      const followUp = form === "PATCH" ? { form, plan: planFor(WRAPPED), first: firstOf(error) } : { form, first: firstOf(error) };
+      await expect(harness.gateway.call({ ...request, structureRepairRouted: true, structureSalvage, structureFollowUp: followUp }))
+        .rejects.toBeInstanceOf(ProviderContentUnacceptedError);
+      expect(harness.executions).toHaveLength(2);
+      expect(salvageCalls).toBe(0);
+    }
+  });
+
+  // Task 2 re-review: "A1 never reads a FULL follow-up reply" is stated in the hook, not left to the builder returning a new
+  // packet. Here the builder hands back the ORIGINAL packet object itself.
+  it("A1 is never called on a FULL reply, even when the builder returned the original packet object", async () => {
+    const { harness, error, request } = await routedCall([{ content: WRAPPED_QUALITY }, { content: WRAPPED_QUALITY }]);
+    let salvageCalls = 0;
+    const structureSalvage = () => { salvageCalls += 1; return { content: JSON.stringify(BASE), classification: classifyPanel(JSON.stringify(BASE)) }; };
+    await expect(harness.gateway.call({ ...request, buildRepairPacket: () => request.packet, structureRepairRouted: true, structureSalvage,
+      structureFollowUp: { form: "FULL", first: firstOf(error) } })).rejects.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(harness.executions).toHaveLength(2);
+    expect(salvageCalls).toBe(0);
   });
 });

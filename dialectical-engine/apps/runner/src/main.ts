@@ -544,7 +544,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
-  // LG-A (Task 14 carry): root 0's room prices its retry as the structure-repair call too, when the route is wired.
+  // LG-A (Task 14 carry): when the route is wired, root 0's room adds the structure-repair call to its first attempt
+  // and its retry (the sum: refused-repair salvage B is root 0's own second POST after the repair call).
   structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
   // B9 (budget spec §2.9, §2.4): a call while arguing refused for money moves
   // to a cheaper claim-eligible maker — hosted, and only with the

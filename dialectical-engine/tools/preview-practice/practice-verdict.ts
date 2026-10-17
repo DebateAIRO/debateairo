@@ -136,6 +136,20 @@ export function practiceRepairKindsByModel(calls: readonly Readonly<{ model: str
   return Object.freeze(Object.fromEntries(Object.entries(out).map(([model, mine]) => [model, Object.freeze(mine)])));
 }
 
+/**
+ * Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask), as
+ * `practiceStructureRescues` (practice-debate.ts) counts them.
+ */
+export type PracticeStructureRescues = Readonly<{ inCode: number; byPatch: number; byFullAsk: number }>;
+
+/**
+ * Whether the report shows the structure rescues: only when there was one, so a run without A1 or B keeps today's
+ * report.json and report.md byte for byte.
+ */
+export function practiceStructureRescuesShown(rescues: PracticeStructureRescues | undefined): rescues is PracticeStructureRescues {
+  return rescues !== undefined && rescues.inCode + rescues.byPatch + rescues.byFullAsk > 0;
+}
+
 /** A busy model's run (owner ruling 2026-10-12, "Keep GLM, it sits out"): what it answered, what it skipped. */
 export type PracticeBusyModelRun = Readonly<{ answered: number; skipped: number }>;
 
