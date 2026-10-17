@@ -1221,6 +1221,9 @@ describe("engine 2's story (R1d)", () => {
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
     investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
+    /** R2 B11: the comparing judges' block (engine 2 only). */
+    judgeVotes?: { model: string; maker: string; letter: string | null; counted: boolean | null }[];
+    labels?: { label: string; trigger: string; engine1LadderLabel: string | null } | null;
     admission: { panel: { providerRef: string; modelId: string }[];
       rotation: { answerWriter: string; answerChecker: string; storyteller: string; storyChecker: string } | null };
   };
@@ -1288,8 +1291,10 @@ describe("engine 2's story (R1d)", () => {
 
   it("R1d-1 --register-next --length-policy --engine-policy: storyteller v4 and checker v4 with their targets, no shape asked, the pack default stored, ask.engine 2: PASS (exit 0)", async () => {
     const { stubs, env, common, quiet, out } = await scenario();
+    const lines: string[] = [];
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
-      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--transcript"], env, quiet);
+      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--transcript"], env,
+    { ...quiet, log: (line: string) => { lines.push(line); } });
     const report = outcome.report as unknown as EngineReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect(outcome.exitCode).toBe(0);
@@ -1327,6 +1332,17 @@ describe("engine 2's story (R1d)", () => {
     expect(report.storyLengthByField!.find((row) => row.field === "headline")?.guidedWords).toBe(15);
     expect(report.storyLengthByField!.find((row) => row.field === "long")?.guidedWords).toBeNull();
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // R2 B11 carry (B12): a real engine-2 practice debate's report carries the comparing judges' block, read from the
+    // throwaway database (its reader swallows a failure into a progress line and leaves the block out), with today's
+    // ladder from the receipt's engine1Ladder record. The stand-in judges answered, in the question's language.
+    expect(stubs.requests.filter((request) => request.kind === "VERDICT_JUDGE").length).toBeGreaterThan(0);
+    expect(stubs.requests.filter((request) => request.kind === "VERDICT_JUDGE").every((request) => request.answer === "OK")).toBe(true);
+    expect(lines.filter((line) => line.includes("could not be read"))).toEqual([]);
+    expect(report.judgeVotes?.length).toBeGreaterThan(0);
+    expect(report.judgeVotes!.every((vote) => vote.letter === "A")).toBe(true);
+    expect(report.labels).toMatchObject({ trigger: expect.stringMatching(/^JUDGES_/u),
+      engine1LadderLabel: expect.stringMatching(/^(SUPPORTED|CONTESTED|UNSUPPORTED)$/u) });
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain("Comparing judges (engine 2: the label comes from their votes;");
   }, 900_000);
 
   it("R1d-2 --length-policy alone: the story stays v3 with no length field, the other calls are told their lengths, ask.engine 1: PASS (exit 0)", async () => {
