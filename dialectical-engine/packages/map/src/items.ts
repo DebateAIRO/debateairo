@@ -11,6 +11,7 @@ import {
   type MapLean,
   type MapMergedAnswer,
   type MapPointItem,
+  type MapRestsOn,
   type MapSeat
 } from "./types.js";
 
@@ -26,7 +27,7 @@ type MapDraftBase = Readonly<{
 
 /** An item before it has an id: what one list (or gap round) said, with who said it. */
 export type MapItemDraft =
-  | (MapDraftBase & Readonly<{ kind: "POINT"; claim: string; whyItMatters: string; leans: MapLean }>)
+  | (MapDraftBase & Readonly<{ kind: "POINT"; claim: string; whyItMatters: string; leans: MapLean; restsOn?: MapRestsOn }>)
   | (MapDraftBase & Readonly<{ kind: "ANSWER"; answer: string }>);
 
 function mapItemLabel(prefix: "pt" | "ca", n: number): string {
@@ -62,7 +63,9 @@ export function mapAssignItemIds(drafts: readonly MapItemDraft[], seed: string,
     if (draft.kind === "POINT") {
       points += 1;
       out.push(Object.freeze({ ...base, itemId: mapItemLabel("pt", points), kind: "POINT" as const, claim: draft.claim,
-        whyItMatters: draft.whyItMatters, leans: draft.leans }));
+        whyItMatters: draft.whyItMatters, leans: draft.leans,
+        // Engine 2 only (P2.2): never written as undefined, so an engine-1 item keeps today's keys.
+        ...(draft.restsOn === undefined ? {} : { restsOn: draft.restsOn }) }));
     } else {
       answers += 1;
       out.push(Object.freeze({ ...base, itemId: mapItemLabel("ca", answers), kind: "ANSWER" as const, answer: draft.answer }));

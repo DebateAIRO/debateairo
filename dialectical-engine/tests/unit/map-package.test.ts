@@ -26,7 +26,8 @@ describe("map package: the shared vocabulary (spec 2026-10-12 §1)", () => {
       "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"]);
     expect([...MAP_NOTES]).toEqual(["LIST_REASSIGNED", "LIST_DROPPED", "MERGE_ITEMS_KEPT", "GAP_SKIPPED", "GAP_STOPPED", "MAP_STOPPED",
       "LANGUAGE_PLANNER_DISAGREES", "INTERNAL_WORDS_SKIPPED"]);
-    expect([...MAP_STEPS]).toEqual(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE"]);
+    // Engine redesign R3: the answer check is the map's last step (MAP:check).
+    expect([...MAP_STEPS]).toEqual(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE", "CHECK"]);
   });
 
   it("is a declared dependency-edge row that depends on kernel, providers and db only", async () => {
