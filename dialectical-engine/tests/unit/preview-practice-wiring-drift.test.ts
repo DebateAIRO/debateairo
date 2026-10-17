@@ -260,6 +260,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
     expect(runnerMain).toContain(shapeRead);
     expect(practiceRunner).toContain(shapeRead);
+    // Engine redesign (R1d Task 5): the runner's engine boot read, in both modes, on both sides.
+    const engineRead = "const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);";
+    expect(runnerMain).toContain(engineRead);
+    expect(practiceRunner).toContain(engineRead);
     expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
     expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
     expect(practiceRunner).toContain("storyPolicy, debateShape, log:");

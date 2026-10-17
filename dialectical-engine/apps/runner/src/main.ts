@@ -54,6 +54,7 @@ import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
 import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
+import { readEngineRunnerSettings } from "./engine-boot.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -133,6 +134,14 @@ const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
  * MAP_CONTRACT_HASH_MISMATCH). A run's sizes are read from its own receipt, never from this row.
  */
 const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
+/**
+ * Engine redesign (spec 2026-10-15 §3.3; INTERFACE §1.5, §2.3): the optional engineVersionPolicy row (absent = engine 1,
+ * today's runner byte for byte, and neither the length row nor the seal is read; malformed = boot refused,
+ * ENGINE_VERSION_POLICY_INVALID) and, only with it (enabled or not), the length row's presence and the sealed
+ * engineContractHash (ENGINE_REQUIRES_LENGTH_POLICY / ENGINE_CONTRACT_HASH_UNSEALED / ENGINE_CONTRACT_HASH_MISMATCH).
+ * A run's engine is read from its own receipt, never from this row.
+ */
+const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.
@@ -588,6 +597,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   callScheduler: runnerCallScheduler,
   // Debate shape (spec 2026-10-12 §3): resolved at boot above; null without the row (today's runner).
   debateShape,
+  // Engine redesign (R1d): resolved at boot above; null without the engine row (engine 1, today's runner).
+  engine,
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),

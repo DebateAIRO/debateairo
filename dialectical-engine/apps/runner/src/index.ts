@@ -56,6 +56,7 @@ import {
   ENGINE_COMPOSITION_SEGMENT_CAP,
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
+  engineOfRun,
   lengthGuidanceAllowanceTokens,
   readVerdictLabelControls,
   resolveScoringOperator,
@@ -255,6 +256,7 @@ import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type Ru
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
+import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
 import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
@@ -2557,6 +2559,12 @@ export interface WalkingSkeletonSettings {
    * it) and argues the shape (Task 13: the Phase 2a per-run refusal is gone).
    */
   readonly debateShape?: DebateShapeRunnerSettings | null;
+  /**
+   * Engine redesign (spec 2026-10-15 §3.3; INTERFACE §2.3): set at boot when the register seals an engineVersionPolicy row
+   * (enabled or not) with the length row and the code's engineContractHash. A run whose receipt carries `engine` needs it
+   * (ENGINE_RUNNER_UNCONFIGURED otherwise); a run without the member never reads it. Absent: engine 1, today's runner.
+   */
+  readonly engine?: EngineRunnerSettings | null;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
@@ -5338,6 +5346,17 @@ export class WalkingSkeletonRunner {
     if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
+    }
+    /**
+     * Engine redesign (R1d; INTERFACE §1.5, §3.3): the engine this run was admitted with, read ONLY from its receipt
+     * (`envelope_basis.engine`), never from the register row: ENGINE_ONE for a receipt without the member, so today's run is
+     * today's, byte for byte. An engine-2 run needs the runner's engine settings (the seal its engine-2 calls carry), else it
+     * is refused before any call.
+     */
+    const engine = engineOfRun(envelopeBasis);
+    if (engine.engine === 2 && this.settings.engine == null) {
+      throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED",
+        "This run was admitted with engine 2, and this runner has no sealed engine contracts");
     }
     const shapeSettings = shapeShape === null ? null : debateShapeSettingsOf(run.depthParams);
     const expansionDepth = resolveExpansionDepth(run.depthParams);
@@ -10941,6 +10960,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "EMPTY_EVENT_STREAM",
   "EMPTY_OVERLAY_OWNER",
   "EMPTY_PROPAGATION",
+  "ENGINE_RUNNER_UNCONFIGURED",
   "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
   "ENVELOPE_FORMULA_INPUTS_INVALID",
   "ENVELOPE_FORMULA_INPUTS_PROVENANCE_MISSING",

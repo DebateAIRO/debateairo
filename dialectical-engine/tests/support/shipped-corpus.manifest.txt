@@ -334,6 +334,7 @@ apps/runner/src/dev-support-config.ts
 apps/runner/src/dev-support-model.ts
 apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
+apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts
 apps/runner/src/hosted-provider-set.ts

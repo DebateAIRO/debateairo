@@ -103,14 +103,19 @@ describe("the runner's length call sites (source pins)", () => {
 describe("the runner never reads the row (Review Focus 2)", () => {
   // apps/runner/src is flat, so the scan also reads Task 8's hosted publisher, which reads the row for its boot-readiness
   // check only; it is exempt for both names (pre-flight PF-C3.4).
+  // Engine redesign (R1d Task 5, controller ruling Q6): engine-boot.ts reads the row's PRESENCE for the reader name only (never a number, never the key).
   it("no runner source names the row's reader or key", () => {
     const dir = new URL("../../apps/runner/src/", import.meta.url);
     for (const name of readdirSync(dir).filter((file) => file.endsWith(".ts"))) {
       const source = readFileSync(new URL(name, dir), "utf8");
       const publisher = name === "hosted-register-publish.ts";
-      expect(source.includes("readLengthGuidancePolicy") && !publisher, name).toBe(false);
+      const presenceOnly = name === "engine-boot.ts";
+      expect(source.includes("readLengthGuidancePolicy") && !publisher && !presenceOnly, name).toBe(false);
       expect(source.includes("LENGTH_GUIDANCE_POLICY_ROW_KEY") && !publisher, name).toBe(false);
     }
+    const engineBoot = readFileSync(new URL("engine-boot.ts", dir), "utf8");
+    expect(engineBoot).toContain("(await readLengthGuidancePolicy(pool, registerVersion)) !== null");
+    expect(engineBoot.split("readLengthGuidancePolicy(")).toHaveLength(2);
   });
   // Task 7 review 4: the publisher's exemption is ONE read, inside its boot-readiness check.
   it("the hosted publisher reads the row exactly once, inside verifyHostedRegisterBootReadiness", () => {
