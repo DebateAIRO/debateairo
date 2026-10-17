@@ -1894,13 +1894,16 @@ export function askRefusalPublicMessage(code: string, message: string): string {
  * The refusals whose message carries the OPERATOR's figures (I6): the day's ceiling and spend, and — debate shape,
  * spec 2026-10-12 — the attempt ceiling's own terms that the receipt readers name when a receipt does not add up
  * (the serve reserve, the serve leg's attempts, a size against the panel). They describe the engine's receipt, not
- * the ask the caller sent, so the caller is told the code and the operator's log keeps the message.
+ * the ask the caller sent, so the caller is told the code and the operator's log keeps the message. Engine redesign R1d
+ * (Task 6 review 2): the engine row in force without the length row names engine words (owner rule: no internals in
+ * user-facing text), so it is told by its code too.
  */
 const ASK_REFUSALS_WITH_OPERATOR_FIGURES: ReadonlySet<string> = new Set([
   "DAILY_COST_ENVELOPE_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "STRUCTURAL_CEILING_SHAPE_INVALID",
   "STRUCTURAL_CEILING_ENGINE_INVALID",
+  "ENGINE_REQUIRES_LENGTH_POLICY",
   ASK_MODEL_ASSIGNMENT_INVALID
 ]);
 

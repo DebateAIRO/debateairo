@@ -28,8 +28,11 @@ describe("the runner hands the receipt's engine and length table to the story (R
       /languageLocked: shapeLanguage !== null,\s*\n(?:\s*\/\/[^\n]*\n)*\s*\.\.\.\(lengthGuidance === null \? \{\} : \{ lengthGuidance \}\),/u);
     expect(snapshot).toContain("engine: engine.engine === 2 ? engine : null,");
     // Pre-flight PF-D7.3 (ruling "backup vs sit-out book"): the members the sit-out book has benched are not offered.
+    // Whole-branch review Minor 1 (ruling W1): the maker rule reads every claim-eligible member's maker BEFORE the
+    // sit-out filter (unfiltered `synthesisMakers`, out-of-panel register refs included), so a benched or out-of-panel
+    // role still excludes its maker.
     expect(snapshot).toMatch(
-      /\.\.\.\(engine\.engine === 2\s*\?\s*\{ backupCandidates: storyBackupCandidatesFrom\(\{\s*panelRefs: run\.discoveredPanel\.map\(\(member\) => member\.provider_ref\),\s*claimEligible: synthesisMakers\.filter\(\(member\) => sitOut\?\.sitsOut\(member\.providerRef\) !== true\)\s*\}\) \}\s*:\s*\{\}\),/u);
+      /\.\.\.\(engine\.engine === 2\s*\?\s*\{\s*backupCandidates: storyBackupCandidatesFrom\(\{\s*panelRefs: run\.discoveredPanel\.map\(\(member\) => member\.provider_ref\),\s*claimEligible: synthesisMakers\.filter\(\(member\) => sitOut\?\.sitsOut\(member\.providerRef\) !== true\)\s*\}\),\s*backupMakers: storyBackupMakersFrom\(synthesisMakers\)\s*\}\s*:\s*\{\}\),/u);
   });
 
   it("never offers a backup storyteller the preview's sit-out book has benched (ruling: backup vs sit-out book)", () => {

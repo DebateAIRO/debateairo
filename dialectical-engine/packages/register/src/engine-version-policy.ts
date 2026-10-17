@@ -122,7 +122,7 @@ const policySchema = z.object({
   const terms = termsProblem(policy.scoring.terms);
   if (terms !== null) ctx.addIssue({ code: "custom", path: ["scoring", "terms"], message: terms });
   if (!labelFits(policy.label.closeCallAgreeing, policy.label.clearAgreeing, policy.judges.count)) {
-    ctx.addIssue({ code: "custom", path: ["label"], message: "a close call <= a clear answer <= the comparing judges" });
+    ctx.addIssue({ code: "custom", path: ["label"], message: "a close call <= a clear answer <= the row's judges" });
   }
 });
 
@@ -311,7 +311,7 @@ export const engineReceiptSchema = z.object({
   const terms = termsProblem(receipt.scoring.terms);
   if (terms !== null) ctx.addIssue({ code: "custom", path: ["scoring", "terms"], message: terms });
   if (!labelFits(receipt.label.close_call_agreeing, receipt.label.clear_agreeing, receipt.judges.count)) {
-    ctx.addIssue({ code: "custom", path: ["label"], message: "a close call <= a clear answer <= the comparing judges" });
+    ctx.addIssue({ code: "custom", path: ["label"], message: "a close call <= a clear answer <= the row's judges" });
   }
   if (receipt.sites.comparing_judges > receipt.judges.count) {
     ctx.addIssue({ code: "custom", path: ["sites", "comparing_judges"], message: "more comparing judges than the row allows" });

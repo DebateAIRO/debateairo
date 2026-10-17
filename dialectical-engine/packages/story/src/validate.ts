@@ -136,13 +136,12 @@ const StoryCheckerCriteriaSchema = z.object({
 }).strict();
 
 /**
- * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
+ * The three rules every checker verdict keeps, v3 and v4 alike (one helper both refines call, Task 12 review Important 1):
+ * satisfied only with every criterion met; no control character in the objection; an objection whenever not satisfied.
+ * The v4 refine adds only the misleading rule.
  */
-export const StoryCheckerVerdictSchema = z.object({
-  satisfied: z.boolean(),
-  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
-  criteria: StoryCheckerCriteriaSchema
-}).strict().superRefine((verdict, context) => {
+function checkerRules(verdict: Readonly<{ satisfied: boolean; objection: string | null; criteria: Readonly<Record<string, boolean>> }>,
+  context: z.RefinementCtx): void {
   if (verdict.satisfied && Object.values(verdict.criteria).some((met) => !met)) {
     context.addIssue({ code: "custom", path: ["satisfied"], message: "STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION" });
   }
@@ -152,7 +151,16 @@ export const StoryCheckerVerdictSchema = z.object({
   if (!verdict.satisfied && verdict.objection === null) {
     context.addIssue({ code: "custom", path: ["objection"], message: "STORY_CHECKER_OBJECTION_REQUIRED" });
   }
-});
+}
+
+/**
+ * The objection's limit is a runaway guard (LG-A, 30,000 characters); the v3 form still asks for at most 4,000.
+ */
+export const StoryCheckerVerdictSchema = z.object({
+  satisfied: z.boolean(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
+  criteria: StoryCheckerCriteriaSchema
+}).strict().superRefine((verdict, context) => checkerRules(verdict, context));
 
 /**
  * Story v4 (R1d, spec §7.2 item 7; INTERFACE §5.3): the checker also says whether a problem would MISLEAD the person.
@@ -167,15 +175,7 @@ export const StoryCheckerV4VerdictSchema = z.object({
   objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
   criteria: StoryCheckerCriteriaSchema
 }).strict().superRefine((verdict, context) => {
-  if (verdict.satisfied && Object.values(verdict.criteria).some((met) => !met)) {
-    context.addIssue({ code: "custom", path: ["satisfied"], message: "STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION" });
-  }
-  if (verdict.objection !== null && STORY_TEXT_FORBIDDEN.test(verdict.objection)) {
-    context.addIssue({ code: "custom", path: ["objection"], message: "STORY_TEXT_CONTROL_CHARACTER" });
-  }
-  if (!verdict.satisfied && verdict.objection === null) {
-    context.addIssue({ code: "custom", path: ["objection"], message: "STORY_CHECKER_OBJECTION_REQUIRED" });
-  }
+  checkerRules(verdict, context);
   if (verdict.misleading && (verdict.satisfied || verdict.objection === null)) {
     context.addIssue({ code: "custom", path: ["misleading"], message: "STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION" });
   }
@@ -376,6 +376,8 @@ function readCheckerVerdict(value: unknown, schema: StoryCheckerSchema): StoryRe
  * read code's shape. Anything else, and every reply read against a v3 index, passes through untouched.
  */
 function withFixedShape(value: unknown, index: StoryMaterialIndex): unknown {
+  // Only the top-level member is set: a shape_id the AI nested inside another member is left there, and the strict
+  // schema refuses it as an extra key (Task 12 review Minor 1).
   if (index.fixedShapeId === undefined || typeof value !== "object" || value === null || Array.isArray(value)) return value;
   return { ...(value as Readonly<Record<string, unknown>>), shape_id: index.fixedShapeId };
 }

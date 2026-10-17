@@ -16,11 +16,11 @@ import type { Pool } from "pg";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { decryptContentForRun, readCallPrompt } from "@debateai/db";
 import {
-  PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, mergePatchReply, structureRepairOriginalKey, type PromptPacket
+  decodeModelJson, isPatchPath, mergePatchReply, structureRepairOriginalKey, type PromptPacket
 } from "@debateai/providers";
 import { engineOfRun } from "@debateai/register";
 import type { StoryBackupRecord, StoryBackupSignal } from "@debateai/story";
-import { practiceIsRevisionPrompt, replyContentOf } from "./practice-lanes.js";
+import { practiceIsRevisionPrompt, practiceModelOfRef, replyContentOf } from "./practice-lanes.js";
 
 /** VERDICT_UNREAD (fix round 1): the checker answered through the patch follow-up and its earlier try could not be read. */
 export type PracticeStoryRoundOutcome = "SATISFIED" | "WORDING_NOTE_ONLY" | "MISLEADING" | "NOT_SATISFIED" | "NO_DRAFT" | "NO_VERDICT"
@@ -61,9 +61,6 @@ export type PracticeStoryLedgerRow = Readonly<{
 
 const STORY_ROUND_SITE = /^STORY:(STORYTELLER|CHECKER):([1-9][0-9]*)$/u;
 
-function modelOfRef(providerRef: string): string {
-  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
-}
 
 /**
  * The story's rounds from its ledger rows (pre-flight PF-D8.2). A reply Haiku's structure repair rescued stands under
@@ -112,12 +109,36 @@ export function practiceCheckerVerdictOf(content: string): PracticeCheckerVerdic
   return Object.freeze({ satisfied: value.satisfied, misleading: typeof value.misleading === "boolean" ? value.misleading : null });
 }
 
+/** One story ledger row as the patch's base is chosen from it (the columns `collectPracticeStoryEngine` reads). */
+export type PracticePatchBaseRow = Readonly<{
+  call_site_key: string; actor_ref: string; reply_form: string | null; raw_artifact_ref: string | null; parse_status: string | null;
+}>;
+
+/**
+ * The base a PATCH try (at `index`) was merged onto: the same call's (call-site key and AI) latest earlier refused
+ * non-PATCH try with an artifact. None (the verdict is then UNREAD) when there is no such try, or when Haiku's structure
+ * repair of that key (`REPAIR:STRUCTURE:<key>`) sits between it and the patch: the salvage's follow-up B was then built
+ * on the repair's shaped tree, not on that raw reply (Task 22 re-review (a)). Pure.
+ */
+export function practicePatchBaseOf<Row extends PracticePatchBaseRow>(rows: readonly Row[], index: number): Row | null {
+  const patch = rows[index];
+  if (patch === undefined) return null;
+  const before = rows.slice(0, index);
+  const at = before.findLastIndex((row) => row.call_site_key === patch.call_site_key && row.actor_ref === patch.actor_ref
+    && row.reply_form !== "PATCH" && row.raw_artifact_ref !== null && row.parse_status !== null && row.parse_status !== "PARSED");
+  if (at === -1) return null;
+  const repairKey = `REPAIR:STRUCTURE:${patch.call_site_key}`;
+  return before.slice(at + 1).some((row) => row.call_site_key === repairKey) ? null : before[at]!;
+}
+
 /**
  * Fix round 1: a checker verdict accepted through the PATCH follow-up. Its stored reply is the patch alone (dotted keys,
  * e.g. {"criteria.no_overstatement": true}); the merged verdict is never stored. It is rebuilt as the gateway merged it
  * (`mergePatchReply`, packages/providers/src/patch-follow-up.ts): each dotted key set at its path in the call's earlier
  * refused try, then read with `practiceCheckerVerdictOf`. "UNREAD" when the earlier try is missing or not one object,
- * the patch is not one object or does not fit it, or the merge holds no verdict.
+ * the patch is not one object or does not fit it, or the merge holds no verdict. Defense in depth (Task 22 re-review (b)):
+ * "UNREAD" too when any patch key fails the gateway's own path rule (`isPatchPath`: no `__proto__`, `constructor` or
+ * `prototype` segment, whitelisted segments only), so such a key never reaches `mergePatchReply` in the practice process.
  */
 export function practicePatchedCheckerVerdictOf(earlier: string | null, patch: string): PracticeCheckerVerdict | PracticeCheckerVerdictUnread {
   if (earlier === null) return "UNREAD";
@@ -126,6 +147,7 @@ export function practicePatchedCheckerVerdictOf(earlier: string | null, patch: s
   const isObject = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
   if (!base.ok || !asked.ok || !isObject(base.value) || !isObject(asked.value)) return "UNREAD";
+  if (!Object.keys(asked.value).every((key) => isPatchPath(key))) return "UNREAD";
   try {
     const merged = mergePatchReply(
       Object.freeze({ base: base.value, locator: Object.freeze({ code: "SCHEMA_FAILED", paths: Object.keys(asked.value) }) }), patch, undefined);
@@ -158,7 +180,7 @@ export function practiceStoryRoundRows(facts: readonly PracticeStoryRoundFacts[]
 export function practiceStoryBackupRows(input: Readonly<{ backup: StoryBackupRecord | null; backupModel: string | null; outcome: string | null }>):
   readonly PracticeStoryBackupRow[] {
   if (input.backup === null) return Object.freeze([]);
-  return Object.freeze([Object.freeze({ firstModel: modelOfRef(input.backup.firstModel), signal: input.backup.signal,
+  return Object.freeze([Object.freeze({ firstModel: practiceModelOfRef(input.backup.firstModel), signal: input.backup.signal,
     backupModel: input.backupModel, outcome: input.outcome ?? "MISSING" })]);
 }
 
@@ -202,7 +224,8 @@ export function practiceStoryEngineLines(block: PracticeStoryEngineBlock): reado
  * first loop's: STORY:STORYTELLER:3 with two rounds); a `REPAIR:STRUCTURE:` row (Haiku's) is never read as the backup.
  * The rows Haiku's structure repair answered (`REPAIR:STRUCTURE:STORY:<role>:<n>`) are read with their round
  * (pre-flight PF-D8.2). A checker try accepted through the patch follow-up (recorded form PATCH) is read merged onto the
- * latest earlier refused try of the same call (its call-site key and AI; each try has its own attempt id) (fix round 1).
+ * latest earlier refused try of the same call (its call-site key and AI; each try has its own attempt id) (fix round 1),
+ * UNREAD when a structure repair of that key ran in between (`practicePatchBaseOf`).
  * Null when the run's row is absent: the block is left out, as the practice's other run readers read a missing run
  * (`readPracticeFrozenLength`, `readPracticeShapeFacts`), never thrown (fix round 1).
  */
@@ -244,13 +267,12 @@ export async function collectPracticeStoryEngine(pool: Pool, runId: string,
     }
     let verdict: PracticeCheckerVerdict | PracticeCheckerVerdictUnread | null = null;
     if (site[1] === "CHECKER" && accepted && entry.reply_form === "PATCH") {
-      // The patch alone was stored: merge it onto the same call's latest earlier refused (non-patch) try.
-      const earlier = entries.slice(0, index).findLast((before) => before.call_site_key === entry.call_site_key
-        && before.actor_ref === entry.actor_ref && before.reply_form !== "PATCH" && before.raw_artifact_ref !== null
-        && before.parse_status !== null && before.parse_status !== "PARSED");
+      // The patch alone was stored: merge it onto the same call's latest earlier refused (non-patch) try, unless a
+      // structure repair of that key ran in between (`practicePatchBaseOf`).
+      const earlier = practicePatchBaseOf(entries, index);
       let earlierContent: string | null = null;
       try {
-        earlierContent = earlier === undefined ? null : await contentOf(earlier);
+        earlierContent = earlier === null ? null : await contentOf(earlier);
       } catch {
         earlierContent = null;
       }
@@ -258,7 +280,7 @@ export async function collectPracticeStoryEngine(pool: Pool, runId: string,
     } else if (site[1] === "CHECKER" && accepted) {
       verdict = practiceCheckerVerdictOf(await contentOf(entry));
     }
-    ledgerRows.push(Object.freeze({ callSiteKey: entry.call_site_key, model: modelOfRef(entry.actor_ref), accepted, revisionPrompt, verdict }));
+    ledgerRows.push(Object.freeze({ callSiteKey: entry.call_site_key, model: practiceModelOfRef(entry.actor_ref), accepted, revisionPrompt, verdict }));
   }
   const storyRounds = practiceStoryRoundRows(practiceStoryRoundFactsOf(ledgerRows));
   const backup = story?.backup ?? null;
@@ -268,7 +290,7 @@ export async function collectPracticeStoryEngine(pool: Pool, runId: string,
     .map((row) => row.outcome);
   return Object.freeze({
     engine, storyRounds,
-    storyBackups: practiceStoryBackupRows({ backup, backupModel: backupRef === undefined ? null : modelOfRef(backupRef), outcome: story?.outcome ?? null }),
+    storyBackups: practiceStoryBackupRows({ backup, backupModel: backupRef === undefined ? null : practiceModelOfRef(backupRef), outcome: story?.outcome ?? null }),
     storyReadyRate: practiceStoryReadyRate(outcomes)
   });
 }

@@ -664,6 +664,17 @@ describe('publish kit v2: the optional engineVersionPolicy row (engine redesign 
     expect(() => assertPreviewEngineBootRows([...published.rows].filter(row => row.rowKey !== ENGINE_CONTRACT_HASH_ROW_KEY)))
       .toThrowError(expect.objectContaining({ code: 'ENGINE_CONTRACT_HASH_UNSEALED' }));
   });
+  it('reads the seal only beside the length row, so its refusal is the runner\'s boot\'s (Task 8 review 1, final wave A5)', async () => {
+    const f = await fixture();
+    const published = compose(await build(length, engine), f.v9).rows;
+    const brokenSeal = (rows: typeof published) => rows.map(row => row.rowKey === ENGINE_CONTRACT_HASH_ROW_KEY
+      ? { ...row, valueJsonText: '"not a seal"' as typeof row.valueJsonText } : row);
+    // No length row: the runner's boot never reads the seal (readEngineRunnerSettings), so neither does the kit.
+    const noLength = brokenSeal(published.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY));
+    expect(() => assertPreviewEngineBootRows(noLength)).toThrowError(expect.objectContaining({ code: 'ENGINE_REQUIRES_LENGTH_POLICY' }));
+    // Beside the length row the same broken seal is refused by its own parser.
+    expect(() => assertPreviewEngineBootRows(brokenSeal(published))).toThrow('ENGINE_CONTRACT_HASH_INVALID');
+  });
   it('R19: a plan without a value keeps the base version\'s row unchanged; a broken base row is refused, never carried', async () => {
     const f = await fixture();
     const base = [...compose(await build(length, engine), f.v9).rows] as Row[];

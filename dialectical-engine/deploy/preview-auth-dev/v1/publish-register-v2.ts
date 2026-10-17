@@ -79,7 +79,7 @@ const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
  * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (69: the 67 at
  * dev 5109a5501 plus role rotation — the 66 of dev b75e4c294 and answerRoleRotationPolicy — mapContractHash, the
  * debate shape's sealed map prompts (P2b Task 6), and engineContractHash, engine 2's seal (engine redesign R1d Task 4);
- * the same keys the live v9 holds minus the two base-owned ones, plus those two rows once they are published).
+ * the same keys the live v9 holds minus the two base-owned ones, plus those three rows once they are published).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
@@ -282,9 +282,12 @@ export function assertPreviewEngineBootRows(rows:readonly RegisterPublicationRow
   const engine=map.get(ENGINE_VERSION_POLICY_ROW_KEY);
   if(engine===undefined)return;
   const seal=map.get(ENGINE_CONTRACT_HASH_ROW_KEY);
+  const lengthPolicyPresent=map.has(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+  // As the runner's boot read (readEngineRunnerSettings): the seal is parsed only beside the length row, so a kit
+  // refusal is the runner's own code (Task 8 review 1).
   resolveEngineRunnerSettings({policy:parseEngineVersionPolicy(JSON.parse(engine.valueJsonText)),
-    lengthPolicyPresent:map.has(LENGTH_GUIDANCE_POLICY_ROW_KEY),
-    engineContractHash:seal===undefined?null:parseEngineContractHash(JSON.parse(seal.valueJsonText)),
+    lengthPolicyPresent,
+    engineContractHash:!lengthPolicyPresent||seal===undefined?null:parseEngineContractHash(JSON.parse(seal.valueJsonText)),
     codeEngineContractHash:engineContractHash()});
 }
 

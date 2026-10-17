@@ -3,6 +3,7 @@ import { PREVIEW_PROVIDER_REF_MODELS, buildFramedRevisionPrompt } from "@debatea
 import { practiceIsRevisionPrompt, practiceReplyFormOf } from "../../tools/preview-practice/practice-lanes.js";
 import {
   practiceCheckerVerdictOf,
+  practicePatchBaseOf,
   practicePatchedCheckerVerdictOf,
   practiceStoryBackupRows,
   practiceStoryEngineLines,
@@ -98,6 +99,45 @@ describe("practice: a story checker verdict accepted through the patch follow-up
     expect(practiceStoryRoundRows(facts)).toEqual([
       { model: "m", round: 1, misleading: null, wordingNoteOnly: false, revisedOwnDraft: false, outcome: "VERDICT_UNREAD" }
     ]);
+  });
+
+  // Task 22 re-review (b), final wave A3 (defense in depth): a patch key the gateway's own path rule (isPatchPath) refuses
+  // never reaches mergePatchReply in the practice process, so no stored reply can set a prototype here.
+  it("a patch key the gateway would never accept (__proto__, constructor, prototype, a bad segment) is UNREAD; nothing is merged", () => {
+    const probe = "r1dFinalWaveProbe";
+    try {
+      expect(practicePatchedCheckerVerdictOf(earlier, `{"constructor.prototype.${probe}": true}`)).toBe("UNREAD");
+      expect(practicePatchedCheckerVerdictOf(earlier, `{"__proto__.${probe}": true}`)).toBe("UNREAD");
+      expect(Object.hasOwn(Object.prototype, probe)).toBe(false);
+      expect(practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "criteria.prototype": true }))).toBe("UNREAD");
+      expect(practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "criteria..no_overstatement": false }))).toBe("UNREAD");
+      // One bad key spoils the whole patch, as the gateway refuses it whole.
+      expect(practicePatchedCheckerVerdictOf(earlier, JSON.stringify({ "criteria.no_overstatement": false, "criteria.constructor": 1 })))
+        .toBe("UNREAD");
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)[probe];
+    }
+  });
+
+  // Task 22 re-review (a), final wave A2: when Haiku's structure repair ran between the earlier try and the patch, the
+  // salvage's follow-up B was built on the repair's shaped tree, not on the earlier raw reply: the base is unknown.
+  it("the patch's base: the same call's latest earlier refused try, none when a structure repair of that key sits between", () => {
+    const row = (callSiteKey: string, actorRef: string, replyForm: string | null, parseStatus: string | null) => Object.freeze({
+      call_site_key: callSiteKey, actor_ref: actorRef, reply_form: replyForm, raw_artifact_ref: `artifact:${String(callSiteKey.length)}`,
+      parse_status: parseStatus });
+    const refused = row("STORY:CHECKER:1", "c", null, "SCHEMA_FAILED");
+    const patch = row("STORY:CHECKER:1", "c", "PATCH", "PARSED");
+    const repair = row("REPAIR:STRUCTURE:STORY:CHECKER:1", "haiku", "STRUCTURE", "SCHEMA_FAILED");
+    expect(practicePatchBaseOf([refused, patch], 1)).toBe(refused);
+    expect(practicePatchBaseOf([refused, repair, patch], 2)).toBeNull();
+    // A repair of another call, or one before the earlier try, changes nothing.
+    expect(practicePatchBaseOf([refused, row("REPAIR:STRUCTURE:STORY:CHECKER:2", "haiku", "STRUCTURE", "SCHEMA_FAILED"), patch], 2))
+      .toBe(refused);
+    expect(practicePatchBaseOf([repair, refused, patch], 2)).toBe(refused);
+    // Another AI's try of the same key, an accepted try, a patch try: never the base.
+    expect(practicePatchBaseOf([row("STORY:CHECKER:1", "other", null, "SCHEMA_FAILED"), patch], 1)).toBeNull();
+    expect(practicePatchBaseOf([row("STORY:CHECKER:1", "c", null, "PARSED"), patch], 1)).toBeNull();
+    expect(practicePatchBaseOf([row("STORY:CHECKER:1", "c", "PATCH", "SCHEMA_FAILED"), patch], 1)).toBeNull();
   });
 
   it("a merged verdict counts for its round like any accepted verdict", () => {

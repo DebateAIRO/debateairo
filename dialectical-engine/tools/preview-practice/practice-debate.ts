@@ -44,11 +44,13 @@ import {
   practiceJsonRepairOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
+  practiceModelOfRef,
   practiceReplyFormOf,
   practiceReviewEdgeCountOf,
   practiceStepOf,
   recheckReply,
   replyContentOf,
+  type PracticeCallFamily,
   type PracticeStep
 } from "./practice-lanes.js";
 import {
@@ -62,7 +64,13 @@ import {
 } from "./practice-language.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
-import { practiceWriterPinsBlock, type PracticeWriterPins, type PracticeWriterPinsBlock } from "./practice-pins.js";
+import {
+  practiceServedModels,
+  practiceServedStoryteller,
+  practiceWriterPinsBlock,
+  type PracticeWriterPins,
+  type PracticeWriterPinsBlock
+} from "./practice-pins.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
@@ -232,7 +240,10 @@ export type PracticeDebateResult = Readonly<{
   length?: PracticeLengthBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
-  /** Pinned final writers (R1d): each pin, the model the run's own pin names, whether it held; absent without a pin. */
+  /**
+   * Pinned final writers (R1d): each pin, the model the run's own pin names, the models that served the step, whether it
+   * held (the pinned model served it); absent without a pin.
+   */
   writerPins?: PracticeWriterPinsBlock;
   /** Length guidance (LG-D): the storyteller's words per field and its unreadable replies; absent when it could not be read. */
   storyLength?: PracticeStoryLengthBlock;
@@ -393,9 +404,6 @@ export function practiceUnrepairedRows(tries: readonly PracticeTryRecord[]): rea
   return Object.freeze(rows);
 }
 
-function modelOfRef(providerRef: string): string {
-  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
-}
 
 function usageOf(metadata: unknown): { input: number; output: number } {
   const usage = typeof metadata === "object" && metadata !== null ? (metadata as { usage?: unknown }).usage : undefined;
@@ -412,7 +420,8 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
   "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
-  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">> {
+  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">
+  & Readonly<{ answerWritersServed: readonly string[] }>> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
     `SELECT sequence::text, attempt_id::text, call_site_key, actor_ref, outcome, started_at, finished_at, raw_artifact_ref::text, thinking_level
@@ -432,7 +441,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
   let refusedCalls = 0;
   // Owner ruling 2026-10-12 ("Fixed slips = warning"): a call is one step on one maker (its call-site key and its actor)
   // with all its tries, in ledger order: its format repair, its one resend after an unbilled refusal, the final retry.
-  const calls = new Map<string, { model: string; tries: PracticeCallTry[] }>();
+  const calls = new Map<string, { model: string; family: PracticeCallFamily; tries: PracticeCallTry[] }>();
   const jsonRepairs: { model: string; repair: string }[] = [];
   const measured: PracticeMeasuredAttempt[] = [];
   /** Each failure's call (`calls` key), in `failures` order: a structure-repair try's failure is its original call's. */
@@ -480,7 +489,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
   const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
   for (const entry of entries) {
-    const model = modelOfRef(entry.actor_ref);
+    const model = practiceModelOfRef(entry.actor_ref);
     const site = callFamilyOf(entry.call_site_key);
     const key = `${entry.actor_ref}\u0000${site}`;
     const bucket = buckets.get(key) ?? { model, providerRef: entry.actor_ref, site, calls: 0, outcomes: {}, parse: {},
@@ -522,7 +531,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         thinkingTokens: artifact.thinking_tokens, cachedInputTokens: artifact.cached_input_tokens, actualWords: artifact.actual_words,
         guidedWords: artifact.guided_words }));
     }
-    const call = calls.get(callKey) ?? { model: callModel, tries: [] };
+    const call = calls.get(callKey) ?? { model: callModel, family: callFamilyOf(entry.call_site_key), tries: [] };
     calls.set(callKey, call);
     call.tries.push(Object.freeze({ outcome: entry.outcome, parseStatus: artifact === undefined ? null : parseStatus, replyForm }));
     if (entry.outcome === "OK" && artifact !== undefined) {
@@ -581,7 +590,9 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
-    tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured) };
+    tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured),
+    // Ruling A1 (Task 21 review): the models that served the final writer, for the pins only (not a report member).
+    answerWritersServed: practiceServedModels(callList.map(([, call]) => call), "SYNTHESIZER") };
 }
 
 function codeOf(error: unknown): string {
@@ -690,7 +701,8 @@ export async function runPracticeDebate(input: Readonly<{
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
       for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
-        if (change !== null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
+        // `!= null`: a row the version did not touch is null (Task 20 review 2: a caller's double may leave it out).
+        if (change != null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
     }
@@ -853,7 +865,7 @@ export async function runPracticeDebate(input: Readonly<{
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
         ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
-        ...(input.pins === undefined ? {} : { writerPins: practiceWriterPinsBlock(input.pins, null) }),
+        ...(input.pins === undefined ? {} : { writerPins: practiceWriterPinsBlock(input.pins, null, null) }),
         // Length guidance: where the row came from, with no frozen numbers (no run was admitted).
         ...(lengthSource === null ? {} : { length: practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange, frozen: null }) }),
         ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
@@ -910,13 +922,6 @@ export async function runPracticeDebate(input: Readonly<{
       answerWriter: rotationRow.writer_provider_ref!, answerChecker: rotationRow.checker_provider_ref!,
       storyteller: rotationRow.storyteller_provider_ref!, storyChecker: rotationRow.story_checker_provider_ref!
     });
-    // Pinned final writers (R1d): which models the run's own pin names, beside the pins (codes and model ids only).
-    const writerPins = input.pins === undefined ? undefined : practiceWriterPinsBlock(input.pins, rotation);
-    if (writerPins !== undefined) {
-      for (const [name, entry] of [["answer writer", writerPins.answerWriter], ["storyteller", writerPins.storyteller]] as const) {
-        if (entry !== null) progress(`pinned ${name} ${entry.pinnedModel}: ${entry.held ? "held" : `not held (${entry.wroteModel ?? "no rotation"})`}`);
-      }
-    }
     let transcript: PracticeDebateResult["transcript"];
     if (input.transcriptDirectory !== undefined && input.transcriptDirectory !== null) {
       // Before the finally below deletes the database and with it the only way to read the run's sealed text; and before
@@ -942,7 +947,18 @@ export async function runPracticeDebate(input: Readonly<{
         progress(`transcript could not be written: ${codeOf(error)}`);
       }
     }
-    const collected = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    const { answerWritersServed, ...collected } = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    // Pinned final writers (R1d; Task 21 review ruling A1): which models the run's own pin names, and which actually
+    // served each step (the answered final-writer calls; the stored story's storyteller), beside the pins (codes and
+    // model ids only). A cost fallback or a backup storyteller serving instead: not held.
+    const writerPins = input.pins === undefined ? undefined : practiceWriterPinsBlock(input.pins, rotation,
+      { answerWriter: answerWritersServed, storyteller: practiceServedStoryteller(storedStory) });
+    if (writerPins !== undefined) {
+      for (const [name, entry] of [["answer writer", writerPins.answerWriter], ["storyteller", writerPins.storyteller]] as const) {
+        if (entry !== null) progress(`pinned ${name} ${entry.pinnedModel}: ${entry.held ? "held" : `not held (${entry.wroteModel ?? "no rotation"}`
+          + `, served by ${entry.servedBy.length === 0 ? "none" : entry.servedBy.join(", ")})`}`);
+      }
+    }
     // Length guidance (LG-D): the story's words per field and its unreadable replies, read before the database goes.
     // A reading that breaks costs only this block, never the report.
     let storyLength: PracticeStoryLengthBlock | undefined;

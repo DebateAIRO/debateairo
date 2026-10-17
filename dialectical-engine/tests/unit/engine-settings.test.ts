@@ -103,8 +103,13 @@ describe("the receipt member engine (INTERFACE §3.1)", () => {
       at(copy).extra = 1;
       return copy;
     };
+    // The control: the same copy without the extra member parses.
+    expect(engineReceiptSchema.safeParse(JSON.parse(JSON.stringify(receipt))).success).toBe(true);
+    // Task 2 review 1 (final wave B1): also scoring.fidelity_floor, investigate, judges and label.
     for (const bad of [withExtra((v) => v), withExtra((v) => v.scoring), withExtra((v) => v.scoring.terms[0]),
-      withExtra((v) => v.scoring.fatal_cap), withExtra((v) => v.links), withExtra((v) => v.sites), withExtra((v) => v.answer_check)]) {
+      withExtra((v) => v.scoring.fatal_cap), withExtra((v) => v.scoring.fidelity_floor), withExtra((v) => v.links),
+      withExtra((v) => v.investigate), withExtra((v) => v.judges), withExtra((v) => v.label), withExtra((v) => v.sites),
+      withExtra((v) => v.answer_check)]) {
       expect(engineReceiptSchema.safeParse(bad).success).toBe(false);
     }
   });

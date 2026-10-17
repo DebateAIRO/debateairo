@@ -483,8 +483,11 @@ echo "exit: $?"
   checkers are still picked from another maker. The run's own role table is never written by the practice. With role
   rotation off in the practice register the run is refused before any AI is asked (`PRACTICE_PIN_NEEDS_ROLE_ROTATION`;
   with `--register-next`, give `--role-rotation on`).
-- `report.json` gains `writerPins`: per pinned role, the pinned model, the model the run's pin names, and whether the
-  pin held. A pinned model that sat out cannot be picked: the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
+- `report.json` gains `writerPins`: per pinned role, the pinned model, the model the run's pin names, the models that
+  actually served the step (`servedBy`: the answered final-writer calls; the stored story's storyteller), and whether the
+  pin held: only when the run's pin names the pinned model and the pinned model served the step. A pinned model that
+  sat out cannot be picked, and a cost fallback or a backup storyteller serving instead is not the pinned model: either
+  way the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
 
 ### The question language (language mode, and debate's `--site-language`)
 

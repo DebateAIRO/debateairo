@@ -5,7 +5,10 @@
 // import and the two compositions are stand-ins here (nothing is started, nothing is sent); the integration suite
 // (tests/integration/preview-practice-run.test.ts) runs the real ones.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, lengthGuidancePolicyStartValues, type DebateShapePolicy } from "@debateai/register";
+import {
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues,
+  type DebateShapePolicy
+} from "@debateai/register";
 import { TypedDomainError } from "@debateai/kernel";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
@@ -240,6 +243,43 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     const report = debateReport({ result: { ...result, parallel: undefined } as never, observer: new PracticeGateObserver(),
       startedAt: new Date(0), finishedAt: new Date(1_000) });
     expect(report.length).toEqual(block);
+  });
+
+  // Task 20 review 1 (final wave B14): the engine row's read-back. A --register-next version composed without the engine
+  // row would silently run engine 1: refused before the ask is composed or submitted.
+  it("--engine-policy on a code's next version composed without it: PRACTICE_ENGINE_POLICY_NOT_PUBLISHED, nothing submitted", async () => {
+    seen.receipt = codeNext([]);
+    seen.versions.add("6");
+    seen.lengthRows.set(6, lengthGuidancePolicyStartValues());
+    await expect(debate({ registerNext: {} as never, length: lengthGuidancePolicyStartValues(), engine: engineVersionPolicyStartValues(),
+      shape: { policy: null, ask: {} } })).rejects.toMatchObject({ code: "PRACTICE_ENGINE_POLICY_NOT_PUBLISHED" });
+    expect([seen.askVersions, seen.requests]).toEqual([[], []]);
+  });
+
+  // Task 20 review 2 (final wave B14): the stand-in publisher leaves engineRow out; the progress loop reads it as untouched.
+  it("a version without an engine change prints no engine line (the progress loop's `!= null`)", async () => {
+    const lines: string[] = [];
+    await debate({ length: lengthGuidancePolicyStartValues(), shape: { policy: null, ask: {} }, progress: (line: string) => lines.push(line) });
+    expect(lines.some((line) => line.startsWith("the length row added"))).toBe(true);
+    expect(lines.some((line) => line.startsWith("the engine row"))).toBe(false);
+  });
+
+  // Task 21 review 4 (final wave B15): report.json carries writerPins only for a run that pinned a writer; report.md its lines.
+  it("debateReport with and without writerPins: the block and its lines only with a pin, and an unheld pin is NOT_PROVEN", async () => {
+    const pinned = await debate({ pins: { answerWriter: "claude-haiku-5-5", storyteller: null }, shape: { policy: null, ask: {} } });
+    expect(pinned.writerPins).toEqual({
+      answerWriter: { pinnedModel: "claude-haiku-5-5", wroteModel: null, servedBy: [], held: false }, storyteller: null });
+    const report = (result: typeof pinned) => debateReport({ result: { ...result, parallel: undefined } as never,
+      observer: new PracticeGateObserver(), startedAt: new Date(0), finishedAt: new Date(1_000) });
+    const withPins = report(pinned);
+    expect(withPins.writerPins).toEqual(pinned.writerPins);
+    expect(withPins.reasons).toContain("PRACTICE_PIN_NOT_HELD:ANSWER_WRITER");
+    expect(reportMarkdown(withPins)).toContain("- answer writer: pinned claude-haiku-5-5, wrote none (no rotation was picked), served by none, held: no");
+    const unpinned = await debate({ shape: { policy: null, ask: {} } });
+    const without = report(unpinned);
+    expect(Object.hasOwn(without, "writerPins")).toBe(false);
+    expect(without.reasons.some((reason) => reason.startsWith("PRACTICE_PIN_NOT_HELD"))).toBe(false);
+    expect(reportMarkdown(without)).not.toContain("Pinned final writers");
   });
 
   it("--shape-policy on a code's next version composed without it: refused before the ask is composed", async () => {

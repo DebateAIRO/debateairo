@@ -8,7 +8,7 @@ import {
   type CharactersPerWord,
   type StoryWordTargetField
 } from "@debateai/kernel";
-import { PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, structureRepairOriginalKey } from "@debateai/providers";
+import { decodeModelJson, structureRepairOriginalKey } from "@debateai/providers";
 import {
   engineSettingsOf,
   engineVersionPolicyStartValues,
@@ -17,7 +17,7 @@ import {
   type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
-import { replyContentOf } from "./practice-lanes.js";
+import { practiceModelOfRef, replyContentOf } from "./practice-lanes.js";
 import { PracticeRefusal } from "./practice-settings.js";
 
 /**
@@ -240,7 +240,7 @@ export async function collectPracticeStoryLength(pool: Pool, runId: string): Pro
       : await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
         entry.raw_artifact_ref, (entry.content_ciphertext ?? null) as never, { rawText: entry.raw_text, parseErrorDetail: null });
     rows.push(Object.freeze({
-      callSiteKey: entry.call_site_key, model: PREVIEW_PROVIDER_REF_MODELS[entry.actor_ref] ?? `unreviewed:${entry.actor_ref}`,
+      callSiteKey: entry.call_site_key, model: practiceModelOfRef(entry.actor_ref),
       outcome: entry.outcome, parseStatus: entry.parse_status, replyForm: entry.reply_form, content: replyContentOf(stored.rawText)
     }));
   }
@@ -256,7 +256,9 @@ export type PracticeStorySample = Readonly<{
 
 /**
  * Formats: from the real model's own artifacts of a STORYTELLER job (the stand-in records none). A PATCH try (the short
- * follow-up, its recorded form PATCH: only the asked members) is skipped, as the debate tables skip it (PF-D8.12).
+ * follow-up, its recorded form PATCH: only the asked members) is skipped, as the debate tables skip it (PF-D8.12). The
+ * fields (and their words) come from the job's LAST accepted reply only; `replies` and `breaks` count every non-PATCH
+ * try (Task 23 review).
  */
 export function practiceStorySampleOf(artifacts: readonly Readonly<{ rawText: string; parseStatus: string; replyForm?: string | null }>[],
   guidance: LengthGuidance | null): PracticeStorySample {

@@ -181,6 +181,9 @@ describe("practice: formats --story-length asks engine 2's story (v4) (LG-D, R1d
     expect(v4.lengthGuidance.story).toEqual(LENGTH_GUIDANCE_START.story);
     expect(v4.engine).toEqual(engineSettingsOf(engineVersionPolicyStartValues(), { makers: 2, mapOpening: false }));
     expect(v4.engine.engine).toBe(2);
+    // Task 23 review 3 (final wave C7): two makers and no map opening, read through the fields they set (the comparing
+    // judges are min(judges.count 3, makers 2); no answer check without the map opening).
+    expect(v4.engine.sites).toEqual({ comparingJudges: 2, investigations: 2, answerCheck: 0 });
     expect(() => practiceStoryLengthFromArgs("debate", new Set(["--story-length"]))).toThrow(PracticeRefusal);
     expect(() => practiceStoryLengthFromArgs("debate", new Set(["--story-length"]))).toThrow(/--story-length \(formats mode only\)/u);
   });

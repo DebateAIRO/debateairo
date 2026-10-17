@@ -3,7 +3,7 @@
 // force without the length row; engineForAsk refuses it again as a belt.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
+import { askRefusalPublicMessage, evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -69,11 +69,11 @@ describe("engineForAsk (INTERFACE §1.4)", () => {
   });
 
   it("the row without the length numbers is refused ENGINE_REQUIRES_LENGTH_POLICY (a belt: the boot refuses first)", () => {
-    expect(() => engineForAsk({ policy: ENGINE, length: null, makers: 2, mapOpening: false }))
-      .toThrowError(expect.objectContaining({ code: "ENGINE_REQUIRES_LENGTH_POLICY" }));
-    let thrown: unknown;
+    // Task 6 review 3 (final wave B4): one call, one try/catch, the class and the code.
+    let thrown: unknown = null;
     try { engineForAsk({ policy: ENGINE, length: null, makers: 2, mapOpening: false }); } catch (error) { thrown = error; }
     expect(thrown).toBeInstanceOf(TypedDomainError);
+    expect(thrown).toMatchObject({ code: "ENGINE_REQUIRES_LENGTH_POLICY" });
   });
 
   it("the boot rule: the row in force without the length row refuses; every other pair passes", () => {
@@ -123,6 +123,15 @@ describe("admission freezes the engine on the receipt (spec §3.2)", () => {
 
   it("the row in force without the length row (a composition that skipped the boot rule) is refused, never admitted", async () => {
     await expect(evaluateAskAdmission(settings({ engine: true }), ASK)).rejects.toMatchObject({ code: "ENGINE_REQUIRES_LENGTH_POLICY" });
+  });
+
+  it("an HTTP caller is told the code only: the refusal's message names engine words (Task 6 review 2, final wave A4)", async () => {
+    const refusal = await evaluateAskAdmission(settings({ engine: true }), ASK)
+      .then(() => null, (error: unknown) => error as { code: string; message: string });
+    expect(refusal).not.toBeNull();
+    expect(refusal!.code).toBe("ENGINE_REQUIRES_LENGTH_POLICY");
+    expect(refusal!.message).toMatch(/Engine 2/u);
+    expect(askRefusalPublicMessage(refusal!.code, refusal!.message)).toBe("ENGINE_REQUIRES_LENGTH_POLICY");
   });
 });
 

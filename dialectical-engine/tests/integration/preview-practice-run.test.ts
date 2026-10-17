@@ -1185,7 +1185,7 @@ describe("preview practice: language mode, the question language (P2L)", () => {
 describe("engine 2's story (R1d)", () => {
   const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
   const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
-  type PinOutcome = { pinnedModel: string; wroteModel: string | null; held: boolean };
+  type PinOutcome = { pinnedModel: string; wroteModel: string | null; servedBy: string[]; held: boolean };
   type EngineReport = {
     verdict: string; reasons: string[]; ask: { engine?: { engine: number } };
     register: { registerVersion: string; codeNext?: { addedKeys: string[] } };
@@ -1241,6 +1241,20 @@ describe("engine 2's story (R1d)", () => {
     faithful_to_material: false, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
     citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
   } });
+
+  // Task 20 review 1 (final wave B14): engine 2 needs the length row; the export has none and no --length-policy is given,
+  // so runPractice refuses at its argument checks, before the throwaway database starts and before any gate is asked.
+  it("--engine-policy without any length row: PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY before the database starts (HARNESS_ERROR, exit 40)", async () => {
+    const { stubs, env, common, quiet } = await scenario();
+    const lines: string[] = [];
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1",
+      "--engine-policy", ENGINE_POLICY_START], env, { ...quiet, log: (line: string) => { lines.push(line); } });
+    expect(outcome.exitCode).toBe(40);
+    expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_ENGINE_REQUIRES_LENGTH_POLICY"]);
+    expect(lines.some((line) => line.includes("practice database started"))).toBe(false);
+    expect(stubs.requests).toEqual([]);
+    expect(stubs.remainingReads).toEqual([]);
+  }, 60_000);
 
   it("R1d-1 --register-next --length-policy --engine-policy: storyteller v4 and checker v4 with their targets, no shape asked, the pack default stored, ask.engine 2: PASS (exit 0)", async () => {
     const { stubs, env, common, quiet, out } = await scenario();
@@ -1317,8 +1331,9 @@ describe("engine 2's story (R1d)", () => {
     expect(report.ask.engine).toEqual({ engine: 1 });
     expectStoryV3(stubs.requests);
     expect(report.writerPins).toEqual({
-      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, held: true },
-      storyteller: { pinnedModel: MIMO, wroteModel: MIMO, held: true }
+      // Ruling A1 (Task 21 review): held = the pinned model SERVED the step (the answered final-writer calls; the stored story).
+      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU], held: true },
+      storyteller: { pinnedModel: MIMO, wroteModel: MIMO, servedBy: [MIMO], held: true }
     });
     expect(new Set(answered(stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([MIMO]));
     expect(new Set(stubs.requests.filter((request) => request.kind === "COMPOSE" && request.answer === "OK").map((request) => request.model)))
@@ -1328,7 +1343,7 @@ describe("engine 2's story (R1d)", () => {
     expectStoryBlocks(report, out, 1, [MIMO]);
     expect(report.storyRounds!.every((row) => row.model === MIMO && row.misleading === null)).toBe(true);
     expect(report.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
-    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, held: yes`);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, served by ${MIMO}, held: yes`);
   }, 900_000);
 
   it("R1d-4 --length-policy --engine-policy, round 1's checker finds the story misleading: round 2 sends the storyteller its own draft as its own turn and the problems, and the story is READY: PASS (exit 0)", async () => {
@@ -1440,8 +1455,10 @@ describe("engine 2's story (R1d)", () => {
       report.admission.panel.find((member) => member.providerRef === providerRef)?.modelId;
     const control = await scenario(storytellerDown);
     const first = (await runPractice(["debate", ...control.common, ...args], control.env, { ...control.quiet, asOf })).report as unknown as EngineReport;
-    // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story.
-    expect({ verdict: first.verdict, reasons: first.reasons }).toEqual({ verdict: "PASS_WITH_WARNINGS", reasons: ["UNBILLED_REFUSALS:2"] });
+    // The pinned storyteller's two unbilled vendor errors are the only warning; the backup told the story. Final wave A1
+    // (Task 21 ruling): the pin did not hold, because the backup, not the pinned model, served the story: NOT_PROVEN.
+    expect({ verdict: first.verdict, reasons: first.reasons })
+      .toEqual({ verdict: "NOT_PROVEN", reasons: ["PRACTICE_PIN_NOT_HELD:STORYTELLER", "UNBILLED_REFUSALS:2"] });
     expect(first.ask.engine).toEqual({ engine: 2 });
     expect(first.run.story.outcome).toBe("READY");
     const [controlBackup] = first.storyBackups as BackupRow[];
@@ -1450,6 +1467,7 @@ describe("engine 2's story (R1d)", () => {
     const benched = controlBackup!.backupModel!;
     expect(benched).not.toBe(MIMO);
     expect(new Set(answered(control.stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([benched]));
+    expect(first.writerPins?.storyteller).toEqual({ pinnedModel: MIMO, wroteModel: MIMO, servedBy: [benched], held: false });
 
     const benchedBusy = (request: GateRequest): GateOverride | null =>
       request.model === benched && request.kind !== "PROBE" ? { unbilled: true } : storytellerDown(request);

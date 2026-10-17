@@ -46,6 +46,7 @@ export interface StoryPack {
    * and the checker are told about the `length` field, the long version's length, what may be said about the debate's
    * gaps, misleading problems against wording notes, and the answers' layout in the long version. Sent ONLY with the v4
    * story contracts (engine 2), so every other story gets exactly the instructions it got before, byte for byte.
+   * OWNER WORDING — approve before switch-on (common-length.md, checker-length.md).
    */
   readonly commonLength: string;
   readonly checkerLength: string;
@@ -53,6 +54,7 @@ export interface StoryPack {
   /**
    * Story v4 (spec §7.2 items 2, 10): the v4 text of every shape (`shapes-v4/<id>.md`), one per id of `shapes`, in the
    * same order, under the same rules. A v4 story is told ONE of them; `shapes` stays the v3 menu, byte for byte.
+   * OWNER WORDING — approve before switch-on (shapes-v4/<id>.md).
    */
   readonly shapesV4: readonly StoryShape[];
   readonly fingerprint: string;
@@ -494,13 +496,15 @@ export function loadStoryPack(dir: string): StoryPack {
     for (const v4 of [null, ...shapeIds.map((shapeId): StoryV4Options => Object.freeze({ shapeId }))]) {
       const instruction = assembleStorytellerInstruction(pack, mapFields, v4);
       const instructionBytes = Buffer.byteLength(instruction, "utf8");
+      // Task 9 review 3: the refusal names the form (v3, or v4 and its shape) and whether the map passages were in it.
+      const form = `the assembled storyteller instruction (${v4 === null ? "v3" : `v4, shape ${v4.shapeId}`}${mapFields ? ", with the map passages" : ""})`;
       if (instructionBytes > STORY_PACK_LIMITS.maxInstructionBytes) {
         throw storyPackFailure(
           "INSTRUCTION_TOO_LARGE",
-          `the assembled storyteller instruction is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
+          `${form} is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
         );
       }
-      assertStoryTextFrameable("the assembled storyteller instruction", instruction);
+      assertStoryTextFrameable(form, instruction);
     }
   }
   assertStoryTextFrameable(checkerFile.path, pack.checker);

@@ -239,7 +239,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -10701,12 +10701,18 @@ export class WalkingSkeletonRunner {
               // without those the preview's sit-out book has benched: a backup never goes to an AI that sits out the rest
               // of the run (G7 + the sit-out rule; its call would be refused before sending and the cost fallback could
               // move it to the first storyteller's or the checker's maker). Off the preview `sitOut` is null: no filter.
+              // Ruling W1 (whole-branch review Minor 1): the maker rule reads every claim-eligible member's maker
+              // BEFORE that filter (`backupMakers`, out-of-panel register refs included), so a benched first storyteller
+              // or an out-of-panel checker still excludes its maker: the maker exclusion first, the sit-out filter after.
               engine: engine.engine === 2 ? engine : null,
               ...(engine.engine === 2
-                ? { backupCandidates: storyBackupCandidatesFrom({
-                  panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
-                  claimEligible: synthesisMakers.filter((member) => sitOut?.sitsOut(member.providerRef) !== true)
-                }) }
+                ? {
+                  backupCandidates: storyBackupCandidatesFrom({
+                    panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+                    claimEligible: synthesisMakers.filter((member) => sitOut?.sitsOut(member.providerRef) !== true)
+                  }),
+                  backupMakers: storyBackupMakersFrom(synthesisMakers)
+                }
                 : {}),
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },

@@ -51,6 +51,7 @@ import {
   readStoryPolicy,
   type CallConcurrencyPolicy,
   type DebateShapeCeilingInput,
+  type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
 import type { DebateShapeSettings } from "@debateai/contract";
@@ -477,6 +478,8 @@ export function previewDebateHarness(input: Readonly<{
     shape?: DebateShapeCeilingInput; settings?: DebateShapeSettings; language?: Readonly<{ tag: string; name: string }>;
     /** LG-C Task 17: the length row's numbers frozen on the receipt (`envelope_basis.length`); absent, today's receipt. */
     length?: LengthGuidance;
+    /** R1d final wave B3: engine 2 frozen on the receipt (`envelope_basis.engine`, needs `length`); absent, engine 1. */
+    engine?: EngineSettings;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -497,7 +500,8 @@ export function previewDebateHarness(input: Readonly<{
       depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
       envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
         ...(admission.shape === undefined ? {} : { shape: admission.shape }),
-        ...(admission.length === undefined ? {} : { length: admission.length }) }),
+        ...(admission.length === undefined ? {} : { length: admission.length }),
+        ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
       ...(admission.shape === undefined ? {} : {
         argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
         argumentLanguageName: (admission.language ?? { name: "English" }).name

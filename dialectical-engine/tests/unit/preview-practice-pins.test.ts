@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PREVIEW_PROVIDER_REF_MODELS } from "@debateai/providers";
+import { PREVIEW_PROVIDER_REF_MODELS, parsePreviewProviderTestConfig, previewPlanTierRosters } from "@debateai/providers";
 import { pickRotatedRoles, type RoleRotationCounts } from "@debateai/scorecard";
 import { parsePracticeArgs } from "../../tools/preview-practice/practice.js";
 import {
@@ -7,6 +8,8 @@ import {
   practicePinsNotHeld,
   practicePinsRequireRotation,
   practiceRotationCountsWithPins,
+  practiceServedModels,
+  practiceServedStoryteller,
   practiceWriterPinsBlock,
   practiceWriterPinsFromArgs,
   practiceWriterPinsLines
@@ -83,29 +86,100 @@ describe("pins: the counts the rotation reads", () => {
     const counts = practiceRotationCountsWithPins({}, { answerWriter: MIMO, storyteller: null }, PREMIUM);
     expect(pickRotatedRoles({ panel: PANEL, counts, seed: SEED })!.answerWriter.modelId).not.toBe(MIMO);
   });
+
+  it("a pin outside the premium list here is a broken invariant (the flags refused it first), never a practice refusal", () => {
+    // Task 21 review 3 (final wave A8): practiceWriterPinsFromArgs checks the same premium list before any gate is asked.
+    expect(() => practiceRotationCountsWithPins({}, { answerWriter: null, storyteller: "gpt-unknown" }, PREMIUM))
+      .toThrowError(new TypeError("PRACTICE_PIN_UNCHECKED: STORYTELLER"));
+  });
+});
+
+// Task 21 review ⚠️ (final wave B15): the counts give a share to every premium model only, so the pin holds only while
+// every model the rotation can pick (the debate's panel) is a premium one. The practice asks on the premium plan, whose
+// roster on the preview is premium_model_ids: the panel is a subset of it.
+describe("pins: the practice panel is drawn from premium_model_ids", () => {
+  it("the practice asks on the premium plan, and the preview's premium roster is premium_model_ids", () => {
+    const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture",
+      anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", free_model_ids: [GLM, HAIKU], premium_model_ids: PREMIUM }))!;
+    expect(previewPlanTierRosters(config, { free: [], premium: [] }).premium).toEqual(PREMIUM);
+    const debateSource = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(debateSource.split("plan_tier: \"premium\"")).toHaveLength(2);
+    // Every premium model gets a count, so no model of a premium panel is left without a share.
+    const counts = practiceRotationCountsWithPins({}, { answerWriter: HAIKU, storyteller: null }, PREMIUM);
+    expect(Object.keys(counts.ANSWER_WRITER!).sort()).toEqual([...PREMIUM].sort());
+  });
 });
 
 describe("pins: what the run did", () => {
   const ref = (model: string) => Object.entries(PREVIEW_PROVIDER_REF_MODELS).find(([, id]) => id === model)![0];
 
-  it("held when the run's own pin names the pinned model; not held otherwise, a NOT_PROVEN reason", () => {
-    const block = practiceWriterPinsBlock({ answerWriter: HAIKU, storyteller: MIMO }, { answerWriter: ref(HAIKU), storyteller: ref(GLM) });
+  // Task 21 review, RULING (final wave A1): "held" means the pinned model actually SERVED the step, read from the run's own
+  // served-call facts (the answered final-writer calls, the stored story's storyteller), not only that the role pin named it.
+  const served = (answerWriter: readonly string[], storyteller: readonly string[]) => ({ answerWriter, storyteller });
+
+  it("held when the run's own pin names the pinned model and it served the step; not held otherwise, a NOT_PROVEN reason", () => {
+    const block = practiceWriterPinsBlock({ answerWriter: HAIKU, storyteller: MIMO }, { answerWriter: ref(HAIKU), storyteller: ref(GLM) },
+      served([HAIKU], [GLM]));
     expect(block).toEqual({
-      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, held: true },
-      storyteller: { pinnedModel: MIMO, wroteModel: GLM, held: false }
+      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU], held: true },
+      storyteller: { pinnedModel: MIMO, wroteModel: GLM, servedBy: [GLM], held: false }
     });
     expect(practicePinsNotHeld(block)).toEqual(["STORYTELLER"]);
-    expect(practiceWriterPinsBlock({ answerWriter: HAIKU, storyteller: null }, null))
-      .toEqual({ answerWriter: { pinnedModel: HAIKU, wroteModel: null, held: false }, storyteller: null });
+    expect(practiceWriterPinsBlock({ answerWriter: HAIKU, storyteller: null }, null, null))
+      .toEqual({ answerWriter: { pinnedModel: HAIKU, wroteModel: null, servedBy: [], held: false }, storyteller: null });
     const verdict = practiceVerdict({ harnessError: null, completed: true, servedAnswer: true, storyOutcome: "READY", formatFailures: 0,
       failedCalls: 0, gateHalted: false, gateStopped: false, notExercisedModels: [], unbilledRefusals: 0, p90ByModel: {},
       pinsNotHeld: practicePinsNotHeld(block) });
     expect({ verdict: verdict.verdict, reasons: verdict.reasons }).toEqual({ verdict: "NOT_PROVEN", reasons: ["PRACTICE_PIN_NOT_HELD:STORYTELLER"] });
   });
 
+  it("a cost fallback serving the final writer instead of the pinned model: not held, though the role pin names it", () => {
+    const pins = { answerWriter: HAIKU, storyteller: null };
+    const rotation = { answerWriter: ref(HAIKU), storyteller: ref(GLM) };
+    // One of the writer's calls was served by the cost fallback's GLM: the pinned model did not write the answer alone.
+    expect(practiceWriterPinsBlock(pins, rotation, served([HAIKU, GLM], [GLM])).answerWriter)
+      .toEqual({ pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU, GLM], held: false });
+    expect(practiceWriterPinsBlock(pins, rotation, served([GLM], [GLM])).answerWriter?.held).toBe(false);
+    // No final-writer call answered (the debate ended first): nothing served, not held.
+    expect(practiceWriterPinsBlock(pins, rotation, served([], [])).answerWriter?.held).toBe(false);
+    expect(practicePinsNotHeld(practiceWriterPinsBlock(pins, rotation, served([GLM], [])))).toEqual(["ANSWER_WRITER"]);
+  });
+
+  it("a backup storyteller (or a cost fallback) telling the story instead of the pinned model: not held", () => {
+    const pins = { answerWriter: null, storyteller: MIMO };
+    const rotation = { answerWriter: ref(HAIKU), storyteller: ref(MIMO) };
+    expect(practiceWriterPinsBlock(pins, rotation, served([HAIKU], [DEEPSEEK])).storyteller)
+      .toEqual({ pinnedModel: MIMO, wroteModel: MIMO, servedBy: [DEEPSEEK], held: false });
+    expect(practiceWriterPinsBlock(pins, rotation, served([HAIKU], [MIMO])).storyteller?.held).toBe(true);
+    // No stored story lineage (the story FAILED): nothing served, not held.
+    expect(practiceWriterPinsBlock(pins, rotation, served([HAIKU], [])).storyteller?.held).toBe(false);
+  });
+
+  it("the served facts: each answered call's own AI, per family, once each in ledger order; the story's served storyteller", () => {
+    const calls = [
+      { model: HAIKU, family: "SYNTHESIZER" as const, tries: [{ outcome: "OK", parseStatus: "PARSED", replyForm: null }] },
+      // A call that never answered serves nothing.
+      { model: QWEN, family: "SYNTHESIZER" as const, tries: [{ outcome: "FAILED", parseStatus: "SCHEMA_FAILED", replyForm: null }] },
+      // A structure-repaired call is its own AI's (the call join names the call's AI, not the repair model).
+      { model: GLM, family: "SYNTHESIZER" as const, tries: [{ outcome: "FAILED", parseStatus: "SCHEMA_FAILED", replyForm: null },
+        { outcome: "OK", parseStatus: "PARSED", replyForm: "STRUCTURE" as const }] },
+      { model: HAIKU, family: "SYNTHESIZER" as const, tries: [{ outcome: "OK", parseStatus: "PARSED", replyForm: null }] },
+      { model: MIMO, family: "STORYTELLER" as const, tries: [{ outcome: "OK", parseStatus: "PARSED", replyForm: null }] }
+    ];
+    expect(practiceServedModels(calls, "SYNTHESIZER")).toEqual([HAIKU, GLM]);
+    expect(practiceServedStoryteller({ storytellerLineage: { maker: "xiaomi", model_id: "m", transport: "t", provider_ref: ref(MIMO) } }))
+      .toEqual([MIMO]);
+    expect(practiceServedStoryteller({ storytellerLineage: null })).toEqual([]);
+    expect(practiceServedStoryteller(null)).toEqual([]);
+  });
+
   it("report lines: model ids and yes/no only", () => {
-    const lines = practiceWriterPinsLines({ answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, held: true }, storyteller: null }).join("\n");
-    expect(lines).toContain(`- answer writer: pinned ${HAIKU}, wrote ${HAIKU}, held: yes`);
+    const lines = practiceWriterPinsLines({ answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU], held: true },
+      storyteller: null }).join("\n");
+    expect(lines).toContain(`- answer writer: pinned ${HAIKU}, wrote ${HAIKU}, served by ${HAIKU}, held: yes`);
+    expect(practiceWriterPinsLines({ answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [], held: false }, storyteller: null })
+      .join("\n")).toContain(`- answer writer: pinned ${HAIKU}, wrote ${HAIKU}, served by none, held: no`);
     expect(lines).not.toContain("storyteller:");
   });
 });

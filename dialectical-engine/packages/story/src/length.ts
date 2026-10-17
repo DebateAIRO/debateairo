@@ -18,11 +18,10 @@ import type { LengthGuidance } from "@debateai/register";
  * With the length row, the storyteller's and the checker's calls are sized from the run's frozen table: the larger of
  * today's allowance and (thinking room + answer room), never past the storyteller's guided ceiling (the largest reviewed
  * row's own maximum) or, for the checker, LG-C's allowance cap (LENGTH_ALLOWANCE_LIMITS.capTokens, as the runner's
- * guidedCallBound). The storyteller's
- * answer room counts the short targets and the long version's reference words once each (no runaway factor: the
- * reference is the whole long story, INTERFACE §3.3); the checker's is the runaway factor × its words. Only the token
- * ceiling moves: tries (2, ruling L35) and the deadline stay the policy's. On the preview the wrapper's per-row story
- * ceilings still decide the storyteller's final allowance (spec §3.3).
+ * guidedCallBound). The storyteller's answer room counts the short targets and the long version's reference words once
+ * each (no runaway factor: the reference is the whole long story, INTERFACE §3.3); the checker's is the runaway factor ×
+ * its words. Only the token ceiling moves: tries (2, ruling L35) and the deadline stay the policy's. On the preview the
+ * wrapper's per-row story ceilings still decide the storyteller's final allowance (spec §3.3).
  *
  * The words are information only (spec §3.6): nothing in the story reads them to decide anything.
  */

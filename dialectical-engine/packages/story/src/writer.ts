@@ -5,7 +5,6 @@ import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQ
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
-  buildFramedRevisionPrompt,
   rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
@@ -21,10 +20,12 @@ import {
 } from "@debateai/providers";
 import type { EngineSettings, LengthGuidance, StoryPolicy } from "@debateai/register";
 import {
+  STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   pickBackupStoryteller,
   storyBackupSignalOf,
   type StoryBackupCandidate,
+  type StoryBackupMaker,
   type StoryBackupRecord
 } from "./backup.js";
 import {
@@ -37,7 +38,7 @@ import {
 } from "./contracts.js";
 import { readStoryEnrichment } from "./enrichment.js";
 import { storyActualWords, storyGuidedBound, storyGuidedWords } from "./length.js";
-import { runStoryLoop, storyCallSiteKey, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
+import { runStoryLoop, storyCallSiteKey, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
 import {
   buildStoryMaterial,
   buildStoryRevisionPrompt,
@@ -199,6 +200,12 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * candidates. Read only under v4. Absent or none of another maker: no backup (STORY_BACKUP_UNAVAILABLE is logged).
    */
   readonly backupCandidates?: readonly StoryBackupCandidate[];
+  /**
+   * R1d (whole-branch review Minor 1, ruling W1): every claim-eligible member's maker, before the sit-out filter, so the
+   * backup's maker rule knows the first storyteller's and the checker's makers even when their refs are not candidates.
+   * Read only under v4. Absent: the makers are read from the candidates alone.
+   */
+  readonly backupMakers?: readonly StoryBackupMaker[];
 };
 
 /**
@@ -226,9 +233,9 @@ const BARE_STEP: StoryStepLease = (use) => use();
 
 /**
  * R1d: the story gateway accepts rounds 1..8 only (`STORY_CALL_SITE`, apps/runner/src/index.ts, and the loop's own
- * limit), so a backup loop whose last round would pass it is not started.
+ * limit, read from the loop: Task 17 review 2), so a backup loop whose last round would pass it is not started.
  */
-const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: 8 });
+const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: storyLoopLastRound() });
 
 /** Story v4 round 2 (R1d decision 3): the accepted round-1 draft as the model's own turn, and the checker's problems. */
 type StoryRevisionTurn = Readonly<{ ownDraft: string; problems: string }>;
@@ -334,9 +341,10 @@ function storyCallRequest(input: {
     providerRef: input.providerRef,
     packet: revision === null ? framed.packet : revision.packet,
     classifyContent: input.classifyContent,
-    buildRepairPacket: turn === null
+    // A revision's full re-ask is the revision's own (`buildStoryRevisionPrompt`), under the same fence (Task 17 review 1).
+    buildRepairPacket: revision === null
       ? (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
-      : (rejected) => buildFramedRevisionPrompt(framed.packet, turn.ownDraft, turn.problems, schemaFailureLocator(rejected)),
+      : revision.buildRepairPacket,
     ...(input.guidedWords === undefined ? {} : { guidedWords: input.guidedWords }),
     ...(input.actualWordsOf === undefined ? {} : { actualWordsOf: input.actualWordsOf })
   };
@@ -801,12 +809,13 @@ export class StoryWriter {
         const chosen = pickBackupStoryteller({
           candidates: input.backupCandidates ?? [],
           firstRef: storyteller.providerRef,
-          checkerRef: checker.providerRef
+          checkerRef: checker.providerRef,
+          makers: input.backupMakers
         });
         const firstRound = policy.loopMaxRounds + 1;
         const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;
         if (chosen === null || !fits) {
-          this.#log("STORY_BACKUP_UNAVAILABLE", () => ({
+          this.#log(STORY_BACKUP_UNAVAILABLE, () => ({
             answerId: input.answerId,
             answerVersion: input.answerVersion,
             signal,

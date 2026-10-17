@@ -5,6 +5,7 @@ import {
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
   type StoryBackupCandidate,
+  type StoryBackupMaker,
   type StoryCostFallback,
   type StoryRoleMaker,
   type StoryRoleResolver,
@@ -165,6 +166,12 @@ export interface StorySnapshotSource {
    * them over only for an engine-2 debate.
    */
   readonly backupCandidates?: readonly StoryBackupCandidate[];
+  /**
+   * R1d (whole-branch review Minor 1, ruling W1): every claim-eligible member's maker, BEFORE the sit-out filter
+   * (`storyBackupMakersFrom`), out-of-panel register refs included, so the backup's maker rule knows the resolved roles'
+   * makers even when their refs are not candidates. Handed over only for an engine-2 debate.
+   */
+  readonly backupMakers?: readonly StoryBackupMaker[];
 }
 
 /**
@@ -251,6 +258,17 @@ export function storyBackupCandidatesFrom(input: Readonly<{
 }>): readonly StoryBackupCandidate[] {
   return Object.freeze(claimEligibleInPanelOrder(input.panelRefs, input.claimEligible)
     .map((member) => Object.freeze({ provider: member.provider, providerRef: member.providerRef, maker: member.maker })));
+}
+
+/**
+ * Engine redesign R1d (whole-branch review Minor 1, ruling W1): the backup's maker rule's makers — every claim-eligible
+ * member of the run, in the order given, BEFORE the sit-out filter, out-of-panel register refs included, each as its ref
+ * and maker only (no gateway: none of them is offered). Pure.
+ */
+export function storyBackupMakersFrom(
+  claimEligible: readonly Readonly<{ providerRef: string; maker: string }>[]
+): readonly StoryBackupMaker[] {
+  return Object.freeze(claimEligible.map((member) => Object.freeze({ providerRef: member.providerRef, maker: member.maker })));
 }
 
 /**
@@ -384,6 +402,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     ...(source.languageLocked === true ? { languageLocked: true as const } : {}),
     // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
     ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
-    ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) })
+    ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),
+    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) })
   });
 }
