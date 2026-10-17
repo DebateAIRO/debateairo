@@ -1,5 +1,7 @@
-import { lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpectation } from "@debateai/kernel";
+import { MAP_CHECK_CALL_SITE_KEY, TypedDomainError, lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpectation } from "@debateai/kernel";
+import { mapApplyAnswerCheck, mapCheckCandidatesOf, mapCheckEntriesOf, mapCheckReadingOf } from "./check.js";
 import { mapFinishChoice, mapInternalWordsSkipped } from "./choose.js";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES } from "./internal-words.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
 import { mapAddGapPoints, mapApplyMerge, mapCodeMerge, mapSingletonMap, type MapMergedMap } from "./keypoints.js";
 import type { MapLength } from "./length.js";
@@ -12,6 +14,7 @@ import {
   mapDroppedAngles,
   mapListAssignments,
   mapOrderAngles,
+  mapPickChecker,
   mapPickChooser,
   mapPickGapSeat,
   mapPickMerger,
@@ -21,6 +24,7 @@ import {
 } from "./roles.js";
 import {
   mapAnglesSpec,
+  mapCheckSpec,
   mapChooseSpec,
   mapLockedLanguage,
   mapGapSpec,
@@ -34,6 +38,7 @@ import {
 import {
   MAP_LIMITS,
   mapLimitsFor,
+  type MapAnswerCheckResult,
   type MapAngle,
   type MapArm,
   type MapCallRecord,
@@ -58,7 +63,7 @@ export type MapCallRequest<T> = Readonly<{
   step: MapStep;
   /**
    * The spec's call-site key (§3.4): MAP:angles, MAP:list:<i>, MAP:list:<i>:2 (a list reassigned to another seat),
-   * MAP:merge, MAP:gap:<k>, MAP:choose.
+   * MAP:merge, MAP:gap:<k>, MAP:choose; engine 2 adds MAP:check.
    */
   callSiteKey: string;
   seat: MapSeat;
@@ -117,6 +122,12 @@ export type MapRunInput = Readonly<{
   /** Length guidance: the run's map targets; absent = today's map. */
   length?: MapLength;
   /**
+   * Engine redesign R3 (spec 2026-10-15 §5): engine 2's map — the v2 contracts (they need `length`), a choose that never
+   * sides by code, and ONE answer check after choose reading up to `answerCheckCandidates` candidates (the receipt's
+   * `answerCheck.candidates`). Set by the runner only for an engine-2 receipt with a map. Absent: today's map.
+   */
+  engine?: Readonly<{ answerCheckCandidates: number }>;
+  /**
    * True for an error that ends the run (claim lost, time limit): rethrown, never a fallback. Must be a pure predicate:
    * a throw inside it replaces the original error.
    */
@@ -147,11 +158,15 @@ class MapRun {
     // Ruling R-5: the reply-language expectation is built once, from the question line, and every step's check reads it
     // (question-language spec 2026-10-13: the lock, never a re-guess). A tag or name with no lock ("und", a stored
     // fallback name) keeps today's expectation; it never crashes.
+    if (input.engine !== undefined && input.length === undefined) {
+      throw new TypedDomainError("MAP_ENGINE_REQUIRES_LENGTH", "MAP_ENGINE_REQUIRES_LENGTH: engine 2's map is always told its lengths");
+    }
     const lock = mapLockedLanguage(input);
     this.ctx = Object.freeze({ questionLine: input.questionLine, languageName: input.languageName, languageTag: input.languageTag,
       replyLanguage: lock === null ? replyLanguageExpectation(input.questionLine) : lockedReplyLanguageExpectation(lock, input.questionLine),
       ...(input.contracts === undefined ? {} : { contracts: input.contracts }),
-      ...(input.length === undefined ? {} : { length: input.length }) });
+      ...(input.length === undefined ? {} : { length: input.length }),
+      ...(input.engine === undefined ? {} : { engine: true as const }) });
   }
 
   /**
@@ -210,7 +225,8 @@ class MapRun {
   }
 
   mapResult(parts: Readonly<{ kind: "MAP" | "UNAVAILABLE"; angles: readonly MapAngle[]; items: readonly MapItem[];
-    keyPoints: readonly MapKeyPoint[]; mergedAnswers: readonly MapMergedAnswer[]; framingChallenges: readonly string[]; choice: MapChoice | null }>): MapResult {
+    keyPoints: readonly MapKeyPoint[]; mergedAnswers: readonly MapMergedAnswer[]; framingChallenges: readonly string[]; choice: MapChoice | null;
+    answerCheck?: MapAnswerCheckResult }>): MapResult {
     return Object.freeze({
       arm: this.arm,
       ...parts,
@@ -313,21 +329,46 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
     }
   }
 
+  const engine = run.input.engine;
   // With no merger (arm A, or a failed merge) roles.ts anchors on the would-be merger, which then comes last among equal ranks.
   const chooser = mapPickChooser(order, run.out, mergedBy);
   const reply = chooser === null ? null
-    : await run.mapAsk("CHOOSE", "MAP:choose", chooser, mapShownIds(merged), mapChooseSpec(run.ctx, merged.keyPoints, merged.mergedAnswers, { raisedByCounts }));
+    : await run.mapAsk("CHOOSE", "MAP:choose", chooser, mapShownIds(merged), mapChooseSpec(run.ctx, merged.keyPoints, merged.mergedAnswers,
+      { raisedByCounts, ...(engine === undefined ? {} : { engine: { framingChallenges: Object.freeze([...challenges]) } }) }));
   // Plan sizes are capped by the makers present (spec §5, ruling P7): no more answers than distinct makers still
   // available, never capped below the two distinct answers the map always gives.
   const makersPresent = Math.max(MAP_LIMITS.chooseDistinctAnswersMin, mapDistinctMakers(run.available));
   const finished = mapFinishChoice({ reply, keyPoints: merged.keyPoints, mergedAnswers: merged.mergedAnswers, items: allItems,
     languageTag: run.input.languageTag, maxAnswers: Math.min(run.input.maxAnswers, makersPresent), pointsPerAnswer: run.input.pointsPerAnswer,
-    claimMaxChars: mapLimitsFor(run.input.length !== undefined).claimMaxChars });
+    claimMaxChars: mapLimitsFor(run.input.length !== undefined).claimMaxChars,
+    ...(engine === undefined ? {} : { siding: "NONE" as const, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES }) });
   run.marks.push(...finished.marks);
-  const skipped = mapInternalWordsSkipped(merged.keyPoints, merged.mergedAnswers);
+  const skipped = mapInternalWordsSkipped(merged.keyPoints, merged.mergedAnswers, engine === undefined ? undefined : MAP_ENGINE_INTERNAL_FIELD_NAMES);
   if (skipped !== null) run.mapNote(skipped.note, skipped.step, skipped.detail);
+  // Engine 2 (spec §5.2 item 5): ONE check by another maker, then its replacements. A stop (mapAsk returns null without a
+  // call), no seat, or a failed call: the answers stand unchecked (MAP_CHECK_UNAVAILABLE). It never runs twice.
+  let choice = finished.choice;
+  let answerCheck: MapAnswerCheckResult | undefined;
+  if (engine !== undefined && choice.answers.length > 0) {
+    const candidates = mapCheckCandidatesOf({ choice, mergedAnswers: merged.mergedAnswers, max: engine.answerCheckCandidates,
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES,
+      // Pre-flight PF-R33.8 (pre-flight consistency: Task 8's member, passed here): the merged answers the chooser's ACCEPTED
+      // reply reused (its answer ids name merged answers) are never candidates, even reworded; empty under the choose fallback.
+      keptMergedAnswerIds: new Set(reply?.answers.map((answer) => answer.answer_id) ?? []) });
+    const entries = mapCheckEntriesOf(choice, candidates);
+    const checker = mapPickChecker(order, run.out, chooser);
+    const checked = checker === null ? null
+      : await run.mapAsk("CHECK", MAP_CHECK_CALL_SITE_KEY, checker, entries.map((entry) => entry.checkId), mapCheckSpec(run.ctx, entries));
+    const applied = mapApplyAnswerCheck({ choice, reading: checker === null || checked === null ? null : mapCheckReadingOf(checked, checker),
+      candidates, keyPoints: merged.keyPoints, pointsPerAnswer: run.input.pointsPerAnswer, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES,
+      // Operators only (pre-flight PF-R34.12): a stop (before or during the check) made no call, so it is named as a stop.
+      unavailableDetail: checker === null ? "no seat to check" : run.stoppedBy !== null ? "map stopped" : "check reply missing" });
+    run.marks.push(...applied.marks);
+    choice = applied.choice;
+    answerCheck = applied.answerCheck;
+  }
   return run.mapResult({ kind: "MAP", angles, items: allItems, keyPoints: merged.keyPoints, mergedAnswers: merged.mergedAnswers,
-    framingChallenges: Object.freeze(challenges), choice: finished.choice });
+    framingChallenges: Object.freeze(challenges), choice, ...(answerCheck === undefined ? {} : { answerCheck }) });
 }
 
 async function mapAfterLists(run: MapRun, angles: readonly MapAngle[], lists: readonly MapArrivedList[]): Promise<MapResult> {

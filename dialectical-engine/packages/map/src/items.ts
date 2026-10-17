@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mapNamesInternalWord } from "./internal-words.js";
+import { MAP_INTERNAL_FIELD_NAMES, mapNamesInternalWord } from "./internal-words.js";
 import { mapNormaliseText } from "./text.js";
 import {
   MAP_FIXED_ANGLE_KINDS,
@@ -166,7 +166,11 @@ export function mapRankMergedAnswers(answers: readonly MapMergedAnswer[]): reado
 }
 
 /** One "also raised, not debated" entry: its claim, the distinct makers who raised it, and the key point (or chosen answer) it is. */
-export type MapAlsoRaisedEntry = Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>;
+export type MapAlsoRaisedEntry = Readonly<{ keyPointId: string; claim: string; makers: readonly string[];
+  /** Engine 2 only (INTERFACE §10.7): "ANSWER" for an answer raised and not debated; absent = a point. */
+  kind?: "POINT" | "ANSWER";
+  /** Engine 2 only (P2.2; ruling R3-T5.1): a point's key point label, what it rests on; absent for engine 1 and for an answer. */
+  restsOn?: MapRestsOn }>;
 
 /** Two spellings of one claim (case, spacing, Unicode form) are one claim. */
 const alsoRaisedClaimKey = (claim: string): string => claim.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase();
@@ -180,11 +184,12 @@ const alsoRaisedClaimKey = (claim: string): string => claim.normalize("NFKC").re
  * again on its own output changes nothing. Applied again when the API reads a stored list, so a row stored before this
  * rule is cleaned on the page too.
  */
-export function mapMergeAlsoRaised<T extends Readonly<{ claim: string; makers: readonly string[] }>>(entries: readonly T[]): readonly T[] {
+export function mapMergeAlsoRaised<T extends Readonly<{ claim: string; makers: readonly string[] }>>(entries: readonly T[],
+  names: readonly string[] = MAP_INTERNAL_FIELD_NAMES): readonly T[] {
   const merged = new Map<string, { first: T; claim: string; makers: Set<string>; order: number }>();
   for (const [order, entry] of entries.entries()) {
     const claim = entry.claim.trim();
-    if (claim === "" || mapNamesInternalWord(claim)) continue;
+    if (claim === "" || mapNamesInternalWord(claim, names)) continue;
     const key = alsoRaisedClaimKey(claim);
     const known = merged.get(key);
     if (known === undefined) merged.set(key, { first: entry, claim, makers: new Set(entry.makers), order });
@@ -208,8 +213,15 @@ export function mapAlsoRaisedOf(input: Readonly<{
   keyPoints: readonly MapKeyPoint[];
   mergedAnswers: readonly MapMergedAnswer[];
   arguedAnswers: number;
+  /** Engine 2 (spec §5.2 item 8): also list unchosen merged answers some AI raised blind (never a code-filled one). */
+  unchosenAnswers?: boolean;
+  /** Engine 2 (deviation 8): words the answer check failed (`mapCheckFailedStatements`), never listed. */
+  checkFailed?: readonly string[];
+  /** Engine 2: the internal words the skip reads. */
+  internalNames?: readonly string[];
 }>): readonly MapAlsoRaisedEntry[] {
   if (input.choice === null) return Object.freeze([]);
+  const engine = input.unchosenAnswers === true;
   const argued = Math.max(0, Math.trunc(input.arguedAnswers));
   const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
   const pointsOf = (answer: MapChoice["answers"][number]): readonly string[] => [...answer.forKeyPointIds, ...answer.againstKeyPointIds];
@@ -221,9 +233,18 @@ export function mapAlsoRaisedOf(input: Readonly<{
       .flatMap((answer) => answer.makers))];
   };
   const answers = cut.filter((answer) => !answer.filled)
-    .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.statement, makers: makersOf(answer.statement) }));
+    .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.statement, makers: makersOf(answer.statement),
+      ...(engine ? { kind: "ANSWER" as const } : {}) }));
+  const failed = new Set((input.checkFailed ?? []).map(mapNormaliseText));
+  const chosenKeys = new Set(input.choice.answers.map((answer) => mapNormaliseText(answer.statement)));
+  const unchosen = !engine ? [] : mapRankMergedAnswers(input.mergedAnswers)
+    .filter((answer) => answer.blindMakers.length >= 1)
+    .filter((answer) => { const key = mapNormaliseText(answer.answer); return key !== "" && !chosenKeys.has(key) && !failed.has(key); })
+    .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.answer, makers: answer.makers, kind: "ANSWER" }));
   const pointIds = [...new Set([...cut.flatMap(pointsOf).filter((id) => !arguedPoints.has(id)), ...input.choice.alsoRaised])];
   const points = mapRankKeyPoints(pointIds.flatMap((id) => byId.get(id) ?? []))
-    .map((keyPoint): MapAlsoRaisedEntry => ({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: keyPoint.makers }));
-  return mapMergeAlsoRaised([...answers, ...points]);
+    .map((keyPoint): MapAlsoRaisedEntry => ({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: keyPoint.makers,
+      // Ruling R3-T5.1 (P2.2 "assumptions stay labelled all the way through"): engine 2 only, never written as undefined.
+      ...(engine && keyPoint.restsOn !== undefined ? { restsOn: keyPoint.restsOn } : {}) }));
+  return mapMergeAlsoRaised([...answers, ...unchosen, ...points], input.internalNames);
 }
