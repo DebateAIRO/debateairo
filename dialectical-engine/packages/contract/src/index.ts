@@ -1340,6 +1340,13 @@ export const ConditionMarkRecordSchema = z.object({
     || record.excluded_from_served_number !== false
     || record.judged_basis_count === null || record.affected_node_ids.length === 0
   )) context.addIssue({ code: "custom", message: "Class D requires unjudged-review provenance and a positive judged basis" });
+  // Engine 2 (R2a; spec §4.2a rule 3): the read side of serve's UNASSESSED_CONDITION_MARK_RECORD_INVALID. A point kept
+  // at a reduced weight names its landed cannot-assess review and nothing else: no transport outcome, no call site, no
+  // served-number exclusion and no judged basis count (it is neither class H nor D).
+  if (record.mark === "UNASSESSED-AT-REDUCED-WEIGHT" && (
+    record.review_outcome !== "cannot-assess" || record.terminal_transport_outcome !== null || record.call_site_key !== null
+    || record.excluded_from_served_number !== null || record.judged_basis_count !== null
+  )) context.addIssue({ code: "custom", message: "A reduced-weight record names its cannot-assess review and nothing else" });
   if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
     record.call_site_key === null || record.planned_leg_count === null
     || record.terminal_transport_outcome === null || record.affected_node_ids.length === 0

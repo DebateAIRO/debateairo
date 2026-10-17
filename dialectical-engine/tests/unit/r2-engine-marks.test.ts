@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
-import { ConditionMarkSchema } from "@debateai/contract";
+import { ConditionMarkRecordSchema, ConditionMarkSchema } from "@debateai/contract";
 import { CONDITION_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import { assertRequiredConditionMarkRecords, resolveTrueUnjudgedReasons, type ConditionMarkRecord } from "@debateai/serve";
 import { conditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
@@ -70,6 +70,20 @@ describe("R2: the four engine marks (spec §4.7, §4.2a; INTERFACE §13)", () =>
       { excludedFromServedNumber: false }, { judgedBasisCount: 1 }]) {
       expect(() => assertRequiredConditionMarkRecords(["UNASSESSED-AT-REDUCED-WEIGHT"], [unassessed(broken)]), JSON.stringify(broken))
         .toThrowError(code("UNASSESSED_CONDITION_MARK_RECORD_INVALID"));
+    }
+  });
+
+  // R2a A7 review Minor 3, carried to R2b B4: the read side refuses what serve's write side refuses
+  // (UNASSESSED_CONDITION_MARK_RECORD_INVALID), so a stored or projected record cannot slip past the contract.
+  it("the contract reads the reduced-weight record by the same rule serve writes it", () => {
+    const wire = (more: Record<string, unknown> = {}) => ({
+      mark: "UNASSESSED-AT-REDUCED-WEIGHT", scope: "node", subject_ref: "node-p", reason: "UNASSESSED_AT_REDUCED_WEIGHT:0.66",
+      lift_path: null, served_root_rule: null, affected_node_ids: ["node-p"], review_outcome: "cannot-assess", ...more
+    });
+    expect(ConditionMarkRecordSchema.safeParse(wire()).success).toBe(true);
+    for (const broken of [{ review_outcome: null }, { terminal_transport_outcome: "FAILED" }, { call_site_key: "JUDGE:review:x" },
+      { excluded_from_served_number: false }, { judged_basis_count: 1 }]) {
+      expect([broken, ConditionMarkRecordSchema.safeParse(wire(broken)).success]).toEqual([broken, false]);
     }
   });
 
