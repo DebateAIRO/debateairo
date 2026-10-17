@@ -1,0 +1,17 @@
+{
+  "version": "engine-verdict-forward0121-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0120_reply_measures.sql",
+    "manifestSha256": "9c187a2f779386525657c5ccfd8fc46a06f651bda21d756c5adfae5aeb5f73bb",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0121_engine_verdict.sql",
+    "sha256": "57a035189f1b1c26cd6a3b82b6d7da91c39fe2413c5b10024ef09a4be48a2560"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

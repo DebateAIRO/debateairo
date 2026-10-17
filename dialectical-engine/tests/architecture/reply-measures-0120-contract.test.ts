@@ -63,9 +63,9 @@ describe("reply measures migration 0120 — architecture contract", () => {
     for (const column of COLUMNS) expect(insert).toContain(column);
   });
 
-  it("is the chain's last step, after the reclaim resume, with its own loader", async () => {
+  it("follows the reclaim resume in the chain, with its own loader", async () => {
     const chain = await read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0119,loadForward0120]");
+    expect(chain).toContain("loadForward0119,loadForward0120,loadForward0121]");
     const loader = await read("packages/db/src/migration-forward0120.ts");
     expect(loader).toContain("const PREVIOUS='0119_reclaim_resume.sql';");
     expect(loader).toContain("const NAME='0120_reply_measures.sql';");

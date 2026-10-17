@@ -44,7 +44,8 @@ const SHIPPED_ROOTS = ["packages", "apps", "tools", "acceptance", "web"] as cons
  */
 const MIGRATIONS_CARRYING_THE_RETIRED_RULE = [
   "0018_panel01_rework.sql",          // created served_root_rule and its one-member CHECK
-  "0055_t10_served_root_selection.sql" // retires that member; names exactly what it retires
+  "0055_t10_served_root_selection.sql", // retires that member; names exactly what it retires
+  "0121_engine_verdict.sql"           // R2 re-adds 0055's CHECK with the judges' rule, keeping the declared history whole
 ] as const;
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "generated", ".next", ".turbo", "coverage"]);
