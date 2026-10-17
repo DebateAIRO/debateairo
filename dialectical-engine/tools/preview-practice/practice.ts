@@ -102,6 +102,7 @@ import {
 import { practiceShapeOverrideFromArgs } from "./practice-shape.js";
 import { practiceLengthOverrideFromArgs } from "./practice-length.js";
 import { PRACTICE_ENGINE_FLAGS, practiceEngineOverrideFromArgs, practiceRegisterHasLengthRow } from "./practice-engine.js";
+import { PRACTICE_PIN_FLAGS, practicePinsGiven, practiceWriterPinsFromArgs } from "./practice-pins.js";
 import { writeSideBySideFile } from "./practice-side-by-side.js";
 import {
   assertGateStatusAllowsPractice,
@@ -137,6 +138,7 @@ const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-d
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
   "--answer-length", "--site-language", "--language-choice", "--length-policy", "--engine-policy",
+  "--answer-writer-model", "--storyteller-model",
   ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next"]);
 
@@ -388,10 +390,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // Length guidance (spec 2026-10-15 §3.7): the debate-only flag, read and checked here, before any socket, settings file
     // or gate is touched; a policy file that does not pass the register's own check never starts a paid run.
     const lengthOverride = practiceLengthOverrideFromArgs(args.mode, args.flags);
-    // Engine row (R1d, INTERFACE §15.1): debate-only, refused here in every other mode before anything is read. The file
-    // itself is read once the register export is read (below): the flag needs a length row, from --length-policy or
-    // from the export.
-    for (const flag of PRACTICE_ENGINE_FLAGS) {
+    // Engine row and pinned final writers (R1d): debate-only, refused here in every other mode before anything is read.
+    // The engine file itself is read once the register export is read (below): the flag needs a length row, from
+    // --length-policy or from the export.
+    for (const flag of [...PRACTICE_ENGINE_FLAGS, ...PRACTICE_PIN_FLAGS]) {
       if (args.flags.has(flag) && args.mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `${flag} (debate mode only)`);
     }
     // The debate's question, a fixed id only, checked here too (it used to fail only once the database had started).
@@ -542,6 +544,9 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // before any socket or gate is touched. Engine 2 needs the length row: from --length-policy, or the export's own.
     const engineOverride = practiceEngineOverrideFromArgs(args.mode, args.flags, undefined,
       lengthOverride !== null || (register !== null && practiceRegisterHasLengthRow(register)));
+    // Pinned final writers (R1d, INTERFACE §15.2): each must be one of the preview's premium models; checked here, before
+    // any gate is asked. Role rotation off in the practice register is refused by the ask composition, before any AI call.
+    const pins = practiceWriterPinsFromArgs(args.mode, args.flags, settings.previewConfig.premium_model_ids);
     // --register-next: the code's next register version, composed before anything is spent (a refusal costs nothing).
     if (args.switches.has("--register-next") && mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_UNKNOWN", "--register-next (debate only)");
     // Debate shape with --register-next (controller ruling D-REGNEXT): the --shape-policy policy goes into the code's
@@ -691,6 +696,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       ...(shapeOverride === null ? {} : { shape: shapeOverride }),
       ...(lengthOverride === null ? {} : { length: lengthOverride }),
       ...(engineOverride === null ? {} : { engine: engineOverride }),
+      ...(practicePinsGiven(pins) ? { pins } : {}),
       ...(debateLanguage === null ? {} : { language: debateLanguage }),
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),

@@ -109,6 +109,7 @@ import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget
 import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
+import { practicePinsRequireRotation, practiceRotationCountsWithPins, type PracticeWriterPins } from "./practice-pins.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
 /** The read-only "what is left today" answer of each gate, over the forwarded sockets. */
@@ -275,6 +276,8 @@ export async function composePracticeAsk(input: Readonly<{
   log?: (line: string) => void;
   /** Question language (P2d's report): each lock or offer the decider makes. Never wired to a logger. */
   onQuestionLanguage?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
+  /** Pinned final writers (R1d, `--answer-writer-model`, `--storyteller-model`): steer the rotation's counts, never the pin table. */
+  pins?: PracticeWriterPins;
 }>) {
   const { pool, settings } = input;
   const version = settings.runner.REGISTER_VERSION;
@@ -371,6 +374,8 @@ export async function composePracticeAsk(input: Readonly<{
   }
   const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
   const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
+  // Pinned final writers (R1d): they work through the rotation; refused with the rotation off, before any AI is asked.
+  if (input.pins !== undefined) practicePinsRequireRotation(input.pins, answerRoleRotation.state === "ON");
   const runSettings: RunCreationSettings = {
     previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
     previewBudgetGate,
@@ -386,7 +391,13 @@ export async function composePracticeAsk(input: Readonly<{
         }),
     resolveDiscoveredPanel: resolveProviderPanel,
     modelPicker,
-    ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: () => readRoleRotationCounts(pool) } } : {}),
+    // Pinned final writers (R1d, INTERFACE §15.2, counts mechanism): the counts the rotation reads give the pinned model
+    // share 0 in its role and every other preview model share 1, so the rotation's own rule picks it when it is on the
+    // panel; the checkers still come from another maker. Without a pin: main.ts's own counts, unchanged.
+    ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: async () => {
+      const counts = await readRoleRotationCounts(pool);
+      return input.pins === undefined ? counts : practiceRotationCountsWithPins(counts, input.pins, previewConfig.premium_model_ids);
+    } } } : {}),
     ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
     ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
     ...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),

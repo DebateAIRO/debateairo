@@ -20,6 +20,7 @@ import {
 } from "./practice-language.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
 import { practiceParallelLines, type PracticeParallelBlock } from "./practice-parallel.js";
+import { practicePinsNotHeld, practiceWriterPinsLines, type PracticeWriterPinsBlock } from "./practice-pins.js";
 import { practiceShapeLines, type PracticeShapeBlock } from "./practice-shape.js";
 import { practiceLengthLines, practiceTokenLines, type PracticeLengthRow, type PracticeTokenRow } from "./practice-tokens.js";
 import {
@@ -397,6 +398,7 @@ export function debateReport(input: Readonly<{
     notExercisedModels: r.admission.satOut.map((entry) => entry.model),
     busyModels: busyDuringRun,
     shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
+    pinsNotHeld: r.writerPins === undefined ? [] : practicePinsNotHeld(r.writerPins),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -428,6 +430,8 @@ export function debateReport(input: Readonly<{
     // Parallel AI calls: the setting, each gate's slots at the start, how many calls really went at once, the waits.
     ...(r.parallel === undefined ? {} : { parallel: r.parallel }),
     byModelAndSite: r.byModelAndSite,
+    // Pinned final writers (R1d): absent without a pin, so today's report keeps its keys.
+    ...(r.writerPins === undefined ? {} : { writerPins: r.writerPins }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, gateBlock(input.observer, gate, r.remaining[gate])])),
     totals: Object.freeze({
       calls: r.byModelAndSite.reduce((sum, row) => sum + row.calls, 0),
@@ -559,6 +563,9 @@ export function reportMarkdown(report: PracticeReport): string {
         + `${row.recovered ? " · recovered" : " · not recovered"}`);
     }
     lines.push("");
+  }
+  if (report.mode === "debate" && typeof report.writerPins === "object" && report.writerPins !== null) {
+    lines.push(...practiceWriterPinsLines(report.writerPins as PracticeWriterPinsBlock));
   }
   const byArm = report.byArm as readonly Readonly<{ arm: string; questions: number; calls: number; costUsd: string; wallSeconds: number;
     unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;

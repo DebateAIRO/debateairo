@@ -463,6 +463,19 @@ echo "exit: $?"
   a backup storyteller when the first cannot write at all). The rest of the debate is today's until the later phases.
 - Example (S-6's debate command plus): `--length-policy tools/preview-practice/length-policy-start.json --engine-policy tools/preview-practice/engine-policy-start.json`.
 
+### Pinning the answer writer and the storyteller (debate mode)
+
+- `--answer-writer-model <model>` and `--storyteller-model <model>` name the AI that writes the answer and the one that
+  tells the story in this practice debate (one practice run is one question, so a pin per question is a flag per run).
+  Each must be one of the preview's premium models (`PRACTICE_PIN_MODEL_INVALID <flag>` otherwise; the value typed is
+  never repeated). Debate mode only.
+- The pin works through the role rotation: the counts the rotation reads are shaped so it picks the pinned model; the
+  checkers are still picked from another maker. The run's own role table is never written by the practice. With role
+  rotation off in the practice register the run is refused before any AI is asked (`PRACTICE_PIN_NEEDS_ROLE_ROTATION`;
+  with `--register-next`, give `--role-rotation on`).
+- `report.json` gains `writerPins`: per pinned role, the pinned model, the model the run's pin names, and whether the
+  pin held. A pinned model that sat out cannot be picked: the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
@@ -1156,6 +1169,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
 - `length-policy-start.json`: the owners' start values for `--length-policy`.
+- `practice-pins.ts`: `--answer-writer-model`, `--storyteller-model` (the report's `writerPins`).
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
@@ -1177,6 +1191,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
+  `tests/unit/preview-practice-pins.test.ts`,
   `tests/unit/lg-a-practice-repairs.test.ts` (the two LG-A tables, the step keys, a structure-repair try read as its step),
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

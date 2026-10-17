@@ -62,6 +62,7 @@ import {
 } from "./practice-language.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
+import { practiceWriterPinsBlock, type PracticeWriterPins, type PracticeWriterPinsBlock } from "./practice-pins.js";
 import { practiceDebateQuestion } from "./practice-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import {
@@ -229,6 +230,8 @@ export type PracticeDebateResult = Readonly<{
   length?: PracticeLengthBlock;
   /** Question language: the lock, its source, the offer and the planner's naming (operator-only); absent without a debate-shape row. */
   language?: PracticeDebateLanguageBlock;
+  /** Pinned final writers (R1d): each pin, the model the run's own pin names, whether it held; absent without a pin. */
+  writerPins?: PracticeWriterPinsBlock;
   /**
    * Hosted mode only (absent in local mode): the ask went through the room or the daily guard, billing as the register
    * says it and as the practice ran it (always off), the ceilings the run was held to (micro-dollars), and the names
@@ -610,6 +613,8 @@ export async function runPracticeDebate(input: Readonly<{
   length?: LengthGuidancePolicy;
   /** Engine row (`--engine-policy`, R1d): put into the throwaway register only (or carried by --register-next's version). */
   engine?: EngineVersionPolicy;
+  /** Pinned final writers (`--answer-writer-model`, `--storyteller-model`, R1d): absent: the rotation's own picks. */
+  pins?: PracticeWriterPins;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
 }>): Promise<PracticeDebateResult> {
@@ -768,6 +773,7 @@ export async function runPracticeDebate(input: Readonly<{
       settings, sockets: input.sockets, budgetPorts: input.budgetPorts, teamUserIds: [userId],
       dispatcher: { dispatch: async (job) => { dispatched.push({ ...job }); } }, log: progress,
       onQuestionLanguage: (outcome) => { languageOutcomes.push(outcome); },
+      ...(input.pins === undefined ? {} : { pins: input.pins }),
       // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
       ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
@@ -839,6 +845,7 @@ export async function runPracticeDebate(input: Readonly<{
         failedCalls: 0, refusedCalls: 0,
         remaining, seconds: { admission: admissionSeconds, debate: 0 }, parallel: runner.callStats.summary(),
         ...(shapeSource === null ? {} : { shape: shapeBlockOf(shapeSource, null) }),
+        ...(input.pins === undefined ? {} : { writerPins: practiceWriterPinsBlock(input.pins, null) }),
         // Length guidance: where the row came from, with no frozen numbers (no run was admitted).
         ...(lengthSource === null ? {} : { length: practiceLengthBlock({ source: lengthSource, registerVersion, row: lengthRowChange, frozen: null }) }),
         ...(siteLanguage === null ? {} : { language: practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice,
@@ -895,6 +902,13 @@ export async function runPracticeDebate(input: Readonly<{
       answerWriter: rotationRow.writer_provider_ref!, answerChecker: rotationRow.checker_provider_ref!,
       storyteller: rotationRow.storyteller_provider_ref!, storyChecker: rotationRow.story_checker_provider_ref!
     });
+    // Pinned final writers (R1d): which models the run's own pin names, beside the pins (codes and model ids only).
+    const writerPins = input.pins === undefined ? undefined : practiceWriterPinsBlock(input.pins, rotation);
+    if (writerPins !== undefined) {
+      for (const [name, entry] of [["answer writer", writerPins.answerWriter], ["storyteller", writerPins.storyteller]] as const) {
+        if (entry !== null) progress(`pinned ${name} ${entry.pinnedModel}: ${entry.held ? "held" : `not held (${entry.wroteModel ?? "no rotation"})`}`);
+      }
+    }
     let transcript: PracticeDebateResult["transcript"];
     if (input.transcriptDirectory !== undefined && input.transcriptDirectory !== null) {
       // Before the finally below deletes the database and with it the only way to read the run's sealed text; and before
@@ -978,6 +992,7 @@ export async function runPracticeDebate(input: Readonly<{
       ...(shape === undefined ? {} : { shape }),
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
+      ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })
     });
   } finally {
