@@ -7,6 +7,8 @@ import {
   POINT_INVESTIGATION_BASES, POINT_INVESTIGATION_RESULTS, VERDICT_VOTE_NOT_COUNTED_REASONS, VerdictVoteRepository,
   type VerdictVoteChoice, type VerdictVoteRecord
 } from "@debateai/judgement";
+// R2a final wave A2 (Ruling (A10 Minors) 2).
+import { PointInvestigationRepository, type PointInvestigationRecord } from "@debateai/judgement";
 
 const sql = readFileSync(new URL("../../migrations/0121_engine_verdict.sql", import.meta.url), "utf8").replace(/\s+/gu, " ");
 const listed = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(", ");
@@ -68,5 +70,27 @@ describe("R2 engine repository: a judge's same-as groups name each letter once",
   it("checks the groups past the letter bound: a letter outside A to H is still refused as before", async () => {
     await expect(votes.recordVerdictVote(vote([["A", "I"]])))
       .rejects.toMatchObject({ code: "ENGINE_RECORD_INVALID", message: "ENGINE_RECORD_INVALID: choice.sameAs[0]" });
+  });
+});
+
+/**
+ * R2a final wave, Ruling (A10 Minors) 2: a point that was never called (over the cap, or no maker left) has no reply, so a
+ * row naming one is refused typed, before any seal or query (0121 refuses it too, untyped); the pool throws if touched.
+ */
+describe("R2 engine repository: a skipped or capped point names no reply", () => {
+  const untouchedPool = new Proxy({}, { get: () => { throw new Error("R2_TEST_POOL_TOUCHED"); } }) as unknown as Pool;
+  const investigations = new PointInvestigationRepository(untouchedPool);
+  const row = (result: "INVESTIGATION_SKIPPED" | "INVESTIGATION_CAPPED", rawArtifactRef: string | null): PointInvestigationRecord => ({
+    runId: "00000000-0000-4000-8000-000000000001", nodeId: "00000000-0000-4000-8000-000000000003", investigationOrder: 2,
+    result, basis: null, investigator: null, rawArtifactRef, standings: null, content: null
+  });
+
+  it.each(["INVESTIGATION_SKIPPED", "INVESTIGATION_CAPPED"] as const)("refuses %s with a raw artifact", async (result) => {
+    await expect(investigations.recordPointInvestigation(row(result, "00000000-0000-4000-8000-000000000002")))
+      .rejects.toMatchObject({ code: "ENGINE_RECORD_INVALID", message: "ENGINE_RECORD_INVALID: rawArtifactRef" });
+  });
+
+  it.each(["INVESTIGATION_SKIPPED", "INVESTIGATION_CAPPED"] as const)("passes the checks for %s without one (then touches the pool)", async (result) => {
+    await expect(investigations.recordPointInvestigation(row(result, null))).rejects.toThrow("R2_TEST_POOL_TOUCHED");
   });
 });

@@ -158,6 +158,9 @@ function pointInvestigationBreach(input: PointInvestigationRecord): string | nul
   }
   if (input.rawArtifactRef !== null && !UUID_TEXT.test(input.rawArtifactRef)) return "rawArtifactRef";
   if (outcome && input.rawArtifactRef === null) return "rawArtifactRef";
+  // R2a final wave (Ruling (A10 Minors) 2): a skipped or capped point was never called, so it names no reply (0121
+  // refuses it too, untyped).
+  if (NO_INVESTIGATOR.has(input.result) && input.rawArtifactRef !== null) return "rawArtifactRef";
   if (input.standings !== null) {
     if (!outcome) return "standings";
     if (!UUID_TEXT.test(input.standings.leaderWithoutRootNodeId)) return "standings.leaderWithoutRootNodeId";

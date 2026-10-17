@@ -37,28 +37,70 @@ const NO_FACTS: Omit<EngineNodeFacts, "nodeId"> = Object.freeze({
 const bearingOf = (arrow: SnapshotArrow): number =>
   arrow.magnitudeStatus === "MEASURED" && arrow.strength !== null ? arrow.strength : 1;
 
+/**
+ * R2a final wave (Ruling (A6 Minors) 2): a value the link rules scale is range-checked BEFORE it is scaled, as engine 1's
+ * propagation checks it (`PROPAGATION_MAGNITUDE_INVALID`, the same code and words): a bearing above one times the
+ * cannot-assess weight could otherwise pass propagation's own check after scaling. Ids only, never a text.
+ */
+function unitBeforeScaling(value: number, field: string): number {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new TypedDomainError("PROPAGATION_MAGNITUDE_INVALID", `${field} must be a finite number in [0,1]`);
+  }
+  return value;
+}
+
+/**
+ * R2a final wave (Ruling (A6 Minors) 3, 5): facts that contradict themselves or the graph are a code defect, refused
+ * before any weight: a cannot-assess status needs the cannot-assess review behind it, and an own reply must be one of
+ * its own node's links (engineLinkedGraph checks the second too; this covers a caller that hands facts in directly).
+ */
+function assertFactsFitGraph(snapshot: EvaluationSnapshot, facts: ReadonlyMap<string, EngineNodeFacts>): void {
+  const sourceOf = new Map(snapshot.arrows.map((item) => [item.arrowId, item.sourceNodeId] as const));
+  for (const fact of facts.values()) {
+    if (fact.status === "CANNOT_ASSESS" && !fact.cannotAssessReview) {
+      throw new TypedDomainError("ENGINE_FACTS_INVALID", `${fact.nodeId} is cannot-assess without a cannot-assess review`);
+    }
+    for (const edgeId of fact.ownReplyEdgeIds) {
+      const source = sourceOf.get(edgeId);
+      if (source !== undefined && source !== fact.nodeId) {
+        throw new TypedDomainError("ENGINE_FACTS_INVALID", `Own reply ${edgeId} of ${fact.nodeId} is ${source}'s link`);
+      }
+    }
+  }
+}
+
 /** The graph engine 2 propagates: the same nodes and links, with the link rules' values (pure; the input is untouched). */
 export function engineSnapshotOf(snapshot: EvaluationSnapshot, facts: ReadonlyMap<string, EngineNodeFacts>,
   engine: EngineSettings): EvaluationSnapshot {
+  assertFactsFitGraph(snapshot, facts);
   const factsOf = (nodeId: string): Omit<EngineNodeFacts, "nodeId"> => facts.get(nodeId) ?? NO_FACTS;
   const ownReply = new Set([...facts.values()].flatMap((fact) => fact.ownReplyEdgeIds));
   const nodes = snapshot.nodes.map((node): SnapshotNode => {
     const factor = honestDisputeFactor(factsOf(node.nodeId).status, engine.scoring);
-    return node.baseStrength === null || factor === 1 ? node : Object.freeze({ ...node, baseStrength: node.baseStrength * factor });
+    return node.baseStrength === null || factor === 1 ? node
+      : Object.freeze({ ...node, baseStrength: unitBeforeScaling(node.baseStrength, `tau for ${node.nodeId}`) * factor });
   });
+  const measuredBearing = (arrow: SnapshotArrow): void => {
+    if (arrow.magnitudeStatus === "MEASURED" && arrow.strength !== null) unitBeforeScaling(arrow.strength, `strength for ${arrow.arrowId}`);
+  };
   const arrows = snapshot.arrows.map((arrow): SnapshotArrow => {
     if (ownReply.has(arrow.arrowId)) {
       if (arrow.polarity !== "support") {
         throw new TypedDomainError("ENGINE_OWN_REPLY_EDGE_INVALID", `Link ${arrow.arrowId} is an own reply but not a support link`);
       }
       // A measured own reply carries nothing; an unmeasured one already carries nothing and stays unmeasured.
-      return engine.links.ownReplyCountsAsSupport || arrow.magnitudeStatus !== "MEASURED" ? arrow : Object.freeze({ ...arrow, strength: 0 });
+      // C2 (Ruling (A6 Minors) 1): if ownReplyCountsAsSupport is ever widened, a counted own reply from a cannot-assess
+      // point must fall through to the cannot-assess rule below, not return here at full weight.
+      if (engine.links.ownReplyCountsAsSupport || arrow.magnitudeStatus !== "MEASURED") return arrow;
+      measuredBearing(arrow);
+      return Object.freeze({ ...arrow, strength: 0 });
     }
     const source = factsOf(arrow.sourceNodeId);
     if (!source.cannotAssessReview) return arrow;
     // Only a point an investigation found to hold counts at full weight. A dead end, an investigation that never ran,
     // and a point found to fail keep the cannot-assess weight; a failed point also carries the disputed weight on its
     // score, so it weighs least (spec §4.2b, §17).
+    measuredBearing(arrow);
     const weight = source.status === "AGREE" ? 1 : engine.links.cannotAssessWeight;
     return Object.freeze({ ...arrow, strength: weight * bearingOf(arrow), magnitudeStatus: "MEASURED" as const });
   });
@@ -93,6 +135,10 @@ export function pointInvestigationStandings(input: Readonly<{ snapshot: Evaluati
   Readonly<{ leaderWithoutRootNodeId: string; leaderWithRootNodeId: string; moved: boolean }> {
   const fact = input.facts.get(input.nodeId);
   if (fact === undefined) throw new TypedDomainError("ENGINE_STANDINGS_NODE_UNKNOWN", input.nodeId);
+  // R2a final wave (Ruling (A6 Minors) 4): only a point whose own review said "cannot assess" is ever investigated.
+  if (!fact.cannotAssessReview) {
+    throw new TypedDomainError("ENGINE_FACTS_INVALID", `${input.nodeId} has no cannot-assess review to investigate`);
+  }
   const without = new Map(input.facts);
   without.set(input.nodeId, Object.freeze({ ...fact, status: "CANNOT_ASSESS" as const, cannotAssessReview: true }));
   const leaderWithRootNodeId = leaderOf(engineSnapshotOf(input.snapshot, input.facts, input.engine), input.servableRootIds);

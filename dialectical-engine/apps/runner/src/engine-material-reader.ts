@@ -105,6 +105,9 @@ export async function readEngineReviews(pool: Pool, runId: string, nodeIds: read
       ORDER BY review.at_seq`,
     [runId, [...callerId.keys()]]
   );
+  // R2a final wave (Ruling (A12 concerns) 1): no review row, nothing to word; the story's reader (a lease and two
+  // queries) is not asked.
+  if (rows.rows.length === 0) return result;
   const enrichment = await readStoryEnrichment(pool, {
     runId, nodes: wanted.map((nodeId) => ({ nodeId, judgeArtifactRef: null }))
   });

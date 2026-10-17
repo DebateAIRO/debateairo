@@ -10,6 +10,9 @@ import { buildTranscriptEngineGraph, panelKeyPrefixOf, rootIndexOfAuthorKey, typ
   from "../../tools/preview-practice/practice-engine-graph.js";
 import { practiceJudgeReadingOf } from "../../tools/preview-practice/practice-lanes.js";
 import { buildPracticeTranscript, type TranscriptRunFacts } from "../../tools/preview-practice/practice-transcript.js";
+// R2a final wave A7 (Ruling (A15 Minors) 1).
+import { TypedDomainError } from "@debateai/kernel";
+import { practiceUnavailableName } from "../../tools/preview-practice/practice-transcript.js";
 import { KEYLESS, PATCH_REPLY, SM, WRAPPED_ECHO, panelFramed } from "../support/structure-salvage-shapes.js";
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -233,5 +236,22 @@ describe("R2 transcript: the engine graph (INTERFACE §15.3)", () => {
     const withGraph = buildPracticeTranscript({ run, attempts: [], answer: null, inspection: null, story: null, unavailable: [], engineGraph: graph });
     expect(Object.keys(withGraph.structure)).toEqual(["answer", "inspection", "story", "engineGraph"]);
     expect(withGraph.structure.engineGraph).toBe(graph);
+  });
+});
+
+// R2a final wave, Ruling (A15 Minors) 1: an `unavailable` line names a typed refusal by its code, so ENGINE_FACTS_INVALID
+// is not lost as "TypedDomainError"; any other error by its class; never its message.
+describe("the transcript's unavailable lines (R2a final wave A7)", () => {
+  it("names a typed refusal by its code, another error by its class, never its message", () => {
+    expect(practiceUnavailableName(new TypedDomainError("ENGINE_FACTS_INVALID", "node-1 has two review outcomes"))).toBe("ENGINE_FACTS_INVALID");
+    expect(practiceUnavailableName(new TypeError("the AI wrote this"))).toBe("TypeError");
+    expect(practiceUnavailableName("a thrown string")).toBe("UNKNOWN");
+  });
+
+  it("is what the engine graph's and the map's lines write", () => {
+    const source = readFileSync(new URL("../../tools/preview-practice/practice-transcript.ts", import.meta.url), "utf8");
+    expect(source).toContain("unavailable.push(`structure.engineGraph: ${practiceUnavailableName(error)}`);");
+    expect(source).toContain("unavailable.push(`structure.map: ${practiceUnavailableName(error)}`);");
+    expect(source).not.toMatch(/structure\.(?:engineGraph|map): \$\{error instanceof Error \? error\.name/u);
   });
 });

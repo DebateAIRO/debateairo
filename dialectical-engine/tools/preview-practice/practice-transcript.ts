@@ -27,6 +27,7 @@ import {
   structureRepairOriginalKey,
   type PromptPacket
 } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -462,6 +463,15 @@ export function writePracticeTranscript(directory: string, transcript: PracticeT
 }
 
 /**
+ * R2a final wave (Ruling (A15 Minors) 1): how an `unavailable` line names what broke a block: a typed refusal by its code
+ * (ENGINE_FACTS_INVALID, not "TypedDomainError"), any other error by its class, never its message.
+ */
+export function practiceUnavailableName(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error ? error.name : "UNKNOWN";
+}
+
+/**
  * Reads the run back and writes the transcript. Called by practice-debate.ts while the throwaway database (and the
  * run's in-process key) still exist. `answer` and `story` are the projections the practice already read.
  */
@@ -506,7 +516,7 @@ export async function recordPracticeTranscript(input: Readonly<{
       }
     } catch (error) {
       map = null;
-      unavailable.push(`structure.map: ${error instanceof Error ? error.name : "UNKNOWN"}`);
+      unavailable.push(`structure.map: ${practiceUnavailableName(error)}`);
     }
   }
   // R2 (E12): the graph `rescore` reads. A reading that breaks costs only this block, never the transcript.
@@ -520,7 +530,7 @@ export async function recordPracticeTranscript(input: Readonly<{
         + "again by their step's reader (listed in structure.engineGraph.unreadVoices)");
     }
   } catch (error) {
-    unavailable.push(`structure.engineGraph: ${error instanceof Error ? error.name : "UNKNOWN"}`);
+    unavailable.push(`structure.engineGraph: ${practiceUnavailableName(error)}`);
   }
   const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable,
     ...(input.map === undefined ? {} : { map }), ...(engineGraph === null ? {} : { engineGraph }) });

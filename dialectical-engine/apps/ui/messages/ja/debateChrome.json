@@ -184,7 +184,7 @@
   "debateChrome.condition.verdictJudgeMissing": "回答を比較したAIモデルの一つが見解を示せず",
   "debateChrome.condition.verdictJudgesUnavailable": "回答を比較できたAIモデルがなく、判定は論拠のみに基づく",
   "debateChrome.condition.verdictVotesIgnored": "回答を比較した各AIモデルが自らの開発元の論じた回答を選んだため、それらの選択は数えられず",
-  "debateChrome.condition.unassessedAtReducedWeight": "2つ目のAIモデルがこの点を確認できなかったため、扱いが軽くなる",
+  "debateChrome.condition.unassessedAtReducedWeight": "もう一つのAIモデルがこの点を確認できなかったため、扱いが軽くなる",
   "debateChrome.condition.mapAnglesFallback": "質問は、あらかじめ用意された標準的な観点から検討されました",
   "debateChrome.condition.mapMergeFallback": "まったく同じことを述べた論点だけがまとめられました",
   "debateChrome.condition.mapChooseFallback": "ディベートで争う回答は、単純なルールで選ばれました",

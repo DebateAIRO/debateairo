@@ -184,7 +184,7 @@
   "debateChrome.condition.panelDegradedSingleVoice": "Zachovalo sa iba vlastné posúdenie autora",
   "debateChrome.condition.verdictJudgeMissing": "Jeden z modelov AI, ktoré porovnávali odpovede, nemohol vyjadriť svoj názor",
   "debateChrome.condition.verdictJudgesUnavailable": "Žiadny model AI nemohol porovnať odpovede, preto sa verdikt opiera len o argumenty",
-  "debateChrome.condition.verdictVotesIgnored": "Každý model AI, ktorý porovnával odpovede, vybral odpoveď obhajovanú jeho vlastným tvorcom, preto sa tieto voľby nezapočítali",
+  "debateChrome.condition.verdictVotesIgnored": "Každý model AI, ktorý porovnával odpovede, vybral odpoveď obhajovanú jeho vlastným tvorcom, preto sa tieto rozhodnutia nezapočítali",
   "debateChrome.condition.unassessedAtReducedWeight": "Druhý model AI nemohol overiť tento bod, preto má menšiu váhu",
   "debateChrome.condition.mapAnglesFallback": "Otázka bola preskúmaná zo štandardnej sady uhlov pohľadu",
   "debateChrome.condition.mapMergeFallback": "Spojené boli len body, ktoré hovorili presne to isté",

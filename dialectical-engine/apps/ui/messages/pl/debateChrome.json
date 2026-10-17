@@ -184,7 +184,7 @@
   "debateChrome.condition.panelDegradedSingleVoice": "Pozostała tylko własna ocena autora",
   "debateChrome.condition.verdictJudgeMissing": "Jeden z modeli AI porównujących odpowiedzi nie mógł przedstawić swojej opinii",
   "debateChrome.condition.verdictJudgesUnavailable": "Żaden model AI nie mógł porównać odpowiedzi, więc werdykt opiera się wyłącznie na argumentach",
-  "debateChrome.condition.verdictVotesIgnored": "Każdy model AI, który porównywał odpowiedzi, wybrał odpowiedź bronioną przez własnego twórcę, więc tych wyborów nie uwzględniono",
+  "debateChrome.condition.verdictVotesIgnored": "Każdy model AI, który porównywał odpowiedzi, wybrał odpowiedź bronioną przez własnego twórcę, więc ich wyboru nie uwzględniono",
   "debateChrome.condition.unassessedAtReducedWeight": "Drugi model AI nie mógł sprawdzić tego punktu, więc liczy się on mniej",
   "debateChrome.condition.mapAnglesFallback": "Pytanie zbadano ze standardowego zestawu punktów widzenia",
   "debateChrome.condition.mapMergeFallback": "Połączono tylko punkty mówiące dokładnie to samo",

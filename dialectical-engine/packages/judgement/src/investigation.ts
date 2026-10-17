@@ -168,8 +168,9 @@ export function pickPointInvestigator<T extends PointInvestigationSeat>(input: R
   seats: readonly T[]; authorMaker: string; reviewerMaker: string; arguingMakers: ReadonlySet<string>; rotationOffset: number;
 }>): T | null {
   const { seats } = input;
-  if (seats.length === 0) return null;
+  // R2a final wave (Ruling (A13 Minors) 3): a bad offset is a code defect even when no seat is left.
   if (!Number.isSafeInteger(input.rotationOffset) || input.rotationOffset < 0) throw new TypeError("POINT_INVESTIGATION_ROTATION_INVALID");
+  if (seats.length === 0) return null;
   const start = input.rotationOffset % seats.length;
   const rotated = [...seats.slice(start), ...seats.slice(0, start)];
   const eligible = rotated.filter((seat) => seat.maker !== input.authorMaker && seat.maker !== input.reviewerMaker);

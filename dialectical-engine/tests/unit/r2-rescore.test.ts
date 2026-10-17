@@ -151,6 +151,53 @@ describe("R2 rescore: engine 1 first, exactly", () => {
   });
 });
 
+// R2a final wave, Ruling (A16 Important 1) and its Minors (1), (3).
+describe("R2 rescore: engine 1 through the runner's own projection (R2a final wave A6)", () => {
+  it("hides exactly the points the recorded reviews hide, whatever the hidden flag says", () => {
+    // P2's review said cannot-assess: the projection hides it even when the flag forgot to.
+    const flagForgot = { ...graph(), nodes: graph().nodes.map((node) => node.nodeId === P2 ? { ...node, hidden: false } : node) };
+    expect(reproduceServedPropagation(flagForgot).ok).toBe(true);
+    // A review that agreed puts the point in the served number; a record that left it out is not given back.
+    const reviewAgreed = { ...graph(), reviews: graph().reviews.map((review) => review.nodeId === P2 ? { ...review, outcome: "agree" as const } : review) };
+    expect(reproduceServedPropagation(reviewAgreed)).toMatchObject({ ok: false, what: `node ${P2}` });
+  });
+
+  it("checks the served answer over the answers that could be served", () => {
+    const wrongRoot = { ...graph(), served: { ...graph().served, servedRootNodeId: B } };
+    expect(reproduceServedPropagation(wrongRoot)).toMatchObject({ ok: false, what: "served-root" });
+    const result = rescoreTranscripts([{ debate: "root", text: transcriptText(wrongRoot) }], SETTINGS);
+    expect(result.notRescored).toEqual([expect.objectContaining({ debate: "root", code: "PRACTICE_RESCORE_ENGINE1_MISMATCH" })]);
+    // A hidden answer is no candidate: hiding A (its review cannot-assess, nothing judged under it) leaves B served.
+    const aHidden = graph();
+    const strengths = evaluate({
+      nodes: [B, P1].map((nodeId) => ({ nodeId, baseStrength: ENGINE1_BASE[nodeId]!, parentNodeId: nodeId === P1 ? B : null })),
+      arrows: [{ arrowId: "e1", sourceNodeId: P1, targetKind: "NODE", targetNodeId: B, targetEdgeId: null, polarity: "attack", kind: null,
+        strength: 1, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" }],
+      arrowOrder: ["e1"], operatorResolutions: [{ parentNodeId: B, operator: "accumulate", suppliedBy: "deployment" }], clusterRecords: []
+    }).strengths;
+    const onlyB = { ...aHidden,
+      reviews: aHidden.reviews.map((review) => review.nodeId === A ? { ...review, outcome: "cannot-assess" as const } : review),
+      served: { ...aHidden.served, finalStrength: Object.fromEntries(strengths.map((row) => [row.nodeId, row.strength])), servedRootNodeId: B } };
+    expect(reproduceServedPropagation(onlyB)).toMatchObject({ ok: true });
+  });
+
+  it("lists a malformed engine graph as an input it lacks, never a batch-wide harness error", () => {
+    const malformed = { ...graph(), nodes: "not a list" } as unknown as TranscriptEngineGraph;
+    const noServed = { ...graph(), served: null } as unknown as TranscriptEngineGraph;
+    const result = rescoreTranscripts([
+      { debate: "malformed", text: transcriptText(malformed) },
+      { debate: "no-served", text: transcriptText(noServed) },
+      { debate: "d1", text: transcriptText(graph()) }
+    ], SETTINGS);
+    expect(result.notRescored).toEqual([
+      { debate: "malformed", code: "PRACTICE_RESCORE_INPUT_INCOMPLETE", what: "engineGraph" },
+      { debate: "no-served", code: "PRACTICE_RESCORE_INPUT_INCOMPLETE", what: "engineGraph" }
+    ]);
+    expect(result.rows.every((row) => row.debate === "d1")).toBe(true);
+    expect(result.verdict).toBe("PASS_WITH_WARNINGS");
+  });
+});
+
 describe("R2 rescore: the sweep (E12)", () => {
   it("scores every weight with the honest scores and the link rules, the author left out", () => {
     const result = rescoreTranscripts([{ debate: "d1", text: transcriptText(graph()) }], SETTINGS);

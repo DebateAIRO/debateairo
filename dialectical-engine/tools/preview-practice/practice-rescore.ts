@@ -127,25 +127,6 @@ function reviewOutcomeOf(value: unknown): TranscriptEngineReview["outcome"] | nu
   return value === "agree" || value === "dispute" || value === "cannot-assess" ? value : null;
 }
 
-/** As the runner's private `snapshotWithoutNodes` (apps/runner/src/index.ts): the nodes, their arrows and undercuts on them. */
-function withoutNodes(snapshot: EvaluationSnapshot, excluded: ReadonlySet<string>): EvaluationSnapshot {
-  let arrows = snapshot.arrows.filter((arrow) => !excluded.has(arrow.sourceNodeId)
-    && !(arrow.targetKind === "NODE" && arrow.targetNodeId !== null && excluded.has(arrow.targetNodeId)));
-  let removed = new Set(snapshot.arrows.filter((arrow) => !arrows.includes(arrow)).map((arrow) => arrow.arrowId));
-  while (arrows.some((arrow) => arrow.targetKind === "EDGE" && arrow.targetEdgeId !== null && removed.has(arrow.targetEdgeId))) {
-    arrows = arrows.filter((arrow) => !(arrow.targetKind === "EDGE" && arrow.targetEdgeId !== null && removed.has(arrow.targetEdgeId)));
-    removed = new Set(snapshot.arrows.filter((arrow) => !arrows.includes(arrow)).map((arrow) => arrow.arrowId));
-  }
-  const kept = new Set(arrows.map((arrow) => arrow.arrowId));
-  return Object.freeze({
-    nodes: Object.freeze(snapshot.nodes.filter((node) => !excluded.has(node.nodeId))),
-    arrows: Object.freeze(arrows),
-    arrowOrder: Object.freeze(snapshot.arrowOrder.filter((arrowId) => kept.has(arrowId))),
-    operatorResolutions: Object.freeze(snapshot.operatorResolutions.filter((row) => !excluded.has(row.parentNodeId))),
-    clusterRecords: snapshot.clusterRecords
-  });
-}
-
 /**
  * The graph as the runner materialises it (packages/graph/src/index.ts:692-790): every node with the given base strength,
  * every edge with its measured bearing, in the recorded order; every arrow target resolved to the one operator the kernel
@@ -222,7 +203,7 @@ function receiptSettingsOf(graph: TranscriptEngineGraph): EngineSettings {
 export function reproduceServedPropagation(graph: TranscriptEngineGraph): Readonly<{ ok: boolean; worstDelta: number; what: string }> {
   const recorded = (nodeId: string): number | null => graph.served.baseStrength[nodeId] ?? null;
   const strengths = graph.engine === 1
-    ? evaluate(withoutNodes(snapshotOf(graph, recorded), new Set(graph.nodes.filter((node) => node.hidden).map((node) => node.nodeId)))).strengths
+    ? evaluate(projectJudgedStanding(snapshotOf(graph, recorded), engineOneStandingSeed(graph)).snapshot).strengths
     : engineTwoStrengths(graph, recorded, receiptSettingsOf(graph), true);
   const computed = new Map(strengths.map((row) => [row.nodeId, row.strength] as const));
   const served = graph.served.finalStrength;
@@ -236,7 +217,31 @@ export function reproduceServedPropagation(graph: TranscriptEngineGraph): Readon
     worstDelta = Math.max(worstDelta, Math.abs(mine - theirs));
   }
   const ok = worstDelta <= PRACTICE_RESCORE_SWEEP.tolerance;
-  return Object.freeze({ ok, worstDelta, what: ok ? "" : `${graph.engine === 1 ? "" : "engine2 "}delta ${String(worstDelta)}` });
+  if (!ok) return Object.freeze({ ok, worstDelta, what: `${graph.engine === 1 ? "" : "engine2 "}delta ${String(worstDelta)}` });
+  // R2a final wave (Ruling (A16 Important 1) Minor 1): the served answer, by the runner's own rule over the answers that
+  // could be served (those with a served final strength); one that is not given back would make every "lead changed
+  // from engine 1" in the sweep spurious.
+  const servable = graph.nodes.filter((node) => node.kind === "ROOT" && Object.hasOwn(served, node.nodeId));
+  if (graph.served.servedRootNodeId !== null && servable.length > 0
+    && selectServedRootByStrength(servable, strengths).root.nodeId !== graph.served.servedRootNodeId) {
+    return Object.freeze({ ok: false, worstDelta, what: "served-root" });
+  }
+  return Object.freeze({ ok, worstDelta, what: "" });
+}
+
+/**
+ * R2a final wave (Ruling (A16 Important 1)): engine 1's judged-standing seed, for the runner's own projection
+ * (`projectJudgedStanding`), so the recorded reviews decide which points engine 1 hid: every point a review agreed with or
+ * disputed, and every point no review reached that was served (a mono-maker debate, or a spend stop that left points
+ * unreviewed). A point whose review said "cannot assess" is never seeded; it stands only on judged points under it.
+ */
+function engineOneStandingSeed(graph: TranscriptEngineGraph): readonly string[] {
+  const reviewed = new Set(graph.reviews.map((review) => review.nodeId));
+  return Object.freeze([
+    ...graph.reviews.filter((review) => review.outcome !== "cannot-assess").map((review) => review.nodeId),
+    ...graph.nodes.filter((node) => !reviewed.has(node.nodeId) && Object.hasOwn(graph.served.finalStrength, node.nodeId))
+      .map((node) => node.nodeId)
+  ]);
 }
 
 /** Each node's honest score (A3): every grader's honest grade, the median of the other makers', the author only as last resort. */
@@ -520,6 +525,21 @@ export function engineGraphFromOlderTranscript(value: unknown): TranscriptEngine
   });
 }
 
+/**
+ * R2a final wave (Ruling (A16 Important 1) Minor 3): the minimal shape the rescore reads, so a malformed block is one
+ * debate's missing input (`engineGraph`), never a batch-wide harness error.
+ */
+function engineGraphShaped(value: unknown): value is TranscriptEngineGraph {
+  if (value === null || typeof value !== "object") return false;
+  const graph = value as Record<string, unknown>;
+  const served = graph.served as Record<string, unknown> | null | undefined;
+  const record = (member: unknown): boolean => member !== null && typeof member === "object" && !Array.isArray(member);
+  return (graph.engine === 1 || graph.engine === 2)
+    && ["nodes", "edges", "reviews", "voices", "investigations", "unreadVoices"].every((key) => Array.isArray(graph[key]))
+    && record(served) && record(served!.baseStrength) && record(served!.finalStrength)
+    && (served!.servedRootNodeId === null || typeof served!.servedRootNodeId === "string");
+}
+
 /** One transcript's graph: its own block (R2 and later), else rebuilt from an older transcript. */
 export function engineGraphOfTranscript(value: unknown): TranscriptEngineGraph {
   const transcript = value as { schema?: unknown; structure?: { engineGraph?: TranscriptEngineGraph } } | null;
@@ -528,6 +548,7 @@ export function engineGraphOfTranscript(value: unknown): TranscriptEngineGraph {
   }
   const graph = transcript.structure?.engineGraph;
   if (graph === undefined) return engineGraphFromOlderTranscript(value);
+  if (!engineGraphShaped(graph)) throw new RescoreInputIncomplete("engineGraph");
   if (graph.unreadVoices.length > 0) throw new RescoreInputIncomplete(`voices ${[...new Set(graph.unreadVoices.map((voice) => voice.nodeId))].join(",")}`);
   return graph;
 }

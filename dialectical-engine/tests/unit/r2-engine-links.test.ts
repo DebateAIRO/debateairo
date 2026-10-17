@@ -189,3 +189,53 @@ describe("engine 2: whether one investigation moved the standings (spec §4.2b, 
       nodeId: "point-p", servableRootIds: [] })).toThrowError(code("ENGINE_STANDINGS_NO_ROOT"));
   });
 });
+
+// R2a final wave, Ruling (A6 Minors) (2)-(5): inconsistent inputs are refused, never weighted quietly.
+describe("engine 2: the link rules refuse inconsistent inputs (R2a final wave A1)", () => {
+  const ONE = graph([{ nodeId: "r", baseStrength: 0.5, parentNodeId: null }, { nodeId: "p", baseStrength: 0.5, parentNodeId: "r" }],
+    [arrow("p-r", "p", "r", "attack", 0.5)]);
+
+  it.each([
+    ["a base strength above one", graph([{ nodeId: "r", baseStrength: 0.5, parentNodeId: null }, { nodeId: "p", baseStrength: 1.4, parentNodeId: "r" }],
+      [arrow("p-r", "p", "r", "attack", 0.5)]), new Map([fact("p", "DISPUTE")])],
+    ["a negative base strength", graph([{ nodeId: "r", baseStrength: 0.5, parentNodeId: null }, { nodeId: "p", baseStrength: -0.1, parentNodeId: "r" }],
+      [arrow("p-r", "p", "r", "attack", 0.5)]), new Map([fact("p", "DISPUTE")])],
+    // 1.4 × 0.66 = 0.924 would pass propagation's own unit check after scaling; it is refused before.
+    ["a bearing above one", graph(ONE.nodes, [arrow("p-r", "p", "r", "attack", 1.4)]), new Map([fact("p", "CANNOT_ASSESS")])],
+    ["a bearing that is not a number", graph(ONE.nodes, [arrow("p-r", "p", "r", "attack", Number.NaN)]), new Map([fact("p", "CANNOT_ASSESS")])],
+    ["a measured own reply above one", graph(ONE.nodes, [arrow("p-r", "p", "r", "support", 1.4)]),
+      new Map([fact("p", "AGREE", { ownReplyEdgeIds: ["p-r"] })])]
+  ] as const)("refuses %s before scaling it, as engine 1's propagation refuses it (PROPAGATION_MAGNITUDE_INVALID)", (_name, snapshot, facts) => {
+    expect(() => engineSnapshotOf(snapshot, facts, ENGINE)).toThrowError(code("PROPAGATION_MAGNITUDE_INVALID"));
+    // Engine 1 (no transform): propagation's own door refuses the same value.
+    expect(() => evaluate(snapshot)).toThrowError(code("PROPAGATION_MAGNITUDE_INVALID"));
+  });
+
+  it("leaves a value it does not scale to propagation's own check", () => {
+    const outOfRangeUnscaled = graph([{ nodeId: "r", baseStrength: 1.4, parentNodeId: null }, { nodeId: "p", baseStrength: 0.5, parentNodeId: "r" }],
+      [arrow("p-r", "p", "r", "attack", 0.5)]);
+    expect(() => engineSnapshotOf(outOfRangeUnscaled, new Map([fact("p", "CANNOT_ASSESS")]), ENGINE)).not.toThrow();
+  });
+
+  it("refuses a cannot-assess status without the cannot-assess review behind it", () => {
+    expect(() => engineSnapshotOf(ONE, new Map([fact("p", "CANNOT_ASSESS", { cannotAssessReview: false })]), ENGINE))
+      .toThrowError(code("ENGINE_FACTS_INVALID"));
+  });
+
+  it("refuses the standings of a point whose review was not cannot-assess", () => {
+    const facts = new Map([fact("p", "AGREE")]);
+    expect(() => pointInvestigationStandings({ snapshot: ONE, facts, engine: ENGINE, nodeId: "p", servableRootIds: ["r"] }))
+      .toThrowError(code("ENGINE_FACTS_INVALID"));
+  });
+
+  // engineLinkedGraph already refused this (A8's ENGINE_FACTS_INVALID, tests/unit/r2-engine-links-wiring.test.ts); the
+  // missing case was a caller that hands facts to the link rules directly (the standings record).
+  it("refuses an own-reply id whose link is another node's, also when the facts reach the link rules directly", () => {
+    const two = graph([...ONE.nodes, { nodeId: "q", baseStrength: 0.5, parentNodeId: "r" }],
+      [arrow("p-r", "p", "r", "support", 0.5), arrow("q-r", "q", "r", "support", 0.5)]);
+    const facts = new Map([fact("q", "AGREE", { ownReplyEdgeIds: ["p-r"] }), fact("p", "CANNOT_ASSESS")]);
+    expect(() => engineSnapshotOf(two, facts, ENGINE)).toThrowError(code("ENGINE_FACTS_INVALID"));
+    expect(() => pointInvestigationStandings({ snapshot: two, facts, engine: ENGINE, nodeId: "p", servableRootIds: ["r"] }))
+      .toThrowError(code("ENGINE_FACTS_INVALID"));
+  });
+});

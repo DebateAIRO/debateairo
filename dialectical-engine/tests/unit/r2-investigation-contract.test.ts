@@ -159,6 +159,14 @@ describe("engine 2: the investigation contract (spec §4.2b, INTERFACE §8)", ()
     expect(pick(0, [], [])).toBeNull();
   });
 
+  // R2a final wave, Ruling (A13 Minors) 3: a bad rotation offset is a code defect even when no seat is left.
+  it.each([-1, 1.5, Number.NaN])("refuses the rotation offset %s before it looks at the seats, an empty list too", (rotationOffset) => {
+    for (const seats of [SEATS, []]) {
+      expect(() => pickPointInvestigator({ seats, authorMaker: "m-a", reviewerMaker: "m-b", arguingMakers: new Set(), rotationOffset }))
+        .toThrow("POINT_INVESTIGATION_ROTATION_INVALID");
+    }
+  });
+
   it("reads each outcome as the review the point lacked, and names its row result", () => {
     expect(pointInvestigationStatus("holds")).toBe("AGREE");
     expect(pointInvestigationStatus("fails")).toBe("DISPUTE");

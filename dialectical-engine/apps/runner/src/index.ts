@@ -544,9 +544,17 @@ export function pointInvestigationFailureOutcome(error: unknown): "RETHROW" | "U
   // inside the call's builders. Decided by the code, never by the class: fetch's own network failure is a TypeError
   // ("fetch failed") and stays unavailable.
   if (error instanceof TypedDomainError && error.code === "DEBATE_MAKER_UNRESOLVED") return "RETHROW";
+  // R2a final wave (re-review Minor 3): a reply refused after the repairs is unavailable BY NAME, whatever carries it,
+  // before the code-shape rule below could read it as a defect.
+  if (error instanceof Error && POINT_INVESTIGATION_REPLY_REFUSALS.has(error instanceof TypedDomainError ? error.code : error.message)) {
+    return "UNAVAILABLE";
+  }
   if (error instanceof TypeError && NAMED_CODE_DEFECT.test(error.message)) return "RETHROW";
   return "UNAVAILABLE";
 }
+
+/** The investigator's reply refusals (packages/judgement's reader): a reply, never a code defect. */
+const POINT_INVESTIGATION_REPLY_REFUSALS: ReadonlySet<string> = new Set(["POINT_INVESTIGATION_PARSE_FAILURE", "POINT_INVESTIGATION_SCHEMA_FAILURE"]);
 
 /** A TypeError the code raised by name: an upper-case code of two or more words, optionally `:<field path>`. */
 const NAMED_CODE_DEFECT = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?::[A-Za-z0-9_.]+)?$/u;
@@ -562,6 +570,10 @@ export function pointInvestigationFailureCode(error: unknown): string {
   if (typeof error !== "object" || error === null) return "UNKNOWN";
   const code = (error as { readonly code?: unknown }).code;
   if (typeof code === "string" && FAILURE_CODE_SHAPE.test(code)) return code;
+  // R2a final wave (re-review Minor 4): Node's fetch throws TypeError("fetch failed") with the socket's code on its cause.
+  const cause: unknown = (error as { readonly cause?: unknown }).cause;
+  const causeCode = typeof cause === "object" && cause !== null ? (cause as { readonly code?: unknown }).code : undefined;
+  if (typeof causeCode === "string" && FAILURE_CODE_SHAPE.test(causeCode)) return causeCode;
   const name: unknown = (error as { readonly constructor?: { readonly name?: unknown } }).constructor?.name;
   return typeof name === "string" && /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(name) ? name : "UNKNOWN";
 }

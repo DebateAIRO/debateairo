@@ -14,7 +14,7 @@
  */
 import { enginePointPlacement, pointInvestigationCallSiteKey, type EngineMaterialSource, type PointInvestigationMaterial } from "@debateai/kernel";
 import {
-  orderPointInvestigations, pickPointInvestigator, pointInvestigationResultOf, pointInvestigationStatus,
+  orderPointInvestigations, pickPointInvestigator, pointInvestigationResultOf,
   type EngineReviewStatus, type PointInvestigationBasis, type PointInvestigationCandidate,
   type PointInvestigationRecord, type PointInvestigationReply, type PointInvestigationResult, type PointInvestigationSeat
 } from "@debateai/judgement";
@@ -214,7 +214,8 @@ export async function runPointInvestigations(input: Readonly<{
     const prior = facts.get(nodeId);
     facts.set(nodeId, Object.freeze({
       nodeId, ownReplyEdgeIds: prior?.ownReplyEdgeIds ?? Object.freeze([]), cannotAssessReview: true,
-      status: pointInvestigationStatus(answer.reply.outcome)
+      // R2a final wave (re-review Minor 2): the ONE rule the record is read back by.
+      status: investigatedStatusOf(pointInvestigationResultOf(answer.reply.outcome)) ?? "CANNOT_ASSESS"
     }));
   });
   const finalFacts: ReadonlyMap<string, EngineNodeFacts> = facts;

@@ -138,6 +138,14 @@ describe("engine 2: the runner's material reader (INTERFACE §11.2)", () => {
     expect(mocks.readStoryEnrichment).not.toHaveBeenCalled();
   });
 
+  // R2a final wave, Ruling (A12 concerns) 1 / (A12 Minors) 5: no review row, no lease and no story read.
+  it("asks the story's reader nothing when the ledger holds no review of the nodes asked", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    expect((await readEngineReviews({ query } as unknown as Pool, RUN, [X1, P2])).size).toBe(0);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(mocks.readStoryEnrichment).not.toHaveBeenCalled();
+  });
+
   it("reads the reviews and the recorded investigations, then builds the source", async () => {
     const query = vi.fn(async () => ({ rows: [{ node_id: X1, outcome: "cannot-assess", author_maker: "m-a", reviewer_maker: "m-b" }] }));
     mocks.readStoryEnrichment.mockResolvedValue(new Map([[X1, { judgeBestCase: null, judgeObjection: null,

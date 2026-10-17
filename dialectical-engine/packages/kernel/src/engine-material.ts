@@ -160,6 +160,8 @@ function checkSource(source: EngineMaterialSource): void {
     if (!(ENGINE_ANSWER_LETTERS as readonly string[]).includes(answer.letter) || letters.has(answer.letter)) throw invalid(`${at}.letter`);
     if (roots.has(answer.rootNodeId)) throw invalid(`${at}.rootNodeId`);
     if (answer.words.trim() === "") throw invalid(`${at}.words`);
+    // R2a final wave (Ruling (A11 Minors) 3): a case is the writer's text or null (the words ARE the case), never blank.
+    if (answer.caseText !== null && answer.caseText.trim() === "") throw invalid(`${at}.caseText`);
     letters.add(answer.letter);
     roots.add(answer.rootNodeId);
   });
@@ -252,15 +254,26 @@ export function engineMaterialOf(source: EngineMaterialSource): EngineDebateMate
   });
 }
 
-/** The material with the judges' verdict block (B5). Throws ENGINE_MATERIAL_INVALID on a letter the material lacks. */
+/** The labels a verdict block may carry (EngineVerdictBlock["label"]). */
+const VERDICT_LABELS: ReadonlySet<string> = new Set<EngineVerdictBlock["label"]>(["SUPPORTED", "CONTESTED", "SPLIT"]);
+
+/**
+ * The material with the judges' verdict block (B5). Throws ENGINE_MATERIAL_INVALID on a letter the material lacks, an
+ * off-list label or a conditional that is not a boolean. R2a final wave (Ruling (A11 Minors) 1, 2): the material is
+ * rebuilt member by member, so a widened object (one carrying a number) never passes its extra members on.
+ */
 export function engineVerdictMaterialOf(material: EngineDebateMaterial, verdict: EngineVerdictBlock): EngineVerdictMaterial {
   const letters = new Set<string>(material.answers.map((answer) => answer.letter));
+  if (!VERDICT_LABELS.has(verdict.label)) throw invalid("verdict.label");
   if (!letters.has(verdict.winner)) throw invalid("verdict.winner");
+  if (typeof verdict.conditional !== "boolean") throw invalid("verdict.conditional");
   verdict.judgesReasons.forEach((entry, index) => {
     if (!letters.has(entry.chose)) throw invalid(`verdict.judgesReasons.${String(index)}.chose`);
   });
   return Object.freeze({
-    ...material,
+    question: material.question,
+    answers: material.answers,
+    disputed: material.disputed,
     verdict: Object.freeze({
       label: verdict.label,
       winner: verdict.winner,

@@ -141,3 +141,31 @@ describe("engine 2: the shared material core (INTERFACE §11.2)", () => {
     expect(() => engineMaterialOf(source)).toThrow(`ENGINE_MATERIAL_INVALID:${field}`);
   });
 });
+
+// R2a final wave, Ruling (A11 Minors) 1-3: the verdict material is rebuilt member by member, and an off-list label, a
+// conditional that is not a boolean and a blank case are refused.
+describe("engine 2: the verdict material refuses what code could not have built (R2a final wave A3)", () => {
+  const VERDICT = { label: "SUPPORTED", winner: "A", conditional: false, judgesReasons: [] } as const;
+
+  it("rebuilds the material member by member: a widened object's extra member (a number) never reaches the verdict material", () => {
+    const widened = { ...engineMaterialOf(SOURCE), strength: 0.9, margin: 0.2 };
+    const verdict = engineVerdictMaterialOf(widened, VERDICT);
+    expect(Object.keys(verdict).sort()).toEqual(["answers", "disputed", "question", "verdict"]);
+    expect(numbersIn(verdict)).toEqual([]);
+    expect(deepFrozen(verdict)).toBe(true);
+  });
+
+  it.each([
+    ["an off-list label", { ...VERDICT, label: "CLEAR" }, "verdict.label"],
+    ["a conditional that is not a boolean", { ...VERDICT, conditional: "no" }, "verdict.conditional"]
+  ] as const)("refuses %s", (_name, verdict, field) => {
+    expect(() => engineVerdictMaterialOf(engineMaterialOf(SOURCE), verdict as unknown as Parameters<typeof engineVerdictMaterialOf>[1]))
+      .toThrow(`ENGINE_MATERIAL_INVALID:${field}`);
+  });
+
+  it.each(["", "   "])("refuses a blank case (%j); a missing case (null) stays the answer's words", (caseText) => {
+    const source = { ...SOURCE, answers: [SOURCE.answers[0]!, { ...SOURCE.answers[1]!, caseText }] };
+    expect(() => engineMaterialOf(source)).toThrow("ENGINE_MATERIAL_INVALID:answers.1.caseText");
+    expect(() => pointInvestigationMaterialOf(source, "x1")).toThrow("ENGINE_MATERIAL_INVALID:answers.1.caseText");
+  });
+});

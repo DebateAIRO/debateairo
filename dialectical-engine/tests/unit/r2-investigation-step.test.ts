@@ -508,3 +508,34 @@ describe("engine 2: the investigation step, R2a final wave W3", () => {
     expect(run.recorded).toEqual([]);
   });
 });
+
+describe("engine 2: the investigation step, R2a final wave A5", () => {
+  // (2) One rule: the in-flight facts read an answer as the record is read back (investigatedStatusOf).
+  it.each(["holds", "fails", "dead_end"] as const)("reads a fresh %s as its recorded row is read back", async (outcome) => {
+    const run = investigate({ candidates: [CANDIDATES[0]!], stepOnly: true,
+      replies: { "VERDICT:investigate:1": outcome === "dead_end" ? reply("dead_end", "", "none") : reply(outcome) } });
+    const { facts, rows } = await run.result;
+    expect(facts.get("p1")?.status).toBe(engineFactsWithInvestigations(FACTS, rows).get("p1")?.status);
+    expect(facts.get("p1")?.status).toBe({ holds: "AGREE", fails: "DISPUTE", dead_end: "CANNOT_ASSESS" }[outcome]);
+  });
+
+  // (3) The two reply refusals are unavailable by name, whatever class carries them.
+  it.each(["POINT_INVESTIGATION_PARSE_FAILURE", "POINT_INVESTIGATION_SCHEMA_FAILURE"])("reads %s as unavailable, also as a TypeError", (name) => {
+    expect(pointInvestigationFailureOutcome(new TypedDomainError(name, "x"))).toBe("UNAVAILABLE");
+    expect(pointInvestigationFailureOutcome(new TypeError(name))).toBe("UNAVAILABLE");
+    // Any other named defect still fails the debate.
+    expect(pointInvestigationFailureOutcome(new TypeError("POINT_INVESTIGATION_CANDIDATE_INVALID"))).toBe("RETHROW");
+  });
+
+  // (4) A network TypeError names its cause's code (Node's fetch: "fetch failed" with cause ECONNRESET), never a message.
+  it("names a network failure by its cause's code when that is code-shaped, else by its class", () => {
+    expect(pointInvestigationFailureCode(new TypeError("fetch failed", { cause: Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }) })))
+      .toBe("ECONNRESET");
+    expect(pointInvestigationFailureCode(new TypeError("fetch failed", { cause: { code: "UND_ERR_SOCKET" } }))).toBe("UND_ERR_SOCKET");
+    expect(pointInvestigationFailureCode(new TypeError("fetch failed", { cause: { code: "connection reset by the vendor" } }))).toBe("TypeError");
+    expect(pointInvestigationFailureCode(new TypeError("fetch failed", { cause: "a string cause" }))).toBe("TypeError");
+    // The error's own code still comes first.
+    expect(pointInvestigationFailureCode(Object.assign(new TypeError("fetch failed", { cause: { code: "ECONNRESET" } }), { code: "EPIPE" })))
+      .toBe("EPIPE");
+  });
+});
