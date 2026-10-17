@@ -462,6 +462,15 @@ echo "exit: $?"
   checker says whether a problem is misleading; only a misleading problem starts round 2, which revises its own draft;
   a backup storyteller when the first cannot write at all). The rest of the debate is today's until the later phases.
 - Example (S-6's debate command plus): `--length-policy tools/preview-practice/length-policy-start.json --engine-policy tools/preview-practice/engine-policy-start.json`.
+- Every debate report now says which engine the run was admitted with (`report.json` `ask.engine`, from the run's own
+  receipt) and, counts and codes only: `storyRounds` (per story round: the storyteller's model, `MISLEADING`,
+  `WORDING_NOTE_ONLY`, `SATISFIED`, `NOT_SATISFIED` for today's checker, `NO_DRAFT` or `NO_VERDICT`, and whether the round
+  revised its own draft), `storyBackups` (the first storyteller's model, the signal `UNREACHABLE`, `TOO_SLOW`,
+  `OUT_OF_ROOM` or `UNUSABLE`, the backup's model, the outcome) and `storyReadyRate` (the stored stories by outcome, to
+  sum over runs). The story tables `storyLengthByField` and `storyJsonBreaks` are described under "The story in words".
+- A story or checker reply that Haiku's structure repair rescued counts for its own round (and its words for the AI
+  whose call it repaired). The words table's `storyteller` row is the short story's sum; `storyLengthByField` splits it
+  per field and adds the long version.
 
 ### Pinning the answer writer and the storyteller (debate mode)
 
@@ -1170,6 +1179,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
 - `length-policy-start.json`: the owners' start values for `--length-policy`.
 - `practice-pins.ts`: `--answer-writer-model`, `--storyteller-model` (the report's `writerPins`).
+- `practice-story-length.ts`, `practice-story-rounds.ts`: the story tables (`storyLengthByField`, `storyJsonBreaks`) and
+  the engine and story-round blocks (`ask.engine`, `storyRounds`, `storyBackups`, `storyReadyRate`).
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
@@ -1192,6 +1203,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-transcript.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/unit/preview-practice-pins.test.ts`,
+  `tests/unit/practice-story-length.test.ts`,
+  `tests/unit/practice-story-rounds.test.ts`,
   `tests/unit/lg-a-practice-repairs.test.ts` (the two LG-A tables, the step keys, a structure-repair try read as its step),
   `tests/integration/preview-practice-run.test.ts` (both modes against the scripted gate doubles in
   `tests/support/preview-gate-stubs.ts`; no vendor is contacted).

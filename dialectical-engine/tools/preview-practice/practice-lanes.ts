@@ -99,7 +99,7 @@ import { TypedDomainError, exhaustive, lengthCallStepOf, type LengthCallStep, ty
 // The runner's own story snapshot builder (not on the runner package's export list; practice.ts reads the runner's
 // dev register module the same way).
 import { buildStoryRunSnapshot } from "../../apps/runner/src/story-snapshot.js";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import { REVISION_REPLY_FORM, readPromptFrame, type PromptPacket } from "@debateai/providers";
 import type { PracticeQuestion } from "./practice-questions.js";
 import type { PracticeReplyForm } from "./practice-verdict.js";
 
@@ -362,6 +362,22 @@ export function practiceReviewEdgeCountOf(messages: PromptPacket["messages"]): n
 }
 
 /**
+ * Engine row, story v4 (R1d; spec 2026-10-15 engine redesign §7.2 item 8): a round-2 storyteller request that revises
+ * its own draft. It carries the model's accepted round-1 draft as its own (assistant) turn, then one fenced block whose
+ * last field is `machine_reply_form` REVISION (packages/providers/src/prompt-frame.ts buildFramedRevisionPrompt), read
+ * through the door. A patch follow-up also carries an assistant turn, but its form is PATCH.
+ */
+export function practiceIsRevisionPrompt(messages: PromptPacket["messages"]): boolean {
+  if (!messages.some((message) => message.role === "assistant")) return false;
+  try {
+    const last = readPromptFrame({ messages }).fields.at(-1);
+    return last?.name === "machine_reply_form" && last.content === REVISION_REPLY_FORM;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Patch follow-up (owner design, 2026-10-12): which form one attempt sent (`PracticeReplyForm`), read from the attempt's
  * own recorded prompt (the `messages` the gateway hands `persistCallPrompt` just before it sends, the same value
  * ledger.call_prompt keeps), through the frame reader the gateway's door runs:
@@ -371,6 +387,15 @@ export function practiceReviewEdgeCountOf(messages: PromptPacket["messages"]): n
  * Null when the frame cannot be read (never the case for a prompt the gateway sent).
  */
 export function practiceReplyFormOf(messages: PromptPacket["messages"]): PracticeReplyForm | null {
+  // A revision (story v4 round 2) is that round's own packet (ORIGINAL), or its full re-ask once it carries the
+  // rejection fields (FULL); never a patch, though it carries the model's own draft as an assistant turn.
+  if (practiceIsRevisionPrompt(messages)) {
+    try {
+      return readPromptFrame({ messages }).fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";
+    } catch {
+      return null;
+    }
+  }
   if (messages.some((message) => message.role === "assistant")) return "PATCH";
   try {
     return readPromptFrame({ messages }).fields.some((field) => field.name === "machine_rejection_code") ? "FULL" : "ORIGINAL";

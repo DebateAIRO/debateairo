@@ -86,6 +86,8 @@ import {
   type PracticeShapeRowChange,
   type PracticeShapeSource
 } from "./practice-shape.js";
+import { collectPracticeStoryLength, type PracticeStoryLengthBlock } from "./practice-story-length.js";
+import { collectPracticeStoryEngine, type PracticeStoryEngineBlock } from "./practice-story-rounds.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
 import {
   practiceLengthRows,
@@ -232,6 +234,10 @@ export type PracticeDebateResult = Readonly<{
   language?: PracticeDebateLanguageBlock;
   /** Pinned final writers (R1d): each pin, the model the run's own pin names, whether it held; absent without a pin. */
   writerPins?: PracticeWriterPinsBlock;
+  /** Length guidance (LG-D): the storyteller's words per field and its unreadable replies; absent when it could not be read. */
+  storyLength?: PracticeStoryLengthBlock;
+  /** Engine row (R1d): the engine the run was admitted with, the story's rounds and backups, the stories by outcome. */
+  storyEngine?: PracticeStoryEngineBlock;
   /**
    * Hosted mode only (absent in local mode): the ask went through the room or the daily guard, billing as the register
    * says it and as the practice ran it (always off), the ceilings the run was held to (micro-dollars), and the names
@@ -935,6 +941,22 @@ export async function runPracticeDebate(input: Readonly<{
       }
     }
     const collected = await collect(pool, job.runId, { structureRouted: runner.structureRouted });
+    // Length guidance (LG-D): the story's words per field and its unreadable replies, read before the database goes.
+    // A reading that breaks costs only this block, never the report.
+    let storyLength: PracticeStoryLengthBlock | undefined;
+    try {
+      storyLength = await collectPracticeStoryLength(pool, job.runId);
+    } catch (error) {
+      progress(`story length: could not be read (${codeOf(error)})`);
+    }
+    // Engine row (R1d): the engine from the run's own receipt, the story's rounds and backups, the stories by outcome
+    // (the stored story's backup record comes from the story the practice already read). Same rule: only this block.
+    let storyEngine: PracticeStoryEngineBlock | undefined;
+    try {
+      storyEngine = await collectPracticeStoryEngine(pool, job.runId, storedStory);
+    } catch (error) {
+      progress(`story rounds: could not be read (${codeOf(error)})`);
+    }
     // Debate shape: what the shape run did, read before the database goes. A reading that breaks costs only this block
     // (NOT_PROVEN: the shape was not shown to run), never the report.
     let shape: PracticeShapeBlock | undefined;
@@ -986,6 +1008,8 @@ export async function runPracticeDebate(input: Readonly<{
       }),
       run: Object.freeze({ runId: job.runId, workItemOutcome, failureCode, answer, story }),
       ...collected, probes: Object.freeze(probes), remaining,
+      ...(storyLength === undefined ? {} : { storyLength }),
+      ...(storyEngine === undefined ? {} : { storyEngine }),
       seconds: Object.freeze({ admission: admissionSeconds, debate: debateSeconds }),
       parallel: runner.callStats.summary(),
       ...(transcript === undefined ? {} : { transcript }),
