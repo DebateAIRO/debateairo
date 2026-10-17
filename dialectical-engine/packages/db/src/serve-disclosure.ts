@@ -63,7 +63,7 @@ export type ServeDisclosureServeStop = typeof SERVE_DISCLOSURE_SERVE_STOPS[numbe
 export const SERVE_DISCLOSURE_FALLBACK_REASONS = Object.freeze(["MONEY", "ROLE_UNAVAILABLE"] as const);
 export type ServeDisclosureFallbackReason = typeof SERVE_DISCLOSURE_FALLBACK_REASONS[number];
 
-export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const);
+export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT"] as const);
 export type ServeDisclosureFloorState = typeof SERVE_DISCLOSURE_FLOOR_STATES[number];
 
 export interface ServeDisclosureRecord {

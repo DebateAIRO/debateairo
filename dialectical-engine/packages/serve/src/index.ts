@@ -2158,7 +2158,7 @@ export class ServeRepository {
         composed_text_id: string | null;
         conformance_record_id: string | null;
         serve_state: "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
-        verdict_state: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+        verdict_state: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT" | null;
         verdict_unavailable: { readonly reason_ref: string } | null;
       }>(
         `SELECT answer_id, answer_version, run_id, work_item_id,

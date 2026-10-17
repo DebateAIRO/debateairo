@@ -107,7 +107,9 @@ replace-these steer.
 - **Liveness** — when a settled question is retired or re-opened (ticket 14).
 - **Verdict model (canonical, DR-063 VR-2)** — two axes, never conflated:
   the VERDICT STATE says what the evidence points to — SUPPORTED, CONTESTED,
-  or UNSUPPORTED; the CONFIDENCE BAND says how settled that reading is — and
+  UNSUPPORTED, or SPLIT (owner ruling E8, 2026-10-15: the comparing judges of
+  the new engine found no majority; engine 2 only, and it never produces
+  UNSUPPORTED); the CONFIDENCE BAND says how settled that reading is — and
   the top confidence band is what the no-independent-critique cap (DR-014)
   denies. An ABSTENTION is neither: a typed non-answer, never a band. Any
   state may combine with any band (an answer can be confidently CONTESTED).

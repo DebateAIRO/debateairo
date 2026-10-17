@@ -601,7 +601,7 @@ export type DebateConfig = Record<string, unknown> & {
 // fabricated verdict.
 // ---------------------------------------------------------------------------
 
-export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailable" | "insufficient_scoring" | "suppressed";
+export type VerdictBand = "supported" | "contested" | "unsupported" | "split" | "unavailable" | "insufficient_scoring" | "suppressed";
 
 /**
  * The live verdict state the engine's three-state label maps onto, in the
@@ -612,7 +612,7 @@ export type VerdictBand = "supported" | "contested" | "unsupported" | "unavailab
  * something false about a label that is derived from propagated strength, not
  * from whether evidence was looked up.
  */
-export type LiveVerdictState = "supported" | "contested" | "unsupported";
+export type LiveVerdictState = "supported" | "contested" | "unsupported" | "split";
 
 export type VerdictSummary = {
   verdictBand: VerdictBand;

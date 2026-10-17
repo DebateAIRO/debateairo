@@ -17,6 +17,7 @@ import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
@@ -1065,13 +1066,13 @@ export const PublicDebateSummarySchema = z.object({
   question: z.string().trim().min(1),
   published_at: z.iso.datetime(),
   models: z.array(z.string().trim().min(1)).optional(),
-  verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict: VerdictStateSchema.nullable(),
   confidence_band: z.string().trim().min(1).nullable(),
   // Engine money rule, Task M6 (spec §14.4.4): a components-only snapshot's
   // floor label (`PublicDebate.floor.verdict_state`), so the public library row
   // shows the label the page shows instead of "verdict unavailable". Absent
   // for every other snapshot; the floor's position and cause never ride here.
-  floor_verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).optional()
+  floor_verdict: VerdictStateSchema.optional()
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
@@ -1190,7 +1191,7 @@ export const AnswerSummarySchema = z.object({
   run_ref: z.string().min(1),
   answer_version: z.number().int().positive(),
   question_line: z.string().min(1),
-  verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict_state: VerdictStateSchema.nullable(),
   abstention: AbstentionSchema.nullable(),
   serve_state: z.enum(["COMPOSED", "RECOMPOSED_ONCE", "COMPONENTS_ONLY"]),
   staleness_state: StalenessStateSchema,
@@ -1352,7 +1353,7 @@ export const PublicDebateSchema = z.object({
   published_at: z.iso.datetime(),
   answer: z.object({
     terminal: z.enum(["SERVED", "DOWNGRADED", "COMPONENTS_ONLY"]),
-    verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+    verdict: VerdictStateSchema.nullable(),
     verdict_available: z.boolean(),
     confidence_band: z.string().trim().min(1).nullable(),
     summary_segments: z.array(z.object({ text: z.string().min(1) }).strict()),
@@ -1427,7 +1428,7 @@ export const AnswerSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().min(1),
   terminal: z.enum(["SERVED", "DOWNGRADED", "BLOCKED", "COMPONENTS_ONLY"]),
-  verdict_state: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
+  verdict_state: VerdictStateSchema.nullable(),
   verdict_unavailable: z.object({ reason_ref: z.string().trim().min(1) }).strict().nullable(),
   confidence_band: z.string().min(1).nullable(),
   band_ceiling: BandCeilingSchema.nullable(),

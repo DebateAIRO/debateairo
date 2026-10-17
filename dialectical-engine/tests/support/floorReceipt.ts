@@ -11,7 +11,7 @@ import { LedgerRepository } from "@debateai/ledger";
 export async function recordFloorLabelReceipt(pool: Pool, input: Readonly<{
   runId: string;
   servedNodeId: string;
-  label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+  label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
   basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
 }>): Promise<void> {
   await new LedgerRepository(pool).recordPropagation({

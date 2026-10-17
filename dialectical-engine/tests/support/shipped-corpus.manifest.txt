@@ -877,6 +877,7 @@ packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
 packages/contract/src/story.ts
+packages/contract/src/verdict-state.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts

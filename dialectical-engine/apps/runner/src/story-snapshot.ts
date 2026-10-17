@@ -74,8 +74,9 @@ export interface StorySnapshotSource {
   readonly languageLocked?: boolean;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
-    readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
-    readonly rung: 0 | 1 | 2 | 3 | 4;
+    readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
+    /** 0-4: engine 1's ladder rung; 5: the comparing judges (engine 2). */
+    readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
     readonly trigger: string;
   };
   readonly servedRootNodeId: string;

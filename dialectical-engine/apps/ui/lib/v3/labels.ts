@@ -171,8 +171,9 @@ export function markLabelFromRecords(mark: ConditionMark, records: readonly Mark
  * the older evidence gate and made the banner say something false about a
  * label derived from propagated strength alone.
  *
- * The switch is exhaustive over the engine's label union — a fourth state fails
+ * The switch is exhaustive over the engine's label union — a fifth state fails
  * typecheck here rather than rendering as an unnamed verdict.
+ * R2 (ruling E8): SPLIT, "no majority", is the fourth state.
  */
 export function liveVerdictState(
   label: NonNullable<Answer["verdict_state"]>
@@ -181,6 +182,7 @@ export function liveVerdictState(
     case "SUPPORTED": return "supported";
     case "CONTESTED": return "contested";
     case "UNSUPPORTED": return "unsupported";
+    case "SPLIT": return "split";
   }
 }
 

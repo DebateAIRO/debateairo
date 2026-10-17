@@ -366,7 +366,7 @@ export interface PublicationApplication {
       question: string;
       published_at: string;
       models?: readonly string[];
-      verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+      verdict: PublicDebate["answer"]["verdict"];
       confidence_band: string | null;
     }>[];
     total: number;
@@ -711,9 +711,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
       question: string;
       published_at: string;
       models?: readonly string[];
-      verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+      verdict: PublicDebate["answer"]["verdict"];
       confidence_band: string | null;
-      floor_verdict?: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      floor_verdict?: AnswerFloor["verdict_state"];
     }>[];
     total: number;
   }>> {

@@ -17,6 +17,7 @@ import {
   type DiscoveredPanelMember,
   type RunCostSubstitutionReason,
   type RunRoleRotationRecord,
+  type ServeDisclosureFloorState,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -1822,7 +1823,8 @@ export interface ReviewCatchUpReviewer {
  */
 export interface ReviewCatchUpFloor {
   readonly leadingNodeId: string;
-  readonly verdictState: VerdictLabelDerivation["label"] | null;
+  /** The owner's floor list's own type: it carries SPLIT (R2b, ruling E8), as the stored floor does. */
+  readonly verdictState: ServeDisclosureFloorState | null;
 }
 
 export interface ReviewCatchUpVersionCandidate {
@@ -3748,7 +3750,8 @@ export function serveDisclosureBodyFacts(input: Readonly<{
  * run persists no answer, so it has no row and no floor.
  */
 export type ServeFloor = Readonly<{
-  verdictState: VerdictLabelDerivation["label"];
+  /** The owner's floor list's own type: it carries SPLIT (R2b, ruling E8), as the stored floor does. */
+  verdictState: ServeDisclosureFloorState;
   leadingNodeId: string;
   reason: string;
 }>;
@@ -3756,7 +3759,7 @@ export type ServeFloor = Readonly<{
 export function serveFloorOf(input: Readonly<{
   terminal: ServeGateResult["terminal"];
   crashClass: ServeGateResult["crashClass"];
-  label: VerdictLabelDerivation["label"];
+  label: ServeDisclosureFloorState;
   leadingNodeId: string;
 }>): ServeFloor | null {
   if (input.terminal !== "COMPONENTS_ONLY") return null;

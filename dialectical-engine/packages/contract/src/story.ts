@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MakerLineageSchema } from "./lineage.js";
+import { VerdictStateSchema } from "./verdict-state.js";
 
 /**
  * THE VERDICT STORY (spec §5.3, §7) — the shapes the storyteller answers in and
@@ -104,12 +105,13 @@ export const StoryStatusSchema = z.enum(["WRITING", "READY", "READY_WITH_RESERVA
 export type StoryStatus = z.infer<typeof StoryStatusSchema>;
 
 /**
- * The arithmetic behind the label, as code computed it (`deriveVerdictLabel`):
- * the story explains it and the PDF prints it, and neither can change it.
+ * The basis behind the label, as code computed it (engine 1: `deriveVerdictLabel`'s ladder; engine 2: the comparing
+ * judges' counted votes, rung 5): the story explains it and the PDF prints it, and neither can change it.
  */
 export const StoryVerdictBasisSchema = z.object({
-  label: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]),
-  rung: z.number().int().min(0).max(4),
+  label: VerdictStateSchema,
+  /** The ladder rung (0-4, engine 1) or 5: the comparing judges decided (engine 2, R2b). */
+  rung: z.number().int().min(0).max(5),
   trigger: z.string().min(1),
   winner_node_id: z.string().min(1),
   winner_strength: z.number(),

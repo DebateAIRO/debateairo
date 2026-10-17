@@ -75,7 +75,7 @@ export const ACCEPTANCE_DOD_VERDICT_LABEL_PROJECTION_INVALID = "ACCEPTANCE_DOD_V
 /* -------------------------------------------------------------- the inputs */
 
 export type SynthesizerStage = "INITIAL" | "RETRY";
-export type VerdictState = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+export type VerdictState = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
 export type AnswerTerminal = "SERVED" | "DOWNGRADED" | "BLOCKED" | "COMPONENTS_ONLY";
 export type AnswerServeState = "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
 export type EdgeMagnitudeStatus = "MEASURED" | "UNKNOWN";
