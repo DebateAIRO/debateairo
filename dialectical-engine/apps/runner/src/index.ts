@@ -2407,9 +2407,11 @@ export interface WalkingSkeletonSettings {
   readonly providerPrices?: ProviderPriceMap;
   /**
    * LG-A (Task 14 carry): the most one structure-repair call can be projected at, on the repair target
-   * (`previewStructureRepairCeiling`), when the route is wired; absent or null: no route. Root 0's room prices its retry
-   * as that call too, at the target's price in `providerPrices` (`rootZeroKeepRoomMicros`), so a routed run's room never
-   * under-counts root 0's retry. No price for the target (local mode) adds nothing.
+   * (`previewStructureRepairCeiling`), when the route is wired; absent or null: no route. Root 0's room adds that call to
+   * its first attempt and its own retry, at the target's price in `providerPrices` (`rootZeroKeepRoomMicros`): a routed
+   * root 0 may send its first POST, the repair call and its own second POST (refused-repair salvage B), so its room never
+   * under-counts them. No price for the target (local mode) adds nothing. Set, it also has a reclaim replay the calls A1
+   * and B answered (`replayingGateway`).
    */
   readonly structureRepairCeiling?: Readonly<{ providerRef: string; requestBytes: number; completionTokenCeiling: number }> | null;
   /**
@@ -5360,6 +5362,9 @@ export class WalkingSkeletonRunner {
      */
     const replayBook = await readReplayBook(this.pool, run.runId, claimed.workItemId);
     replayBookInLease = replayBook;
+    // Refused-repair salvage (2026-10-16): A1 and B exist only on a run whose structure-repair route is wired (main.ts sets
+    // `structureRepairCeiling` only then), so only such a run replays the calls they answered (`replayingGateway`).
+    const structureReplay = (this.settings.structureRepairCeiling ?? null) !== null;
     /** Setting nodes aside changes rows another copy saved, so it is fenced on THIS copy's claim (RUNNER_CLAIM_LOST). */
     const retireClaim = () => Object.freeze({
       workItemId: claimed.workItemId, workerId: this.settings.workerId,
@@ -5367,7 +5372,7 @@ export class WalkingSkeletonRunner {
     });
     const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
       if (replayBook.pending === 0) return maker;
-      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall());
+      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));
@@ -6921,11 +6926,12 @@ export class WalkingSkeletonRunner {
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
         // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
         // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
-        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`).
+        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
+        // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
         const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
         const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
           .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
-        // LG-A (Task 14 carry): on a routed run the retry may be the structure-repair call, at the repair target's price.
+        // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
         const repairCeiling = this.settings.structureRepairCeiling ?? null;
         const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({

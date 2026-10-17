@@ -70,6 +70,28 @@ export type ContentClassification =
       readonly failureClass?: ReplyFailureClass };
 
 /**
+ * Refused-repair salvage (2026-10-16, A1): a STRUCTURE reply A1 rescued in code (`structureSalvageFor`,
+ * ./structure-repair.ts): the content the step's own check accepted and that check's classification, A1's drops named on it.
+ */
+export type StructureSalvaged = Readonly<{ content: string; classification: ContentClassification }>;
+
+/**
+ * Refused-repair salvage (2026-10-16, B): a routed call's first reply as its ProviderStructureUnrepairedError recorded it —
+ * the refusal, its artifact and ledger row, and whether that POST's body carried the material's cache mark — so the
+ * follow-up B can be sent as the same call's second POST and, when it does not do, the call ends with these facts.
+ */
+export type StructureFirstReply = Readonly<{ rejected: RejectedProviderContent; rawArtifactRef: string; ledgerEntryRef: string; materialMarked: boolean }>;
+
+/**
+ * Refused-repair salvage (2026-10-16, B): the one follow-up to the ORIGINAL AI. PATCH asks only the members the step's
+ * refusal names (`plan`, built on A's object) and merges the reply into it; FULL re-asks the whole answer with the step's
+ * own repair packet (`buildRepairPacket`), when A found no object at all.
+ */
+export type StructureFollowUp =
+  | Readonly<{ form: "PATCH"; plan: PatchFollowUpPlan; first: StructureFirstReply }>
+  | Readonly<{ form: "FULL"; first: StructureFirstReply }>;
+
+/**
  * W10/1 (`board/W10-call-budget-truthfulness.md`, audit
  * `audits/token-budget-reasoning.md`): the OpenAI-compatible completion that
  * was cut off at `max_tokens` reports it, and until this row existed nobody
@@ -188,8 +210,28 @@ export interface ProviderCallRequest {
    * call with ProviderStructureUnrepairedError (the wrapper sends the structure-repair call); CONTENT gets one PATCH, or a
    * full re-ask when no member can be named; EMPTY a full re-ask; CUT_OFF today's length retry. Every follow-up states in
    * plain words what is missing (`machine_rejection_reason`). Absent: today's loop, byte for byte. Never sent.
+   * Refused-repair salvage (2026-10-16): with `structureFollowUp` the same call is continued instead: its one remaining POST,
+   * the follow-up B, is sent alone as attempt 2.
    */
   readonly structureRepairRouted?: boolean;
+  /**
+   * Refused-repair salvage (2026-10-16, B): set ONLY by `withStructureRepair` (./structure-repair.ts), after its
+   * structure-repair call did not do, never by a step. Requires `structureRepairRouted: true` and `classifyContent`
+   * (TypeError otherwise, before anything is sent). The call is the routed call's continuation: exactly one POST, the
+   * follow-up (PATCH or FULL) to the original AI, recorded as attempt 2 at the repair thinking level, its body marked as
+   * the first POST's was (`first.materialMarked`). A PATCH reply must keep to the asked members (the whole answer again
+   * is never accepted). A follow-up that cannot go out (over its packet cap or the window, or a packet the wire or the
+   * builder refuses) sends nothing and ends as today's ProviderContentUnacceptedError with the first reply's facts, as
+   * does a PATCH reply that could not be merged. Absent: today's loop, byte for byte. Never sent.
+   */
+  readonly structureFollowUp?: StructureFollowUp;
+  /**
+   * Refused-repair salvage (2026-10-16, A1): set ONLY by `withStructureRepair` (./structure-repair.ts, `structureSalvageFor`),
+   * never by a step. On a routed call's first reply of class STRUCTURE, before its artifact is written, A1 reads the reply in
+   * code with no call; a reply it rescues is accepted as the original AI's own OK row (no structure-repair call). Null: no
+   * rescue, the routed rule goes on. Absent: today's loop, byte for byte. Never sent.
+   */
+  readonly structureSalvage?: (content: string, reply: ModelReplyFacts | undefined) => StructureSalvaged | null;
   /**
    * Run resilience (spec 2026-10-12, fix (b)): whose attempts the step's allowance counts. "actor" — set only by
    * the preview's call policy (`withPreviewProviderCallPolicy`) — counts the asking maker's own rows
@@ -316,12 +358,17 @@ export const PROVIDER_STRUCTURE_UNREPAIRED = "PROVIDER_STRUCTURE_UNREPAIRED" as 
 export class ProviderStructureUnrepairedError extends TypedDomainError {
   override readonly code = PROVIDER_STRUCTURE_UNREPAIRED;
 
+  /**
+   * Refused-repair salvage (2026-10-16, B): `materialMarked` is whether this attempt's body carried the material's cache
+   * mark, so the follow-up B (`structureFollowUp.first.materialMarked`) repeats that body's marks and reads the cache.
+   */
   constructor(
     readonly rejected: RejectedProviderContent,
     readonly attempts: number,
     readonly lastRawArtifactRef: string,
     readonly lastLedgerEntryRef: string,
-    readonly reply: Readonly<Pick<ProviderCallResult, "provider" | "model" | "maker" | "modelVersion" | "thinkingLevel" | "reasoningTokens">>
+    readonly reply: Readonly<Pick<ProviderCallResult, "provider" | "model" | "maker" | "modelVersion" | "thinkingLevel" | "reasoningTokens">>,
+    readonly materialMarked: boolean = false
   ) {
     super(PROVIDER_STRUCTURE_UNREPAIRED, rejected.parseError);
     this.name = "ProviderStructureUnrepairedError";
@@ -1715,24 +1762,46 @@ export function readRecordedProviderReply(rawText: string, provider: string): Re
  * and the merge is the content (`mergePatchReply`); otherwise the OK reply itself, when the step's classifier accepts
  * it. Null when neither holds: the call cannot be replayed and is made again. The classifier runs on the returned
  * content last, as the gateway runs it, so a step that remembers its reading (`rememberingAcceptedReply`) has it.
+ *
+ * Refused-repair salvage (2026-10-16; pre-flight PF-S2): with the structure readers (`structureReplayReaders`, passed only on
+ * a run whose structure-repair route is wired), a call the first copy's gateway rescued or followed up is rebuilt as that
+ * gateway decided it. An `answered` reply of class STRUCTURE (measured as the gateway measures it) never got today's
+ * patch live: its second POST was B, built from A's base, so the plan is B's (`structureFollowUpPlan`) only. An OK reply
+ * with no `answered` that the step refuses was A1's rescue (`structureSalvage`). Without the readers: today's rebuild.
  */
 export function rebuildRecordedCallContent(input: Readonly<{
   accepted: RecordedProviderReply;
   answered: RecordedProviderReply | null;
   classifyContent?: (content: string, reply?: ModelReplyFacts) => ContentClassification;
+  structureSalvage?: (content: string, reply: ModelReplyFacts) => StructureSalvaged | null;
+  structureFollowUpPlan?: (content: string, reply: ModelReplyFacts) => PatchFollowUpPlan | null;
 }>): string | null {
-  const { accepted, answered, classifyContent } = input;
+  const { accepted, answered, classifyContent, structureSalvage, structureFollowUpPlan } = input;
   if (accepted.content === null) return null;
   if (classifyContent === undefined) return accepted.content;
   if (answered !== null && answered.content !== null && answered.reply.finishReason !== PROVIDER_FINISH_REASON_LENGTH) {
     const first = classifyContent(answered.content, answered.reply);
-    const plan = first.parseStatus === "SCHEMA_FAILED"
-      ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
-      : null;
+    // As the gateway reads it live: a class that cannot be read is no class (never STRUCTURE), so today's patch rebuild.
+    let structureClass = false;
+    try {
+      structureClass = structureFollowUpPlan !== undefined
+        && (first.parseStatus === "PARSE_FAILED" || first.parseStatus === "SCHEMA_FAILED")
+        && (first.failureClass ?? replyFailureClassOf({ rawText: answered.content, parseStatus: first.parseStatus,
+          parseError: first.parseError }, answered.reply)) === "STRUCTURE";
+    } catch {
+      structureClass = false;
+    }
+    const plan = structureClass && structureFollowUpPlan !== undefined
+      ? structureFollowUpPlan(answered.content, answered.reply)
+      : first.parseStatus === "SCHEMA_FAILED"
+        ? planPatchFollowUp({ content: answered.content, reply: answered.reply, parseStatus: first.parseStatus, parseError: first.parseError })
+        : null;
     const merged = plan === null ? null : mergePatchReply(plan, accepted.content, accepted.reply);
     if (merged !== null && merged.ok && classifyContent(merged.content, accepted.reply).parseStatus === "PARSED") return merged.content;
   }
-  return classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED" ? accepted.content : null;
+  if (classifyContent(accepted.content, accepted.reply).parseStatus === "PARSED") return accepted.content;
+  // A1's rescue: its salvage runs the step's classifier last, on the content it returns.
+  return answered === null && structureSalvage !== undefined ? structureSalvage(accepted.content, accepted.reply)?.content ?? null : null;
 }
 
 /**
@@ -1923,6 +1992,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (request.outputTokenCap !== undefined && (!Number.isSafeInteger(request.outputTokenCap) || request.outputTokenCap < 1)) {
       throw new TypeError("ProviderCallRequest.outputTokenCap must be a positive whole number");
     }
+    // Refused-repair salvage (B): the follow-up continues a routed structured call, never any other.
+    const followUp = request.structureFollowUp;
+    if (followUp !== undefined && (request.structureRepairRouted !== true || request.classifyContent === undefined)) {
+      throw new TypeError("ProviderCallRequest.structureFollowUp needs a routed structured call");
+    }
     // L26/L29: the call's own caps when the preview names them (the final writers), else today's.
     const packetCap = request.packetByteCap ?? MAX_PROVIDER_REQUEST_PACKET_BYTES;
     const outputCap = request.outputTokenCap ?? this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER;
@@ -1942,6 +2016,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     // LG-A (L32, L33): a routed call follows the routed rule (`structureRepairRouted`); every other call, today's loop.
     const routed = request.structureRepairRouted === true;
     const callAttempts = (): number => {
+      // Refused-repair salvage (B): the continuation is the routed call's second POST and its last.
+      if (followUp !== undefined) return 2;
       const sealed = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
       // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it.
       return routed ? Math.min(2, sealed) : Math.min(request.bound.maxAttempts,
@@ -1974,7 +2050,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * owner's `slip_fix` level when it differs send today's unmarked body, so they never pay the write premium for a read
      * that cannot come. Decided once, before the first byte leaves, so every POST of the call has the same body form.
      */
-    const markMaterial = this.#options.cacheFirstUserTurn === true && callAttempts() >= 2 && repairThinking.sent === thinking.sent;
+    // Refused-repair salvage (B): the continuation repeats its first POST's decision, so its body carries the same marks.
+    const markMaterial = followUp !== undefined ? this.#options.cacheFirstUserTurn === true && followUp.first.materialMarked
+      : this.#options.cacheFirstUserTurn === true && callAttempts() >= 2 && repairThinking.sent === thinking.sent;
     // Length guidance L25: the answer room is a whole number, and the lower level is refused here, before the first byte.
     const lengthRetry = request.lengthRetry;
     if (lengthRetry !== undefined && (!Number.isSafeInteger(lengthRetry.answerRoomTokens) || lengthRetry.answerRoomTokens < 0)) {
@@ -2047,7 +2125,53 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let patchedRefusal: ContentRefusalRecord | null = null;
     let repairForm: "PATCH" | "FULL" | undefined;
 
-    for (let attempt = 1; attempt <= callAttempts(); attempt += 1) {
+    /**
+     * Refused-repair salvage (2026-10-16, B): the continuation starts where the routed call's first POST left it — that
+     * reply refused and recorded, one follow-up chosen — so the loop below sends exactly one POST, attempt 2, and merges or
+     * re-reads its reply exactly as it would a follow-up the call had chosen itself. A follow-up that cannot go out (the
+     * builder or the door refuses it, the wire cannot say it, or it would not fit its packet cap or the window: the cap
+     * is this call's own, which may be smaller than the first POST's) sends nothing and writes nothing: the call ends
+     * with the first reply's refusal.
+     */
+    if (followUp !== undefined) {
+      const { first } = followUp;
+      const firstRefusal: ContentRefusalRecord = { attempts: 1, parseStatus: first.rejected.parseStatus,
+        parseError: first.rejected.parseError, rawArtifactRef: first.rawArtifactRef, ledgerEntryRef: first.ledgerEntryRef };
+      const followUpTokenCeiling = Math.min(request.bound.tokenCeiling, outputCap);
+      let followUpPacket: PromptPacket | null;
+      if (followUp.form === "PATCH") {
+        followUpPacket = this.#patchPacket(request.packet, first.rejected.rawText, followUp.plan, followUpTokenCeiling,
+          repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
+      } else {
+        // As `#patchPacket`: a packet the step's builder or the door refuses is one that cannot go out. A chosen swallow
+        // (spec §6 step 3, "only if B cannot be sent, today's refusal"): the refusal is the first reply's, never the builder's.
+        let full: PromptPacket | undefined;
+        try {
+          full = request.buildRepairPacket?.({ ...first.rejected, failureClass: "STRUCTURE" });
+          if (full !== undefined) assertFramedPrompt(full);
+        } catch (error) {
+          if (!(error instanceof TypedDomainError)) throw error;
+          full = undefined;
+        }
+        followUpPacket = full !== undefined
+          && Buffer.byteLength(JSON.stringify(full.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
+          && fitsContextWindow(full, followUpTokenCeiling) ? full : null;
+      }
+      if (followUpPacket === null) {
+        throw new ProviderContentUnacceptedError(firstRefusal.attempts, firstRefusal.parseStatus, firstRefusal.parseError,
+          firstRefusal.rawArtifactRef, firstRefusal.ledgerEntryRef);
+      }
+      attemptPacket = followUpPacket;
+      patchPlan = followUp.form === "PATCH" ? followUp.plan : null;
+      patchTried = true;
+      patchedRejection = first.rejected;
+      patchedRefusal = firstRefusal;
+      lastContentRejection = firstRefusal;
+      repairForm = followUp.form;
+      repairAttempts = 1;
+    }
+
+    for (let attempt = followUp === undefined ? 1 : 2; attempt <= callAttempts(); attempt += 1) {
       const attemptTokenCeiling = Math.min(
         lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
         outputCap
@@ -2249,7 +2373,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // Length guidance L27: information only, never a reason to refuse or retry. The cached part of the input as the
         // vendor reported it, and the words this reply wrote.
         const cachedInputTokens = reportedCachedInputTokens(vendorUsageBlock);
-        const attemptWords = replyWordsOf(request, content, replyFacts);
+        // A reply A1 rescues is counted again on what was accepted (the hook below).
+        let attemptWords = replyWordsOf(request, content, replyFacts);
         /**
          * Patch follow-up: what this call hands back when the reply is accepted. The reply itself, except after a
          * merged patch, where it is the first reply with the patch merged in (`mergePatchReply`) — the string the step's
@@ -2277,7 +2402,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
                * saving the full re-ask. When it does not, it stays refused as a patch (its record keeps
                * PATCH_KEY_NOT_REQUESTED) and the first reply stands.
                */
-              if (merged.parseError === PATCH_KEY_NOT_REQUESTED) {
+              // Refused-repair salvage (B): never for the follow-up B, whose reply keeps to the asked members.
+              if (merged.parseError === PATCH_KEY_NOT_REQUESTED && followUp === undefined) {
                 const whole = request.classifyContent(content, replyFacts);
                 if (whole.parseStatus === "PARSED") classifiedContent = whole;
               }
@@ -2329,6 +2455,29 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         } catch {
           attemptFailureClass = null;
           attemptRepairs = [];
+        }
+        // Refused-repair salvage (2026-10-16, A1): a routed call's reply to the ORIGINAL question (the first POST, or the
+        // length retry that sends it again; never a reply to a follow-up packet) of class STRUCTURE, not cut off, is read
+        // in code, with no call, before its artifact is written. A rescued reply is accepted here as the original AI's own
+        // reply: its artifact PARSED with A1's drops among its repairs and its words counted on what was accepted, its OK
+        // row at the call's own key, no structure-repair call. A1 sends nothing, so the routed call's POSTs stay as they
+        // were. A throw is no rescue (the reply goes on as it was refused), never a lost artifact. Never a reply to a full
+        // re-ask (`repairForm` set), even one whose builder handed back the original packet object.
+        if (routed && patchPlan === null && repairForm === undefined && attemptPacket === request.packet && attemptFailureClass === "STRUCTURE"
+          && !truncatedReply && content !== null && request.structureSalvage !== undefined) {
+          let salvaged: StructureSalvaged | null = null;
+          try {
+            salvaged = request.structureSalvage(content, replyFacts);
+          } catch {
+            salvaged = null;
+          }
+          if (salvaged !== null) {
+            acceptedContent = salvaged.content;
+            classifiedContent = salvaged.classification;
+            attemptFailureClass = null;
+            attemptRepairs = contentRepairsOf(salvaged.classification);
+            attemptWords = replyWordsOf(request, salvaged.content, replyFacts);
+          }
         }
         rawArtifactRef = await this.#options.persistRawArtifact({
           artifactId: randomUUID(),
@@ -2588,7 +2737,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
                 attempt, rawArtifactRef, ledgerEntryRef,
                 Object.freeze({ provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
                   model: candidate.data.model, maker: this.#options.maker, modelVersion: candidate.data.model,
-                  thinkingLevel: thinkingLevelUsed, reasoningTokens }));
+                  thinkingLevel: thinkingLevelUsed, reasoningTokens }), markMaterial);
             }
             break;
           } else if (request.buildRepairPacket !== undefined) {
@@ -2889,7 +3038,8 @@ export {
 export {
   mergePatchReply,
   planPatchFollowUp,
-  schemaFailurePaths
+  schemaFailurePaths,
+  type PatchFollowUpPlan
 } from "./patch-follow-up.js";
 
 // V-11 addendum layer 5: tripwires — typed signals on the run, never gates.
@@ -2927,6 +3077,7 @@ export {
   modelJsonSyntaxRepair,
   parsedWithRepairs,
   rememberingAcceptedReply,
+  STRUCTURE_SALVAGE_REPAIRS,
   type ModelJsonDecoded,
   type ModelJsonDecodeOptions,
   type ModelJsonDecodeRepair,
@@ -2934,7 +3085,8 @@ export {
   type ModelJsonSyntaxRepair,
   type MapReplySalvageRepair,
   type ModelJsonRepair,
-  type ModelReplyFacts
+  type ModelReplyFacts,
+  type StructureSalvageRepair
 } from "./model-json.js";
 // Length guidance L27: the words of a reply (information only).
 export { replyWordCount } from "./reply-words.js";
@@ -2950,7 +3102,13 @@ export {
   STRUCTURE_REPAIR_ANSWER_FORM, STRUCTURE_REPAIR_CALL_SITE_PREFIX, STRUCTURE_REPAIR_CONTRACT_HASH, STRUCTURE_REPAIR_CONTRACT_ID,
   STRUCTURE_REPAIR_INSTRUCTION, STRUCTURE_REPAIR_PASSED_STOPS, STRUCTURE_REPAIR_PROMPT_CONTRACT, structureRepairCallSiteKey, structureRepairKeepsWords,
   structureRepairOriginalKey, structureRepairTextsKeptAt, withStructureRepair, type StructureRepairRoute,
-  type StructureRepairTextsKept
+  type StructureRepairTextsKept,
+  // Refused-repair salvage (2026-10-16, A1): the verified subset of a STRUCTURE reply, read in code with no call.
+  salvageStructureReply, structureSalvageFor, type StructureSalvage, type StructureSalvageRefusal,
+  // Refused-repair salvage (2026-10-16, B): the one follow-up to the original AI after a structure-repair call that did not do.
+  structureFollowUpFor,
+  // Refused-repair salvage (2026-10-16): a reclaim replays an A1-rescued or B-answered call from its recorded rows.
+  structureReplayReaders
 } from "./structure-repair.js";
 export * from "./preview-test.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.

@@ -271,10 +271,12 @@ describe("root 0's worst-case call", () => {
   });
 
   /**
-   * LG-A (Task 14 carry): on a routed run (the preview provider config with a Haiku target), root 0's retry after a reply
-   * whose structure the fixer cannot repair is the structure-repair call: Haiku's price, Haiku's whole answer cap (the
-   * route's 32,768-token ceiling), and a body the preview wire refuses above PREVIEW_REQUEST_BODY_MAX_BYTES (it carries
-   * root 0's whole broken reply, so no smaller bound holds). Root 0's own seat prices never price it.
+   * LG-A (Task 14 carry): on a routed run (the preview provider config with a Haiku target), root 0's room adds the
+   * structure-repair call (sent after a reply whose structure the fixer cannot repair) to its first attempt and its retry:
+   * the sum, since refused-repair salvage B is root 0's own second POST after it. The repair call is priced at Haiku's
+   * price, Haiku's whole answer cap (the route's 32,768-token ceiling), and a body the preview wire refuses above
+   * PREVIEW_REQUEST_BODY_MAX_BYTES (it carries root 0's whole broken reply, so no smaller bound holds). Root 0's own seat
+   * prices never price it.
    */
   const previewPrice = (model: string) => {
     const row = previewModelRow(model)!;
@@ -284,7 +286,7 @@ describe("root 0's worst-case call", () => {
     attempt: Object.freeze({ requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES, completionTokenCeiling: 32_768 }) });
   const PREVIEW_SEATS = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"];
 
-  it("LG-A (Task 14 carry): a routed run's room also prices the retry as the structure-repair call, at the repair model's price", () => {
+  it("a routed run's room is the first attempt plus the retry plus the repair call", () => {
     const attempts = rootZeroRoomAttempts({ questionLine: QUESTION, argumentLanguageName: "English", tokenCeiling: CEILING });
     const repair = projectedCallCeilingMicros(HAIKU_REPAIR.price, HAIKU_REPAIR.attempt);
     // ceil(262,144 / 2) = 131,072 input tokens at 100,000 per million (13,108, rounded up) + 32,768 at 500,000 (16,384).
@@ -293,15 +295,16 @@ describe("root 0's worst-case call", () => {
       const price = previewPrice(model);
       const today = rootZeroKeepRoomMicros({ prices: [price], ...attempts });
       const first = projectedCallCeilingMicros(price, attempts.first);
-      // The under-count: at every preview seat, root 0's own retry is cheaper than the repair call it may be.
+      // The under-count: at every preview seat, root 0's own retry is cheaper than the repair call the room adds.
       expect(today, model).toBeLessThan(first + repair);
-      expect(rootZeroKeepRoomMicros({ prices: [price], ...attempts, structureRepair: HAIKU_REPAIR }), model).toBe(first + repair);
+      expect(rootZeroKeepRoomMicros({ prices: [price], ...attempts, structureRepair: HAIKU_REPAIR }), model).toBe(today + repair);
     }
-    // A seat whose own retry is dearer than the repair keeps its own retry: the larger of the two, never the sum.
+    // B means a routed root 0 may send its first POST, the repair call and its own second POST: the room is the sum, even
+    // at a seat whose own retry is dearer than the repair.
     const dear = { inputMicrosPerMillionTokens: 40_000_000, outputMicrosPerMillionTokens: 1_000_000 };
     const dearToday = rootZeroKeepRoomMicros({ prices: [dear], ...attempts });
     expect(dearToday - projectedCallCeilingMicros(dear, attempts.first)).toBeGreaterThan(repair);
-    expect(rootZeroKeepRoomMicros({ prices: [dear], ...attempts, structureRepair: HAIKU_REPAIR })).toBe(dearToday);
+    expect(rootZeroKeepRoomMicros({ prices: [dear], ...attempts, structureRepair: HAIKU_REPAIR })).toBe(dearToday + repair);
     // No route (hosted production, local): today's room exactly; no price (local) keeps no room, route or not.
     expect(rootZeroKeepRoomMicros({ prices: [PRICE], ...attempts, structureRepair: null })).toBe(rootZeroKeepRoomMicros({ prices: [PRICE], ...attempts }));
     expect(rootZeroKeepRoomMicros({ prices: [], ...attempts, structureRepair: HAIKU_REPAIR })).toBe(0);
@@ -316,6 +319,9 @@ describe("root 0's worst-case call", () => {
     const routed = rootZeroKeepRoomMicros({ prices: [glm], ...attempts, structureRepair: HAIKU_REPAIR });
     expect(await decide(BODY_CEILING - routed, glm, attempts.first)).toBe("ADMITTED");
     expect(await decide(afterFirst(routed), HAIKU_REPAIR.price, HAIKU_REPAIR.attempt)).toBe("ADMITTED");
+    // B (pre-flight PF-S26): after root 0's first attempt AND the repair call are spent, root 0's own second POST still fits.
+    const afterRepair = (room: number) => afterFirst(room) + projectedCallCeilingMicros(HAIKU_REPAIR.price, HAIKU_REPAIR.attempt);
+    for (const retry of attempts.retries) expect(await decide(afterRepair(routed), glm, retry)).toBe("ADMITTED");
     for (const retry of attempts.retries) expect(await decide(afterFirst(routed), glm, retry)).toBe("ADMITTED");
     // Today's room would leave the repair call refused for money: no answer.
     const today = rootZeroKeepRoomMicros({ prices: [glm], ...attempts });
