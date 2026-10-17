@@ -163,12 +163,14 @@ node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/format
 ```
 
 A debate's report also counts the "cannot assess" reviews and what was done about them (`investigations`, R2): how many
-points one more AI was asked to look into and what it found (holds, fails, dead end), how many could not be looked into
-(the call failed or the money had run out, no AI of another maker was left, the debate's cap was reached; an answer
-itself is never investigated, nor a point that bears on no answer, so these add up to at most the "cannot assess"
-count), how many investigations changed which answer leads, and their money and time. On engine 1 only the "cannot
-assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the comparing judges
-(`VERDICT_JUDGE`) as their own steps.
+points one more AI was asked to look into ("asked") and what it found (holds, fails, dead end), or that its answer was
+unavailable ("unavailable (call failed or money)": the call failed, or the money had run out; counted in "asked" too);
+how many could not be looked into (no AI of another maker was left, the debate's cap was reached; an answer itself is
+never investigated, nor a point that bears on no answer, so these add up to at most the "cannot assess" count); how
+many investigations changed which answer leads ("standings moved"); and their money and time. A point a later copy set
+aside after a crash is not counted (the time and money still include that copy's calls: that money was spent). On
+engine 1 only the "cannot assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the
+comparing judges (`VERDICT_JUDGE`) as their own steps.
 
 ### The openings record (openings mode)
 

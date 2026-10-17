@@ -73,9 +73,19 @@ export function practiceInvestigationBlock(input: Readonly<{
 /** Reads the block from the throwaway database; the investigators' money is `collect`'s own INVESTIGATOR rows. */
 export async function readPracticeInvestigations(pool: Pool, runId: string,
   byModelAndSite: readonly Readonly<{ site: string; costNanoUsd: string }>[]): Promise<PracticeInvestigationBlock> {
-  const reviews = (await pool.query<{ outcome: string }>("SELECT outcome FROM ledger.node_review WHERE run_id=$1", [runId])).rows;
+  // A later copy that took the run over after a crash (0119) writes its own tree: the dead copy's nodes are set aside
+  // ('stale') and skipped here, as A10's reader skips them (packages/judgement/src/engine-repository.ts).
+  const reviews = (await pool.query<{ outcome: string }>(
+    `SELECT review.outcome FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.run_id = review.run_id AND node.node_id = review.node_id
+      WHERE review.run_id=$1 AND node.generation_status IS DISTINCT FROM 'stale'`, [runId])).rows;
   const rows = (await pool.query<{ result: string; standings_moved: boolean | null }>(
-    "SELECT result, standings_moved FROM ledger.point_investigation WHERE run_id=$1 ORDER BY investigation_order", [runId])).rows;
+    `SELECT investigation.result, investigation.standings_moved FROM ledger.point_investigation AS investigation
+       JOIN core.node AS node ON node.run_id = investigation.run_id AND node.node_id = investigation.node_id
+      WHERE investigation.run_id=$1 AND node.generation_status IS DISTINCT FROM 'stale'
+      ORDER BY investigation.investigation_order, investigation.node_id`, [runId])).rows;
+  // The calls carry no node: their time (and `collect`'s money) include a dead copy's calls on purpose, since that money
+  // was really spent, as `collect` counts it.
   const calls = (await pool.query<{ started_at: Date; finished_at: Date }>(
     `SELECT started_at, finished_at FROM ledger.ledger_entry
       WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE 'VERDICT:investigate:%'`, [runId])).rows;
@@ -91,7 +101,7 @@ export async function readPracticeInvestigations(pool: Pool, runId: string,
 export function practiceInvestigationLines(block: PracticeInvestigationBlock, dollars: (nano: bigint) => string): readonly string[] {
   return Object.freeze([
     "\"Cannot assess\" reviews and their investigations (E12, E13; information only; what the weight of such a link does: the rescore mode):", "",
-    "| cannot-assess reviews | investigated | holds | fails | dead end | call failed | no other maker | over the cap | standings moved | cost $ | time s |",
+    "| cannot-assess reviews | asked | holds | fails | dead end | unavailable (call failed or money) | no other maker | over the cap | standings moved | cost $ | time s |",
     "|---|---|---|---|---|---|---|---|---|---|---|",
     `| ${String(block.cannotAssessReviews)} | ${String(block.run)} | ${String(block.holds)} | ${String(block.fails)} | `
       + `${String(block.deadEnd)} | ${String(block.unavailable)} | ${String(block.skipped)} | ${String(block.capped)} | `

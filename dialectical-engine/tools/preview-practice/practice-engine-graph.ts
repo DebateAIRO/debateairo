@@ -388,10 +388,15 @@ export async function readEngineGraphSource(pool: Pool, runId: string, panelRefs
     `SELECT review.node_id::text, review.outcome, artifact.maker AS reviewer_maker
        FROM ledger.node_review AS review
        JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = review.review_raw_artifact_ref
-      WHERE review.run_id=$1 ORDER BY review.at_seq`, [runId])).rows;
-  // A9's table (one row per qualifying point, in investigation order).
+       JOIN core.node AS node ON node.run_id = review.run_id AND node.node_id = review.node_id
+      WHERE review.run_id=$1 AND node.generation_status IS DISTINCT FROM 'stale' ORDER BY review.at_seq`, [runId])).rows;
+  // A9's table (one row per qualifying point, in investigation order). Both reads skip a set-aside ('stale') node, as A10's
+  // reader does and as the report's investigations block does (practice-investigations.ts).
   const investigations = (await pool.query<{ node_id: string; result: string }>(
-    "SELECT node_id::text, result FROM ledger.point_investigation WHERE run_id=$1 ORDER BY investigation_order", [runId])).rows;
+    `SELECT investigation.node_id::text, investigation.result FROM ledger.point_investigation AS investigation
+       JOIN core.node AS node ON node.run_id = investigation.run_id AND node.node_id = investigation.node_id
+      WHERE investigation.run_id=$1 AND node.generation_status IS DISTINCT FROM 'stale'
+      ORDER BY investigation.investigation_order, investigation.node_id`, [runId])).rows;
   const servedRow = (await pool.query<{ propagation_run_id: string; served_root_selection: { servedNodeId?: unknown } | null }>(
     `SELECT propagation_run_id::text, served_root_selection FROM ledger.propagation_run
       WHERE run_id=$1 AND served_root_selection IS NOT NULL ORDER BY at_seq DESC LIMIT 1`, [runId])).rows[0];

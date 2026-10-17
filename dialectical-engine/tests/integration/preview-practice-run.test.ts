@@ -1248,7 +1248,7 @@ describe("engine 2's story (R1d)", () => {
     // engine 1 runs no investigation.
     expect(report.investigations).toBeDefined();
     if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
-    expect(markdown).toContain("| cannot-assess reviews | investigated |");
+    expect(markdown).toContain("| cannot-assess reviews | asked |");
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>
