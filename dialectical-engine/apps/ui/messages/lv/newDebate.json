@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Izsmeļoša",
   "newDebate.scrutinyExhaustiveHelp": "Visvairāk papildu raundu, aptverot vairāk punktu, kuros ir šaubas.",
   "newDebate.answerLength": "Atbildes garums",
-  "newDebate.answerLengthHint": "Aptuveni 300, 700 vai 1500 vārdu: mērķis, nevis stingrs maksimums.",
+  "newDebate.answerLengthHint": "Vārdu skaits: aptuveni {short}, {standard} vai {detailed}. Tas ir mērķis, nevis stingrs maksimums.",
   "newDebate.answerLengthShort": "Īsa",
   "newDebate.answerLengthStandard": "Standarta",
   "newDebate.answerLengthDetailed": "Detalizēta",

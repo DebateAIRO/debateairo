@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Menyeluruh",
   "newDebate.scrutinyExhaustiveHelp": "Ronde tambahan paling banyak, untuk lebih banyak poin yang diragukan.",
   "newDebate.answerLength": "Panjang jawaban",
-  "newDebate.answerLengthHint": "Sekitar 300, 700, atau 1.500 kata: sebagai sasaran, bukan batas maksimum yang ketat.",
+  "newDebate.answerLengthHint": "Sekitar {short}, {standard}, atau {detailed} kata: sebagai sasaran, bukan batas maksimum yang ketat.",
   "newDebate.answerLengthShort": "Singkat",
   "newDebate.answerLengthStandard": "Standar",
   "newDebate.answerLengthDetailed": "Terperinci",

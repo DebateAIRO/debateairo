@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Exaustivo",
   "newDebate.scrutinyExhaustiveHelp": "O maior número de rondas adicionais, sobre mais pontos duvidosos.",
   "newDebate.answerLength": "Comprimento da resposta",
-  "newDebate.answerLengthHint": "Cerca de 300, 700 ou 1 500 palavras: um objetivo, e não um máximo estrito.",
+  "newDebate.answerLengthHint": "Cerca de {short}, {standard} ou {detailed} palavras: um objetivo, e não um máximo estrito.",
   "newDebate.answerLengthShort": "Curta",
   "newDebate.answerLengthStandard": "Normal",
   "newDebate.answerLengthDetailed": "Detalhada",

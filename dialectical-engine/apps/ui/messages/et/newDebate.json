@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Ammendav",
   "newDebate.scrutinyExhaustiveHelp": "Kõige rohkem lisavoore, rohkemate kahtluse all olevate punktide kohta.",
   "newDebate.answerLength": "Vastuse pikkus",
-  "newDebate.answerLengthHint": "Umbes 300, 700 või 1500 sõna: sihtpikkus, mitte range maksimum.",
+  "newDebate.answerLengthHint": "Umbes {short}, {standard} või {detailed} sõna: sihtpikkus, mitte range maksimum.",
   "newDebate.answerLengthShort": "Lühike",
   "newDebate.answerLengthStandard": "Standardne",
   "newDebate.answerLengthDetailed": "Üksikasjalik",

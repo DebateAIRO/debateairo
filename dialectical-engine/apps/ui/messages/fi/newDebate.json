@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Perusteellinen",
   "newDebate.scrutinyExhaustiveHelp": "Eniten lisäkierroksia, useammissa niistä kohdista, joissa on epäilystä.",
   "newDebate.answerLength": "Vastauksen pituus",
-  "newDebate.answerLengthHint": "Noin 300, 700 tai 1 500 sanaa: tavoitepituus, ei tiukka enimmäismäärä.",
+  "newDebate.answerLengthHint": "Noin {short}, {standard} tai {detailed} sanaa: tavoitepituus, ei tiukka enimmäismäärä.",
   "newDebate.answerLengthShort": "Lyhyt",
   "newDebate.answerLengthStandard": "Tavanomainen",
   "newDebate.answerLengthDetailed": "Yksityiskohtainen",

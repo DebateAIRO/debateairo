@@ -22,6 +22,24 @@ export const DEPTH_MODES: readonly DepthMode[] = ["adaptive", "fixed"];
 export const SCRUTINY_LEVELS: readonly Scrutiny[] = ["standard", "deep", "exhaustive"];
 export const ANSWER_LENGTHS: readonly AnswerLength[] = ["short", "standard", "detailed"];
 
+/**
+ * Spec 2026-10-15 §3.8: what the hint says when no room read named the plan's own words. The program's start values,
+ * OVERVIEW C-1 (owner ruling G5): Short 200, Standard 350, Detailed 1,000 (engine INTERFACE §4.1).
+ */
+const ANSWER_LENGTH_HINT_DEFAULTS = Object.freeze({ short: 200, standard: 350, detailed: 1000 });
+
+/**
+ * The hint's three numbers for the person's plan (the room read's `answer_words`, else the start values 200 / 350 / 1,000),
+ * formatted by the page's language rules with Latin digits, as every translation wrote them before ("1.500", "1 500").
+ */
+export function answerLengthHintVars(words: Readonly<{ short: number; standard: number; detailed: number }> | null,
+  locale: string): Readonly<{ short: string; standard: string; detailed: string }> {
+  const chosen = words ?? ANSWER_LENGTH_HINT_DEFAULTS;
+  let format: Intl.NumberFormat;
+  try { format = new Intl.NumberFormat(locale, { numberingSystem: "latn" }); } catch { format = new Intl.NumberFormat("en"); }
+  return Object.freeze({ short: format.format(chosen.short), standard: format.format(chosen.standard), detailed: format.format(chosen.detailed) });
+}
+
 /** S6: Fixed is offered on Premium; Free is adaptive (its depth ceiling 2). */
 export function fixedDepthAllowedFor(planTier: PlanTier): boolean {
   return planTier !== "free";

@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Uitputtend",
   "newDebate.scrutinyExhaustiveHelp": "De meeste extra rondes, bij meer van de punten waarover twijfel bestaat.",
   "newDebate.answerLength": "Antwoordlengte",
-  "newDebate.answerLengthHint": "Ongeveer 300, 700 of 1.500 woorden: een richtlijn, geen strikt maximum.",
+  "newDebate.answerLengthHint": "Ongeveer {short}, {standard} of {detailed} woorden: een richtlijn, geen strikt maximum.",
   "newDebate.answerLengthShort": "Kort",
   "newDebate.answerLengthStandard": "Standaard",
   "newDebate.answerLengthDetailed": "Uitgebreid",

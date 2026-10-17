@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Изчерпателна",
   "newDebate.scrutinyExhaustiveHelp": "Най-много допълнителни кръгове, върху повече от точките, по които има съмнения.",
   "newDebate.answerLength": "Дължина на отговора",
-  "newDebate.answerLengthHint": "Около 300, 700 или 1 500 думи: ориентир, а не строг максимум.",
+  "newDebate.answerLengthHint": "Дължина в думи: около {short}, {standard} или {detailed}. Това е ориентир, а не строг максимум.",
   "newDebate.answerLengthShort": "Кратка",
   "newDebate.answerLengthStandard": "Стандартна",
   "newDebate.answerLengthDetailed": "Подробна",

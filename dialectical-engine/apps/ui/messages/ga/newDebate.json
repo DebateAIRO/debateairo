@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Cuimsitheach",
   "newDebate.scrutinyExhaustiveHelp": "An líon is mó babhtaí breise, ar níos mó de na pointí atá faoi amhras.",
   "newDebate.answerLength": "Fad an fhreagra",
-  "newDebate.answerLengthHint": "Thart ar 300, 700 nó 1,500 focal: sprioc atá ann, ní uasteorainn dhocht.",
+  "newDebate.answerLengthHint": "Líon na bhfocal: thart ar {short}, {standard} nó {detailed}. Sprioc atá ann, ní uasteorainn dhocht.",
   "newDebate.answerLengthShort": "Gearr",
   "newDebate.answerLengthStandard": "Caighdeánach",
   "newDebate.answerLengthDetailed": "Mionsonraithe",

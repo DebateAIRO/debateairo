@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "شامل",
   "newDebate.scrutinyExhaustiveHelp": "أكبر عدد من الجولات الإضافية، على عدد أكبر من النقاط موضع الشك.",
   "newDebate.answerLength": "طول الإجابة",
-  "newDebate.answerLengthHint": "نحو 300 أو 700 أو 1500 كلمة: هدف تقريبي وليس حدًّا أقصى صارمًا.",
+  "newDebate.answerLengthHint": "عدد الكلمات: نحو {short} أو {standard} أو {detailed}. هذا هدف تقريبي وليس حدًّا أقصى صارمًا.",
   "newDebate.answerLengthShort": "قصيرة",
   "newDebate.answerLengthStandard": "قياسية",
   "newDebate.answerLengthDetailed": "مفصّلة",

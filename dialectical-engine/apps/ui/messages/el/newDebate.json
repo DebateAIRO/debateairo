@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Εξαντλητικό",
   "newDebate.scrutinyExhaustiveHelp": "Οι περισσότεροι επιπλέον γύροι, σε περισσότερα από τα αμφισβητούμενα σημεία.",
   "newDebate.answerLength": "Μήκος απάντησης",
-  "newDebate.answerLengthHint": "Περίπου 300, 700 ή 1.500 λέξεις: στόχος, όχι αυστηρό μέγιστο.",
+  "newDebate.answerLengthHint": "Περίπου {short}, {standard} ή {detailed} λέξεις: στόχος, όχι αυστηρό μέγιστο.",
   "newDebate.answerLengthShort": "Σύντομο",
   "newDebate.answerLengthStandard": "Τυπικό",
   "newDebate.answerLengthDetailed": "Λεπτομερές",

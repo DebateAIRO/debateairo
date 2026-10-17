@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "ממצה",
   "newDebate.scrutinyExhaustiveHelp": "הכי הרבה סבבים נוספים, על מספר רב יותר של הנקודות המוטלות בספק.",
   "newDebate.answerLength": "אורך התשובה",
-  "newDebate.answerLengthHint": "כ-300, 700 או 1,500 מילים: יעד ולא מקסימום מחייב.",
+  "newDebate.answerLengthHint": "מספר מילים: כ-{short}, {standard} או {detailed}. זהו יעד ולא מקסימום מחייב.",
   "newDebate.answerLengthShort": "קצרה",
   "newDebate.answerLengthStandard": "רגילה",
   "newDebate.answerLengthDetailed": "מפורטת",

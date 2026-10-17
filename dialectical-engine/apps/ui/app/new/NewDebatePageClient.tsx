@@ -38,6 +38,7 @@ import { previewPlanRoster } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   ANSWER_LENGTHS,
+  answerLengthHintVars,
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
   DEPTH_MODES,
@@ -623,7 +624,7 @@ function NewDebateForm({
                 <SegmentedRow
                   field="answerLength"
                   label={t(catalog, "newDebate.answerLength")}
-                  hint={t(catalog, "newDebate.answerLengthHint")}
+                  hint={t(catalog, "newDebate.answerLengthHint", answerLengthHintVars(answerWords, pageLocale))}
                   options={ANSWER_LENGTHS.map((length) => ({ value: length, label: t(catalog, ANSWER_LENGTH_WORDS[length]) }))}
                   value={answerLength}
                   onChange={(value) => setAnswerLength(value as AnswerLength)}

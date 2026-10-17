@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Kapsamlı",
   "newDebate.scrutinyExhaustiveHelp": "En fazla ek tur, şüphe uyandıran daha fazla noktada.",
   "newDebate.answerLength": "Yanıt uzunluğu",
-  "newDebate.answerLengthHint": "Yaklaşık 300, 700 veya 1.500 kelime: bir hedef, katı bir üst sınır değil.",
+  "newDebate.answerLengthHint": "Yaklaşık {short}, {standard} veya {detailed} kelime: bir hedef, katı bir üst sınır değil.",
   "newDebate.answerLengthShort": "Kısa",
   "newDebate.answerLengthStandard": "Standart",
   "newDebate.answerLengthDetailed": "Ayrıntılı",

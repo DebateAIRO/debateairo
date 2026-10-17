@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Исчерпывающая",
   "newDebate.scrutinyExhaustiveHelp": "Больше всего дополнительных раундов, по большему числу пунктов, вызывающих сомнения.",
   "newDebate.answerLength": "Длина ответа",
-  "newDebate.answerLengthHint": "Около 300, 700 или 1 500 слов: ориентир, а не строгий максимум.",
+  "newDebate.answerLengthHint": "Длина в словах: около {short}, {standard} или {detailed}. Это ориентир, а не строгий максимум.",
   "newDebate.answerLengthShort": "Короткая",
   "newDebate.answerLengthStandard": "Стандартная",
   "newDebate.answerLengthDetailed": "Подробная",
