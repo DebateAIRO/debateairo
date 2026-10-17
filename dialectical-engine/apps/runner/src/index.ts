@@ -236,7 +236,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -10576,6 +10576,19 @@ export class WalkingSkeletonRunner {
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
               ...(lengthGuidance === null ? {} : { lengthGuidance }),
+              // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1): the receipt's engine, never the row, so an
+              // engine-2 debate's story is told v4 (with the length table above); engine 1: null, today's story. The
+              // backup storytellers are this run's claim-eligible members in the stored panel's order (spec §7.2 item 11),
+              // without those the preview's sit-out book has benched: a backup never goes to an AI that sits out the rest
+              // of the run (G7 + the sit-out rule; its call would be refused before sending and the cost fallback could
+              // move it to the first storyteller's or the checker's maker). Off the preview `sitOut` is null: no filter.
+              engine: engine.engine === 2 ? engine : null,
+              ...(engine.engine === 2
+                ? { backupCandidates: storyBackupCandidatesFrom({
+                  panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+                  claimEligible: synthesisMakers.filter((member) => sitOut?.sitsOut(member.providerRef) !== true)
+                }) }
+                : {}),
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,

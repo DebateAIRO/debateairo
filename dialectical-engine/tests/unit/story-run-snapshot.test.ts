@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
-import { lengthGuidancePolicyStartValues, resolveLengthGuidance } from "@debateai/register";
-import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
 import {
-  buildStoryRunSnapshot, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
+  engineSettingsOf,
+  engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues,
+  resolveLengthGuidance
+} from "@debateai/register";
+import type { StoryBackupCandidate, StoryCostFallback, StoryStepLease } from "@debateai/story";
+import {
+  buildStoryRunSnapshot, storyBackupCandidatesFrom, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
 } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -149,6 +154,21 @@ describe("buildStoryRunSnapshot", () => {
     // Today's run: no member at all, so the writer builds today's bytes.
     expect(Object.hasOwn(buildStoryRunSnapshot(source()), "languageLocked")).toBe(false);
     expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), languageLocked: false }), "languageLocked")).toBe(false);
+  });
+
+  it("hands the story the run's engine, its length table and its backup storytellers only when given (engine redesign R1d)", () => {
+    const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 3, mapOpening: false });
+    const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });
+    const candidates: readonly StoryBackupCandidate[] = [Object.freeze({ provider, providerRef: "provider:b", maker: "maker y" })];
+    const made = buildStoryRunSnapshot({ ...source(), engine, lengthGuidance: guidance, backupCandidates: candidates });
+    expect(made.engine).toBe(engine);
+    expect(made.lengthGuidance).toBe(guidance);
+    expect(made.backupCandidates).toEqual(candidates);
+    expect(made.backupCandidates?.[0]?.provider).toBe(provider);
+    // A run admitted without them (engine 1, no length row): no member at all, so the writer builds today's bytes.
+    const today = buildStoryRunSnapshot(source());
+    for (const member of ["engine", "lengthGuidance", "backupCandidates"]) expect(Object.hasOwn(today, member)).toBe(false);
+    expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), engine: null }), "engine")).toBe(false);
   });
 
   // Task 15 review (a): the receipt's numbers pass to the story's input, and no key without them.
@@ -366,5 +386,18 @@ describe("the story's rotated role makers, with a panel stand-in for an absent p
     const offPanel = member("provider:off-panel", "maker y");
     expectRoles(pick([A, B], [A, offPanel], A, B), A, null);
     expectRoles(pick([A, B, C], [offPanel, B, C], C, A), C, B);
+  });
+
+  it("offers the backup storytellers in the stored panel's order, claim-eligible members only, each once (R1d)", () => {
+    const offPanel = member("provider:off-panel", "maker y");
+    const made = storyBackupCandidatesFrom({
+      panelRefs: [C, A, B, C, D].map((entry) => entry.providerRef),
+      claimEligible: [A, B, C, offPanel]
+    });
+    expect(made.map((entry) => [entry.providerRef, entry.maker]))
+      .toEqual([["provider:c", "maker z"], ["provider:a", "maker x"], ["provider:b", "maker y"]]);
+    expect(made[0]!.provider).toBe(C.provider);
+    expect(Object.isFrozen(made)).toBe(true);
+    expect(storyBackupCandidatesFrom({ panelRefs: [], claimEligible: [A, B] })).toEqual([]);
   });
 });
