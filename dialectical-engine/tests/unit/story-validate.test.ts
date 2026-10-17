@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { STORY_BODY_LIMITS, type StoryBody } from "@debateai/contract";
 import { schemaFailureLocator, type ContentClassification, type FramedSizeLimit } from "@debateai/providers";
 import {
+  STORY_CHECKER_RUNAWAY_LIMITS,
   STORY_ENGINE_TOKENS,
+  StoryCheckerV4VerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,
   parseCheckerVerdict,
@@ -627,5 +629,127 @@ describe("verdict story — the checker classifier", () => {
     expect(classifyCheckerContent("Looks fine to me.").parseStatus).toBe("PARSE_FAILED");
     expect(() => parseCheckerVerdict("Looks fine to me."))
       .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));
+  });
+});
+
+/**
+ * Story v4 (R1d, design decision 2; INTERFACE §5.4): the AI never writes the shape. Code chose one
+ * (`storyShapeOf`), the material index carries it (`fixedShapeId`), and the reader sets `shape_id` on the decoded
+ * reply before the fixer, the trailing-object test and the schema. The pack still bounds it (STORY_UNKNOWN_SHAPE).
+ */
+describe("story v4 — the shape is set by code, and still checked against the pack", () => {
+  const STOP = { finishReason: "stop" } as const;
+  const V4_INDEX: StoryMaterialIndex = { ...INDEX, fixedShapeId: "health" };
+  function withoutShape(): Omit<StoryBody, "shape_id"> {
+    const { shape_id: _shape, ...rest } = story();
+    return rest;
+  }
+
+  it("accepts a v4 reply with no shape_id and reads it with the shape code chose", () => {
+    const content = JSON.stringify(withoutShape());
+    expect(classifyStoryContent(content, V4_INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(parseStoryBody(content, V4_INDEX)).toEqual({ ...story(), shape_id: "health" });
+  });
+
+  it("overwrites a shape_id the AI wrote anyway, and names no repair for it", () => {
+    const content = JSON.stringify({ ...story(), shape_id: "general" });
+    expect(classifyStoryContent(content, V4_INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(parseStoryBody(content, V4_INDEX).shape_id).toBe("health");
+  });
+
+  it("still refuses a shape the pack does not offer, at shape_id (an index built with a foreign shape)", () => {
+    const result = classifyStoryContent(JSON.stringify(withoutShape()), { ...INDEX, fixedShapeId: "legal" });
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "shape_id" });
+    expect(result.parseError).toContain("STORY_UNKNOWN_SHAPE");
+  });
+
+  it("sets the shape inside the trailing-object check too (a reply that ends with its object after prose)", () => {
+    // A straight quote written raw inside a text (MiMo's habit), after prose with no brace: no earlier read decodes it,
+    // so only the trailing-object read does, and its check passes only with code's shape set.
+    const sent = withoutShape();
+    sent.long.sections[2]!.paragraphs[0]!.text = "Funding held up, „as the city said\" in its report.";
+    const content = `I checked the material first.\n${JSON.stringify(sent).replace("\\\"", "\"")}`;
+    expect(classifyStoryContent(content, V4_INDEX, STOP)).toMatchObject({ parseStatus: "PARSED", jsonRepair: "TRAILING_OBJECT" });
+    expect(parseStoryBody(content, V4_INDEX, STOP).shape_id).toBe("health");
+    // Control: the same reply against a v3 index (no shape set by code) stays refused.
+    expect(classifyStoryContent(content, INDEX, STOP).parseStatus).toBe("PARSE_FAILED");
+  });
+
+  it("v3 is unchanged: an index without fixedShapeId reads the AI's own shape and refuses a missing one", () => {
+    expect(Object.hasOwn(INDEX, "fixedShapeId")).toBe(false);
+    expect(parseStoryBody(JSON.stringify({ ...story(), shape_id: "health" }), INDEX).shape_id).toBe("health");
+    expect(refused(classifyStoryContent(JSON.stringify(withoutShape()), INDEX))).toEqual({ code: "SCHEMA_FAILED", path: "shape_id" });
+  });
+});
+
+/**
+ * Story v4 (R1d, spec §7.2 item 7; INTERFACE §5.3): the checker says whether a problem would MISLEAD the person.
+ * Only `misleading: true` starts round 2 (Task 15); `satisfied: false, misleading: false` is a wording note.
+ */
+describe("story v4 — the checker's misleading", () => {
+  const V4_SATISFIED = { satisfied: true, misleading: false, objection: null, criteria: SATISFIED.criteria };
+  const MISLEADING = {
+    satisfied: false,
+    misleading: true,
+    objection: "The summary presents the disputed fare model as settled.",
+    criteria: { ...SATISFIED.criteria, no_overstatement: false }
+  };
+  const WORDING_NOTE = { ...MISLEADING, misleading: false, objection: "Say fares rather than tickets in the headline." };
+
+  it("accepts a satisfied verdict, a misleading problem and a wording note, each read back exactly", () => {
+    for (const verdict of [V4_SATISFIED, MISLEADING, WORDING_NOTE]) {
+      const content = JSON.stringify(verdict);
+      expect(classifyCheckerContent(content, undefined, undefined, true)).toEqual({ parseStatus: "PARSED", parseError: null });
+      expect(parseCheckerVerdict(content, undefined, true)).toEqual(verdict);
+    }
+    expect(StoryCheckerV4VerdictSchema.safeParse(MISLEADING).success).toBe(true);
+  });
+
+  it("refuses misleading with a satisfied verdict, at misleading", () => {
+    const result = classifyCheckerContent(JSON.stringify({ ...V4_SATISFIED, misleading: true }), undefined, undefined, true);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "misleading" });
+    expect(result.parseError).toContain("STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION");
+  });
+
+  it("refuses misleading without an objection: v3's rule speaks first, the misleading rule too", () => {
+    const result = classifyCheckerContent(JSON.stringify({ ...MISLEADING, objection: null }), undefined, undefined, true);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+    expect(result.parseError).toContain("STORY_CHECKER_OBJECTION_REQUIRED");
+    expect(result.parseError).toContain("STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION");
+    expect(() => parseCheckerVerdict(JSON.stringify({ ...MISLEADING, objection: null }), undefined, true))
+      .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));
+  });
+
+  it("refuses a v4 verdict that leaves out misleading, and keeps v3's three rules", () => {
+    expect(refused(classifyCheckerContent(JSON.stringify(SATISFIED), undefined, undefined, true)))
+      .toEqual({ code: "SCHEMA_FAILED", path: "misleading" });
+    expect(refused(classifyCheckerContent(JSON.stringify({ ...V4_SATISFIED, criteria: { ...SATISFIED.criteria, citations_correct: false } }),
+      undefined, undefined, true))).toEqual({ code: "SCHEMA_FAILED", path: "satisfied" });
+    expect(refused(classifyCheckerContent(JSON.stringify({ ...WORDING_NOTE, objection: null }), undefined, undefined, true)))
+      .toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+    const hidden = classifyCheckerContent(JSON.stringify({ ...WORDING_NOTE, objection: "Fix the ‮headline‬." }),
+      undefined, undefined, true);
+    expect(refused(hidden)).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+    expect(hidden.parseError).toContain("STORY_TEXT_CONTROL_CHARACTER");
+  });
+
+  it("holds the objection to LG-A's runaway limit, not to a number the form states", () => {
+    const at = "x".repeat(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars);
+    expect(classifyCheckerContent(JSON.stringify({ ...MISLEADING, objection: at }), undefined, undefined, true).parseStatus).toBe("PARSED");
+    expect(refused(classifyCheckerContent(JSON.stringify({ ...MISLEADING, objection: `${at}x` }), undefined, undefined, true))).toEqual({
+      code: "SCHEMA_FAILED", path: "objection",
+      limit: { path: "objection", bound: "at most", size: STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars, unit: "characters" }
+    });
+  });
+
+  it("a v3 verdict object never gains misleading: absent from the form, dropped when a reply writes it anyway", () => {
+    expect(Object.hasOwn(parseCheckerVerdict(JSON.stringify(SATISFIED)), "misleading")).toBe(false);
+    expect(Object.hasOwn(parseCheckerVerdict(JSON.stringify(SATISFIED), undefined, false), "misleading")).toBe(false);
+    // LG-A's fixer drops a root key the v3 form never names (UNASKED_KEYS): misleading is not a v3 member.
+    const smuggled = JSON.stringify({ ...SATISFIED, misleading: true });
+    expect(classifyCheckerContent(smuggled)).toEqual({ parseStatus: "PARSED", parseError: null, jsonRepair: "UNASKED_KEYS" });
+    const read = parseCheckerVerdict(smuggled);
+    expect(read).toEqual(SATISFIED);
+    expect(Object.hasOwn(read, "misleading")).toBe(false);
   });
 });

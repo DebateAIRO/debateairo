@@ -44,6 +44,7 @@ export {
   STORY_CHECKER_PROSE,
   STORY_FIXER_OPTIONS,
   StoryCheckerVerdictSchema,
+  StoryCheckerV4VerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,
   parseCheckerVerdict,
