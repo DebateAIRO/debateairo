@@ -9,6 +9,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
   const role = roleOf(node);
@@ -87,6 +88,7 @@ export function DebateMap({
   composeCatalog = composeEnglish
 }: DebateMapProps) {
   const { catalog } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const maxDepth = Math.max(1, treeDepth(root));
@@ -156,6 +158,7 @@ export function DebateMap({
                 role="button"
                 tabIndex={0}
                 aria-label={`${localizedRoleLabel(arc.node, catalog, debateChromeCatalog)}: ${arc.node.claim}`}
+                lang={textLang.lang}
                 onClick={() => onOpenSplit(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
                 onFocus={() => setHoverId(arc.id)}
@@ -180,6 +183,7 @@ export function DebateMap({
               role="button"
               tabIndex={0}
               aria-label={root.claim}
+              lang={textLang.lang}
               onClick={() => {
                 setHoverId(null);
                 onOpenSplit(root.id);

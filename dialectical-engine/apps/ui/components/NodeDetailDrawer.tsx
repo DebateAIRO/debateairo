@@ -35,6 +35,7 @@ import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
 import { useDialogSurface } from "@/components/dialogSurface";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -144,6 +145,7 @@ export function NodeDetailDrawer({
 }) {
   const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const { locale } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
@@ -284,9 +286,9 @@ export function NodeDetailDrawer({
               <p>{pathDecisionCopy(catalog, lifecycleDecision)}</p>
             </div>
           ) : null}
-          <div className="drawerClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
+          <div className="drawerClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
           {generation?.argument ? (
-            <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} data-challenge-prose={node.id} onMouseUp={onChallenge ? selectProse : undefined}>
+            <div className="drawerProse" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} data-challenge-prose={node.id} onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
           ) : (
@@ -349,7 +351,7 @@ export function NodeDetailDrawer({
                     <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} className="modelPill metaLine" catalog={miscCatalog} composeCatalog={composeCatalog} />
                   ) : null}
                 </div>
-                <div className="compareClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
+                <div className="compareClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
               </div>
               <div className="compareCell">
                 <div className="compareCellHead">
@@ -382,7 +384,7 @@ export function NodeDetailDrawer({
                       <ModelMetaLine modelId={item.model_id} className="modelPill metaLine" catalog={miscCatalog} composeCatalog={composeCatalog} />
                       <span className="historyTag">{t(catalog, item.is_active ? "debateDrawers.node.active" : "debateDrawers.node.archived")}</span>
                     </div>
-                    <div className="historyCardBody" data-ai-generated="true">{item.argument}</div>
+                    <div className="historyCardBody" {...textLang} data-ai-generated="true">{item.argument}</div>
                   </button>
                 );
               })
