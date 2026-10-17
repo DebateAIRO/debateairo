@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { TypedDomainError } from "@debateai/kernel";
 import { canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst, type CanonicalRegisterJson } from "./register-publication.js";
 
 /**
@@ -217,4 +218,188 @@ export function engineVersionPolicyStartValues(): EngineVersionPolicy {
     label: { clearAgreeing: start.clearAgreeing, closeCallAgreeing: start.closeCallAgreeing },
     answerCheck: { candidates: start.answerCheckCandidates }
   });
+}
+
+/** Extra call sites the engine adds to this debate, frozen at admission (the ceiling and the estimate read them). */
+export type EngineSites = Readonly<{
+  /** min(judges.count, makers): the comparing judges are capped by the makers present. */
+  comparingJudges: number;
+  /** investigate.maxPerDebate: the cap, so a ceiling never under-counts. */
+  investigations: number;
+  /** 1 when the map opens the debate (spec §5: the new shape only), else 0. */
+  answerCheck: 0 | 1;
+}>;
+
+/** The resolved, camelCase values the runner, the estimate and the story read (INTERFACE §3.1). */
+export type EngineSettings = Readonly<{
+  engine: 2;
+  scoring: EngineScoring;
+  links: EngineLinks;
+  investigate: EngineInvestigate;
+  judges: EngineJudges;
+  label: EngineLabel;
+  answerCheck: EngineAnswerCheck;
+  sites: EngineSites;
+}>;
+
+const engineInvalid = (message: string): never => {
+  throw new TypedDomainError("STRUCTURAL_CEILING_ENGINE_INVALID", message);
+};
+
+/** This debate's engine: the row's values (never its kind, version or switch) and the sites for `makers` makers. */
+export function engineSettingsOf(policy: EngineVersionPolicy, input: Readonly<{ makers: number; mapOpening: boolean }>): EngineSettings {
+  if (!Number.isSafeInteger(input.makers) || input.makers < 1) {
+    return engineInvalid(`The engine needs a whole number of makers of at least one, not ${String(input.makers)}`);
+  }
+  const { scoring, links, label } = policy;
+  return deepFreeze({
+    engine: 2 as const,
+    scoring: {
+      terms: scoring.terms.map((term) => ({ metric: term.metric, coefficient: term.coefficient })),
+      clarityDecayPerAmbiguity: scoring.clarityDecayPerAmbiguity,
+      fatalCap: { minFlagSeverity: scoring.fatalCap.minFlagSeverity, to: scoring.fatalCap.to },
+      fidelityFloor: { below: scoring.fidelityFloor.below, to: scoring.fidelityFloor.to },
+      combine: scoring.combine,
+      disputedWeight: scoring.disputedWeight
+    },
+    links: { cannotAssessWeight: links.cannotAssessWeight, ownReplyCountsAsSupport: links.ownReplyCountsAsSupport, rivalReplies: links.rivalReplies },
+    investigate: { maxPerDebate: policy.investigate.maxPerDebate },
+    judges: { count: policy.judges.count, makerRule: policy.judges.makerRule },
+    label: { clearAgreeing: label.clearAgreeing, closeCallAgreeing: label.closeCallAgreeing },
+    answerCheck: { candidates: policy.answerCheck.candidates },
+    sites: {
+      comparingJudges: Math.min(policy.judges.count, input.makers),
+      investigations: policy.investigate.maxPerDebate,
+      answerCheck: input.mapOpening ? 1 as const : 0 as const
+    }
+  });
+}
+
+/**
+ * The receipt member `envelope_basis.engine` (INTERFACE §3.1): the settings in snake_case, version 1, strict at every
+ * level, with the row's own rules re-checked and the sites tied to the values (the comparing judges never above the
+ * row's judges, the investigations exactly the row's cap). `added_model_attempts` is tied to the receipt's per-site
+ * attempts by the strict receipt parser (`parseCostEnvelopeBasis`), which can see them.
+ */
+export const engineReceiptSchema = z.object({
+  version: z.literal(1),
+  engine: z.literal(2),
+  scoring: z.object({
+    terms: z.array(z.object({ metric: z.enum(COMPOSITION_METRICS), coefficient: share }).strict()).length(COMPOSITION_METRICS.length),
+    clarity_decay_per_ambiguity: share,
+    fatal_cap: z.object({ min_flag_severity: share, to: share }).strict(),
+    fidelity_floor: z.object({ below: share, to: share }).strict(),
+    combine: z.enum(ENGINE_SCORING_COMBINES),
+    disputed_weight: share
+  }).strict(),
+  links: z.object({
+    cannot_assess_weight: share,
+    own_reply_counts_as_support: z.literal(false),
+    rival_replies: z.enum(ENGINE_RIVAL_REPLIES)
+  }).strict(),
+  investigate: z.object({ max_per_debate: whole(0, LIMITS.investigationsMax) }).strict(),
+  judges: z.object({ count: whole(1, LIMITS.judgesMax), maker_rule: z.enum(ENGINE_JUDGE_MAKER_RULES) }).strict(),
+  label: z.object({ clear_agreeing: whole(1, LIMITS.judgesMax), close_call_agreeing: whole(1, LIMITS.judgesMax) }).strict(),
+  answer_check: z.object({ candidates: whole(0, LIMITS.answerCheckMax) }).strict(),
+  sites: z.object({
+    comparing_judges: whole(1, LIMITS.judgesMax),
+    investigations: whole(0, LIMITS.investigationsMax),
+    answer_check: z.union([z.literal(0), z.literal(1)]),
+    added_model_attempts: z.number().int().min(0)
+  }).strict()
+}).strict().superRefine((receipt, ctx) => {
+  const terms = termsProblem(receipt.scoring.terms);
+  if (terms !== null) ctx.addIssue({ code: "custom", path: ["scoring", "terms"], message: terms });
+  if (!labelFits(receipt.label.close_call_agreeing, receipt.label.clear_agreeing, receipt.judges.count)) {
+    ctx.addIssue({ code: "custom", path: ["label"], message: "a close call <= a clear answer <= the comparing judges" });
+  }
+  if (receipt.sites.comparing_judges > receipt.judges.count) {
+    ctx.addIssue({ code: "custom", path: ["sites", "comparing_judges"], message: "more comparing judges than the row allows" });
+  }
+  if (receipt.sites.investigations !== receipt.investigate.max_per_debate) {
+    ctx.addIssue({ code: "custom", path: ["sites", "investigations"], message: "the investigation sites are not the row's cap" });
+  }
+});
+export type EngineReceipt = z.infer<typeof engineReceiptSchema>;
+
+/**
+ * The member, parsed with its OWN schema before it is handed back: a receipt the strict parser would later refuse is
+ * never minted. Each added call is one call bounded like a panel member: the caller passes that allowance.
+ */
+export function engineReceipt(settings: EngineSettings, perSiteAttempts: number): EngineReceipt {
+  if (!Number.isSafeInteger(perSiteAttempts) || perSiteAttempts < 1) {
+    return engineInvalid(`The engine's calls need a whole number of attempts per site, not ${String(perSiteAttempts)}`);
+  }
+  const { scoring, links, sites } = settings;
+  const receipt: EngineReceipt = deepFreeze({
+    version: 1 as const,
+    engine: settings.engine,
+    scoring: {
+      terms: scoring.terms.map((term) => ({ metric: term.metric, coefficient: term.coefficient })),
+      clarity_decay_per_ambiguity: scoring.clarityDecayPerAmbiguity,
+      fatal_cap: { min_flag_severity: scoring.fatalCap.minFlagSeverity, to: scoring.fatalCap.to },
+      fidelity_floor: { below: scoring.fidelityFloor.below, to: scoring.fidelityFloor.to },
+      combine: scoring.combine,
+      disputed_weight: scoring.disputedWeight
+    },
+    links: {
+      cannot_assess_weight: links.cannotAssessWeight,
+      own_reply_counts_as_support: links.ownReplyCountsAsSupport,
+      rival_replies: links.rivalReplies
+    },
+    investigate: { max_per_debate: settings.investigate.maxPerDebate },
+    judges: { count: settings.judges.count, maker_rule: settings.judges.makerRule },
+    label: { clear_agreeing: settings.label.clearAgreeing, close_call_agreeing: settings.label.closeCallAgreeing },
+    answer_check: { candidates: settings.answerCheck.candidates },
+    sites: {
+      comparing_judges: sites.comparingJudges,
+      investigations: sites.investigations,
+      answer_check: sites.answerCheck,
+      added_model_attempts: (sites.comparingJudges + sites.investigations + sites.answerCheck) * perSiteAttempts
+    }
+  });
+  const parsed = engineReceiptSchema.safeParse(receipt);
+  if (!parsed.success) {
+    return engineInvalid("The engine's receipt does not parse: "
+      + parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+  }
+  return receipt;
+}
+
+/** The engine a run was admitted with, read back from its receipt (the runner's only source: it never reads the row). */
+export function engineSettingsOfReceipt(receipt: EngineReceipt): EngineSettings {
+  const { scoring, links, sites } = receipt;
+  return deepFreeze({
+    engine: receipt.engine,
+    scoring: {
+      terms: scoring.terms.map((term) => ({ metric: term.metric, coefficient: term.coefficient })),
+      clarityDecayPerAmbiguity: scoring.clarity_decay_per_ambiguity,
+      fatalCap: { minFlagSeverity: scoring.fatal_cap.min_flag_severity, to: scoring.fatal_cap.to },
+      fidelityFloor: { below: scoring.fidelity_floor.below, to: scoring.fidelity_floor.to },
+      combine: scoring.combine,
+      disputedWeight: scoring.disputed_weight
+    },
+    links: {
+      cannotAssessWeight: links.cannot_assess_weight,
+      ownReplyCountsAsSupport: links.own_reply_counts_as_support,
+      rivalReplies: links.rival_replies
+    },
+    investigate: { maxPerDebate: receipt.investigate.max_per_debate },
+    judges: { count: receipt.judges.count, makerRule: receipt.judges.maker_rule },
+    label: { clearAgreeing: receipt.label.clear_agreeing, closeCallAgreeing: receipt.label.close_call_agreeing },
+    answerCheck: { candidates: receipt.answer_check.candidates },
+    sites: { comparingJudges: sites.comparing_judges, investigations: sites.investigations, answerCheck: sites.answer_check }
+  });
+}
+
+/** Engine 1: a run admitted without the member, today's debate byte for byte. */
+export const ENGINE_ONE = Object.freeze({ engine: 1 } as const);
+export type EngineOfRun = typeof ENGINE_ONE | EngineSettings;
+
+/**
+ * The ONE reader (INTERFACE §3.3): a structural parameter, so register never imports budget; pass the run's parsed
+ * `CostEnvelopeBasis`. Every engine-2 branch asks `engineOfRun(basis).engine === 2`.
+ */
+export function engineOfRun(basis: Readonly<{ engine?: EngineSettings }>): EngineOfRun {
+  return basis.engine ?? ENGINE_ONE;
 }

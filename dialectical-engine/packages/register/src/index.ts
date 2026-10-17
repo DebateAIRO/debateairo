@@ -1262,12 +1262,18 @@ export {
 export {
   COMPOSITION_METRICS,
   ENGINE_JUDGE_MAKER_RULES,
+  ENGINE_ONE,
   ENGINE_RIVAL_REPLIES,
   ENGINE_SCORING_COMBINES,
   ENGINE_VERSION_LIMITS,
   ENGINE_VERSION_POLICY_ROW_KEY,
   ENGINE_VERSION_START,
   engineInForce,
+  engineOfRun,
+  engineReceipt,
+  engineReceiptSchema,
+  engineSettingsOf,
+  engineSettingsOfReceipt,
   engineVersionPolicyRow,
   engineVersionPolicyStartValues,
   parseEngineVersionPolicy,
@@ -1278,7 +1284,11 @@ export {
   type EngineJudges,
   type EngineLabel,
   type EngineLinks,
+  type EngineOfRun,
+  type EngineReceipt,
   type EngineScoring,
+  type EngineSettings,
+  type EngineSites,
   type EngineVersionPolicy
 } from "./engine-version-policy.js";
 export {
