@@ -1,13 +1,16 @@
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
 import { rootPositionRepairRequestBytesBound, rootPositionRequestBytesBound } from "@debateai/judgement";
-import { exhaustive, questionLanguageForBounds, TypedDomainError, type QuestionLanguage } from "@debateai/kernel";
+import {
+  LENGTH_ALLOWANCE_LIMITS, answerRoomTokens, exhaustive, guidedAllowanceTokens, lengthGuideForBounds, questionLanguageForBounds,
+  TypedDomainError, type QuestionLanguage
+} from "@debateai/kernel";
 import {
   MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
-  type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapResult, type MapRunInput, type MapSeat,
-  type MapStep
+  type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapLimits, type MapResult, type MapRunInput,
+  type MapSeat, type MapStep
 } from "@debateai/map";
 import { lengthRetryTokenCeiling, type CallBound, type ProviderGateway } from "@debateai/providers";
-import type { DebateShapeOpening } from "@debateai/register";
+import type { DebateShapeOpening, LengthGuidance } from "@debateai/register";
 import type { ConditionMarkRecord } from "@debateai/serve";
 import type { EnvelopeStopKind } from "./index.js";
 import { shapeSeatOrder } from "./shape-seats.js";
@@ -41,6 +44,8 @@ export type MapStageDeps = Readonly<{
    * so the arguing is not stopped. Absent: no such refusal is told apart.
    */
   roomKept?: (error: unknown) => boolean;
+  /** Length guidance: the run's frozen numbers (map thinking room, runaway factor); absent or null = today's bounds. */
+  lengthGuidance?: LengthGuidance | null;
 }>;
 /**
  * `settled()` (Task 1 note): resolves once every call this caller SENT has finished, whatever its outcome. When an
@@ -58,6 +63,18 @@ export type RunnerMapCaller = MapCaller & Readonly<{
 export function mapStageBound(bound: CallBound, step: MapStep, longBounds: Readonly<{ merge: number; choose: number }>): CallBound {
   const ceiling = step === "MERGE" ? longBounds.merge : step === "CHOOSE" ? longBounds.choose : null;
   return ceiling === null || ceiling <= bound.tokenCeiling ? bound : Object.freeze({ ...bound, tokenCeiling: ceiling });
+}
+
+/**
+ * Length guidance (spec 2026-10-15 §3.3): a map call's bound raised to the map's thinking room + its reply's runaway answer
+ * room when that is larger; the same object without the row or without a reply ceiling (merge, choose).
+ */
+export function guidedMapBound(bound: CallBound, replyWordsCeiling: number | null, guidance: LengthGuidance | null): CallBound {
+  if (guidance === null || replyWordsCeiling === null) return bound;
+  const tokenCeiling = guidedAllowanceTokens({ todayTokens: bound.tokenCeiling, thinkingRoomTokens: guidance.thinkingRoom.map,
+    answerRoomTokens: answerRoomTokens(replyWordsCeiling, guidance.runawayMultiplier, guidance.tokensPerWord),
+    capTokens: LENGTH_ALLOWANCE_LIMITS.capTokens });
+  return tokenCeiling === bound.tokenCeiling ? bound : Object.freeze({ ...bound, tokenCeiling });
 }
 
 const MAKER_SAT_OUT = "MAKER_SAT_OUT";
@@ -93,7 +110,14 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
       const pieces = mapProviderPieces(request.spec);
       const response = await inTurn(() => member.provider.call({
         runId: deps.runId, subjectItemId: deps.subjectItemId, callSiteKey: request.callSiteKey, role: "JUDGE", lane: "served",
-        bound: mapStageBound(deps.judgeBound, request.step, deps.longBounds), contractHash: deps.mapContractHash,
+        bound: guidedMapBound(mapStageBound(deps.judgeBound, request.step, deps.longBounds), request.spec.replyWordsCeiling,
+          deps.lengthGuidance ?? null),
+        contractHash: deps.mapContractHash,
+        // Length guidance: the parts' words this call was told, recorded beside what it wrote.
+        ...(request.spec.guidedWords === null ? {} : { guidedWords: request.spec.guidedWords }),
+        // Length guidance L25 (pre-flight PF-C5.11): the most guided words this reply can hold, which the preview wrapper's
+        // length-retry room reads before guidedWords (one item of each part); absent for merge and choose (no most).
+        ...(request.spec.replyWordsCeiling === null ? {} : { replyWordsCeiling: request.spec.replyWordsCeiling }),
         providerRef: member.providerRef, packet: pieces.framed.packet,
         classifyContent: pieces.classifyContent, buildRepairPacket: pieces.buildRepairPacket, ...keepRoom
       }));
@@ -165,10 +189,14 @@ export function mapConditionRecords(result: MapResult, runId: string, servedRoot
  * chosen answer, plus the quota fills, each a key point's claim with room for its JSON members). Task 13 frames root 0's
  * `assigned_answer` and `map_points` within these, so the room the map keeps for root 0 is never below its real call.
  */
-export const rootZeroMapMaterialChars = Object.freeze({
-  answer: 2 * MAP_LIMITS.claimMaxChars,
-  points: (2 * MAP_LIMITS.choosePointsPerSideMax + 3) * (MAP_LIMITS.claimMaxChars + 64) + 64
-});
+/** Root 0's material limits under a set of map limits (today's: `rootZeroMapMaterialChars`). */
+export function rootZeroMapMaterialCharsFor(limits: MapLimits): Readonly<{ answer: number; points: number }> {
+  return Object.freeze({
+    answer: 2 * limits.claimMaxChars,
+    points: (2 * limits.choosePointsPerSideMax + 3) * (limits.claimMaxChars + 64) + 64
+  });
+}
+export const rootZeroMapMaterialChars = rootZeroMapMaterialCharsFor(MAP_LIMITS);
 
 /**
  * Binding note 2 (Task 13) — ROOT 0'S MATERIAL, ENFORCED: what a root is asked to argue, held within
@@ -230,9 +258,16 @@ export function rootZeroRoomRefs<S>(input: Readonly<{
     .flatMap((seat) => input.membersOf(seat).map((member) => member.providerRef)))]);
 }
 
-/** What sizes one of root 0's requests: the question, the language, the completion bound and the run's lock (or none). */
+/**
+ * What sizes one of root 0's requests: the question, the language, the completion bound, the run's lock (or none) and
+ * whether the run has a length receipt (`lengthed`: the request is framed with the longest target any row can make,
+ * `lengthGuideForBounds`, so the room stays a ceiling whatever words the receipt froze; absent or false, today's framing).
+ */
 type RootZeroRequestInput = Readonly<{
   questionLine: string; argumentLanguageName: string; completionTokenCeiling: number; questionLanguage?: QuestionLanguage | null;
+  lengthed?: boolean;
+  /** Root 0's map material limits (`rootZeroMapMaterialCharsFor`); absent = today's `rootZeroMapMaterialChars`. */
+  materialChars?: Readonly<{ answer: number; points: number }>;
 }>;
 
 /**
@@ -247,15 +282,15 @@ function rootZeroRoomLock(questionLanguage: QuestionLanguage | null | undefined)
 
 /** The most bytes root 0's own request can carry for this question (a primary root, or a map-assigned one). */
 export function rootZeroRequestBytes(input: RootZeroRequestInput): number {
-  return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars,
-    questionLanguage: rootZeroRoomLock(input.questionLanguage) })
+  return rootPositionRequestBytesBound({ ...input, assignedMaterialChars: input.materialChars ?? rootZeroMapMaterialChars,
+    questionLanguage: rootZeroRoomLock(input.questionLanguage), length: input.lengthed === true ? lengthGuideForBounds() : null })
     + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
 }
 
 /** Ruling T12-R3: the most bytes root 0's FORMAT REPAIR (the judge's full re-ask) can carry for this question. */
 export function rootZeroRepairRequestBytes(input: RootZeroRequestInput): number {
-  return rootPositionRepairRequestBytesBound({ ...input, assignedMaterialChars: rootZeroMapMaterialChars,
-    questionLanguage: rootZeroRoomLock(input.questionLanguage) })
+  return rootPositionRepairRequestBytesBound({ ...input, assignedMaterialChars: input.materialChars ?? rootZeroMapMaterialChars,
+    questionLanguage: rootZeroRoomLock(input.questionLanguage), length: input.lengthed === true ? lengthGuideForBounds() : null })
     + ROOT_ZERO_BODY_ALLOWANCES.modelIdBytes;
 }
 
@@ -268,13 +303,15 @@ export type RootZeroAttempt = Readonly<{ requestBytes: number; completionTokenCe
  * re-sends it after a cut reply) or a format repair (the full re-ask at the first attempt's bound, as the gateway sends it
  * after a reply that failed its check). The backup answering after a billed failure of the main is the first packet at
  * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`),
- * and each frames the run's lock when it has one (PF-L38: `rootZeroRoomLock`).
+ * and each frames the run's lock when it has one (PF-L38: `rootZeroRoomLock`) and, on a run with a length receipt
+ * (`lengthed`), the lengthed variant at its bound target (spec 2026-10-15 §3.2).
  */
 export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number;
-  questionLanguage?: QuestionLanguage | null }>):
+  questionLanguage?: QuestionLanguage | null; lengthed?: boolean; materialChars?: Readonly<{ answer: number; points: number }> }>):
   Readonly<{ first: RootZeroAttempt; retries: readonly RootZeroAttempt[] }> {
   const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName,
-    questionLanguage: input.questionLanguage ?? null };
+    questionLanguage: input.questionLanguage ?? null, ...(input.lengthed === true ? { lengthed: true } : {}),
+    ...(input.materialChars === undefined ? {} : { materialChars: input.materialChars }) };
   const firstBound = lengthRetryTokenCeiling(input.tokenCeiling, 0);
   const lengthRetryBound = lengthRetryTokenCeiling(input.tokenCeiling, 1);
   return Object.freeze({

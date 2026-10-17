@@ -188,4 +188,16 @@ describe("the preview call policy sets lengthRetry, and only it", () => {
     expect(deepseek.seen[0]!.lengthRetry).toEqual({ answerRoomTokens: 12000, lowerThinkingLevel: "low" });
     expect(deepseek.seen[0]!.guidedWords).toBe(1000);
   });
+
+  // LG-C Task 14 (pre-flight PF-C5.11): a map call's one reply holds several told items, so its room is its reply's ceiling,
+  // never its one-item guided words; no ceiling (merge, choose): the start sum, today's room.
+  it("LG-C: a map call's answer room is its reply's ceiling, never its one-item guided words", () => {
+    const glm = previewModelRow(GLM)!;
+    const list = { callSiteKey: "MAP:list:1", lane: "served" };
+    expect(previewLengthRetryOf({ ...list, guidedWords: 95, replyWordsCeiling: 635 }, glm, "high"))
+      .toEqual({ answerRoomTokens: 7620, lowerThinkingLevel: "low" });
+    expect(previewLengthRetryOf(list, glm, "high")).toEqual({ answerRoomTokens: 2976, lowerThinkingLevel: "low" });
+    expect(previewLengthRetryOf({ callSiteKey: "MAP:merge", lane: "served", guidedWords: 60 }, glm, "high"))
+      .toEqual({ answerRoomTokens: 2976, lowerThinkingLevel: "low" });
+  });
 });

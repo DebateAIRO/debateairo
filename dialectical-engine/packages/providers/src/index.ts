@@ -307,6 +307,13 @@ export interface ProviderCallRequest {
    */
   readonly guidedWords?: number;
   /**
+   * Length guidance L25 (pre-flight PF-C5.11): the most guided words this call's ONE reply can hold, for a call whose reply
+   * holds several told items (a map angles, list, snowball or gap call: `MapStepSpec.replyWordsCeiling`). NEVER sent and never
+   * recorded; read only by the preview wrapper's length retry (`previewLengthRetryOf`), which sizes a map call's answer room
+   * from it. Absent = no such ceiling (every other call, and the map's merge and choose).
+   */
+  readonly replyWordsCeiling?: number;
+  /**
    * Length guidance L27 (spec 2026-10-15 §3.6, INTERFACE §3.2): counts the words of this call's replies when only a part
    * of the answer is to be counted (LG-D: the storyteller's short version). Absent: `replyWordCount` over the whole reply.
    * Information only: a counter that throws or answers anything but a whole number records null. Never sent.
@@ -1636,12 +1643,15 @@ function assertProviderCallRecord(request: ProviderCallRequest): void {
   const candidate = request.candidateId;
   const version = request.scorecardVersion;
   const guided = request.guidedWords;
+  const ceiling = request.replyWordsCeiling;
   if ((role !== undefined && !isDebateRole(role))
     || (candidate !== undefined && candidate !== null && !CANDIDATE_ID_TOKEN.test(candidate))
     || (version !== undefined && version !== null
       && (!Number.isSafeInteger(version) || version < 1 || version > MAX_USAGE_COUNTER))
     || (guided !== undefined
-      && (!Number.isSafeInteger(guided) || guided < 1 || guided > MAX_USAGE_COUNTER))) {
+      && (!Number.isSafeInteger(guided) || guided < 1 || guided > MAX_USAGE_COUNTER))
+    || (ceiling !== undefined
+      && (!Number.isSafeInteger(ceiling) || ceiling < 1 || ceiling > MAX_USAGE_COUNTER))) {
     throw new TypeError("PROVIDER_CALL_RECORD_INVALID");
   }
 }

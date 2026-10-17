@@ -2,6 +2,7 @@ import { lockedReplyLanguageExpectation, questionLanguageOf, replyLanguageExpect
 import { mapFinishChoice, mapInternalWordsSkipped } from "./choose.js";
 import { mapAssignItemIds, mapNextItemNumbers, type MapItemDraft } from "./items.js";
 import { mapAddGapPoints, mapApplyMerge, mapCodeMerge, mapSingletonMap, type MapMergedMap } from "./keypoints.js";
+import type { MapLength } from "./length.js";
 import type { MapPromptContractSet } from "./prompts.js";
 import type { MapAnglesReply, MapListReply } from "./replies.js";
 import { mapPrimarySubtag } from "./text.js";
@@ -32,6 +33,7 @@ import {
 } from "./specs.js";
 import {
   MAP_LIMITS,
+  mapLimitsFor,
   type MapAngle,
   type MapArm,
   type MapCallRecord,
@@ -111,6 +113,8 @@ export type MapRunInput = Readonly<{
   /** K: points per answer when the code chooses. */
   pointsPerAnswer: number;
   contracts?: MapPromptContractSet;
+  /** Length guidance: the run's map targets; absent = today's map. */
+  length?: MapLength;
   /**
    * True for an error that ends the run (claim lost, time limit): rethrown, never a fallback. Must be a pure predicate:
    * a throw inside it replaces the original error.
@@ -145,7 +149,8 @@ class MapRun {
     const lock = mapLockedLanguage(input);
     this.ctx = Object.freeze({ questionLine: input.questionLine, languageName: input.languageName, languageTag: input.languageTag,
       replyLanguage: lock === null ? replyLanguageExpectation(input.questionLine) : lockedReplyLanguageExpectation(lock, input.questionLine),
-      ...(input.contracts === undefined ? {} : { contracts: input.contracts }) });
+      ...(input.contracts === undefined ? {} : { contracts: input.contracts }),
+      ...(input.length === undefined ? {} : { length: input.length }) });
   }
 
   /**
@@ -310,7 +315,8 @@ async function mapMergeGapChoose(run: MapRun, angles: readonly MapAngle[], items
   // available, never capped below the two distinct answers the map always gives.
   const makersPresent = Math.max(MAP_LIMITS.chooseDistinctAnswersMin, mapDistinctMakers(run.available));
   const finished = mapFinishChoice({ reply, keyPoints: merged.keyPoints, mergedAnswers: merged.mergedAnswers, items: allItems,
-    languageTag: run.input.languageTag, maxAnswers: Math.min(run.input.maxAnswers, makersPresent), pointsPerAnswer: run.input.pointsPerAnswer });
+    languageTag: run.input.languageTag, maxAnswers: Math.min(run.input.maxAnswers, makersPresent), pointsPerAnswer: run.input.pointsPerAnswer,
+    claimMaxChars: mapLimitsFor(run.input.length !== undefined).claimMaxChars });
   run.marks.push(...finished.marks);
   const skipped = mapInternalWordsSkipped(merged.keyPoints, merged.mergedAnswers);
   if (skipped !== null) run.mapNote(skipped.note, skipped.step, skipped.detail);

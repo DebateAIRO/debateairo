@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Toàn diện",
   "newDebate.scrutinyExhaustiveHelp": "Nhiều vòng bổ sung nhất, cho nhiều luận điểm còn nghi vấn hơn.",
   "newDebate.answerLength": "Độ dài câu trả lời",
-  "newDebate.answerLengthHint": "Khoảng 300, 700 hoặc 1.500 từ: đây là mục tiêu, không phải giới hạn tối đa nghiêm ngặt.",
+  "newDebate.answerLengthHint": "Khoảng {short}, {standard} hoặc {detailed} từ: đây là mục tiêu, không phải giới hạn tối đa nghiêm ngặt.",
   "newDebate.answerLengthShort": "Ngắn",
   "newDebate.answerLengthStandard": "Tiêu chuẩn",
   "newDebate.answerLengthDetailed": "Chi tiết",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PREVIEW_MODEL_ROWS } from "@debateai/providers";
 import {
   answerJobTokenCeilings, computeStructuralCeilingBasis, debateShapePolicyStartValues, lengthGuidanceAllowanceTokens,
-  lengthGuidancePolicyStartValues, lengthGuidedFirstCallCeiling, resolveLengthGuidance
+  lengthGuidancePolicyStartValues, lengthGuidedFirstCallCeiling, resolveDebateShape, resolveLengthGuidance
 } from "@debateai/register";
 import { admittedLengthOf, answerTokenCeilingsForBasis } from "../../apps/api/src/ask-model-picker.js";
 import {
@@ -79,6 +79,16 @@ describe("the hosted picker and the boot checks (spec §3.10)", () => {
       CROSS_EXCHANGE: 9144, JUDGE: 6496, REVIEWER: 3488, ANSWER_WRITER: 20584, ANSWER_CHECKER: 3848 });
   });
 
+  // Task 6 review 3: the writer's row at the other two answer lengths (Standard is pinned above).
+  it("the writer's per-run ceiling at Short and Detailed: 18,784 and 28,384, each the runner's guided writer bound", () => {
+    expect(LENGTHS.map((answerLength) => answerTokenCeilingsForBasis(SEALED, basisAt(answerLength)).ANSWER_WRITER))
+      .toEqual([18784, 20584, 28384]);
+    for (const answerLength of LENGTHS) {
+      expect(answerTokenCeilingsForBasis(SEALED, basisAt(answerLength)).ANSWER_WRITER)
+        .toBe(lengthGuidanceAllowanceTokens(guidanceAt(answerLength), "answer_writer", SEALED.ANSWER_WRITER));
+    }
+  });
+
   it("the Free answer jobs and the first call are checked at the largest any plan can ask", () => {
     const sealed = { writer: 2048, checker: 2048 };
     expect(answerJobTokenCeilings(sealed, null, null)).toEqual({ ANSWER_WRITER: 2048, ANSWER_CHECKER: 2048 });
@@ -88,5 +98,49 @@ describe("the hosted picker and the boot checks (spec §3.10)", () => {
     expect(answerJobTokenCeilings(sealed, debateShapePolicyStartValues(), POLICY)).toEqual({ ANSWER_WRITER: 28384, ANSWER_CHECKER: 3848 });
     expect(lengthGuidedFirstCallCeiling(2048, null)).toBe(2048);
     expect(lengthGuidedFirstCallCeiling(2048, POLICY)).toBe(9496);
+  });
+});
+
+/**
+ * LG-C Task 14 (spec 2026-10-15 §3.3, §3.10): a map runs only with the shape, and with the length member each map call asks
+ * the map's thinking room + its reply's runaway answer room (`guidedMapBound`). The largest reply is the gap's: 8 x (35 + 35)
+ * + 3 x 35 = 665 words, so a map call may ask 8,192 + 4 x 665 x 3 = 16,172 tokens. The shaped basis is built as
+ * tests/unit/debate-shape-preview-estimate.test.ts builds its own, with `length:` added.
+ */
+describe("a shaped run with the length member prices the map's allowance (Task 14)", () => {
+  const SHAPE = resolveDebateShape({ policy: debateShapePolicyStartValues(), plan: "pro", makers: 2,
+    settings: { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } })!;
+  const shaped = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, shape: SHAPE });
+  const shapedLengthed = computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, shape: SHAPE, length: guidanceAt("standard") });
+
+  it("the preview estimate prices every debate call at least at a map call's allowance, 16,172", () => {
+    expect(previewOutputTokensForBasis(OUTPUT, shapedLengthed).debate).toBe(16172);
+    // Without the shape there is no map: the debate steps' own largest allowance, as before.
+    expect(previewOutputTokensForBasis(OUTPUT, basisAt("standard")).debate).toBe(9144);
+    // Without the length member: today's shaped pricing (the debate output untouched).
+    expect(previewOutputTokensForBasis(OUTPUT, shaped).debate).toBe(OUTPUT.debate);
+  });
+
+  it("the hosted picker seats debaters (POSITION) at least at a map call's allowance", () => {
+    const ceilings = answerTokenCeilingsForBasis(SEALED, shapedLengthed);
+    expect(ceilings.POSITION).toBeGreaterThanOrEqual(16172);
+    expect(ceilings.POSITION).toBe(Math.max(16172, SHAPE.mapMergeBound, SHAPE.mapChooseBound,
+      lengthGuidanceAllowanceTokens(guidanceAt("standard"), "opening", SEALED.POSITION)));
+    // Only POSITION carries the map; every other role is as without the shape (the writer keeps its shape bound).
+    expect(ceilings.SUPPORT_ATTACK).toBe(answerTokenCeilingsForBasis(SEALED, basisAt("standard")).SUPPORT_ATTACK);
+  });
+
+  // Task 6 review 3: shape and length together, every role: the writer is guided from the shape's own writer bound.
+  it("shape and length together: the writer is guided from the shape's writer bound; the debate roles as without the shape", () => {
+    const ceilings = answerTokenCeilingsForBasis(SEALED, shapedLengthed);
+    const unshaped = answerTokenCeilingsForBasis(SEALED, basisAt("standard"));
+    expect(ceilings.ANSWER_WRITER).toBe(lengthGuidanceAllowanceTokens(guidanceAt("standard"), "answer_writer",
+      Math.max(SEALED.ANSWER_WRITER, SHAPE.writerBound)));
+    expect(ceilings.ANSWER_WRITER).toBeGreaterThanOrEqual(Math.max(SHAPE.writerBound, unshaped.ANSWER_WRITER));
+    for (const role of ["SUPPORT_ATTACK", "CROSS_EXCHANGE", "JUDGE", "REVIEWER", "ANSWER_CHECKER"] as const) {
+      expect(ceilings[role], role).toBe(unshaped[role]);
+    }
+    // Without the length member: the shape's raise only.
+    expect(answerTokenCeilingsForBasis(SEALED, shaped).ANSWER_WRITER).toBe(Math.max(SEALED.ANSWER_WRITER, SHAPE.writerBound));
   });
 });

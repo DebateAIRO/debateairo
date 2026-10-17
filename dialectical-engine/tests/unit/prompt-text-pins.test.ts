@@ -26,7 +26,7 @@ import {
   SYNTHESIZER_V3_CONTRACT_ID,
   SYNTHESIZER_V3_PROMPT_CONTRACT
 } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_LENGTH_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import {
   BLIND_JUDGE_GRADE_PROMPT_CONTRACT,
   DOMAIN_TAGGER_PROMPT_CONTRACT
@@ -751,6 +751,8 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     ["panel", PANEL_PROMPT_CONTRACT],
     ["synthesizer", SYNTHESIZER_PROMPT_CONTRACT],
     ["evaluator", EVALUATOR_PROMPT_CONTRACT],
+    // Length guidance (LG-C Task 13): the checker's length variant.
+    ["evaluator-length", EVALUATOR_LENGTH_PROMPT_CONTRACT],
     ["blind-judge-grade", BLIND_JUDGE_GRADE_PROMPT_CONTRACT],
     ["domain-tagger", DOMAIN_TAGGER_PROMPT_CONTRACT],
     ["consumer-aggregate", CONSUMER_AGGREGATE_PROMPT_CONTRACT],

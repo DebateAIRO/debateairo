@@ -50,7 +50,8 @@ import {
   effectiveCallConcurrency,
   readStoryPolicy,
   type CallConcurrencyPolicy,
-  type DebateShapeCeilingInput
+  type DebateShapeCeilingInput,
+  type LengthGuidance
 } from "@debateai/register";
 import type { DebateShapeSettings } from "@debateai/contract";
 import { createPostgresProviderGateway, WalkingSkeletonRunner, type ProviderPriceMap, type WalkingSkeletonSettings } from "@debateai/runner";
@@ -474,6 +475,8 @@ export function previewDebateHarness(input: Readonly<{
   async function admittedRun(label: string, admission: Readonly<{
     panelRefs: readonly string[]; pin?: RotatedRoles; depth?: number; question?: string;
     shape?: DebateShapeCeilingInput; settings?: DebateShapeSettings; language?: Readonly<{ tag: string; name: string }>;
+    /** LG-C Task 17: the length row's numbers frozen on the receipt (`envelope_basis.length`); absent, today's receipt. */
+    length?: LengthGuidance;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -493,7 +496,8 @@ export function previewDebateHarness(input: Readonly<{
       tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
       depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
       envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
-        ...(admission.shape === undefined ? {} : { shape: admission.shape }) }),
+        ...(admission.shape === undefined ? {} : { shape: admission.shape }),
+        ...(admission.length === undefined ? {} : { length: admission.length }) }),
       ...(admission.shape === undefined ? {} : {
         argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
         argumentLanguageName: (admission.language ?? { name: "English" }).name

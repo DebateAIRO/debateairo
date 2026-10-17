@@ -3,7 +3,9 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildAcceptanceRegisterRows } from "../../acceptance/seed-register.js";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
-import { EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import {
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_CONTRACT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT
+} from "@debateai/runner";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 
@@ -41,8 +43,9 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   it("fingerprints the exported evaluator constant in BOTH deployments", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
+    // Length guidance (LG-C Task 13): the seal is v2 then its length variant, the text the runner exports.
     expect(acceptance.conformanceContractHash)
-      .toBe(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)));
+      .toBe(sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT));
     expect(development.conformanceContractHash).toBe(acceptance.conformanceContractHash);
   });
 
@@ -74,7 +77,8 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // Practice debate 3 (2026-10-12): serve.evaluator.v2 changed only the owners' instruction slot
     // (owner-approved wording), so the answer form above is still the sealed 2026-09-04 text and the
     // fingerprint moves again, to a NEW sealed value; serve.evaluator.v1's f205421c…9dcc stays history
-    // (register versions sealed before v2, the preview's 11 among them, carry it).
+    // (register versions sealed before v2, the preview's 11 among them, carry it). v2's 660ec7cb…e22f below is itself
+    // history since LG-C Task 13: the conformance row now seals v2 + length.v1 (108f1b29…22f6).
     expect(sha256(promptContractFingerprintText(EVALUATOR_V1_PROMPT_CONTRACT as PromptContract)))
       .toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
     expect(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)))
@@ -98,9 +102,10 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
   it("pins the judge and composer fingerprints as sealed VALUES, not derivations", async () => {
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
-    // Debate shape (Phase 2b Task 4): the judge seal grew from e7f7e4b0…1365 (frozen V1, history) by six contracts.
+    // Debate shape (Phase 2b Task 4): the judge seal grew from e7f7e4b0…1365 (frozen V1, history) by six contracts to
+    // aac53407…2612 (frozen V2, history); length guidance (LG-C2 Task 11) appended the 18 length variants.
     expect(acceptance.judgeContractHash)
-      .toBe("aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612");
+      .toBe("810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee");
     // serve.synthesizer.v2 (2026-10-09) superseded the v1 composer seal
     // d96e7cc9…c866, and serve.synthesizer.v3 (2026-10-12, practice debate 3)
     // superseded v2's 340e11a6…8b70 (register versions sealed before each keep

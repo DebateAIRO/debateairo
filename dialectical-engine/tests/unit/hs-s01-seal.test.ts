@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 import { PROMPT_FRAME_VERSION, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
 import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
-  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2
 } from "../../packages/judgement/src/prompts.js";
 import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT,
   SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_V3_PROMPT_CONTRACT
 } from "@debateai/serve";
-import { EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
 import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash } from "@debateai/story";
@@ -71,7 +72,11 @@ describe("S01 seals the content rule", () => {
     // Debate shape (Phase 2b Task 4): the judge text R7-a sealed is now frozen as V1; the current text appends the
     // shape's six contracts to it, so the judge family moves once more, from e7f7e4b0... to its debate-shape seal.
     ["judgeContractHash", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1), "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69", "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365"],
-    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    // Length guidance (LG-C2 Task 11): the debate shape's text is now frozen as V2 (this row, its seal unchanged), and the
+    // current text appends the 18 length variants to it, so the judge family moves once more, from aac53407... to its
+    // length-guidance seal (measured by this row's first run, LG-C2 Task 11: 810d611a...).
+    ["judgeContractHash (debate shape)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2), "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365", "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612"],
+    ["judgeContractHash (length guidance)", () => sha256(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT), "aac534075f292189027590dcbde6256a9684f085814ad2ab2bb4cb4be9c22612", "810d611a72cbf486d7027ca444e2181541a60c4843c42ebaed549eb4577bf1ee"],
     // Debate shape (Phase 2b Task 5): the composer row now seals v3 then its answer-length variant; v3's own seal
     // (the base here, register 12's value) stays pinned below as history.
     // Answer writer v4 (owner-approved wording, 2026-10-15): v4 + length.v2 supersede v3 + length.v1, so this row now
@@ -83,6 +88,10 @@ describe("S01 seals the content rule", () => {
     // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.
     ["composerContractHash serve.synthesizer.v1", () => sha256(promptContractFingerprintText(SYNTHESIZER_V1_PROMPT_CONTRACT)), "9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888", "d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866"],
     ["conformanceContractHash serve.evaluator.v1", () => sha256(promptContractFingerprintText(EVALUATOR_V1_PROMPT_CONTRACT)), "80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447", "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc"],
+    // Length guidance (LG-C2 Task 13): the conformance row now seals serve.evaluator.v2 then its length variant
+    // serve.evaluator.length.v1 (measured by this row's first run: 108f1b29...); v2 alone (the base here, 660ec7cb...)
+    // stays pinned below as history.
+    ["conformanceContractHash serve.evaluator.v2 + length.v1", () => sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT), "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f", "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6"],
     ["evaluator.blind-judge-grade.v1", () => BLIND_JUDGE_GRADE_CONTRACT_HASH, "8aeaf308a59c5c9d77349c2888cccfda2f9d6589eba991cad85ef3fc03744e31", "b23685cf8ac31e68f151573b83f1e807af73fe93098d026f5e23ca70f83fabe8"],
     ["evaluator.domain-tagger.v1", () => DOMAIN_TAGGER_CONTRACT_HASH, "02fc1d4e36df8d137a1673c85b5c8d03c3379b52c00bee627f84497d65ffd7f5", "0dfa57266bb57d90481e60e9d184fed8fd61eca6fab70c93a765d79e7ec3d509"],
     ["evaluator.consumer-aggregate.v1", () => sha256(promptContractFingerprintText(CONSUMER_AGGREGATE_PROMPT_CONTRACT)), "82bf46b39a0eca190425c4e8d9d01eb100ab61c39145d0af8551de1a65d70ac4", "33ce6f2ec2ff87f03cd5f4e76123e8d61f23235d88d32808a21adbd53a85f0ab"],
@@ -103,8 +112,9 @@ describe("S01 seals the content rule", () => {
     expect(v2).toBe("340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70");
   });
   // Practice debate 3 (2026-10-12, owner-approved wording): serve.synthesizer.v3 supersedes v2 and
-  // serve.evaluator.v2 supersedes v1. The conformance row of every register version published from this
-  // code carries evaluator v2's seal below. v3 ALONE is the composer seal of the preview's version 12
+  // serve.evaluator.v2 supersedes v1. Evaluator v2's seal below is history since length guidance (LG-C Task 13): the
+  // conformance row of every register version published from this code carries v2 + length.v1 (108f1b29..., the R7-a
+  // row above). v3 ALONE is the composer seal of the preview's version 12
   // (history, checked here); from the debate shape (2026-10-13) the published composer row is v3 + its
   // answer-length variant (the R7-a row above). Answer writer v4 (2026-10-15) superseded v3, so v3 is now read from
   // its exported HISTORY contract (SYNTHESIZER_V3_PROMPT_CONTRACT); its seal is unchanged.

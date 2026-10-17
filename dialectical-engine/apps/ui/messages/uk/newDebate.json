@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Вичерпна",
   "newDebate.scrutinyExhaustiveHelp": "Найбільше додаткових раундів, щодо більшої кількості пунктів, які викликають сумніви.",
   "newDebate.answerLength": "Довжина відповіді",
-  "newDebate.answerLengthHint": "Близько 300, 700 або 1 500 слів: орієнтир, а не суворий максимум.",
+  "newDebate.answerLengthHint": "Довжина в словах: близько {short}, {standard} або {detailed}. Це орієнтир, а не суворий максимум.",
   "newDebate.answerLengthShort": "Коротка",
   "newDebate.answerLengthStandard": "Стандартна",
   "newDebate.answerLengthDetailed": "Докладна",

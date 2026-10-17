@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Kimerítő",
   "newDebate.scrutinyExhaustiveHelp": "A legtöbb további kör, több kétséges ponton.",
   "newDebate.answerLength": "A válasz hossza",
-  "newDebate.answerLengthHint": "Körülbelül 300, 700 vagy 1500 szó: célérték, nem szigorú maximum.",
+  "newDebate.answerLengthHint": "Körülbelül {short}, {standard} vagy {detailed} szó: célérték, nem szigorú maximum.",
   "newDebate.answerLengthShort": "Rövid",
   "newDebate.answerLengthStandard": "Normál",
   "newDebate.answerLengthDetailed": "Részletes",

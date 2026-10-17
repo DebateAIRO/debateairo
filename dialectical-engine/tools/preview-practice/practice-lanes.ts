@@ -26,15 +26,20 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
+  MAP_LENGTH_CONTRACT_IDS,
+  MAP_LENGTHED_REPLY_SCHEMAS,
   mapAnglesReplySchema,
   mapAnglesSalvage,
+  mapAnglesSalvageLengthed,
   mapChooseReplySchema,
   mapChooseSalvage,
   mapClassifyReply,
   mapGapReplySchema,
   mapGapSalvage,
+  mapGapSalvageLengthed,
   mapListReplySchema,
   mapListSalvage,
+  mapListSalvageLengthed,
   mapMergeReplySchema,
   mapMergeSalvage,
   mapSnowballReplySchema,
@@ -44,7 +49,6 @@ import {
   decodedRepairsOf,
   decodeModelJson,
   fixReplyStructure,
-  promptContractFingerprintText,
   rememberingAcceptedReply,
   structureRepairOriginalKey,
   type CallBound,
@@ -55,7 +59,7 @@ import {
 } from "@debateai/providers";
 import { buildStoryRegisterRows, readStoryPolicy, type StoryPolicy } from "@debateai/register";
 import {
-  EVALUATOR_PROMPT_CONTRACT,
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT,
   buildComposedRepairPacket,
   buildDigestFollowingServeNodes,
   buildSchemaRepairPacket,
@@ -212,13 +216,27 @@ const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMa
   choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
 });
 
-/** The step's readings in order: the first that accepts the reply, else the first refusal. Null for a key that is no map step. */
+/** Length guidance (spec 2026-10-15 §3.9): a lengthed map call's readings: the runaway-limit schemas, no trims, ids still normalised. */
+const MAP_RECHECK_READINGS_LENGTHED: Readonly<Record<PracticeMapStep, readonly PracticeMapReading[]>> = Object.freeze({
+  angles: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.angles, salvage: () => mapAnglesSalvageLengthed }],
+  list: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.list, salvage: () => mapListSalvageLengthed },
+    { schema: MAP_LENGTHED_REPLY_SCHEMAS.snowball, salvage: () => mapListSalvageLengthed }],
+  merge: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.merge, salvage: () => mapMergeSalvage }],
+  gap: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.gap, salvage: () => mapGapSalvageLengthed }],
+  choose: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.choose, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
+});
+
+/**
+ * The step's readings in order: the first that accepts the reply, else the first refusal. Null for a key that is no map
+ * step. `lengthed`: the call was asked under a length variant (`practiceMapLengthedOf`), so its reply is read with the
+ * runaway limits and the lengthed salvages.
+ */
 function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFacts | undefined,
-  keyPointIds: ReadonlySet<string> | null): ReturnType<typeof mapClassifyReply<unknown>> | null {
+  keyPointIds: ReadonlySet<string> | null, lengthed = false): ReturnType<typeof mapClassifyReply<unknown>> | null {
   const step = practiceMapStepOf(callSiteKey);
   if (step === null) return null;
   let first: ReturnType<typeof mapClassifyReply<unknown>> | null = null;
-  for (const reading of MAP_RECHECK_READINGS[step]) {
+  for (const reading of (lengthed ? MAP_RECHECK_READINGS_LENGTHED : MAP_RECHECK_READINGS)[step]) {
     const read = mapClassifyReply(content, ending, reading.schema, () => [], reading.salvage(keyPointIds));
     if (read.classification.parseStatus === "PARSED") return read;
     first ??= read;
@@ -226,8 +244,9 @@ function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFa
   return first;
 }
 
-function recheckMapReply(callSiteKey: string, content: string): readonly string[] {
-  const read = readMapReply(callSiteKey, content, undefined, null);
+/** `lengthed`: the call was asked under a map length variant, so its reply is re-checked under the lengthed limits (Task 14 review 4). */
+function recheckMapReply(callSiteKey: string, content: string, lengthed: boolean): readonly string[] {
+  const read = readMapReply(callSiteKey, content, undefined, null, lengthed);
   return read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification);
 }
 
@@ -248,6 +267,12 @@ export function practiceMapKeyPointIdsOf(messages: PromptPacket["messages"]): Re
   }
 }
 
+/** A recorded map call was asked under a length variant (its prompt's contract id): its reply is read with the runaway limits. */
+export function practiceMapLengthedOf(messages: Parameters<typeof practiceMapKeyPointIdsOf>[0]): boolean {
+  try { return Object.values(MAP_LENGTH_CONTRACT_IDS).includes(readPromptFrame({ messages } as PromptPacket).contractId); }
+  catch { return false; }
+}
+
 /**
  * Information only (all-steps format robustness, 2026-10-12): which tolerant repair an ACCEPTED reply needed, read by
  * the shared decode (`decodeModelJson`) with how the reply ended (`finish_reason` as the gateway recorded it). Null for
@@ -256,14 +281,15 @@ export function practiceMapKeyPointIdsOf(messages: PromptPacket["messages"]): Re
  * report, never a reason for a verdict.
  */
 export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string,
-  mapKeyPointIds?: ReadonlySet<string> | null): string | null {
+  mapKeyPointIds?: ReadonlySet<string> | null, mapLengthed = false): string | null {
   const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
   // LG-A (L32): a structure-repair try (`REPAIR:STRUCTURE:<key>`) is read as the step it repairs.
   const key = callSiteKey === undefined ? undefined : structureRepairOriginalKey(callSiteKey);
   // Ruling MAP-SALVAGE (2026-10-14): a map reply is read by its step's own reading, salvage included, and every repair
   // it needed is named, joined by "+" ("INNER_QUOTE+MAP_TEXT_TRIMMED"). A reply that reading refuses (a patch reply holds
   // only the patched members) is read by the shared decode, as before.
-  const map = key === undefined ? null : readMapReply(key, content, ending, mapKeyPointIds ?? null);
+  // Length guidance (spec 2026-10-15 §3.9): a call asked under a map length variant is read with the runaway limits.
+  const map = key === undefined ? null : readMapReply(key, content, ending, mapKeyPointIds ?? null, mapLengthed);
   if (map !== null && map.classification.parseStatus === "PARSED") return map.repairs.length === 0 ? null : map.repairs.join("+");
   // MiMo salvage (2026-10-12): the judge-family steps also make SHAPE repairs (NESTED_FIELDS, RENAMED_MEMBER,
   // UNASKED_KEYS, EMPTY_LIST) that the schema-blind decode cannot see, so with its call-site key a judge, panel or
@@ -378,9 +404,11 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
  * check's length rule needs the number of edges: `reviewEdgeCount` (read from the call's own prompt,
  * `practiceReviewEdgeCountOf`) when the caller has it, else the reply's own `edge_bearings` length, so only a length
  * mismatch is not re-detected (the stored detail still names it); a reply with no list and no known count is not read
- * as [] (MiMo salvage EMPTY_LIST needs a node with no edges).
+ * as [] (MiMo salvage EMPTY_LIST needs a node with no edges). `mapLengthed`: a map call asked under a length variant
+ * (`practiceMapLengthedOf`), re-checked under the lengthed limits as the live call read it.
  */
-export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
+export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null,
+  mapLengthed = false): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
   // LG-A (L32): a structure-repair try is checked as the step it repairs; its own family stays STRUCTURE_REPAIR.
   const key = structureRepairOriginalKey(callSiteKey);
@@ -407,7 +435,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       if (fixed !== null && StoryBodySchema.safeParse(fixed.value).success) return { family, issues: Object.freeze([]) };
       return { family, issues: fromZod(read) };
     }
-    case "MAP": return { family, issues: recheckMapReply(key, content) };
+    case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed) };
     default: return { family, issues: Object.freeze(["UNMAPPED"]) };
   }
 }
@@ -420,7 +448,7 @@ const digestHex = (text: string): string => createHash("sha256").update(text).di
 export const PRACTICE_CONTRACT_HASHES = Object.freeze({
   judge: digestHex(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
   composer: digestHex(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-  conformance: digestHex(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+  conformance: digestHex(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)
 });
 
 export type PracticeLaneBounds = Readonly<{ judge: CallBound; synthesizer: CallBound; evaluator: CallBound }>;

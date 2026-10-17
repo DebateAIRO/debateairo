@@ -86,12 +86,16 @@ function eachRecord(record: Record<string, unknown>, key: string, fix: (entry: R
   return Array.isArray(list) ? { ...record, [key]: list.map((entry) => (isRecord(entry) ? fix(entry) : entry)) } : record;
 }
 
+/** A point's lean read as "context" when unusable (kept with the length row: it is not about length). */
+function defaultLean(point: Record<string, unknown>, log: MapSalvageLog): Record<string, unknown> {
+  if ((MAP_LEANS as readonly unknown[]).includes(point.leans)) return point;
+  log.note("MAP_LEANS_DEFAULTED");
+  return { ...point, leans: "context" };
+}
+
 /** A point: its why_it_matters trimmed (internal: only the merge reads it), its lean read as "context" when unusable. */
 function salvagePoint(point: Record<string, unknown>, log: MapSalvageLog): Record<string, unknown> {
-  const trimmed = trimMember(point, "why_it_matters", MAP_LIMITS.whyMaxChars, log);
-  if ((MAP_LEANS as readonly unknown[]).includes(trimmed.leans)) return trimmed;
-  log.note("MAP_LEANS_DEFAULTED");
-  return { ...trimmed, leans: "context" };
+  return defaultLean(trimMember(point, "why_it_matters", MAP_LIMITS.whyMaxChars, log), log);
 }
 
 function decodedSalvage(fix: (record: Record<string, unknown>, log: MapSalvageLog) => Record<string, unknown>): (value: unknown) => MapSalvaged<unknown> {
@@ -187,6 +191,23 @@ export const mapGapSalvage = Object.freeze({
       return kept;
     }) };
   })
+});
+
+/**
+ * Length guidance (spec 2026-10-15 §3.9, ruling L19): with the length row nothing is trimmed (MAP_TEXT_TRIMMED is never
+ * made): the limits are runaway guards, and a text over one is the AI gone wrong, refused like any slip. The lean
+ * default stays; the angles keep only the id normalisation (LG-A, MAP_IDS_NORMALISED), and the merge and the choose keep
+ * their own salvages unchanged (they trim nothing).
+ */
+/** Angles with the length row: no trim (L19), the ids still normalised (LG-A, MAP_IDS_NORMALISED; ruling PF-C5.1). */
+export const mapAnglesSalvageLengthed = Object.freeze({
+  decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log))
+});
+export const mapListSalvageLengthed = Object.freeze({
+  decoded: decodedSalvage((reply, log) => eachRecord(reply, "points", (point) => defaultLean(point, log)))
+});
+export const mapGapSalvageLengthed = Object.freeze({
+  decoded: decodedSalvage((reply, log) => eachRecord(reply, "new_points", (point) => defaultLean(point, log)))
 });
 
 /**

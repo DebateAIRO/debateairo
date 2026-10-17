@@ -12,10 +12,9 @@ import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
   buildFramedRepairPrompt,
-  promptContractFingerprintText,
   readPromptFrame
 } from "@debateai/providers";
-import { EVALUATOR_PROMPT_CONTRACT, buildSynthesisRolePrompt } from "@debateai/runner";
+import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, buildSynthesisRolePrompt } from "@debateai/runner";
 import { canonicalPromptFingerprint, momentIdFor, type MomentBuilder } from "@debateai/scorecard";
 import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
@@ -218,7 +217,7 @@ describe("A18 · contract hashes, grader context, outcomes and runtime", () => {
     expect(currentContractHash("JUDGE_REVIEW")).toBe(sha(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT));
     expect(currentContractHash("JUDGE_ASSESS")).toBe(sha(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT));
     expect(currentContractHash("SYNTHESIS_WRITER")).toBe(sha(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT));
-    expect(currentContractHash("SYNTHESIS_CHECKER")).toBe(sha(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)));
+    expect(currentContractHash("SYNTHESIS_CHECKER")).toBe(sha(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT));
   });
 
   it("hands the grader the question and the material the model saw, never routing", () => {

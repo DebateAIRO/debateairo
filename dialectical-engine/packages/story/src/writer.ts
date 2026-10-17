@@ -18,7 +18,7 @@ import {
   type ProviderGateway,
   type TypedRole
 } from "@debateai/providers";
-import type { StoryPolicy } from "@debateai/register";
+import type { LengthGuidance, StoryPolicy } from "@debateai/register";
 import {
   buildStoryCheckerContract,
   buildStorytellerContract,
@@ -169,6 +169,11 @@ export type StoryWriteInput = StoryRunSnapshot & {
    * field, replies checked against it). Absent on every other run: today's story bytes.
    */
   readonly languageLocked?: true;
+  /**
+   * Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers, set by the runner only when its receipt carries them.
+   * LG-C reads only its presence (the also-raised claims whole); LG-D reads the story's targets. Absent: today's story.
+   */
+  readonly lengthGuidance?: LengthGuidance;
 };
 
 /**
@@ -527,7 +532,8 @@ export class StoryWriter {
       snapshot,
       enrichment: enrichmentWithoutNodeIds(enrichment),
       budgetBytes: policy.materialBudget[input.compositionBudgetTier],
-      shapeIds: new Set(pack.shapes.map((shape) => shape.id))
+      shapeIds: new Set(pack.shapes.map((shape) => shape.id)),
+      ...(input.lengthGuidance === undefined ? {} : { alsoRaisedWhole: true })
     });
     if (built.kind === "TOO_LARGE") {
       this.#log("STORY_MATERIAL_TOO_LARGE", () => ({

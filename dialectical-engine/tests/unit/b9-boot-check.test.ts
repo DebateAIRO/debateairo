@@ -245,6 +245,11 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {
     const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
     const stage = main.indexOf("boot.run(\"run-ceiling-covers-one-call\"");
+    // Task 6 concern 4: each stage named below exists (an indexOf of -1 would pass every "after" check).
+    for (const marker of ["boot.run(\"run-ceiling-covers-one-call\"", "boot.runSync(\"provider-targets\"", "const costEnvelopeRows =",
+      "boot.run(\"length-guidance-policy\"", "const debateShapeInForcePolicy ="]) {
+      expect(main.indexOf(marker), marker).toBeGreaterThanOrEqual(0);
+    }
     expect(stage).toBeGreaterThan(main.indexOf("boot.runSync(\"provider-targets\""));
     expect(stage).toBeGreaterThan(main.indexOf("const costEnvelopeRows ="));
     expect(main).toContain("if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;");
@@ -259,5 +264,21 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     // PF-L38: the lock is priced only with the debate-shape row in force (read before this stage).
     expect(main).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
     expect(stage).toBeGreaterThan(main.indexOf("const debateShapeInForcePolicy ="));
+  });
+
+  // Task 12 review 1: the three first-call checks (API boot, hosted publish, practice runner) frame the lengthed variant
+  // exactly when they price the guided opening: one `lengthed:` line inside each one's firstPositionCallProjections call.
+  it.each([
+    ["apps/api/src/main.ts", "lengthed: lengthGuidancePolicy !== null"],
+    ["apps/runner/src/hosted-register-publish.ts", "lengthed: lengthGuidance !== null"],
+    ["tools/preview-practice/practice-ask-composition.ts", "lengthed: input.lengthGuidancePolicy !== null"]
+  ])("%s frames the first call lengthed with the row", async (file, line) => {
+    const source = await readFile(new URL(`../../${file}`, import.meta.url), "utf8");
+    const start = source.indexOf("const firstCalls = firstPositionCallProjections({");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const call = source.slice(start, source.indexOf("});", start));
+    expect(call.split(line).length - 1).toBe(1);
+    expect(call).toContain("judgeTokenCeiling: lengthGuidedFirstCallCeiling(");
+    expect(source.split("lengthed:").length - 1).toBe(1);
   });
 });

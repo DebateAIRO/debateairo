@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Izčrpno",
   "newDebate.scrutinyExhaustiveHelp": "Največ dodatnih krogov, pri večjem številu točk, pri katerih obstaja dvom.",
   "newDebate.answerLength": "Dolžina odgovora",
-  "newDebate.answerLengthHint": "Približno 300, 700 ali 1.500 besed: okvirna dolžina, ne strog maksimum.",
+  "newDebate.answerLengthHint": "Število besed: približno {short}, {standard} ali {detailed}. To je okvirna dolžina, ne strog maksimum.",
   "newDebate.answerLengthShort": "Kratka",
   "newDebate.answerLengthStandard": "Običajna",
   "newDebate.answerLengthDetailed": "Podrobna",

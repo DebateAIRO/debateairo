@@ -54,43 +54,53 @@ export type LengthGuidance = Readonly<{
 const whole = (min: number, max: number) => z.number().int().min(min).max(max);
 /** At most six decimals: the register's canonical decimal limit (register-publication.ts normalizeDecimal). */
 const decimal = (min: number, max: number) => z.number().min(min).max(max).refine((value) => Number(value.toFixed(6)) === value);
-const levels = (min: number) => z.object({ short: whole(min, 5000), standard: whole(min, 5000), detailed: whole(min, 5000) }).strict();
 const words = () => whole(5, 5000);
 // Every thinking room is 0..32768 (every preview row's standard output cap), except the storyteller's: owner Q-C2
 // (2026-10-16) lets it reach 64k; the model's own output maximum still caps the call (pre-flight PF-C1.2, PF-C1.5).
 const room = () => whole(0, 32 * 1024);
 const storyRoom = () => whole(0, 64 * 1024);
+/** One step's words at one level; the answer writer's bounds are the debate-shape row's (debate-shape-policy.ts lengthSchema). */
+const stepWords = (step: LengthGuidanceStep) => (step === "answer_writer" ? whole(50, 5000) : words());
+const levels = (step: LengthGuidanceStep) => z.object({ short: stepWords(step), standard: stepWords(step), detailed: stepWords(step) }).strict();
 // Keys are listed in the kernel arrays' order: zod outputs keys in schema order and the drift test compares the order
-// (pre-flight PF-C1.4).
+// (pre-flight PF-C1.4). Each part below is the row's ONE statement of its bounds: the row's schema and the mint-time check
+// of a debate's numbers (`lengthGuidanceBoundsSchema`) are both built from them (Task 3 review 1).
+/** One schema per step, keyed in the kernel's order (engine INTERFACE §4.2 adds the comparing judges and the investigator). */
+const stepsOf = <T extends z.ZodType>(each: (step: LengthGuidanceStep) => T) => z.object({
+  opening: each("opening"), pros_cons: each("pros_cons"), cross_exchange: each("cross_exchange"), judge_panel: each("judge_panel"),
+  reviewer: each("reviewer"), answer_writer: each("answer_writer"), answer_checker: each("answer_checker"),
+  story_checker: each("story_checker"), comparing_judge: each("comparing_judge"), investigator: each("investigator") // pre-flight PF-C1.1
+}).strict();
+const storyPartsSchema = z.object({
+  headline: words(), summary: words(), confidence: words(), positionLine: words(), change: words(), whyReason: words()
+}).strict();
+const mapPartsSchema = z.object({
+  claim: words(), whyItMatters: words(), candidateAnswer: words(), angleLabel: words(), angleFocus: words(),
+  framingChallenge: words(), chosenAnswer: words(), checkReason: words() // checkReason: pre-flight PF-C1.1
+}).strict();
+const thinkingRoomSchema = z.object({
+  opening: room(), pros_cons: room(), cross_exchange: room(), judge_panel: room(), reviewer: room(),
+  answer_writer: room(), answer_checker: room(), story_checker: room(), comparing_judge: room(), investigator: room(),
+  story_writer: storyRoom(), map: room() // pre-flight PF-C1.1, PF-C1.2
+}).strict();
+const runawayMultiplierSchema = whole(2, 10);
+const tokensPerWordSchema = decimal(1.5, 5);
+const storyLongReferenceWordsSchema = whole(500, 20000);
+const charactersPerWordSchema = z.object({ zh: decimal(0.5, 10), ja: decimal(0.5, 10), th: decimal(0.5, 10) }).strict();
 const planSchema = z.object({
-  steps: z.object({
-    opening: levels(5), pros_cons: levels(5), cross_exchange: levels(5), judge_panel: levels(5), reviewer: levels(5),
-    // The answer writer's bounds are the debate-shape row's (debate-shape-policy.ts lengthSchema).
-    answer_writer: levels(50), answer_checker: levels(5), story_checker: levels(5),
-    // Engine INTERFACE §4.2: the comparing judges and the investigator (pre-flight PF-C1.1).
-    comparing_judge: levels(5), investigator: levels(5)
-  }).strict(),
-  story: z.object({
-    headline: words(), summary: words(), confidence: words(), positionLine: words(), change: words(), whyReason: words()
-  }).strict(),
-  map: z.object({
-    claim: words(), whyItMatters: words(), candidateAnswer: words(), angleLabel: words(), angleFocus: words(),
-    framingChallenge: words(), chosenAnswer: words(), checkReason: words() // checkReason: pre-flight PF-C1.1
-  }).strict()
+  steps: stepsOf(levels),
+  story: storyPartsSchema,
+  map: mapPartsSchema
 }).strict();
 const policySchema = z.object({
   kind: z.literal("LENGTH_GUIDANCE_POLICY"),
   version: z.literal(1),
   plans: z.object({ free: planSchema, plus: planSchema, pro: planSchema, max: planSchema, premium: planSchema }).strict(),
-  runawayMultiplier: whole(2, 10),
-  tokensPerWord: decimal(1.5, 5),
-  thinkingRoom: z.object({
-    opening: room(), pros_cons: room(), cross_exchange: room(), judge_panel: room(), reviewer: room(),
-    answer_writer: room(), answer_checker: room(), story_checker: room(), comparing_judge: room(), investigator: room(),
-    story_writer: storyRoom(), map: room() // pre-flight PF-C1.1, PF-C1.2
-  }).strict(),
-  storyLongReferenceWords: whole(500, 20000),
-  charactersPerWord: z.object({ zh: decimal(0.5, 10), ja: decimal(0.5, 10), th: decimal(0.5, 10) }).strict(),
+  runawayMultiplier: runawayMultiplierSchema,
+  tokensPerWord: tokensPerWordSchema,
+  thinkingRoom: thinkingRoomSchema,
+  storyLongReferenceWords: storyLongReferenceWordsSchema,
+  charactersPerWord: charactersPerWordSchema,
   answerWriterSeesJudgeReasons: z.boolean()
 }).strict().superRefine((policy, ctx) => {
   for (const plan of DEBATE_SHAPE_PLAN_KEYS) {
@@ -240,12 +250,33 @@ export function lengthAnswerWordsOf(policy: LengthGuidancePolicy, plan: DebateSh
   return policy.plans[plan].steps.answer_writer;
 }
 
+/**
+ * Task 3 review 1: one debate's numbers checked against the row's own bounds (the same parts as the row's schema), at
+ * MINT time only. A debate's numbers come from a row that already parsed, so this refuses only a hand-built or drifted
+ * `LengthGuidance`.
+ */
+const lengthGuidanceBoundsSchema = z.object({
+  plan: z.enum(DEBATE_SHAPE_PLAN_KEYS),
+  answerLength: AnswerLengthSchema,
+  steps: stepsOf(stepWords),
+  story: storyPartsSchema,
+  map: mapPartsSchema,
+  thinkingRoom: thinkingRoomSchema,
+  runawayMultiplier: runawayMultiplierSchema,
+  tokensPerWord: tokensPerWordSchema,
+  storyLongReferenceWords: storyLongReferenceWordsSchema,
+  charactersPerWord: charactersPerWordSchema,
+  answerWriterSeesJudgeReasons: z.boolean()
+}).strict();
+
 const positive = () => z.number().int().positive();
 const atLeastZero = () => z.number().int().min(0);
 /**
  * The receipt member (INTERFACE §5.5): the debate's numbers in snake_case, version 1, strict at every level. Minted by
  * `computeStructuralCeilingBasis` at admission and read back by the strict parser (`parseCostEnvelopeBasis`); NOT tied to
- * the formula version or to the shape member, so it rides with today's shape too (ruling L20).
+ * the formula version or to the shape member, so it rides with today's shape too (ruling L20). Looser than the row on
+ * purpose (Task 3 review 1): a sealed receipt minted under an older row's bounds must still read back; the row's own
+ * bounds are checked once, when the receipt is minted (`lengthGuidanceBoundsSchema`).
  */
 export const lengthGuidanceReceiptSchema = z.object({
   version: z.literal(1),
@@ -278,8 +309,24 @@ export const lengthGuidanceReceiptSchema = z.object({
 }).strict();
 export type LengthGuidanceReceipt = z.infer<typeof lengthGuidanceReceiptSchema>;
 
-/** The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted. */
+const lengthInvalid = (detail: string): never => {
+  throw new TypedDomainError("STRUCTURAL_CEILING_LENGTH_INVALID", `The length guidance's receipt does not parse: ${detail}`);
+};
+const issuesText = (error: z.ZodError): string => error.issues.map((issue) => `${issue.path.join(".")}: ${issue.code}`).join("; ");
+
+/**
+ * The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted.
+ * Refused with STRUCTURAL_CEILING_LENGTH_INVALID (Task 3 review 1, 3): a member that is not a plain object (`null`, an
+ * array, a Map), and numbers outside the row's own bounds.
+ */
 export function lengthGuidanceReceipt(guidance: LengthGuidance): LengthGuidanceReceipt {
+  const candidate: unknown = guidance;
+  if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)
+    || ![Object.prototype, null].includes(Object.getPrototypeOf(candidate) as object | null)) {
+    return lengthInvalid("$: not a plain object");
+  }
+  const bounded = lengthGuidanceBoundsSchema.safeParse(candidate);
+  if (!bounded.success) return lengthInvalid(issuesText(bounded.error));
   const receipt = deepFreeze({
     version: 1 as const,
     plan: guidance.plan,
@@ -303,10 +350,7 @@ export function lengthGuidanceReceipt(guidance: LengthGuidance): LengthGuidanceR
     answer_writer_sees_judge_reasons: guidance.answerWriterSeesJudgeReasons
   });
   const parsed = lengthGuidanceReceiptSchema.safeParse(receipt);
-  if (!parsed.success) {
-    throw new TypedDomainError("STRUCTURAL_CEILING_LENGTH_INVALID", "The length guidance's receipt does not parse: "
-      + parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.code}`).join("; "));
-  }
+  if (!parsed.success) return lengthInvalid(issuesText(parsed.error));
   return receipt;
 }
 

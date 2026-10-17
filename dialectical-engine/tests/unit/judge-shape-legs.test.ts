@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame, promptContractFingerprintText } from "@debateai/providers";
 import {
   JUDGE_CONSIDERATION_SENTENCE, JUDGE_LEG_KINDS, JUDGE_LEG_MATERIAL_FIELDS, JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
-  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1, judgeConsiderationPromptContract, judgeLegModelRole, judgePromptContract,
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1, JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2, judgeConsiderationPromptContract, judgeLegModelRole, judgePromptContract,
   framedJudgePromptForTest, type JudgeLeg
 } from "@debateai/judgement";
 import { builderFromRecordedPacket, captureMomentPacket, graderContextOf, parseMomentBuilder } from "../../acceptance/moment-tools.js";
@@ -19,7 +19,9 @@ describe("judge legs for the debate shape", () => {
   });
 
   it("appends exactly the six new contracts to the fingerprint", () => {
-    const tail = JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT.slice(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1.length + 5);
+    // Length guidance (LG-C2 Task 11) froze the shape's text as V2 and appends its 18 variants after it
+    // (tests/unit/length-guidance-judge.test.ts); the six shape contracts are V2's tail after V1.
+    const tail = JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2.slice(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1.length + 5);
     expect(tail).toBe([
       promptContractFingerprintText(judgePromptContract("assigned-root", "unknown")),
       promptContractFingerprintText(judgePromptContract("assigned-root", "resolved")),

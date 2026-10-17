@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Eżawrjenti",
   "newDebate.scrutinyExhaustiveHelp": "L-aktar rawnds addizzjonali, fuq aktar punti li huma f’dubju.",
   "newDebate.answerLength": "Tul it-tweġiba",
-  "newDebate.answerLengthHint": "Madwar 300, 700 jew 1,500 kelma: mira, mhux massimu strett.",
+  "newDebate.answerLengthHint": "Għadd tal-kliem: madwar {short}, {standard} jew {detailed}. Mira, mhux massimu strett.",
   "newDebate.answerLengthShort": "Qasir",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Dettaljat",

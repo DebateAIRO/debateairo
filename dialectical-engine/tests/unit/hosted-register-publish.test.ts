@@ -436,6 +436,9 @@ describe("Task 14b · the operator's hosted register file", () => {
   it.each([
     ["a member carrying kind", { ...JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) }],
     ["a null member", null],
+    // Task 8 review 8: an array and a string member.
+    ["an array member", [JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues()))]],
+    ["a string member", "off"],
     ["a member the parser refuses", { ...(({ kind: _k, ...rest }) => rest)(JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues()))), runawayMultiplier: 1 }]
   ])("length guidance (LG-C): refuses %s with the file's own code", async (_name, member) => {
     await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: member }))))
@@ -895,6 +898,25 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
     for (const shape of [member, { ...member, enabled: false }]) {
       expect(await planCode({ ...freeRosterFile({ input: fits, output }, true), debateShapePolicy: shape })).toBe("RUN_CEILING_BELOW_ONE_CALL");
     }
+  });
+
+  /**
+   * Task 8 review 1: with the lengthGuidancePolicy member the first call is checked at the largest guided opening
+   * allowance (and framed lengthed), so the dearest output price a version WITHOUT the member lets through is refused with it.
+   */
+  it("prices the guided opening allowance whenever a lengthGuidancePolicy member is present", async () => {
+    const { kind: _kind, ...member } = JSON.parse(JSON.stringify(lengthGuidancePolicyStartValues())) as Record<string, unknown>;
+    const input = 1_000_000;
+    const withoutRow = (output: number) => planCode(freeRosterFile({ input, output }, true));
+    let fits = 4_000_000;
+    let refused = 400_000_000;
+    expect(await withoutRow(fits)).toBe("NO_REFUSAL");
+    expect(await withoutRow(refused)).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    while (refused - fits > 1) {
+      const middle = Math.floor((fits + refused) / 2);
+      if (await withoutRow(middle) === "NO_REFUSAL") fits = middle; else refused = middle;
+    }
+    expect(await planCode({ ...freeRosterFile({ input, output: fits }, true), lengthGuidancePolicy: member })).toBe("RUN_CEILING_BELOW_ONE_CALL");
   });
 
   it("has nothing to ask while no plan's whole roster is configured, as at boot", async () => {

@@ -18,8 +18,10 @@ import {
   type PromptContract,
   type PromptPacket
 } from "@debateai/providers";
-import { mapContractInLanguage, mapPromptContracts, type MapContractName, type MapPromptContractSet } from "./prompts.js";
+import { mapContractInLanguage, mapLengthContractsOf, mapPromptContracts, type MapContractName, type MapPromptContractSet } from "./prompts.js";
+import { mapGuidedWords, mapLengthField, mapReplyWordsCeiling, type MapLength } from "./length.js";
 import {
+  MAP_LENGTHED_REPLY_SCHEMAS,
   mapAnglesCheck,
   mapAnglesReplySchema,
   mapChooseCheck,
@@ -40,7 +42,10 @@ import {
   type MapReplyCheck,
   type MapSnowballReply
 } from "./replies.js";
-import { mapAnglesSalvage, mapChooseSalvage, mapGapSalvage, mapListSalvage, mapMergeSalvage, type MapReplySalvage } from "./salvage.js";
+import {
+  mapAnglesSalvage, mapAnglesSalvageLengthed, mapChooseSalvage, mapGapSalvage, mapGapSalvageLengthed, mapListSalvage, mapListSalvageLengthed,
+  mapMergeSalvage, type MapReplySalvage
+} from "./salvage.js";
 import type { MapAngle, MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem, MapStep } from "./types.js";
 
 /** One map call, fully described: the contract (in the question's language), its material, its check. */
@@ -48,6 +53,10 @@ export type MapStepSpec<T> = Readonly<{
   step: MapStep;
   contract: PromptContract;
   material: readonly FramedMaterialField[];
+  /** Length guidance: the words this call is told (the sum of its parts), null without the row. */
+  guidedWords: number | null;
+  /** Length guidance: the most guided words its reply can hold, for its allowance; null without the row, or no most. */
+  replyWordsCeiling: number | null;
   classify: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   /** The accepted reply's value; throws MAP_REPLY_UNREADABLE for a reply `classify` would refuse. */
   read: (content: string, reply?: ModelReplyFacts) => T;
@@ -66,8 +75,10 @@ export type MapSpecContext = Readonly<{
    * when the kernel's verdict is "OTHER".
    */
   replyLanguage: ReplyLanguageExpectation;
-  /** The owners' contracts; default the shipped text. */
+  /** The owners' contracts; default the shipped text. With `length`, their length variants (`mapLengthContractsOf`). */
   contracts?: MapPromptContractSet;
+  /** Length guidance (spec 2026-10-15 §3.2): the run's map targets; absent = today's map. */
+  length?: MapLength;
 }>;
 
 /**
@@ -82,12 +93,19 @@ export function mapLockedLanguage(ctx: Pick<MapSpecContext, "languageTag" | "lan
 function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName, material: readonly FramedMaterialField[],
   schema: z.ZodType<T>, check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): MapStepSpec<T> {
   const lock = mapLockedLanguage(ctx);
-  const contract = mapContractInLanguage((ctx.contracts ?? mapPromptContracts())[name], lock, ctx.languageName);
+  // Length guidance: the variants of the SAME contracts the run uses (owner-edited texts kept; Task 14 review 3).
+  const runs = ctx.contracts ?? mapPromptContracts();
+  const contracts = ctx.length === undefined ? runs : mapLengthContractsOf(runs);
+  const contract = mapContractInLanguage(contracts[name], lock, ctx.languageName);
+  // Length guidance: the parts' targets ride right before question_language (which stays last); nothing without the row.
+  const told = ctx.length === undefined ? material : [...material, mapLengthField(name, ctx.length, ctx.languageTag)];
   return Object.freeze({
     step,
     contract,
     // With a lock, the question_language field comes LAST; without one, the same material as today.
-    material: Object.freeze(withQuestionLanguageField(material, lock).map((entry) => Object.freeze({ ...entry }))),
+    material: Object.freeze(withQuestionLanguageField(told, lock).map((entry) => Object.freeze({ ...entry }))),
+    guidedWords: ctx.length === undefined ? null : mapGuidedWords(name, ctx.length),
+    replyWordsCeiling: ctx.length === undefined ? null : mapReplyWordsCeiling(name, ctx.length),
     classify: (content: string, reply?: ModelReplyFacts) => mapClassifyReply(content, reply, schema, check, salvage).classification,
     read: (content: string, reply?: ModelReplyFacts) => {
       const out = mapClassifyReply(content, reply, schema, check, salvage);
@@ -97,25 +115,32 @@ function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName,
   });
 }
 
+/** Length guidance: today's schema without the row; the runaway-limit schema (built once in replies.ts) with it. */
+const lengthed = (ctx: MapSpecContext): boolean => ctx.length !== undefined;
+
 const mapQuestionField = (ctx: MapSpecContext): FramedMaterialField => ({ name: "question_line", content: ctx.questionLine });
 const mapByItemId = <T extends MapItem>(list: readonly T[]): T[] => [...list].sort((a, b) => a.itemId.localeCompare(b.itemId));
 
 export function mapAnglesSpec(ctx: MapSpecContext): MapStepSpec<MapAnglesReply> {
-  return mapSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], mapAnglesReplySchema, mapAnglesCheck, mapAnglesSalvage);
+  return mapSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.angles : mapAnglesReplySchema, mapAnglesCheck,
+    lengthed(ctx) ? mapAnglesSalvageLengthed : mapAnglesSalvage);
 }
 
 export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapStepSpec<MapListReply> {
+  const schema = lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.list : mapListReplySchema;
+  const salvage = lengthed(ctx) ? mapListSalvageLengthed : mapListSalvage;
   return angle === null
-    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], mapListReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage)
+    ? mapSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], schema, mapListCheck(ctx.replyLanguage), salvage)
     : mapSpecOf("LIST", ctx, "listAngle", [mapQuestionField(ctx), { name: "angle_label", content: angle.label },
-      { name: "angle_focus", content: angle.focus }], mapListReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage);
+      { name: "angle_focus", content: angle.focus }], schema, mapListCheck(ctx.replyLanguage), salvage);
 }
 
 /** Snowball (arm A): the claims so far as a short plain list, never who wrote them. */
 export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPointItem[]): MapStepSpec<MapSnowballReply> {
   return mapSpecOf("SNOWBALL", ctx, "listSnowball", [mapQuestionField(ctx),
     { name: "points_so_far", content: JSON.stringify(mapByItemId(pointsSoFar).map((point) => point.claim)) }],
-  mapSnowballReplySchema, mapListCheck(ctx.replyLanguage), mapListSalvage);
+  lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.snowball : mapSnowballReplySchema, mapListCheck(ctx.replyLanguage),
+  lengthed(ctx) ? mapListSalvageLengthed : mapListSalvage);
 }
 
 /** Merge: every item with its opaque id, in id order; never its author, list or angle. */
@@ -125,7 +150,7 @@ export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): Ma
   return mapSpecOf("MERGE", ctx, "merge", [mapQuestionField(ctx),
     { name: "points", content: JSON.stringify(points.map((point) => ({ item_id: point.itemId, claim: point.claim, why_it_matters: point.whyItMatters }))) },
     { name: "candidate_answers", content: JSON.stringify(answers.map((answer) => ({ item_id: answer.itemId, answer: answer.answer }))) }],
-  mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage),
+  lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.merge : mapMergeReplySchema, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage),
   mapMergeSalvage);
 }
 
@@ -134,7 +159,8 @@ export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[
   return mapSpecOf("GAP", ctx, "gap", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => keyPoint.claim)) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => answer.answer)) }],
-  mapGapReplySchema, mapGapCheck(ctx.replyLanguage), mapGapSalvage);
+  lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.gap : mapGapReplySchema, mapGapCheck(ctx.replyLanguage),
+  lengthed(ctx) ? mapGapSalvageLengthed : mapGapSalvage);
 }
 
 /**
@@ -155,7 +181,8 @@ export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoi
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
       raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer }))) }],
-  mapChooseReplySchema, mapChooseCheck(shownIds, ctx.replyLanguage), mapChooseSalvage(shownIds));
+  lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.choose : mapChooseReplySchema, mapChooseCheck(shownIds, ctx.replyLanguage),
+  mapChooseSalvage(shownIds));
 }
 
 /**

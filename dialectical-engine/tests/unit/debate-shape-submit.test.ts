@@ -21,7 +21,8 @@ import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import { mapPromptContractHash } from "@debateai/map";
 import {
-  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues, type PlanId
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues,
+  lengthGuidancePolicyStartValues, type PlanId
 } from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
@@ -72,19 +73,21 @@ const PANEL = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium].map((mod
   probe_evidence_ref: `probe:${index}`, probed_at: "2026-10-13T00:00:00.000Z"
 }));
 
-function settingsWith(input: Readonly<{ policy: boolean; billing?: AskBilling; room?: AskRoomPort; shapes?: unknown[] }>): RunCreationSettings {
+function settingsWith(input: Readonly<{ policy: boolean; length?: boolean; billing?: AskBilling; room?: AskRoomPort; shapes?: unknown[] }>): RunCreationSettings {
   return {
     strangerSampleRate: 0, registerVersion: 1, batteryVersion: "shape-submit", settlementWatchHandle: "shape-submit",
     resolveDiscoveredPanel: async () => PANEL,
-    resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape }) => {
+    resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape, length }) => {
       input.shapes?.push(shape);
+      // As apps/api/src/main.ts mints it: the length member only when admission resolved one.
       return computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned,
-        ...(shape === null ? {} : { shape }) });
+        ...(shape === null ? {} : { shape }), ...(length === null ? {} : { length }) });
     },
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     ...(input.billing === undefined ? {} : { billing: input.billing }),
     ...(input.room === undefined ? {} : { room: input.room }),
-    ...(input.policy ? { debateShapePolicy: POLICY } : {})
+    ...(input.policy ? { debateShapePolicy: POLICY } : {}),
+    ...(input.length === true ? { lengthGuidancePolicy: lengthGuidancePolicyStartValues() } : {})
   };
 }
 
@@ -130,7 +133,7 @@ function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number
   return { billing, estimateMicros };
 }
 
-function arrange(input: Readonly<{ policy: boolean; billing?: AskBilling; room?: AskRoomPort }>) {
+function arrange(input: Readonly<{ policy: boolean; length?: boolean; billing?: AskBilling; room?: AskRoomPort }>) {
   const started: Array<Parameters<RunRepository["startRun"]>[0]> = [];
   const shapes: unknown[] = [];
   vi.spyOn(LivenessRepository.prototype, "recordQuery").mockResolvedValue(1);
@@ -208,6 +211,19 @@ describe("submit stores the normalised ask (note 1)", () => {
     expect(JSON.stringify(started[0]!.depthParams)).toBe('{"depth":3}');
     expect(shapes).toEqual([null]);
     expect(started[0]!.envelopeBasis).toMatchObject({ formula_version: "DR-184-v4" });
+  });
+
+  // Task 4 review 1: the submit path end to end with the length row alone (no shape row).
+  it("the length row alone: the stored ask is depth and answer length only, and the receipt carries length", async () => {
+    const { application, started, shapes } = arrange({ policy: false, length: true });
+    await application.submit(ask({ plan_tier: "free",
+      depth_params: { depth: 2, depthMode: "fixed", scrutiny: "deep", answerLength: "detailed" } }), serverSession, serverPrincipal);
+    expect(JSON.stringify(started[0]!.depthParams)).toBe('{"depth":2,"answerLength":"detailed"}');
+    expect(shapes).toEqual([null]);
+    const basis = started[0]!.envelopeBasis as Record<string, unknown>;
+    expect(basis).toMatchObject({ formula_version: "DR-184-v4" });
+    expect(Object.keys(basis).at(-1)).toBe("length");
+    expect((basis.length as { answer_length: unknown }).answer_length).toBe("detailed");
   });
 
   it("billing on, a FREE person: the billing rewrite keeps the answer length and the shape normalises the rest", async () => {

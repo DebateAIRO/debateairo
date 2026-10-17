@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Erschöpfend",
   "newDebate.scrutinyExhaustiveHelp": "Die meisten zusätzlichen Runden, bei mehr Punkten, die in Zweifel stehen.",
   "newDebate.answerLength": "Antwortlänge",
-  "newDebate.answerLengthHint": "Etwa 300, 700 oder 1.500 Wörter: ein Richtwert, keine feste Obergrenze.",
+  "newDebate.answerLengthHint": "Etwa {short}, {standard} oder {detailed} Wörter: ein Richtwert, keine feste Obergrenze.",
   "newDebate.answerLengthShort": "Kurz",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Ausführlich",

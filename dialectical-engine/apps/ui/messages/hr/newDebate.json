@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Iscrpno",
   "newDebate.scrutinyExhaustiveHelp": "Najviše dodatnih krugova, na većem broju upitnih točaka.",
   "newDebate.answerLength": "Duljina odgovora",
-  "newDebate.answerLengthHint": "Oko 300, 700 ili 1.500 riječi: okvirna duljina, a ne strogi maksimum.",
+  "newDebate.answerLengthHint": "Broj riječi: oko {short}, {standard} ili {detailed}. To je okvirna duljina, a ne strogi maksimum.",
   "newDebate.answerLengthShort": "Kratka",
   "newDebate.answerLengthStandard": "Standardna",
   "newDebate.answerLengthDetailed": "Detaljna",

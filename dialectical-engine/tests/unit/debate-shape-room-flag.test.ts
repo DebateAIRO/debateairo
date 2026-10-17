@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { AskRoomResponseSchema } from "@debateai/contract";
-import { debateShapePolicyStartValues, lengthGuidancePolicyStartValues } from "@debateai/register";
+import {
+  debateShapePolicyStartValues, lengthGuidancePolicyStartValues, parseLengthGuidancePolicy, type LengthGuidancePolicy
+} from "@debateai/register";
 import type { AskRoomReader } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -37,7 +39,8 @@ function fixtureApplication(): AskApplication {
   };
 }
 
-async function roomBody(input: Readonly<{ policy: boolean; length?: boolean; internal?: boolean; noReader?: boolean }>): Promise<string> {
+async function roomBody(input: Readonly<{ policy: boolean; length?: boolean; internal?: boolean; noReader?: boolean;
+  lengthPolicy?: LengthGuidancePolicy; url?: string }>): Promise<string> {
   const identity = testHttpIdentity("shape-room-flag");
   const askRoom: AskRoomReader = {
     readRoom: async () => ({
@@ -49,10 +52,10 @@ async function roomBody(input: Readonly<{ policy: boolean; length?: boolean; int
     application: fixtureApplication(), sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
     ...(input.noReader === true ? {} : { askRoom }),
     ...(input.policy ? { debateShapePolicy: debateShapePolicyStartValues() } : {}),
-    ...(input.length === true ? { lengthGuidancePolicy: lengthGuidancePolicyStartValues() } : {})
+    ...(input.length === true ? { lengthGuidancePolicy: input.lengthPolicy ?? lengthGuidancePolicyStartValues() } : {})
   });
   try {
-    const response = await api.inject({ method: "GET", url: ROOM_URL, headers: testSessionHeaders(identity) });
+    const response = await api.inject({ method: "GET", url: input.url ?? ROOM_URL, headers: testSessionHeaders(identity) });
     expect(response.statusCode).toBe(200);
     return response.body;
   } finally {
@@ -102,5 +105,21 @@ describe("debate shape P2c — the room says whether the shape settings are in f
   it("with both rows: shape_settings, the length row's words (they win), then length_settings", async () => {
     expect(await roomBody({ policy: true, length: true }))
       .toBe(JSON.stringify({ ...CUSTOMER_FITS, shape_settings: true, answer_words: LENGTH_WORDS, length_settings: true }));
+  });
+
+  // Task 5 review 1: the words are the room's PLAN's own (the plan-key route), not Free's.
+  it("a plan whose own answer words differ from Free's: the room names that plan's words, by the room's plan key", async () => {
+    const start = lengthGuidancePolicyStartValues();
+    const PREMIUM_WORDS = { short: 300, standard: 700, detailed: 1500 };
+    const lengthPolicy = parseLengthGuidancePolicy({ ...start, plans: { ...start.plans,
+      premium: { ...start.plans.premium, steps: { ...start.plans.premium.steps, answer_writer: PREMIUM_WORDS } } } });
+    expect(lengthPolicy.plans.free.steps.answer_writer).toEqual(LENGTH_WORDS);
+    for (const noReader of [false, true]) {
+      expect(await roomBody({ policy: false, length: true, lengthPolicy, noReader }), `noReader ${String(noReader)}`)
+        .toBe(JSON.stringify({ ...CUSTOMER_FITS, answer_words: PREMIUM_WORDS, length_settings: true }));
+      expect(await roomBody({ policy: false, length: true, lengthPolicy, noReader,
+        url: "/v1/asks/room?plan_tier=free&composition_budget_tier=low&depth=2" }), `free, noReader ${String(noReader)}`)
+        .toBe(JSON.stringify({ ...CUSTOMER_FITS, answer_words: LENGTH_WORDS, length_settings: true }));
+    }
   });
 });

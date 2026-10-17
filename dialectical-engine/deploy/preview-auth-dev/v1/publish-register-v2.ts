@@ -34,6 +34,9 @@
 // that holds it keeps it unchanged (controller ruling R19: the composer carries it from the base, like a base-owned row).
 // Debate shape (spec 2026-10-12 §3.1): likewise optional; the source carries a debateShapePolicy row only when the operator hands one.
 // Question language (spec 2026-10-13): likewise optional; the source carries a questionLanguagePolicy row only when the operator hands one.
+// Length guidance (spec 2026-10-15, LG-C): likewise optional; the source carries a lengthGuidancePolicy row only when the operator hands one
+// (the eighth builder argument), re-parsed by the register's own parser; a carried base row is re-parsed too. No 'off' word: the rollback is
+// a version without the row.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';

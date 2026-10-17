@@ -1,5 +1,6 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type WayOfKnowing } from "@debateai/kernel";
 import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
+import type { LengthGuidance } from "@debateai/register";
 import {
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
@@ -149,6 +150,8 @@ export interface StorySnapshotSource {
    * (`storyAnswersNoteFrom`). Undefined on today's run and on a map that chose everything itself.
    */
   readonly answersNote?: StoryAnswersNoteKind | undefined;
+  /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers, only when the receipt carries them. */
+  readonly lengthGuidance?: LengthGuidance | undefined;
 }
 
 /**
@@ -339,6 +342,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       ? {}
       : { alsoRaised: Object.freeze(source.alsoRaised.map((item) => Object.freeze({ claim: item.claim, raisedBy: item.raisedBy }))) }),
     ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
+    ...(source.lengthGuidance === undefined ? {} : { lengthGuidance: source.lengthGuidance }),
     ...(source.languageLocked === true ? { languageLocked: true as const } : {})
   });
 }

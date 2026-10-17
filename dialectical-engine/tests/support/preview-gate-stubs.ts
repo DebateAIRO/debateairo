@@ -18,7 +18,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
-import { MAP_CONTRACT_IDS } from "@debateai/map";
+import { mapContractNameOf } from "@debateai/map";
 import { STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
@@ -234,7 +234,7 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
  */
 export function stubMapContent(chat: string, serial: number): string {
   const frame = readFramedMaterial(wirePacket(chat));
-  if (frame.contractId === MAP_CONTRACT_IDS.angles) {
+  if (mapContractNameOf(frame.contractId) === "angles") {
     const locked = frame.fields.find((entry) => entry.name === "question_language")?.content;
     const code = locked === undefined ? null : (JSON.parse(locked) as { code?: unknown }).code;
     // No lock in the request: the question's own language, as the kernel's guesser reads it (pre-flight PF-D15).
@@ -243,7 +243,7 @@ export function stubMapContent(chat: string, serial: number): string {
     const angles = JSON.parse(openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial, slip: false })) as object;
     return JSON.stringify({ question_language: planner, ...angles });
   }
-  if (frame.contractId === MAP_CONTRACT_IDS.choose) {
+  if (mapContractNameOf(frame.contractId) === "choose") {
     const field = (name: string): string => frame.fields.find((entry) => entry.name === name)?.content ?? "[]";
     const keyPoints = JSON.parse(field("key_points")) as { key_point_id: string; angle_kind: string | null }[];
     const merged = JSON.parse(field("answers")) as { answer_id: string; answer: string }[];
@@ -330,7 +330,7 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
   if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
   // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
-  if ((Object.values(MAP_CONTRACT_IDS) as string[]).includes(contractId)) return "MAP";
+  if (mapContractNameOf(contractId) !== null) return "MAP";
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
   const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).

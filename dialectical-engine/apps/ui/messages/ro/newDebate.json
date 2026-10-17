@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Exhaustiv",
   "newDebate.scrutinyExhaustiveHelp": "Cel mai mare număr de runde suplimentare, la mai multe dintre punctele incerte.",
   "newDebate.answerLength": "Lungimea răspunsului",
-  "newDebate.answerLengthHint": "Aproximativ 300, 700 sau 1.500 de cuvinte: un obiectiv, nu un maxim strict.",
+  "newDebate.answerLengthHint": "Lungime în cuvinte: aproximativ {short}, {standard} sau {detailed}. Un obiectiv, nu un maxim strict.",
   "newDebate.answerLengthShort": "Scurt",
   "newDebate.answerLengthStandard": "Standard",
   "newDebate.answerLengthDetailed": "Detaliat",

@@ -180,7 +180,7 @@ import {
   type VerdictLabelDerivation
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
-import { MapChoiceRepository, mapAnswersArgued, type MapResult } from "@debateai/map";
+import { MapChoiceRepository, mapAnswersArgued, mapLimitsFor, type MapResult } from "@debateai/map";
 import {
   argumentLanguageDirective,
   questionLanguageFromRun,
@@ -191,8 +191,11 @@ import {
   LENGTH_GUIDANCE_START,
   LENGTH_GUIDANCE_STEPS,
   lengthGuidanceText,
+  lengthGuidanceField,
+  LENGTH_SENTENCE_ANSWER_CHECKER,
   type CharactersPerWord,
   type LengthCallStep,
+  type LengthGuide,
   type LengthGuidanceStep,
   SERVED_ROOT_SELECTION_RULE,
   TypedDomainError,
@@ -238,8 +241,8 @@ import {
   type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroRoomAttempts,
-  rootZeroRoomRefs, runMapStage, shapeRootMaterial
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroMapMaterialCharsFor,
+  rootZeroRoomAttempts, rootZeroRoomRefs, runMapStage, shapeRootMaterial
 } from "./map-stage.js";
 import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
@@ -713,6 +716,24 @@ export const EVALUATOR_PROMPT_CONTRACT: PromptContract = Object.freeze({
 });
 
 /**
+ * Length guidance (spec 2026-10-15 §3.2): `serve.evaluator.length.v1`, v2's instruction plus the checker's one sentence,
+ * v2's answer form (so the verdict schema is unchanged). Its two targets arrive as material fields: `answer_length` (the
+ * writer's) and `length` (its own reply's). Sent only for a run admitted with the length row; every other checker call
+ * is v2's, byte for byte.
+ */
+export const EVALUATOR_LENGTH_CONTRACT_ID = "serve.evaluator.length.v1" as const;
+export const EVALUATOR_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_LENGTH_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+/** What `conformanceContractHash` seals from length guidance on: v2, then its length variant (as the writer's seal). */
+export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+
+/**
  * The fingerprints of the three prompt contracts this code SENDS, derived
  * exactly as the register's builder derives its rows
  * (`computeDevelopmentContractRows` in `./dev-deployment-register.ts`; that
@@ -725,7 +746,7 @@ export function codePromptContractHashes(): Readonly<{ judge: string; composer: 
   return Object.freeze({
     judge: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
     composer: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-    conformance: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT))
+    conformance: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT)
   });
 }
 
@@ -840,22 +861,28 @@ export function buildSynthesisRolePrompt(
   length: RoleLength | null = null,
   questionLanguage: QuestionLanguage | null = null
 ): FramedPrompt {
-  // Debate shape (spec §3.3 step 8) and length guidance (spec 2026-10-15 §3.2): only a writer call with a target takes the
-  // length variant; without one (and, until LG-C2, every checker call) the packet is today's, byte for byte.
-  const lengthed = request.role === "SYNTHESIZER" && length !== null;
-  // V-MINIMUM-PAYLOAD: the one projection, applied once; the length variant only appends its own field after it.
+  // Length guidance (spec 2026-10-15 §3.2): the writer with a target takes its length variant; the checker takes its own
+  // only with its own target (`ownWords`, a run admitted with the length row). Every other call: today's packet.
+  const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
+  const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
+  // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
   const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (lengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
-        : EVALUATOR_PROMPT_CONTRACT,
+        ? (writerLengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
+        : (checkerLengthed ? EVALUATOR_LENGTH_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT),
       argumentLanguageName,
       questionLanguage
     ),
-    // The language field wraps the ONE projection (and the length field after it): it rides LAST; with no lock
+    // The language field wraps the ONE projection (and the length fields after it): it rides LAST; with no lock
     // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(lengthed ? [...material, answerLengthField(length)] : material, questionLanguage),
+    material: withQuestionLanguageField(
+      writerLengthed ? [...material, answerLengthField(length)]
+        : checkerLengthed ? [...material, answerLengthField(length),
+          lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]
+          : material,
+      questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
 }
@@ -881,6 +908,17 @@ export function guidedCallBound(bound: CallBound, step: LengthCallStep, guidance
   if (guidance === null || !(LENGTH_GUIDANCE_STEPS as readonly string[]).includes(step)) return bound;
   const tokenCeiling = lengthGuidanceAllowanceTokens(guidance, step as LengthGuidanceStep, bound.tokenCeiling);
   return tokenCeiling === bound.tokenCeiling ? bound : Object.freeze({ ...bound, tokenCeiling });
+}
+
+/**
+ * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call, spread into the call's
+ * input, from a run's receipt `length` and its stored language tag; nothing without the receipt's `length` (today's
+ * request, byte for byte). The run's own calls and the review catch-up both use it (Task 12 review 3).
+ */
+export function lengthGuideFrom(guidance: LengthGuidance | null, step: LengthGuidanceStep, languageCode: string):
+  Readonly<{ length?: LengthGuide }> {
+  return guidance === null ? {}
+    : { length: Object.freeze({ words: guidance.steps[step], languageCode, charactersPerWord: guidance.charactersPerWord }) };
 }
 
 /**
@@ -1856,14 +1894,18 @@ export async function runReviewCatchUp(input: {
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
   // P2d Task 7c (controller ruling D-CATCHUP): THE RUN'S LOCK, read off its receipt as the runner reads it. The Postgres
   // reader above has already parsed this same receipt, so one that does not parse is refused there, as today.
+  // The run's stored tag, as the lock and the length target both read it ("und" when none was given).
+  const catchUpTag = input.argumentLanguageTag ?? "und";
   const catchUpLanguage: QuestionLanguage | null = input.envelopeBasis === undefined ? null
     : runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {
-      argumentLanguageTag: input.argumentLanguageTag ?? "und",
+      argumentLanguageTag: catchUpTag,
       argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
     });
   const catchUpLanguageInput = catchUpLanguage === null ? {} : { questionLanguage: catchUpLanguage };
-  // Length guidance: a catch-up review is sized like the run's own reviews, from the same receipt (never the row).
+  // Length guidance: a catch-up review is sized and told like the run's own reviews, from the same receipt (never the
+  // row), in the run's stored tag (Task 12 review 3).
   const catchUpLength = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis).length ?? null;
+  const catchUpGuide = lengthGuideFrom(catchUpLength, "reviewer", catchUpTag);
   // Final review m5: an assigned run's catch-up reviews come from its pinned
   // REVIEWER seats — the models the drawer lists for reviewing — never from the
   // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
@@ -1918,6 +1960,7 @@ export async function runReviewCatchUp(input: {
         questionLine: input.questionLine,
         argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         ...catchUpLanguageInput,
+        ...catchUpGuide,
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
@@ -5287,6 +5330,11 @@ export class WalkingSkeletonRunner {
      * reaches a running or re-claimed debate.
      */
     const lengthGuidance = envelopeBasis.length ?? null;
+    /**
+     * Ruling "PF-C5 root-0 bound" (a): root 0's map material bound, the runaway limits with the receipt's `length` (L19,
+     * no trims), today's limits without. Root 0's kept room and every root's framing read this one value (Task 14 review 6).
+     */
+    const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));
     if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
@@ -5878,6 +5926,16 @@ export class WalkingSkeletonRunner {
       : shapeRun === null ? null
         : Object.freeze({ answerWords: shapeRun.shape.answerWords, ownWords: null, languageCode: null,
           charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord });
+    /** The answer checker's targets (spec 2026-10-15 §3.2): the writer's words and its own, only with the receipt's `length`. */
+    const checkerLength: RoleLength | null = lengthGuidance === null ? null
+      : Object.freeze({ answerWords: lengthGuidance.steps.answer_writer, ownWords: lengthGuidance.steps.answer_checker,
+        languageCode: run.argumentLanguageTag, charactersPerWord: lengthGuidance.charactersPerWord });
+    /**
+     * Length guidance (spec 2026-10-15 §3.2): one step's target for a judge, panel or review call of this run, spread into
+     * the call's input; nothing without the receipt's `length` (today's request, byte for byte).
+     */
+    const lengthGuideOf = (step: LengthGuidanceStep): Readonly<{ length?: LengthGuide }> =>
+      lengthGuideFrom(lengthGuidance, step, run.argumentLanguageTag);
     /**
      * Question language (spec 2026-10-13 L6; P2L Task 17) — THE RUN'S LOCK, decided by its SHAPE RECEIPT
      * (`runQuestionLanguageLock`): a shaped receipt reads its stored tag and name back as a lock; a receipt without a
@@ -6347,6 +6405,7 @@ export class WalkingSkeletonRunner {
               questionLine: input.questionLine,
               argumentLanguageName: run.argumentLanguageName,
               ...shapeLanguageInput,
+              ...lengthGuideOf("judge_panel"),
               statement: input.statement,
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
@@ -6936,7 +6995,10 @@ export class WalkingSkeletonRunner {
         const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling }),
+          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+          lengthed: lengthGuidance !== null,
+          // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+          materialChars: rootMaterialChars }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -6963,7 +7025,9 @@ export class WalkingSkeletonRunner {
           serial: !callsRunTogether,
           keepRoomMicros,
           // T12-R1: a refusal only because of root 0's room stops the map, never the arguing.
-          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT
+          roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT,
+          // Length guidance (spec 2026-10-15 §3.3): the receipt's numbers size each map call's allowance.
+          lengthGuidance
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
@@ -6971,7 +7035,10 @@ export class WalkingSkeletonRunner {
           const result = await runMapStage({ opening: shapeRun.shape.opening, map: {
             questionLine: run.questionLine, languageName: run.argumentLanguageName, languageTag: run.argumentLanguageTag,
             seats: mapStageSeats(rootSeats, shapeRun.shape.mapAIs), caller: mapCaller, abandon: keepAliveStop, seed: run.runId,
-            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer
+            gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer,
+            // Length guidance (spec 2026-10-15 §3.2): the receipt's map targets; absent = today's map.
+            ...(lengthGuidance === null ? {} : { length: Object.freeze({ targets: lengthGuidance.map,
+              charactersPerWord: lengthGuidance.charactersPerWord }) })
           } });
           return Object.freeze({ result, spendStop: mapCaller.spendStop() });
         } catch (error) {
@@ -7213,7 +7280,7 @@ export class WalkingSkeletonRunner {
       if (position === undefined || position.statement === null || position.mapPoints === null) {
         return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
       }
-      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints });
+      const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
     };
     const openFirstPosition = async (primarySeat: RunSeat, leg: JudgeLeg = { kind: "primary-root" }) => {
@@ -7238,6 +7305,7 @@ export class WalkingSkeletonRunner {
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
+            ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7469,6 +7537,7 @@ export class WalkingSkeletonRunner {
             questionLine: run.questionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
+            ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
             providerRef: member.providerRef,
             contractHash: this.settings.judgeContractHash,
@@ -7755,6 +7824,7 @@ export class WalkingSkeletonRunner {
               questionLine: run.questionLine,
               argumentLanguageName: run.argumentLanguageName,
               ...shapeLanguageInput,
+              ...lengthGuideOf("reviewer"),
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
@@ -9998,7 +10068,7 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, null, shapeLanguage);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -10068,6 +10138,8 @@ export class WalkingSkeletonRunner {
             // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
             bound: guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, "answer_checker", lengthGuidance),
             contractHash: this.settings.conformanceContractHash,
+            // Length guidance: the checker is told its own target, so its words are recorded beside what it wrote.
+            ...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_checker }),
             providerRef: planned.providerRef,
             packet,
             classifyContent: checkerReading.classifyContent,
@@ -10484,6 +10556,7 @@ export class WalkingSkeletonRunner {
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
+              ...(lengthGuidance === null ? {} : { lengthGuidance }),
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,

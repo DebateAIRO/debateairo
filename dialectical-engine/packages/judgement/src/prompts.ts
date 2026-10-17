@@ -1,6 +1,6 @@
 import type { PromptContract } from "@debateai/providers";
 import { promptContractFingerprintText } from "@debateai/providers";
-import { CLAIM_TYPES } from "@debateai/kernel";
+import { CLAIM_TYPES, LENGTH_SENTENCE_WRITING } from "@debateai/kernel";
 
 /**
  * V-11 ADDENDUM — THE INSTRUCTION SLOT FOR EVERY JUDGEMENT HAND-OFF.
@@ -138,18 +138,26 @@ export const JUDGE_LEG_MATERIAL_FIELDS: Readonly<Record<JudgeLegKind, readonly s
 
 export function judgePromptContract(
   leg: JudgeLegKind,
-  claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+  claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
+  lengthed = false
 ): PromptContract {
   return Object.freeze({
-    contractId: `judge.${leg}.${claimType}.v1`,
+    contractId: lengthed ? `judge.${leg}.${claimType}.length.v1` : `judge.${leg}.${claimType}.v1`,
     instruction: [
       JUDGE_LEG_DIRECTIVES[leg],
       JUDGE_INSTRUCTIONS,
-      JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType]
+      JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType],
+      // Length guidance (spec 2026-10-15 §3.2): the variant adds the one sentence; its target is the `length` field.
+      ...(lengthed ? [LENGTH_SENTENCE_WRITING] : [])
     ].join(" "),
     answerForm: JUDGE_ANSWER_FORM
   });
 }
+
+/** Length guidance (spec 2026-10-15 §3.2): each leg's table plus `length`, the field the variant names. */
+export const JUDGE_LEG_LENGTH_MATERIAL_FIELDS: Readonly<Record<JudgeLegKind, readonly string[]>> = Object.freeze(
+  Object.fromEntries(JUDGE_LEG_KINDS.map((leg) => [leg, Object.freeze([...JUDGE_LEG_MATERIAL_FIELDS[leg], "length"])])) as
+    Record<JudgeLegKind, readonly string[]>);
 
 /**
  * Debate shape (spec §3.3 step 3): a support or attack reply built on ONE chosen
@@ -166,16 +174,28 @@ export const JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS: Readonly<Record<JudgeConsi
     attack: Object.freeze(["question_line", "position_under_debate", "consideration"])
   });
 
+/** Length guidance (spec 2026-10-15 §3.2): each consideration table plus `length`, the field the variant names. */
+export const JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS: Readonly<Record<JudgeConsiderationLegKind, readonly string[]>> =
+  Object.freeze({
+    support: Object.freeze([...JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS.support, "length"]),
+    attack: Object.freeze([...JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS.attack, "length"])
+  });
+
 export function judgeConsiderationPromptContract(
   leg: JudgeConsiderationLegKind,
-  claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS
+  claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
+  lengthed = false
 ): PromptContract {
   return Object.freeze({
-    contractId: `judge.${leg}.consideration.${claimType}.v1`,
+    contractId: lengthed
+      ? `judge.${leg}.consideration.${claimType}.length.v1`
+      : `judge.${leg}.consideration.${claimType}.v1`,
     instruction: [
       `${JUDGE_LEG_DIRECTIVES[leg]} ${JUDGE_CONSIDERATION_SENTENCE}`,
       JUDGE_INSTRUCTIONS,
-      JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType]
+      JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType],
+      // Length guidance (spec 2026-10-15 §3.2): the variant adds the one sentence; its target is the `length` field.
+      ...(lengthed ? [LENGTH_SENTENCE_WRITING] : [])
     ].join(" "),
     answerForm: JUDGE_ANSWER_FORM
   });
@@ -195,10 +215,10 @@ export function reviewAnswerForm(edgeCount: number): string {
   return `Return only one JSON object with exactly this schema and no additional keys:\n{\n  "outcome": "agree" | "dispute" | "cannot-assess",\n  "reasons": [non-empty string, ...],\n  "edge_bearings": [number in [0,1] or null, ...]\n}\nedge_bearings has exactly ${String(edgeCount)} entries.`;
 }
 
-export function reviewPromptContract(edgeCount: number): PromptContract {
+export function reviewPromptContract(edgeCount: number, lengthed = false): PromptContract {
   return Object.freeze({
-    contractId: "judge.review.v1",
-    instruction: REVIEW_INSTRUCTIONS,
+    contractId: lengthed ? "judge.review.length.v1" : "judge.review.v1",
+    instruction: lengthed ? `${REVIEW_INSTRUCTIONS} ${LENGTH_SENTENCE_WRITING}` : REVIEW_INSTRUCTIONS,
     answerForm: reviewAnswerForm(edgeCount)
   });
 }
@@ -220,9 +240,16 @@ export const PANEL_PROMPT_CONTRACT: PromptContract = Object.freeze({
   answerForm: PANEL_ANSWER_FORM
 });
 
+/** Length guidance (spec 2026-10-15 §3.2): the panel's variant, today's instruction plus the one sentence. */
+export const PANEL_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "judge.panel.length.v1",
+  instruction: `${PANEL_INSTRUCTIONS} ${LENGTH_SENTENCE_WRITING}`,
+  answerForm: PANEL_ANSWER_FORM
+});
+
 /**
  * THE fingerprint the register sealed as `policy.hashes.judge` up to the debate
- * shape (V1, frozen; `JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT` below extends it).
+ * shape (V1, frozen; V2 below extends it, and `JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT` extends V2).
  *
  * One row covers the whole judgement prompt family, because that is what the
  * register has always had: every leg, both classifier branches, the review and
@@ -244,16 +271,28 @@ export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1: string = [
 ].join("\n---\n");
 
 /**
- * What the register seals NOW: the frozen V1 text (today's sealed value, never
- * edited), then the debate shape's six contracts — `assigned-root` and the
- * support/attack consideration variants, each in both classifier branches. A
- * later leg or variant is appended the same way; any change is a new register
- * version.
+ * The judge text the register sealed with the debate shape (V2, frozen: today's `judgeContractHash` aac53407…). Never
+ * edited; the current text below extends it.
  */
-export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT: string = [
+export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2: string = [
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V1,
   ...(["unknown", "resolved"] as const)
     .map((claim) => promptContractFingerprintText(judgePromptContract("assigned-root", claim))),
   ...(["support", "attack"] as const).flatMap((leg) => (["unknown", "resolved"] as const)
     .map((claim) => promptContractFingerprintText(judgeConsiderationPromptContract(leg, claim))))
+].join("\n---\n");
+
+/**
+ * What the register seals NOW (length guidance, spec 2026-10-15 §3.2 notes): V2, then the 18 length variants, appended
+ * in one fixed order — every leg of JUDGE_LEG_KINDS in both claim branches, the four consideration variants, the panel,
+ * the review. Old texts keep their bytes; any change is a new register version.
+ */
+export const JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT: string = [
+  JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2,
+  ...JUDGE_LEG_KINDS.flatMap((leg) => (["unknown", "resolved"] as const)
+    .map((claim) => promptContractFingerprintText(judgePromptContract(leg, claim, true)))),
+  ...(["support", "attack"] as const).flatMap((leg) => (["unknown", "resolved"] as const)
+    .map((claim) => promptContractFingerprintText(judgeConsiderationPromptContract(leg, claim, true)))),
+  promptContractFingerprintText(PANEL_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(reviewPromptContract(0, true))
 ].join("\n---\n");

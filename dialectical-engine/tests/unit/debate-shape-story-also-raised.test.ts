@@ -256,6 +256,18 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     }
   });
 
+  it("length guidance (LG-C, ruling L19): with alsoRaisedWhole each also-raised claim is sent whole; without it, today's 240 clip", () => {
+    const longRaised = [{ claim: text("raised", 600), raisedBy: 1 }];
+    const whole = built(buildStoryMaterial({ snapshot: snapshot({ alsoRaised: longRaised }), enrichment: new Map(),
+      budgetBytes: 10_000_000, shapeIds: SHAPES, alsoRaisedWhole: true }));
+    expect(whole.compressionStep).toBe(0);
+    expect(whole.material.alsoRaised?.[0]?.claim).toBe(text("raised", 600).trim());
+    const today = built(build({ alsoRaised: longRaised }, 10_000_000));
+    expect(Array.from(today.material.alsoRaised?.[0]?.claim ?? "").length).toBeLessThanOrEqual(240);
+    expect(built(buildStoryMaterial({ snapshot: snapshot({ alsoRaised: longRaised }), enrichment: new Map(),
+      budgetBytes: 10_000_000, shapeIds: SHAPES, alsoRaisedWhole: false })).material).toEqual(today.material);
+  });
+
   it("refuses the field's own name in a story, as every underscore key of the material", () => {
     expect(STORY_ENGINE_TOKENS).toContain("also_raised");
     // C-ORDER: no count key is sent, so none is a material key either.

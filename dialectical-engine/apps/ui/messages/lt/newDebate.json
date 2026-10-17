@@ -56,7 +56,7 @@
   "newDebate.scrutinyExhaustive": "Išsamus",
   "newDebate.scrutinyExhaustiveHelp": "Daugiausia papildomų ratų, apimančių daugiau abejotinų punktų.",
   "newDebate.answerLength": "Atsakymo ilgis",
-  "newDebate.answerLengthHint": "Apytiksliai 300, 700 arba 1500 žodžių: tikslinis ilgis, o ne griežtas maksimumas.",
+  "newDebate.answerLengthHint": "Žodžių skaičius: apytiksliai {short}, {standard} arba {detailed}. Tai tikslinis ilgis, o ne griežtas maksimumas.",
   "newDebate.answerLengthShort": "Trumpas",
   "newDebate.answerLengthStandard": "Standartinis",
   "newDebate.answerLengthDetailed": "Detalus",

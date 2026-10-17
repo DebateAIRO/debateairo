@@ -42,6 +42,24 @@ export const MAP_LIMITS = Object.freeze({
   gapRoundNewPointsToContinue: 2
 });
 
+/** The limits a map call reads: every member of MAP_LIMITS. */
+export type MapLimits = Readonly<{ [K in keyof typeof MAP_LIMITS]: number }>;
+
+/**
+ * Length guidance (spec 2026-10-15 §3.9, ruling L19; INTERFACE §5.7): with the length row the map's TEXT limits are
+ * runaway guards only, about 8 x today's, since each text is guided to about N words. Ids keep their 24 characters and
+ * every count stays.
+ */
+export const MAP_RUNAWAY_LIMITS = Object.freeze({
+  claimMaxChars: 2000, whyMaxChars: 2000, candidateAnswerMaxChars: 1300, angleLabelMaxChars: 650, angleFocusMaxChars: 2000
+});
+const MAP_LENGTHED_LIMITS: MapLimits = Object.freeze({ ...MAP_LIMITS, ...MAP_RUNAWAY_LIMITS });
+
+/** Today's limits, or (a run admitted with the length row) the same with its text limits at runaway level. */
+export function mapLimitsFor(lengthed: boolean): MapLimits {
+  return lengthed ? MAP_LENGTHED_LIMITS : MAP_LIMITS;
+}
+
 /** The marks the spec names (§1.1, §1.2). The kernel's CONDITION_MARKS lists them too (Phase 2), with typed records. */
 export const MAP_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
   "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED"] as const);

@@ -15,7 +15,7 @@
  * unbilled refusals.
  */
 import { detectArgumentLanguage } from "@debateai/kernel";
-import { MAP_CONTRACT_IDS, MAP_LIMITS } from "@debateai/map";
+import { MAP_LIMITS, mapContractNameOf } from "@debateai/map";
 import {
   parsePreviewProviderTestConfig,
   previewTargetJsonRow,
@@ -108,13 +108,15 @@ export function openingsDryContent(input: Readonly<{ contractId: string; fields:
   const text = openingsDryTextOf(input.fields);
   const short = String(input.serial);
   const point = (claim: string) => ({ claim, why_it_matters: text.why, leans: "context" });
+  // Length guidance (spec 2026-10-15 §3.2): dispatched by the contract's name, so a length variant gets the same reply.
+  const mapName = mapContractNameOf(input.contractId);
   if (input.contractId.startsWith("judge.")) {
     return JSON.stringify({ statement: text.position, way_of_knowing: "REASONING", locator: null, restatement_text: text.position,
       restatement_status: "PASS", value_laden: false, claim_type: "unknown", steelman: { summary: text.position, fidelity: 0.72 },
       critic: { summary: text.no, counterargumentStrength: 0.28, basis: "PLAUSIBLE_COUNTER" }, evidence: { quality: 0.72, relevance: 0.72 },
       context: { fit: 0.72, ambiguityFlags: [] }, fallacy: { severity: 0.28, fatalFlags: [] } });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.angles) {
+  if (mapName === "angles") {
     const [opposite, worry, practical, cost] = text.angles;
     return JSON.stringify({ angles: [
       { angle_id: "opposite", kind: "OPPOSITE_CASE", label: opposite, focus: opposite },
@@ -122,16 +124,16 @@ export function openingsDryContent(input: Readonly<{ contractId: string; fields:
       { angle_id: "practical", kind: "PRACTICAL", label: practical, focus: practical },
       { angle_id: "cost", kind: "SPECIFIC", label: cost, focus: cost }] });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.listAngle || input.contractId === MAP_CONTRACT_IDS.listOpen) {
+  if (mapName === "listAngle" || mapName === "listOpen") {
     const label = openingsDryField(input.fields, "angle_label");
     const claims = [1, 2, 3].map((n) => `${text.point}${label === "" ? "" : ` (${label})`} ${String(n)}`);
     if (input.slip) claims[0] = `${claims[0]!} ${"x".repeat(MAP_LIMITS.claimMaxChars)}`;
     return JSON.stringify({ points: claims.map(point), candidate_answers: [label === text.angles[0] ? text.no : text.yes] });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.listSnowball) {
+  if (mapName === "listSnowball") {
     return JSON.stringify({ points: [point(`${text.snowball} (${short})`)], candidate_answers: [] });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.merge) {
+  if (mapName === "merge") {
     const points = JSON.parse(openingsDryField(input.fields, "points")) as { item_id: string; claim: string }[];
     const answers = JSON.parse(openingsDryField(input.fields, "candidate_answers")) as { item_id: string; answer: string }[];
     const claims = [...new Set(points.map((row) => row.claim))];
@@ -143,10 +145,10 @@ export function openingsDryContent(input: Readonly<{ contractId: string; fields:
         member_item_ids: answers.filter((row) => row.answer === answer).map((row) => row.item_id) }))
     });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.gap) {
+  if (mapName === "gap") {
     return JSON.stringify({ new_points: [point(`${text.gap} (${short})`)], framing_challenges: [] });
   }
-  if (input.contractId === MAP_CONTRACT_IDS.choose) {
+  if (mapName === "choose") {
     const first = (JSON.parse(openingsDryField(input.fields, "key_points")) as { key_point_id: string }[])[0]?.key_point_id;
     return JSON.stringify({ answers: [{ answer_id: "a-1", statement: text.yes, for: first === undefined ? [] : [first], against: [], strongest_rival: null }] });
   }
@@ -186,13 +188,13 @@ export function openingsDryPorts(): Readonly<{
       const { model, packet } = openingsDryPacket(input.requestBody);
       const frame = readPromptFrame(packet);
       if (model === script.busyModel) throw new PreviewVendorRefusedUnbilled();
-      if (frame.contractId === MAP_CONTRACT_IDS.merge && script.busyModel === null) {
+      if (mapContractNameOf(frame.contractId) === "merge" && script.busyModel === null) {
         script.busyModel = model;
         throw new PreviewVendorRefusedUnbilled();
       }
       const patchPaths = frame.fields.find((entry) => entry.name === "machine_rejection_paths")?.content;
       const isPatch = patchPaths !== undefined && frame.fields.some((entry) => entry.name === "machine_reply_form" && entry.content === "PATCH");
-      const slip = provider === "anthropic" && !script.slipped && frame.contractId === MAP_CONTRACT_IDS.listOpen && !isPatch;
+      const slip = provider === "anthropic" && !script.slipped && mapContractNameOf(frame.contractId) === "listOpen" && !isPatch;
       if (slip) script.slipped = true;
       const content = isPatch ? openingsDryPatch(patchPaths.split(","), frame.fields)
         : openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial: script.requests, slip });
