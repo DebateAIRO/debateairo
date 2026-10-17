@@ -201,3 +201,45 @@ describe("the preview call policy sets lengthRetry, and only it", () => {
       .toEqual({ answerRoomTokens: 2976, lowerThinkingLevel: "low" });
   });
 });
+
+/**
+ * Engine redesign R1d (spec 2026-10-15 §7.2 item 11 (c); pre-flight PF-D6.5): a call that ends cut off says how it ran out
+ * of room — how many of its attempts were cut off, and whether the last cut-off ran at the lowest level this call can
+ * think at (the length retry's one-level-lower level, or the call's own level when it has no lower one). The story's
+ * backup reads it; nothing else does.
+ */
+describe("the gateway's out-of-room facts (R1d)", () => {
+  const refusal = (promise: Promise<unknown>) => promise.then(() => null, (caught: unknown) => caught);
+
+  it("two cut-offs, the second one level lower: 2 cut-offs, the last at the lowest level", async () => {
+    const { gateway, sent } = harness([{ content: "cut", finish: "length", reasoning: 990 }, { content: "cut", finish: "length", reasoning: 1990 }]);
+    const error = await refusal(gateway.call(request()));
+    expect(sent.map((body) => body.reasoning_effort)).toEqual(["high", "low"]);
+    expect(error).toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", lastParseStatus: "LENGTH_EXCEEDED", attempts: 2,
+      outOfRoom: { cutOffs: 2, lastAtLowestLevel: true } });
+  });
+
+  it("two cut-offs where thinking left the answer its room: the second ran above the lowest level", async () => {
+    const { gateway, sent } = harness([{ content: "cut", finish: "length", reasoning: 700 }, { content: "cut", finish: "length", reasoning: 700 }]);
+    const error = await refusal(gateway.call(request()));
+    expect(sent.map((body) => body.reasoning_effort)).toEqual(["high", "high"]);
+    expect(error).toMatchObject({ outOfRoom: { cutOffs: 2, lastAtLowestLevel: false } });
+  });
+
+  it("a call already at its lowest level, or with no lower level offered: the second cut-off is at its lowest", async () => {
+    const lowest = harness([{ content: "cut", finish: "length", reasoning: 990 }, { content: "cut", finish: "length", reasoning: 990 }]);
+    await expect(refusal(lowest.gateway.call(request({ lengthRetry: { answerRoomTokens: 300, lowerThinkingLevel: null } }))))
+      .resolves.toMatchObject({ outOfRoom: { cutOffs: 2, lastAtLowestLevel: true } });
+    const offPreview = harness([{ content: "cut", finish: "length" }, { content: "cut", finish: "length" }]);
+    const { lengthRetry: _omitted, ...today } = request();
+    await expect(refusal(offPreview.gateway.call(today))).resolves.toMatchObject({ outOfRoom: { cutOffs: 2, lastAtLowestLevel: true } });
+  });
+
+  it("a single cut-off says 1 cut-off; a refusal that is not a cut-off carries no facts", async () => {
+    const once = harness([{ content: "cut", finish: "length", reasoning: 990 }]);
+    await expect(refusal(once.gateway.call(request({ maxAttemptsThisCall: 1 }))))
+      .resolves.toMatchObject({ lastParseStatus: "LENGTH_EXCEEDED", attempts: 1, outOfRoom: { cutOffs: 1, lastAtLowestLevel: false } });
+    const thenBad = harness([{ content: "cut", finish: "length", reasoning: 990 }, { content: "bad" }]);
+    await expect(refusal(thenBad.gateway.call(request()))).resolves.toMatchObject({ lastParseStatus: "PARSE_FAILED", outOfRoom: null });
+  });
+});

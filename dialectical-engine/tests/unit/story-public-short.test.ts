@@ -260,6 +260,13 @@ describe("toPublicStoryShort", () => {
   it("publishes nothing for a FAILED story", () => {
     expect(toPublicStoryShort(storedStoryRecord({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", body: null }))).toBeNull();
   });
+
+  it("never publishes the backup storyteller's record (engine redesign R1d): the short story is the same with or without it", () => {
+    const backup = { code: "STORY_BACKUP_USED", signal: "TOO_SLOW", firstModel: "provider:openai" } as const;
+    const withBackup = toPublicStoryShort(storedStoryRecord({ backup }));
+    expect(withBackup).toEqual(toPublicStoryShort(storedStoryRecord()));
+    expect(JSON.stringify(withBackup)).not.toMatch(/STORY_BACKUP_USED|TOO_SLOW|backup|firstModel/u);
+  });
 });
 
 describe("publish copies the short story", () => {

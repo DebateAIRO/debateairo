@@ -337,6 +337,15 @@ export class ProviderCallFailedError extends TypedDomainError {
   }
 }
 
+/**
+ * Engine redesign R1d (spec 2026-10-15 §7.2 item 11 (c); pre-flight PF-D6.5): how a call that ended cut off at its
+ * allowance ran out of room — how many of its attempts were cut off (`cutOffs`), and whether the last cut-off ran at the
+ * lowest thinking level THIS call can run at (`lastAtLowestLevel`): the length retry's one-level-lower level (LG-B, L25),
+ * or the call's own level when it has no lower one (`lengthRetry` absent, or its `lowerThinkingLevel` null). Facts only:
+ * the story's backup storyteller reads them (`@debateai/story` backup.ts); nothing decides a retry by them.
+ */
+export type ProviderOutOfRoomFacts = Readonly<{ cutOffs: number; lastAtLowestLevel: boolean }>;
+
 export class ProviderContentUnacceptedError extends TypedDomainError {
   override readonly code = "PROVIDER_CONTENT_UNACCEPTED";
 
@@ -345,7 +354,9 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
     readonly lastParseStatus: ProviderContentRejectionStatus,
     readonly lastParseError: string,
     readonly lastRawArtifactRef: string,
-    readonly lastLedgerEntryRef: string
+    readonly lastLedgerEntryRef: string,
+    /** R1d: set by the gateway only when the call ended LENGTH_EXCEEDED; null on every other refusal (and every double). */
+    readonly outOfRoom: ProviderOutOfRoomFacts | null = null
   ) {
     super("PROVIDER_CONTENT_UNACCEPTED", lastParseError);
     this.name = "ProviderContentUnacceptedError";
@@ -2072,6 +2083,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       ? null : resolveThinkingLevel(lengthRetry.lowerThinkingLevel, this.#options.thinking, request.providerRef);
     /** L25: set once a cut-off attempt's thinking left the answer no room; this call's length retries then think less. */
     let thinkLess = false;
+    /** R1d (PF-D6.5): whether the latest cut-off attempt ran at the lowest level this call can think at. */
+    let lastCutOffAtLowestLevel = false;
+    const lowestThinking = lowerThinking ?? thinking;
     assertProviderCallRecord(request);
     const callFacts = Object.freeze({
       modelRole: request.modelRole ?? null,
@@ -2715,6 +2729,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // it owes stays the same — so the next attempt re-sends the
             // ORIGINAL packet under a raised bound.
             lengthFailures += 1;
+            // R1d (PF-D6.5): read before `thinkLess` changes, so it names the level THIS attempt ran at.
+            lastCutOffAtLowestLevel = attemptThinking === lowestThinking;
             // Length guidance L25 (spec 2026-10-15 §3.3): the vendor's own count shows thinking used more than the allowance
             // minus the answer's room, so the retry thinks one level lower (once; a call already at its lowest stays).
             if (lowerThinking !== null && reasoningTokens !== null
@@ -2970,7 +2986,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         lastContentRejection.parseStatus,
         lastContentRejection.parseError,
         lastContentRejection.rawArtifactRef,
-        lastContentRejection.ledgerEntryRef
+        lastContentRejection.ledgerEntryRef,
+        // R1d (PF-D6.5): only a call that ended cut off says how it ran out of room.
+        lastContentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED
+          ? Object.freeze({ cutOffs: lengthFailures, lastAtLowestLevel: lastCutOffAtLowestLevel })
+          : null
       );
     }
     throw new ProviderCallFailedError(

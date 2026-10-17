@@ -91,6 +91,15 @@ export {
   type StoryRoundRecord
 } from "./loop.js";
 export {
+  STORY_BACKUP_SIGNALS,
+  STORY_BACKUP_USED,
+  pickBackupStoryteller,
+  storyBackupSignalOf,
+  type StoryBackupCandidate,
+  type StoryBackupRecord,
+  type StoryBackupSignal
+} from "./backup.js";
+export {
   StoryRepository,
   type StoredStory,
   type StoryRecordInput

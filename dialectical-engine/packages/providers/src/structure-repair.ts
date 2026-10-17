@@ -965,12 +965,17 @@ function unreadableReplyRepairPacket(packet: PromptPacket): (rejected: RejectedP
  * Task 13 review, finding 1: the two stops of the run's own machinery a repair call can meet besides the money stops,
  * which keep their names as they do: the debate's call lane stopped while the repair waited for a slot
  * (`CALL_LANE_STOPPED`, apps/runner/src/call-scheduler.ts) and the money seam's room-only refusal for root 0
- * (`RUN_COST_ENVELOPE_ROOM_KEPT`, @debateai/budget; the repair carries the call's `keepRoomMicros`). Turned into a content
- * refusal, a sent and billed call would be filed as the AI's failure, and the map would record FAILED instead of
- * STOPPED. Written here because neither package is this one's dependency; tests/unit/lg-a-repair-wiring.test.ts pins
- * both against their owners' constants.
+ * (`RUN_COST_ENVELOPE_ROOM_KEPT`, @debateai/budget; the repair carries the call's `keepRoomMicros`).
+ * Engine redesign R1d (pre-flight PF-D6.1): and the story's own money stop (`STORY_COST_ENVELOPE_REACHED`,
+ * @debateai/budget): a story's repair call spends the story's envelope, so its refusal is a money stop like the run's,
+ * never "the reply stayed unusable" — otherwise the story would start a backup storyteller for money (G7).
+ * Turned into a content refusal, a sent and billed call would be filed as the AI's failure, and the map would record
+ * FAILED instead of STOPPED. Written here because neither package is this one's dependency;
+ * tests/unit/lg-a-repair-wiring.test.ts pins all three against their owners' constants.
  */
-export const STRUCTURE_REPAIR_PASSED_STOPS = Object.freeze(["CALL_LANE_STOPPED", "RUN_COST_ENVELOPE_ROOM_KEPT"] as const);
+export const STRUCTURE_REPAIR_PASSED_STOPS = Object.freeze(
+  ["CALL_LANE_STOPPED", "RUN_COST_ENVELOPE_ROOM_KEPT", "STORY_COST_ENVELOPE_REACHED"] as const
+);
 
 /** The repair reply's refusal when it changed what the AI wrote (STRUCTURE_REPAIR_NOT_VERBATIM, INTERFACE §9). */
 const NOT_VERBATIM = JSON.stringify([{ code: "custom", path: [], message: "STRUCTURE_REPAIR_NOT_VERBATIM" }]);
@@ -1049,7 +1054,7 @@ async function repairStructure(gateway: ProviderGateway, request: ProviderCallRe
     // A money stop is the run's own and keeps its name: the cost-envelope refusals, and the run's spend stops
     // (`@debateai/kernel` RUN_LEVEL_SPEND_STOP_CODES), among them (ruling R9, pre-flight PF-A48) the run's attempt ceiling,
     // which the repair gateway's `assertAttemptAllowed` raises unwrapped before it sends; and so does a stop of the run's
-    // own machinery (STRUCTURE_REPAIR_PASSED_STOPS: the lane stopped, root 0's room kept). Every other
+    // own machinery (STRUCTURE_REPAIR_PASSED_STOPS: the lane stopped, root 0's room kept; R1d: the story's money). Every other
     // way the repair did not do (refused, unavailable, cut off, a transport death) never leaves the wrapper: it goes on to
     // the original AI's follow-up B. (The list is read here, inside the function: ./index.js re-exports this file, so a
     // module-level copy would read it before index.js has run.)

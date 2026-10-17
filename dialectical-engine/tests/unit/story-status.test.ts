@@ -135,6 +135,15 @@ describe("verdict story status (spec §7)", () => {
     expect(response.verdict_basis?.trigger).toBe("MID_BAND");
   });
 
+  it("keeps the backup storyteller's record out of the owner's response (engine redesign R1d)", () => {
+    const backup = { code: "STORY_BACKUP_USED", signal: "UNUSABLE", firstModel: "provider:openai" } as const;
+    const build = (stored: ReturnType<typeof storedStoryRecord>) => AnswerStorySchema.parse(buildAnswerStory({
+      answerId: STORY_TEST_ANSWER_ID, answerVersion: 1, stored, derived: { status: "READY", unavailableReason: null }
+    }));
+    expect(build(storedStoryRecord({ backup }))).toEqual(build(storedStoryRecord()));
+    expect(JSON.stringify(build(storedStoryRecord({ backup })))).not.toMatch(/STORY_BACKUP_USED|UNUSABLE|firstModel/u);
+  });
+
   it("names the question's language from the stored story (R1): a BCP-47 tag, und, or null when none was stored", () => {
     const build = (languageTag: string | null) => AnswerStorySchema.parse(buildAnswerStory({
       answerId: STORY_TEST_ANSWER_ID, answerVersion: 1, stored: storedStoryRecord({ languageTag }),
