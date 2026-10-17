@@ -85,8 +85,10 @@ import {
 } from "@debateai/serve";
 import {
   STORY_CHECKER_CONTRACT_ID,
+  STORY_CHECKER_V4_CONTRACT_ID,
   STORY_FIXER_OPTIONS,
   STORYTELLER_CONTRACT_ID,
+  STORYTELLER_V4_CONTRACT_ID,
   StoryWriter,
   classifyCheckerContent,
   type StoryPack,
@@ -650,6 +652,27 @@ const CANNED_CHECKER = JSON.stringify({ satisfied: true, objection: null, criter
   citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
 } });
 
+/** Story v4 (R1d): the v4 checker's form carries `misleading`; a satisfied verdict sets it false. v3 keeps CANNED_CHECKER. */
+const CANNED_CHECKER_V4 = JSON.stringify({ satisfied: true, misleading: false, objection: null, criteria: {
+  faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
+  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
+} });
+
+/** Length guidance (LG-D) and story v4 (R1d): the stand-in answers the other story job by either version of its contract. */
+const STANDIN_STORYTELLER_IDS: ReadonlySet<string> = new Set<string>([STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID]);
+const STANDIN_CHECKER_IDS: ReadonlySet<string> = new Set<string>([STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID]);
+
+/**
+ * What the stand-in answers a story request with, by its contract id: the canned story for either storyteller version
+ * (under v4 code sets shape_id on the decoded story, and the canned one is the pack default anyway), the satisfied
+ * verdict in the checker's own version's form, and "{}" for anything else.
+ */
+export function practiceStandInStoryContent(pack: StoryPack, question: PracticeQuestion, contractId: string): string {
+  if (STANDIN_STORYTELLER_IDS.has(contractId)) return practiceCannedStory(pack, question);
+  if (!STANDIN_CHECKER_IDS.has(contractId)) return "{}";
+  return contractId === STORY_CHECKER_V4_CONTRACT_ID ? CANNED_CHECKER_V4 : CANNED_CHECKER;
+}
+
 /** A local stand-in for the OTHER story job, so each story job is tested on its own and costs one call. No network. */
 function cannedStoryGateway(pack: StoryPack, question: PracticeQuestion): ProviderGateway {
   let calls = 0;
@@ -657,8 +680,7 @@ function cannedStoryGateway(pack: StoryPack, question: PracticeQuestion): Provid
     async call(request: ProviderCallRequest) {
       calls += 1;
       const contractId = readPromptFrame(request.packet).contractId;
-      const content = contractId === STORYTELLER_CONTRACT_ID ? practiceCannedStory(pack, question)
-        : contractId === STORY_CHECKER_CONTRACT_ID ? CANNED_CHECKER : "{}";
+      const content = practiceStandInStoryContent(pack, question, contractId);
       return { rawArtifactRef: `practice:canned:${String(calls)}`, ledgerEntryRef: `practice:canned:${String(calls)}`, content,
         provider: "openai-compatible-http" as const, model: "practice/canned", maker: "practice", modelVersion: "practice/canned" };
     }

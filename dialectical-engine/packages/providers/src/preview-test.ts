@@ -308,16 +308,26 @@ export function previewCallTierOf(request: Readonly<{ callSiteKey: string; lane:
     || (step === "story_checker" && story && request.role === "EVALUATOR") ? "FINAL_WRITER" : "STANDARD";
 }
 /**
+ * Story v4 (engine redesign R1d, absorbing LG-D; spec 2026-10-15 §7.4): the story contracts whose native requests keep
+ * the one safe repair try: v3, and v4 for an engine-2 debate. An id missing here silently turns that try off.
+ */
+export const PREVIEW_STORY_REPAIR_CONTRACT_IDS = Object.freeze(
+  ["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4"] as const);
+/**
  * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
  * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check). The current
- * checker is v3 since 2026-10-13 (the objection's limit raised to 4000 characters).
+ * checker is v3 since 2026-10-13 (the objection's limit raised to 4000 characters); v4 joins both under engine 2.
+ * Each id is accepted only on its own site: a checker contract on the storyteller's site keeps one attempt.
  */
 function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   const site = previewStorySite(request, "STORYTELLER") ? "STORYTELLER" : previewStorySite(request, "CHECKER") ? "CHECKER" : null;
   if (site === null || !Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 2
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
-  try { return assertFramedPrompt(request.packet).contractId === (site === "STORYTELLER" ? "story.storyteller.v3" : "story.checker.v3"); }
-  catch { return false; }
+  try {
+    const contractId = assertFramedPrompt(request.packet).contractId;
+    return (PREVIEW_STORY_REPAIR_CONTRACT_IDS as readonly string[]).includes(contractId)
+      && contractId.startsWith(site === "STORYTELLER" ? "story.storyteller." : "story.checker.");
+  } catch { return false; }
 }
 /**
  * All-steps format robustness (2026-10-12): every other structured step gets the story's one repair try on the preview.

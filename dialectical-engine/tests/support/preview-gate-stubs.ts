@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import { mapContractNameOf } from "@debateai/map";
-import { STORY_CHECKER_CONTRACT_ID, STORYTELLER_CONTRACT_ID } from "@debateai/story";
+import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
@@ -193,32 +193,42 @@ export const STUB_STORY_CHECKER_SATISFIED = JSON.stringify({ satisfied: true, ob
   faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
   citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
 } });
+/** Story v4 (R1d): the v4 checker's form carries `misleading`; a satisfied verdict sets it false (Task 12's schema). */
+export const STUB_STORY_CHECKER_V4_SATISFIED = JSON.stringify({ satisfied: true, misleading: false, objection: null, criteria: {
+  faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true,
+  citations_correct: true, reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true
+} });
+
+/** The story checker's satisfied verdict in the form of the request's own contract: v4 with misleading, v3 as today. */
+export function stubStoryCheckerFor(chat: string): string {
+  return readFramedMaterial(wirePacket(chat)).contractId === STORY_CHECKER_V4_CONTRACT_ID
+    ? STUB_STORY_CHECKER_V4_SATISFIED : STUB_STORY_CHECKER_SATISFIED;
+}
 
 /**
  * A story with one path per position the storyteller was handed (its `positions` material, refs P1..Pn), in the
- * language the request's directive names.
+ * language the request's directive names. Story v4 (R1d): a v4 request is answered as the v4 form asks, with no
+ * shape_id (code sets it) and long last.
  */
 export function stubStoryFor(chat: string, defaultShape: string): string {
-  const fields = readFramedMaterial(wirePacket(chat)).fields;
-  const positions = JSON.parse(fields.find((field) => field.name === "positions")?.content ?? "[]") as { id: string }[];
+  const frame = readFramedMaterial(wirePacket(chat));
+  const positions = JSON.parse(frame.fields.find((field) => field.name === "positions")?.content ?? "[]") as { id: string }[];
   const refs = positions.length === 0 ? ["P1"] : positions.map((position) => position.id);
   const prose = STUB_PROSE[stubReplyLanguage(chat)].story;
   const paragraph = (text: string) => ({ text, node_refs: [refs[0]!] });
-  return JSON.stringify({
-    shape_id: defaultShape,
-    short: {
-      headline: prose.headline,
-      summary: prose.summary,
-      confidence: prose.confidence,
-      paths: refs.map((ref) => ({ position_ref: ref, fate: "HELD_UP", line: prose.line, node_refs: [ref] })),
-      change: paragraph(prose.change)
-    },
-    why: { reasons: [paragraph(prose.reason)] },
-    long: { sections: prose.sections.map((title) => ({
-      title, paragraphs: [paragraph(prose.paragraph(title))]
-    })) },
-    reviewer_note: null
-  });
+  const short = {
+    headline: prose.headline,
+    summary: prose.summary,
+    confidence: prose.confidence,
+    paths: refs.map((ref) => ({ position_ref: ref, fate: "HELD_UP", line: prose.line, node_refs: [ref] })),
+    change: paragraph(prose.change)
+  };
+  const why = { reasons: [paragraph(prose.reason)] };
+  const long = { sections: prose.sections.map((title) => ({
+    title, paragraphs: [paragraph(prose.paragraph(title))]
+  })) };
+  if (frame.contractId === STORYTELLER_V4_CONTRACT_ID) return JSON.stringify({ short, why, reviewer_note: null, long });
+  return JSON.stringify({ shape_id: defaultShape, short, why, long, reviewer_note: null });
 }
 
 /**
@@ -327,8 +337,9 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   const messages = wirePacket(chat).messages;
   if (messages.length === 1 && messages[0]!.role === "user" && messages[0]!.content.includes(PROBE_QUESTION)) return "PROBE";
   const contractId = readFramedMaterial(wirePacket(chat)).contractId;
-  if (contractId === STORYTELLER_CONTRACT_ID) return "STORYTELLER";
-  if (contractId === STORY_CHECKER_CONTRACT_ID) return "STORY_CHECKER";
+  // Story v4 (R1d, absorbing LG-D): an engine-2 debate asks with story contracts v4.
+  if (contractId === STORYTELLER_CONTRACT_ID || contractId === STORYTELLER_V4_CONTRACT_ID) return "STORYTELLER";
+  if (contractId === STORY_CHECKER_CONTRACT_ID || contractId === STORY_CHECKER_V4_CONTRACT_ID) return "STORY_CHECKER";
   // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
   if (mapContractNameOf(contractId) !== null) return "MAP";
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
@@ -437,7 +448,7 @@ export async function startPreviewGateStubs(input: Readonly<{
     switch (kind) {
       case "PROBE": return "OK";
       case "STORYTELLER": return stubStoryFor(chat, input.storyDefaultShape);
-      case "STORY_CHECKER": return STUB_STORY_CHECKER_SATISFIED;
+      case "STORY_CHECKER": return stubStoryCheckerFor(chat);
       case "PANEL": return stubPanelAssessment(language);
       case "REVIEW": return withRequestDerivedBearings(reviewArtifact("agree", [STUB_PROSE[language].review(served)]), chat);
       case "JUDGE": return stubJudgement(STUB_PROSE[language].point(served), language);
