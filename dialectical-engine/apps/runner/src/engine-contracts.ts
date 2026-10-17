@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
+import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -18,8 +18,9 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
  * ENGINE_CONTRACT_HASH_SEALED in tests/unit/engine-contract-hash.test.ts.
  */
 export function engineSealedContracts(): readonly PromptContract[] {
-  // Append-only, in phase order: R2a seals the investigation (spec §4.2b); R2b appends verdict.judge.v1 (B1).
-  return Object.freeze([POINT_INVESTIGATION_PROMPT_CONTRACT]);
+  // Append-only, in phase order: R2a seals the investigation (spec §4.2b), R2b the comparing judges (spec §4.8); R3 and
+  // R4 append theirs after them.
+  return Object.freeze([POINT_INVESTIGATION_PROMPT_CONTRACT, COMPARING_JUDGE_PROMPT_CONTRACT]);
 }
 
 /** The ids of engineSealedContracts(), in order (pinned by tests/unit/engine-contract-hash.test.ts). */

@@ -247,6 +247,10 @@ code back while a debate admitted with the length row runs: the older code refus
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`, R1d's seal over no contract). Nothing reads it
 without an `engineVersionPolicy` row, so the runner boots either way.
 
+**R2b moves the engine seal again.** A register version for this code carries `engineContractHash` `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` (was `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a`
+after R2a, or `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24` from a release before R2a): R2b appends the
+comparing judges' prompt contract. Nothing reads it without an `engineVersionPolicy` row, so the runner boots either way.
+
 There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
 changed row: stop and ask.
 

@@ -87,6 +87,7 @@ import {
 export * from "./s04.js";
 export * from "./prompts.js";
 export * from "./investigation.js";
+export * from "./comparing-judges.js";
 export * from "./engine-repository.js";
 export * from "./honest-score.js";
 

@@ -1105,6 +1105,13 @@ older code never writes them.
 
 The runner's journal gains one line kind, `DEBATEAI_POINT_INVESTIGATION` (engine 2 only), listed with its other lines under "What the runner's log says about answers and stories" below.
 
+### Upgrading to the engine redesign R2b (the engine seal)
+
+A register version for this code carries the code-owned `engineContractHash` row with `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` (was `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` after R2a, or
+`b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24` from a release before R2a): R2b appends the comparing
+judges' prompt contract. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way;
+publish the new version from this release as for any release. R2b adds no migration.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
