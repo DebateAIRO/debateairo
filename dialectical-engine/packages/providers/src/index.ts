@@ -3050,6 +3050,8 @@ export {
   buildFramedPrompt,
   buildFramedRepairPrompt,
   buildFramedRevisionPrompt,
+  // R1d final wave A3: the patch path rule, so the practice reads a stored patch only under the gateway's own rule.
+  isPatchPath,
   promptContractFingerprintText,
   promptTextHasReservedToken,
   framedAnswerForm,

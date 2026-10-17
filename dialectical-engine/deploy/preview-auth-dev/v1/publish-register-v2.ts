@@ -282,9 +282,12 @@ export function assertPreviewEngineBootRows(rows:readonly RegisterPublicationRow
   const engine=map.get(ENGINE_VERSION_POLICY_ROW_KEY);
   if(engine===undefined)return;
   const seal=map.get(ENGINE_CONTRACT_HASH_ROW_KEY);
+  const lengthPolicyPresent=map.has(LENGTH_GUIDANCE_POLICY_ROW_KEY);
+  // As the runner's boot read (readEngineRunnerSettings): the seal is parsed only beside the length row, so a kit
+  // refusal is the runner's own code (Task 8 review 1).
   resolveEngineRunnerSettings({policy:parseEngineVersionPolicy(JSON.parse(engine.valueJsonText)),
-    lengthPolicyPresent:map.has(LENGTH_GUIDANCE_POLICY_ROW_KEY),
-    engineContractHash:seal===undefined?null:parseEngineContractHash(JSON.parse(seal.valueJsonText)),
+    lengthPolicyPresent,
+    engineContractHash:!lengthPolicyPresent||seal===undefined?null:parseEngineContractHash(JSON.parse(seal.valueJsonText)),
     codeEngineContractHash:engineContractHash()});
 }
 

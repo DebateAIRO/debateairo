@@ -1185,7 +1185,7 @@ describe("preview practice: language mode, the question language (P2L)", () => {
 describe("engine 2's story (R1d)", () => {
   const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
   const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
-  type PinOutcome = { pinnedModel: string; wroteModel: string | null; held: boolean };
+  type PinOutcome = { pinnedModel: string; wroteModel: string | null; servedBy: string[]; held: boolean };
   type EngineReport = {
     verdict: string; reasons: string[]; ask: { engine?: { engine: number } };
     register: { registerVersion: string; codeNext?: { addedKeys: string[] } };
@@ -1317,8 +1317,9 @@ describe("engine 2's story (R1d)", () => {
     expect(report.ask.engine).toEqual({ engine: 1 });
     expectStoryV3(stubs.requests);
     expect(report.writerPins).toEqual({
-      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, held: true },
-      storyteller: { pinnedModel: MIMO, wroteModel: MIMO, held: true }
+      // Ruling A1 (Task 21 review): held = the pinned model SERVED the step (the answered final-writer calls; the stored story).
+      answerWriter: { pinnedModel: HAIKU, wroteModel: HAIKU, servedBy: [HAIKU], held: true },
+      storyteller: { pinnedModel: MIMO, wroteModel: MIMO, servedBy: [MIMO], held: true }
     });
     expect(new Set(answered(stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([MIMO]));
     expect(new Set(stubs.requests.filter((request) => request.kind === "COMPOSE" && request.answer === "OK").map((request) => request.model)))
@@ -1328,7 +1329,7 @@ describe("engine 2's story (R1d)", () => {
     expectStoryBlocks(report, out, 1, [MIMO]);
     expect(report.storyRounds!.every((row) => row.model === MIMO && row.misleading === null)).toBe(true);
     expect(report.storyLengthByField!.every((row) => row.guidedWords === null)).toBe(true);
-    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, held: yes`);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain(`- storyteller: pinned ${MIMO}, wrote ${MIMO}, served by ${MIMO}, held: yes`);
   }, 900_000);
 
   it("R1d-4 --length-policy --engine-policy, round 1's checker finds the story misleading: round 2 sends the storyteller its own draft as its own turn and the problems, and the story is READY: PASS (exit 0)", async () => {

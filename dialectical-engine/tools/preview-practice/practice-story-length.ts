@@ -8,7 +8,7 @@ import {
   type CharactersPerWord,
   type StoryWordTargetField
 } from "@debateai/kernel";
-import { PREVIEW_PROVIDER_REF_MODELS, decodeModelJson, structureRepairOriginalKey } from "@debateai/providers";
+import { decodeModelJson, structureRepairOriginalKey } from "@debateai/providers";
 import {
   engineSettingsOf,
   engineVersionPolicyStartValues,
@@ -17,7 +17,7 @@ import {
   type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
-import { replyContentOf } from "./practice-lanes.js";
+import { practiceModelOfRef, replyContentOf } from "./practice-lanes.js";
 import { PracticeRefusal } from "./practice-settings.js";
 
 /**
@@ -240,7 +240,7 @@ export async function collectPracticeStoryLength(pool: Pool, runId: string): Pro
       : await decryptContentForRun<{ rawText: string; parseErrorDetail: string | null }>(pool, runId, "ledger.raw_artifact",
         entry.raw_artifact_ref, (entry.content_ciphertext ?? null) as never, { rawText: entry.raw_text, parseErrorDetail: null });
     rows.push(Object.freeze({
-      callSiteKey: entry.call_site_key, model: PREVIEW_PROVIDER_REF_MODELS[entry.actor_ref] ?? `unreviewed:${entry.actor_ref}`,
+      callSiteKey: entry.call_site_key, model: practiceModelOfRef(entry.actor_ref),
       outcome: entry.outcome, parseStatus: entry.parse_status, replyForm: entry.reply_form, content: replyContentOf(stored.rawText)
     }));
   }

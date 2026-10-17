@@ -5,7 +5,6 @@ import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQ
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
-  buildFramedRevisionPrompt,
   rememberingAcceptedReply,
   schemaFailureLocator,
   type CallBound,
@@ -38,7 +37,7 @@ import {
 } from "./contracts.js";
 import { readStoryEnrichment } from "./enrichment.js";
 import { storyActualWords, storyGuidedBound, storyGuidedWords } from "./length.js";
-import { runStoryLoop, storyCallSiteKey, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
+import { runStoryLoop, storyCallSiteKey, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome } from "./loop.js";
 import {
   buildStoryMaterial,
   buildStoryRevisionPrompt,
@@ -233,9 +232,9 @@ const BARE_STEP: StoryStepLease = (use) => use();
 
 /**
  * R1d: the story gateway accepts rounds 1..8 only (`STORY_CALL_SITE`, apps/runner/src/index.ts, and the loop's own
- * limit), so a backup loop whose last round would pass it is not started.
+ * limit, read from the loop: Task 17 review 2), so a backup loop whose last round would pass it is not started.
  */
-const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: 8 });
+const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: storyLoopLastRound() });
 
 /** Story v4 round 2 (R1d decision 3): the accepted round-1 draft as the model's own turn, and the checker's problems. */
 type StoryRevisionTurn = Readonly<{ ownDraft: string; problems: string }>;
@@ -341,9 +340,10 @@ function storyCallRequest(input: {
     providerRef: input.providerRef,
     packet: revision === null ? framed.packet : revision.packet,
     classifyContent: input.classifyContent,
-    buildRepairPacket: turn === null
+    // A revision's full re-ask is the revision's own (`buildStoryRevisionPrompt`), under the same fence (Task 17 review 1).
+    buildRepairPacket: revision === null
       ? (rejected) => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
-      : (rejected) => buildFramedRevisionPrompt(framed.packet, turn.ownDraft, turn.problems, schemaFailureLocator(rejected)),
+      : revision.buildRepairPacket,
     ...(input.guidedWords === undefined ? {} : { guidedWords: input.guidedWords }),
     ...(input.actualWordsOf === undefined ? {} : { actualWordsOf: input.actualWordsOf })
   };

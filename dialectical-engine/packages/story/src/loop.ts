@@ -49,6 +49,11 @@ const STORY_CAUSE_SHAPE = /^[A-Za-z][A-Za-z0-9_]{0,95}$/u;
 /** The last round a story call-site key names (`STORY:STORYTELLER:1` to `:8`; the register caps the rounds at 8). */
 const STORY_LOOP_LAST_ROUND = 8;
 
+/** The loop's last round (`STORY_LOOP_LAST_ROUND`), for the writer's backup loop (Task 17 review 2): one number, one place. */
+export function storyLoopLastRound(): number {
+  return STORY_LOOP_LAST_ROUND;
+}
+
 /** `STORY:STORYTELLER:{round}` or `STORY:CHECKER:{round}`: the only call sites the story gateway accepts. */
 export function storyCallSiteKey(role: "STORYTELLER" | "CHECKER", round: number): string {
   return `STORY:${role}:${String(round)}`;

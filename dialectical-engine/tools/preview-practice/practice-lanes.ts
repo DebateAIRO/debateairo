@@ -46,6 +46,7 @@ import {
   type MapReplySalvage
 } from "@debateai/map";
 import {
+  PREVIEW_PROVIDER_REF_MODELS,
   decodedRepairsOf,
   decodeModelJson,
   fixReplyStructure,
@@ -161,6 +162,11 @@ export function replyContentOf(rawText: string): string {
     }
   } catch { /* not a vendor body: the text itself */ }
   return rawText;
+}
+
+/** The preview model a provider ref names, as every practice table reports it; a ref the preview does not review is named as such. */
+export function practiceModelOfRef(providerRef: string): string {
+  return PREVIEW_PROVIDER_REF_MODELS[providerRef] ?? `unreviewed:${providerRef}`;
 }
 
 export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "SYNTHESIZER" | "EVALUATOR" | "STORYTELLER" | "STORY_CHECKER"

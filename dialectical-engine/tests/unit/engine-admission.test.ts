@@ -3,7 +3,7 @@
 // force without the length row; engineForAsk refuses it again as a belt.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
+import { askRefusalPublicMessage, evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -123,6 +123,15 @@ describe("admission freezes the engine on the receipt (spec §3.2)", () => {
 
   it("the row in force without the length row (a composition that skipped the boot rule) is refused, never admitted", async () => {
     await expect(evaluateAskAdmission(settings({ engine: true }), ASK)).rejects.toMatchObject({ code: "ENGINE_REQUIRES_LENGTH_POLICY" });
+  });
+
+  it("an HTTP caller is told the code only: the refusal's message names engine words (Task 6 review 2, final wave A4)", async () => {
+    const refusal = await evaluateAskAdmission(settings({ engine: true }), ASK)
+      .then(() => null, (error: unknown) => error as { code: string; message: string });
+    expect(refusal).not.toBeNull();
+    expect(refusal!.code).toBe("ENGINE_REQUIRES_LENGTH_POLICY");
+    expect(refusal!.message).toMatch(/Engine 2/u);
+    expect(askRefusalPublicMessage(refusal!.code, refusal!.message)).toBe("ENGINE_REQUIRES_LENGTH_POLICY");
   });
 });
 
