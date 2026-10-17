@@ -34,6 +34,7 @@
  * before it starts.
  */
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
+import { parseCostEnvelopeBasis } from "@debateai/budget";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
@@ -59,8 +60,8 @@ import {
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import {
-  lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls,
-  type DebateShapeCeilingInput
+  engineOfRun, lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
+  readSynthesisRoleControls, type DebateShapeCeilingInput, type EngineSettings
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
 import { admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
@@ -509,6 +510,7 @@ function offPanelRoleRefs(panel: readonly PreviewPanelMember[], roleProviderRefs
  * - story: per round, the storyteller twice and the story checker twice (each one repair try; story format
  *   robustness, 2026-10-12: the checker's second try replaced its unbilled 60-second resend, so the calls are
  *   as many as before and the second one is priced);
+ *   an engine-2 receipt counts its rounds twice: the backup storyteller's whole loop (engine redesign R1d);
  * - probes: the runner's paid health checks at every pickup, one per panel member plus one per role
  *   ref not on the panel, times (1 + the hold cap: `hold_cap` on the basis, else the register's,
  *   + PREVIEW_ESTIMATE_RESTART_PICKUPS);
@@ -550,7 +552,7 @@ export function previewExpectedCalls(input: Readonly<{
   if (debate < 1) throw new TypeError("PREVIEW_BASIS_HAS_NO_CALL_COUNT");
   const probes = previewPickups(input.basis, input.maxCooldownHoldsPerRun)
     * (input.panel.length + offPanelRoleRefs(input.panel, input.roleProviderRefs).length);
-  const story = 4 * input.storyRounds;
+  const story = 4 * previewStoryRoundsOf(input.basis, input.storyRounds);
   const unbilledRetries = debate;
   return Object.freeze({ debate, story, probes, askProbes, unbilledRetries, total: debate + story + probes + askProbes + unbilledRetries });
 }
@@ -782,7 +784,8 @@ export function previewCallShares(input: Readonly<{
     if (!rotated) for (const ref of offPanelRoleRefs(input.panel, input.roleProviderRefs)) add(modelOfRef(ref), "PROBE", pickups);
     for (const model of askProbeModelIds) add(model, "PROBE", denominator);
   }
-  const rounds = BigInt(input.storyRounds) * denominator;
+  // Engine redesign (R1d decision 7): an engine-2 receipt's story rounds count twice (the backup storyteller's worst case).
+  const rounds = BigInt(previewStoryRoundsOf(input.basis, input.storyRounds)) * denominator;
   if (rounds > 0n) {
     const tellers = rotated ? perGate("STORYTELLER") : [input.roleModels.storyteller!];
     const checkers = rotated ? perGate("STORY_CHECKER") : [input.roleModels.storyChecker!];
@@ -1271,6 +1274,26 @@ export function previewCallOutputTokens(config: PreviewProviderTestConfig, ceili
  */
 function previewShapeOf(basis: Readonly<Record<string, unknown>>): DebateShapeCeilingInput | null {
   return admittedShapeOf(basis)?.shape ?? null;
+}
+
+/**
+ * Engine redesign (R1d; INTERFACE §3.4): the run's frozen engine member, read ONLY through the strict receipt parser (as
+ * the shape is, controller ruling PF7); null for a receipt without it (engine 1). A malformed member, or one without the
+ * length member, is refused (RUN_COST_ENVELOPE_UNRESOLVED), never priced as engine 1.
+ */
+function previewEngineOf(basis: Readonly<Record<string, unknown>>): EngineSettings | null {
+  if (basis.engine === undefined) return null;
+  const engine = engineOfRun(parseCostEnvelopeBasis(basis));
+  return engine.engine === 2 ? engine : null;
+}
+
+/**
+ * The story rounds a debate is priced at (R1d decision 7). Engine 2: twice the register's rounds, because when the first
+ * storyteller's round 1 fails for good the story runs its whole loop once more with a backup storyteller (the worst case,
+ * so the ceiling never under-counts). Engine 1: the register's rounds, exactly as today.
+ */
+function previewStoryRoundsOf(basis: Readonly<Record<string, unknown>>, storyRounds: number): number {
+  return previewEngineOf(basis) === null ? storyRounds : 2 * storyRounds;
 }
 
 /** Debate shape: the run's answer-writer bound from its receipt (`shape.writer_bound`), or null for today's receipt. */
