@@ -17,6 +17,7 @@ import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAn
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function verdictLabel(
   verdict: PublicDebate["answer"]["verdict"],
@@ -38,6 +39,7 @@ function ArgumentCard({
   side: "pro" | "con";
   onRead: (nodeId: string) => void;
 }) {
+  const textLang = useDebateTextLang();
   const label = side === "pro"
     ? t(catalog, "public.overview.proLabel")
     : t(catalog, "public.overview.conLabel");
@@ -89,7 +91,7 @@ function ArgumentCard({
             </span>
           )}
         </div>
-        <p className="publicArgumentClaim">{argument.claim}</p>
+        <p className="publicArgumentClaim" {...textLang}>{argument.claim}</p>
         <div className="publicArgumentFoot">
           <button type="button" className="publicLockedAction" disabled aria-label={t(catalog, "public.overview.challengeLockedAria")}>
             🔒 {t(catalog, "public.overview.challenge")}

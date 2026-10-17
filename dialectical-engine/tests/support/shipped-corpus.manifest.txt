@@ -545,6 +545,7 @@ apps/ui/components/debateReferenceDesign.drawers.source-test.mjs
 apps/ui/components/debateReferenceDesign.public.source-test.mjs
 apps/ui/components/debateReferenceDesign.source-test.mjs
 apps/ui/components/debateReferenceDesign.views.source-test.mjs
+apps/ui/components/debateTextLang.tsx
 apps/ui/components/dialogSurface.ts
 apps/ui/components/landing/LandingChrome.tsx
 apps/ui/components/landing/LandingHero.tsx

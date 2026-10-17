@@ -34,6 +34,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
 // gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
@@ -270,6 +271,7 @@ function CanvasCard({
   composeCatalog,
   locale
 }: CanvasCardProps) {
+  const textLang = useDebateTextLang();
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
   const stance = role === "pov" ? "reasoning" : role;
@@ -409,7 +411,7 @@ function CanvasCard({
           other card gets this hidden one, outside the card so a card that is itself a button
           keeps it. The visible heading carries the stance in its one name (aria-label). */}
       {stanceLabel !== null && !claimIsHeading ? (
-        <div className="srOnly" role="heading" aria-level={outlineLevel(placed.depth)} id={headingId}>
+        <div className="srOnly" role="heading" aria-level={outlineLevel(placed.depth)} id={headingId} {...textLang}>
           {node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
         </div>
       ) : null}
@@ -437,6 +439,7 @@ function CanvasCard({
           <div
             className="nodeClaim treePreview"
             role="heading"
+            {...textLang}
             aria-level={outlineLevel(placed.depth)}
             id={headingId}
             aria-label={node.claim ? `${stanceLabel}: ${node.claim}` : (stanceLabel ?? undefined)}
@@ -484,7 +487,7 @@ function CanvasCard({
         {role === "root" ? (
           <>
             <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-            <div className="nodeClaim root" role="heading" aria-level={2}>{node.claim}</div>
+            <div className="nodeClaim root" role="heading" aria-level={2} {...textLang}>{node.claim}</div>
             <div className="nodeRootMeta">
               <span>{tPlural(catalog, "debateViews.claimCount", meta.claims, locale)}</span>
               <span className="sep">/</span>
@@ -517,7 +520,7 @@ function CanvasCard({
             <span className="nodeAbandonedMark" aria-hidden>⊗</span>
             <div>
               <div className="nodeAbandonedLabel">{t(catalog, "debateViews.stoppedPath")}</div>
-              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.abandonedArgument")}</div>
+              <div className="nodeAbandonedClaim" {...(node.claim ? textLang : {})}>{node.claim || t(catalog, "debateViews.abandonedArgument")}</div>
             </div>
           </div>
         ) : state === "failed" ? (
@@ -525,7 +528,7 @@ function CanvasCard({
             <span className="nodeAbandonedMark" aria-hidden>⚠</span>
             <div>
               <div className="nodeAbandonedLabel">{t(catalog, "debateViews.failedBranch")}</div>
-              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.generationFailed")}</div>
+              <div className="nodeAbandonedClaim" {...(node.claim ? textLang : {})}>{node.claim || t(catalog, "debateViews.generationFailed")}</div>
               <div className="metaLine" style={{ marginTop: 5 }}>
                 {t(catalog, "debateViews.generationFailedContinued")}
               </div>
@@ -609,7 +612,7 @@ function CanvasCard({
                 <div className="skel" style={{ height: 13, borderRadius: 4, width: "64%" }} />
               </div>
             ) : state === "streaming" ? (
-              <div className="nodeClaim streaming">
+              <div className="nodeClaim streaming" {...textLang}>
                 {generation?.argument || node.claim}
                 <span className="streamCursor" style={{ background: pal?.text }} />
               </div>
