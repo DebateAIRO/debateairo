@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Kết nối của bạn có vẻ đến từ {ipCountry}. Bạn có sống ở {declaredCountry} không?",
   "billing.checkout.confirmCountryYes": "Có, tôi sống ở đó",
   "billing.checkout.confirmCountryRequired": "Vui lòng xác nhận quốc gia bạn sinh sống, rồi tiếp tục.",
+  "billing.checkout.consentsRequired": "Vui lòng đánh dấu cả hai mục đồng ý ở trên, rồi tiếp tục.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT theo cơ chế tính thuế ngược",
   "billing.checkout.noTax": "không có thuế",

@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Схоже, ви під’єднуєтеся з цієї країни: {ipCountry}. Ви живете в цій країні: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Так, я там живу",
   "billing.checkout.confirmCountryRequired": "Підтвердьте країну проживання, а потім продовжте.",
+  "billing.checkout.consentsRequired": "Позначте обидві згоди вище, а потім продовжте.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "ПДВ за механізмом зворотного нарахування",
   "billing.checkout.noTax": "без податку",

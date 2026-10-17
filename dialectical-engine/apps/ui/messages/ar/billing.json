@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "يبدو أن اتصالك من هذا البلد: {ipCountry}. هل تقيم في هذا البلد: {declaredCountry}؟",
   "billing.checkout.confirmCountryYes": "نعم، أقيم هناك",
   "billing.checkout.confirmCountryRequired": "يُرجى تأكيد بلد إقامتك، ثم المتابعة.",
+  "billing.checkout.consentsRequired": "يُرجى وضع علامة على الموافقتين أعلاه، ثم المتابعة.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%، {country})",
   "billing.checkout.taxReverseCharge": "ضريبة القيمة المضافة بآلية الاحتساب العكسي",
   "billing.checkout.noTax": "بلا ضريبة",

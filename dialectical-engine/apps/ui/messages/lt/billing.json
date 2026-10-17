@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Atrodo, kad jūsų ryšys yra iš šios šalies: {ipCountry}. Ar gyvenate šioje šalyje: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Taip, gyvenu ten",
   "billing.checkout.confirmCountryRequired": "Patvirtinkite šalį, kurioje gyvenate, ir tęskite.",
+  "billing.checkout.consentsRequired": "Pažymėkite abu aukščiau esančius sutikimus ir tęskite.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "PVM atvirkštinis apmokestinimas",
   "billing.checkout.noTax": "be mokesčio",

@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Bağlantınız şu ülkeden geliyor gibi görünüyor: {ipCountry}. Şu ülkede mi yaşıyorsunuz: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Evet, orada yaşıyorum",
   "billing.checkout.confirmCountryRequired": "Lütfen yaşadığınız ülkeyi onaylayın, ardından devam edin.",
+  "billing.checkout.consentsRequired": "Lütfen yukarıdaki iki onayı da işaretleyin, ardından devam edin.",
   "billing.checkout.taxLabel": "{tax} {taxName} (%{rate}, {country})",
   "billing.checkout.taxReverseCharge": "KDV tersine vergilendirme",
   "billing.checkout.noTax": "vergi yok",

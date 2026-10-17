@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Vaša povezava je videti, kot da prihaja iz te države: {ipCountry}. Ali živite v tej državi: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Da, tam živim",
   "billing.checkout.confirmCountryRequired": "Potrdite državo, v kateri živite, in nato nadaljujte.",
+  "billing.checkout.consentsRequired": "Označite obe soglasji zgoraj in nato nadaljujte.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "DDV po sistemu obrnjene davčne obveznosti",
   "billing.checkout.noTax": "brez davka",

@@ -226,6 +226,28 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
   });
 
+  it("keeps Continue to payment focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await render();
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    const next = button("billing.checkout.continueToCard")!;
+    expect(next.disabled).toBe(false);
+    expect(next.getAttribute("aria-disabled")).toBe("true");
+    const reason = (): string | null | undefined =>
+      next.hasAttribute("aria-describedby") ? container.querySelector(`#${next.getAttribute("aria-describedby")}`)?.textContent : null;
+    expect(reason()).toBe(EN["billing.checkout.consentsRequired"]);
+    await click(next);
+    expect(document.activeElement).toBe(checkbox(0));
+    await click(checkbox(0));
+    await click(next);
+    expect(document.activeElement).toBe(checkbox(1));
+    expect(client.startBillingCheckout).not.toHaveBeenCalled();
+    await click(checkbox(1));
+    expect(isLocked(next)).toBe(false);
+    expect(reason()).toBeNull();
+  });
+
   it("keeps the price disabled while the phone holds only its calling code", async () => {
     client.createBillingQuote.mockResolvedValue(quote({ address_required: true }));
     await render();

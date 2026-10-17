@@ -209,7 +209,7 @@
   "settings.security.lastPath": "Cuir modh eile sínithe isteach leis sula mbainfidh tú an ceann seo.",
   "settings.security.remove": "Bain",
   "settings.security.removeNamed": "Bain {method}",
-  "settings.security.removePasskey": "Bain pas-eochair",
+  "settings.security.removePasskey": "Bain eochair rochtana",
   "settings.security.removeAuthenticator": "Bain aip fíordheimhnithe",
   "settings.security.codesRemaining": "Cóid aisghabhála: {count}",
   "settings.security.regenerate": "Gin cóid aisghabhála nua",

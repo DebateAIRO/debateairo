@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "접속 위치가 {ipCountry}(으)로 보입니다. {declaredCountry}에 거주하시나요?",
   "billing.checkout.confirmCountryYes": "네, 그곳에 거주합니다",
   "billing.checkout.confirmCountryRequired": "거주 국가를 확인한 후 계속해 주세요.",
+  "billing.checkout.consentsRequired": "위의 두 가지 동의에 모두 체크한 후 계속해 주세요.",
   "billing.checkout.taxLabel": "{tax} {taxName}({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT 역과세",
   "billing.checkout.noTax": "세금 없음",

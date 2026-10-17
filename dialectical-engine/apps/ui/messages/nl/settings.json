@@ -207,7 +207,7 @@
   "settings.security.remove": "Verwijderen",
   "settings.security.removeNamed": "{method} verwijderen",
   "settings.security.removePasskey": "Passkey verwijderen",
-  "settings.security.removeAuthenticator": "Verificatie-app verwijderen",
+  "settings.security.removeAuthenticator": "Authenticator-app verwijderen",
   "settings.security.codesRemaining": "Herstelcodes: {count}",
   "settings.security.regenerate": "Nieuwe herstelcodes genereren",
   "settings.security.lockoutReminder": "U hebt nog geen herstelcodes of passkey. Als u uw telefoon kwijtraakt, komt u daarmee meteen weer binnen.",

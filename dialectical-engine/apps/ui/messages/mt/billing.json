@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Il-konnessjoni tiegħek tidher li ġejja minn dan il-pajjiż: {ipCountry}. Tgħix f’dan il-pajjiż: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Iva, ngħix hemm",
   "billing.checkout.confirmCountryRequired": "Jekk jogħġbok ikkonferma l-pajjiż fejn tgħix, imbagħad kompli.",
+  "billing.checkout.consentsRequired": "Jekk jogħġbok immarka ż-żewġ ftehimiet ta’ hawn fuq, imbagħad kompli.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT b’ħlas invers",
   "billing.checkout.noTax": "l-ebda taxxa",

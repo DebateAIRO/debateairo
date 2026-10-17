@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "La tua connessione sembra provenire da questo paese: {ipCountry}. Vivi in questo paese: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Sì, vivo lì",
   "billing.checkout.confirmCountryRequired": "Conferma il paese in cui vivi, poi continua.",
+  "billing.checkout.consentsRequired": "Seleziona entrambi i consensi qui sopra, poi continua.",
   "billing.checkout.taxLabel": "{tax} di {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "IVA in inversione contabile",
   "billing.checkout.noTax": "nessuna imposta",

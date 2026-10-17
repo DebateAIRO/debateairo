@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Wygląda na to, że Twoje połączenie pochodzi z tego kraju: {ipCountry}. Czy mieszkasz w tym kraju: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Tak, mieszkam tam",
   "billing.checkout.confirmCountryRequired": "Potwierdź kraj zamieszkania, a potem kontynuuj.",
+  "billing.checkout.consentsRequired": "Zaznacz obie zgody powyżej, a potem kontynuuj.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT – odwrotne obciążenie",
   "billing.checkout.noTax": "bez podatku",

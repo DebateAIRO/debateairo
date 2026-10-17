@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Vaše pripojenie vyzerá, že pochádza z tejto krajiny: {ipCountry}. Žijete v tejto krajine: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Áno, žijem tam",
   "billing.checkout.confirmCountryRequired": "Potvrďte krajinu, v ktorej žijete, a pokračujte.",
+  "billing.checkout.consentsRequired": "Označte oba súhlasy vyššie a pokračujte.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "DPH – prenesenie daňovej povinnosti",
   "billing.checkout.noTax": "bez dane",

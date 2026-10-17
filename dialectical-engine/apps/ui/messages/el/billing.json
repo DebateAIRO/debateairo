@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Η σύνδεσή σας φαίνεται να προέρχεται από: {ipCountry}. Ζείτε σε αυτή τη χώρα: {declaredCountry};",
   "billing.checkout.confirmCountryYes": "Ναι, ζω εκεί",
   "billing.checkout.confirmCountryRequired": "Επιβεβαιώστε τη χώρα όπου ζείτε και, στη συνέχεια, συνεχίστε.",
+  "billing.checkout.consentsRequired": "Επιλέξτε και τις δύο συναινέσεις παραπάνω και, στη συνέχεια, συνεχίστε.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "ΦΠΑ με αντίστροφη επιβάρυνση",
   "billing.checkout.noTax": "χωρίς φόρο",

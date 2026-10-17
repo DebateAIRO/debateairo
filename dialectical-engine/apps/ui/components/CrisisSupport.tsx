@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ContractHttpError, CRISIS_SUPPORT_OFFERED, detectCrisis, warmCrisisCheck } from "@debateai/contract";
 import { useModalSurface } from "@/components/consent/modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import {
   CRISIS_LINES,
   FIND_A_HELPLINE_URL,
@@ -131,6 +132,7 @@ export function CrisisSupportDialog({
   const entry = country === "" ? undefined : CRISIS_LINES[country];
   // Esc and "Back to my question" close it. The backdrop does not: a stray click must not take
   // the numbers away from someone who needs them.
+  useHideOutside(dialogRef);
   useModalSurface(true, { containerRef: dialogRef, initialFocusRef: titleRef, onClose: onBack });
 
   return (

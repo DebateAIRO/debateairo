@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Yhteytesi näyttää tulevan maasta {ipCountry}. Asutko maassa {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Kyllä, asun siellä",
   "billing.checkout.confirmCountryRequired": "Vahvista asuinmaasi ja jatka sitten.",
+  "billing.checkout.consentsRequired": "Valitse molemmat yllä olevat suostumukset ja jatka sitten.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "ALV, käännetty verovelvollisuus",
   "billing.checkout.noTax": "ei veroa",

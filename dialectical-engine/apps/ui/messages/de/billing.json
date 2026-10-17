@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Ihre Verbindung scheint aus folgendem Land zu kommen: {ipCountry}. Wohnen Sie in diesem Land: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ja, ich wohne dort",
   "billing.checkout.confirmCountryRequired": "Bitte bestätigen Sie das Land, in dem Sie wohnen, und fahren Sie dann fort.",
+  "billing.checkout.consentsRequired": "Bitte setzen Sie bei beiden Zustimmungen oben ein Häkchen und fahren Sie dann fort.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "USt. – Steuerschuldnerschaft des Leistungsempfängers",
   "billing.checkout.noTax": "keine Steuer",

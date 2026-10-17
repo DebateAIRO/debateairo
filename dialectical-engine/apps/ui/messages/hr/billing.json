@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Čini se da je vaša veza iz zemlje {ipCountry}. Živite li u zemlji {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Da, živim ondje",
   "billing.checkout.confirmCountryRequired": "Potvrdite zemlju u kojoj živite, a zatim nastavite.",
+  "billing.checkout.consentsRequired": "Označite obje suglasnosti iznad, a zatim nastavite.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "PDV prijenos porezne obveze",
   "billing.checkout.noTax": "bez poreza",

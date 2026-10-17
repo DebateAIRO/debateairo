@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Is cosúil gur ón tír seo do cheangal: {ipCountry}. An gcónaíonn tú sa tír seo: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Cónaím, cónaím ansin",
   "billing.checkout.confirmCountryRequired": "Deimhnigh an tír ina gcónaíonn tú, agus ansin lean ar aghaidh.",
+  "billing.checkout.consentsRequired": "Cuir tic leis an dá chomhaontú thuas, agus ansin lean ar aghaidh.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "CBL faoin muirear droim ar ais",
   "billing.checkout.noTax": "gan cháin",

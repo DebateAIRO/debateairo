@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Your connection looks like it's from {ipCountry}. Do you live in {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Yes, I live there",
   "billing.checkout.confirmCountryRequired": "Please confirm the country where you live, then continue.",
+  "billing.checkout.consentsRequired": "Tick both agreements above, then continue.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT reverse charge",
   "billing.checkout.noTax": "no tax",

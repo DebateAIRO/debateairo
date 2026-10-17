@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "A kapcsolata úgy tűnik, innen érkezik: {ipCountry}. Ebben az országban él: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Igen, ott élek",
   "billing.checkout.confirmCountryRequired": "Kérjük, erősítse meg, melyik országban él, majd folytassa.",
+  "billing.checkout.consentsRequired": "Kérjük, jelölje be mindkét fenti hozzájárulást, majd folytassa.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "Fordított adózású ÁFA",
   "billing.checkout.noTax": "adó nélkül",

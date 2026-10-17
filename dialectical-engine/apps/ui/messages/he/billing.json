@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "נראה שהחיבור שלכם מגיע מהמדינה הזו: {ipCountry}. האם אתם גרים במדינה הזו: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "כן, אני גר/ה שם",
   "billing.checkout.confirmCountryRequired": "אשרו את מדינת המגורים שלכם, ואז המשיכו.",
+  "billing.checkout.consentsRequired": "סמנו את שתי ההסכמות שלמעלה, ואז המשיכו.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "מע״מ בחיוב הפוך",
   "billing.checkout.noTax": "ללא מס",

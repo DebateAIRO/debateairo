@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "您的连接似乎来自 {ipCountry}。您是否居住在 {declaredCountry}？",
   "billing.checkout.confirmCountryYes": "是的，我住在那里",
   "billing.checkout.confirmCountryRequired": "请确认您居住的国家/地区，然后继续。",
+  "billing.checkout.consentsRequired": "请勾选上方的两项同意，然后继续。",
   "billing.checkout.taxLabel": "{tax} {taxName}（{rate}%，{country}）",
   "billing.checkout.taxReverseCharge": "增值税反向征收",
   "billing.checkout.noTax": "无税费",

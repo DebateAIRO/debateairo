@@ -318,6 +318,20 @@ export function CheckoutFlow({
   // The server refuses 422 BILLING_ADDRESS_REQUIRED for a quote that still lacks a payer field, so it never goes on.
   const canContinue = !busy && quote !== null && consents !== null && renewalAccepted && immediateAccepted
     && !quote.address_required && (!quote.country_confirm_needed || countryConfirmed);
+  // "Continue to payment" stays focusable too: while it is locked, this says why (as its description and
+  // when pressed), and a press moves focus to the first thing still missing.
+  const continueBlocker: { key: string; target: string } | null = busy || quote === null || consents === null ? null
+    : quote.address_required ? { key: "billing.checkout.detailsRequired", target: `checkout-${FIELD_ORDER.find((field) => missing[field] !== undefined) ?? FIELD_ORDER[0]}` }
+    : quote.country_confirm_needed && !countryConfirmed ? { key: "billing.checkout.confirmCountryRequired", target: "checkout-confirm-country" }
+    : !renewalAccepted ? { key: "billing.checkout.consentsRequired", target: "checkout-renewal" }
+    : !immediateAccepted ? { key: "billing.checkout.consentsRequired", target: "checkout-immediate" }
+    : null;
+  function pressLockedContinue(): void {
+    if (continueBlocker === null) return;
+    if (quote?.address_required) setShowErrors(true);
+    document.getElementById(continueBlocker.target)?.focus();
+    announcer.announce(t(catalog, continueBlocker.key));
+  }
 
   return (
     <section aria-labelledby="checkout-title">
@@ -426,26 +440,34 @@ export function CheckoutFlow({
               <p>{t(catalog, "billing.checkout.confirmCountry", {
                 ipCountry: countryName(locale, quote.ip_country), declaredCountry: countryName(locale, country)
               })}</p>
-              <button type="button" className="setBtn" aria-pressed={countryConfirmed} onClick={() => setCountryConfirmed(true)}>
+              <button type="button" id="checkout-confirm-country" className="setBtn" aria-pressed={countryConfirmed} onClick={() => setCountryConfirmed(true)}>
                 {t(catalog, "billing.checkout.confirmCountryYes")}
               </button>
             </div>
           ) : null}
           <label className="billingConsent">
-            <input type="checkbox" checked={renewalAccepted} onChange={(event) => setRenewalAccepted(event.target.checked)} />
+            <input type="checkbox" id="checkout-renewal" checked={renewalAccepted} onChange={(event) => setRenewalAccepted(event.target.checked)} />
             {/* Spec §2.18: the card-saving agreement names the monthly total (N20 adds {total} to the sentence). */}
             <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, quote.total, quote.currency) })}</span>
           </label>
           <label className="billingConsent">
-            <input type="checkbox" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
+            <input type="checkbox" id="checkout-immediate" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
             <span>{t(catalog, "billing.consent.immediateStart")}</span>
           </label>
           <h2 className="setSubtitle">{t(catalog, "billing.checkout.cardTitle")}</h2>
           <p className="billingNote">{t(catalog, "billing.checkout.cardNote")}</p>
           <div className="billingActions">
-            <button type="button" className="btn btnDark" disabled={!canContinue} onClick={() => { void continueToPayment(); }}>
+            <button
+              type="button"
+              className="btn btnDark"
+              disabled={busy}
+              aria-disabled={!canContinue || undefined}
+              aria-describedby={continueBlocker !== null ? "checkout-continue-hint" : undefined}
+              onClick={() => { if (canContinue) void continueToPayment(); else pressLockedContinue(); }}
+            >
               {t(catalog, "billing.checkout.continueToCard")}
             </button>
+            {continueBlocker !== null ? <span id="checkout-continue-hint" className="srOnly">{t(catalog, continueBlocker.key)}</span> : null}
           </div>
           {/* Spec §2.18: NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer. */}
           <PaymentMarksGroup marks={paymentMarks} />

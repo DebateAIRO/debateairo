@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Похоже, вы подключаетесь из этой страны: {ipCountry}. Вы живёте в этой стране: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Да, я живу там",
   "billing.checkout.confirmCountryRequired": "Подтвердите страну проживания, затем продолжите.",
+  "billing.checkout.consentsRequired": "Отметьте оба согласия выше, затем продолжите.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "НДС по механизму обратного начисления",
   "billing.checkout.noTax": "без налога",

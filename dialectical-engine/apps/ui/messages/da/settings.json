@@ -207,7 +207,7 @@
   "settings.security.remove": "Fjern",
   "settings.security.removeNamed": "Fjern {method}",
   "settings.security.removePasskey": "Fjern adgangsnøgle",
-  "settings.security.removeAuthenticator": "Fjern godkenderapp",
+  "settings.security.removeAuthenticator": "Fjern godkendelsesapp",
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
   "settings.security.regenerate": "Generér nye gendannelseskoder",
   "settings.security.lockoutReminder": "Du har endnu ingen gendannelseskoder eller adgangsnøgle. Hvis du mister din telefon, kommer du ind igen med det samme med dem.",

@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Su conexión parece proceder de este país: {ipCountry}. ¿Reside en este país: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Sí, resido allí",
   "billing.checkout.confirmCountryRequired": "Confirme el país donde reside y luego continúe.",
+  "billing.checkout.consentsRequired": "Marque las dos casillas de aceptación de arriba y luego continúe.",
   "billing.checkout.taxLabel": "{tax} de {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "IVA por inversión del sujeto pasivo",
   "billing.checkout.noTax": "sin impuestos",

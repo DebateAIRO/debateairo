@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Koneksi Anda tampaknya berasal dari {ipCountry}. Apakah Anda tinggal di {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ya, saya tinggal di sana",
   "billing.checkout.confirmCountryRequired": "Konfirmasikan negara tempat Anda tinggal, lalu lanjutkan.",
+  "billing.checkout.consentsRequired": "Centang kedua persetujuan di atas, lalu lanjutkan.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "PPN mekanisme reverse charge",
   "billing.checkout.noTax": "tanpa pajak",

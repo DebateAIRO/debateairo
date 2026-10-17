@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Teie ühendus näib olevat pärit riigist {ipCountry}. Kas elate riigis {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Jah, elan seal",
   "billing.checkout.confirmCountryRequired": "Kinnitage riik, kus elate, ja jätkake.",
+  "billing.checkout.consentsRequired": "Märkige mõlemad ülaltoodud nõusolekud ja jätkake.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "Käibemaksu pöördmaksustamine",
   "billing.checkout.noTax": "maksuta",

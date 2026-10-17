@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Din anslutning verkar komma från det här landet: {ipCountry}. Bor du i det här landet: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ja, jag bor där",
   "billing.checkout.confirmCountryRequired": "Bekräfta landet där du bor och fortsätt sedan.",
+  "billing.checkout.consentsRequired": "Kryssa i båda godkännandena ovan och fortsätt sedan.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "Moms enligt omvänd skattskyldighet",
   "billing.checkout.noTax": "ingen skatt",

@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Din forbindelse ser ud til at komme fra {ipCountry}. Bor du i {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Ja, jeg bor der",
   "billing.checkout.confirmCountryRequired": "Bekræft det land, du bor i, og fortsæt derefter.",
+  "billing.checkout.consentsRequired": "Sæt kryds ved begge aftaler ovenfor, og fortsæt derefter.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate} %, {country})",
   "billing.checkout.taxReverseCharge": "Moms efter omvendt betalingspligt",
   "billing.checkout.noTax": "ingen skat",

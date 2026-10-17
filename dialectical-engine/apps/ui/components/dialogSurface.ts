@@ -15,10 +15,55 @@ export function useDialogSurface<T extends HTMLElement = HTMLElement>(
   onClose: () => void
 ): React.RefObject<T | null> {
   const containerRef = React.useRef<T | null>(null);
+  useHideOutside(containerRef);
   useModalSurface(true, {
     containerRef: containerRef as React.RefObject<HTMLElement | null>,
     initialFocusRef: containerRef as React.RefObject<HTMLElement | null>,
     onClose
   });
   return containerRef;
+}
+
+/** How many open surfaces currently hide each element, so nested dialogs undo only their own. */
+const hiddenBy = new WeakMap<Element, number>();
+
+const isLiveRegion = (element: Element): boolean =>
+  element.hasAttribute("aria-live") || /^(status|alert|log)$/.test(element.getAttribute("role") ?? "");
+
+/**
+ * While `active`, hides everything outside `containerRef` from assistive technology, so a
+ * screen reader cannot wander out of an open modal (VoiceOver otherwise leaves it with
+ * VO-Shift-Up or through the rotor, `aria-modal` notwithstanding). It sets `aria-hidden` and
+ * not `inert`: pointer clicks on a scrim beside the dialog keep working. Live regions stay
+ * exposed so announcements still reach the reader. A layout effect, so its cleanup runs before
+ * the modal helper's passive cleanup returns focus to the opener.
+ */
+export function useHideOutside(containerRef: React.RefObject<HTMLElement | null>, active = true): void {
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!active || container === null) return undefined;
+    const hidden: Element[] = [];
+    for (let node: Element = container; node.parentElement !== null && node !== document.body; node = node.parentElement) {
+      for (const sibling of Array.from(node.parentElement.children)) {
+        if (sibling === node || isLiveRegion(sibling) || sibling.tagName === "SCRIPT" || sibling.tagName === "STYLE") continue;
+        const count = hiddenBy.get(sibling) ?? 0;
+        // Hidden by its own markup: never this hook's to undo.
+        if (count === 0 && sibling.getAttribute("aria-hidden") === "true") continue;
+        hiddenBy.set(sibling, count + 1);
+        if (count === 0) sibling.setAttribute("aria-hidden", "true");
+        hidden.push(sibling);
+      }
+    }
+    return () => {
+      for (const sibling of hidden) {
+        const count = (hiddenBy.get(sibling) ?? 1) - 1;
+        if (count > 0) {
+          hiddenBy.set(sibling, count);
+        } else {
+          hiddenBy.delete(sibling);
+          sibling.removeAttribute("aria-hidden");
+        }
+      }
+    };
+  }, [active, containerRef]);
 }

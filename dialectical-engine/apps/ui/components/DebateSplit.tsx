@@ -213,9 +213,12 @@ export function DebateSplit({
         {total > 0 ? (
           <>
             <div className="splitMeter">
+              {/* Label and count are two blocks VoiceOver would run together ("THE CASE FOR8
+                  arguments"), so a screen reader gets them as one sentence instead. */}
               <div className="splitMeterSide right">
-                <div className="splitMeterLabel pro"><span aria-hidden="true">↑</span> {t(catalog, "debateViews.caseFor")}</div>
-                <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", pro, locale)}</div>
+                <div className="splitMeterLabel pro" aria-hidden="true">↑ {t(catalog, "debateViews.caseFor")}</div>
+                <div className="splitMeterCount" aria-hidden="true">{tPlural(catalog, "debateViews.argumentCount", pro, locale)}</div>
+                <span className="srOnly">{`${t(catalog, "debateViews.caseFor")}: ${tPlural(catalog, "debateViews.argumentCount", pro, locale)}`}</span>
               </div>
               <div
                 className="splitMeterBar"
@@ -224,8 +227,9 @@ export function DebateSplit({
                 }}
               />
               <div className="splitMeterSide left">
-                <div className="splitMeterLabel con">{t(catalog, "debateViews.caseAgainst")} <span aria-hidden="true">↓</span></div>
-                <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", con, locale)}</div>
+                <div className="splitMeterLabel con" aria-hidden="true">{t(catalog, "debateViews.caseAgainst")} ↓</div>
+                <div className="splitMeterCount" aria-hidden="true">{tPlural(catalog, "debateViews.argumentCount", con, locale)}</div>
+                <span className="srOnly">{`${t(catalog, "debateViews.caseAgainst")}: ${tPlural(catalog, "debateViews.argumentCount", con, locale)}`}</span>
               </div>
             </div>
             <div className="splitMeterNote">{t(catalog, "debateViews.leanAndFocusHint", { lean: leanLabel })}</div>

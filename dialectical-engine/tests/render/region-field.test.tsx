@@ -149,6 +149,15 @@ describe("RegionField artboard states", () => {
     expect(query(".regionPath").textContent).toBe("Europe · RO");
   });
 
+  it("tells a screen reader what is picked: the label names the trigger, the pick describes it (a11y 2026-10-17)", async () => {
+    await mountRegion();
+    const description = (): string =>
+      (query("#signup-region-trigger").getAttribute("aria-describedby") ?? "").split(" ").map((id) => host.querySelector(`#${id}`)?.textContent ?? "").join(" ");
+    expect(description()).toBe("Select your region");
+    await pick("Europe", "RO");
+    expect(description()).toBe("Romania");
+  });
+
   it("E6 reopens the picked continent and marks only that cell", async () => {
     await mountRegion();
     await pick("Europe", "RO");

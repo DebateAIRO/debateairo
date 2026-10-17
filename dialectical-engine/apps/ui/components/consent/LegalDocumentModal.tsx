@@ -5,6 +5,7 @@ import * as React from "react";
 import type { LegalDocument } from "../../lib/legalDocument";
 import { withNames } from "../legal/LegalBodies";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import { t } from "@/lib/i18n/translate";
 import { useConsentCatalog } from "./useConsentCatalog";
 
@@ -66,6 +67,7 @@ export function LegalDocumentModal({
   // The trap, initial placement on the close control, return on close, backdrop close and the
   // Esc STACK — all of it from the ONE shared helper. This component installs no keydown
   // listener of its own.
+  useHideOutside(dialogRef, open);
   useModalSurface(open, { containerRef: dialogRef, initialFocusRef: closeRef, onClose });
 
   React.useEffect(() => {

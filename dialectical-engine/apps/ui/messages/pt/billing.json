@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "A sua ligação parece vir deste país: {ipCountry}. Reside neste país: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Sim, resido lá",
   "billing.checkout.confirmCountryRequired": "Confirme o país onde reside e, depois, continue.",
+  "billing.checkout.consentsRequired": "Marque as duas autorizações acima e, depois, continue.",
   "billing.checkout.taxLabel": "{tax} de {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "IVA em autoliquidação",
   "billing.checkout.noTax": "sem impostos",

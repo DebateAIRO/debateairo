@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Връзката Ви изглежда, че е от {ipCountry}. Живеете ли в {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Да, живея там",
   "billing.checkout.confirmCountryRequired": "Моля, потвърдете държавата, в която живеете, и продължете.",
+  "billing.checkout.consentsRequired": "Моля, отметнете двете съгласия по-горе и продължете.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "ДДС с обратно начисляване",
   "billing.checkout.noTax": "без данък",

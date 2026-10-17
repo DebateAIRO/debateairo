@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Šķiet, ka jūsu savienojums ir no šīs valsts: {ipCountry}. Vai dzīvojat šajā valstī: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Jā, es tur dzīvoju",
   "billing.checkout.confirmCountryRequired": "Lūdzu, apstipriniet valsti, kurā dzīvojat, un pēc tam turpiniet.",
+  "billing.checkout.consentsRequired": "Lūdzu, atzīmējiet abas augstāk esošās piekrišanas un pēc tam turpiniet.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "PVN apgrieztā maksāšana",
   "billing.checkout.noTax": "bez nodokļa",

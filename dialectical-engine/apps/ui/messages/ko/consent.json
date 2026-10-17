@@ -16,6 +16,6 @@
   "consent.policy.close": "닫기",
   "consent.policy.questions": "질문:",
   "consent.policy.gateHint": "계속하려면 처리방침의 끝까지 내려 확인하세요.",
-  "consent.policy.gateOpened": "끝까지 도달했습니다. 이제 계속할 수 있습니다.",
+  "consent.policy.gateOpened": "끝에 도달했습니다. 이제 계속할 수 있습니다.",
   "consent.policy.acknowledge": "읽고 확인했습니다"
 }

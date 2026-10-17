@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "आपका कनेक्शन इस देश से लगता है: {ipCountry}। क्या आप इस देश में रहते हैं: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "हाँ, मैं वहीं रहता/रहती हूँ",
   "billing.checkout.confirmCountryRequired": "कृपया वह देश पुष्टि करें जहाँ आप रहते हैं, फिर आगे बढ़ें।",
+  "billing.checkout.consentsRequired": "कृपया ऊपर दी गई दोनों सहमतियों पर टिक करें, फिर आगे बढ़ें।",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "VAT रिवर्स चार्ज",
   "billing.checkout.noTax": "कोई कर नहीं",

@@ -70,6 +70,7 @@
   "billing.checkout.confirmCountry": "Conexiunea dvs. pare să fie din această țară: {ipCountry}. Locuiți în această țară: {declaredCountry}?",
   "billing.checkout.confirmCountryYes": "Da, locuiesc acolo",
   "billing.checkout.confirmCountryRequired": "Vă rugăm să confirmați țara în care locuiți, apoi să continuați.",
+  "billing.checkout.consentsRequired": "Bifați ambele acorduri de mai sus, apoi continuați.",
   "billing.checkout.taxLabel": "{tax} {taxName} ({rate}%, {country})",
   "billing.checkout.taxReverseCharge": "TVA cu taxare inversă",
   "billing.checkout.noTax": "fără taxe",
