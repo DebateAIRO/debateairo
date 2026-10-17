@@ -1,12 +1,15 @@
 export {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
+  STORY_V4_SHAPE_SENTENCE,
   assembleStoryCheckerInstruction,
   assembleStorytellerInstruction,
   loadStoryPack,
   resolveStoryPackDir,
+  storyShapeOf,
   type StoryPack,
-  type StoryShape
+  type StoryShape,
+  type StoryV4Options
 } from "./pack.js";
 export {
   STORYTELLER_ANSWER_FORM,

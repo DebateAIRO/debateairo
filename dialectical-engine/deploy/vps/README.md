@@ -1909,6 +1909,9 @@ are read from. Left unset, the runner finds `story-shapes/` in its own checkout,
 `/opt/debateai/dialectical-engine/story-shapes`. A value that names no directory holding
 `pack.json` is refused when the runner starts: `STORY_PACK_INVALID` with the reason
 `STORY_PACK_DIR_UNRESOLVED`. Stories then fail; debates do not.
+From pack 2026-10-17.1 (engine redesign R1d) a pack also holds `common-length.md`, `checker-length.md` and one
+`shapes-v4/<id>.md` per listed shape; a directory without them is refused (`FILE_MISSING`) and every story then fails,
+so copy them in before upgrading.
 
 #### What the asker sees when a debate fails
 

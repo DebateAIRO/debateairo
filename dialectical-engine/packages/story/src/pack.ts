@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type EngineQuestionKind } from "@debateai/kernel";
 import { buildFramedPrompt } from "@debateai/providers";
 
 /**
@@ -41,7 +41,20 @@ export interface StoryPack {
    */
   readonly commonMap: string;
   readonly checkerMap: string;
+  /**
+   * Story v4 (engine redesign spec 2026-10-15 §7.2 items 3, 7, 9, 10; absorbs length guidance LG-D): what the storyteller
+   * and the checker are told about the `length` field, the long version's length, what may be said about the debate's
+   * gaps, misleading problems against wording notes, and the answers' layout in the long version. Sent ONLY with the v4
+   * story contracts (engine 2), so every other story gets exactly the instructions it got before, byte for byte.
+   */
+  readonly commonLength: string;
+  readonly checkerLength: string;
   readonly shapes: readonly StoryShape[];
+  /**
+   * Story v4 (spec §7.2 items 2, 10): the v4 text of every shape (`shapes-v4/<id>.md`), one per id of `shapes`, in the
+   * same order, under the same rules. A v4 story is told ONE of them; `shapes` stays the v3 menu, byte for byte.
+   */
+  readonly shapesV4: readonly StoryShape[];
   readonly fingerprint: string;
 }
 
@@ -262,14 +275,59 @@ function assertStoryTextFrameable(path: string, text: string): void {
 }
 
 /**
+ * Story v4 (engine redesign spec 2026-10-15 §7.2 item 2; INTERFACE §5.2, §5.4): the one shape a v4 story is told. The
+ * storyteller no longer chooses: code picks the shape (`storyShapeOf`) and fills `shape_id` on the decoded story.
+ */
+export type StoryV4Options = Readonly<{ shapeId: string }>;
+
+/**
+ * The code sentence before the one v4 shape (the v3 menu's choosing sentence without the choice).
+ * OWNER WORDING — approve before switch-on (option 1; ships behind the engine row, absent = today's bytes).
+ */
+export const STORY_V4_SHAPE_SENTENCE = "Use the sections of the shape below, in order, as the titles of long.sections, written in the language of the question, and follow its guidance.";
+
+/** The v4 shape a v4 instruction names; an id the pack does not have is a programming error, refused by name. */
+function storyV4Shape(pack: StoryPack, v4: StoryV4Options): StoryShape {
+  const shape = pack.shapesV4.find((candidate) => candidate.id === v4.shapeId);
+  if (shape === undefined) {
+    throw new TypedDomainError(
+      "STORY_PACK_SHAPE_UNKNOWN",
+      `${JSON.stringify(v4.shapeId.slice(0, 40))} is not a shape of story pack ${pack.packId} ${pack.version}`
+    );
+  }
+  return shape;
+}
+
+/**
  * The storyteller's instruction: `common.md`, then a menu of every shape with
  * its id, title, when-to-use line, ordered sections and guidance.
  *
  * Debate shape (ruling W-STORY): with `mapFields` true (the material carries `also_raised` or `answers_note`),
  * `common-map.md` follows `common.md`, before the menu. Without it the instruction is the one every story got before
  * the debate shape, byte for byte.
+ *
+ * Story v4 (engine 2, R1d): with `v4` set, `common-length.md` follows them, then "## The shape", the shape sentence and
+ * the ONE v4 shape (title, ordered sections, guidance; no id and no when-to-use: nothing is chosen). With `v4` null the
+ * instruction is today's, byte for byte.
  */
-export function assembleStorytellerInstruction(pack: StoryPack, mapFields = false): string {
+export function assembleStorytellerInstruction(pack: StoryPack, mapFields = false, v4: StoryV4Options | null = null): string {
+  if (v4 !== null) {
+    const shape = storyV4Shape(pack, v4);
+    return [
+      pack.common,
+      ...(mapFields ? [pack.commonMap] : []),
+      pack.commonLength,
+      "## The shape",
+      STORY_V4_SHAPE_SENTENCE,
+      [
+        `### ${shape.title}`,
+        "Sections, in order:",
+        ...shape.sections.map((title, index) => `${String(index + 1)}. ${title}`),
+        "Guidance:",
+        shape.guidance
+      ].join("\n")
+    ].join("\n\n");
+  }
   const menu = pack.shapes.map((shape) => [
     `### Shape ${shape.id}: ${shape.title}`,
     `When to use: ${shape.whenToUse}`,
@@ -290,9 +348,67 @@ export function assembleStorytellerInstruction(pack: StoryPack, mapFields = fals
 /**
  * The checker's instruction: `checker.md`, then, only when the material carries a map field (ruling W-STORY),
  * `checker-map.md` after a blank line. Without it, the checker's instruction of every story before the debate shape.
+ * Story v4 (R1d): with `v4` set, `checker-length.md` follows them, after a blank line (the shape must still be the
+ * pack's: the checker is asked about the same story).
  */
-export function assembleStoryCheckerInstruction(pack: StoryPack, mapFields = false): string {
+export function assembleStoryCheckerInstruction(pack: StoryPack, mapFields = false, v4: StoryV4Options | null = null): string {
+  if (v4 !== null) {
+    storyV4Shape(pack, v4);
+    return [pack.checker, ...(mapFields ? [pack.checkerMap] : []), pack.checkerLength].join("\n\n");
+  }
   return mapFields ? `${pack.checker}\n\n${pack.checkerMap}` : pack.checker;
+}
+
+/**
+ * Story v4 (spec §7.2 item 2, INTERFACE §5.4): the one shape a v4 story is told. Only kinds that are shapes of this
+ * pack are counted; the shape named by more than half of them is chosen; a tie, no strict majority, or no kind at all
+ * gives the pack's default shape. R1d passes no kinds (the default, deviation 12); R2 passes the comparing judges'.
+ */
+export function storyShapeOf(input: Readonly<{ questionKinds: readonly EngineQuestionKind[]; pack: StoryPack }>): string {
+  const shapeIds = new Set(input.pack.shapes.map((shape) => shape.id));
+  const counted = input.questionKinds.filter((kind) => shapeIds.has(kind));
+  const votes = new Map<string, number>();
+  for (const kind of counted) votes.set(kind, (votes.get(kind) ?? 0) + 1);
+  for (const [kind, count] of votes) {
+    if (count * 2 > counted.length) return kind;
+  }
+  return input.pack.defaultShape;
+}
+
+interface StoryShapeFolder {
+  readonly files: readonly StoryPackFile[];
+  readonly shapes: readonly StoryShape[];
+}
+
+/** Every listed shape from one folder (`shapes` for v3, `shapes-v4` for v4), each under every shape rule, with its own id. */
+function loadStoryShapes(dir: string, folder: string, shapeIds: readonly string[]): StoryShapeFolder {
+  const files: StoryPackFile[] = [];
+  const shapes: StoryShape[] = [];
+  for (const id of shapeIds) {
+    const file = readStoryPackFile(dir, `${folder}/${id}.md`);
+    const shape = parseStoryShapeFile(file);
+    if (shape.id !== id) {
+      throw storyPackFailure("SHAPE_ID_MISMATCH", `${file.path} declares id ${JSON.stringify(shape.id.slice(0, 40))}`);
+    }
+    if (shape.sections.length < STORY_PACK_LIMITS.minSections || shape.sections.length > STORY_PACK_LIMITS.maxSections) {
+      throw storyPackFailure(
+        "SECTION_COUNT",
+        `${file.path} has ${String(shape.sections.length)} sections; a shape has ${String(STORY_PACK_LIMITS.minSections)} to ${String(STORY_PACK_LIMITS.maxSections)}`
+      );
+    }
+    for (const title of shape.sections) {
+      if (title === "" || title.length > STORY_PACK_LIMITS.maxSectionTitleChars) {
+        throw storyPackFailure(
+          "SECTION_TITLE_INVALID",
+          `${file.path} has a section title that is empty or longer than ${String(STORY_PACK_LIMITS.maxSectionTitleChars)} characters`
+        );
+      }
+    }
+    if (shape.guidance === "") throw storyPackFailure("TEXT_EMPTY", `${file.path} has no guidance after its front matter`);
+    files.push(file);
+    shapes.push(shape);
+  }
+  return Object.freeze({ files: Object.freeze(files), shapes: Object.freeze(shapes) });
 }
 
 /**
@@ -347,36 +463,15 @@ export function loadStoryPack(dir: string): StoryPack {
   const checkerFile = readStoryPackFile(dir, "checker.md");
   const commonMapFile = readStoryPackFile(dir, "common-map.md");
   const checkerMapFile = readStoryPackFile(dir, "checker-map.md");
-  for (const file of [commonFile, checkerFile, commonMapFile, checkerMapFile]) {
+  const commonLengthFile = readStoryPackFile(dir, "common-length.md");
+  const checkerLengthFile = readStoryPackFile(dir, "checker-length.md");
+  for (const file of [commonFile, checkerFile, commonMapFile, checkerMapFile, commonLengthFile, checkerLengthFile]) {
     if (file.text.trim() === "") throw storyPackFailure("TEXT_EMPTY", `${file.path} is empty`);
   }
 
-  const shapeFiles: StoryPackFile[] = [];
-  const shapes: StoryShape[] = [];
-  for (const id of shapeIds) {
-    const file = readStoryPackFile(dir, `shapes/${id}.md`);
-    const shape = parseStoryShapeFile(file);
-    if (shape.id !== id) {
-      throw storyPackFailure("SHAPE_ID_MISMATCH", `${file.path} declares id ${JSON.stringify(shape.id.slice(0, 40))}`);
-    }
-    if (shape.sections.length < STORY_PACK_LIMITS.minSections || shape.sections.length > STORY_PACK_LIMITS.maxSections) {
-      throw storyPackFailure(
-        "SECTION_COUNT",
-        `${file.path} has ${String(shape.sections.length)} sections; a shape has ${String(STORY_PACK_LIMITS.minSections)} to ${String(STORY_PACK_LIMITS.maxSections)}`
-      );
-    }
-    for (const title of shape.sections) {
-      if (title === "" || title.length > STORY_PACK_LIMITS.maxSectionTitleChars) {
-        throw storyPackFailure(
-          "SECTION_TITLE_INVALID",
-          `${file.path} has a section title that is empty or longer than ${String(STORY_PACK_LIMITS.maxSectionTitleChars)} characters`
-        );
-      }
-    }
-    if (shape.guidance === "") throw storyPackFailure("TEXT_EMPTY", `${file.path} has no guidance after its front matter`);
-    shapeFiles.push(file);
-    shapes.push(shape);
-  }
+  const v3Shapes = loadStoryShapes(dir, "shapes", shapeIds);
+  // Story v4 (R1d): one v4 file per listed shape, under the same rules and ids; no manifest key lists them.
+  const v4Shapes = loadStoryShapes(dir, "shapes-v4", shapeIds);
 
   const pack: StoryPack = Object.freeze({
     packId,
@@ -386,22 +481,30 @@ export function loadStoryPack(dir: string): StoryPack {
     checker: checkerFile.text.trim(),
     commonMap: commonMapFile.text.trim(),
     checkerMap: checkerMapFile.text.trim(),
-    shapes: Object.freeze(shapes),
-    fingerprint: storyPackFingerprint([manifestFile, commonFile, checkerFile, commonMapFile, checkerMapFile, ...shapeFiles])
+    commonLength: commonLengthFile.text.trim(),
+    checkerLength: checkerLengthFile.text.trim(),
+    shapes: v3Shapes.shapes,
+    shapesV4: v4Shapes.shapes,
+    fingerprint: storyPackFingerprint([manifestFile, commonFile, checkerFile, commonMapFile, checkerMapFile, commonLengthFile,
+      checkerLengthFile, ...v3Shapes.files, ...v4Shapes.files])
   });
-  // Both forms of each instruction are checked: the larger one (with the map fields) bounds the size.
+  // Every form of the storyteller's instruction is checked: v3 (the menu) and v4 with each shape, each with and without
+  // the map passages. The largest bounds the size, and each must pass the frame's door.
   for (const mapFields of [false, true]) {
-    const instruction = assembleStorytellerInstruction(pack, mapFields);
-    const instructionBytes = Buffer.byteLength(instruction, "utf8");
-    if (instructionBytes > STORY_PACK_LIMITS.maxInstructionBytes) {
-      throw storyPackFailure(
-        "INSTRUCTION_TOO_LARGE",
-        `the assembled storyteller instruction is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
-      );
+    for (const v4 of [null, ...shapeIds.map((shapeId): StoryV4Options => Object.freeze({ shapeId }))]) {
+      const instruction = assembleStorytellerInstruction(pack, mapFields, v4);
+      const instructionBytes = Buffer.byteLength(instruction, "utf8");
+      if (instructionBytes > STORY_PACK_LIMITS.maxInstructionBytes) {
+        throw storyPackFailure(
+          "INSTRUCTION_TOO_LARGE",
+          `the assembled storyteller instruction is ${String(instructionBytes)} bytes; the limit is ${String(STORY_PACK_LIMITS.maxInstructionBytes)}`
+        );
+      }
+      assertStoryTextFrameable("the assembled storyteller instruction", instruction);
     }
-    assertStoryTextFrameable("the assembled storyteller instruction", instruction);
   }
   assertStoryTextFrameable(checkerFile.path, pack.checker);
   assertStoryTextFrameable(checkerMapFile.path, pack.checkerMap);
+  assertStoryTextFrameable(checkerLengthFile.path, pack.checkerLength);
   return pack;
 }

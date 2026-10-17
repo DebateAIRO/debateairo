@@ -4,18 +4,21 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { StoryBodySchema, StoryFateSchema, StoryVerdictBasisSchema, WayOfKnowingSchema } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { ENGINE_QUESTION_KINDS, TypedDomainError } from "@debateai/kernel";
 import {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
+  STORY_V4_SHAPE_SENTENCE,
   StoryCheckerVerdictSchema,
   assembleStoryCheckerInstruction,
   assembleStorytellerInstruction,
   buildStoryMaterial,
   loadStoryPack,
   resolveStoryPackDir,
+  storyShapeOf,
   toStoryPromptMaterial,
-  type StoryMaterialResult
+  type StoryMaterialResult,
+  type StoryPack
 } from "@debateai/story";
 
 /**
@@ -81,11 +84,18 @@ function writePack(files: PackFiles = {}): string {
     "checker.md": "Checker instructions.\n",
     "common-map.md": "Common map instructions.\n",
     "checker-map.md": "Checker map instructions.\n",
+    // Story v4 (engine redesign R1d, absorbing LG-D): the v4-only passages and the v4 text of each shape are their own
+    // files, required like the map passages.
+    "common-length.md": "Common length instructions.\n",
+    "checker-length.md": "Checker length instructions.\n",
+    "shapes-v4/alpha.md": shapeText({ id: "alpha", guidance: "V4 guidance for alpha." }),
+    "shapes-v4/beta.md": shapeText({ id: "beta", guidance: "V4 guidance for beta." }),
     "shapes/alpha.md": shapeText({ id: "alpha" }),
     "shapes/beta.md": shapeText({ id: "beta" }),
     ...files
   };
   mkdirSync(join(directory, "shapes"));
+  mkdirSync(join(directory, "shapes-v4"));
   for (const [path, content] of Object.entries(all)) {
     if (content !== null) writeFileSync(join(directory, ...path.split("/")), content);
   }
@@ -108,10 +118,10 @@ function packVerdict(directory: string): string {
 const TOO_BIG_SHAPES = ["sa", "sb", "sc", "sd", "se"];
 const tooBigInstruction: PackFiles = {
   "pack.json": manifest({ default_shape: "sa", shapes: TOO_BIG_SHAPES }),
-  ...Object.fromEntries(TOO_BIG_SHAPES.map((id) => [
-    `shapes/${id}.md`,
+  ...Object.fromEntries(TOO_BIG_SHAPES.flatMap((id) => ["shapes", "shapes-v4"].map((folder) => [
+    `${folder}/${id}.md`,
     shapeText({ id, guidance: "g".repeat(11_000) })
-  ]))
+  ])))
 };
 
 const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles])[] = [
@@ -120,6 +130,9 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   // Ruling W-STORY: the map passages are their own files, required like common.md and checker.md.
   ["FILE_MISSING", "common-map.md is absent", { "common-map.md": null }],
   ["FILE_MISSING", "checker-map.md is absent", { "checker-map.md": null }],
+  ["FILE_MISSING", "common-length.md is absent", { "common-length.md": null }],
+  ["FILE_MISSING", "checker-length.md is absent", { "checker-length.md": null }],
+  ["FILE_MISSING", "a listed shape has no v4 file", { "shapes-v4/beta.md": null }],
   ["FILE_TOO_LARGE", "a file is over the file limit (24 KB)", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
   ["NOT_UTF8", "a file is not UTF-8", { "common.md": Uint8Array.from([0x43, 0xff, 0xfe, 0x0a]) }],
   ["CONTROL_CHARACTER", "a file holds a bell character", { "checker.md": "Checker\u0007 instructions.\n" }],
@@ -139,6 +152,14 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   ["DEFAULT_SHAPE_MISSING", "the default is not listed", { "pack.json": manifest({ default_shape: "gamma" }) }],
   ["TEXT_EMPTY", "common.md is blank", { "common.md": "  \n\n" }],
   ["TEXT_EMPTY", "checker-map.md is blank", { "checker-map.md": "\n" }],
+  ["TEXT_EMPTY", "common-length.md is blank", { "common-length.md": "  \n" }],
+  ["TEXT_EMPTY", "checker-length.md is blank", { "checker-length.md": "\n" }],
+  ["TEXT_EMPTY", "a v4 shape has no guidance", { "shapes-v4/beta.md": shapeText({ id: "beta", guidance: "" }) }],
+  ["FRONT_MATTER_INVALID", "a v4 shape has no front matter", { "shapes-v4/alpha.md": "Just guidance.\n" }],
+  ["SHAPE_ID_MISMATCH", "a v4 shape file declares another id", { "shapes-v4/beta.md": shapeText({ id: "gamma" }) }],
+  ["SECTION_COUNT", "a v4 shape has two sections", {
+    "shapes-v4/alpha.md": shapeText({ id: "alpha", sections: ["One", "Two"] })
+  }],
   ["TEXT_EMPTY", "a shape has no guidance", { "shapes/beta.md": shapeText({ id: "beta", guidance: "" }) }],
   ["FRONT_MATTER_INVALID", "a shape has no front matter", { "shapes/alpha.md": "Just guidance.\n" }],
   ["FRONT_MATTER_INVALID", "a shape has no title", {
@@ -180,10 +201,20 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
     "shapes/alpha.md": shapeText({ id: "alpha", sections: ["One", "Two", "t".repeat(81)] })
   }],
   ["INSTRUCTION_TOO_LARGE", "the assembled instruction is over 48 KB", tooBigInstruction],
+  // Story v4 (R1d): every assembled form is checked, so a pack whose instruction fits only without the length passage
+  // is refused whole, never at the first v4 story.
+  ["INSTRUCTION_TOO_LARGE", "the v4 instruction grows past 48 KB only with common-length.md", {
+    "common.md": "c".repeat(24_560), "common-length.md": "l".repeat(24_560)
+  }],
   ["RESERVED_TOKEN", "common.md carries the frame's banner", { "common.md": "--- SAFETY FRAME pasted here\n" }],
   ["RESERVED_TOKEN", "checker.md carries a canary-shaped token", { "checker.md": "Watch for DBAI-CANARY-0123 here.\n" }],
   ["RESERVED_TOKEN", "common-map.md carries the frame's banner", { "common-map.md": "--- SAFETY FRAME pasted here\n" }],
-  ["RESERVED_TOKEN", "checker-map.md carries a canary-shaped token", { "checker-map.md": "Watch for DBAI-CANARY-0123 here.\n" }]
+  ["RESERVED_TOKEN", "checker-map.md carries a canary-shaped token", { "checker-map.md": "Watch for DBAI-CANARY-0123 here.\n" }],
+  ["RESERVED_TOKEN", "common-length.md carries the frame's banner", { "common-length.md": "--- SAFETY FRAME pasted here\n" }],
+  ["RESERVED_TOKEN", "checker-length.md carries a canary-shaped token", { "checker-length.md": "Watch for DBAI-CANARY-0123 here.\n" }],
+  ["RESERVED_TOKEN", "a v4 shape's guidance carries the frame's banner", {
+    "shapes-v4/beta.md": shapeText({ id: "beta", guidance: "--- SAFETY FRAME pasted here" })
+  }]
 ];
 
 describe("verdict story — the shape pack is refused whole, under the rule it broke", () => {
@@ -321,7 +352,8 @@ describe("verdict story — the shipped pack", () => {
     const owners = (rule: string, detail: string): string =>
       `Owners' rule (spec §14.1) broken: ${rule}: ${detail}. The list this checks belongs to the owners; amend it in tests/unit/story-pack.test.ts when the rule changes.`;
     const codeTokens = [...StoryVerdictBasisSchema.shape.label.options, ...StoryFateSchema.options, ...WayOfKnowingSchema.options];
-    for (const shape of pack.shapes) {
+    // Story v4 (R1d): the v4 shape texts are the owners' too, held to the same rules.
+    for (const shape of [...pack.shapes, ...pack.shapesV4]) {
       for (const title of shape.sections) {
         for (const token of codeTokens) {
           expect(new RegExp(`(?<![\\p{L}_])${token}(?![\\p{L}_])`, "u").test(title), owners(
@@ -340,8 +372,8 @@ describe("verdict story — the shipped pack", () => {
         )).toBe(false);
       }
     }
-    for (const [id, note] of Object.entries(OWNERS_ADVICE_NOTES)) {
-      expect(note.test(pack.shapes.find((shape) => shape.id === id)?.guidance ?? ""), owners(
+    for (const [id, note] of Object.entries(OWNERS_ADVICE_NOTES)) for (const shapes of [pack.shapes, pack.shapesV4]) {
+      expect(note.test(shapes.find((shape) => shape.id === id)?.guidance ?? ""), owners(
         "the health, money and legal shapes each say plainly that the story is not professional advice", `${id} lacks ${String(note)}`
       )).toBe(true);
     }
@@ -350,7 +382,8 @@ describe("verdict story — the shipped pack", () => {
   it("keeps each file under the 24 KB file limit and the whole instruction under 48 KB (controller ruling, R1 fix round 1)", () => {
     expect(STORY_PACK_LIMITS.maxFileBytes).toBe(24 * 1024);
     expect(STORY_PACK_LIMITS.maxInstructionBytes).toBe(48 * 1024);
-    for (const file of ["common.md", "checker.md", "pack.json", ...pack.shapes.map((shape) => `shapes/${shape.id}.md`)]) {
+    for (const file of ["common.md", "checker.md", "common-length.md", "checker-length.md", "pack.json",
+      ...pack.shapes.map((shape) => `shapes/${shape.id}.md`), ...pack.shapesV4.map((shape) => `shapes-v4/${shape.id}.md`)]) {
       expect(readFileSync(join(SHIPPED_DIR, file)).byteLength).toBeLessThanOrEqual(STORY_PACK_LIMITS.maxFileBytes);
     }
   });
@@ -540,5 +573,177 @@ describe("verdict story — where the pack is read from", () => {
     const moduleUrl = pathToFileURL(join(workspace, "apps", "runner", "src", "main.ts")).href;
     expect(() => resolveStoryPackDir({ env: {}, moduleUrl }))
       .toThrowError(expect.objectContaining({ code: "STORY_PACK_DIR_UNRESOLVED" }));
+  });
+});
+
+/**
+ * Story v4 (engine redesign spec 2026-10-15 §7.2 items 2, 3, 7, 9, 10; INTERFACE §5.2-§5.4; absorbs LG-D Task 1). The
+ * v4-only passages and the ONE shape ride only with a v4 contract (engine 2), so every other story keeps its
+ * instructions byte for byte (tests/unit/debate-shape-story-request-bytes.test.ts holds the bytes). Nothing here pins
+ * the owners' prose beyond where the passages go, the identifiers they must explain, and the one line each v4 shape
+ * file changes.
+ */
+describe("verdict story v4 — the v4 passages and the one shape (engine redesign R1d)", () => {
+  const pack = loadStoryPack(SHIPPED_DIR);
+  const V4 = Object.freeze({ shapeId: "general" });
+  const blockOf = (shape: (typeof pack.shapesV4)[number]): string => [
+    `### ${shape.title}`,
+    "Sections, in order:",
+    ...shape.sections.map((title, index) => `${String(index + 1)}. ${title}`),
+    "Guidance:",
+    shape.guidance
+  ].join("\n");
+
+  it("v4 null: neither instruction holds a v4 passage, and both are today's", () => {
+    for (const mapFields of [false, true]) {
+      expect(assembleStorytellerInstruction(pack, mapFields, null)).toBe(assembleStorytellerInstruction(pack, mapFields));
+      expect(assembleStoryCheckerInstruction(pack, mapFields, null)).toBe(assembleStoryCheckerInstruction(pack, mapFields));
+      expect(assembleStorytellerInstruction(pack, mapFields)).not.toContain(pack.commonLength);
+      expect(assembleStoryCheckerInstruction(pack, mapFields)).not.toContain(pack.checkerLength);
+    }
+    expect(assembleStoryCheckerInstruction(pack)).toBe(pack.checker);
+    expect(assembleStoryCheckerInstruction(pack, true)).toBe(`${pack.checker}\n\n${pack.checkerMap}`);
+  });
+
+  it("v4: common.md, the map passages, common-length.md, the shape sentence, the one shape; the checker's length passage last", () => {
+    const general = pack.shapesV4.find((shape) => shape.id === "general")!;
+    expect(assembleStorytellerInstruction(pack, false, V4))
+      .toBe([pack.common, pack.commonLength, "## The shape", STORY_V4_SHAPE_SENTENCE, blockOf(general)].join("\n\n"));
+    expect(assembleStorytellerInstruction(pack, true, V4))
+      .toBe([pack.common, pack.commonMap, pack.commonLength, "## The shape", STORY_V4_SHAPE_SENTENCE, blockOf(general)].join("\n\n"));
+    expect(assembleStoryCheckerInstruction(pack, false, V4)).toBe(`${pack.checker}\n\n${pack.checkerLength}`);
+    expect(assembleStoryCheckerInstruction(pack, true, V4)).toBe(`${pack.checker}\n\n${pack.checkerMap}\n\n${pack.checkerLength}`);
+  });
+
+  it("every v4 instruction holds exactly one shape block, its v4 text, no menu and no shape_id", () => {
+    for (const shape of pack.shapesV4) {
+      for (const mapFields of [false, true]) {
+        const instruction = assembleStorytellerInstruction(pack, mapFields, { shapeId: shape.id });
+        expect([shape.id, instruction.split("Sections, in order:").length - 1]).toEqual([shape.id, 1]);
+        expect(instruction).toContain(`${blockOf(shape)}`);
+        expect(instruction.endsWith(blockOf(shape))).toBe(true);
+        expect(instruction).not.toContain("## The shapes");
+        expect(instruction).not.toContain("shape_id");
+        expect(instruction).not.toContain(pack.shapes.find((v3) => v3.id === shape.id)!.guidance);
+        for (const other of pack.shapesV4.filter((candidate) => candidate.id !== shape.id)) {
+          expect(instruction).not.toContain(other.guidance);
+        }
+      }
+    }
+  });
+
+  it("an unknown shape id is refused loudly, by name", () => {
+    for (const assemble of [assembleStorytellerInstruction, assembleStoryCheckerInstruction]) {
+      expect(() => assemble(pack, false, { shapeId: "poetry" }))
+        .toThrowError(expect.objectContaining({ code: "STORY_PACK_SHAPE_UNKNOWN" }));
+    }
+  });
+
+  it("explains the length field, the reasons and the long version to the storyteller; the objection and misleading to the checker", () => {
+    for (const name of ["length", "why", "long"]) expect([name, pack.commonLength.includes(name)]).toEqual([name, true]);
+    // D6 (2026-10-16, pre-flight PF-D4.1): the long version says whether each other answer's objection still stands.
+    expect(pack.commonLength).toContain("still stands");
+    expect(pack.commonLength).not.toContain("falls short");
+    // The checker is told the same layout (spec §7.2 item 9, pre-flight PF-D4.3).
+    for (const name of ["length", "objection", "long", "misleading", "still stands"]) {
+      expect([name, pack.checkerLength.includes(name)]).toEqual([name, true]);
+    }
+  });
+
+  it("keeps every form of the storyteller's instruction under 48 KB: v3, and v4 with each shape, with and without the map", () => {
+    for (const mapFields of [false, true]) {
+      for (const v4 of [null, ...pack.shapes.map((shape) => ({ shapeId: shape.id }))]) {
+        expect(Buffer.byteLength(assembleStorytellerInstruction(pack, mapFields, v4), "utf8"))
+          .toBeLessThanOrEqual(STORY_PACK_LIMITS.maxInstructionBytes);
+      }
+    }
+  });
+
+  it("has one v4 shape per shape, same ids, same order, same titles and sections (only the guidance differs)", () => {
+    const withoutGuidance = (shapes: StoryPack["shapes"]) => shapes.map(({ guidance: _guidance, ...rest }) => rest);
+    expect(withoutGuidance(pack.shapesV4)).toEqual(withoutGuidance(pack.shapes));
+  });
+
+  /** The line each v4 shape file changes (spec §7.2 item 10): the answers' paragraph, at 48586d527's line numbers. */
+  const V4_CHANGED_LINE: Readonly<Record<string, number>> = Object.freeze({
+    general: 17, health: 19, "money-decision": 19, legal: 19, factual: 19, "personal-choice": 19
+  });
+
+  it("each v4 shape file is its v3 file with exactly one line changed: ours first, then each other answer as an objection", () => {
+    expect(Object.keys(V4_CHANGED_LINE).sort()).toEqual(pack.shapes.map((shape) => shape.id).sort());
+    for (const shape of pack.shapes) {
+      const v3 = readFileSync(join(SHIPPED_DIR, "shapes", `${shape.id}.md`), "utf8").split("\n");
+      const v4 = readFileSync(join(SHIPPED_DIR, "shapes-v4", `${shape.id}.md`), "utf8").split("\n");
+      expect([shape.id, v4.length]).toEqual([shape.id, v3.length]);
+      const changed = v3.flatMap((line, index) => (line === v4[index] ? [] : [index + 1]));
+      expect([shape.id, changed]).toEqual([shape.id, [V4_CHANGED_LINE[shape.id]]]);
+      const at = V4_CHANGED_LINE[shape.id]! - 1;
+      const label = (line: string): string => line.slice(0, line.indexOf(":") + 1);
+      expect([shape.id, label(v4[at]!)]).toEqual([shape.id, label(v3[at]!)]);
+      expect(v3[at]).toContain("one paragraph per position, ours first");
+      expect(v4[at]).not.toContain("one paragraph per position");
+      expect(v4[at]).toContain("as the objection it raises against");
+      // D6 (2026-10-16, pre-flight PF-D4.1): whether the objection still stands, never that it falls short.
+      expect(v4[at]).toContain("whether that objection still stands");
+      expect(v4[at]).not.toContain("falls short");
+    }
+  });
+
+  it("the question kinds the comparing judges name are exactly the pack's shapes (INTERFACE §5.4)", () => {
+    expect(new Set(ENGINE_QUESTION_KINDS)).toEqual(new Set(pack.shapes.map((shape) => shape.id)));
+    expect(new Set(ENGINE_QUESTION_KINDS)).toEqual(new Set(pack.shapesV4.map((shape) => shape.id)));
+  });
+
+  it("storyShapeOf: a strict majority of the kinds that are shapes; a tie, no majority or no kind gives the default", () => {
+    expect(storyShapeOf({ questionKinds: ["health", "health", "general"], pack })).toBe("health");
+    expect(storyShapeOf({ questionKinds: ["legal"], pack })).toBe("legal");
+    expect(storyShapeOf({ questionKinds: ["health", "legal"], pack })).toBe("general");
+    expect(storyShapeOf({ questionKinds: ["health", "health", "legal", "factual", "money-decision"], pack })).toBe("general");
+    expect(storyShapeOf({ questionKinds: [], pack })).toBe("general");
+    // A kind that is not a shape of this pack is not counted at all.
+    const narrowed: StoryPack = { ...pack, shapes: pack.shapes.filter((shape) => shape.id !== "health") };
+    expect(storyShapeOf({ questionKinds: ["health", "health", "factual"], pack: narrowed })).toBe("factual");
+  });
+
+  it("fingerprints every v4 file: one changed byte of common-length.md, checker-length.md or a v4 shape changes it", () => {
+    for (const file of ["common-length.md", "checker-length.md", join("shapes-v4", "general.md")]) {
+      const copy = scratchDir();
+      cpSync(SHIPPED_DIR, copy, { recursive: true });
+      const before = loadStoryPack(copy).fingerprint;
+      const target = join(copy, file);
+      const bytes = readFileSync(target);
+      const last = bytes.length - 2;
+      bytes[last] = bytes[last] === 0x2e ? 0x21 : 0x2e;
+      writeFileSync(target, bytes);
+      expect([file, loadStoryPack(copy).fingerprint === before]).toEqual([file, false]);
+    }
+  });
+});
+
+describe("verdict story v4 — the assembled v4 instruction's layout (engine redesign R1d)", () => {
+  it("renders common text, the length passage, the shape sentence, then the one v4 shape with no id and no when-to-use", () => {
+    const pack = loadStoryPack(writePack());
+    expect(assembleStorytellerInstruction(pack, false, { shapeId: "beta" })).toBe([
+      "Common instructions.",
+      "Common length instructions.",
+      "## The shape",
+      // OWNER WORDING — approve before switch-on (STORY_V4_SHAPE_SENTENCE).
+      "Use the sections of the shape below, in order, as the titles of long.sections, written in the language of the "
+        + "question, and follow its guidance.",
+      [
+        "### Shape beta",
+        "Sections, in order:",
+        "1. First section",
+        "2. Second section",
+        "3. Third section",
+        "Guidance:",
+        "V4 guidance for beta."
+      ].join("\n")
+    ].join("\n\n"));
+    expect(assembleStorytellerInstruction(pack, true, { shapeId: "alpha" }))
+      .toContain("Common instructions.\n\nCommon map instructions.\n\nCommon length instructions.\n\n## The shape\n\n");
+    expect(assembleStoryCheckerInstruction(pack, false, { shapeId: "beta" })).toBe("Checker instructions.\n\nChecker length instructions.");
+    expect(assembleStoryCheckerInstruction(pack, true, { shapeId: "beta" }))
+      .toBe("Checker instructions.\n\nChecker map instructions.\n\nChecker length instructions.");
   });
 });
