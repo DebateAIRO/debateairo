@@ -7,7 +7,7 @@ import {
   LENGTH_ALLOWANCE_LIMITS, TypedDomainError, answerRoomTokens, guidedAllowanceTokens, type DebateRole, type LengthGuidanceStep,
   type ModelStrength
 } from "@debateai/kernel";
-import { mapLargestReplyWordsCeiling } from "@debateai/map";
+import { mapEngineLargestReplyWordsCeiling, mapLargestReplyWordsCeiling } from "@debateai/map";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   answerJobTokenCeilings,
@@ -175,18 +175,21 @@ export function answerTokenCeilingsForBasis(
     JUDGE: Math.max(guided.JUDGE, lengthGuidanceAllowanceTokens(length, "comparing_judge", withShape.JUDGE)),
     REVIEWER: Math.max(guided.REVIEWER, lengthGuidanceAllowanceTokens(length, "investigator", withShape.REVIEWER)) };
   return Object.freeze(shaped === null ? withEngine
-    : { ...withEngine, POSITION: Math.max(withEngine.POSITION, mapLengthAllowanceTokens(length, withShape.POSITION)) });
+    : { ...withEngine, POSITION: Math.max(withEngine.POSITION, mapLengthAllowanceTokens(length, withShape.POSITION, engine !== null)) });
 }
 
 /**
  * Length guidance (spec 2026-10-15 §3.3, §3.10): the most a map call asks with the row, from `todayTokens` (the bound it
  * is raised from): the map's thinking room + the runaway answer room of the largest reply any map contract can hold
  * (`mapLargestReplyWordsCeiling`), never below `todayTokens`, as the runner's `guidedMapBound` raises each map call. Shared
- * by the picker and the preview estimate.
+ * by the picker and the preview estimate. Engine redesign R3 (`engine`): under engine 2 a map call may be the answer
+ * check, whose reasons are guided by `checkReason`; the largest of every engine-2 map contract's ceiling is priced
+ * (`mapEngineLargestReplyWordsCeiling`), so the estimate never under-counts (spec §10). Engine 1: as before.
  */
-export function mapLengthAllowanceTokens(length: LengthGuidance, todayTokens: number): number {
+export function mapLengthAllowanceTokens(length: LengthGuidance, todayTokens: number, engine = false): number {
+  const targets = { targets: length.map, charactersPerWord: length.charactersPerWord };
   return guidedAllowanceTokens({ todayTokens, thinkingRoomTokens: length.thinkingRoom.map,
-    answerRoomTokens: answerRoomTokens(mapLargestReplyWordsCeiling({ targets: length.map, charactersPerWord: length.charactersPerWord }),
+    answerRoomTokens: answerRoomTokens(engine ? mapEngineLargestReplyWordsCeiling(targets) : mapLargestReplyWordsCeiling(targets),
       length.runawayMultiplier, length.tokensPerWord),
     capTokens: LENGTH_ALLOWANCE_LIMITS.capTokens });
 }

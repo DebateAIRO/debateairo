@@ -1340,7 +1340,7 @@ export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, bas
     mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
   const length = admittedLengthOf(basis);
   if (length === null) return shaped;
-  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate)];
+  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate, previewEngineOf(basis) !== null)];
   return Object.freeze({ ...shaped,
     // R2 B10: an engine-2 receipt's judge and investigator calls ask their own steps' allowance (engine 1: none added).
     debate: Math.max(...[...PREVIEW_LENGTH_DEBATE_STEPS, ...(previewEngineOf(basis) === null ? [] : PREVIEW_ENGINE_DEBATE_STEPS)]
