@@ -161,7 +161,11 @@ describe("debate shape P2c — the story snapshot's also-raised points", () => {
     expect(runner).toContain(
       "const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);"
     );
-    expect(call).toContain("alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0),");
+    // Ruling R3-T14.1 (R3 Task 14): the call's third argument is engine 2's (both failed lists, amendment A9-1); engine 1
+    // passes undefined, so its list is today's.
+    expect(call).toContain("alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0,\n"
+      + "                engineMap ? { checkFailed: mapCheckFailedStatements(debateShapeMap?.answerCheck),\n"
+      + "                  checkFailedMergedAnswerIds: mapCheckFailedMergedAnswerIds(debateShapeMap?.answerCheck) } : undefined),");
     expect(call.indexOf("alsoRaised: storyAlsoRaisedFrom(")).toBeGreaterThan(call.indexOf("positionNodeIds: makerPositionNodeIds,"));
     // Pre-flight PF-C6: the note reads the map's whole result, never debateShapeMap (null on a fallback).
     expect(call).toContain("answersNote: storyAnswersNoteFrom(shapeMapResult,");
