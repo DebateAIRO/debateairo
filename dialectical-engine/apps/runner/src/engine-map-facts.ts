@@ -12,10 +12,14 @@ export type EngineMapFacts = Readonly<{
   restsOnByNodeId: ReadonlyMap<string, MapRestsOn>;
 }>;
 
-/** From the shape's positions and legs and the saved node of each plan position (null: never saved). */
+/**
+ * From the shape's positions and legs and the saved node of each plan position (null: never saved). Ruling R3-T15.1: only
+ * a POINT leg (the map's own key point) rests on what its key point rests on; a deeper round's reply or defence shares its
+ * chain's key-point id but not its basis, so it carries none (P2.2: a label must be true).
+ */
 export function engineMapFactsOf(input: Readonly<{
   positions: readonly ShapePositionPlan[];
-  legs: readonly Pick<ShapeLeg, "childIndex" | "keyPointId">[];
+  legs: readonly Pick<ShapeLeg, "kind" | "childIndex" | "keyPointId">[];
   nodeIdAt: (planPosition: number) => string | null;
   keyPoints: readonly MapKeyPoint[];
 }>): EngineMapFacts {
@@ -30,7 +34,7 @@ export function engineMapFactsOf(input: Readonly<{
   const basisOf = new Map(input.keyPoints.flatMap((keyPoint) => (keyPoint.restsOn === undefined ? [] : [[keyPoint.keyPointId, keyPoint.restsOn] as const])));
   const restsOn = new Map<string, MapRestsOn>();
   for (const leg of input.legs) {
-    if (leg.keyPointId === null) continue;
+    if (leg.kind !== "POINT" || leg.keyPointId === null) continue;
     const basis = basisOf.get(leg.keyPointId);
     const nodeId = input.nodeIdAt(leg.childIndex);
     if (basis !== undefined && nodeId !== null) restsOn.set(nodeId, basis);
