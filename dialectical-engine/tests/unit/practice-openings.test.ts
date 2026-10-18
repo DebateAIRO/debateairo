@@ -474,10 +474,14 @@ describe("practice openings: arms C2 and C2N, wording N's comparison (Task 17a, 
 
   it("ruling R3-T17a.4: C2 answers and C2N is refused (wording N's base moved): NOT_PROVEN, never PASS, named by arm, question, code", async () => {
     const real = await vi.importActual<typeof import("../../tools/preview-practice/practice-map-wording.js")>("../../tools/preview-practice/practice-map-wording.js");
-    // A base that moved: the request reaches the real wrapper with its instruction no longer starting with the shipped text.
+    // A base that moved: a WRITING request (one of wording N's four contracts) reaches the real wrapper with its instruction
+    // no longer starting with the shipped text; every other request goes through as sent (R3 final wave P18).
+    const writing = new Set(Object.keys(real.MAP_WORDING_N_INSTRUCTIONS).map((name) =>
+      mapEnginePromptContracts()[name as keyof ReturnType<typeof mapEnginePromptContracts>].contractId));
+    expect(writing.size).toBe(4);
     vi.mocked(practiceWordingNCaller).mockImplementationOnce((inner) => {
       const wrapped = real.practiceWordingNCaller(inner);
-      return { call: (request) => wrapped.call({ ...request, spec: { ...request.spec,
+      return { call: (request) => wrapped.call(!writing.has(request.spec.contract.contractId) ? request : { ...request, spec: { ...request.spec,
         contract: { ...request.spec.contract, instruction: `Moved. ${request.spec.contract.instruction}` } } }) };
     });
     const sent: { arm: string; id: string; fields: string; named: boolean }[] = [];

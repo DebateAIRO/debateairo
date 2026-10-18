@@ -46,9 +46,10 @@ const candidateId = (index: number): string => `c${String(index + 1)}`;
 export function mapCheckCandidatesOf(input: Readonly<{ choice: MapChoice; mergedAnswers: readonly MapMergedAnswer[]; max: number;
   internalNames: readonly string[];
   /**
-   * Merged answer ids the chooser's reply reused (it kept them, maybe reworded); empty or absent under the fallback. Such
-   * an answer is never a candidate: its words may differ from the chosen statement, so the text guard alone would let it
-   * come back and the debate argue two wordings of one answer (Review Focus 2; pre-flight PF-R33.8).
+   * Merged answer ids the choice already holds (`mapKeptMergedAnswerIds`): the ones the chooser's reply reused (maybe
+   * reworded), and under the fallback or a fill the ones code chose or filled from (ruling R3-T9.1). Such an answer is
+   * never a candidate: its words may differ from the chosen statement, so the text guard alone would let it come back and
+   * the debate argue two wordings of one answer (Review Focus 2; pre-flight PF-R33.8).
    */
   keptMergedAnswerIds?: ReadonlySet<string> }>): readonly MapCheckCandidate[] {
   const limit = Math.max(0, Math.min(Math.trunc(input.max), MAP_ENGINE_LIMITS.candidatesMax));
@@ -197,8 +198,11 @@ export function mapApplyAnswerCheck(input: Readonly<{
   return Object.freeze({
     choice,
     marks: Object.freeze(marks),
+    // R3 final wave P8 (Task 8 Minor 1): only the ids shown, as the outcomes (the reading is exported and pure; a reason
+    // or an exemption for an id never shown stands for nothing).
     answerCheck: Object.freeze({ checker: reading.checker, outcomes: Object.freeze(Object.fromEntries(ids.map((id) => [id, outcome(id)]))),
-      reasons: reading.reasons, premiseExempt: Object.freeze([...reading.premiseExempt]), candidates: shown, replacements: Object.freeze(replacements) })
+      reasons: Object.freeze(Object.fromEntries(Object.entries(reading.reasons).filter(([id]) => ids.includes(id)))),
+      premiseExempt: Object.freeze(reading.premiseExempt.filter((id) => ids.includes(id))), candidates: shown, replacements: Object.freeze(replacements) })
   });
 }
 

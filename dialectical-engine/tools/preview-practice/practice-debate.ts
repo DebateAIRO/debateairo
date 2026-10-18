@@ -500,6 +500,18 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     const messages = await promptMessagesOf(attemptId);
     return messages === null ? false : practiceMapEngineOf(messages);
   };
+  /**
+   * R3 final wave P17 (Task 17 Minor 1): a structure-repair try of a map call is re-read with the readings of the call it
+   * repairs. Its own prompt is the repair packet, which names no map contract, so before this an engine-2 repair (a
+   * MAP:check one included) was re-read with engine 1's readings (UNMAPPED). The call's engine flag is kept by its call key.
+   */
+  const mapEngineByCall = new Map<string, boolean>();
+  const mapEngineOfTry = async (attemptId: string | null, callSiteKey: string, callKey: string): Promise<boolean> => {
+    if (structureRepairOriginalKey(callSiteKey) !== callSiteKey) return mapEngineByCall.get(callKey) ?? false;
+    const engine = await mapEngineOf(attemptId, callSiteKey);
+    if (callSiteKey.startsWith("MAP:")) mapEngineByCall.set(callKey, engine);
+    return engine;
+  };
   // LG-A (L32): a structure-repair try joins the call it repairs (`practiceTryJoiner`).
   const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
@@ -534,6 +546,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     const { callKey, callModel, recordModel, replyForm } = await joinTry({ actorRef: entry.actor_ref, model,
       callSiteKey: entry.call_site_key, outcome: entry.outcome, formatFailed, recordedForm: artifact?.reply_form ?? null },
     () => replyFormOf(entry.attempt_id));
+    const mapEngine = await mapEngineOfTry(entry.attempt_id, entry.call_site_key, callKey);
     // Length guidance L27 (LG-B): this try's measures. A structure-repair try's words count for its call's AI (callModel).
     if (artifact !== undefined) {
       const recorded = typeof artifact.metadata_json === "object" && artifact.metadata_json !== null
@@ -554,7 +567,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
       // Refused-repair salvage: A1's drops are recorded on the artifact only (re-reading the raw reply would miss them).
       const repair = recordedSalvageRepairs(artifact.reply_repairs) ?? practiceJsonRepairOf(replyContentOf(stored.rawText),
         practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key, await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key),
-        await mapLengthedOf(entry.attempt_id, entry.call_site_key), await mapEngineOf(entry.attempt_id, entry.call_site_key));
+        await mapLengthedOf(entry.attempt_id, entry.call_site_key), mapEngine);
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;
@@ -567,7 +580,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail),
         recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),
-          await mapLengthedOf(entry.attempt_id, entry.call_site_key), await mapEngineOf(entry.attempt_id, entry.call_site_key)).issues,
+          await mapLengthedOf(entry.attempt_id, entry.call_site_key), mapEngine).issues,
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }

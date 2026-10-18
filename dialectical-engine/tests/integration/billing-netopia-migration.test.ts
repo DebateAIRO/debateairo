@@ -17,7 +17,7 @@ const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const NETOPIA_MIGRATION = "0111_billing_netopia.sql";
 // The auth DB batch is the chain step after 0111 (migrations/lineage/README.md): every migrate() here appends it too.
 const AUTH_DB_BATCH = "0112_auth_db_batch.sql";
-/** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6): migrate() applies it last. */
+/** Part C's step, chained after the auth DB batch (spec 2026-10-05 §2.16.6). */
 const PART_C_MIGRATION = "0113_billing_price_currencies.sql";
 /** Role rotation's step, chained after Part C's (spec 2026-10-11 Part 3). */
 const ROLE_ROTATION_MIGRATION = "0114_role_rotation.sql";
@@ -31,7 +31,7 @@ const MAP_MIGRATION = "0117_debate_shape_map.sql";
 const LANGUAGE_CHECK_MIGRATION = "0118_language_check_spend.sql";
 /** The reclaim resume (spec 2026-10-14-reclaim-resume-design), chained after the language check's. */
 const RECLAIM_MIGRATION = "0119_reclaim_resume.sql";
-/** The reply measures (length guidance LG-A, spec 2026-10-15), chained after the reclaim resume's; migrate() applies it last. */
+/** The reply measures (length guidance LG-A, spec 2026-10-15), chained after the reclaim resume's. */
 const REPLY_MEASURES_MIGRATION = "0120_reply_measures.sql";
 /** The engine verdict (engine redesign R2, spec 2026-10-15), chained after the reply measures'. */
 const ENGINE_VERDICT_MIGRATION = "0121_engine_verdict.sql";

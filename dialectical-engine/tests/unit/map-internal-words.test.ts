@@ -4,6 +4,7 @@ import { replyLanguageExpectation } from "@debateai/kernel";
 import { promptContractFingerprintText } from "@debateai/providers";
 import {
   MAP_CONTRACT_NAMES,
+  MAP_ENGINE_INTERNAL_FIELD_NAMES,
   MAP_INTERNAL_FIELD_NAMES,
   MAP_NOTES,
   mapAlsoRaisedOf,
@@ -211,5 +212,27 @@ describe("map internal words: no prompt change", () => {
     // Review Focus 1: today's seven are byte for byte unchanged (their own fingerprint is still register 14's seal).
     expect(createHash("sha256").update(MAP_CONTRACT_NAMES.map((name) => promptContractFingerprintText(mapPromptContracts()[name]))
       .join("\n---\n")).digest("hex")).toBe("25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392");
+  });
+});
+
+/**
+ * R3 final wave P3 (Task 3 Minor 1): the skip's compiled pattern is keyed by the joined names, not the list object, so a
+ * fresh copy of a list reads as the list does, a list changed after a first read is read again, and an empty list names
+ * no field (an empty alternation would match every text, so every claim would be skipped).
+ */
+describe("map internal words: one pattern per name list, keyed by its names", () => {
+  it("reads a fresh copy as the list, a changed list anew, and an empty list as naming nothing", () => {
+    const text = "Each rests_on of the answer matters.";
+    expect(mapNamesInternalWord(text, MAP_INTERNAL_FIELD_NAMES)).toBe(false);
+    expect(mapNamesInternalWord(text, MAP_ENGINE_INTERNAL_FIELD_NAMES)).toBe(true);
+    expect(mapNamesInternalWord(text, [...MAP_ENGINE_INTERNAL_FIELD_NAMES])).toBe(true);
+    const names = ["why_it_matters"];
+    expect(mapNamesInternalWord(text, names)).toBe(false);
+    names.push("rests_on");
+    expect(mapNamesInternalWord(text, names)).toBe(true);
+    expect(mapNamesInternalWord("Fares fund night buses.", [])).toBe(false);
+    expect(mapNamesInternalWord("A claim citing pt04.", [])).toBe(true);
+    expect(mapMergeAlsoRaised([{ claim: "Fares fund night buses.", makers: ["A"] }], []).map((entry) => entry.claim))
+      .toEqual(["Fares fund night buses."]);
   });
 });

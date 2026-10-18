@@ -60,7 +60,8 @@ import {
   mapAnglesSalvage, mapAnglesSalvageEngine, mapAnglesSalvageLengthed, mapCheckSalvage, mapChooseSalvage, mapChooseSalvageV2, mapGapSalvage,
   mapGapSalvageLengthed, mapListSalvage, mapListSalvageLengthed, mapMergeSalvage, type MapReplySalvage
 } from "./salvage.js";
-import type { MapAngle, MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem, MapStep } from "./types.js";
+import { MAP_ENGINE_LIMITS, type MapAngle, type MapAnswerItem, type MapItem, type MapKeyPoint, type MapMergedAnswer, type MapPointItem,
+  type MapStep } from "./types.js";
 
 /** One map call, fully described: the contract (in the question's language), its material, its check. */
 export type MapStepSpec<T> = Readonly<{
@@ -289,6 +290,13 @@ export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoi
  */
 export function mapCheckSpec(ctx: MapSpecContext, entries: readonly Readonly<{ checkId: string; answer: string }>[]): MapStepSpec<MapCheckReply> {
   if (ctx.engine !== true) throw new TypedDomainError("MAP_CHECK_ENGINE_ONLY", "MAP_CHECK_ENGINE_ONLY: the answer check is an engine-2 call");
+  // R3 final wave P6 (Task 6 Minor 2): the ids are code's own (a1..a4, then c1..c4), so a bad, repeated or empty list is
+  // a code defect, never a reply to refuse: the call is not built.
+  const ids = entries.map((entry) => entry.checkId);
+  if (ids.length === 0 || ids.length > MAP_ENGINE_LIMITS.checkIdsMax || new Set(ids).size !== ids.length
+    || ids.some((id) => !/^(a[1-4]|c[1-4])$/u.test(id))) {
+    throw new TypedDomainError("MAP_CHECK_IDS_INVALID", "MAP_CHECK_IDS_INVALID: the check's ids are 1 to 8 distinct a1..a4 / c1..c4");
+  }
   return mapEngineSpecOf("CHECK", ctx, "check", [mapQuestionField(ctx),
     { name: "answers", content: JSON.stringify(entries.map((entry) => ({ check_id: entry.checkId, answer: entry.answer }))) }],
   MAP_ENGINE_REPLY_SCHEMAS.check, mapCheckCheck(entries.map((entry) => entry.checkId), ctx.replyLanguage), mapCheckSalvage);

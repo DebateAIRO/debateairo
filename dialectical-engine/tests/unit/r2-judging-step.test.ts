@@ -38,7 +38,8 @@ import {
   floorDecidedByJudges,
   pointInvestigationFailureOutcome,
   providerCallCostEnvelopePhase,
-  rederiveCatchUpFloor
+  rederiveCatchUpFloor,
+  runnerTerminalFailureReason
 } from "../../apps/runner/src/index.js";
 
 /**
@@ -468,12 +469,24 @@ describe("the controller's carries on the judging step", () => {
     ["a network failure", new TypeError("fetch failed")],
     ["a refused reply", new TypedDomainError("COMPARING_JUDGE_REPLY_REFUSED", "best")],
     ["a money refusal", new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "the run's ceiling for arguing is reached")],
-    ["an unplanned seat", new TypedDomainError("COMPARING_JUDGE_SEAT_UNRESOLVED", "mimo")]
+    ["an unplanned seat", new TypedDomainError("COMPARING_JUDGE_SEAT_UNRESOLVED", "mimo")],
+    // R3 final wave P14 (Task 14 Minor 4): thrown while the judge's material is built, inside the seat's call.
+    ["a material order refused", new TypedDomainError("COMPARING_JUDGE_ORDER_INVALID", "order of 3 answers")]
   ] as const)("records %s as a failed judge and the debate goes on", async (_, failure) => {
     const { run, records } = step({ answers: { haiku: "A", mimo: failure, ds: "A" } });
     const result = await run();
     expect(records[1]).toMatchObject({ judgeSeat: 2, notCountedReason: "JUDGE_FAILED", chosenLetter: null });
     expect(result.verdict.marks).toEqual(["VERDICT-JUDGE-MISSING"]);
+  });
+
+  // R3 final wave P14 (Task 14 Minor 4): the seat pick runs outside any seat's call, so a refused pick leaves the step and
+  // reaches the runner's catch; it is a declared code there, never UNRECOGNIZED_DOMAIN_ERROR.
+  it("lets a refused seat pick leave the step, named at the runner's boundary (COMPARING_JUDGE_SEATS_INVALID)", async () => {
+    const { run, asks, records } = step({ rotationOffset: -1 });
+    await expect(run()).rejects.toMatchObject({ code: "COMPARING_JUDGE_SEATS_INVALID" });
+    expect([asks, records]).toEqual([[], []]);
+    expect(runnerTerminalFailureReason(new TypedDomainError("COMPARING_JUDGE_SEATS_INVALID", "count 3, rotation -1")))
+      .toBe("RUNNER_EXECUTION_FAILED:COMPARING_JUDGE_SEATS_INVALID");
   });
 
   it("names a code defect by the one rule the investigation step reads too", () => {

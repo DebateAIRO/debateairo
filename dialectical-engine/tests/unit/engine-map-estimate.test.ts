@@ -7,7 +7,7 @@ import {
   resolveDebateShape, resolveLengthGuidance, type EngineSettings, type LengthGuidance
 } from "@debateai/register";
 import { previewOutputTokensForBasis, type PreviewCallOutputTokens } from "../../apps/api/src/preview-budget-estimate.js";
-import { expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "../../apps/api/src/ask-model-picker.js";
+import { answerTokenCeilingsForBasis, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "../../apps/api/src/ask-model-picker.js";
 
 // As tests/unit/debate-shape-preview-estimate.test.ts builds its shaped basis, with LG-C's length and R1d's engine.
 const OUTPUT: PreviewCallOutputTokens = Object.freeze({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 });
@@ -36,9 +36,12 @@ describe("engine 2: the start-of-debate estimate counts the map's answer check",
     // The smallest raise (in steps of 10 words) that makes the check's reply the map's largest by at least 100 words,
     // found from the code's own ceilings, never typed.
     const withReason = (words: number): LengthGuidance => ({ ...LENGTH, map: { ...LENGTH.map, checkReason: words } });
+    // R3 final wave P16 (Task 16 Minor 3): the search is bounded by its number of steps (words are never compared with a
+    // token cap); the assertion below guards the result.
     let reason = LENGTH.map.checkReason;
-    while (mapEngineLargestReplyWordsCeiling(targetsOf(withReason(reason))) < mapLargestReplyWordsCeiling(targetsOf(withReason(reason))) + 100
-      && reason < LENGTH_ALLOWANCE_LIMITS.capTokens) reason += 10;
+    for (let step = 0; step < 1000
+      && mapEngineLargestReplyWordsCeiling(targetsOf(withReason(reason))) < mapLargestReplyWordsCeiling(targetsOf(withReason(reason))) + 100;
+      step += 1) reason += 10;
     const raised = withReason(reason);
     expect(mapEngineLargestReplyWordsCeiling(targetsOf(raised))).toBeGreaterThanOrEqual(mapLargestReplyWordsCeiling(targetsOf(raised)) + 100);
     const today = mapLengthAllowanceTokens(raised, OUTPUT.debate, false);
@@ -50,5 +53,17 @@ describe("engine 2: the start-of-debate estimate counts the map's answer check",
       .toBeGreaterThanOrEqual(mapLengthAllowanceTokens(raised, OUTPUT.debate, true));
     // Without the engine the raised and the start receipts price the same: checkReason reaches no engine-1 map contract.
     expect(previewOutputTokensForBasis(OUTPUT, basisWith(raised)).debate).toBe(previewOutputTokensForBasis(OUTPUT, basisWith(LENGTH)).debate);
+    // P16 (Task 16 Minor 2): the picker side. With the shape's merge and choose bounds below the cap (start values sit AT
+    // the cap, which hides the engine's figure), an engine-2 receipt's POSITION is priced at the engine map allowance.
+    const lowShape = { ...SHAPE, mapMergeBound: OUTPUT.debate, mapChooseBound: OUTPUT.debate };
+    const lowBasis = (engineSettings?: EngineSettings) => computeStructuralCeilingBasis({ ...TERMS, panelSize: 2, depth: 1, shape: lowShape,
+      length: raised, ...(engineSettings === undefined ? {} : { engine: engineSettings }) });
+    const ceilings = Object.freeze(Object.fromEntries(Object.keys(expectedCallsByRoleFromBasis(lowBasis())).map((role) => [role, OUTPUT.debate]))) as
+      Parameters<typeof answerTokenCeilingsForBasis>[0];
+    const pickedToday = answerTokenCeilingsForBasis(ceilings, lowBasis()).POSITION;
+    const pickedEngine = answerTokenCeilingsForBasis(ceilings, lowBasis(engine(true))).POSITION;
+    expect(pickedToday).toBe(Math.max(OUTPUT.debate, today));
+    expect(pickedEngine).toBe(mapLengthAllowanceTokens(raised, OUTPUT.debate, true));
+    expect(pickedEngine).toBeGreaterThan(pickedToday);
   });
 });

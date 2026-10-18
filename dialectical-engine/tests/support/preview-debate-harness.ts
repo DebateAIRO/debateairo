@@ -85,7 +85,7 @@ import {
   type GateProvider,
   type GateRequest
 } from "./preview-gate-stubs.js";
-import { fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
+import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -520,25 +520,31 @@ export function previewDebateHarness(input: Readonly<{
     const rotated = admission.pin ?? pickRotatedRoles({ panel, counts: {}, seed: roleRotationSeed({ as_of: asOf, question_line: question }) });
     if (rotated === null) throw new Error("test: four makers always rotate");
     if (admission.runId !== undefined) nextRandomUUIDIs(admission.runId);
-    const runId = await new RunRepository(pool()).startRun({
-      questionLine: question,
-      ...(admission.owner === undefined
-        ? { principal: { kind: "legacy" as const, legacyAskerId: askerId }, sessionId: `session:${askerId}` }
-        : { principal: { kind: "server" as const, userId: admission.owner.userId, ownerRef: admission.owner.ownerRef },
-          sessionId: admission.owner.sessionId }),
-      callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
-      tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
-      depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
-      envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
-        ...(admission.shape === undefined ? {} : { shape: admission.shape }),
-        ...(admission.length === undefined ? {} : { length: admission.length }),
-        ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
-      ...(admission.shape === undefined ? {} : {
-        argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
-        argumentLanguageName: (admission.language ?? { name: "English" }).name
-      }),
-      registerVersion: 1, batteryVersion: "s00", batteryRows
-    });
+    // R3 final wave P17 (Task 17 Minor 2): a start that throws never leaves the fixed id pending for a later randomUUID().
+    let runId: string;
+    try {
+      runId = await new RunRepository(pool()).startRun({
+        questionLine: question,
+        ...(admission.owner === undefined
+          ? { principal: { kind: "legacy" as const, legacyAskerId: askerId }, sessionId: `session:${askerId}` }
+          : { principal: { kind: "server" as const, userId: admission.owner.userId, ownerRef: admission.owner.ownerRef },
+            sessionId: admission.owner.sessionId }),
+        callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
+        depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
+        envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
+          ...(admission.shape === undefined ? {} : { shape: admission.shape }),
+          ...(admission.length === undefined ? {} : { length: admission.length }),
+          ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
+        ...(admission.shape === undefined ? {} : {
+          argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
+          argumentLanguageName: (admission.language ?? { name: "English" }).name
+        }),
+        registerVersion: 1, batteryVersion: "s00", batteryRows
+      });
+    } finally {
+      if (admission.runId !== undefined) clearPendingRunId();
+    }
     if (admission.runId !== undefined) fixedRunIdTaken(admission.runId, runId);
     await insertRunRoleRotation(pool(), { runId, ...rotationPinFields(rotated) });
     const workItemId = await new WorkItemRepository(pool()).enqueue({

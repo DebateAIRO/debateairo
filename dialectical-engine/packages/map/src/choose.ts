@@ -189,7 +189,9 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     for (const answer of mapFirstOfEachStatement(replyAnswers, (entry) => entry.statement).slice(0, maxAnswers)) {
       drafts.push({ answerId: answer.answer_id, statement: answer.statement, forIds: shownKeyPoints(answer.for), againstIds: shownKeyPoints(answer.against),
         rival: answer.strongest_rival, filled: false, opposite: oppositeAnswerIds.has(answer.answer_id) || isOpposite(answer.statement),
-        assumptions: noSiding && "assumptions" in answer ? (answer.assumptions ?? []).filter(readable) : [], raised: [],
+        // R3 final wave P7: at most MAP_ENGINE_LIMITS.assumptionsMax in code too (the schema's limit; this holds for any reply).
+        assumptions: noSiding && "assumptions" in answer
+          ? (answer.assumptions ?? []).filter(readable).slice(0, MAP_ENGINE_LIMITS.assumptionsMax) : [], raised: [],
         mergedAnswerId: mergedIds.has(answer.answer_id) ? answer.answer_id : null });
     }
   }
@@ -204,9 +206,12 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     // `taken` keeps the old rule on purpose (an empty normalised key IS taken): if an answer that normalises to nothing
     // matched nothing here, the same merged answer could be filled in twice while drafts start empty.
     const taken = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
+    // R3 final wave P9 (Task 9 O2): under engine 2 a merged answer a chosen answer already reuses (maybe reworded) never
+    // fills a second place, so the debate never argues two wordings of one answer. Engine 1 keeps today's text rule only.
+    const keptIds = new Set(noSiding ? drafts.flatMap((draft) => (draft.mergedAnswerId === null ? [] : [draft.mergedAnswerId])) : []);
     // Final review M-3: an answer with no letter or digit never fills a place (the template is the last resort).
     const fromMap = mapRankMergedAnswers(input.mergedAnswers).find((answer) => readable(answer.answer)
-      && !taken.has(mapNormaliseText(answer.answer)));
+      && !taken.has(mapNormaliseText(answer.answer)) && !keptIds.has(answer.answerId));
     const fromOpposite = input.items.find((item): item is MapAnswerItem => item.kind === "ANSWER"
       && item.angleKind === "OPPOSITE_CASE" && readable(item.answer) && !taken.has(mapNormaliseText(item.answer)));
     const first = drafts[0];
@@ -249,8 +254,10 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
   quota("OPPOSITE_CASE", (keyPoint) => keyPoint.fixedAngleKinds.includes("OPPOSITE_CASE"), true);
   quota("ASKER_WORRY", (keyPoint) => keyPoint.fixedAngleKinds.includes("ASKER_WORRY"), false);
 
-  // Engine 2 (spec §5.2 item 3): choose's reserve answers, in its order, renamed r1/r2; one that repeats a chosen answer
-  // or names an internal word is left out (the check refuses both; this holds for any reply).
+  // Engine 2 (spec §5.2 item 3): choose's reserve answers, in its order, renamed r1/r2. Code leaves out a reserve with no
+  // words, one naming an internal word or one repeating a chosen answer (after code's own fills), and every one past the
+  // second; it keeps at most MAP_ENGINE_LIMITS.assumptionsMax readable assumptions each. Reserves repeating EACH OTHER
+  // are the reply check's to refuse (mapChooseCheckV2, MAP_ANSWER_DUPLICATE), as are all of the above in a checked reply.
   const chosenKeys = new Set(drafts.map((draft) => mapNormaliseText(draft.statement)));
   const reserveReplies = noSiding && input.reply !== null && "reserve_answers" in input.reply ? input.reply.reserve_answers ?? [] : [];
   const reserves: MapReserveAnswer[] = reserveReplies
@@ -258,14 +265,14 @@ export function mapFinishChoice(input: MapFinishChoiceInput): Readonly<{ choice:
     .slice(0, MAP_ENGINE_LIMITS.reservesMax)
     .map((reserve, index) => Object.freeze({ reserveId: index === 0 ? "r1" as const : "r2" as const, statement: reserve.statement,
       forKeyPointIds: Object.freeze(shownKeyPoints(reserve.for)), againstKeyPointIds: Object.freeze(shownKeyPoints(reserve.against)),
-      assumptions: Object.freeze((reserve.assumptions ?? []).filter(readable)) }));
+      assumptions: Object.freeze((reserve.assumptions ?? []).filter(readable).slice(0, MAP_ENGINE_LIMITS.assumptionsMax)) }));
 
   // Ruling T7-PRIV: the answers are renamed a1..aN in choice order (filled ones too), and each strongest rival with them.
   // A rival that names no chosen answer (or the answer itself) becomes the next answer, as before.
   const draftIds = drafts.map((draft) => draft.answerId);
   const answers = drafts.map((draft, index) => {
-    const named = draft.rival === null || draft.rival === draft.answerId ? -1 : draftIds.indexOf(draft.rival);
-    const rival = named >= 0 && named !== index ? named : (index + 1) % drafts.length;
+    const rivalAt = draft.rival === null || draft.rival === draft.answerId ? -1 : draftIds.indexOf(draft.rival);
+    const rival = rivalAt >= 0 && rivalAt !== index ? rivalAt : (index + 1) % drafts.length;
     return Object.freeze({
       answerId: mapChosenAnswerCodeId(index),
       statement: draft.statement,

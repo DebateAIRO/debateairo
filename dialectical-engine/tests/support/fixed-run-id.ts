@@ -42,3 +42,8 @@ export function fixedRunIdTaken(expected: string, runId: string): void {
   pending = null;
   if (runId !== expected) throw new Error(`test: the run did not take the fixed run id (got ${runId})`);
 }
+
+/** R3 final wave P17 (Task 17 Minor 2): drops a pending id whatever happened (a `finally`), so a failed start never leaks it. */
+export function clearPendingRunId(): void {
+  pending = null;
+}

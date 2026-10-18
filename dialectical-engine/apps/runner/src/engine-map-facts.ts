@@ -43,6 +43,14 @@ export function engineMapFactsOf(input: Readonly<{
 }
 
 /**
+ * R3 final wave P15 (Task 15 Minor): the story's `positionWords` member, OMITTED (never written as undefined) when the run
+ * has no map facts, as on a map fallback, so such a story's source keeps the shape of one with no engine map.
+ */
+export function enginePositionWordsOf(facts: EngineMapFacts | null): Readonly<{ positionWords?: ReadonlyMap<string, string> }> {
+  return facts === null ? Object.freeze({}) : Object.freeze({ positionWords: facts.wordsByRootNodeId });
+}
+
+/**
  * R2's material answers with the map's words and the chooser's assumptions. R2 already takes the words from the map
  * (`mapWords`) and keeps the node's text as the case, so on R2's own source only `assumptions` changes; the words and
  * case lines keep the rule for a source built without `mapWords`.

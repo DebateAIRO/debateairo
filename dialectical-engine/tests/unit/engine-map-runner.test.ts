@@ -8,9 +8,10 @@ import {
   type MapResult, type MapSpecContext
 } from "@debateai/map";
 import { readPromptFrame, type ProviderCallRequest, type ProviderGateway } from "@debateai/providers";
+import { engineSettingsOf, engineVersionPolicyStartValues } from "@debateai/register";
 import { framedJudgePromptForTest, rootPositionRequestBytesBound, type JudgeLeg } from "@debateai/judgement";
 import {
-  createRunnerMapCaller, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroMapMaterialCharsFor, runMapStage, shapeEngineRootMaterial,
+  createRunnerMapCaller, engineMapCheckUnbudgeted, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroMapMaterialCharsFor, runMapStage, shapeEngineRootMaterial,
   type MapStageDeps
 } from "../../apps/runner/src/map-stage.js";
 import { shapePositionsFromMap } from "../../apps/runner/src/shape-plan.js";
@@ -43,6 +44,31 @@ describe("engine 2 in the runner's map caller", () => {
     expect(typeof seen[0]!.buildRepairPacket).toBe("function");
     await caller.call({ step: "LIST", callSiteKey: "MAP:list:0", seat, order: 1, shown: "BLIND", spec: mapListSpec(ctx(false), null) });
     expect(seen[1]!.contractHash).toBe("m".repeat(64));
+  });
+
+  // R3 final wave P14 (Task 14 Minor 2): the map caller's own refusal of an engine-2 call with no engine seal.
+  it("refuses an engine-2 call when the runner was given no engine seal, sending nothing; engine 1's call still goes (ENGINE_RUNNER_UNCONFIGURED)", async () => {
+    const seen: ProviderCallRequest[] = [];
+    const { engineContractHash: _none, ...unsealed } = deps(seen, JSON.stringify({ points: [], candidate_answers: [] }));
+    const caller = createRunnerMapCaller(unsealed);
+    const seat = { aiRef: "preview:a", maker: "maker-a" };
+    await expect(caller.call({ step: "LIST", callSiteKey: "MAP:list:0", seat, order: 0, shown: "BLIND", spec: mapListSpec(ctx(true), null) }))
+      .rejects.toMatchObject({ code: "ENGINE_RUNNER_UNCONFIGURED" });
+    expect(seen).toEqual([]);
+    await caller.call({ step: "LIST", callSiteKey: "MAP:list:1", seat, order: 1, shown: "BLIND", spec: mapListSpec(ctx(false), null) });
+    expect(seen.map((request) => request.contractHash)).toEqual(["m".repeat(64)]);
+  });
+
+  // P14 (Task 14 Minor 2): a shaped engine-2 run whose receipt did not count the check never reaches the map.
+  it("stops a shaped engine-2 run whose receipt did not count the answer check, and only that run (ENGINE_MAP_CHECK_UNBUDGETED)", () => {
+    const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 4, mapOpening: true });
+    expect(engine.sites.answerCheck).toBe(1);
+    expect(engineMapCheckUnbudgeted(engine, true)).toBe(false);
+    const uncounted = { ...engine, sites: { ...engine.sites, answerCheck: 0 as const } };
+    expect(engineMapCheckUnbudgeted(uncounted, true)).toBe(true);
+    expect(engineMapCheckUnbudgeted(uncounted, false)).toBe(false);
+    expect(engineMapCheckUnbudgeted({ engine: 1 }, true)).toBe(false);
+    // Where the runner reads it (before the map, throwing the declared code) is pinned in "the run body's engine-2 wiring" below.
   });
 
   it("the check runs at the map's own thinking level and is told the map's lengths (spec §17 default; INTERFACE §4.3)", () => {
@@ -266,7 +292,8 @@ describe("the run body's engine-2 wiring (pinned in the source; A0-3: the run bo
     const guard = RUNNER.indexOf("throw new TypedDomainError(\"ENGINE_MAP_CHECK_UNBUDGETED\"");
     expect(guard).toBeGreaterThan(RUNNER.indexOf("const shapeRun = "));
     expect(guard).toBeLessThan(RUNNER.indexOf("const runMap = async ()"));
-    expect(RUNNER).toContain("if (engine.engine === 2 && shapeRun !== null && engine.sites.answerCheck !== 1) {");
+    // R3 final wave P14: the guard reads the one pure rule (`engineMapCheckUnbudgeted`, its behaviour pinned above).
+    expect(RUNNER).toContain("if (engineMapCheckUnbudgeted(engine, shapeRun !== null)) {");
     const map = between("const runMap = async ()", "shapeMapResult = resolved.result;");
     expect(map).toContain("...(engineMap ? { engineContractHash: this.settings.engine!.engineContractHash } : {})");
     expect(map).toContain("...(engineMap && engine.engine === 2 ? { engine: { answerCheckCandidates: engine.answerCheck.candidates } } : {})");

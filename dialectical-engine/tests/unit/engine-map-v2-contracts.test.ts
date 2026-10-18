@@ -9,9 +9,6 @@ import {
 } from "@debateai/map";
 
 const LENGTH: MapLength = { targets: LENGTH_GUIDANCE_START.map, charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord };
-/** Every material field name a map call's packet can carry (specs.ts and the check): none may appear in a v2 instruction. */
-const MATERIAL_FIELDS = ["question_line", "angle_label", "angle_focus", "points_so_far", "points", "candidate_answers", "key_points",
-  "answers", "framing_challenges", "length", "question_language"];
 
 describe("engine 2: the map's contracts (spec §5.6, §9)", () => {
   it("are eight, with their sealed ids, in this order", () => {
@@ -38,10 +35,18 @@ describe("engine 2: the map's contracts (spec §5.6, §9)", () => {
       const text = MAP_ENGINE_INSTRUCTIONS[name];
       expect(text, name).not.toMatch(/[A-Za-z]+_[A-Za-z]+/u);
       // (pre-flight PF-R3-2.2, FINAL Ruling D4(b) encoding) the check's stored outcomes ADDED_FACT and NO_COST are code values too.
-      for (const code of ["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC", "GENERAL", "PASSED", "NOT_AN_ANSWER", "ADDED_FACT", "NO_COST"]) {
+      // R3 final wave P3 (Task 3 Minor 2): the check's other stored words (UNCHECKED, and the actions REPLACED, DROPPED).
+      for (const code of ["OPPOSITE_CASE", "ASKER_WORRY", "PRACTICAL", "SPECIFIC", "GENERAL", "PASSED", "NOT_AN_ANSWER", "ADDED_FACT", "NO_COST",
+        "UNCHECKED", "REPLACED", "DROPPED"]) {
         expect(text, `${name}:${code}`).not.toContain(code);
       }
-      for (const field of MATERIAL_FIELDS.filter((entry) => entry.includes("_"))) expect(text, `${name}:${field}`).not.toContain(field);
+      // P3: an underscored name is caught above; a joined (camelCase) one and a distinctive spaced one ("angle focus",
+      // "key point id") through the skip's own engine-2 pattern, and every joined spelling of every engine-2 name.
+      expect(mapNamesInternalWord(text, MAP_ENGINE_INTERNAL_FIELD_NAMES), name).toBe(false);
+      for (const field of MAP_ENGINE_INTERNAL_FIELD_NAMES) {
+        const joined = field.replace(/_([a-z])/gu, (_all, letter: string) => letter.toUpperCase());
+        expect(text.toLowerCase(), `${name}:${joined}`).not.toContain(joined.toLowerCase());
+      }
       for (const limit of [MAP_LIMITS.claimMaxChars, MAP_LIMITS.candidateAnswerMaxChars, MAP_LIMITS.angleLabelMaxChars]) {
         expect(MAP_ENGINE_ANSWER_FORMS[name], name).not.toContain(`at most ${String(limit)} characters`);
       }

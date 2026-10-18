@@ -45,6 +45,7 @@ describe("R3: the map's words, assumptions and bases in the run body", () => {
 
   it("the story names each position by the map's words", async () => {
     const story = between(await readFile(RUNNER, "utf8"), "input: buildStoryRunSnapshot({", "answersNote:");
-    expect(story).toContain("...(engineMap ? { positionWords: engineMapFactsNow()?.wordsByRootNodeId } : {})");
+    // R3 final wave P15: omitted, never undefined, when the run has no map facts (`enginePositionWordsOf`).
+    expect(story).toContain("...(engineMap ? enginePositionWordsOf(engineMapFactsNow()) : {})");
   });
 });

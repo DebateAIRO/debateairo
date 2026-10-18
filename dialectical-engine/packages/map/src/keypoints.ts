@@ -103,7 +103,8 @@ export function mapAddGapPoints(current: MapMergedMap, items: readonly MapItem[]
       }));
     if (at >= 0) {
       const keyPoint = keyPoints[at]!;
-      // The join keeps the merger's word; the members' own (a gap point's included) are added by mapGroupRestsOn.
+      // The join passes the key point's combined label (the merger's word already joined with its members'); the gap
+      // point's own is added to it by mapGroupRestsOn, so an assumption from either side wins.
       keyPoints[at] = mapKeyPoint(keyPoint.keyPointId, keyPoint.claim, [...keyPoint.memberItemIds, item.itemId], byId, keyPoint.restsOn);
     } else {
       created += 1;

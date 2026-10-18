@@ -1019,8 +1019,9 @@ for (const row of HAND_OFFS) {
  * rows (eight then; eleven since the debate shape's three; thirteen since engine
  * redesign R3's two v2 position rows) drive a gateway, and
  * only a gateway calls `buildRepairPacket`.
- * The other nine rows render one packet each, so `packets.slice(1)` was empty
- * for them and the loop asserted nothing at all — nine rows of silent pass.
+ * The other rows (nine when this was found; twenty-two of the thirty-five since
+ * R3) render one packet each, so `packets.slice(1)` was empty for them and the
+ * loop asserted nothing at all — nine rows of silent pass then.
  *
  * The count is asserted now, so the row states its own extent and a render that
  * quietly stops producing a repair packet turns it red instead of shrinking it.

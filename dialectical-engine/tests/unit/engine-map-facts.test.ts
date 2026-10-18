@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { MapKeyPoint } from "@debateai/map";
 import {
-  engineMapFactsOf, engineMaterialAnswersWithMap, engineMaterialPointsWithMap, engineSourceWithMap
+  engineMapFactsOf, engineMaterialAnswersWithMap, engineMaterialPointsWithMap, enginePositionWordsOf, engineSourceWithMap
 } from "../../apps/runner/src/engine-map-facts.js";
 import { buildShapePlan, type ShapePositionPlan } from "../../apps/runner/src/shape-plan.js";
 
@@ -61,5 +61,13 @@ describe("engine 2: the map's facts for every reader", () => {
     expect(wrapped.answers[0]!.assumptions).toEqual(["The city can pay."]);
     expect(wrapped.points[0]!.restsOn).toBe("question");
     expect(wrapped.reviews).toBe("kept as R2 built it");
+  });
+});
+
+/** R3 final wave P15 (Task 15 Minor): a map fallback has no facts, so the story's member is omitted, never undefined. */
+describe("engine 2: the story's position words", () => {
+  it("are the facts' words, and no member at all without facts", () => {
+    expect(enginePositionWordsOf(facts)).toEqual({ positionWords: facts.wordsByRootNodeId });
+    expect(Object.hasOwn(enginePositionWordsOf(null), "positionWords")).toBe(false);
   });
 });

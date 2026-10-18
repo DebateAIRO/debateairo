@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { replyLanguageExpectation } from "@debateai/kernel";
 import {
   MAP_ENGINE_REPLY_SCHEMAS, mapChooseCheckV2, mapChooseSalvageV2, mapCheckCheck, mapCheckReplySchema, mapCheckSalvage, mapClassifyReply,
-  mapLimitsFor, mapReplySchemasV2For
+  mapLimitsFor, mapMergeSalvage, mapReplySchemasV2For
 } from "@debateai/map";
 import { CONTENT_FOLLOW_UP_SENTENCES, schemaFailureLimits } from "@debateai/providers";
 
@@ -103,10 +103,75 @@ describe("engine 2: every refusal states its exact limit (P2.3)", () => {
     // Two ids that would normalise to one are left as written (LG-A's collision guard), so the schema refuses the first.
     const reply = { key_points: [{ key_point_id: "KP-1", claim: "One.", rests_on: "question", member_item_ids: ["pt01"] },
       { key_point_id: "kp-1", claim: "Two.", rests_on: "question", member_item_ids: ["pt02"] }], answers: [] };
-    const read = mapClassifyReply(JSON.stringify(reply), STOP, V2.merge, none, {}, { exactLimits: true });
+    // R3 final wave P4 (Task 4 Minor 2): with merge's own salvage, so the collision guard is what leaves them as written.
+    const read = mapClassifyReply(JSON.stringify(reply), STOP, V2.merge, none, mapMergeSalvage, { exactLimits: true });
+    expect(read.repairs).not.toContain("MAP_IDS_NORMALISED");
     expect(JSON.parse((read.classification as { parseError: string }).parseError))
       .toContainEqual({ code: "custom", path: ["key_points", 0, "key_point_id"], message: "MAP_ID_FORM" });
     // (pre-flight PF-R3-2.8) the sentence DESCRIBES the earlier answer (content-follow-up.ts:4-7), and states the rule.
     expect(CONTENT_FOLLOW_UP_SENTENCES.MAP_ID_FORM).toBe("The earlier answer gives an id the form does not allow: an id is 1 to 24 characters, lowercase letters, digits and hyphens.");
+  });
+});
+
+/** R3 final wave P4 (Task 4 Minor 1, tests-that-are-not-testing: under-reaching): one case per v2 schema rule. */
+describe("engine 2: each v2 schema rule, one case each", () => {
+  const pathsOf = (result: { success: boolean; error?: { issues: readonly { path: readonly PropertyKey[] }[] } }) =>
+    result.success ? [] : result.error!.issues.map((issue) => issue.path.join("."));
+  const choice = (id: string, extra: object = {}) => ({ answer_id: id, statement: `Answer ${id}.`, for: [], against: [], strongest_rival: null, ...extra });
+  const check = (id: string, extra: object = {}) =>
+    ({ check_id: id, answers_question: true, adds_unstated_fact: false, cost_can_be_named: true, reason: null, ...extra });
+  const IDS = ["a1", "a2", "a3", "a4", "c1", "c2", "c3", "c4"];
+
+  it("rests_on is one of question | assumption on a list point, and required on a merged key point", () => {
+    const list = (restsOn: string) => ({ points: [point("A.", restsOn), point("B.", "question"), point("C.", "assumption")], candidate_answers: ["Yes."] });
+    expect(V2.list.safeParse(list("question")).success).toBe(true);
+    expect(V2.list.safeParse(list("assumption")).success).toBe(true);
+    expect(pathsOf(V2.list.safeParse(list("fact")))).toEqual(["points.0.rests_on"]);
+    const keyPoint = { key_point_id: "kp01", claim: "One.", member_item_ids: ["pt01"] };
+    expect(V2.merge.safeParse({ key_points: [{ ...keyPoint, rests_on: "assumption" }], answers: [] }).success).toBe(true);
+    expect(pathsOf(V2.merge.safeParse({ key_points: [keyPoint], answers: [] }))).toEqual(["key_points.0.rests_on"]);
+  });
+
+  it("an answer's assumptions are optional and at most 3", () => {
+    const reply = (assumptions?: readonly string[]) =>
+      ({ answers: [choice("yes", assumptions === undefined ? {} : { assumptions }), choice("no")] });
+    expect(V2.choose.safeParse(reply()).success).toBe(true);
+    expect(V2.choose.safeParse(reply(["One.", "Two.", "Three."])).success).toBe(true);
+    expect(pathsOf(V2.choose.safeParse(reply(["One.", "Two.", "Three.", "Four."])))).toEqual(["answers.0.assumptions"]);
+  });
+
+  it("reserve answers are optional and at most 2", () => {
+    const reserve = (n: number) => ({ statement: `Reserve ${String(n)}.`, for: [], against: [], assumptions: [] });
+    const reply = (count: number) => ({ answers: [choice("yes"), choice("no")], reserve_answers: Array.from({ length: count }, (_, n) => reserve(n)) });
+    expect(V2.choose.safeParse({ answers: [choice("yes"), choice("no")] }).success).toBe(true);
+    expect(V2.choose.safeParse(reply(2)).success).toBe(true);
+    expect(pathsOf(V2.choose.safeParse(reply(3)))).toEqual(["reserve_answers"]);
+  });
+
+  it("the check holds 1 to 8 entries, each id of the a1..a4 / c1..c4 form", () => {
+    expect(pathsOf(V2.check.safeParse({ checks: [] }))).toEqual(["checks"]);
+    expect(V2.check.safeParse({ checks: IDS.map((id) => check(id)) }).success).toBe(true);
+    expect(pathsOf(V2.check.safeParse({ checks: [...IDS, "a1"].map((id) => check(id)) }))).toEqual(["checks"]);
+    expect(pathsOf(V2.check.safeParse({ checks: [check("a5")] }))).toEqual(["checks.0.check_id"]);
+  });
+
+  it("a well-formed id not shown is MAP_CHECK_UNKNOWN_ID; answers_question false with no reason is MAP_CHECK_REASON_MISSING", () => {
+    const shown = ["a1", "a2"];
+    expect(mapCheckCheck(shown, EN)(V2.check.parse({ checks: [check("a1"), check("a2"), check("c1")] })))
+      .toEqual([{ path: ["checks", 2, "check_id"], code: "MAP_CHECK_UNKNOWN_ID" }]);
+    expect(mapCheckCheck(shown, EN)(V2.check.parse({ checks: [check("a1", { answers_question: false }), check("a2")] })))
+      .toEqual([{ path: ["checks", 0, "reason"], code: "MAP_CHECK_REASON_MISSING" }]);
+    expect(mapCheckCheck(shown, EN)(V2.check.parse({ checks: [check("a1", { answers_question: false, reason: "It says it depends." }), check("a2")] })))
+      .toEqual([]);
+  });
+
+  it("the v2 salvage drops a reserve's unknown, repeated and two-sided ids (MAP_IDS_DROPPED)", () => {
+    const KP = new Set(["kp01", "kp02", "kp03"]);
+    const reply = { answers: [choice("yes", { for: ["kp01"] }), choice("no", { against: ["kp02"] })],
+      reserve_answers: [{ statement: "Only at night.", for: ["kp03", "kp99", "kp03", "kp02"], against: ["kp02"], assumptions: [] }] };
+    const read = mapChooseSalvageV2(KP).parsed!(V2.choose.parse(reply));
+    expect(read.repairs).toEqual(["MAP_IDS_DROPPED"]);
+    expect(read.value.reserve_answers?.[0]).toMatchObject({ for: ["kp03"], against: [] });
+    expect(read.value.answers).toEqual(V2.choose.parse(reply).answers);
   });
 });

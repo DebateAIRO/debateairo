@@ -256,12 +256,13 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.setAside).toContainEqual({ nodeId: CHILD, reason: "UNAUTHORED-BRANCH-HALTED: Expansion under (a point) halted" });
   });
 
-  // Task 14 (Task 12 NOTE): the debate shape's eight marks are about how the debate was run (the map's fallbacks, the
-  // two extensions); their records carry codes only (`MAP_MERGE_FALLBACK:MERGE`, `SCRUTINY_EXTENDED:2`). The story is
+  // Task 14 (Task 12 NOTE): the debate shape's twelve marks (DEBATE_SHAPE_MARKS) are about how the debate was run (the
+  // map's fallbacks, R3's four answer-check marks, the two extensions); their records carry codes only (`MAP_MERGE_FALLBACK:MERGE`, `SCRUTINY_EXTENDED:2`). The story is
   // never handed them — neither the mark codes nor a record's reason — so the story writer never reads a raw code.
   it("never hands the story a debate-shape mark or its coded reason", () => {
     const shapeMarks = ["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK", "MAP_UNAVAILABLE_TODAYS_OPENING",
-      "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"];
+      "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED",
+      "MAP_ANSWER_KEPT_UNCHECKED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"];
     const snapshot = buildStoryRunSnapshot({
       ...source(),
       answerMarks: ["BRANCH-FROZEN-LOW-LEVERAGE", ...shapeMarks],

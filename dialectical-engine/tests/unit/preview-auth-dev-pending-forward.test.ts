@@ -30,6 +30,7 @@ const RECLAIM_STEP = '0119_reclaim_resume.sql';
 const REPLY_MEASURES_STEP = '0120_reply_measures.sql';
 // The engine verdict (engine redesign R2, spec 2026-10-15): the chain's eleventh step.
 const ENGINE_VERDICT_STEP = '0121_engine_verdict.sql';
+// The engine's map answer step (engine redesign R3, spec 2026-10-15): the chain's twelfth step.
 const ENGINE_MAP_CHECK_STEP = '0122_engine_map_check.sql';
 const DEV_STEP = '0110_account_erasure_public_debates.sql';
 const LEDGER = 'SELECT name FROM public.debateai_schema_migration';

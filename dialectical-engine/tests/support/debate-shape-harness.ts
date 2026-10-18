@@ -4,7 +4,7 @@
 // completed (`runShapeDebate`, pre-flight PF-B53: P2L Task 17 calls it too). Plan Task 15 Step 1, written in Task 13.
 import { createHash } from "node:crypto";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { mapContractNameOf, mapPromptContractHash } from "@debateai/map";
+import { MAP_ENGINE_CONTRACT_IDS, mapContractNameOf, mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
   debateShapePolicyStartValues, engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveDebateShape,
@@ -105,7 +105,9 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
       const material = readFramedMaterial(wirePacket(chat));
       // Engine redesign R3: an engine-2 map contract (map.*.v2, map.check.v1) is answered by the engine script.
       const engineReply = engineMapScriptedContent(material.contractId, material.fields, options.engineMap ?? {});
-      if (engineReply !== null) return fail.has("CHOOSE") && material.contractId === "map.choose.v2" ? { content: "not json" } : { content: engineReply };
+      if (engineReply !== null) {
+        return fail.has("CHOOSE") && material.contractId === MAP_ENGINE_CONTRACT_IDS.choose ? { content: "not json" } : { content: engineReply };
+      }
       const contractId = material.contractId;
       // LG-C Task 14: today's map contract or its length variant, by name (Task 17's lengthed shaped run).
       const mapName = mapContractNameOf(contractId);

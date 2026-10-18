@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
-  MAP_ANSWER_CHECK_OUTCOMES, MAP_ENGINE_LIMITS, MAP_RESTS_ON, MAP_STEPS, mapAssignItemIds, type MapItemDraft
+  MAP_ANSWER_CHECK_OUTCOMES, MAP_ENGINE_LIMITS, MAP_RESTS_ON, MAP_STEPS, mapAssignItemIds, type MapAnswerCheckReading,
+  type MapAnswerCheckResult, type MapChosenAnswer, type MapItemDraft, type MapKeyPoint, type MapRestsOn
 } from "@debateai/map";
 import { ENGINE_VERSION_LIMITS } from "@debateai/register";
 
@@ -33,5 +34,21 @@ describe("engine 2: the map's vocabulary", () => {
     expect(withBasis).toMatchObject({ restsOn: "assumption" });
     expect(Object.hasOwn(without, "restsOn")).toBe(false);
     expect(Object.hasOwn(items.find((item) => item.kind === "ANSWER")!, "restsOn")).toBe(false);
+  });
+});
+
+/**
+ * R3 final wave P1 (Task 1 Minor): a type-level pin of the engine-2 shapes. premiseExempt is REQUIRED on the reading and
+ * the result (D1 counts it); the engine-2 members of engine-1 objects stay OPTIONAL (absent on engine 1, never undefined).
+ * Checked by the typecheck; vitest's expectTypeOf is a no-op at run time.
+ */
+describe("engine 2: the type shapes (type-level pin)", () => {
+  it("premiseExempt is required; restsOn, assumptions and pointsRaised are optional members", () => {
+    expectTypeOf<MapAnswerCheckReading["premiseExempt"]>().toEqualTypeOf<readonly string[]>();
+    expectTypeOf<MapAnswerCheckResult["premiseExempt"]>().toEqualTypeOf<readonly string[]>();
+    expectTypeOf<Pick<MapAnswerCheckReading, "premiseExempt">>().toEqualTypeOf<Readonly<{ premiseExempt: readonly string[] }>>();
+    expectTypeOf<Pick<MapKeyPoint, "restsOn">>().toEqualTypeOf<Readonly<{ restsOn?: MapRestsOn }>>();
+    expectTypeOf<Pick<MapChosenAnswer, "assumptions" | "pointsRaised">>()
+      .toEqualTypeOf<Readonly<{ assumptions?: readonly string[]; pointsRaised?: readonly string[] }>>();
   });
 });

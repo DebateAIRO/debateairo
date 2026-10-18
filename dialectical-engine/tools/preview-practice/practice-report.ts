@@ -623,7 +623,9 @@ export function reportMarkdown(report: PracticeReport): string {
     unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;
   if (byArm !== undefined && byArm.length > 0) {
     lines.push("Openings per arm (counts, cost and time only; T today's opening, A snowball, B blind lists, C angle map):", "",
-      "| arm | questions | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
+      // R3 final wave P18 (Task 17a Minor): this table's count is of the questions ATTEMPTED (a refused one included); the
+      // wording N table below counts those that RAN, beside the refused ones. Each header says which.
+      "| arm | questions attempted | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
     for (const row of byArm) {
       lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.calls)} | ${JSON.stringify(row.statuses)} | ${row.costUsd} | `
         + `${String(row.wallSeconds)} | ${String(row.unavailable)} | ${JSON.stringify(row.marks)} | ${JSON.stringify(row.notes)} |`);
@@ -643,7 +645,7 @@ export function reportMarkdown(report: PracticeReport): string {
     assumptions: readonly number[] }>[] | undefined;
   if (wordingTotals !== undefined && wordingTotals.length > 0) {
     lines.push("Wording N (D5; counts only, the debated answers word for word are in report.json `wording`; C2 the sealed wording, C2N wording N):", "",
-      "| arm | questions | refused | seats | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
+      "| arm | questions ran | refused | seats | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
       "|---|---|---|---|---|---|---|---|---|---|---|");
     for (const row of wordingTotals) {
       const mean = row.assumptions.length === 0 ? "none" : (row.assumptions.reduce((sum, n) => sum + n, 0) / row.assumptions.length).toFixed(1);

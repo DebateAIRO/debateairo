@@ -260,7 +260,7 @@ import {
   type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroKeepRoomMicros,
+  createRunnerMapCaller, engineMapCheckUnbudgeted, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroKeepRoomMicros,
   rootZeroMapMaterialCharsFor, rootZeroRoomAttempts, rootZeroRoomRefs, runMapStage, shapeEngineRootMaterial, shapeRootMaterial
 } from "./map-stage.js";
 import {
@@ -284,7 +284,7 @@ import {
   runPointInvestigations, type PointInvestigationRow
 } from "./engine-investigations.js";
 import { engineMaterialGraphOf, engineMaterialInvestigationsOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
-import { engineMapFactsOf, engineSourceWithMap, type EngineMapFacts } from "./engine-map-facts.js";
+import { engineMapFactsOf, enginePositionWordsOf, engineSourceWithMap, type EngineMapFacts } from "./engine-map-facts.js";
 import {
   comparingJudgeCodeDefect,
   comparingJudgesSourceOf,
@@ -6181,7 +6181,7 @@ export class WalkingSkeletonRunner {
      * never sends it: the run stops before the map (deviation 10).
      */
     const engineMap = engine.engine === 2 && shapeRun !== null;
-    if (engine.engine === 2 && shapeRun !== null && engine.sites.answerCheck !== 1) {
+    if (engineMapCheckUnbudgeted(engine, shapeRun !== null)) {
       throw new TypedDomainError("ENGINE_MAP_CHECK_UNBUDGETED", "The run's receipt does not count the map's answer check");
     }
     /**
@@ -11362,7 +11362,7 @@ export class WalkingSkeletonRunner {
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
               positionNodeIds: makerPositionNodeIds,
-              ...(engineMap ? { positionWords: engineMapFactsNow()?.wordsByRootNodeId } : {}),
+              ...(engineMap ? enginePositionWordsOf(engineMapFactsNow()) : {}),
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
               // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
               // Ruling W-CUT: a chosen answer past the positions argued is listed too (the page's stored list agrees).
@@ -11655,6 +11655,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CLAIM_TYPE_COMPOSITION_MAP_INVALID",
   "CLAIM_TYPE_COMPOSITION_MAP_PROVENANCE_MISSING",
   "CLAIM_TYPE_COMPOSITION_MAP_UNRESOLVED",
+  "COMPARING_JUDGE_SEATS_INVALID",
   "COMPLETENESS_GATE_FAILED",
   "COMPOSITION_BUDGET_UNRESOLVED",
   "COMPOSITION_CONTRACT_ERROR",
@@ -11727,13 +11728,13 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "EMPTY_EVENT_STREAM",
   "EMPTY_OVERLAY_OWNER",
   "EMPTY_PROPAGATION",
-  "ENGINE_MAP_CHECK_UNBUDGETED",
-  "ENGINE_RUNNER_UNCONFIGURED",
-  "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
   "ENGINE_CATCH_UP_RULE_MISSING",
+  "ENGINE_MAP_CHECK_UNBUDGETED",
   "ENGINE_RECORD_INVALID",
   "ENGINE_ROW_INVALID",
+  "ENGINE_RUNNER_UNCONFIGURED",
   "ENGINE_SCORING_COMBINE_UNSUPPORTED",
+  "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
   "ENVELOPE_FORMULA_INPUTS_INVALID",
   "ENVELOPE_FORMULA_INPUTS_PROVENANCE_MISSING",
   "ENVELOPE_FORMULA_INPUTS_UNRESOLVED",
@@ -11826,6 +11827,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MAP_CHECK_ENGINE_ONLY",
+  "MAP_CHECK_IDS_INVALID",
   "MAP_ENGINE_REQUIRES_LENGTH",
   "MAP_GAP_ITEM_UNKNOWN",
   "MAP_RECORD_INVALID",

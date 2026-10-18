@@ -244,6 +244,8 @@ describe("engine 2 end to end (spec §14.2)", () => {
         // receipt's planned count (`run.shape.answers`, 3), which held only while the map was unavailable.
         const chosen = (await new MapChoiceRepository(database.pool).readMapChoiceForRun(runId))!;
         expect(chosen.opening).toBe("MAP");
+        // R3 final wave P17 (Task 17 Minor 4): the scripted choose names two answers, so the ring is two replies, never 0.
+        expect(chosen.answers).toHaveLength(2);
         expect((await callKeys(runId, "OK")).filter((key) => key.startsWith("JUDGE:cross-root:"))).toHaveLength(chosen.answers.length);
       }
     }, 15 * 60 * 1000);

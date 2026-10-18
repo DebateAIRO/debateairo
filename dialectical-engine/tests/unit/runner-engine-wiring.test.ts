@@ -65,9 +65,8 @@ describe("the runner reads the engine from the receipt only", () => {
         .map((match) => match[1]!);
       expect(codes.length, file).toBeGreaterThan(100);
       expect(codes, file).toEqual(expect.arrayContaining(["ENGINE_RUNNER_UNCONFIGURED", "ENGINE_MAP_CHECK_UNBUDGETED"]));
-      // Sorted, but for the one pair already out of order before R3 (pinned here, so no second one can join it).
-      const unsorted = codes.slice(1).flatMap((code, at) => (codes[at]! > code ? [[codes[at]!, code]] : []));
-      expect(unsorted, file).toEqual([["ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS", "ENGINE_CATCH_UP_RULE_MISSING"]]);
+      // R3 final wave P14: truly sorted, with no allowance (no pin or hash reads the order: every other reader sorts first).
+      expect(codes, file).toEqual([...codes].sort());
     }
   });
 });

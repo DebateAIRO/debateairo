@@ -180,11 +180,15 @@ function insertRawPosition(row: Readonly<{ runId: string; answerId: string; root
   );
 }
 
-async function rowCounts(runId: string): Promise<Readonly<{ items: number; choices: number; positions: number }>> {
-  const result = await database.pool.query<{ items: number; choices: number; positions: number }>(
+type RowCounts = Readonly<{ items: number; choices: number; positions: number; restsOn: number; checks: number }>;
+/** R3 final wave P11 (Task 11 Minor 2): 0117's three tables and 0122's two. */
+async function rowCounts(runId: string): Promise<RowCounts> {
+  const result = await database.pool.query<RowCounts>(
     `SELECT (SELECT count(*)::int FROM core.map_item WHERE run_id = $1) AS items,
             (SELECT count(*)::int FROM core.map_choice WHERE run_id = $1) AS choices,
-            (SELECT count(*)::int FROM core.map_position WHERE run_id = $1) AS positions`, [runId]);
+            (SELECT count(*)::int FROM core.map_position WHERE run_id = $1) AS positions,
+            (SELECT count(*)::int FROM core.map_item_rests_on WHERE run_id = $1) AS "restsOn",
+            (SELECT count(*)::int FROM core.map_answer_check WHERE run_id = $1) AS checks`, [runId]);
   return result.rows[0]!;
 }
 
@@ -315,7 +319,7 @@ describe("MapChoiceRepository (0117)", () => {
     await eraseRunFully(late);
     expect(await repository.writeMapRun({ runId: late, result: RESULT, answerCount: 2 })).toBe("RUN_ERASED");
     expect(await repository.writeMapPosition({ runId: late, answerId: "a1", rootIndex: 0, rootNodeId: FAKE_ROOT, maker: "maker-0" })).toBe("RUN_ERASED");
-    expect(await rowCounts(late)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(late)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("a missing attestation secret on a LIVE run is a defect, never masked as RUN_ERASED", async () => {
@@ -323,7 +327,7 @@ describe("MapChoiceRepository (0117)", () => {
     await database.pool.query("DELETE FROM core.run_content_attestation_secret WHERE run_id = $1", [runId]);
     await expect(new MapChoiceRepository(database.pool).writeMapRun({ runId, result: RESULT, answerCount: 2 }))
       .rejects.toMatchObject({ code: "55000", message: "CONTENT_ATTESTATION_SECRET_UNRESOLVED" });
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("refuses an id that is not code-minted typed, before anything is sealed or stored, naming no AI text", async () => {
@@ -363,7 +367,7 @@ describe("MapChoiceRepository (0117)", () => {
     const positionRefusal = await repository.writeMapPosition({ runId, answerId: SLUG, rootIndex: 0, rootNodeId: FAKE_ROOT, maker: "maker-0" })
       .then(() => null, (error: unknown) => error);
     expect(positionRefusal).toMatchObject({ code: "MAP_RECORD_INVALID", message: "MAP_RECORD_INVALID: answerId" });
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 });
 
@@ -387,10 +391,10 @@ describe("MapChoiceRepository: one write per run (pre-flight PF-B28a, Task 8 rev
     } finally {
       await database.pool.query("DROP TRIGGER zzz_map_test_refuse ON core.map_item; DROP FUNCTION public.map_test_refuse()");
     }
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
     // The run is not poisoned: the next write stores the whole map.
     expect(await new MapChoiceRepository(database.pool).writeMapRun({ runId, result: RESULT, answerCount: 2 })).toBe("INSERTED");
-    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it.each(["legacy", "encrypted"] as const)("two concurrent writers of one %s run: one INSERTED, one ALREADY_PRESENT, the items of one write only", async (mode) => {
@@ -402,7 +406,7 @@ describe("MapChoiceRepository: one write per run (pre-flight PF-B28a, Task 8 rev
       new MapChoiceRepository(database.pool).writeMapRun({ runId, result: other, answerCount: 2 })
     ]);
     expect([...outcomes].sort()).toEqual(["ALREADY_PRESENT", "INSERTED"]);
-    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 0, restsOn: 0, checks: 0 });
     const winner = outcomes[0] === "INSERTED" ? RESULT : other;
     const items = await readMapItemsForRun(database.pool, runId);
     expect(items).toEqual([winner.items[3], ...winner.items.slice(0, 3)]);
@@ -437,7 +441,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       .rejects.toThrowError(/^CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core\.map_choice$/u);
     await expect(insertRawChoice({ runId, content: CONTENT_JSON_SENTINEL, envelope: null, attestation: null }))
       .rejects.toThrowError(/^CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core\.map_choice$/u);
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
 
     const legacyRunId = await newRun("legacy");
     const donor = await sealFor(runId, "core.map_item", "pt01", POINT_CONTENT);
@@ -447,7 +451,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       .rejects.toThrowError(/^CONTENT_ENCRYPTION_STATE_INVALID: core\.map_item$/u);
     await expect(insertRawChoice({ runId: legacyRunId, content: CONTENT_JSON_SENTINEL, envelope: donor.envelope, attestation: donor.attestation }))
       .rejects.toThrowError(/^CONTENT_ATTESTATION_STATE_INVALID$/u);
-    expect(await rowCounts(legacyRunId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(legacyRunId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("binds an envelope to its own row: copied to another item, another carrier or another run, or forged, it is CONTENT_ATTESTATION_INVALID", async () => {
@@ -470,8 +474,8 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
     const choice = await sealFor(runId, "core.map_choice", runId, CHOICE_CONTENT);
     await expect(insertRawChoice({ runId: otherRunId, content: CONTENT_JSON_SENTINEL, envelope: choice.envelope, attestation: choice.attestation }))
       .rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
-    expect(await rowCounts(otherRunId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
+    expect(await rowCounts(otherRunId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
 
     // Positive control, then a stored row copied whole under a fresh item id.
     await insertRawItem({ runId, itemId: "pt01", content: CONTENT_JSON_SENTINEL, envelope: item.envelope, attestation: item.attestation });
@@ -480,7 +484,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
        SELECT (jsonb_populate_record(NULL::core.map_item, to_jsonb(source) || jsonb_build_object('item_id', 'pt09'))).*
        FROM core.map_item AS source WHERE source.run_id = $1 AND source.item_id = 'pt01'`, [runId]
     )).rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
-    expect(await rowCounts(runId)).toEqual({ items: 1, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 1, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("is append-only: UPDATE, DELETE and TRUNCATE are refused on all three tables, owner included", async () => {
@@ -498,7 +502,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       await expect(database.pool.query(`TRUNCATE core.${table}`))
         .rejects.toThrowError(new RegExp(`^TRUNCATE_REJECTED: append-only or immutable table core\\.${table} rejects TRUNCATE$`, "u"));
     }
-    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 1 });
+    expect(await rowCounts(runId)).toEqual({ items: 4, choices: 1, positions: 1, restsOn: 0, checks: 0 });
   });
 
   it("an erased run takes no new row in any of the three tables", async () => {
@@ -514,7 +518,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       .rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
     await expect(insertRawPosition({ runId: pending, answerId: "a1", rootIndex: 0, rootNodeId: FAKE_ROOT }))
       .rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
-    expect(await rowCounts(pending)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(pending)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
 
     // Erased as 0040 erases (the attestation secret deleted too): the two carriers' attestation guard refuses first,
     // map_position (no content) meets the barrier.
@@ -528,7 +532,7 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       .rejects.toMatchObject({ code: "55000", message: "CONTENT_ATTESTATION_SECRET_UNRESOLVED" });
     await expect(insertRawPosition({ runId: erased, answerId: "a1", rootIndex: 0, rootNodeId: FAKE_ROOT }))
       .rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
-    expect(await rowCounts(erased)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(erased)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("refuses an AI-written slug in a readable id column (angle_id, answer_id)", async () => {
@@ -538,11 +542,11 @@ describe("0117 at the database level (Task 7 review, binding on Task 8)", () => 
       .rejects.toThrowError(/violates check constraint "map_item_codes_shape"/u);
     await expect(insertRawPosition({ runId, answerId: SLUG, rootIndex: 0, rootNodeId }))
       .rejects.toThrowError(/violates check constraint "map_position_answer_shape"/u);
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
     // Positive controls: the code-minted forms are accepted.
     await insertRawItem({ runId, itemId: "pt01", content: POINT_CONTENT, envelope: null, attestation: null, angleId: "g7" });
     await insertRawPosition({ runId, answerId: "a4", rootIndex: 0, rootNodeId });
-    expect(await rowCounts(runId)).toEqual({ items: 1, choices: 0, positions: 1 });
+    expect(await rowCounts(runId)).toEqual({ items: 1, choices: 0, positions: 1, restsOn: 0, checks: 0 });
   });
 });
 
@@ -605,7 +609,7 @@ describe("MapChoiceRepository: engine 2's map (0122)", () => {
     // (pre-flight consistency) a premise-exempt id the checker never read is refused like a bad code.
     const badExempt = { ...ENGINE_RESULT, answerCheck: { ...ENGINE_RESULT.answerCheck!, premiseExempt: ["c4"] } } as MapResult;
     await expect(repository.writeMapRun({ runId, result: badExempt, answerCount: 2 })).rejects.toMatchObject({ message: "MAP_RECORD_INVALID: answerCheck.premiseExempt" });
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   it("0122 at the database level: closed sets, append-only, no row on an erased run", async () => {
@@ -665,11 +669,50 @@ describe("MapChoiceRepository: engine 2's map (0122)", () => {
       expect(codes).toContain(code);
       expect(codes.every((each) => MAP_ANSWER_CHECK_CODE.test(each))).toBe(true);
       await expect(repository.writeMapRun({ runId, result, answerCount: 2, unchosenAnswers: true })).rejects.toMatchObject({
-        code: "MAP_RECORD_INVALID", message: "MAP_RECORD_INVALID: answerCheck.codes" });
+        code: "MAP_RECORD_INVALID", message: "MAP_RECORD_INVALID: answerCheck.codes.fate" });
     }
-    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0 });
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
     // The loose CHECK is kept as built: at the database level the same code is a row (so the rule lives in the code).
     await database.pool.query("INSERT INTO core.map_answer_check (run_id, answer_check) VALUES ($1, ARRAY['a1:PASSED>KEPT'])", [runId]);
+  });
+
+  // R3 final wave P11 (Task 11 Minors 1, 3, 5): a second or concurrent engine-2 write adds no row to any table, and the
+  // breach check refuses a bad checker maker, a repeated or over-long exemption list, a fate on an UNCHECKED chosen
+  // answer and a basis on an item that is not a point id, each typed and named, before anything is stored.
+  it("a second and a concurrent engine-2 write answer ALREADY_PRESENT and add no row to the new tables (Task 11 Minor 1)", async () => {
+    const stored = { items: 4, choices: 1, positions: 0, restsOn: 3, checks: 1 };
+    const runId = await newRun("encrypted");
+    const repository = new MapChoiceRepository(database.pool);
+    expect(await repository.writeMapRun({ runId, result: ENGINE_RESULT, answerCount: 2, unchosenAnswers: true })).toBe("INSERTED");
+    expect(await repository.writeMapRun({ runId, result: ENGINE_RESULT, answerCount: 2, unchosenAnswers: true })).toBe("ALREADY_PRESENT");
+    expect(await rowCounts(runId)).toEqual(stored);
+    const raced = await newRun("legacy");
+    const outcomes = await Promise.all([0, 1].map(() =>
+      new MapChoiceRepository(database.pool).writeMapRun({ runId: raced, result: ENGINE_RESULT, answerCount: 2, unchosenAnswers: true })));
+    expect([...outcomes].sort()).toEqual(["ALREADY_PRESENT", "INSERTED"]);
+    expect(await rowCounts(raced)).toEqual(stored);
+  });
+
+  it("names each breach of an engine-2 record: checker maker, exemption list, a fate on UNCHECKED, a basis off a point id", async () => {
+    const runId = await newRun("legacy");
+    const repository = new MapChoiceRepository(database.pool);
+    const check = ENGINE_RESULT.answerCheck!;
+    const refused = async (result: MapResult, breach: string) => expect(repository.writeMapRun({ runId, result, answerCount: 2,
+      unchosenAnswers: true })).rejects.toMatchObject({ code: "MAP_RECORD_INVALID", message: `MAP_RECORD_INVALID: ${breach}` });
+    await refused({ ...ENGINE_RESULT, answerCheck: { ...check, checker: { aiRef: "preview:ref-1", maker: "Maker One" } } } as MapResult,
+      "answerCheck.checker.maker");
+    await refused({ ...ENGINE_RESULT, answerCheck: { ...check, premiseExempt: ["a1", "a1"] } } as MapResult, "answerCheck.premiseExempt");
+    await refused({ ...ENGINE_RESULT, answerCheck: { ...check, premiseExempt: Array.from({ length: 9 }, () => "a1") } } as MapResult,
+      "answerCheck.premiseExempt");
+    const unchecked = { ...ENGINE_RESULT, answerCheck: { ...check, outcomes: { ...check.outcomes, a2: "UNCHECKED" },
+      replacements: [{ answerId: "a2", statement: "No.", replacedBy: null, action: "KEPT_UNCHECKED" }] } } as MapResult;
+    expect(mapAnswerCheckCodes(unchecked.answerCheck!)).toContain("a2:UNCHECKED>KEPT");
+    await refused(unchecked, "answerCheck.codes.fate");
+    // A malformed code keeps its own name.
+    await refused({ ...ENGINE_RESULT, answerCheck: { ...check, outcomes: { a9: "PASSED" } } } as MapResult, "answerCheck.codes");
+    await refused({ ...ENGINE_RESULT, items: ENGINE_RESULT.items.map((item, index) => (index === 0 ? { ...item, itemId: "xx01" } : item)) } as MapResult,
+      "items[0].itemId");
+    expect(await rowCounts(runId)).toEqual({ items: 0, choices: 0, positions: 0, restsOn: 0, checks: 0 });
   });
 
   // Plan amendment A9-1 (ruling R3-T9.1) and ruling R3-T5.1: the merged-answer ids ride in the stored result, and the

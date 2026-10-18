@@ -10,7 +10,7 @@ import {
   type MapSeat, type MapStep
 } from "@debateai/map";
 import { lengthRetryTokenCeiling, type CallBound, type ProviderGateway } from "@debateai/providers";
-import type { DebateShapeOpening, LengthGuidance } from "@debateai/register";
+import type { DebateShapeOpening, EngineOfRun, LengthGuidance } from "@debateai/register";
 import type { ConditionMarkRecord } from "@debateai/serve";
 import type { EnvelopeStopKind } from "./index.js";
 import { shapeSeatOrder } from "./shape-seats.js";
@@ -84,6 +84,15 @@ export function guidedMapBound(bound: CallBound, replyWordsCeiling: number | nul
 }
 
 const MAKER_SAT_OUT = "MAKER_SAT_OUT";
+
+/**
+ * Engine redesign R3 (spec 2026-10-15 §5, deviation 10): engine 2's map sends one answer check, so a shaped engine-2 run
+ * whose receipt did not count it (R1d `sites.answerCheck`) must never reach the map: the runner stops it first
+ * (ENGINE_MAP_CHECK_UNBUDGETED). Engine 1 and an unshaped run send no check. Pure; the runner's one guard reads it.
+ */
+export function engineMapCheckUnbudgeted(engine: EngineOfRun, shaped: boolean): boolean {
+  return engine.engine === 2 && shaped && engine.sites.answerCheck !== 1;
+}
 
 export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
   const keepRoom = deps.keepRoomMicros !== undefined && deps.keepRoomMicros > 0 ? { keepRoomMicros: deps.keepRoomMicros } : {};

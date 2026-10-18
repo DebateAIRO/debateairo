@@ -7,6 +7,7 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import { readPromptFrame } from "@debateai/providers";
+import { builderFromRecordedPacket } from "../../acceptance/moment-tools.js";
 
 const GUIDE: LengthGuide = { words: 300, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord };
 const Q = "Should a mid-sized city make its central bus lines free to ride?";
@@ -37,6 +38,18 @@ describe("engine 2: the fixed-words position contract", () => {
     expect(frame.fields.map((field) => field.name)).toEqual(["question_line", "assigned_answer", "map_points", "points_raised", "assumptions", "length"]);
     expect(LONG.length).toBeGreaterThan(480);
     expect(frame.fields[1]!.content).toBe(LONG);
+  });
+
+  // R3 final wave P12 (Task 12 Minors 1-2): the unknown branch's framed id, and the moment replay's loud refusal of a
+  // .v2 packet (it rebuilds only v1 legs, so a widened pattern would rebuild a v2 leg with its engine part dropped).
+  it("frames the unknown branch under its own v2 id; the moment replay refuses a v2 packet by its contract", () => {
+    const packet = framedJudgePromptForTest(leg("Yes, where buses run full."), Q, "English", "unknown", null, GUIDE).packet;
+    expect(readPromptFrame(packet).contractId).toBe("judge.assigned-root.unknown.v2");
+    const resolved = framedJudgePromptForTest(leg("Yes, where buses run full."), Q, "English", "resolved", null, GUIDE).packet;
+    for (const recorded of [packet, resolved]) {
+      expect(() => builderFromRecordedPacket("POSITION", "JUDGE:root:1", recorded))
+        .toThrowError(expect.objectContaining({ code: "MOMENT_CONTRACT_MISMATCH" }));
+    }
   });
 
   it("refuses an unlengthed v2 position; today's assigned root (no engine) keeps its contracts", () => {

@@ -361,3 +361,32 @@ describe("engine 2: the snowball v2 material carries no candidate answers (rulin
     expect(answers.every((entry) => entry.raised_by >= 1)).toBe(true);
   });
 });
+
+/** R3 final wave P9 (Task 9): two edges of engine 2's "also raised". */
+describe("engine 2: also raised keeps a same-words point's label and a reworded cut answer's makers (P9)", () => {
+  const keyPoint = (keyPointId: string, claim: string, makers: readonly string[], restsOn?: "question" | "assumption"): MapKeyPoint =>
+    Object.freeze({ keyPointId, claim, memberItemIds: [], blindMakers: [...makers], gapMakers: [], makers: [...makers], fixedAngleKinds: [],
+      leansAgainst: false, ...(restsOn === undefined ? {} : { restsOn }) });
+  const chosen = (n: number, statement: string, extra: object = {}) => Object.freeze({ answerId: `a${String(n)}`, statement, forKeyPointIds: [],
+    againstKeyPointIds: [], strongestRival: n === 1 ? "a2" : "a1", filled: false, assumptions: [], pointsRaised: [], ...extra });
+  const merged = (answerId: string, answer: string, makers: readonly string[]) =>
+    Object.freeze({ answerId, answer, memberItemIds: [], blindMakers: [...makers], makers: [...makers], fromOppositeCase: false });
+
+  it("an answer and a point in the same words are one entry that keeps the point's assumption label", () => {
+    const choice = { answers: [chosen(1, "Yes."), chosen(2, "No.")], alsoRaised: ["kp05"] };
+    const listed = mapAlsoRaisedOf({ choice, keyPoints: [keyPoint("kp05", "Only at night.", ["m1"], "assumption")],
+      mergedAnswers: [merged("an03", "Only at night.", ["m2"])], arguedAnswers: 2, unchosenAnswers: true,
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
+    expect(listed).toEqual([{ keyPointId: "an03", claim: "Only at night.", makers: ["m2", "m1"], kind: "ANSWER", restsOn: "assumption" }]);
+    // Engine 1 lists no unchosen answer and no label.
+    expect(mapAlsoRaisedOf({ choice, keyPoints: [keyPoint("kp05", "Only at night.", ["m1"])], mergedAnswers: [merged("an03", "Only at night.", ["m2"])],
+      arguedAnswers: 2 })).toEqual([{ keyPointId: "kp05", claim: "Only at night.", makers: ["m1"] }]);
+  });
+
+  it("a cut answer reusing a merged answer in new words is raised by that answer's makers (Task 9 O1)", () => {
+    const choice = { answers: [chosen(1, "Yes."), chosen(2, "No."), chosen(3, "Wait a year, then decide.", { mergedAnswerId: "an04" })], alsoRaised: [] };
+    const listed = mapAlsoRaisedOf({ choice, keyPoints: [], mergedAnswers: [merged("an04", "Wait a year.", ["m1", "m3"])], arguedAnswers: 2,
+      unchosenAnswers: true, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
+    expect(listed).toEqual([{ keyPointId: "a3", claim: "Wait a year, then decide.", makers: ["m1", "m3"], kind: "ANSWER" }]);
+  });
+});

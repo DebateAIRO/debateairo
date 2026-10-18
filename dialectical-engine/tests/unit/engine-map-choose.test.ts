@@ -72,3 +72,59 @@ describe("engine 2: choose never sides a point by code", () => {
     expect(out.choice.answers.map((answer) => answer.statement)).not.toContain("Its rests_on says yes.");
   });
 });
+
+/** R3 final wave P7 (Task 7 Minors 3-4): what code keeps of a reply, whatever reached it (the check refuses these first). */
+describe("engine 2: choose's code guards over the reply (review carries)", () => {
+  const answer = (id: string, statement: string, assumptions: readonly string[] = []) =>
+    ({ answer_id: id, statement, for: ["kp03"], against: [], strongest_rival: null, assumptions: [...assumptions] });
+  const reserve = (statement: string, assumptions: readonly string[] = []) => ({ statement, for: ["kp04"], against: [], assumptions: [...assumptions] });
+
+  it("mints r1 and r2 in the reply's order and cuts a third reserve", () => {
+    const reply: MapChooseReplyV2 = { answers: [answer("an01", "Yes, with conditions."), answer("an02", "No, keep the fares.")],
+      reserve_answers: [reserve("Only at night."), reserve("Only for students."), reserve("Only on weekends.")] };
+    const out = mapFinishChoice({ ...base(reply), maxAnswers: 2 });
+    expect(out.choice.reserves?.map((entry) => [entry.reserveId, entry.statement])).toEqual([["r1", "Only at night."], ["r2", "Only for students."]]);
+  });
+
+  it("keeps at most three assumptions per answer and per reserve", () => {
+    const four = ["One holds.", "Two holds.", "Three holds.", "Four holds."];
+    const reply: MapChooseReplyV2 = { answers: [answer("an01", "Yes, with conditions.", four), answer("an02", "No, keep the fares.")],
+      reserve_answers: [reserve("Only at night.", four)] };
+    const out = mapFinishChoice({ ...base(reply), maxAnswers: 2 });
+    expect(out.choice.answers[0]!.assumptions).toEqual(four.slice(0, 3));
+    expect(out.choice.reserves?.[0]?.assumptions).toEqual(four.slice(0, 3));
+  });
+
+  it("drops an assumption, a reserve and a reserve's assumption that name an engine-2 word", () => {
+    const reply: MapChooseReplyV2 = { answers: [answer("an01", "Yes, with conditions.", ["Its rests_on holds.", "Riders pay fares today."]),
+      answer("an02", "No, keep the fares.")],
+      reserve_answers: [reserve("The key_point_id says so."), reserve("Only at night.", ["Each raised_by counts.", "Night riders are workers."])] };
+    const out = mapFinishChoice({ ...base(reply), maxAnswers: 2 });
+    expect(out.choice.answers[0]!.assumptions).toEqual(["Riders pay fares today."]);
+    expect(out.choice.reserves).toEqual([{ reserveId: "r1", statement: "Only at night.", forKeyPointIds: ["kp04"], againstKeyPointIds: [],
+      assumptions: ["Night riders are workers."] }]);
+  });
+
+  it("skips a key point whose claim names an engine-2 word: never dealt, never also raised", () => {
+    const leaked = Object.freeze({ ...kp("kp05", ["m1", "m2", "m3"]), claim: "The rests_on of each point is fine." });
+    for (const reply of [null, { answers: [answer("an01", "Yes, with conditions."), answer("an02", "No, keep the fares.")] }]) {
+      const out = mapFinishChoice({ ...base(reply), keyPoints: [...KEY_POINTS, leaked], maxAnswers: 2 });
+      for (const chosen of out.choice.answers) expect([...sided(chosen), ...(chosen.pointsRaised ?? [])]).not.toContain("kp05");
+      expect(out.choice.alsoRaised).not.toContain("kp05");
+    }
+  });
+});
+
+/** R3 final wave P9 (Task 9 O2): the reply path's fill never brings back, in its own words, a merged answer already chosen. */
+describe("engine 2: a fill never reuses a merged answer a chosen answer reuses", () => {
+  it("skips the reused merged answer under engine 2; engine 1 keeps today's text rule", () => {
+    const reply: MapChooseReplyV2 = { answers: [{ answer_id: "an01", statement: "Yes, if the conditions hold.", for: ["kp03"], against: [],
+      strongest_rival: null, assumptions: [] }] };
+    const engine = mapFinishChoice({ ...base(reply), maxAnswers: 2 });
+    expect(engine.choice.answers.map((answer) => [answer.statement, answer.filled, answer.mergedAnswerId])).toEqual([
+      ["Yes, if the conditions hold.", false, "an01"], ["No, keep the fares.", true, "an02"]]);
+    const { siding: _s, internalNames: _n, ...engineOne } = base(reply);
+    expect(mapFinishChoice({ ...engineOne, maxAnswers: 2 }).choice.answers.map((answer) => answer.statement))
+      .toEqual(["Yes, if the conditions hold.", "Yes, with conditions."]);
+  });
+});

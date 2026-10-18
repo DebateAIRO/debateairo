@@ -73,6 +73,8 @@ const ANGLE_ID = /^g[1-7]$/u;
 const ANSWER_ID = /^a[1-4]$/u;
 /** 0122's check ids: the chosen answers a1..a4 and the candidates c1..c4. */
 const CHECK_ID = /^(a[1-4]|c[1-4])$/u;
+/** 0122's `map_item_rests_on_item_shape`: a point's item id. */
+const POINT_ITEM_ID = /^pt[0-9]{2,4}$/u;
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
 const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
@@ -149,6 +151,8 @@ function mapRecordBreach(result: MapResult, answerCount: number): string | null 
     if (item.kind === "POINT" && item.restsOn !== undefined && !(MAP_RESTS_ON as readonly string[]).includes(item.restsOn)) {
       return `items[${String(index)}].restsOn`;
     }
+    // R3 final wave P11 (Task 11 Minor 5): 0122's map_item_rests_on takes only a point's `pt` id; said here first, typed.
+    if (item.kind === "POINT" && item.restsOn !== undefined && !POINT_ITEM_ID.test(item.itemId)) return `items[${String(index)}].itemId`;
     if (item.angleId !== null && !ANGLE_ID.test(item.angleId)) return `items[${String(index)}].angleId`;
     if (item.angleKind !== null && !ANGLE_KINDS.has(item.angleKind)) return `items[${String(index)}].angleKind`;
     if (!Number.isSafeInteger(item.listIndex) || item.listIndex < 0 || item.listIndex > PG_INTEGER_MAX) {
@@ -164,7 +168,8 @@ function mapRecordBreach(result: MapResult, answerCount: number): string | null 
     if (codes.length < 1 || codes.length > MAP_ENGINE_LIMITS.checkIdsMax || codes.some((code) => !MAP_ANSWER_CHECK_CODE.test(code))) return "answerCheck.codes";
     // Ruling R3-T10.1: 0122's CHECK takes any well-formed code, so the fate rule lives here: a `>…` fate only, and
     // always, on a chosen answer (a1..a4) the check failed (an outcome other than PASSED and UNCHECKED).
-    if (codes.some((code) => codeFateBreached(code))) return "answerCheck.codes";
+    // P11 (Task 11 Minor 4): a wrong fate is named apart from a malformed code.
+    if (codes.some((code) => codeFateBreached(code))) return "answerCheck.codes.fate";
     if (result.answerCheck.checker !== null && !CODE_TOKEN.test(result.answerCheck.checker.maker)) return "answerCheck.checker.maker";
     // (pre-flight consistency, Ruling (premiseExempt storage)) only ids the checker read, each once, at most 8.
     const exempt = result.answerCheck.premiseExempt;

@@ -33,9 +33,27 @@ describe("what a point rests on, through the merge", () => {
     expect(joined.restsOn).toBe("assumption");
   });
 
+  // R3 final wave P5 (Task 5 Minor 1): the merger's own word counts too, through mapApplyMerge (never passed as undefined).
+  it("the merger may call a group of question members an assumption: its word wins", () => {
+    const items = mapAssignItemIds([draft(0, "Riders are workers.", "question"), draft(1, "Riders are workers.", "question")], "seed");
+    const merged = mapApplyMerge({ key_points: [{ key_point_id: "k1", claim: "Riders are workers.", rests_on: "assumption",
+      member_item_ids: items.map((item) => item.itemId) }], answers: [] }, items);
+    expect(merged.keyPoints).toHaveLength(1);
+    expect(merged.keyPoints[0]!.restsOn).toBe("assumption");
+  });
+
   it("engine 1: an item, a key point and a merge carry no rests_on member at all", () => {
     const items = mapAssignItemIds([draft(0, "A."), draft(1, "B.")], "seed");
     for (const item of items) expect(Object.hasOwn(item, "restsOn")).toBe(false);
     for (const keyPoint of mapCodeMerge(items).keyPoints) expect(Object.hasOwn(keyPoint, "restsOn")).toBe(false);
+    // P5 (Task 5 Minor 2): a v1 merge reply and a gap join add none either.
+    const merged = mapApplyMerge({ key_points: [{ key_point_id: "k1", claim: "A.", member_item_ids: [items.find((item) => item.kind === "POINT"
+      && item.claim === "A.")!.itemId] }], answers: [] }, items);
+    for (const keyPoint of merged.keyPoints) expect(Object.hasOwn(keyPoint, "restsOn")).toBe(false);
+    const gap = mapAssignItemIds([{ ...draft(3, "A."), origin: "GAP" }, { ...draft(4, "C."), origin: "GAP" }], "gap",
+      { points: 2, answers: 0 }) as readonly MapPointItem[];
+    const joined = mapAddGapPoints(merged, [...items, ...gap], gap);
+    expect(joined.newKeyPoints).toBe(1);
+    for (const keyPoint of joined.map.keyPoints) expect(Object.hasOwn(keyPoint, "restsOn")).toBe(false);
   });
 });

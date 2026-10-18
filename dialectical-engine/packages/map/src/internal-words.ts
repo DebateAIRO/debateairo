@@ -60,14 +60,22 @@ function fieldPattern(name: string): string {
 
 const BEFORE = "(?<![\\p{L}\\p{N}_])";
 const AFTER = "(?![\\p{L}\\p{N}_])";
-const fieldRegex = (names: readonly string[]): RegExp => new RegExp(`${BEFORE}(?:${names.map(fieldPattern).join("|")})${AFTER}`, "iu");
-/** One compiled pattern per frozen name list (engine 1's and engine 2's), built once. */
-const FIELD_PATTERNS = new Map<readonly string[], RegExp>([[MAP_INTERNAL_FIELD_NAMES, fieldRegex(MAP_INTERNAL_FIELD_NAMES)]]);
+/** An empty name list names no field: a pattern that never matches (an empty alternation would match every text). */
+const NO_FIELD = /(?!)/u;
+const fieldRegex = (names: readonly string[]): RegExp => names.length === 0 ? NO_FIELD
+  : new RegExp(`${BEFORE}(?:${names.map(fieldPattern).join("|")})${AFTER}`, "iu");
+/**
+ * One compiled pattern per name list, built once and keyed by the joined names (R3 final wave P3), so a fresh copy of a
+ * list reuses its pattern and a list changed after a first read never reads a stale one. Engine 1's is built up front.
+ */
+const namesKey = (names: readonly string[]): string => names.join("\n");
+const FIELD_PATTERNS = new Map<string, RegExp>([[namesKey(MAP_INTERNAL_FIELD_NAMES), fieldRegex(MAP_INTERNAL_FIELD_NAMES)]]);
 function internalFieldPattern(names: readonly string[]): RegExp {
-  const known = FIELD_PATTERNS.get(names);
+  const key = namesKey(names);
+  const known = FIELD_PATTERNS.get(key);
   if (known !== undefined) return known;
   const built = fieldRegex(names);
-  FIELD_PATTERNS.set(names, built);
+  FIELD_PATTERNS.set(key, built);
   return built;
 }
 

@@ -81,11 +81,14 @@ describe("practice: the answer check's carried counts (Tasks 4, 7, 8)", () => {
     expect(practiceCheckEmptyReasons([
       { callSiteKey: "MAP:check", issues, recheckIssues: [] },
       // A structure-repair try of the check is the check's (LG-A); its stored issues may be empty, then its recheck counts.
-      { callSiteKey: "REPAIR:STRUCTURE:MAP:check", issues: [], recheckIssues: ["too_small@checks.2.reason"] },
+      // R3 final wave P17: the practice re-reads such a try with the readings of the call it repairs (engine 2's here).
+      { callSiteKey: "REPAIR:STRUCTURE:MAP:check", issues: [], recheckIssues: recheckReply("REPAIR:STRUCTURE:MAP:check", empty, null, true, true).issues },
       // Another step's empty text is not the check's reason.
       { callSiteKey: "MAP:choose", issues: ["too_small@answers.0.statement"], recheckIssues: [] },
       { callSiteKey: "MAP:check", issues: ["invalid_type@checks.0.cost_can_be_named"], recheckIssues: [] }
-    ])).toBe(3);
+    ])).toBe(4);
+    // Read with engine 1's readings (as before P17) the same repair try is UNMAPPED, and no reason could be counted.
+    expect(recheckReply("REPAIR:STRUCTURE:MAP:check", empty, null, true, false).issues).toEqual(["UNMAPPED"]);
     expect(practiceCheckEmptyReasons([])).toBe(0);
   });
 

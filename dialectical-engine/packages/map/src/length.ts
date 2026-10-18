@@ -65,7 +65,7 @@ export function mapLargestReplyWordsCeiling(length: MapLength): number {
 }
 
 /**
- * Engine 2 (spec §5.6, INTERFACE §4.1): each engine contract's told parts. Seven are LG-C's; choose also tells its
+ * Engine 2 (spec §5.6, INTERFACE §4.1): each engine contract's told parts. Six are LG-C's; choose also tells its
  * assumptions (a claim's length), and the check tells its reasons (`checkReason`, ~40), at most one per id shown.
  */
 export const MAP_ENGINE_LENGTH_PARTS: Readonly<Record<MapEngineContractName, readonly MapLengthPart[]>> = Object.freeze({

@@ -135,6 +135,26 @@ describe("replace, drop, keep (spec §5.5)", () => {
       "a4:ADDED_FACT>KEPT"]);
   });
 
+  // R3 final wave P8 (Task 8 Minor 2): Review Focus 1 for two and three answers too.
+  it("never leaves fewer than two answers: two failing are both kept; three failing, one dropped and two kept (Review Focus 1)", () => {
+    const two = apply(choiceOf([answer(1, "One."), answer(2, "Two.")]), reading({ a1: "NOT_AN_ANSWER", a2: "NO_COST" }), []);
+    expect(two.choice.answers.map((a) => a.answerId)).toEqual(["a1", "a2"]);
+    expect(mapAnswerCheckCodes(two.answerCheck)).toEqual(["a1:NOT_AN_ANSWER>KEPT", "a2:NO_COST>KEPT"]);
+    const three = apply(choiceOf([answer(1, "One."), answer(2, "Two."), answer(3, "Three.")]),
+      reading({ a1: "ADDED_FACT", a2: "NOT_AN_ANSWER", a3: "ADDED_FACT+NO_COST" }), []);
+    expect(three.choice.answers.map((a) => a.answerId)).toEqual(["a2", "a3"]);
+    expect(three.marks.map((mark) => mark.mark)).toEqual(["MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED", "MAP_ANSWER_KEPT_UNCHECKED"]);
+    expect(mapAnswerCheckCodes(three.answerCheck)).toEqual(["a1:ADDED_FACT>DROPPED", "a2:NOT_AN_ANSWER>KEPT", "a3:ADDED_FACT+NO_COST>KEPT"]);
+  });
+
+  it("keeps only the reasons and premise exemptions of the ids shown (Task 8 Minor 1)", () => {
+    const read = Object.freeze({ ...reading({ a1: "NOT_AN_ANSWER", a2: "PASSED", a3: "PASSED" }, ["c4", "a2"]),
+      reasons: { a1: "Only says it depends.", c4: "Never shown." } });
+    const out = apply(THREE, read, []);
+    expect(out.answerCheck.reasons).toEqual({ a1: "Only says it depends." });
+    expect(out.answerCheck.premiseExempt).toEqual(["a2"]);
+  });
+
   it("the check unavailable: the answers stand, every id UNCHECKED, one MAP_CHECK_UNAVAILABLE", () => {
     const out = apply(THREE, null, candidatesOf(THREE));
     expect(out.choice).toBe(THREE);
@@ -150,7 +170,9 @@ describe("replace, drop, keep (spec §5.5)", () => {
     expect(read).toEqual({ checker: CHECKER, outcomes: { a1: "NOT_AN_ANSWER" }, reasons: { a1: "Only says it depends." }, premiseExempt: [] });
     for (const code of ["a4:NOT_AN_ANSWER+ADDED_FACT>KEPT", "c4:PASSED", "a1:UNCHECKED", "a2:NOT_AN_ANSWER>c3", "a3:NO_COST>DROPPED",
       "a1:ADDED_FACT+NO_COST", "c2:NOT_AN_ANSWER+NO_COST"]) expect(code).toMatch(MAP_ANSWER_CHECK_CODE);
-    // BOTH is retired (deviation 12); failed tests only in the fixed order; nothing after PASSED or UNCHECKED (pre-flight PF-R33.1).
+    // BOTH is retired (deviation 12); failed tests only in the fixed order; at most one fate after the outcome (pre-flight
+    // PF-R33.1). The pattern itself admits a fate after PASSED or UNCHECKED (e.g. a1:PASSED>KEPT, as 0122's CHECK does);
+    // that code never writes one is the code's own rule (repository.ts `codeFateBreached`), not the pattern's.
     for (const code of ["a5:PASSED", "c1:PASSED>DROPPED>KEPT", "a1:passed", "r1:PASSED", "a1:BOTH", "a4:BOTH>KEPT", "a1:NOCOST",
       "a1:ADDED_FACT+NOT_AN_ANSWER", "a1:NO_COST+ADDED_FACT", "a1:NO_COST+NOT_AN_ANSWER", "a1:PASSED+NO_COST", "a1:UNCHECKED+NO_COST",
       "a1:NOT_AN_ANSWER+", "a1:NOT_AN_ANSWER+NO_COST+ADDED_FACT"]) expect(code).not.toMatch(MAP_ANSWER_CHECK_CODE);

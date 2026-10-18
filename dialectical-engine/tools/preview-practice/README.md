@@ -493,7 +493,8 @@ block holds:
 
 Engine 2 (`--engine-policy`, with `--length-policy` and `--shape-policy`): the map ends with one `MAP:check` call (another maker than the chooser's); `report.json` carries `answerCheck` (checked; rejected, and per test: not an answer, adding a fact, no cost named; exempt as premise challenges; replaced, dropped, kept, unavailable; assumptions per debated answer) and `mapFallbacks` (merge, choose: 0 or 1 per debate). Counts only: the checker's and the chooser's own verdicts, never code's.
 The `answerCheck` block also carries two counts beside the tests: `emptyReasons`, how many empty reasons the checker
-wrote in its refused tries (each is refused and asked again, so this counts slips, not outcomes), and
+wrote in its refused tries (each is refused and asked again, so this counts slips, not outcomes; a structure-repair try
+of an engine-2 map call is re-read with the readings of the call it repairs, since its own prompt names no map contract), and
 `templateFillsDebated`, how many of the answers the run debated are the code's own last-resort template ("The opposite of
 this answer: ..."). These are fills DEBATED: a template fill that the check replaced is not counted, though its
 `ANSWERS_FILLED` mark stays in `mapMarks` (which counts fills MADE, from any source). The block's `mapCallsByStep` gains

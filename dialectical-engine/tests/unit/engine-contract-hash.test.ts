@@ -18,7 +18,10 @@ import { buildDevelopmentRunnerRegisterRows, DEVELOPMENT_RUNNER_SOURCE_REF } fro
 import { buildPreviewSourceRows } from "../../deploy/preview-auth-dev/v1/publish-register.js";
 import { buildPreviewSourceRowsV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 
-/** The sealed ids in phase order (INTERFACE §2.2, §2.5): R2a seals the investigation; R2b (B1) appends verdict.judge.v1. */
+/**
+ * The sealed ids in phase order (INTERFACE §2.2, §2.5): R2a seals the investigation; R2b (B1) appends verdict.judge.v1;
+ * R3 (Task 13) appends the map's eight engine-2 contracts, then judge.assigned-root.unknown.v2 and .resolved.v2.
+ */
 // R3 (engine redesign spec §9): the map's eight engine-2 contracts, then the fixed-words position writer's two, after R2's.
 const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict.judge.v1", "map.angles.v2", "map.list.angle.v2",
   "map.list.open.v2", "map.list.snowball.v2", "map.merge.v2", "map.gap.v2", "map.choose.v2", "map.check.v1",

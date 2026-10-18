@@ -51,6 +51,20 @@ describe("engine 2: the map's step specs (spec §5.2 items 1-5)", () => {
     expect(() => mapCheckSpec(engineOne, [])).toThrowError(expect.objectContaining({ code: "MAP_CHECK_ENGINE_ONLY" }));
   });
 
+  // R3 final wave P6 (Task 6 Minor 2): the check's ids are code's own, so a bad, repeated or empty list is a code defect.
+  it("the check refuses to build on an empty, repeated, over-long or ill-formed id list", () => {
+    const entry = (checkId: string) => ({ checkId, answer: `Answer ${checkId}.` });
+    const invalid = expect.objectContaining({ code: "MAP_CHECK_IDS_INVALID" });
+    expect(() => mapCheckSpec(ctx(), [])).toThrowError(invalid);
+    expect(() => mapCheckSpec(ctx(), [entry("a1"), entry("a1")])).toThrowError(invalid);
+    expect(() => mapCheckSpec(ctx(), [entry("a1"), entry("r1")])).toThrowError(invalid);
+    expect(() => mapCheckSpec(ctx(), [entry("a5")])).toThrowError(invalid);
+    const all = ["a1", "a2", "a3", "a4", "c1", "c2", "c3", "c4"];
+    expect(frameOf(mapCheckSpec(ctx(), all.map(entry))).contractId).toBe("map.check.v1");
+    // Nine ids cannot be told apart by the a1..a4 / c1..c4 form, so a repeat is the only way past eight.
+    expect(() => mapCheckSpec(ctx(), [...all, "c4"].map(entry))).toThrowError(invalid);
+  });
+
   it("a locked language rides last; engine 2 without length is a programming error; without engine, LG-C's map", () => {
     expect(frameOf(mapListSpec(ctx({ languageTag: "ro", languageName: "Romanian", questionLine: "Ar trebui orașul să facă autobuzele gratuite?",
       replyLanguage: replyLanguageExpectation("Ar trebui orașul să facă autobuzele gratuite?") }), null)).fields.at(-1)!.name).toBe("question_language");
@@ -117,6 +131,13 @@ describe("engine 2: the map's step specs (spec §5.2 items 1-5)", () => {
     // Engine 1 (LG-C) keeps today's refusal JSON with no limit members, byte for byte.
     const { engine: _off, ...engineOne } = ctx();
     const today = mapListSpec(engineOne, null).classify(JSON.stringify({ points: [], candidate_answers: ["Yes."] }), { finishReason: "stop" });
-    expect((JSON.parse(today.parseError!) as readonly Record<string, unknown>[]).some((issue) => "minimum" in issue)).toBe(false);
+    expect((JSON.parse(today.parseError!) as readonly Record<string, unknown>[]).some((issue) => "minimum" in issue || "maximum" in issue))
+      .toBe(false);
+    // P6 (Task 6 Minor 4): an engine-1 reply over its limit names no "maximum" either.
+    const over = mapSnowballSpec(engineOne, []).classify(JSON.stringify({ points: Array.from({ length: 9 }, () => point), candidate_answers: [] }),
+      { finishReason: "stop" });
+    expect(over.parseStatus).toBe("SCHEMA_FAILED");
+    expect((JSON.parse(over.parseError!) as readonly Record<string, unknown>[]).some((issue) => "minimum" in issue || "maximum" in issue))
+      .toBe(false);
   });
 });

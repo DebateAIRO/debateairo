@@ -489,9 +489,12 @@ export function judgeLegFrameSpec(
 
 /**
  * The closed material table, applied. A leg's fields are fixed by the table
- * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS`, or the consideration
- * variant's), and this function is the only place that fills them — so a new
- * field cannot reach a model without appearing in that table.
+ * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS` or its length variant,
+ * the consideration variants', or, for an engine-2 assigned root, the v2 table
+ * `JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS`: question_line, assigned_answer,
+ * map_points, points_raised, assumptions, length), and this function is the only
+ * place that fills them — so a new field cannot reach a model without appearing
+ * in that table.
  */
 function judgeLegMaterial(
   leg: JudgeLeg,

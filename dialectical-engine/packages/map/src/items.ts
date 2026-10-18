@@ -169,7 +169,11 @@ export function mapRankMergedAnswers(answers: readonly MapMergedAnswer[]): reado
 export type MapAlsoRaisedEntry = Readonly<{ keyPointId: string; claim: string; makers: readonly string[];
   /** Engine 2 only (INTERFACE §10.7): "ANSWER" for an answer raised and not debated; absent = a point. */
   kind?: "POINT" | "ANSWER";
-  /** Engine 2 only (P2.2; ruling R3-T5.1): a point's key point label, what it rests on; absent for engine 1 and for an answer. */
+  /**
+   * Engine 2 only (P2.2; ruling R3-T5.1): a point's key point label, what it rests on; absent for engine 1 and for an
+   * answer, except an answer listed in the same words as a labelled point (R3 final wave P9): the one entry keeps the
+   * point's label, an assumption winning, so an assumption stays labelled all the way through.
+   */
   restsOn?: MapRestsOn }>;
 
 /** Two spellings of one claim (case, spacing, Unicode form) are one claim. */
@@ -245,8 +249,14 @@ export function mapAlsoRaisedOf(input: Readonly<{
     return key === "" ? [] : [...new Set(input.mergedAnswers.filter((answer) => mapNormaliseText(answer.answer) === key)
       .flatMap((answer) => answer.makers))];
   };
+  // R3 final wave P9 (Task 9 O1): a cut answer that reuses a merged answer (engine 2's mergedAnswerId, maybe reworded) is
+  // raised by that answer's makers too, not only by the merged answers in the same words. Absent on engine 1.
+  const makersOfAnswer = (answer: MapChoice["answers"][number]): readonly string[] => [...new Set([
+    ...(answer.mergedAnswerId === undefined ? [] : input.mergedAnswers.filter((merged) => merged.answerId === answer.mergedAnswerId)
+      .flatMap((merged) => merged.makers)),
+    ...makersOf(answer.statement)])];
   const answers = cut.filter((answer) => !answer.filled)
-    .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.statement, makers: makersOf(answer.statement),
+    .map((answer): MapAlsoRaisedEntry => ({ keyPointId: answer.answerId, claim: answer.statement, makers: makersOfAnswer(answer),
       ...(engine ? { kind: "ANSWER" as const } : {}) }));
   const failed = new Set((input.checkFailed ?? []).map(mapNormaliseText));
   const chosenKeys = new Set(input.choice.answers.map((answer) => mapNormaliseText(answer.statement)));
@@ -262,5 +272,18 @@ export function mapAlsoRaisedOf(input: Readonly<{
     .map((keyPoint): MapAlsoRaisedEntry => ({ keyPointId: keyPoint.keyPointId, claim: keyPoint.claim, makers: keyPoint.makers,
       // Ruling R3-T5.1 (P2.2 "assumptions stay labelled all the way through"): engine 2 only, never written as undefined.
       ...(engine && keyPoint.restsOn !== undefined ? { restsOn: keyPoint.restsOn } : {}) }));
-  return mapMergeAlsoRaised([...answers, ...unchosen, ...points], input.internalNames);
+  const merged = mapMergeAlsoRaised([...answers, ...unchosen, ...points], input.internalNames);
+  if (!engine) return merged;
+  // R3 final wave P9 (Task 9): an answer and a point in the same words are one entry, the answer's (it comes first); the
+  // point's label is kept on it ("assumption" when any same-words point rests on one), never lost by the merge.
+  const labels = new Map<string, MapRestsOn>();
+  for (const entry of points) {
+    if (entry.restsOn === undefined) continue;
+    const key = alsoRaisedClaimKey(entry.claim.trim());
+    if (labels.get(key) !== "assumption") labels.set(key, entry.restsOn);
+  }
+  return Object.freeze(merged.map((entry) => {
+    const label = labels.get(alsoRaisedClaimKey(entry.claim));
+    return label === undefined || entry.restsOn === label ? entry : Object.freeze({ ...entry, restsOn: label });
+  }));
 }
