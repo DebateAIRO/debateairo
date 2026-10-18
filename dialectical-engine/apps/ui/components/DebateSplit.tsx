@@ -44,6 +44,15 @@ type DebateSplitProps = SplitCallbacks & {
   composeCatalog?: MessageCatalog;
 };
 
+/**
+ * A claim as Split shows it: its text, or "Loading…" while a live run has not delivered that
+ * text yet, so no chip, heading or button is left without a name. Only the claim itself takes
+ * the debate's language (`node.claim ? textLang : {}` at each use).
+ */
+function shownClaim(node: DebateNode, debateChromeCatalog: MessageCatalog): string {
+  return node.claim || (renderStateOf(node) === "pending" ? t(debateChromeCatalog, "debateChrome.loading") : "");
+}
+
 function subtreeLean(node: DebateNode): { pro: number; con: number } {
   let pro = 0;
   let con = 0;
@@ -136,7 +145,7 @@ export function DebateSplit({
                       <span aria-hidden="true">{role === "root" ? "●" : pal.arrow}</span>{" "}
                       {role === "root" ? t(catalog, "debateViews.root") : localizedRoleLabel(node, catalog, debateChromeCatalog)}
                     </span>
-                    <span className="splitChipClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
+                    <span className="splitChipClaim" {...(node.claim ? textLang : {})} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{shownClaim(node, debateChromeCatalog)}</span>
                   </button>
                 </div>
               );
@@ -175,13 +184,13 @@ export function DebateSplit({
             <div
               className="splitFocusClaim"
               role="heading"
-              {...textLang}
+              {...(focus.claim ? textLang : {})}
               aria-level={2}
               tabIndex={-1}
               ref={focusHeadingRef}
-              aria-label={`${localizedRoleLabel(focus, catalog, debateChromeCatalog)}: ${focus.claim}`}
+              aria-label={`${localizedRoleLabel(focus, catalog, debateChromeCatalog)}: ${shownClaim(focus, debateChromeCatalog)}`}
             >
-              {focus.claim}
+              {shownClaim(focus, debateChromeCatalog)}
             </div>
             {focus.active_generation?.argument ? (
               <div className="splitFocusBody" {...textLang} data-challenge-prose={focus.id} onMouseUp={(event) => onProseSelect?.(focus, event)}>
@@ -332,7 +341,7 @@ function PerspectiveCard({
   return (
     <button type="button" className="splitPerspective" onClick={() => onFocus(node.id)}>
       <span className="splitPerspectiveBadge"><span aria-hidden="true">◆</span> {localizedRoleLabel(node, catalog, debateChromeCatalog)}</span>
-      <span className="splitPerspectiveClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
+      <span className="splitPerspectiveClaim" {...(node.claim ? textLang : {})} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{shownClaim(node, debateChromeCatalog)}</span>
       <span className="splitPerspectiveMeta">
         {t(catalog, "debateViews.perspectiveBalance", { pro, con })} <span aria-hidden="true">▸</span>
       </span>
@@ -412,8 +421,8 @@ function SplitCard({
           </div>
         ) : (
           <>
-            <button type="button" className="splitCardClaim" {...textLang} onClick={() => onFocus(node.id)}>
-              {node.claim}
+            <button type="button" className="splitCardClaim" {...(node.claim ? textLang : {})} onClick={() => onFocus(node.id)}>
+              {shownClaim(node, debateChromeCatalog)}
             </button>
             {node.active_generation?.argument ? (
               <div
@@ -461,8 +470,8 @@ function SplitCard({
                 <span className="splitRebuttalRel" style={{ color: cpal.text }}>
                   <span aria-hidden="true">↳</span> {rel}
                 </span>
-                <span className="splitRebuttalClaim">
-                  {renderStateOf(child) === "empty" ? t(catalog, "debateViews.noStrongArgument") : child.claim}
+                <span className="splitRebuttalClaim" {...(child.claim ? textLang : {})}>
+                  {renderStateOf(child) === "empty" ? t(catalog, "debateViews.noStrongArgument") : shownClaim(child, debateChromeCatalog)}
                 </span>
               </button>
             );

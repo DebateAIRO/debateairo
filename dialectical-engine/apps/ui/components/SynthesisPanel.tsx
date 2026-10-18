@@ -1,6 +1,7 @@
 "use client";
 
 import { FloorAnswer } from "@/components/FloorAnswer";
+import { useDebateTextLang } from "@/components/debateTextLang";
 import type { Synthesis } from "@/lib/types";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { FloorAnswerView } from "@/lib/v3/floorAnswer";
@@ -36,10 +37,13 @@ export function SynthesisPanel({
   catalog = debateDrawersEnglish,
   ...view
 }: SynthesisView & { catalog?: MessageCatalog }) {
-  const verdictBody =
-    view.verdictGate?.state === "suppressed_no_evidence"
-      ? t(catalog, "debateDrawers.synthesis.verdictWithheldNoEvidence")
-      : view.verdict || t(catalog, "debateDrawers.common.pending");
+  const verdictWithheld = view.verdictGate?.state === "suppressed_no_evidence";
+  const verdictBody = verdictWithheld
+    ? t(catalog, "debateDrawers.synthesis.verdictWithheldNoEvidence")
+    : view.verdict || t(catalog, "debateDrawers.common.pending");
+  // The debate's own words take its language; the panel's fallbacks are interface copy.
+  const textLang = useDebateTextLang();
+  const verdictLang = !view.floor && !verdictWithheld && view.verdict ? textLang : {};
 
   return (
     <aside className="synthPanel scroll" aria-label={t(catalog, "debateDrawers.synthesis.title")}>
@@ -65,14 +69,14 @@ export function SynthesisPanel({
                   <div className="synthCardHead">
                     <span className="synthCardLabel pro">↑ {t(catalog, "debateDrawers.synthesis.strongestPro")}</span>
                   </div>
-                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.proClaim || t(catalog, "debateDrawers.common.pending")}</div>
+                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`} {...(view.proClaim ? textLang : {})}>{view.proClaim || t(catalog, "debateDrawers.common.pending")}</div>
                 </section>
 
                 <section className="synthCard synthCon">
                   <div className="synthCardHead">
                     <span className="synthCardLabel con">↓ {t(catalog, "debateDrawers.synthesis.strongestCon")}</span>
                   </div>
-                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`}>{view.conClaim || t(catalog, "debateDrawers.common.pending")}</div>
+                  <div className={`synthCardClaim${view.streaming ? " cursor" : ""}`} {...(view.conClaim ? textLang : {})}>{view.conClaim || t(catalog, "debateDrawers.common.pending")}</div>
                 </section>
               </>
             )}
@@ -82,7 +86,7 @@ export function SynthesisPanel({
                 <span className="synthCardLabel verdict">{t(catalog, "debateDrawers.synthesis.verdict")}</span>
                 {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
               </div>
-              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>
+              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`} {...verdictLang}>
                 {view.floor ? <FloorAnswer view={view.floor} showLabel /> : verdictBody}
               </div>
               {view.lean ? (
@@ -106,7 +110,7 @@ export function SynthesisPanel({
                     <div className="synthSectionTitle">{section.title}</div>
                     <ul className="synthSectionList">
                       {section.items.map((item) => (
-                        <li key={item}>{item}</li>
+                        <li key={item} {...textLang}>{item}</li>
                       ))}
                     </ul>
                   </section>

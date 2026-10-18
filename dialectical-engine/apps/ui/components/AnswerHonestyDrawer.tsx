@@ -27,6 +27,7 @@ import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
 import publicEnglish from "@/messages/en/public.json";
 import { useDialogSurface } from "@/components/dialogSurface";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 /**
  * UI-01 honesty surface (additive, V2 drawer vocabulary). V2's workspace has
@@ -197,6 +198,8 @@ export function AnswerHonestyDrawer({
 }) {
   const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const { locale } = useChromeI18n();
+  // The answer's own sentences (comparisons, objections, what would reverse it) take the debate's language.
+  const textLang = useDebateTextLang();
   const freshness = summarizeFreshness(
     answer.nodes.map((node) => ({ subjectRef: node.node_id, state: node.staleness_state }))
   );
@@ -314,7 +317,7 @@ export function AnswerHonestyDrawer({
                     {group.map((entry) => (
                       <Fragment key={entry.root_node_id}>
                         {comparisonStatement(answer, entry.root_node_id) === null ? null : (
-                          <div className="drawerFindingText" data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
+                          <div className="drawerFindingText" {...textLang} data-ai-generated="true">{comparisonStatement(answer, entry.root_node_id)}</div>
                         )}
                         {entry.honest_score === null ? null : (
                           <meter
@@ -564,7 +567,7 @@ export function AnswerHonestyDrawer({
               <ul className="drawerFindingList">
                 {answer.residual_objections.map((objection) => (
                   <li key={objection} className="drawerFindingItem">
-                    <div className="drawerFindingText" data-ai-generated="true">{objection}</div>
+                    <div className="drawerFindingText" {...textLang} data-ai-generated="true">{objection}</div>
                   </li>
                 ))}
               </ul>
@@ -573,7 +576,7 @@ export function AnswerHonestyDrawer({
 
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.whatWouldReverseThis")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.whatWouldReverseThis")}</div>
-            <div className="drawerFindingText" data-ai-generated="true">{answer.reversal_point}</div>
+            <div className="drawerFindingText" {...textLang} data-ai-generated="true">{answer.reversal_point}</div>
           </section>
 
           {answer.value_hinges.length > 0 ? (

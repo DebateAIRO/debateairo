@@ -134,6 +134,16 @@ export function debateAfterRunTerminalFailure(debate: DebateDetail, reason: stri
   };
 }
 
+/**
+ * The live stream carries no question text, so a tree built from it has an empty root claim.
+ * The question line the page already read stays the topic and the root claim; without it the
+ * h1, the tab title and the root card went blank until the run settled.
+ */
+export function withKnownTopic(debate: DebateDetail, topic: string | undefined): DebateDetail {
+  if (debate.topic !== "" || !topic) return debate;
+  return { ...debate, topic, tree: debate.tree === null ? null : { ...debate.tree, claim: topic } };
+}
+
 type SynthesisDraft = {
   model_id?: string;
   worker_id?: string;
@@ -173,7 +183,10 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
       const tree = liveTreeFromState(next, input.runRef, "", input.composeCatalog ?? composeEnglish);
       if (tree) input.updateDebate((current) => input.hasAnswer()
         ? current
-        : { ...liveDebateDetail(input.runRef, tree), run_state: current?.run_state === "FAILED" ? "FAILED" : "RUNNING" });
+        : withKnownTopic(
+          { ...liveDebateDetail(input.runRef, tree), run_state: current?.run_state === "FAILED" ? "FAILED" : "RUNNING" },
+          current?.topic
+        ));
     }
     if (event.event_type === "serve.composition_started") {
       input.updateSynthesisDraft({ raw: "" });
@@ -792,7 +805,7 @@ export default function DebatePageClient({
         if (bundle.detail.synthesis) setSynthesisDraft(null);
       } else {
         setDebate((current) => current?.id === bundle.detail.id && current.tree?.children.length
-          ? { ...current, run_state: bundle.detail.run_state, status: bundle.detail.status }
+          ? withKnownTopic({ ...current, run_state: bundle.detail.run_state, status: bundle.detail.status }, bundle.detail.topic)
           : bundle.detail);
       }
       // Self-heal: recovered data must always clear any stale error banner/fatal
