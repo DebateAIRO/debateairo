@@ -9,6 +9,7 @@ import {
   mapAnglesReplySchema,
   mapAnglesSalvage,
   mapAnglesSpec,
+  mapCheckSalvage,
   mapChooseCheck,
   mapChooseReplySchema,
   mapChooseSalvage,
@@ -22,6 +23,7 @@ import {
   mapListReplySchema,
   mapListSalvage,
   mapListSpec,
+  mapMergeSalvage,
   mapMergeSpec,
   mapPromptContractHash,
   mapPromptContracts,
@@ -336,5 +338,24 @@ describe("map salvage log: every kind it notes is reported, in the providers' fi
     log.note("MAP_TEXT_TRIMMED");
     expect(log.repairs).toEqual(["MAP_TEXT_TRIMMED", "MAP_IDS_DROPPED", "MAP_IDS_NORMALISED"]);
     expect(new MapSalvageLog().repairs).toEqual([]);
+  });
+});
+
+/**
+ * Ruling W2 (R3 whole-branch review, Minor 1): `check_id` names an id only in the answer check's reply, so only the
+ * check's salvage normalises it. Every engine-1 salvage reads a reply carrying that key exactly as at BASE (the key is
+ * left as written and no MAP_IDS_NORMALISED is noted for it).
+ */
+describe("map salvage: only the answer check's salvage reads check_id as an id (W2)", () => {
+  it("leaves an engine-1 reply's check_id as written, and the check still normalises it", () => {
+    const merge = { key_points: [{ key_point_id: "kp01", claim: "One.", member_item_ids: ["pt01"] }], answers: [], check_id: "A1" };
+    expect(mapMergeSalvage.decoded(merge)).toEqual({ value: merge, repairs: [] });
+    const choose = { answers: [{ answer_id: "a1", statement: "Yes.", for: [], against: [], strongest_rival: null }], check_id: "A1" };
+    expect(mapChooseSalvage(null).decoded(choose)).toEqual({ value: choose, repairs: [] });
+    expect(mapAnglesSalvage.decoded({ angles: [], check_id: "A1" })).toEqual({ value: { angles: [], check_id: "A1" }, repairs: [] });
+    const check = { checks: [{ check_id: "A1", answers_question: true, adds_unstated_fact: false, cost_can_be_named: true, reason: null }] };
+    const read = mapCheckSalvage.decoded(check);
+    expect(read.repairs).toEqual(["MAP_IDS_NORMALISED"]);
+    expect((read.value as typeof check).checks[0]?.check_id).toBe("a1");
   });
 });

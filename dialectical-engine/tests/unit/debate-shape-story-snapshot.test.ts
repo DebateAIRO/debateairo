@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
 import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
-import { mapAlsoRaisedOf, type MapChosenAnswer, type MapKeyPoint } from "@debateai/map";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapChosenAnswer, type MapKeyPoint } from "@debateai/map";
 import { debateMapViewFrom } from "../../apps/api/src/map-views.js";
 import {
   buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, type StoryMapSource, type StorySnapshotSource
@@ -96,6 +96,37 @@ describe("debate shape P2c — the story snapshot's also-raised points", () => {
     expect(storyAlsoRaisedFrom(cut, 3)?.map((item) => item.claim)).toEqual(["Raised by three makers.", "A point quoting (a point) by id."]);
     const filled = { ...cut, choice: { ...cut.choice!, answers: cut.choice!.answers.map((entry) => ({ ...entry, filled: entry.answerId === "a3" })) } };
     expect(storyAlsoRaisedFrom(filled, 2)?.map((item) => item.claim)).not.toContain("Wait a year.");
+  });
+
+  /**
+   * Ruling W1 (R3 whole-branch review, Important 1): under engine 2 a code-chosen, filled or replacement answer holds its
+   * points UNSIDED in `pointsRaised`. When such an answer is cut, those points were raised and never debated, so they are
+   * listed beside the cut answer exactly as engine 1 lists a cut answer's sided points; a point an argued answer took is not.
+   */
+  it("engine 2: lists a cut answer's points raised too, as engine 1 lists its sided points (W1, W-CUT)", () => {
+    const points = [keyPoint("kp01", "Shared point.", ["A", "B"]), keyPoint("kp02", "First answer's point.", ["A"]),
+      keyPoint("kp03", "Third answer's point.", ["B", "C"]), keyPoint("kp04", "Second answer's point.", ["C"]),
+      keyPoint("kp06", "Third answer's other point.", ["A"])];
+    const unsided = (answerId: string, statement: string, pointsRaised: readonly string[]): MapChosenAnswer =>
+      ({ ...answer(answerId, statement, []), pointsRaised });
+    const choice = { answers: [unsided("a1", "Yes.", ["kp01", "kp02"]), unsided("a2", "No.", ["kp04"]),
+      unsided("a3", "Wait a year.", ["kp03", "kp06", "kp01"])], alsoRaised: [] };
+    const mergedAnswers = [{ answerId: "an03", answer: "Wait a year.", memberItemIds: [], blindMakers: ["A", "B", "C"],
+      makers: ["A", "B", "C"], fromOppositeCase: false }];
+    const engine = mapAlsoRaisedOf({ choice, keyPoints: points, mergedAnswers, arguedAnswers: 2, unchosenAnswers: true,
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES });
+    expect(engine.map((entry) => entry.keyPointId)).toEqual(["a3", "kp03", "kp06"]);
+    // Engine 1's equivalent (the same points sided) lists the same ids; its W-CUT output is unchanged.
+    const sided = { answers: [answer("a1", "Yes.", ["kp01", "kp02"]), answer("a2", "No.", ["kp04"]),
+      answer("a3", "Wait a year.", ["kp03", "kp06", "kp01"])], alsoRaised: [] };
+    expect(mapAlsoRaisedOf({ choice: sided, keyPoints: points, mergedAnswers, arguedAnswers: 2 }).map((entry) => entry.keyPointId))
+      .toEqual(["a3", "kp03", "kp06"]);
+    // Argued, the third answer's points raised are not listed (they reached its writer).
+    expect(mapAlsoRaisedOf({ choice, keyPoints: points, mergedAnswers, arguedAnswers: 3, unchosenAnswers: true,
+      internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES })).toEqual([]);
+    // The story reads the same rule.
+    expect(storyAlsoRaisedFrom({ keyPoints: points, mergedAnswers, choice }, 2, { checkFailed: [], checkFailedMergedAnswerIds: [] })
+      ?.map((item) => item.claim)).toEqual(["Wait a year.", "Third answer's point.", "Third answer's other point."]);
   });
 
   /** Whole-branch review m-4: the story and the page list the same claims, in the same order, merged by one rule. */

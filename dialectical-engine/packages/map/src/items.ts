@@ -235,7 +235,9 @@ export function mapAlsoRaisedOf(input: Readonly<{
   const engine = input.unchosenAnswers === true;
   const argued = Math.max(0, Math.trunc(input.arguedAnswers));
   const byId = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
-  const pointsOf = (answer: MapChoice["answers"][number]): readonly string[] => [...answer.forKeyPointIds, ...answer.againstKeyPointIds];
+  // Ruling W1: engine 2's code-chosen, filled and replacement answers hold their points unsided in pointsRaised (absent on engine 1).
+  const pointsOf = (answer: MapChoice["answers"][number]): readonly string[] =>
+    [...answer.forKeyPointIds, ...answer.againstKeyPointIds, ...(answer.pointsRaised ?? [])];
   const arguedPoints = new Set(input.choice.answers.slice(0, argued).flatMap(pointsOf));
   const cut = input.choice.answers.slice(argued);
   const makersOf = (statement: string): readonly string[] => {

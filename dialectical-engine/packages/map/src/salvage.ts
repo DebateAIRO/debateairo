@@ -109,7 +109,9 @@ function decodedSalvage(fix: (record: Record<string, unknown>, log: MapSalvageLo
 
 /** LG-A: the keys whose string values are ids the reply defines, and the keys whose values (a string or a list) name ids. */
 const MAP_ID_DEFINING_KEYS: ReadonlySet<string> = new Set(["angle_id", "key_point_id", "answer_id"]);
-const MAP_ID_NAMING_KEYS: ReadonlySet<string> = new Set(["member_item_ids", "for", "against", "strongest_rival", "check_id"]);
+const MAP_ID_NAMING_KEYS: ReadonlySet<string> = new Set(["member_item_ids", "for", "against", "strongest_rival"]);
+/** Ruling W2: the answer check's own naming keys (engine 2 only); every other salvage keeps the set above, as at BASE. */
+const MAP_CHECK_ID_NAMING_KEYS: ReadonlySet<string> = new Set([...MAP_ID_NAMING_KEYS, "check_id"]);
 
 /**
  * An id as the map's schema writes ids (`mapId` in replies.ts: `^[a-z0-9][a-z0-9-]{0,23}$`), pre-flight PF-A31 (ruling
@@ -132,7 +134,8 @@ function normalisedMapId(id: string): string {
  * two defined ids become one (the collision guard: `KP-1` beside `kp-1`, or `kp_1` beside `kp-1`, leaves the reply as
  * written); the schema then checks every id's shape as before.
  */
-function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog): Record<string, unknown> {
+function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog,
+  namingKeys: ReadonlySet<string> = MAP_ID_NAMING_KEYS): Record<string, unknown> {
   const defined: string[] = [];
   const collect = (node: unknown): void => {
     if (Array.isArray(node)) { node.forEach(collect); return; }
@@ -146,9 +149,9 @@ function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog): Re
   if (new Set(defined.map(normalisedMapId)).size !== new Set(defined).size) return reply;
   let changed = false;
   const rewrite = (node: unknown, key: string | null): unknown => {
-    if (Array.isArray(node)) return node.map((entry) => rewrite(entry, key !== null && MAP_ID_NAMING_KEYS.has(key) ? key : null));
+    if (Array.isArray(node)) return node.map((entry) => rewrite(entry, key !== null && namingKeys.has(key) ? key : null));
     if (isRecord(node)) return Object.fromEntries(Object.entries(node).map(([inner, value]) => [inner, rewrite(value, inner)]));
-    if (typeof node === "string" && key !== null && (MAP_ID_DEFINING_KEYS.has(key) || MAP_ID_NAMING_KEYS.has(key))) {
+    if (typeof node === "string" && key !== null && (MAP_ID_DEFINING_KEYS.has(key) || namingKeys.has(key))) {
       const next = normalisedMapId(node);
       if (next !== node) changed = true;
       return next;
@@ -246,7 +249,7 @@ export const mapAnglesSalvageEngine = mapAnglesSalvageLengthed;
 
 /** ENGINE 2: the check's ids normalised in code ("A1" → "a1"); anything else is the schema's to refuse. Its own object (not an alias). */
 export const mapCheckSalvage = Object.freeze({
-  decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log))
+  decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log, MAP_CHECK_ID_NAMING_KEYS))
 });
 
 /** ENGINE 2: today's choose salvage (ids normalised; unknown, repeated and two-sided ids dropped), over answers AND reserves. */
