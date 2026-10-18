@@ -265,6 +265,11 @@ export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoi
     return mapEngineSpecOf("CHOOSE", ctx, "choose", [mapQuestionField(ctx),
       { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
         raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null, rests_on: keyPoint.restsOn ?? null }))) },
+      // Ruling R3-T6.1 REVISED: map.choose.v2 says raised_by counts the AIs that raised an answer "on their own". That is
+      // true for engine 2 on every arm, arm A's "ALL" count included: the snowball v2 spec (mapSnowballSpec) shows a later
+      // AI only the earlier POINTS' claims, never the earlier candidate answers, so every AI that names an answer names
+      // it unprompted (a blind count would tell choose 0 for those). Pinned by engine-map-orchestrator's "snowball v2
+      // shows no candidate answers" case; if a change ever shows answers, that case fails and this sentence is revisited.
       { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer,
         raised_by: raisedBy(answer) }))) },
       { name: "framing_challenges", content: JSON.stringify(options.engine?.framingChallenges ?? []) }],

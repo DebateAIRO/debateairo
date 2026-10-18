@@ -13,7 +13,9 @@
  *
  * Reclaim resume (PR #171): a seat whose vote an earlier copy recorded is never asked again; its row is its vote,
  * a recorded failure included. A vote another write stored first (the record answers ALREADY_PRESENT) is read back and
- * its stored row decides, never this copy's fresh reply. The run body supplies the I/O (`ask`, `record`, the recorded
+ * its stored row decides, never this copy's fresh reply. Two stored seats of one maker (two copies after a mid-judging
+ * reclaim): the earliest seat is the maker's vote and a later one is not counted (`storedSeatsOfRepeatedMakers`, R3 final
+ * wave O2), so the count never refuses a resumed debate and never counts one maker twice. The run body supplies the I/O (`ask`, `record`, the recorded
  * rows), so this step is driven whole by `tests/unit/r2-judging-step.test.ts`.
  */
 import {
@@ -94,8 +96,18 @@ export type ComparingJudgesStepInput = Readonly<{
   record: (vote: ComparingJudgeVoteRecord) => Promise<RecordedComparingJudgeVote | null | void>;
 }>;
 
+/**
+ * R3 final wave O2 (R2b review N2, ruling index b; spec §4.3 "never two judges of one maker"): why a STORED vote was left
+ * out of the count. Two copies of a debate after a mid-judging reclaim can each store a vote by one maker at different
+ * seats; the earliest stored seat of that maker is its vote and every later one is not counted. The reason is the step's
+ * own: a stored row is never written again, so it never reaches 0121's not_counted_reason column (no new code there).
+ */
+export type ComparingJudgeSetAside = Readonly<{ seat: number; maker: string; reason: "MAKER_SEATED_EARLIER" }>;
+
 export type ComparingJudgesStepResult = Readonly<{
   verdict: JudgesVerdict;
+  /** O2: stored seats of a maker an earlier stored seat holds, not counted (ascending seat order; [] on a first pass). */
+  setAside: readonly ComparingJudgeSetAside[];
   unavailable: ComparingJudgesUnavailableCause | null;
   seats: readonly ComparingJudgeSeat[];
   /** Per seat: the letter its reply named (null: failed) and whether it counted (the step's own record; the panel and the report read the vote rows). */
@@ -205,10 +217,33 @@ export function comparingJudgesSourceOf(input: Readonly<{
 }
 
 type Outcome = Readonly<{ seat: ComparingJudgeSeat; recorded: RecordedComparingJudgeVote | null; asked: ComparingJudgeAsked | null }>;
+type TallyEntry = Readonly<{ seat: number; counted: boolean;
+  notCountedReason: JudgesVerdict["counted"][number]["notCountedReason"] | ComparingJudgeSetAside["reason"] }>;
 type Tally = Readonly<{
   verdict: JudgesVerdict;
-  countedBySeat: ReadonlyMap<number, JudgesVerdict["counted"][number]>;
+  /** Every seat of the outcomes: the count's entry, or a set-aside stored seat (not counted, no letter withheld). */
+  countedBySeat: ReadonlyMap<number, TallyEntry>;
+  setAside: readonly ComparingJudgeSetAside[];
 }>;
+
+const makerOfOutcome = (outcome: Outcome): string => outcome.asked?.maker ?? outcome.seat.maker;
+
+/**
+ * O2: the stored seats (a row an earlier copy recorded, or one another copy stored meanwhile) whose maker an EARLIER stored
+ * seat already holds, in seat order. A seat this copy asks is never set aside: its maker holds no stored seat by
+ * construction (the pick skips recorded makers, `finalOf` drops a fresh seat whose maker a re-read row took), so a
+ * repeated maker among fresh seats still reaches the count's own refusal, a code defect.
+ */
+export function storedSeatsOfRepeatedMakers(outcomes: readonly Readonly<{ seat: number; maker: string; stored: boolean }>[]):
+  readonly ComparingJudgeSetAside[] {
+  const held = new Set<string>();
+  const setAside: ComparingJudgeSetAside[] = [];
+  for (const outcome of [...outcomes].filter((entry) => entry.stored).sort((left, right) => left.seat - right.seat)) {
+    if (held.has(outcome.maker)) setAside.push(Object.freeze({ seat: outcome.seat, maker: outcome.maker, reason: "MAKER_SEATED_EARLIER" }));
+    else held.add(outcome.maker);
+  }
+  return Object.freeze(setAside);
+}
 
 /** A recorded row's reply; a row with a letter but no kind, flag or reasons is read as a failure, never completed. */
 function recordedReply(row: RecordedComparingJudgeVote): ComparingJudgeReply | null {
@@ -281,12 +316,16 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
     }
   }));
   const tallyOf = (of: readonly Outcome[]): Tally => {
+    // O2: a later stored seat of a maker an earlier stored seat holds is left out of the count (never one maker twice).
+    const setAside = storedSeatsOfRepeatedMakers(of.map((outcome) =>
+      ({ seat: outcome.seat.seat, maker: makerOfOutcome(outcome), stored: outcome.recorded !== null })));
+    const asideSeats = new Set(setAside.map((entry) => entry.seat));
     const verdict = deriveJudgesVerdict({
-      votes: of.map((outcome) => {
+      votes: of.filter((outcome) => !asideSeats.has(outcome.seat.seat)).map((outcome) => {
         const reply = replyOf(outcome);
         return Object.freeze({
           seat: outcome.seat.seat,
-          maker: outcome.asked?.maker ?? outcome.seat.maker,
+          maker: makerOfOutcome(outcome),
           reply: reply === null ? null : Object.freeze({ best: reply.best, conditional: reply.conditional, sameAs: reply.sameAs,
             questionKind: reply.questionKind })
         });
@@ -295,7 +334,9 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
       honestFinalStrength: input.honestFinalStrength,
       label: input.engine.label
     });
-    return Object.freeze({ verdict, countedBySeat: new Map(verdict.counted.map((entry) => [entry.seat, entry] as const)) });
+    const countedBySeat = new Map<number, TallyEntry>(verdict.counted.map((entry) => [entry.seat, entry] as const));
+    for (const entry of setAside) countedBySeat.set(entry.seat, Object.freeze({ seat: entry.seat, counted: false, notCountedReason: entry.reason }));
+    return Object.freeze({ verdict, countedBySeat, setAside });
   };
   // Controller ruling R2b-B5.1 (B5 fix 1): a fresh row's `counted` is written from the FINAL tally. One seat's `counted`
   // depends on the other seats' replies (OWN_MAKER reads the majority groups, built from every standing reply), so every
@@ -335,7 +376,8 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   for (const outcome of outcomes) {
     if (outcome.recorded !== null || storedBySeat.has(outcome.seat.seat) || !final.includes(outcome)) continue;
     const reply = standingReplyOf(tally, outcome);
-    const entry = tally.countedBySeat.get(outcome.seat.seat);
+    // The count's own entry: a seat written here is never a set-aside one (O2 sets aside stored seats only).
+    const entry = tally.verdict.counted.find((counted) => counted.seat === outcome.seat.seat);
     /*
      * The counted column is a hint; readers recount through deriveJudgesVerdict from the stored letters, groups and
      * makers (controller ruling R2b-B5.1). Rows are immutable: a row an earlier copy wrote keeps the counted value of
@@ -405,6 +447,7 @@ export async function runComparingJudges(input: ComparingJudgesStepInput): Promi
   }));
   return Object.freeze({
     verdict,
+    setAside: tally.setAside,
     unavailable,
     seats,
     ballots: Object.freeze(final.map((outcome) => Object.freeze({

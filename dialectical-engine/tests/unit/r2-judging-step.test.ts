@@ -272,6 +272,38 @@ describe("reclaim resume: a recorded vote is never asked again", () => {
       expect(new Set(result.seats.map((seat) => seat.maker)).size).toBe(3);
       expect(result).toMatchObject({ asked: 3, reused: 1 });
     });
+
+    /*
+     * R3 final wave O2 (R2b review N2, ruling index b): two copies after a mid-judging reclaim can each STORE a vote by one
+     * maker at different seats. The earliest stored seat of a maker is its vote; a later one is not counted
+     * (MAKER_SEATED_EARLIER), so the count never refuses the resumed debate and never counts one maker twice.
+     */
+    it("counts only the earliest stored seat of a maker; a later stored seat of it is not counted, and the verdict derives", async () => {
+      const { run, asks, records } = step({ recorded: [row(1, "anthropic", "haiku", "A"), row(2, "xiaomi", "mimo", "A"),
+        row(3, "anthropic", "haiku", "A")] });
+      const result = await run();
+      expect(asks).toEqual([]);
+      expect(records).toEqual([]);
+      expect(result.verdict).toMatchObject({ winnerRootNodeId: ROOT.A, judgesSeated: 2, judgesAnswered: 2, winnerVotes: 2 });
+      expect(result.verdict.counted.map((entry) => entry.seat)).toEqual([1, 2]);
+      expect(result.setAside).toEqual([{ seat: 3, maker: "anthropic", reason: "MAKER_SEATED_EARLIER" }]);
+      expect(result.ballots).toEqual([{ seat: 1, letter: "A", counted: true }, { seat: 2, letter: "A", counted: true },
+        { seat: 3, letter: "A", counted: false }]);
+      expect(result).toMatchObject({ asked: 0, reused: 3 });
+    });
+
+    it("sets aside a later seat of a maker another copy stored meanwhile, and writes only this copy's other seats", async () => {
+      // This copy reuses seat 1 (anthropic); another copy stored seat 3 for anthropic too while this copy asked 2 and 3.
+      const theirs = Object.freeze({ ...row(3, "anthropic", "haiku", "A"), modelId: "claude-haiku-5-5" });
+      const { run, records } = step({ recorded: [row(1, "anthropic", "haiku", "A")],
+        readRecorded: async () => [row(1, "anthropic", "haiku", "A"), theirs] });
+      const result = await run();
+      expect(records.map((vote) => [vote.judgeSeat, vote.maker, vote.counted])).toEqual([[2, "xiaomi", true]]);
+      expect(result.verdict.counted.map((entry) => entry.seat)).toEqual([1, 2]);
+      expect(result.setAside).toEqual([{ seat: 3, maker: "anthropic", reason: "MAKER_SEATED_EARLIER" }]);
+      // A first pass sets nothing aside.
+      expect((await step().run()).setAside).toEqual([]);
+    });
   });
 
   it("asks only the seats with no recorded vote, and reuses a recorded failure as a failure", async () => {

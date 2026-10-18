@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { LENGTH_GUIDANCE_START } from "@debateai/kernel";
 import {
-  MAP_ENGINE_CONTRACT_IDS, mapAlsoRaisedOf, mapProviderPieces, mapRunAngleMap, type MapCallOutcome, type MapCallRequest, type MapCaller,
+  MAP_ENGINE_CONTRACT_IDS, mapAlsoRaisedOf, mapProviderPieces, mapRunAngleMap, mapRunSnowball, type MapCallOutcome, type MapCallRequest, type MapCaller,
   type MapLength, type MapRunInput,
   // Review carries (the last describe).
   MAP_ENGINE_INTERNAL_FIELD_NAMES, MAP_INTERNAL_FIELD_NAMES, type MapKeyPoint, type MapPointItem,
@@ -322,5 +322,42 @@ describe("engine 2: the check's edges at the orchestrator (review Minor 4)", () 
     const entry = today.find((listed) => listed.keyPointId === cut.answerId)!;
     expect(entry.claim).toBe(cut.statement);
     expect("kind" in entry).toBe(false);
+  });
+});
+
+/**
+ * Ruling R3-T6.1 REVISED: choose v2 reads raised_by as the AIs that raised an answer "on their own". On arm A every later
+ * list is stored as SHOWN, yet the snowball v2 material shows only the earlier points' claims, never an earlier candidate
+ * answer, so each answer was raised unprompted and the all-makers count is true. If a change ever shows the snowball the
+ * earlier answers, this case fails and the count (and choose v2's sentence) must be revisited.
+ */
+describe("engine 2: the snowball v2 material carries no candidate answers (ruling R3-T6.1 REVISED)", () => {
+  it("each later AI sees the question and the points' claims only, and choose counts each answer's raiser as one", async () => {
+    const answerOf = (index: number) => `Only on weekdays, as list ${String(index)} says.`;
+    let snowballs = 0;
+    const { caller, requests } = scripted({}, (request) => {
+      if (frameOf(request).contractId !== MAP_ENGINE_CONTRACT_IDS.listSnowball) return null;
+      snowballs += 1;
+      const reply = JSON.stringify({ points: [{ claim: `Snowball point ${String(snowballs)}.`, why_it_matters: "It could change the answer.",
+        leans: "context", rests_on: "question" }], candidate_answers: [answerOf(snowballs)] });
+      return { kind: "OK", value: request.spec.read(reply, STOP) };
+    });
+    const result = await mapRunSnowball(input(caller));
+    const shown = requests.filter((request) => frameOf(request).contractId === MAP_ENGINE_CONTRACT_IDS.listSnowball);
+    expect(shown.length).toBeGreaterThanOrEqual(2);
+    const listedAnswers = result.items.filter((item) => item.kind === "ANSWER").map((item) => (item as { answer: string }).answer);
+    expect(listedAnswers.length).toBeGreaterThanOrEqual(3);
+    for (const request of shown) {
+      const fields = frameOf(request).fields;
+      expect(fields.map((field) => field.name)).toEqual(["question_line", "points_so_far", "length", "question_language"]);
+      const pointsSoFar = JSON.parse(fields.find((field) => field.name === "points_so_far")!.content) as unknown[];
+      expect(pointsSoFar.every((entry) => typeof entry === "string")).toBe(true);
+      for (const answer of listedAnswers) for (const field of fields) expect(field.content).not.toContain(answer);
+    }
+    // The count choose v2 reads stays every maker on arm A: an answer a later (SHOWN) AI raised reads 1, never 0.
+    const choose = requests.find((request) => frameOf(request).contractId === MAP_ENGINE_CONTRACT_IDS.choose)!;
+    const answers = JSON.parse(frameOf(choose).fields.find((field) => field.name === "answers")!.content) as { raised_by: number }[];
+    expect(answers.length).toBeGreaterThanOrEqual(3);
+    expect(answers.every((entry) => entry.raised_by >= 1)).toBe(true);
   });
 });
