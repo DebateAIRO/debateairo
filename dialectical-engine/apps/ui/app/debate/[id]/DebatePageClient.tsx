@@ -94,7 +94,8 @@ import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import type { LocaleCode } from "@/lib/i18n/locales";
-import { questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
+import { localeDirection, questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
+import { DebateTextLocaleProvider } from "@/components/debateTextLang";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import { AlsoRaisedList } from "@/components/AlsoRaisedList";
@@ -1488,11 +1489,16 @@ export default function DebatePageClient({
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
   const runStatusText = statusLabel(debate.run_state ?? debate.status, timeCatalog);
+  // The debate's own text (topic, claims, arguments) is tagged with the language it was argued
+  // in, so a screen reader reads it in that language's voice (components/debateTextLang.tsx).
+  const debateTextLocale = readQuestionLocale ?? storyLocale;
+  const debateTextDir = localeDirection(debateTextLocale);
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = formatScoringConfidenceCopy(debateChromeCatalog);
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
   return (
     <PositionTitlesContext.Provider value={positionTitles}>
+    <DebateTextLocaleProvider value={debateTextLocale}>
     <div
       className="debateView"
       data-public-mode={publicMode ? "true" : "false"}
@@ -1503,7 +1509,7 @@ export default function DebatePageClient({
       data-adaptive-depth-dry-run-state={adaptiveDepthDryRunState.status}
       data-actions-collapsed={headerActionsCollapsed ? "true" : "false"}
     >
-      <h1 className="srOnly">{debate.topic}</h1>
+      <h1 className="srOnly" lang={debateTextLocale} dir={debateTextDir}>{debate.topic}</h1>
       <p className="srOnly" role="status">
         {runStatusText}
       </p>
@@ -2039,6 +2045,7 @@ export default function DebatePageClient({
         </div>
       )}
     </div>
+    </DebateTextLocaleProvider>
     </PositionTitlesContext.Provider>
   );
 }

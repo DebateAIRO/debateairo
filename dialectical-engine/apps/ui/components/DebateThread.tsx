@@ -12,6 +12,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
   const role = roleOf(node);
@@ -86,6 +87,7 @@ export function DebateThread({
   composeCatalog = composeEnglish
 }: DebateThreadProps) {
   const { catalog, locale } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const rows = buildRows(root, collapsed);
 
   return (
@@ -95,7 +97,7 @@ export function DebateThread({
           <div className="threadRoot">
             <span className="referenceStanceTab root" aria-hidden />
             <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-            <div className="threadRootClaim" role="heading" aria-level={2}>{root.claim}</div>
+            <div className="threadRootClaim" role="heading" aria-level={2} {...textLang}>{root.claim}</div>
             <div className="nodeRootMeta">
               <span>{tPlural(catalog, "debateViews.claimCount", meta.nodes, locale)}</span>
               <span className="sep">/</span>
@@ -162,6 +164,7 @@ function ThreadRowCard({
   debateChromeCatalog,
   composeCatalog
 }: ThreadRowCardProps) {
+  const textLang = useDebateTextLang();
   const { node, trail, childCount } = row;
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
@@ -218,6 +221,7 @@ function ThreadRowCard({
             <div
               className="threadClaim"
               role="heading"
+              {...textLang}
               aria-level={outlineLevel(trail.length)}
               id={headingId}
               aria-label={node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
@@ -225,7 +229,7 @@ function ThreadRowCard({
               {node.claim}
             </div>
           ) : (
-            <div className="srOnly" role="heading" aria-level={outlineLevel(trail.length)} id={headingId}>
+            <div className="srOnly" role="heading" aria-level={outlineLevel(trail.length)} id={headingId} {...textLang}>
               {node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
             </div>
           )}
@@ -261,7 +265,7 @@ function ThreadRowCard({
               <div className="skel" style={{ height: 13, borderRadius: 4, width: "60%" }} />
             </div>
           ) : state === "streaming" ? (
-            <div className="threadClaim">
+            <div className="threadClaim" {...textLang}>
               {generation?.argument || node.claim}
               <span className="streamCursor" style={{ background: pal.text }} />
             </div>
@@ -270,6 +274,7 @@ function ThreadRowCard({
               {generation?.argument ? (
                 <div
                   className={`threadBody${expanded ? " open" : ""}`}
+                  {...textLang}
                   data-challenge-prose={node.id}
                   onMouseUp={(event) => onProseSelect?.(node, event)}
                 >

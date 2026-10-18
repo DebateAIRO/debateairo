@@ -12,6 +12,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
   const role = roleOf(node);
@@ -76,6 +77,7 @@ export function DebateSplit({
   composeCatalog = composeEnglish
 }: DebateSplitProps) {
   const { catalog, locale } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const path = focusNodeId ? findNodePathById(root, focusNodeId) : [root];
   const focus = path.length ? path[path.length - 1] : root;
   const isRootFocus = focus.node_type === "ROOT_CLAIM";
@@ -134,7 +136,7 @@ export function DebateSplit({
                       <span aria-hidden="true">{role === "root" ? "●" : pal.arrow}</span>{" "}
                       {role === "root" ? t(catalog, "debateViews.root") : localizedRoleLabel(node, catalog, debateChromeCatalog)}
                     </span>
-                    <span className="splitChipClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
+                    <span className="splitChipClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
                   </button>
                 </div>
               );
@@ -149,7 +151,7 @@ export function DebateSplit({
             <div className="splitFocusRoot">
               <span className="referenceStanceTab root" aria-hidden />
               <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-              <div className="splitFocusRootClaim" role="heading" aria-level={2} tabIndex={-1} ref={focusHeadingRef}>{root.claim}</div>
+              <div className="splitFocusRootClaim" role="heading" aria-level={2} tabIndex={-1} ref={focusHeadingRef} {...textLang}>{root.claim}</div>
             </div>
           </div>
         ) : (
@@ -173,6 +175,7 @@ export function DebateSplit({
             <div
               className="splitFocusClaim"
               role="heading"
+              {...textLang}
               aria-level={2}
               tabIndex={-1}
               ref={focusHeadingRef}
@@ -181,7 +184,7 @@ export function DebateSplit({
               {focus.claim}
             </div>
             {focus.active_generation?.argument ? (
-              <div className="splitFocusBody" data-challenge-prose={focus.id} onMouseUp={(event) => onProseSelect?.(focus, event)}>
+              <div className="splitFocusBody" {...textLang} data-challenge-prose={focus.id} onMouseUp={(event) => onProseSelect?.(focus, event)}>
                 {focus.active_generation.argument}
               </div>
             ) : null}
@@ -324,11 +327,12 @@ function PerspectiveCard({
   debateChromeCatalog: MessageCatalog;
 }) {
   const { catalog } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const { pro, con } = subtreeLean(node);
   return (
     <button type="button" className="splitPerspective" onClick={() => onFocus(node.id)}>
       <span className="splitPerspectiveBadge"><span aria-hidden="true">◆</span> {localizedRoleLabel(node, catalog, debateChromeCatalog)}</span>
-      <span className="splitPerspectiveClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
+      <span className="splitPerspectiveClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
       <span className="splitPerspectiveMeta">
         {t(catalog, "debateViews.perspectiveBalance", { pro, con })} <span aria-hidden="true">▸</span>
       </span>
@@ -366,6 +370,7 @@ function SplitCard({
   composeCatalog
 }: SplitCardProps) {
   const { catalog } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const state = renderStateOf(node);
@@ -407,12 +412,13 @@ function SplitCard({
           </div>
         ) : (
           <>
-            <button type="button" className="splitCardClaim" onClick={() => onFocus(node.id)}>
+            <button type="button" className="splitCardClaim" {...textLang} onClick={() => onFocus(node.id)}>
               {node.claim}
             </button>
             {node.active_generation?.argument ? (
               <div
                 className={`threadBody${expanded ? " open" : ""}`}
+                {...textLang}
                 data-challenge-prose={node.id}
                 onMouseUp={(event) => onProseSelect?.(node, event)}
               >
