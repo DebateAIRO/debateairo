@@ -471,7 +471,7 @@ block holds:
   points per answer, deeper points, gap rounds, the three settings, the opening);
 - `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
   answers to argue, and each AI argued its own position, as today;
-- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose), every try as the ledger recorded it;
+- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose, check), every try as the ledger recorded it;
 - `chosenAnswers` and `alsoRaised`: how many different answers the map chose to argue, and how many points came up but
   were not debated. When fewer than two answers were chosen, the points are still counted here, but the story and the
   debate page show none of them (today's opening was argued instead);
@@ -480,6 +480,14 @@ block holds:
   (counted even when an extra grader then failed), and how many points scrutiny examined further (one count per point,
   not per exchange);
 - `notExercised`: why the new shape did not run, else null.
+
+Engine 2 (`--engine-policy`, with `--length-policy` and `--shape-policy`): the map ends with one `MAP:check` call (another maker than the chooser's); `report.json` carries `answerCheck` (checked; rejected, and per test: not an answer, adding a fact, no cost named; exempt as premise challenges; replaced, dropped, kept, unavailable; assumptions per debated answer) and `mapFallbacks` (merge, choose: 0 or 1 per debate). Counts only: the checker's and the chooser's own verdicts, never code's.
+The `answerCheck` block also carries two counts beside the tests: `emptyReasons`, how many empty reasons the checker
+wrote in its refused tries (each is refused and asked again, so this counts slips, not outcomes), and
+`templateFillsDebated`, how many of the answers the run debated are the code's own last-resort template ("The opposite of
+this answer: ..."). These are fills DEBATED: a template fill that the check replaced is not counted, though its
+`ANSWERS_FILLED` mark stays in `mapMarks` (which counts fills MADE, from any source). The block's `mapCallsByStep` gains
+`check`, and `report.md` gains an "answer check" line (engine 2 only) and a "map fallbacks" line.
 
 Map calls also count everywhere else, like any other call:
 

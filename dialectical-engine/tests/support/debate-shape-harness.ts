@@ -4,9 +4,14 @@
 // completed (`runShapeDebate`, pre-flight PF-B53: P2L Task 17 calls it too). Plan Task 15 Step 1, written in Task 13.
 import { createHash } from "node:crypto";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { mapContractNameOf, mapPromptContractHash } from "@debateai/map";
+import { MAP_ENGINE_CONTRACT_IDS, mapContractNameOf, mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
-import { debateShapePolicyStartValues, resolveDebateShape, type DebateShapeCeilingInput, type DebateShapePlanKey, type LengthGuidance } from "@debateai/register";
+import {
+  debateShapePolicyStartValues, engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveDebateShape,
+  resolveLengthGuidance, type DebateShapeCeilingInput, type DebateShapePlanKey, type LengthGuidance
+} from "@debateai/register";
+import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
+import { engineMapScriptedContent, type EngineMapScriptOptions } from "./engine-map-script.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import {
   OWNER_CALL_CONCURRENCY, PANEL_REFS, RUN_RESILIENCE, type AdmittedRun, type PreviewGates, type PreviewRunnerMoney,
@@ -66,6 +71,23 @@ const lockedCodeOf = (chat: string): string | null => {
 };
 const mapProseOf = (chat: string) => lockedCodeOf(chat)?.split("-")[0]?.toLowerCase() === "ro" ? MAP_PROSE.ro : MAP_PROSE.en;
 
+/**
+ * Engine redesign R3 (Task 17): the map numbers its items in an order seeded by the RUN id (packages/map/src/items.ts
+ * `mapAssignItemIds`, seed `run.runId`), so the merge is shown the same points and answers in another order on every run,
+ * and the engine script's merge (which groups and numbers in the order shown) would argue other answers with other points
+ * each run. The harness hands the script the merge's points and candidate answers in text order instead, so the scripted
+ * map, and every judge's material after it, depends on what was raised, never on the run's seed: a debate on a fixed
+ * question argues the same map every run (ruling W4's fixed question, tests/integration/r2-engine-debate.test.ts).
+ */
+function inTextOrder(material: Readonly<{ contractId: string; fields: readonly FramedMaterialField[] }>): readonly FramedMaterialField[] {
+  if (material.contractId !== MAP_ENGINE_CONTRACT_IDS.merge) return material.fields;
+  // By text; two items of the same text keep the order shown (their ids say nothing the merge needs).
+  const sorted = (content: string, text: "claim" | "answer") => JSON.stringify((JSON.parse(content) as Record<string, string>[])
+    .sort((a, b) => (a[text]! < b[text]! ? -1 : a[text]! > b[text]! ? 1 : 0)));
+  return material.fields.map((entry) => entry.name === "points" ? { ...entry, content: sorted(entry.content, "claim") }
+    : entry.name === "candidate_answers" ? { ...entry, content: sorted(entry.content, "answer") } : entry);
+}
+
 export type ShapeScriptOptions = Readonly<{
   fail?: ReadonlySet<"ANGLES" | "MERGE" | "CHOOSE" | "LISTS_BUT_ONE" | "CHOOSE_ONE_ANSWER">;
   stopAt?: "MERGE"; stopCloseCallAfter?: number; reviews?: "agree" | "dispute"; panelSpread?: boolean;
@@ -76,6 +98,8 @@ export type ShapeScriptOptions = Readonly<{
   stopCloseCallSkip?: number;
   /** How many of the merged answers the choose names (default 3; plan Task 15's SHARE case names all four). */
   chooseAnswers?: number;
+  /** Engine redesign R3: how the scripted engine-2 map answers (failed checks, reserves). */
+  engineMap?: EngineMapScriptOptions;
 }>;
 
 /**
@@ -95,7 +119,11 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
   const spreadLow = new Map<string, string>();
   return (request: GateRequest, chat: string): GateOverride | null => {
     if (request.kind === "MAP") {
-      const contractId = readFramedMaterial(wirePacket(chat)).contractId;
+      const material = readFramedMaterial(wirePacket(chat));
+      // Engine redesign R3: an engine-2 map contract (map.*.v2, map.check.v1) is answered by the engine script.
+      const engineReply = engineMapScriptedContent(material.contractId, inTextOrder(material), options.engineMap ?? {});
+      if (engineReply !== null) return fail.has("CHOOSE") && material.contractId === "map.choose.v2" ? { content: "not json" } : { content: engineReply };
+      const contractId = material.contractId;
       // LG-C Task 14: today's map contract or its length variant, by name (Task 17's lengthed shaped run).
       const mapName = mapContractNameOf(contractId);
       const prose = mapProseOf(chat);
@@ -194,6 +222,8 @@ export type ShapeDebateOptions = Readonly<{
   money?: PreviewRunnerMoney;
   /** LG-C Task 17: the length row's numbers frozen on the receipt; absent, today's receipt. */
   length?: LengthGuidance;
+  /** Engine redesign R3: admit with engine 2 (and the length row it needs), run with the engine seal. */
+  engine?: true;
 }>;
 /** One captured framed packet: its system message and its fenced material fields (P2L Task 17). */
 export type ShapePrompt = Readonly<{ system: string; fields: readonly FramedMaterialField[] }>;
@@ -252,11 +282,17 @@ export async function runShapeDebate(harness: ShapeDebateHarness, options: Shape
   const settings: DebateShapeSettings = options.settings ?? { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" };
   const depth = options.depth ?? 1;
   const shape = shapeForTest({ plan: options.plan ?? "free", makers: PANEL_REFS.length, settings });
+  // Engine redesign R3: engine 2 needs the length row; LG-C's own `length` option wins when given.
+  const length = options.length ?? (options.engine === true
+    ? resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: options.plan ?? "free", answerLength: settings.answerLength }) : undefined);
+  const engine = options.engine === true
+    ? engineSettingsOf(engineVersionPolicyStartValues(), { makers: PANEL_REFS.length, mapOpening: true }) : undefined;
   const debate = await harness.admittedRun(options.label ?? "shape", {
     panelRefs: PANEL_REFS, depth, shape, settings,
     ...(options.language === undefined ? {} : { language: options.language }),
     ...(options.question === undefined ? {} : { question: options.question }),
-    ...(options.length === undefined ? {} : { length: options.length })
+    ...(length === undefined ? {} : { length }),
+    ...(engine === undefined ? {} : { engine })
   });
   const scripted = scriptedShapeAnswers(debate.question, options.script ?? {});
   const before = options.before;
@@ -267,7 +303,8 @@ export async function runShapeDebate(harness: ShapeDebateHarness, options: Shape
     debateShape: { mapContractHash: mapPromptContractHash() },
     ...(options.stoppingPolicy === undefined ? {} : { stoppingPolicy: options.stoppingPolicy }),
     ...(options.resilience === true ? { resilience: RUN_RESILIENCE } : {}),
-    ...(options.money === undefined ? {} : { money: options.money })
+    ...(options.money === undefined ? {} : { money: options.money }),
+    ...(options.engine === true ? { engine: { engineContractHash: engineContractHash() } } : {})
   });
   const result = await harness.completedRun(composed, debate, gates);
   return { debate, gates, shape, result, calls: await harness.modelCalls(debate.runId), prompts: framedPromptsOf(gates.requests) };

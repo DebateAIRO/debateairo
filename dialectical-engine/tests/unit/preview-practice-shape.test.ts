@@ -288,7 +288,9 @@ const FACTS: PracticeShapeFacts = Object.freeze({
   sizes: SIZES,
   marks: { "CHOOSE_QUOTA_FILLED": 1, "PANEL-CLOSE-CALL-EXTENDED": 3, "SCRUTINY-EXTENDED": 2, "PANEL-PARTIAL": 1 },
   choice: { opening: "MAP", answers: 2, alsoRaised: 7 },
-  mapCallSiteKeys: ["MAP:angles", "MAP:list:0", "MAP:list:1", "MAP:list:1:2", "MAP:merge", "MAP:gap:1", "MAP:choose"]
+  mapCallSiteKeys: ["MAP:angles", "MAP:list:0", "MAP:list:1", "MAP:list:1:2", "MAP:merge", "MAP:gap:1", "MAP:choose"],
+  // R3: the map's answer check step and blocks
+  answerCheckCodes: null, checkPremiseExempt: null, assumptionsPerAnswer: null,
 });
 const blockOf = (facts: PracticeShapeFacts | null, unreadable?: string) => practiceShapeBlock({ source: "FLAG", registerVersion: "6", row: "ADDED",
   asked: { scrutiny: "deep" }, facts, ...(unreadable === undefined ? {} : { unreadable }) });
@@ -299,7 +301,9 @@ describe("practice debate shape: what the run did", () => {
       source: "FLAG", registerVersion: "6", row: "ADDED", asked: { depthMode: null, scrutiny: "deep", answerLength: null },
       storedDepthParams: FACTS.storedDepthParams, sizes: SIZES, opening: "ANGLE_MAP", mapMarks: { CHOOSE_QUOTA_FILLED: 1 },
       chosenAnswers: 2, alsoRaised: 7, panelCloseCallExtensions: 3, scrutinyExtensions: 2,
-      mapCallsByStep: { angles: 1, list: 3, merge: 1, gap: 1, choose: 1 }, notExercised: null
+      // R3: the map's answer check step and blocks
+      answerCheck: null, mapFallbacks: { merge: 0, choose: 0 },
+      mapCallsByStep: { angles: 1, list: 3, merge: 1, gap: 1, choose: 1, check: 0 }, notExercised: null
     });
   });
 
@@ -323,7 +327,9 @@ describe("practice debate shape: what the run did", () => {
     // Refused at the ask: the verdict already fails the run; the block only says nothing ran.
     expect(blockOf(null)).toEqual({ source: "FLAG", registerVersion: "6", row: "ADDED", asked: { depthMode: null, scrutiny: "deep", answerLength: null },
       storedDepthParams: null, sizes: null, opening: null, mapMarks: {}, chosenAnswers: null, alsoRaised: null, panelCloseCallExtensions: 0,
-      scrutinyExtensions: 0, mapCallsByStep: { angles: 0, list: 0, merge: 0, gap: 0, choose: 0 }, notExercised: null });
+      // R3: the map's answer check step and blocks
+      answerCheck: null, mapFallbacks: { merge: 0, choose: 0 },
+      scrutinyExtensions: 0, mapCallsByStep: { angles: 0, list: 0, merge: 0, gap: 0, choose: 0, check: 0 }, notExercised: null });
   });
 
   it("a shape run that did not exercise the shape is NOT_PROVEN, never PASS", () => {
@@ -346,7 +352,8 @@ describe("practice debate shape: what the run did", () => {
     expect(markdown).toContain("- asked: depth mode default, scrutiny deep, answer length default; stored: "
       + "{\"depth\":1,\"depthMode\":\"adaptive\",\"scrutiny\":\"standard\",\"answerLength\":\"standard\"}");
     expect(markdown).toContain("- opening used: ANGLE_MAP");
-    expect(markdown).toContain("- map calls (every try, as the ledger recorded them): angles 1, list 3, merge 1, gap 1, choose 1");
+    // R3: the map's answer check step and blocks
+    expect(markdown).toContain("- map calls (every try, as the ledger recorded them): angles 1, list 3, merge 1, gap 1, choose 1, check 0");
     expect(markdown).toContain("- chosen answers: 2; also raised, not debated: 7");
     expect(markdown).toContain("- map marks: CHOOSE_QUOTA_FILLED x1");
     // Pre-flight PF-D19 (T14-P): the close call called for extra graders; one that then failed still leaves the mark.

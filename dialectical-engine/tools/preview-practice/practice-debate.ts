@@ -42,6 +42,7 @@ import {
   PRACTICE_ISSUE_LIST,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceMapEngineOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
   practiceModelOfRef,
@@ -86,6 +87,7 @@ import {
 import { composePracticeRunner } from "./practice-runner-composition.js";
 import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
 import {
+  practiceCheckEmptyReasons,
   practiceMapReaders,
   practiceShapeBlock,
   readPracticeMap,
@@ -492,6 +494,12 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     const messages = await promptMessagesOf(attemptId);
     return messages === null ? false : practiceMapLengthedOf(messages);
   };
+  /** Engine redesign R3: a map call asked under an engine-2 contract, from its own prompt (read by engine 2's readings only). */
+  const mapEngineOf = async (attemptId: string | null, callSiteKey: string): Promise<boolean> => {
+    if (!callSiteKey.startsWith("MAP:")) return false;
+    const messages = await promptMessagesOf(attemptId);
+    return messages === null ? false : practiceMapEngineOf(messages);
+  };
   // LG-A (L32): a structure-repair try joins the call it repairs (`practiceTryJoiner`).
   const joinTry = practiceTryJoiner();
   const records: PracticeTryRecord[] = [];
@@ -546,7 +554,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
       // Refused-repair salvage: A1's drops are recorded on the artifact only (re-reading the raw reply would miss them).
       const repair = recordedSalvageRepairs(artifact.reply_repairs) ?? practiceJsonRepairOf(replyContentOf(stored.rawText),
         practiceFinishReasonOf(artifact.metadata_json), entry.call_site_key, await mapKeyPointIdsOf(entry.attempt_id, entry.call_site_key),
-        await mapLengthedOf(entry.attempt_id, entry.call_site_key));
+        await mapLengthedOf(entry.attempt_id, entry.call_site_key), await mapEngineOf(entry.attempt_id, entry.call_site_key));
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
     let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;
@@ -559,7 +567,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
         issues: issueListFromParseError(stored.parseErrorDetail),
         recheckIssues: replyForm === "PATCH" ? [] : recheckReply(entry.call_site_key, content, await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),
-          await mapLengthedOf(entry.attempt_id, entry.call_site_key)).issues,
+          await mapLengthedOf(entry.attempt_id, entry.call_site_key), await mapEngineOf(entry.attempt_id, entry.call_site_key)).issues,
         replyForm, latencyMs, replyText: reportableReplyText(content), fixedBySameCall: false
       }));
     }
@@ -768,8 +776,10 @@ export async function runPracticeDebate(input: Readonly<{
     const languageOutcomes: (QuestionLanguageLock | QuestionLanguageChoiceNeeded)[] = [];
     const shapeSource = input.shape !== undefined && input.shape.policy !== null ? "FLAG" as const
       : shapeRow !== null ? "REGISTER" as const : null;
-    const shapeBlockOf = (source: PracticeShapeSource, facts: PracticeShapeFacts | null, unreadable?: string): PracticeShapeBlock =>
-      practiceShapeBlock({ source, registerVersion, row: shapeRowChange, asked, facts, ...(unreadable === undefined ? {} : { unreadable }) });
+    const shapeBlockOf = (source: PracticeShapeSource, facts: PracticeShapeFacts | null, unreadable?: string,
+      checkEmptyReasons?: number): PracticeShapeBlock =>
+      practiceShapeBlock({ source, registerVersion, row: shapeRowChange, asked, facts, ...(unreadable === undefined ? {} : { unreadable }),
+        ...(checkEmptyReasons === undefined ? {} : { checkEmptyReasons }) });
     // Content encryption ON, as on the live preview, with a key that lives only in this process.
     const users = new PracticeUserDekStore();
     configureContentEncryption(pool, new ContentCipher(new MemoryRunContentKeyStore(users, async (ownerRef) => {
@@ -1006,7 +1016,9 @@ export async function runPracticeDebate(input: Readonly<{
     let shape: PracticeShapeBlock | undefined;
     if (shapeSource !== null) {
       try {
-        shape = shapeBlockOf(shapeSource, await readPracticeShapeFacts(pool, job.runId, answerId, practiceMapReaders(pool)));
+        // Carried from Task 4: the check's refused empty reasons, from the refused tries' own issues (shown only with a check).
+        shape = shapeBlockOf(shapeSource, await readPracticeShapeFacts(pool, job.runId, answerId, practiceMapReaders(pool)), undefined,
+          practiceCheckEmptyReasons(collected.failures));
       } catch (error) {
         shape = shapeBlockOf(shapeSource, null, codeOf(error));
         progress(`debate shape: what the run did could not be read (${codeOf(error)})`);

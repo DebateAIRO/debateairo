@@ -426,6 +426,8 @@ export function debateReport(input: Readonly<{
       ...(r.storyEngine === undefined ? {} : { engine: Object.freeze({ engine: r.storyEngine.engine }) }) }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
+    // INTERFACE §15.4 (R3): the answer check and the map's fallbacks, top-level for the proof's jq lines.
+    ...(r.shape === undefined ? {} : { mapFallbacks: r.shape.mapFallbacks, ...(r.shape.answerCheck === null ? {} : { answerCheck: r.shape.answerCheck }) }),
     // Length guidance: only when the debate ran with a length row; absent otherwise (today's keys).
     ...(r.length === undefined ? {} : { length: r.length }),
     // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).

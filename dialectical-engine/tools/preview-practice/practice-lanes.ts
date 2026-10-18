@@ -33,13 +33,18 @@ import {
   type JudgeLeg
 } from "@debateai/judgement";
 import {
+  MAP_ENGINE_CONTRACT_IDS,
+  MAP_ENGINE_REPLY_SCHEMAS,
   MAP_LENGTH_CONTRACT_IDS,
   MAP_LENGTHED_REPLY_SCHEMAS,
   mapAnglesReplySchema,
   mapAnglesSalvage,
+  mapAnglesSalvageEngine,
   mapAnglesSalvageLengthed,
+  mapCheckSalvage,
   mapChooseReplySchema,
   mapChooseSalvage,
+  mapChooseSalvageV2,
   mapClassifyReply,
   mapGapReplySchema,
   mapGapSalvage,
@@ -201,7 +206,7 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
 }
 
 /** The map's steps as their call-site keys name them (spec 2026-10-12 §3.4). */
-export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap", "choose"] as const);
+export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap", "choose", "check"] as const);
 export type PracticeMapStep = typeof PRACTICE_MAP_STEPS[number];
 
 /**
@@ -235,7 +240,9 @@ const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMa
   list: [{ schema: mapListReplySchema, salvage: () => mapListSalvage }, { schema: mapSnowballReplySchema, salvage: () => mapListSalvage }],
   merge: [{ schema: mapMergeReplySchema, salvage: () => mapMergeSalvage }],
   gap: [{ schema: mapGapReplySchema, salvage: () => mapGapSalvage }],
-  choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
+  choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }],
+  // Engine redesign R3: engine 1 has no check step, so a MAP:check reply read here is UNMAPPED (pre-flight PF-R35.15).
+  check: []
 });
 
 /** Length guidance (spec 2026-10-15 §3.9): a lengthed map call's readings: the runaway-limit schemas, no trims, ids still normalised. */
@@ -245,20 +252,34 @@ const MAP_RECHECK_READINGS_LENGTHED: Readonly<Record<PracticeMapStep, readonly P
     { schema: MAP_LENGTHED_REPLY_SCHEMAS.snowball, salvage: () => mapListSalvageLengthed }],
   merge: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.merge, salvage: () => mapMergeSalvage }],
   gap: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.gap, salvage: () => mapGapSalvageLengthed }],
-  choose: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.choose, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }]
+  choose: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.choose, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }],
+  // Engine redesign R3: engine 1 has no check step, so a MAP:check reply read here is UNMAPPED (pre-flight PF-R35.15).
+  check: []
+});
+
+/** Engine redesign R3: engine 2's readings (runaway limits; the v2 forms), the once-built schemas (pre-flight PF-R3-2.10). */
+const ENGINE_READING = MAP_ENGINE_REPLY_SCHEMAS;
+const ENGINE_MAP_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMapReading[]>> = Object.freeze({
+  angles: [{ schema: ENGINE_READING.angles, salvage: () => mapAnglesSalvageEngine }],
+  list: [{ schema: ENGINE_READING.list, salvage: () => mapListSalvageLengthed }, { schema: ENGINE_READING.snowball, salvage: () => mapListSalvageLengthed }],
+  merge: [{ schema: ENGINE_READING.merge, salvage: () => mapMergeSalvage }],
+  gap: [{ schema: ENGINE_READING.gap, salvage: () => mapGapSalvageLengthed }],
+  choose: [{ schema: ENGINE_READING.choose, salvage: (keyPointIds) => mapChooseSalvageV2(keyPointIds) as MapReplySalvage<unknown> }],
+  check: [{ schema: ENGINE_READING.check, salvage: () => mapCheckSalvage }]
 });
 
 /**
  * The step's readings in order: the first that accepts the reply, else the first refusal. Null for a key that is no map
  * step. `lengthed`: the call was asked under a length variant (`practiceMapLengthedOf`), so its reply is read with the
- * runaway limits and the lengthed salvages.
+ * runaway limits and the lengthed salvages. `engine` (engine redesign R3): the call was asked under an engine-2 contract
+ * (`practiceMapEngineOf`), so its reply is read by engine 2's readings ONLY, and an engine-1 reply reads exactly as before.
  */
 function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFacts | undefined,
-  keyPointIds: ReadonlySet<string> | null, lengthed = false): ReturnType<typeof mapClassifyReply<unknown>> | null {
+  keyPointIds: ReadonlySet<string> | null, lengthed = false, engine = false): ReturnType<typeof mapClassifyReply<unknown>> | null {
   const step = practiceMapStepOf(callSiteKey);
   if (step === null) return null;
   let first: ReturnType<typeof mapClassifyReply<unknown>> | null = null;
-  for (const reading of (lengthed ? MAP_RECHECK_READINGS_LENGTHED : MAP_RECHECK_READINGS)[step]) {
+  for (const reading of (engine ? ENGINE_MAP_READINGS : lengthed ? MAP_RECHECK_READINGS_LENGTHED : MAP_RECHECK_READINGS)[step]) {
     const read = mapClassifyReply(content, ending, reading.schema, () => [], reading.salvage(keyPointIds));
     if (read.classification.parseStatus === "PARSED") return read;
     first ??= read;
@@ -266,9 +287,12 @@ function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFa
   return first;
 }
 
-/** `lengthed`: the call was asked under a map length variant, so its reply is re-checked under the lengthed limits (Task 14 review 4). */
-function recheckMapReply(callSiteKey: string, content: string, lengthed: boolean): readonly string[] {
-  const read = readMapReply(callSiteKey, content, undefined, null, lengthed);
+/**
+ * `lengthed`: the call was asked under a map length variant, so its reply is re-checked under the lengthed limits (Task 14
+ * review 4). `engine` (R3): an engine-2 call, re-checked by engine 2's readings only.
+ */
+function recheckMapReply(callSiteKey: string, content: string, lengthed: boolean, engine = false): readonly string[] {
+  const read = readMapReply(callSiteKey, content, undefined, null, lengthed, engine);
   return read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification);
 }
 
@@ -289,9 +313,20 @@ export function practiceMapKeyPointIdsOf(messages: PromptPacket["messages"]): Re
   }
 }
 
-/** A recorded map call was asked under a length variant (its prompt's contract id): its reply is read with the runaway limits. */
+/**
+ * A recorded map call was asked under a length variant (its prompt's contract id): its reply is read with the runaway
+ * limits. Engine redesign R3: an engine-2 call is always lengthed (pre-flight PF-R35.15).
+ */
 export function practiceMapLengthedOf(messages: Parameters<typeof practiceMapKeyPointIdsOf>[0]): boolean {
-  try { return Object.values(MAP_LENGTH_CONTRACT_IDS).includes(readPromptFrame({ messages } as PromptPacket).contractId); }
+  try {
+    const contractId = readPromptFrame({ messages } as PromptPacket).contractId;
+    return Object.values(MAP_LENGTH_CONTRACT_IDS).includes(contractId) || (Object.values(MAP_ENGINE_CONTRACT_IDS) as string[]).includes(contractId);
+  } catch { return false; }
+}
+
+/** Engine redesign R3: a recorded map call was asked under an engine-2 contract (its prompt's contract id). */
+export function practiceMapEngineOf(messages: Parameters<typeof practiceMapKeyPointIdsOf>[0]): boolean {
+  try { return (Object.values(MAP_ENGINE_CONTRACT_IDS) as string[]).includes(readPromptFrame({ messages } as PromptPacket).contractId); }
   catch { return false; }
 }
 
@@ -303,7 +338,7 @@ export function practiceMapLengthedOf(messages: Parameters<typeof practiceMapKey
  * report, never a reason for a verdict.
  */
 export function practiceJsonRepairOf(content: string, finishReason: unknown, callSiteKey?: string,
-  mapKeyPointIds?: ReadonlySet<string> | null, mapLengthed = false): string | null {
+  mapKeyPointIds?: ReadonlySet<string> | null, mapLengthed = false, mapEngine = false): string | null {
   const ending: ModelReplyFacts = { finishReason: typeof finishReason === "string" ? finishReason : null };
   // LG-A (L32): a structure-repair try (`REPAIR:STRUCTURE:<key>`) is read as the step it repairs.
   const key = callSiteKey === undefined ? undefined : structureRepairOriginalKey(callSiteKey);
@@ -311,7 +346,8 @@ export function practiceJsonRepairOf(content: string, finishReason: unknown, cal
   // it needed is named, joined by "+" ("INNER_QUOTE+MAP_TEXT_TRIMMED"). A reply that reading refuses (a patch reply holds
   // only the patched members) is read by the shared decode, as before.
   // Length guidance (spec 2026-10-15 §3.9): a call asked under a map length variant is read with the runaway limits.
-  const map = key === undefined ? null : readMapReply(key, content, ending, mapKeyPointIds ?? null, mapLengthed);
+  // Engine redesign R3: an engine-2 map call is read by engine 2's readings only.
+  const map = key === undefined ? null : readMapReply(key, content, ending, mapKeyPointIds ?? null, mapLengthed, mapEngine);
   if (map !== null && map.classification.parseStatus === "PARSED") return map.repairs.length === 0 ? null : map.repairs.join("+");
   // MiMo salvage (2026-10-12): the judge-family steps also make SHAPE repairs (NESTED_FIELDS, RENAMED_MEMBER,
   // UNASKED_KEYS, EMPTY_LIST) that the schema-blind decode cannot see, so with its call-site key a judge, panel or
@@ -475,10 +511,11 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
  * `practiceReviewEdgeCountOf`) when the caller has it, else the reply's own `edge_bearings` length, so only a length
  * mismatch is not re-detected (the stored detail still names it); a reply with no list and no known count is not read
  * as [] (MiMo salvage EMPTY_LIST needs a node with no edges). `mapLengthed`: a map call asked under a length variant
- * (`practiceMapLengthedOf`), re-checked under the lengthed limits as the live call read it.
+ * (`practiceMapLengthedOf`), re-checked under the lengthed limits as the live call read it. `mapEngine` (engine redesign
+ * R3): a map call asked under an engine-2 contract (`practiceMapEngineOf`), re-checked by engine 2's readings only.
  */
 export function recheckReply(callSiteKey: string, content: string, reviewEdgeCount?: number | null,
-  mapLengthed = false): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
+  mapLengthed = false, mapEngine = false): Readonly<{ family: PracticeCallFamily; issues: readonly string[] }> {
   const family = callFamilyOf(callSiteKey);
   // LG-A (L32): a structure-repair try is checked as the step it repairs; its own family stays STRUCTURE_REPAIR.
   const key = structureRepairOriginalKey(callSiteKey);
@@ -505,7 +542,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       if (fixed !== null && StoryBodySchema.safeParse(fixed.value).success) return { family, issues: Object.freeze([]) };
       return { family, issues: fromZod(read) };
     }
-    case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed) };
+    case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed, mapEngine) };
     // R2 (B11; A17 review Minor 4): the investigator and the comparing judges, through their step's own schema and
     // reading. The investigator's one content rule needs nothing but the reply; the judges' letter and group checks need
     // the letters that judge was shown, and the language check the question: not re-run here (the stored detail names them).

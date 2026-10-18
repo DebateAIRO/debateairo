@@ -36,6 +36,7 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceMapEngineOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
   practiceModelOfRef,
@@ -316,7 +317,9 @@ export function buildTranscriptAttempts(input: Readonly<{
     const jsonRepair = entry.outcome === "OK" && content !== null
       ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds,
         // Length guidance (spec 2026-10-15 §3.9): a map call asked under a length variant is re-read with the runaway limits.
-        messageList !== null && practiceMapLengthedOf(messageList as Parameters<typeof practiceMapLengthedOf>[0])) : null;
+        messageList !== null && practiceMapLengthedOf(messageList as Parameters<typeof practiceMapLengthedOf>[0]),
+        // Engine redesign R3: an engine-2 map call is re-read by engine 2's readings only.
+        messageList !== null && practiceMapEngineOf(messageList as Parameters<typeof practiceMapEngineOf>[0])) : null;
     return Object.freeze({
       sequence: Number(entry.sequence),
       ledgerEntryId: entry.ledgerEntryId,

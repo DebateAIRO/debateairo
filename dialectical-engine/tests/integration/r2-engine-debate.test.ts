@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { migrate, ServeDisclosureRepository } from "@debateai/db";
 // (pre-flight PF-R2b7.20) B3's rule name, imported, never restated.
 import { ENGINE2_REDUCER_VERSION, SERVED_ROOT_SELECTION_RULE_JUDGES } from "@debateai/kernel";
-import { mapPromptContractHash } from "@debateai/map";
+import { MAP_ENGINE_CONTRACT_IDS, MapChoiceRepository, mapPromptContractHash } from "@debateai/map";
 import {
   ENGINE_VERSION_POLICY_ROW_KEY, engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues,
   resolveLengthGuidance
@@ -21,12 +21,13 @@ import type { RotatedRoles } from "@debateai/scorecard";
 import { ServeRepository } from "@debateai/serve";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { scriptedShapeAnswers, shapeForTest } from "../support/debate-shape-harness.js";
+import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import {
   DEEPSEEK, FIVE_MAKER_REFS, GLM, HAIKU, INCIDENT_PIN, MIMO, OWNER_CALL_CONCURRENCY, PANEL_REFS, QWEN, RUN_RESILIENCE, configured,
   previewDebateHarness
 } from "../support/preview-debate-harness.js";
 import {
-  comparingJudgeLettersShown, stubComparingJudgeVote, stubPointInvestigation, type GateOverride, type GateRequest
+  comparingJudgeLettersShown, stubChatBody, stubComparingJudgeVote, stubPointInvestigation, type GateOverride, type GateRequest
 } from "../support/preview-gate-stubs.js";
 import { requestedReviewEdges, reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import { scriptedAnswers } from "../support/scripted-answers.js";
@@ -185,6 +186,33 @@ describe("engine 2 end to end (spec §14.2)", () => {
       expect(story).toMatchObject({ outcome: "READY" });
       expect(story!.verdictBasis).toMatchObject({ label, rung: 5, winner_node_id: receipt.servedNodeId });
       if (shaped) {
+        // Controller ruling R3-T14.2 (binding, R3 Task 17): the new shape under engine 2 drives the REAL v2 map. The gate
+        // answered every request (an "unexpected" one is a vendor 500 that leaves the map unavailable, so the run argues
+        // today's opening), no map step fell back, choose v2 was answered, the check ran exactly once and stored a code for
+        // every id it was shown, and the positions were asked under engine 2's position contract.
+        const material = (request: GateRequest) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
+        expect(run.gates.requests.filter((request) => request.answer === "UNEXPECTED").map((request) => request.kind)).toEqual([]);
+        expect(marksOf(answer!).filter((mark) => /^MAP_.*_FALLBACK$/u.test(mark))).toEqual([]);
+        const mapRequests = run.gates.requests.filter((request) => request.kind === "MAP" && request.answer === "OK");
+        expect(mapRequests.filter((request) => material(request).contractId === MAP_ENGINE_CONTRACT_IDS.choose)).toHaveLength(1);
+        expect((await callKeys(runId)).filter((key) => key === "MAP:check")).toHaveLength(1);
+        const checkRequests = mapRequests.filter((request) => material(request).contractId === MAP_ENGINE_CONTRACT_IDS.check);
+        expect(checkRequests).toHaveLength(1);
+        const shown = (JSON.parse(material(checkRequests[0]!).fields.find((field) => field.name === "answers")!.content) as { check_id: string }[])
+          .map((entry) => entry.check_id);
+        expect(shown.length).toBeGreaterThanOrEqual(2);
+        const check = await new MapChoiceRepository(database.pool).readMapAnswerCheckForRun(runId);
+        expect([...check!.codes].sort()).toEqual(shown.map((id) => `${id}:PASSED`).sort());
+        const positions = run.gates.requests.filter((request) => request.kind === "JUDGE"
+          && material(request).contractId.startsWith("judge.assigned-root."));
+        expect(positions.length).toBeGreaterThan(0);
+        for (const request of positions) expect(material(request).contractId).toMatch(/^judge\.assigned-root\.(unknown|resolved)\.v2$/u);
+        // R3 Task 17 — OPEN, FOR THE CONTROLLER'S RULING (task-17-report.md, "W4"): now that this case runs the REAL v2 map,
+        // the map's item order and the seats that grade, review and attack each node follow the RUN id (mapAssignItemIds,
+        // seatRotationOffset), so the fixed question no longer fixes the strength leader. Measured: with the harness's
+        // text-ordered merge (debate-shape-harness.ts `inTextOrder`) this case passed 14 of 15 runs; of six logged
+        // margins, five were -0.32 to -0.19 and one +0.004 (the failure). Before it, the sign changed run to run. These W4
+        // lines are kept unchanged, never weakened, until the ruling.
         // Ruling W4 (B12 Minor 1, whole-branch review): the judges' winner is NOT the strength leader here (its strongest
         // rival finished above it, so the receipt's margin is negative), and the served answer, the label and the story's
         // material all follow the judges' winner, never the leader.
@@ -198,8 +226,12 @@ describe("engine 2 end to end (spec §14.2)", () => {
           runner_up_node_id: runnerUp!.nodeId });
         expect(story!.verdictBasis!.margin!).toBeLessThan(0);
         expect(story!.shapeId).toBe("factual");
-        // The ring (A5): one cross-reply per answer, as before.
-        expect((await callKeys(runId, "OK")).filter((key) => key.startsWith("JUDGE:cross-root:"))).toHaveLength(run.shape!.answers);
+        // The ring (A5): one cross-reply per answer, as before. R3 Task 17 (ruling R3-T14.2): the case now argues the REAL
+        // v2 map's answers, so "per answer" is per answer the map chose (the scripted choose names two), no longer the
+        // receipt's planned count (`run.shape.answers`, 3), which held only while the map was unavailable.
+        const chosen = (await new MapChoiceRepository(database.pool).readMapChoiceForRun(runId))!;
+        expect(chosen.opening).toBe("MAP");
+        expect((await callKeys(runId, "OK")).filter((key) => key.startsWith("JUDGE:cross-root:"))).toHaveLength(chosen.answers.length);
       }
     }, 15 * 60 * 1000);
 

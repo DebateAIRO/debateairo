@@ -18,9 +18,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
-import { mapContractNameOf } from "@debateai/map";
+import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
 import { COMPARING_JUDGE_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
 import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
+import { engineMapScriptedContent } from "./engine-map-script.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
@@ -246,6 +247,9 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
  */
 export function stubMapContent(chat: string, serial: number): string {
   const frame = readFramedMaterial(wirePacket(chat));
+  // Engine redesign R3: an engine-2 map contract (map.*.v2, map.check.v1) is answered by the engine script; engine 1's
+  // ids (v1 and lengthed) read below exactly as before.
+  const engineReply = engineMapScriptedContent(frame.contractId, frame.fields); if (engineReply !== null) return engineReply;
   if (mapContractNameOf(frame.contractId) === "angles") {
     const locked = frame.fields.find((entry) => entry.name === "question_language")?.content;
     const code = locked === undefined ? null : (JSON.parse(locked) as { code?: unknown }).code;
@@ -390,6 +394,9 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === STORY_CHECKER_CONTRACT_ID || contractId === STORY_CHECKER_V4_CONTRACT_ID) return "STORY_CHECKER";
   // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
   if (mapContractNameOf(contractId) !== null) return "MAP";
+  // Engine redesign R3 (controller ruling R3-T14.2): engine 2's map contracts (map.*.v2, map.check.v1) are map requests too;
+  // unclassified, each was answered as an unexpected request (a vendor 500), so the map was unavailable.
+  if (mapEngineContractNameOf(contractId) !== null) return "MAP";
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
   // Engine redesign R2 (plan Task B12): the comparing judge and the point investigation, by their contract ids, before
   // any instruction sniffing (their instructions name none of the keys below).
