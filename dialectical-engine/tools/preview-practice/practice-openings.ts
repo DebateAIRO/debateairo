@@ -343,7 +343,10 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
         maxAnswers: OPENINGS_MAP_SIZES.maxAnswers, pointsPerAnswer: OPENINGS_MAP_SIZES.pointsPerAnswer,
         ...practiceWordingMapExtras(arm),
         // Ruling R3-T17a.2: a practice refusal in the caller (the engine seal missing, wording N's base moved) is rethrown,
-        // never turned into a failed call and a map fallback.
+        // never turned into a failed call and a map fallback. Known limit (re-review N5): the map starts a step's list calls
+        // in one synchronous batch, and a rethrow does not cancel the batch's siblings. Safe today: both refusals throw
+        // before any gateway call, and every call of one batch shares one contract and one base, so a batch refuses whole
+        // (nothing of it is sent). A refusal that could hit only some siblings would need the map to settle the batch first.
         abandon: (error) => error instanceof PracticeRefusal
       };
       // Task 17a: the engine-2 arms' lines say how many seats they started with (a seat busy in C2 sits out C2N).

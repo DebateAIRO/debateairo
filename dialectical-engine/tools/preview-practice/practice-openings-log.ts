@@ -230,6 +230,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     return [model, Object.freeze({ answered, skipped: mine.length - answered })];
   }));
   const answeredModels = new Set(calls.filter(openingsAnswered).map((call) => call.model));
+  // Ruling R3-T17a.4: an arm that ended on a practice refusal (its PRACTICE_REFUSED note) makes the run NOT_PROVEN.
+  const armsRefused = armLines.flatMap((line) => line.notes.flatMap((note) => (note.note === "PRACTICE_REFUSED"
+    ? [Object.freeze({ arm: line.arm, questionId: line.questionId, code: note.detail })] : [])));
   const formatFailures = calls.filter((call) => call.status === "FORMAT_FAILED").length;
   const failedCalls = calls.filter((call) => call.status === "CALL_FAILED").length;
   const verdict = practiceVerdict({
@@ -248,6 +251,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     gatePauses: gatePauses(ending.observer),
     notExercisedModels: start.models.filter((model) => !answeredModels.has(model) && !busy.includes(model)),
     busyModels: busy,
+    armsRefused: armsRefused.map((refused) => `${refused.arm}:${refused.questionId}:${refused.code}`),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + ending.observer.summary(gate).unbilled, 0),
     p90ByModel: p90ByModel(calls.map((call) => ({ model: call.model, latencies: call.attempts.map((attempt) => attempt.latencyMs) })))
   });
@@ -283,6 +287,8 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     models: start.models, questions: start.questions, questionDigests: start.questionDigests, arms: start.arms, busyModels: busy,
     callsByModel, repairKindsByModel: practiceRepairKindsByModel(tries),
     byArm,
+    // Ruling R3-T17a.4 (N3): each refused arm with its refusal's code (report.md lists them under the per-arm table).
+    ...(armsRefused.length === 0 ? {} : { armsRefused }),
     // Task 17a (D5): wording N's comparison, only when an engine-2 arm ran (the debated answers word for word are for the
     // owner's reading; report.md prints counts only).
     ...(wording.length === 0 ? {} : { wording, wordingTotals: practiceWordingTotals(wording) }),

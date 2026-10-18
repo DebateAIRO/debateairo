@@ -43,10 +43,16 @@ import {
   runPracticeOpenings,
   type OpeningsRunInput
 } from "../../tools/preview-practice/practice-openings.js";
-import { MAP_WORDING_N_ID_SUFFIX } from "../../tools/preview-practice/practice-map-wording.js";
+import { MAP_WORDING_N_ID_SUFFIX, practiceWordingNCaller } from "../../tools/preview-practice/practice-map-wording.js";
 import { reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import { PracticeRefusal } from "../../tools/preview-practice/practice-settings.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
+
+// Fix round 2 (ruling R3-T17a.4): the wording-N wrapper is the real one; one case moves its base for one arm.
+vi.mock("../../tools/preview-practice/practice-map-wording.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../tools/preview-practice/practice-map-wording.js")>();
+  return { ...real, practiceWordingNCaller: vi.fn(real.practiceWordingNCaller) };
+});
 
 const HAIKU = "claude-haiku-5-5";
 const config = openingsDryConfig();
@@ -345,6 +351,18 @@ describe("practice openings: arms C2 and C2N, wording N's comparison (Task 17a, 
       return { status: 200, body: stubVendorReply(provider, model, reply, `engine-${String(sent.length)}`) };
     } });
 
+  /** The run's own log lines, rebuilt from its result, and the report built from them (as openings.jsonl would give). */
+  const reportOf = (result: Pick<Awaited<ReturnType<typeof runPracticeOpenings>>, "calls" | "arms">, questionsFlag: string, armsFlag: string) => {
+    const questions = openingsQuestionsFromFlag(questionsFlag);
+    const lines: OpeningsLogLine[] = [{ kind: "start", schema: OPENINGS_SCHEMA, mode: "openings", dry: true, startedAt: new Date().toISOString(),
+      models: targets.map((target) => target.model), questions: questions.map((question) => question.id),
+      questionDigests: openingsQuestionDigests(questions), arms: openingsArmsFromFlag(armsFlag), busyWaitMs: 0,
+      unsentStreakAtStart: { deepinfra: 0, anthropic: 0 }, remainingBefore: { deepinfra: null, anthropic: null } },
+    ...result.calls.map((call) => ({ kind: "call" as const, call })), ...result.arms.map((arm) => ({ kind: "arm" as const, arm })),
+    { kind: "end", finishedAt: new Date().toISOString(), interrupted: false, remainingAfter: { deepinfra: null, anthropic: null } }];
+    return openingsReportFromLog(lines);
+  };
+
   it("the arms flag and check: C2 and C2N only when named, in the fixed order; anything else refused before a call", async () => {
     expect(openingsArmsFromFlag(undefined)).toEqual(["T", "A", "B", "C"]);
     expect(openingsArmsFromFlag("C2N,T,C2")).toEqual(["T", "C2", "C2N"]);
@@ -428,8 +446,11 @@ describe("practice openings: arms C2 and C2N, wording N's comparison (Task 17a, 
     expect((report.wordingTotals as readonly Readonly<{ arm: string }>[]).map((row) => row.arm)).toEqual(["C2", "C2N"]);
     const markdown = reportMarkdown(report);
     expect(markdown).toContain("Wording N (D5; counts only, the debated answers word for word are in report.json `wording`; C2 the sealed wording, C2N wording N):");
-    expect(markdown).toMatch(/^\| C2 \| 1 \| \d+ \| 0 \| 0 \| 0 \| 0 \| 0 \| \d\.\d \|$/mu);
-    expect(markdown).toMatch(/^\| C2N \| 1 \| \d+ \| 0 \| 0 \| 0 \| 0 \| 0 \| \d\.\d \|$/mu);
+    // The columns: arm, questions, refused, seats (fix round 2, N4), then D1's counts.
+    expect(markdown).toMatch(/^\| C2 \| 1 \| 0 \| 5 \| \d+ \| 0 \| 0 \| 0 \| 0 \| 0 \| \d\.\d \|$/mu);
+    expect(markdown).toMatch(/^\| C2N \| 1 \| 0 \| 5 \| \d+ \| 0 \| 0 \| 0 \| 0 \| 0 \| \d\.\d \|$/mu);
+    expect(report.verdict).toBe("PASS");
+    expect(report.armsRefused).toBeUndefined();
   });
 
   it("ruling R3-T17a.2: an engine-2 arm without the engine seal ends loudly: nothing sent, the arm's note names the refusal", async () => {
@@ -440,5 +461,40 @@ describe("practice openings: arms C2 and C2N, wording N's comparison (Task 17a, 
     expect([line.outcome, line.map, line.marks]).toEqual(["UNAVAILABLE", null, []]);
     expect(line.notes).toEqual([{ note: "PRACTICE_REFUSED", step: "MAP", detail: "PRACTICE_OPENINGS_ENGINE_UNSEALED" }]);
     expect(result.arms.find((arm) => arm.arm === "C")!.outcome).toBe("MAP");
+    // Ruling R3-T17a.4: the refusal reaches the verdict (NOT_PROVEN, never PASS) and report.md names its code (N2, N3).
+    const report = reportOf(result, "en-nuclear", "C,C2");
+    expect([report.verdict, report.exitCode, report.reasons[0]]).toEqual(["NOT_PROVEN", 30, "ARM_REFUSED:C2:en-nuclear:PRACTICE_OPENINGS_ENGINE_UNSEALED"]);
+    expect(report.armsRefused).toEqual([{ arm: "C2", questionId: "en-nuclear", code: "PRACTICE_OPENINGS_ENGINE_UNSEALED" }]);
+    const markdown = reportMarkdown(report);
+    expect(markdown).toContain("- C2, en-nuclear: PRACTICE_OPENINGS_ENGINE_UNSEALED");
+    // Arm C's dry script makes one AI busy for good, so C2 starts with 4 seats: the seats column shows the loss (N4).
+    expect([line.seats, result.busyModels.length]).toEqual([4, 1]);
+    expect(markdown).toMatch(/^\| C2 \| 0 \| 1 \| 4 \| 0 \| 0 \| 0 \| 0 \| 0 \| 0 \| none \|$/mu);
+  });
+
+  it("ruling R3-T17a.4: C2 answers and C2N is refused (wording N's base moved): NOT_PROVEN, never PASS, named by arm, question, code", async () => {
+    const real = await vi.importActual<typeof import("../../tools/preview-practice/practice-map-wording.js")>("../../tools/preview-practice/practice-map-wording.js");
+    // A base that moved: the request reaches the real wrapper with its instruction no longer starting with the shipped text.
+    vi.mocked(practiceWordingNCaller).mockImplementationOnce((inner) => {
+      const wrapped = real.practiceWordingNCaller(inner);
+      return { call: (request) => wrapped.call({ ...request, spec: { ...request.spec,
+        contract: { ...request.spec.contract, instruction: `Moved. ${request.spec.contract.instruction}` } } }) };
+    });
+    const sent: { arm: string; id: string; fields: string; named: boolean }[] = [];
+    let current = "C2";
+    const result = await run("en-nuclear", "C2,C2N", engineScript(sent, () => current), { contractHashes: sealed,
+      onArm: () => { current = "C2N"; } });
+    expect(result.arms.map((line) => [line.arm, line.outcome])).toEqual([["C2", "MAP"], ["C2N", "UNAVAILABLE"]]);
+    expect(result.arms[1]!.notes).toEqual([{ note: "PRACTICE_REFUSED", step: "MAP", detail: "PRACTICE_WORDING_N_BASE_CHANGED" }]);
+    // The angle plan went out (it is not wording N); the first writing step refused, so nothing after it was sent.
+    expect(sent.filter((entry) => entry.arm === "C2N").map((entry) => entry.id)).toEqual(["map.angles.v2"]);
+    expect(result.calls.every((call) => call.status === "ACCEPTED")).toBe(true);
+    const report = reportOf(result, "en-nuclear", "C2,C2N");
+    expect({ verdict: report.verdict, exitCode: report.exitCode, reasons: report.reasons })
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["ARM_REFUSED:C2N:en-nuclear:PRACTICE_WORDING_N_BASE_CHANGED"] });
+    const markdown = reportMarkdown(report);
+    expect(markdown).toContain("- C2N, en-nuclear: PRACTICE_WORDING_N_BASE_CHANGED");
+    expect(markdown).toMatch(/^\| C2 \| 1 \| 0 \| 5 \| \d+ \| 0 \| 0 \| 0 \| 0 \| 0 \| \d\.\d \|$/mu);
+    expect(markdown).toMatch(/^\| C2N \| 0 \| 1 \| 5 \| 0 \| 0 \| 0 \| 0 \| 0 \| 0 \| none \|$/mu);
   });
 });

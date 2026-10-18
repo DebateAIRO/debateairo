@@ -217,7 +217,9 @@ in the sealed wording (C2) and in wording N (C2N: the four answer-writing instru
 lists each question's debated answers word for word with the check's codes; `wordingTotals` and report.md give D1's
 counts per wording (rejections by test, premise challenges exempt, assumptions per answer). The owner reads the answers
 and marks the hedged or circular ones; the wording with fewer of them and fewer check rejections ships (as NEW sealed
-ids, a later task).
+ids, a later task). An arm that hits a practice refusal (the engine seal missing, or wording N's base no longer the
+shipped text) ends at once with no map; report.md lists it under "Refused arms" with its code, its Wording N row counts it
+as refused, and the run reads NOT_PROVEN (exit 30, `ARM_REFUSED:<arm>:<question>:<code>`), never PASS.
 
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls

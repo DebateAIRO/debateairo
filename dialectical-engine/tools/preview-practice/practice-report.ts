@@ -630,17 +630,26 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
-  // Task 17a (D5): wording N's counts per arm (the answers word for word are in report.json `wording`).
-  const wordingTotals = report.wordingTotals as readonly Readonly<{ arm: string; questions: number; checked: number; rejected: number;
-    notAnAnswer: number; addedFact: number; noCost: number; premiseExempt: number; assumptions: readonly number[] }>[] | undefined;
+  // Ruling R3-T17a.4 (N3): each arm that ended on a practice refusal, with the refusal's code (the run reads NOT_PROVEN).
+  const armsRefused = report.armsRefused as readonly Readonly<{ arm: string; questionId: string; code: string }>[] | undefined;
+  if (armsRefused !== undefined && armsRefused.length > 0) {
+    lines.push("Refused arms (each ended on a practice refusal, with no map; the run is NOT_PROVEN):", "",
+      ...armsRefused.map((refused) => `- ${refused.arm}, ${refused.questionId}: ${refused.code}`), "");
+  }
+  // Task 17a (D5): wording N's counts per arm (the answers word for word are in report.json `wording`). A refused arm keeps
+  // its row (N2), and each arm's seats per question are shown (N4), so a seat lost in C2 shows in C2N.
+  const wordingTotals = report.wordingTotals as readonly Readonly<{ arm: string; questions: number; refused: number; seats: readonly number[];
+    checked: number; rejected: number; notAnAnswer: number; addedFact: number; noCost: number; premiseExempt: number;
+    assumptions: readonly number[] }>[] | undefined;
   if (wordingTotals !== undefined && wordingTotals.length > 0) {
     lines.push("Wording N (D5; counts only, the debated answers word for word are in report.json `wording`; C2 the sealed wording, C2N wording N):", "",
-      "| arm | questions | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
-      "|---|---|---|---|---|---|---|---|---|");
+      "| arm | questions | refused | seats | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
+      "|---|---|---|---|---|---|---|---|---|---|---|");
     for (const row of wordingTotals) {
       const mean = row.assumptions.length === 0 ? "none" : (row.assumptions.reduce((sum, n) => sum + n, 0) / row.assumptions.length).toFixed(1);
-      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.checked)} | ${String(row.rejected)} | ${String(row.notAnAnswer)} | `
-        + `${String(row.addedFact)} | ${String(row.noCost)} | ${String(row.premiseExempt)} | ${mean} |`);
+      const seats = row.seats.length === 0 ? "none" : row.seats.join(", ");
+      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.refused)} | ${seats} | ${String(row.checked)} | ${String(row.rejected)} | `
+        + `${String(row.notAnAnswer)} | ${String(row.addedFact)} | ${String(row.noCost)} | ${String(row.premiseExempt)} | ${mean} |`);
     }
     lines.push("");
   }

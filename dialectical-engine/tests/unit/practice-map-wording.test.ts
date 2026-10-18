@@ -102,14 +102,23 @@ describe("wording N, practice only (spec §5.6, D5; Ruling PF-R3-2.3)", () => {
       map: { choice: { answers: [{ answerId: "a1", statement: "Yes.", assumptions: ["A fact."] }, { answerId: "a2", statement: "No.", assumptions: [] }] },
         // A whole MapAnswerCheckResult (Task 1's members, premiseExempt included; FINAL Ruling D4(b) encoding).
         answerCheck: { checker: null, outcomes: codes, reasons: {}, candidates: [], replacements: [], premiseExempt } } as unknown as OpeningsArmLine["map"] });
+    // Fix round 2 (N2): a refused arm keeps its row (no answers, its refusal's code), so it never drops out of the table.
+    const refused: OpeningsArmLine = { ...line("C2N", {}, [], 4), questionId: "ro-euro", outcome: "UNAVAILABLE", map: null,
+      notes: [{ note: "PRACTICE_REFUSED", step: "MAP", detail: "PRACTICE_WORDING_N_BASE_CHANGED" }] };
     const rows = practiceWordingRows([line("C2", { a1: "PASSED", a2: "NO_COST" }, ["a1"]), line("C2N", { a1: "PASSED", a2: "PASSED" }, [], 4),
-      { ...line("C2", {}, []), arm: "C" }]);
-    expect(rows.map((row) => [row.arm, row.questionId, row.answers])).toEqual([["C2", "en-nuclear", ["Yes.", "No."]], ["C2N", "en-nuclear", ["Yes.", "No."]]]);
+      { ...line("C2", {}, []), arm: "C" }, refused]);
+    expect(rows.map((row) => [row.arm, row.questionId, row.answers])).toEqual([["C2", "en-nuclear", ["Yes.", "No."]], ["C2N", "en-nuclear", ["Yes.", "No."]],
+      ["C2N", "ro-euro", []]]);
     // Fix round 1 (review Minor 6): each row carries its arm's seat count, so a seat that went busy during C2 shows.
-    expect(rows.map((row) => row.seats)).toEqual([5, 4]);
+    expect(rows.map((row) => row.seats)).toEqual([5, 4, 4]);
+    expect(rows.map((row) => row.refused)).toEqual([null, null, "PRACTICE_WORDING_N_BASE_CHANGED"]);
+    expect([rows[2]!.codes, rows[2]!.answerCheck]).toEqual([null, null]);
     expect(rows[0]!.answerCheck).toMatchObject({ rejected: 1, noCost: 1, premiseExempt: 1, assumptionsPerAnswer: [1, 0] });
     expect(practiceWordingTotals(rows)).toEqual([
-      { arm: "C2", questions: 1, checked: 2, rejected: 1, notAnAnswer: 0, addedFact: 0, noCost: 1, premiseExempt: 1, assumptions: [1, 0] },
-      { arm: "C2N", questions: 1, checked: 2, rejected: 0, notAnAnswer: 0, addedFact: 0, noCost: 0, premiseExempt: 0, assumptions: [1, 0] }]);
+      { arm: "C2", questions: 1, refused: 0, seats: [5], checked: 2, rejected: 1, notAnAnswer: 0, addedFact: 0, noCost: 1, premiseExempt: 1, assumptions: [1, 0] },
+      { arm: "C2N", questions: 1, refused: 1, seats: [4, 4], checked: 2, rejected: 0, notAnAnswer: 0, addedFact: 0, noCost: 0, premiseExempt: 0, assumptions: [1, 0] }]);
+    // An arm refused on every question still has its totals row.
+    expect(practiceWordingTotals([rows[2]!])).toEqual([
+      { arm: "C2N", questions: 0, refused: 1, seats: [4], checked: 0, rejected: 0, notAnAnswer: 0, addedFact: 0, noCost: 0, premiseExempt: 0, assumptions: [] }]);
   });
 });

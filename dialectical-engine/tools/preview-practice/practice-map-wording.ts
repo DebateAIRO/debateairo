@@ -74,14 +74,24 @@ export function practiceWordingMapExtras(arm: OpeningsArm): Partial<Pick<MapRunI
 export type PracticeWordingRow = Readonly<{ arm: "C2" | "C2N"; questionId: string; answers: readonly string[]; codes: readonly string[] | null;
   answerCheck: PracticeAnswerCheckBlock | null;
   /** The seats the arm started with (fix round 1): C2 runs first, so a seat that went busy in C2 shows as fewer in C2N. */
-  seats: number | null }>;
+  seats: number | null;
+  /**
+   * Ruling R3-T17a.4 (N2): the code of the practice refusal the arm ended on (no answers, no codes), so a refused arm keeps
+   * its row and never drops out of the comparison; null for an arm that ran.
+   */
+  refused: string | null }>;
 
 type WordingAnswer = Readonly<{ statement: string; assumptions?: readonly unknown[] }>;
 
 /** The engine-2 arms' lines only, in log order. Counts read the checker's and the chooser's verdicts; code judges none (G1). */
 export function practiceWordingRows(lines: readonly OpeningsArmLine[]): readonly PracticeWordingRow[] {
   return Object.freeze(lines.flatMap((line): PracticeWordingRow[] => {
-    if ((line.arm !== "C2" && line.arm !== "C2N") || line.map === null) return [];
+    if (line.arm !== "C2" && line.arm !== "C2N") return [];
+    const refusal = line.notes.find((note) => note.note === "PRACTICE_REFUSED");
+    if (line.map === null) {
+      return refusal === undefined ? [] : [Object.freeze({ arm: line.arm, questionId: line.questionId, answers: Object.freeze([]), codes: null,
+        answerCheck: null, seats: line.seats ?? null, refused: refusal.detail })];
+    }
     const answers = ((line.map.choice?.answers ?? []) as readonly WordingAnswer[]);
     const check = (line.map as Readonly<{ answerCheck?: MapAnswerCheckResult }>).answerCheck;
     const codes = check === undefined ? null : mapAnswerCheckCodes(check);
@@ -89,19 +99,24 @@ export function practiceWordingRows(lines: readonly OpeningsArmLine[]): readonly
     for (const mark of line.marks) marks[mark.mark] = (marks[mark.mark] ?? 0) + 1;
     return [Object.freeze({ arm: line.arm, questionId: line.questionId, answers: Object.freeze(answers.map((answer) => reportableReplyText(answer.statement))), codes,
       answerCheck: practiceAnswerCheckBlock(codes, marks, { premiseExempt: check === undefined ? null : check.premiseExempt?.length ?? 0,
-        assumptionsPerAnswer: answers.map((answer) => answer.assumptions?.length ?? 0) }), seats: line.seats ?? null })];
+        assumptionsPerAnswer: answers.map((answer) => answer.assumptions?.length ?? 0) }), seats: line.seats ?? null, refused: null })];
   }));
 }
 
-/** Per wording, summed over its questions (D1's counts; the owner marks the hedged or circular answers by reading them). */
-export type PracticeWordingTotals = Readonly<{ arm: "C2" | "C2N"; questions: number; checked: number; rejected: number; notAnAnswer: number;
-  addedFact: number; noCost: number; premiseExempt: number; assumptions: readonly number[] }>;
+/**
+ * Per wording, summed over its questions (D1's counts; the owner marks the hedged or circular answers by reading them).
+ * `questions` counts the questions the arm ran, `refused` those it was refused on (N2), `seats` each question's seats (N4).
+ */
+export type PracticeWordingTotals = Readonly<{ arm: "C2" | "C2N"; questions: number; refused: number; seats: readonly number[]; checked: number;
+  rejected: number; notAnAnswer: number; addedFact: number; noCost: number; premiseExempt: number; assumptions: readonly number[] }>;
 export function practiceWordingTotals(rows: readonly PracticeWordingRow[]): readonly PracticeWordingTotals[] {
   return Object.freeze((["C2", "C2N"] as const).flatMap((arm): PracticeWordingTotals[] => {
     const mine = rows.filter((row) => row.arm === arm);
     if (mine.length === 0) return [];
     const sum = (pick: (block: PracticeAnswerCheckBlock) => number) => mine.reduce((total, row) => total + (row.answerCheck === null ? 0 : pick(row.answerCheck)), 0);
-    return [Object.freeze({ arm, questions: mine.length, checked: sum((block) => block.checked), rejected: sum((block) => block.rejected),
+    const refused = mine.filter((row) => row.refused !== null).length;
+    return [Object.freeze({ arm, questions: mine.length - refused, refused,
+      seats: Object.freeze(mine.flatMap((row) => (row.seats === null ? [] : [row.seats]))), checked: sum((block) => block.checked), rejected: sum((block) => block.rejected),
       notAnAnswer: sum((block) => block.notAnAnswer), addedFact: sum((block) => block.addedFact), noCost: sum((block) => block.noCost),
       premiseExempt: sum((block) => block.premiseExempt ?? 0),
       assumptions: Object.freeze(mine.flatMap((row) => row.answerCheck?.assumptionsPerAnswer ?? [])) })];
