@@ -351,7 +351,7 @@ describe("map salvage: only the answer check's salvage reads check_id as an id (
     const merge = { key_points: [{ key_point_id: "kp01", claim: "One.", member_item_ids: ["pt01"] }], answers: [], check_id: "A1" };
     expect(mapMergeSalvage.decoded(merge)).toEqual({ value: merge, repairs: [] });
     const choose = { answers: [{ answer_id: "a1", statement: "Yes.", for: [], against: [], strongest_rival: null }], check_id: "A1" };
-    expect(mapChooseSalvage(null).decoded(choose)).toEqual({ value: choose, repairs: [] });
+    expect(mapChooseSalvage(null).decoded!(choose)).toEqual({ value: choose, repairs: [] });
     expect(mapAnglesSalvage.decoded({ angles: [], check_id: "A1" })).toEqual({ value: { angles: [], check_id: "A1" }, repairs: [] });
     const check = { checks: [{ check_id: "A1", answers_question: true, adds_unstated_fact: false, cost_can_be_named: true, reason: null }] };
     const read = mapCheckSalvage.decoded(check);
