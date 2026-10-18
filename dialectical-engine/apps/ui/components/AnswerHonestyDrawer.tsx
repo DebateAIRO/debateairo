@@ -38,7 +38,7 @@ import { useDialogSurface } from "@/components/dialogSurface";
  */
 
 /**
- * Debate shape P2c (ruling C-DRAWER): the eight shape marks show only their words here. Their
+ * Debate shape P2c (ruling C-DRAWER): the twelve shape marks (R3 added the answer check's four) show only their words here. Their
  * records' scope, subject (a run id, `<run>:<n>`, or a node id), reason code (`MAP_MERGE_FALLBACK:MERGE`,
  * `SCRUTINY_EXTENDED:3`) and lift path are engine internals, and their chips carry no raw mark as a tooltip.
  * R2a (Ruling W1): engine 2's four marks are label-only the same way — an UNASSESSED-AT-REDUCED-WEIGHT

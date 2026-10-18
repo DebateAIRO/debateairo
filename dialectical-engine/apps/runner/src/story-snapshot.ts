@@ -1,6 +1,6 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
 import type { VerdictState } from "@debateai/contract";
-import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
   withoutStoryNodeIds,
@@ -48,7 +48,7 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
     + "threshold, so nothing was expanded beneath it"
 ]]);
 /**
- * Debate shape (Task 14; Task 12 note): the eight shape marks say how the debate was run (the map's fallbacks and fills,
+ * Debate shape (Task 14; Task 12 note): the twelve shape marks say how the debate was run (the map's fallbacks, fills and answer check,
  * a close call that gained graders, a point that got scrutiny), and their records carry codes only. The story is never
  * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
  */
@@ -108,6 +108,8 @@ export interface StorySnapshotSource {
     readonly panelDispersion: number | null;
   }[];
   readonly positionNodeIds: ReadonlySet<string>;
+  /** Engine 2 + map (R3, P2.6): a position's words, by root node id; absent = the node's statement (today). */
+  readonly positionWords?: ReadonlyMap<string, string> | undefined;
   readonly baseStrengths: readonly { readonly nodeId: string; readonly baseStrength: number | null }[];
   readonly finalStrengths: readonly { readonly nodeId: string; readonly strength: number }[];
   /** Every arrow of the debate's graph, whatever order they were read in. */
@@ -301,10 +303,17 @@ export type StoryMapSource = Pick<MapResult, "keyPoints" | "mergedAnswers" | "ch
  */
 export function storyAlsoRaisedFrom(
   map: StoryMapSource | null,
-  arguedAnswers: number
+  arguedAnswers: number,
+  /**
+   * Engine 2 (spec §5.2 item 8): unchosen answers too, never one the answer check failed (deviation 8), by its words
+   * (`mapCheckFailedStatements`) and by the merged answer behind it (`mapCheckFailedMergedAnswerIds`, amendment A9-1).
+   */
+  engine?: Readonly<{ checkFailed: readonly string[]; checkFailedMergedAnswerIds: readonly string[] }>
 ): readonly { readonly claim: string; readonly raisedBy: number }[] | undefined {
   if (map === null || map.choice === null) return undefined;
-  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers })
+  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers,
+    ...(engine === undefined ? {} : { unchosenAnswers: true as const, checkFailed: engine.checkFailed,
+      checkFailedMergedAnswerIds: engine.checkFailedMergedAnswerIds, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES }) })
     .map((entry) => Object.freeze({ claim: withoutNodeIds(entry.claim), raisedBy: Math.max(1, new Set(entry.makers).size) })));
 }
 
@@ -372,7 +381,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     servedStatement: Object.freeze(source.servedSegments.map((segment) => segment.text)),
     nodes: Object.freeze(source.authored.map((node) => Object.freeze({
       nodeId: node.nodeId,
-      claim: node.statement,
+      claim: source.positionNodeIds.has(node.nodeId) ? (source.positionWords?.get(node.nodeId) ?? node.statement) : node.statement,
       isPosition: source.positionNodeIds.has(node.nodeId),
       wayOfKnowing: node.wayOfKnowing,
       baseScore: baseById.get(node.nodeId) ?? null,

@@ -401,7 +401,8 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
     // Model scorecard A16: 37 -> 38 (BACKUP-MODEL-USED, minted mid-list beside
     // DEGRADED-DIVERSITY); the tail below is still read and still unchanged.
     // R2 (engine redesign, INTERFACE §13) minted four engine marks mid-list: 46 -> 50.
-    expect(CONDITION_MARKS).toHaveLength(50);
+    // R3 (engine redesign, spec §5.5) minted four answer-check marks mid-list: 50 -> 54.
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

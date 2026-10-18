@@ -181,6 +181,12 @@ export const CONDITION_MARKS = [
   "MAP_UNAVAILABLE_TODAYS_OPENING",
   "ANSWERS_FILLED",
   "CHOOSE_QUOTA_FILLED",
+  // Engine redesign R3 (spec 2026-10-15 §5.5): the map's answer check (answer scope). Placed HERE beside the other map
+  // marks, mid-list, never at the DR-176 tail read by `CONDITION_MARKS.slice(-4)`.
+  "MAP_CHECK_UNAVAILABLE",
+  "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED",
+  "MAP_ANSWER_KEPT_UNCHECKED",
   "PANEL-CLOSE-CALL-EXTENDED",
   "SCRUTINY-EXTENDED",
   "AMBIGUOUS_ATTRIBUTION",
@@ -259,7 +265,8 @@ export type ConditionMark = typeof CONDITION_MARKS[number];
 
 /** The debate shape's marks, in their CONDITION_MARKS order. */
 export const DEBATE_SHAPE_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
-  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
+  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
 export type DebateShapeMark = typeof DEBATE_SHAPE_MARKS[number];
 
 /** Engine 2's marks (INTERFACE §13), in their CONDITION_MARKS order. Engine 1 never mints one. */

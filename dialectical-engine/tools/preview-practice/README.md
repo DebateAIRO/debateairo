@@ -211,6 +211,16 @@ To build `report.json` and `report.md` again from a folder's `openings.jsonl` (n
 acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
 folder holds one.
 
+Arms `C2` and `C2N` (Task 17a, D5's comparison, named only with `--arms`; refused with `--dry`): the angle map on engine 2,
+in the sealed wording (C2) and in wording N (C2N: the four answer-writing instructions name the failing forms, ids
+`<id>.wording-n`, never sealed, practice only). Both are judged by the same sealed answer check. `report.json` `wording`
+lists each question's debated answers word for word with the check's codes; `wordingTotals` and report.md give D1's
+counts per wording (rejections by test, premise challenges exempt, assumptions per answer). The owner reads the answers
+and marks the hedged or circular ones; the wording with fewer of them and fewer check rejections ships (as NEW sealed
+ids, a later task). An arm that hits a practice refusal (the engine seal missing, or wording N's base no longer the
+shipped text) ends at once with no map; report.md lists it under "Refused arms" with its code, its Wording N row counts it
+as refused, and the run reads NOT_PROVEN (exit 30, `ARM_REFUSED:<arm>:<question>:<code>`), never PASS.
+
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
 (angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
@@ -471,7 +481,7 @@ block holds:
   points per answer, deeper points, gap rounds, the three settings, the opening);
 - `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
   answers to argue, and each AI argued its own position, as today;
-- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose), every try as the ledger recorded it;
+- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose, check), every try as the ledger recorded it;
 - `chosenAnswers` and `alsoRaised`: how many different answers the map chose to argue, and how many points came up but
   were not debated. When fewer than two answers were chosen, the points are still counted here, but the story and the
   debate page show none of them (today's opening was argued instead);
@@ -480,6 +490,15 @@ block holds:
   (counted even when an extra grader then failed), and how many points scrutiny examined further (one count per point,
   not per exchange);
 - `notExercised`: why the new shape did not run, else null.
+
+Engine 2 (`--engine-policy`, with `--length-policy` and `--shape-policy`): the map ends with one `MAP:check` call (another maker than the chooser's); `report.json` carries `answerCheck` (checked; rejected, and per test: not an answer, adding a fact, no cost named; exempt as premise challenges; replaced, dropped, kept, unavailable; assumptions per debated answer) and `mapFallbacks` (merge, choose: 0 or 1 per debate). Counts only: the checker's and the chooser's own verdicts, never code's.
+The `answerCheck` block also carries two counts beside the tests: `emptyReasons`, how many empty reasons the checker
+wrote in its refused tries (each is refused and asked again, so this counts slips, not outcomes; a structure-repair try
+of an engine-2 map call is re-read with the readings of the call it repairs, since its own prompt names no map contract), and
+`templateFillsDebated`, how many of the answers the run debated are the code's own last-resort template ("The opposite of
+this answer: ..."). These are fills DEBATED: a template fill that the check replaced is not counted, though its
+`ANSWERS_FILLED` mark stays in `mapMarks` (which counts fills MADE, from any source). The block's `mapCallsByStep` gains
+`check`, and `report.md` gains an "answer check" line (engine 2 only) and a "map fallbacks" line.
 
 Map calls also count everywhere else, like any other call:
 
@@ -939,7 +958,8 @@ Optional flags:
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
-  (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  (default all four; they always run in the order T, A, B, C, C2, C2N; C2 and C2N run only when named, never with
+  `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
   formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT } from "@debateai/judgement";
+import { COMPARING_JUDGE_PROMPT_CONTRACT, POINT_INVESTIGATION_PROMPT_CONTRACT, judgeAssignedRootV2PromptContract } from "@debateai/judgement";
+import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -20,7 +21,15 @@ export const ENGINE_CONTRACT_FINGERPRINT_HEADER = "debateai.engine-contracts.v1"
 export function engineSealedContracts(): readonly PromptContract[] {
   // Append-only, in phase order: R2a seals the investigation (spec §4.2b), R2b the comparing judges (spec §4.8); R3 and
   // R4 append theirs after them.
-  return Object.freeze([POINT_INVESTIGATION_PROMPT_CONTRACT, COMPARING_JUDGE_PROMPT_CONTRACT]);
+  return Object.freeze([
+    POINT_INVESTIGATION_PROMPT_CONTRACT,
+    COMPARING_JUDGE_PROMPT_CONTRACT,
+    // R3 (engine redesign spec §9, INTERFACE §2.2): the map's eight engine-2 contracts in MAP_ENGINE_CONTRACT_NAMES order,
+    // then the fixed-words position writer, unknown then resolved.
+    ...MAP_ENGINE_CONTRACT_NAMES.map((name) => mapEnginePromptContracts()[name]),
+    judgeAssignedRootV2PromptContract("unknown"),
+    judgeAssignedRootV2PromptContract("resolved")
+  ]);
 }
 
 /** The ids of engineSealedContracts(), in order (pinned by tests/unit/engine-contract-hash.test.ts). */

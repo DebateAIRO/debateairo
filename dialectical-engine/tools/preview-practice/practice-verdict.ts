@@ -213,6 +213,12 @@ export type PracticeVerdictInput = Readonly<{
    * role. Optional: none when absent.
    */
   pinsNotHeld?: readonly string[];
+  /**
+   * Openings (ruling R3-T17a.4): each requested arm that ended on a practice refusal, as `<arm>:<question>:<code>` in run
+   * order. Not a failure: NOT_PROVEN, as the comparison it was asked for did not run; listed first, since it is the cause.
+   * Optional: none when absent.
+   */
+  armsRefused?: readonly string[];
   /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -252,6 +258,7 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const answeredOf = (model: string) => input.busyRuns?.[model]?.answered ?? 0;
   const partlyBusy = busy.filter((model) => answeredOf(model) >= 1);
   const notProven = [
+    ...(input.armsRefused ?? []).map((refused) => `ARM_REFUSED:${refused}`),
     ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),

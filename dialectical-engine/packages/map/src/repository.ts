@@ -11,10 +11,12 @@ import {
   type Pool
 } from "@debateai/db";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
+import { MAP_ANSWER_CHECK_CODE, mapAnswerCheckCodes, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements } from "./check.js";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES } from "./internal-words.js";
 import { mapAlsoRaisedOf } from "./items.js";
 import {
-  MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_MARKS, type MapAngleKind, type MapItem, type MapItemOrigin, type MapMark,
-  type MapResult
+  MAP_ENGINE_LIMITS, MAP_FIXED_ANGLE_KINDS, MAP_LEANS, MAP_LIMITS, MAP_MARKS, MAP_RESTS_ON, type MapAngleKind, type MapItem,
+  type MapItemOrigin, type MapMark, type MapRestsOn, type MapResult
 } from "./types.js";
 
 /**
@@ -25,10 +27,20 @@ import {
  * Every readable column holds a code (ruling T7-PRIV): the repository refuses, typed and before anything is sealed or
  * stored, any id that is not code-minted. Its refusals name a field and a position only, never a value: no AI-written
  * id, claim or reason reaches an error message.
+ *
+ * Engine 2 (engine redesign R3, spec 2026-10-15 §5.7) adds two code-only tables of migration 0122, written in the same
+ * transaction as the choice: core.map_item_rests_on (what each point rests on) and core.map_answer_check (the check's
+ * codes, the checker's maker, the premise-exempt ids). Their texts stay in core.map_choice's sealed content.
  */
 export type MapChoiceAnswerRecord = Readonly<{ answerId: string; statement: string; rootIndex: number;
-  rootNodeId: string | null; maker: string | null; filled: boolean }>;
-export type MapAlsoRaisedRecord = Readonly<{ keyPointId: string; claim: string; makers: readonly string[] }>;
+  rootNodeId: string | null; maker: string | null; filled: boolean;
+  /** Engine 2 only (spec §5.7): the chooser's assumptions for this answer; absent under engine 1. */
+  assumptions?: readonly string[] | undefined }>;
+export type MapAlsoRaisedRecord = Readonly<{ keyPointId: string; claim: string; makers: readonly string[];
+  /** Engine 2 only (INTERFACE §10.7): "ANSWER" for an answer raised and not debated; absent = a point. */
+  kind?: "POINT" | "ANSWER" | undefined;
+  /** Engine 2 only (ruling R3-T5.1): a point's label, what it rests on; absent under engine 1 and for an answer. */
+  restsOn?: MapRestsOn | undefined }>;
 export type MapChoiceRecord = Readonly<{ opening: "MAP" | "TODAYS_OPENING"; answers: readonly MapChoiceAnswerRecord[];
   alsoRaised: readonly MapAlsoRaisedRecord[]; marks: readonly MapMark[] }>;
 /**
@@ -59,6 +71,10 @@ const ROOT_IN_FORCE_SQL = `SELECT position.answer_id, COALESCE(moved.root_node_i
 const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;
 const ANGLE_ID = /^g[1-7]$/u;
 const ANSWER_ID = /^a[1-4]$/u;
+/** 0122's check ids: the chosen answers a1..a4 and the candidates c1..c4. */
+const CHECK_ID = /^(a[1-4]|c[1-4])$/u;
+/** 0122's `map_item_rests_on_item_shape`: a point's item id. */
+const POINT_ITEM_ID = /^pt[0-9]{2,4}$/u;
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 /** 0069's core.jsonb_is_code_token: one token of 1..256 characters from a closed set (no whitespace). */
 const CODE_TOKEN = /^[[\]A-Za-z0-9_.:@/+>=#-]{1,256}$/u;
@@ -73,15 +89,21 @@ const PG_INTEGER_MAX = 2_147_483_647;
 const itemContent = z.union([z.object({ claim: z.string(), why: z.string() }).strict(), z.object({ answer: z.string() }).strict()]);
 /** The run's map without its items (they are rows of core.map_item) and without its call records (they are ledger rows). */
 const choiceContent = z.object({
-  answers: z.array(z.object({ answerId: z.string(), statement: z.string(), rootIndex: z.number().int().min(0), filled: z.boolean() }).strict()),
-  alsoRaised: z.array(z.object({ keyPointId: z.string(), claim: z.string(), makers: z.array(z.string()) }).strict()),
+  answers: z.array(z.object({ answerId: z.string(), statement: z.string(), rootIndex: z.number().int().min(0), filled: z.boolean(),
+    // Engine 2 only (spec §5.7): the chooser's assumptions for this answer.
+    assumptions: z.array(z.string()).optional() }).strict()),
+  alsoRaised: z.array(z.object({ keyPointId: z.string(), claim: z.string(), makers: z.array(z.string()),
+    // Engine 2 only: an answer raised and not debated (kind), and a point's label (ruling R3-T5.1).
+    kind: z.enum(["POINT", "ANSWER"]).optional(), restsOn: z.enum(MAP_RESTS_ON).optional() }).strict()),
   result: z.unknown()
 }).strict();
 type ChoiceContent = z.infer<typeof choiceContent>;
 
 type ItemRow = Readonly<{ item_id: string; ai_ref: string; maker: string; origin: MapItemOrigin; angle_id: string | null;
   angle_kind: MapItem["angleKind"]; kind: "POINT" | "ANSWER"; leans: string | null; list_index: number; content: unknown;
-  content_ciphertext: CryptoEnvelope | null }>;
+  content_ciphertext: CryptoEnvelope | null;
+  /** Engine 2 (0122, LEFT JOIN): what the point rests on; null when no row (engine 1, an answer item). */
+  rests_on: string | null }>;
 
 function pgError(error: unknown): { code: unknown; message: unknown } | null {
   return typeof error === "object" && error !== null ? error as { code: unknown; message: unknown } : null;
@@ -126,6 +148,11 @@ function mapRecordBreach(result: MapResult, answerCount: number): string | null 
     if (!ORIGINS.has(item.origin)) return `items[${String(index)}].origin`;
     if (!KINDS.has(item.kind)) return `items[${String(index)}].kind`;
     if (item.kind === "POINT" && !LEANS.has(item.leans)) return `items[${String(index)}].leans`;
+    if (item.kind === "POINT" && item.restsOn !== undefined && !(MAP_RESTS_ON as readonly string[]).includes(item.restsOn)) {
+      return `items[${String(index)}].restsOn`;
+    }
+    // R3 final wave P11 (Task 11 Minor 5): 0122's map_item_rests_on takes only a point's `pt` id; said here first, typed.
+    if (item.kind === "POINT" && item.restsOn !== undefined && !POINT_ITEM_ID.test(item.itemId)) return `items[${String(index)}].itemId`;
     if (item.angleId !== null && !ANGLE_ID.test(item.angleId)) return `items[${String(index)}].angleId`;
     if (item.angleKind !== null && !ANGLE_KINDS.has(item.angleKind)) return `items[${String(index)}].angleKind`;
     if (!Number.isSafeInteger(item.listIndex) || item.listIndex < 0 || item.listIndex > PG_INTEGER_MAX) {
@@ -136,7 +163,28 @@ function mapRecordBreach(result: MapResult, answerCount: number): string | null 
   for (const [index, answer] of (result.choice?.answers ?? []).entries()) {
     if (!ANSWER_ID.test(answer.answerId)) return `choice.answers[${String(index)}].answerId`;
   }
+  if (result.answerCheck !== undefined) {
+    const codes = mapAnswerCheckCodes(result.answerCheck);
+    if (codes.length < 1 || codes.length > MAP_ENGINE_LIMITS.checkIdsMax || codes.some((code) => !MAP_ANSWER_CHECK_CODE.test(code))) return "answerCheck.codes";
+    // Ruling R3-T10.1: 0122's CHECK takes any well-formed code, so the fate rule lives here: a `>…` fate only, and
+    // always, on a chosen answer (a1..a4) the check failed (an outcome other than PASSED and UNCHECKED).
+    // P11 (Task 11 Minor 4): a wrong fate is named apart from a malformed code.
+    if (codes.some((code) => codeFateBreached(code))) return "answerCheck.codes.fate";
+    if (result.answerCheck.checker !== null && !CODE_TOKEN.test(result.answerCheck.checker.maker)) return "answerCheck.checker.maker";
+    // (pre-flight consistency, Ruling (premiseExempt storage)) only ids the checker read, each once, at most 8.
+    const exempt = result.answerCheck.premiseExempt;
+    if (exempt.length > MAP_ENGINE_LIMITS.checkIdsMax || new Set(exempt).size !== exempt.length
+      || exempt.some((id) => !Object.hasOwn(result.answerCheck!.outcomes, id) || !CHECK_ID.test(id))) return "answerCheck.premiseExempt";
+  }
   return null;
+}
+
+/** Ruling R3-T10.1: a well-formed stored code whose fate is wrong (a fate on a pass or a candidate, none on a failed answer). */
+function codeFateBreached(code: string): boolean {
+  const fate = code.indexOf(">");
+  const [id = "", outcome = ""] = (fate === -1 ? code : code.slice(0, fate)).split(":");
+  const failedChosen = id.startsWith("a") && outcome !== "PASSED" && outcome !== "UNCHECKED";
+  return failedChosen !== (fate !== -1);
 }
 
 export class MapChoiceRepository {
@@ -148,17 +196,26 @@ export class MapChoiceRepository {
    * transaction inserts the choice FIRST and then the items, so a crash leaves neither, and a second writer of the same
    * run (a re-claim) finds the choice and writes no item: the stored items always belong to the stored choice.
    */
-  async writeMapRun(input: Readonly<{ runId: string; result: MapResult; answerCount: number }>): Promise<MapWriteOutcome> {
+  async writeMapRun(input: Readonly<{ runId: string; result: MapResult; answerCount: number;
+    /** Engine 2 (spec §5.2 item 8): the stored "also raised" lists unchosen answers some AI raised. Absent under engine 1. */
+    unchosenAnswers?: boolean }>): Promise<MapWriteOutcome> {
     const { runId, result } = input;
     const breach = mapRecordBreach(result, input.answerCount);
     if (breach !== null) throw recordInvalid(breach);
     const answers = (result.choice?.answers ?? []).slice(0, input.answerCount)
-      .map((answer, rootIndex) => Object.freeze({ answerId: answer.answerId, statement: answer.statement, rootIndex, filled: answer.filled }));
+      .map((answer, rootIndex) => Object.freeze({ answerId: answer.answerId, statement: answer.statement, rootIndex, filled: answer.filled,
+        ...(answer.assumptions === undefined ? {} : { assumptions: [...answer.assumptions] }) }));
     // Ruling W-CUT and review m-4: the chosen answers past answerCount (never argued) and the points only they took are
     // also raised, not debated; one shared rule (mapAlsoRaisedOf) builds the list for the page and the story alike.
     const alsoRaised = mapAlsoRaisedOf({ choice: result.choice, keyPoints: result.keyPoints, mergedAnswers: result.mergedAnswers,
-      arguedAnswers: input.answerCount })
-      .map((entry) => Object.freeze({ keyPointId: entry.keyPointId, claim: entry.claim, makers: [...entry.makers] }));
+      arguedAnswers: input.answerCount,
+      // Engine 2 (spec §5.2 item 8, deviation 8): unchosen answers some AI raised, never one the check failed.
+      ...(input.unchosenAnswers === true ? { unchosenAnswers: true, checkFailed: mapCheckFailedStatements(result.answerCheck),
+        checkFailedMergedAnswerIds: mapCheckFailedMergedAnswerIds(result.answerCheck), // Task 9 amendment A9-1 (ruling R3-T9.1)
+        internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES } : {}) })
+      .map((entry) => Object.freeze({ keyPointId: entry.keyPointId, claim: entry.claim, makers: [...entry.makers],
+        ...(entry.kind === undefined ? {} : { kind: entry.kind }),
+        ...(entry.restsOn === undefined ? {} : { restsOn: entry.restsOn }) })); // ruling R3-T5.1: the label is stored too
     const { items: _items, calls: _calls, ...rest } = result;
     const content: ChoiceContent = choiceContent.parse({ answers, alsoRaised, result: rest });
     const opening = result.kind === "MAP" ? "MAP" : "TODAYS_OPENING";
@@ -202,6 +259,17 @@ export class MapChoiceRepository {
                 Number(item.itemId.slice(2)),
                 sealed === null ? JSON.stringify(value) : SENTINEL, sealed === null ? null : JSON.stringify(sealed.envelope), sealed?.attestation ?? null]
             );
+          }
+          // Engine 2 (0122): what each point rests on, and the check's codes, in the SAME transaction as the choice and
+          // its items (deviation 1: no foreign key; this transaction is what ties them). Engine 1 writes neither.
+          for (const { item } of items) {
+            if (item.kind !== "POINT" || item.restsOn === undefined) continue;
+            await client.query(`INSERT INTO core.map_item_rests_on (run_id, item_id, rests_on) VALUES ($1,$2,$3)`, [runId, item.itemId, item.restsOn]);
+          }
+          if (result.answerCheck !== undefined) {
+            // (pre-flight consistency, Ruling (premiseExempt storage)) the premise-exempt ids beside the codes, for D1's count.
+            await client.query(`INSERT INTO core.map_answer_check (run_id, answer_check, checker_maker, premise_exempt) VALUES ($1,$2::text[],$3,$4::text[])`,
+              [runId, mapAnswerCheckCodes(result.answerCheck), result.answerCheck.checker?.maker ?? null, [...result.answerCheck.premiseExempt]]);
           }
           return "INSERTED" as const;
         });
@@ -261,6 +329,21 @@ export class MapChoiceRepository {
     return row.opening;
   }
 
+  /**
+   * Engine 2 (0122): the answer check's codes, the checker's maker and the check ids the checker exempted from the third
+   * test (premise challenges; Ruling (premiseExempt storage)), or null (engine 1, no map, or no check row).
+   */
+  async readMapAnswerCheckForRun(runId: string): Promise<Readonly<{ codes: readonly string[]; checkerMaker: string | null;
+    premiseExempt: readonly string[] }> | null> {
+    const row = (await this.pool.query<{ answer_check: string[]; checker_maker: string | null; premise_exempt: string[] }>(
+      `SELECT answer_check, checker_maker, premise_exempt FROM core.map_answer_check WHERE run_id = $1`, [runId])).rows[0];
+    if (row === undefined) return null;
+    if (!row.answer_check.every((code) => MAP_ANSWER_CHECK_CODE.test(code))) throw rowInvalid("core.map_answer_check answer_check");
+    if (!row.premise_exempt.every((id) => CHECK_ID.test(id))) throw rowInvalid("core.map_answer_check premise_exempt");
+    return Object.freeze({ codes: Object.freeze([...row.answer_check]), checkerMaker: row.checker_maker,
+      premiseExempt: Object.freeze([...row.premise_exempt]) });
+  }
+
   async readMapChoiceForRun(runId: string): Promise<MapChoiceRecord | null> {
     const read = await this.#leasedRead(runId, null, () => this.#readChoiceLeased(runId));
     if (read === null) return null;
@@ -306,8 +389,11 @@ export class MapChoiceRepository {
   /** Inside the run's content lease (the caller holds it). */
   async #readItemsLeased(runId: string): Promise<readonly MapItem[]> {
     const rows = await this.pool.query<ItemRow>(
-      `SELECT item_id, ai_ref, maker, origin, angle_id, angle_kind, kind, leans, list_index, content, content_ciphertext
-         FROM core.map_item WHERE run_id = $1 ORDER BY item_id`, [runId]);
+      `SELECT item.item_id, item.ai_ref, item.maker, item.origin, item.angle_id, item.angle_kind, item.kind, item.leans, item.list_index,
+              item.content, item.content_ciphertext, basis.rests_on
+         FROM core.map_item AS item
+         LEFT JOIN core.map_item_rests_on AS basis ON basis.run_id = item.run_id AND basis.item_id = item.item_id
+        WHERE item.run_id = $1 ORDER BY item.item_id`, [runId]);
     if (rows.rows.length === 0) return Object.freeze([]);
     const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
@@ -364,7 +450,10 @@ function itemOf(row: ItemRow, parsed: ReturnType<typeof itemContent.safeParse>):
   if (row.kind === "POINT" && "claim" in value) {
     const leans = LEAN.safeParse(row.leans);
     if (!leans.success) throw rowInvalid(`core.map_item ${row.item_id}`);
-    return Object.freeze({ ...base, kind: "POINT" as const, claim: value.claim, whyItMatters: value.why, leans: leans.data });
+    const restsOn = row.rests_on === null ? null : z.enum(MAP_RESTS_ON).safeParse(row.rests_on);
+    if (restsOn !== null && !restsOn.success) throw rowInvalid(`core.map_item_rests_on ${row.item_id}`);
+    return Object.freeze({ ...base, kind: "POINT" as const, claim: value.claim, whyItMatters: value.why, leans: leans.data,
+      ...(restsOn === null ? {} : { restsOn: restsOn.data }) });
   }
   if (row.kind === "ANSWER" && "answer" in value) {
     return Object.freeze({ ...base, kind: "ANSWER" as const, answer: value.answer });

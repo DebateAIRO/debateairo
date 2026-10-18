@@ -426,6 +426,8 @@ export function debateReport(input: Readonly<{
       ...(r.storyEngine === undefined ? {} : { engine: Object.freeze({ engine: r.storyEngine.engine }) }) }),
     // Debate shape: only when the debate ran with a debate-shape row; absent otherwise, so today's report keeps its keys.
     ...(r.shape === undefined ? {} : { shape: r.shape }),
+    // INTERFACE §15.4 (R3): the answer check and the map's fallbacks, top-level for the proof's jq lines.
+    ...(r.shape === undefined ? {} : { mapFallbacks: r.shape.mapFallbacks, ...(r.shape.answerCheck === null ? {} : { answerCheck: r.shape.answerCheck }) }),
     // Length guidance: only when the debate ran with a length row; absent otherwise (today's keys).
     ...(r.length === undefined ? {} : { length: r.length }),
     // Question language: only when the debate ran with a debate-shape row; absent otherwise (today's keys).
@@ -621,10 +623,35 @@ export function reportMarkdown(report: PracticeReport): string {
     unavailable: number; statuses: Record<string, number>; marks: Record<string, number>; notes: Record<string, number> }>[] | undefined;
   if (byArm !== undefined && byArm.length > 0) {
     lines.push("Openings per arm (counts, cost and time only; T today's opening, A snowball, B blind lists, C angle map):", "",
-      "| arm | questions | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
+      // R3 final wave P18 (Task 17a Minor): this table's count is of the questions ATTEMPTED (a refused one included); the
+      // wording N table below counts those that RAN, beside the refused ones. Each header says which.
+      "| arm | questions attempted | calls | statuses | cost $ | time s | map unavailable | marks | notes |", "|---|---|---|---|---|---|---|---|---|");
     for (const row of byArm) {
       lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.calls)} | ${JSON.stringify(row.statuses)} | ${row.costUsd} | `
         + `${String(row.wallSeconds)} | ${String(row.unavailable)} | ${JSON.stringify(row.marks)} | ${JSON.stringify(row.notes)} |`);
+    }
+    lines.push("");
+  }
+  // Ruling R3-T17a.4 (N3): each arm that ended on a practice refusal, with the refusal's code (the run reads NOT_PROVEN).
+  const armsRefused = report.armsRefused as readonly Readonly<{ arm: string; questionId: string; code: string }>[] | undefined;
+  if (armsRefused !== undefined && armsRefused.length > 0) {
+    lines.push("Refused arms (each ended on a practice refusal, with no map; the run is NOT_PROVEN):", "",
+      ...armsRefused.map((refused) => `- ${refused.arm}, ${refused.questionId}: ${refused.code}`), "");
+  }
+  // Task 17a (D5): wording N's counts per arm (the answers word for word are in report.json `wording`). A refused arm keeps
+  // its row (N2), and each arm's seats per question are shown (N4), so a seat lost in C2 shows in C2N.
+  const wordingTotals = report.wordingTotals as readonly Readonly<{ arm: string; questions: number; refused: number; seats: readonly number[];
+    checked: number; rejected: number; notAnAnswer: number; addedFact: number; noCost: number; premiseExempt: number;
+    assumptions: readonly number[] }>[] | undefined;
+  if (wordingTotals !== undefined && wordingTotals.length > 0) {
+    lines.push("Wording N (D5; counts only, the debated answers word for word are in report.json `wording`; C2 the sealed wording, C2N wording N):", "",
+      "| arm | questions ran | refused | seats | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
+      "|---|---|---|---|---|---|---|---|---|---|---|");
+    for (const row of wordingTotals) {
+      const mean = row.assumptions.length === 0 ? "none" : (row.assumptions.reduce((sum, n) => sum + n, 0) / row.assumptions.length).toFixed(1);
+      const seats = row.seats.length === 0 ? "none" : row.seats.join(", ");
+      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.refused)} | ${seats} | ${String(row.checked)} | ${String(row.rejected)} | `
+        + `${String(row.notAnAnswer)} | ${String(row.addedFact)} | ${String(row.noCost)} | ${String(row.premiseExempt)} | ${mean} |`);
     }
     lines.push("");
   }

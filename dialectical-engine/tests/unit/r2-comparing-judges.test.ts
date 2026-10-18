@@ -23,6 +23,7 @@ import {
   COMPARING_JUDGE_PROMPT_CONTRACT,
   COMPARING_JUDGE_READING,
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
+  POINT_INVESTIGATION_PROMPT_CONTRACT,
   askComparingJudge,
   classifyComparingJudgeReply,
   comparingJudgeMaterialFields,
@@ -139,12 +140,13 @@ describe("verdict.judge.v1: the sealed contract", () => {
     expect(COMPARING_JUDGE_ANSWER_FORM).not.toMatch(/\d/u);
   });
 
-  it("is sealed by engineContractHash after the investigation contract, and never by the engine-1 judge seal", () => {
-    expect(engineSealedContracts().map((contract) => contract.contractId)).toEqual(["verdict.investigate.v1", "verdict.judge.v1"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS).toEqual(["verdict.investigate.v1", "verdict.judge.v1"]);
+  it("is sealed by engineContractHash directly after the investigation contract (R3 appends after them), and never by the engine-1 judge seal", () => {
+    expect(engineSealedContracts().slice(0, 2).map((contract) => contract.contractId)).toEqual(["verdict.investigate.v1", "verdict.judge.v1"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(0, 2)).toEqual(["verdict.investigate.v1", "verdict.judge.v1"]);
     const text = engineContractFingerprintText();
+    const investigation = promptContractFingerprintText(POINT_INVESTIGATION_PROMPT_CONTRACT);
     const judge = promptContractFingerprintText(COMPARING_JUDGE_PROMPT_CONTRACT);
-    expect(text.endsWith(`\n---\n${judge}`)).toBe(true);
+    expect(text.includes(`\n---\n${investigation}\n---\n${judge}\n---\n`)).toBe(true);
     expect(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT.includes("verdict.judge.v1")).toBe(false);
   });
 });

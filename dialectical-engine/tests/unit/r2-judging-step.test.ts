@@ -38,7 +38,8 @@ import {
   floorDecidedByJudges,
   pointInvestigationFailureOutcome,
   providerCallCostEnvelopePhase,
-  rederiveCatchUpFloor
+  rederiveCatchUpFloor,
+  runnerTerminalFailureReason
 } from "../../apps/runner/src/index.js";
 
 /**
@@ -272,6 +273,38 @@ describe("reclaim resume: a recorded vote is never asked again", () => {
       expect(new Set(result.seats.map((seat) => seat.maker)).size).toBe(3);
       expect(result).toMatchObject({ asked: 3, reused: 1 });
     });
+
+    /*
+     * R3 final wave O2 (R2b review N2, ruling index b): two copies after a mid-judging reclaim can each STORE a vote by one
+     * maker at different seats. The earliest stored seat of a maker is its vote; a later one is not counted
+     * (MAKER_SEATED_EARLIER), so the count never refuses the resumed debate and never counts one maker twice.
+     */
+    it("counts only the earliest stored seat of a maker; a later stored seat of it is not counted, and the verdict derives", async () => {
+      const { run, asks, records } = step({ recorded: [row(1, "anthropic", "haiku", "A"), row(2, "xiaomi", "mimo", "A"),
+        row(3, "anthropic", "haiku", "A")] });
+      const result = await run();
+      expect(asks).toEqual([]);
+      expect(records).toEqual([]);
+      expect(result.verdict).toMatchObject({ winnerRootNodeId: ROOT.A, judgesSeated: 2, judgesAnswered: 2, winnerVotes: 2 });
+      expect(result.verdict.counted.map((entry) => entry.seat)).toEqual([1, 2]);
+      expect(result.setAside).toEqual([{ seat: 3, maker: "anthropic", reason: "MAKER_SEATED_EARLIER" }]);
+      expect(result.ballots).toEqual([{ seat: 1, letter: "A", counted: true }, { seat: 2, letter: "A", counted: true },
+        { seat: 3, letter: "A", counted: false }]);
+      expect(result).toMatchObject({ asked: 0, reused: 3 });
+    });
+
+    it("sets aside a later seat of a maker another copy stored meanwhile, and writes only this copy's other seats", async () => {
+      // This copy reuses seat 1 (anthropic); another copy stored seat 3 for anthropic too while this copy asked 2 and 3.
+      const theirs = Object.freeze({ ...row(3, "anthropic", "haiku", "A"), modelId: "claude-haiku-5-5" });
+      const { run, records } = step({ recorded: [row(1, "anthropic", "haiku", "A")],
+        readRecorded: async () => [row(1, "anthropic", "haiku", "A"), theirs] });
+      const result = await run();
+      expect(records.map((vote) => [vote.judgeSeat, vote.maker, vote.counted])).toEqual([[2, "xiaomi", true]]);
+      expect(result.verdict.counted.map((entry) => entry.seat)).toEqual([1, 2]);
+      expect(result.setAside).toEqual([{ seat: 3, maker: "anthropic", reason: "MAKER_SEATED_EARLIER" }]);
+      // A first pass sets nothing aside.
+      expect((await step().run()).setAside).toEqual([]);
+    });
   });
 
   it("asks only the seats with no recorded vote, and reuses a recorded failure as a failure", async () => {
@@ -436,12 +469,24 @@ describe("the controller's carries on the judging step", () => {
     ["a network failure", new TypeError("fetch failed")],
     ["a refused reply", new TypedDomainError("COMPARING_JUDGE_REPLY_REFUSED", "best")],
     ["a money refusal", new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "the run's ceiling for arguing is reached")],
-    ["an unplanned seat", new TypedDomainError("COMPARING_JUDGE_SEAT_UNRESOLVED", "mimo")]
+    ["an unplanned seat", new TypedDomainError("COMPARING_JUDGE_SEAT_UNRESOLVED", "mimo")],
+    // R3 final wave P14 (Task 14 Minor 4): thrown while the judge's material is built, inside the seat's call.
+    ["a material order refused", new TypedDomainError("COMPARING_JUDGE_ORDER_INVALID", "order of 3 answers")]
   ] as const)("records %s as a failed judge and the debate goes on", async (_, failure) => {
     const { run, records } = step({ answers: { haiku: "A", mimo: failure, ds: "A" } });
     const result = await run();
     expect(records[1]).toMatchObject({ judgeSeat: 2, notCountedReason: "JUDGE_FAILED", chosenLetter: null });
     expect(result.verdict.marks).toEqual(["VERDICT-JUDGE-MISSING"]);
+  });
+
+  // R3 final wave P14 (Task 14 Minor 4): the seat pick runs outside any seat's call, so a refused pick leaves the step and
+  // reaches the runner's catch; it is a declared code there, never UNRECOGNIZED_DOMAIN_ERROR.
+  it("lets a refused seat pick leave the step, named at the runner's boundary (COMPARING_JUDGE_SEATS_INVALID)", async () => {
+    const { run, asks, records } = step({ rotationOffset: -1 });
+    await expect(run()).rejects.toMatchObject({ code: "COMPARING_JUDGE_SEATS_INVALID" });
+    expect([asks, records]).toEqual([[], []]);
+    expect(runnerTerminalFailureReason(new TypedDomainError("COMPARING_JUDGE_SEATS_INVALID", "count 3, rotation -1")))
+      .toBe("RUNNER_EXECUTION_FAILED:COMPARING_JUDGE_SEATS_INVALID");
   });
 
   it("names a code defect by the one rule the investigation step reads too", () => {

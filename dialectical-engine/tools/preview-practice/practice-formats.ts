@@ -223,6 +223,7 @@ export function practiceAttemptsOf(sink: PracticeSink): readonly PracticeAttempt
     return Object.freeze({ callSiteKey: entry.callSiteKey, outcome: entry.outcome, parseStatus: artifact?.parseStatus ?? null,
       latencyMs: entry.finishedAt.getTime() - entry.startedAt.getTime(),
       jsonRepair: artifact === null || entry.outcome !== "OK" ? null
+        // Engine redesign R3: formats mode runs no map; a map reply read here would be read by engine 1's readings (a MAP:check reply as UNMAPPED).
         : practiceJsonRepairOf(replyContentOf(artifact.rawText), practiceFinishReasonOf(artifact.metadata), entry.callSiteKey),
       replyForm: sink.forms.get(entry.attemptId) ?? null,
       tokenCeiling: typeof ceiling === "number" && Number.isSafeInteger(ceiling) ? ceiling : null,
@@ -530,6 +531,7 @@ export async function runPracticeFormats(input: Readonly<{
       const problem = sink.artifacts.find((artifact) => artifact.parseStatus !== "PARSED") ?? null;
       const content = problem === null ? null : replyContentOf(problem.rawText);
       const issues = problem === null ? [] : issueListFromParseError(problem.parseError ?? null);
+      // Engine redesign R3: formats mode runs no map; a map reply read here would be read by engine 1's readings (a MAP:check reply as UNMAPPED).
       const recheck = problem === null || content === null ? [] : recheckReply(attempts.find((attempt) => attempt.parseStatus !== "PARSED")?.callSiteKey
         ?? attempts[0]?.callSiteKey ?? "UNMAPPED", content).issues;
       // A call ended in the vendor's refusal, not billed: while its budget lasts, the model is parked and the SAME job is

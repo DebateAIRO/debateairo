@@ -129,6 +129,11 @@ Team rule at start: on the preview, before the worker exists, every claimable ru
   rule widened so they accept `SPLIT` and the judges' rule before any code writes them. Run the native operator's
   `apply-and-plan` with the owner's yes before that release's first start (see "Verify never applies a database step"). It
   changes nothing a debate does: engine 2 stays off while no register version carries the engine row.
+- A release with R3 (engine redesign, the map's answer step) adds the database step `0122_engine_map_check.sql`:
+  two append-only code tables, what each engine-2 map point rests on and the answer check's codes. Every map read
+  of the new code joins the first one (engine 1 included), so run the native operator's `apply-and-plan` with the
+  owner's yes before that release's first start (see "Verify never applies a database step"). It changes nothing
+  a debate does: engine 2 stays off while no register version carries the engine row.
 - A call runs at its step's level if the table sets one, else its AI's `level` if the table sets one, else the row's default (its first menu word, which is today's request). A model the table leaves out runs at its default.
 - The API and the runner read the same value. A bad table (an unknown model, step or level, an empty entry, or any other key) makes both refuse to start, but their launchers print only `PREVIEW_API_STARTUP_REFUSED` and `PREVIEW_RUNNER_STARTUP_REFUSED`, never why. So run the checker below first; it prints the detail.
 - An entry for a reviewed model that is not on this config's `free_model_ids` or `premium_model_ids` is accepted but unused (no call goes to that AI); the checker's row for it says so.

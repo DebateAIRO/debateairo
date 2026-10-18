@@ -251,6 +251,8 @@ without an `engineVersionPolicy` row, so the runner boots either way.
 after R2a, or `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24` from a release before R2a): R2b appends the
 comparing judges' prompt contract. Nothing reads it without an `engineVersionPolicy` row, so the runner boots either way.
 
+**R3 moves the engine seal again.** A register version for this code carries `engineContractHash` `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads it without an `engineVersionPolicy` row, so the runner boots either way. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
+
 There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
 changed row: stop and ask.
 

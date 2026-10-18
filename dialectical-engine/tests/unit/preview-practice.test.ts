@@ -89,6 +89,14 @@ describe("practice verdict", () => {
       .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["MODEL_NOT_EXERCISED:m", "UNBILLED_REFUSALS:1"] });
     expect(practiceVerdict({ ...CLEAN, notExercisedModels: ["m"], formatFailures: 1 }).verdict).toBe("FAIL");
   });
+  it("NOT_PROVEN (30) when a requested openings arm was refused (ruling R3-T17a.4): named by arm, question and code, first", () => {
+    expect(practiceVerdict({ ...CLEAN, armsRefused: ["C2N:en-nuclear:PRACTICE_WORDING_N_BASE_CHANGED"], unbilledRefusals: 1 }))
+      .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["ARM_REFUSED:C2N:en-nuclear:PRACTICE_WORDING_N_BASE_CHANGED", "UNBILLED_REFUSALS:1"] });
+    expect(practiceVerdict({ ...CLEAN, armsRefused: ["C2N:ro-euro:X"], notExercisedModels: ["m"] }).reasons)
+      .toEqual(["ARM_REFUSED:C2N:ro-euro:X", "MODEL_NOT_EXERCISED:m"]);
+    expect(practiceVerdict({ ...CLEAN, armsRefused: ["C2:en-nuclear:X"], formatFailures: 1 }).verdict).toBe("FAIL");
+    expect(practiceVerdict({ ...CLEAN, armsRefused: [] })).toEqual({ verdict: "PASS", exitCode: 0, reasons: [] });
+  });
   it("NOT_PROVEN (30), not FAIL, for a busy model: listed once, beside its busy refusals", () => {
     expect(practiceVerdict({ ...CLEAN, busyModels: ["glm"], notExercisedModels: ["glm"], unbilledRefusals: 2 }))
       .toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["MODEL_BUSY:glm", "UNBILLED_REFUSALS:2"] });

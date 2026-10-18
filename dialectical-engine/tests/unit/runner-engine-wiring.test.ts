@@ -53,9 +53,20 @@ describe("the runner reads the engine from the receipt only", () => {
     }
   });
 
-  it("the per-run refusal is a declared diagnostic code in both alphabets", () => {
+  // Ruling R3-T14.1: R3 adds ENGINE_MAP_CHECK_UNBUDGETED in its alphabetical place beside R1d's refusal, so the pin reads
+  // the declared list (both codes, in both alphabets) and its order, not one adjacency.
+  it("the per-run refusals are declared diagnostic codes in both alphabets, each alphabet in sorted order", () => {
     for (const file of ["apps/runner/src/index.ts", "apps/api/src/index.ts"]) {
-      expect(read(file), file).toContain("  \"EMPTY_PROPAGATION\",\n  \"ENGINE_RUNNER_UNCONFIGURED\",\n  \"ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS\",");
+      const source = read(file);
+      const block = source.slice(source.indexOf("// ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET"),
+        source.indexOf("// ─── END OPERATIONAL DIAGNOSTIC ALPHABET"));
+      const declaration = block.slice(block.indexOf("const KNOWN_DOMAIN_CODES"));
+      const codes = [...declaration.slice(declaration.indexOf("["), declaration.indexOf("]);")).matchAll(/"([A-Z][A-Z0-9_]*)"/gu)]
+        .map((match) => match[1]!);
+      expect(codes.length, file).toBeGreaterThan(100);
+      expect(codes, file).toEqual(expect.arrayContaining(["ENGINE_RUNNER_UNCONFIGURED", "ENGINE_MAP_CHECK_UNBUDGETED"]));
+      // R3 final wave P14: truly sorted, with no allowance (no pin or hash reads the order: every other reader sorts first).
+      expect(codes, file).toEqual([...codes].sort());
     }
   });
 });

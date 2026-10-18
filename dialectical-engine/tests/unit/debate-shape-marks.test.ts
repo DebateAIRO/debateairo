@@ -16,7 +16,7 @@ describe("the debate shape's condition marks", () => {
     const at = CONDITION_MARKS.indexOf("PANEL-DEGRADED-SINGLE-VOICE");
     expect(CONDITION_MARKS.slice(at + 1, at + 1 + DEBATE_SHAPE_MARKS.length)).toEqual([...DEBATE_SHAPE_MARKS]);
     expect(CONDITION_MARKS.slice(-4)).toEqual(["HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"]);
-    expect(CONDITION_MARKS).toHaveLength(50);
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
   });
 
   it("names every map mark the map package mints", () => {

@@ -16,6 +16,8 @@ const BEFORE_R2 = ["UNINSTRUMENTED", "UNFALSIFIED-AFTER-ROTATION", "SKIPPED-BY-B
   "MISSING-NUMBER", "LABEL-BASIS-INCOMPLETE", "OWED-CHECK-UNEXECUTED", "SYNTHESIS-OBJECTION-STANDING", "DIGEST-COMPRESSED",
   "DIGEST-CANNOT-EXIST", "PROTECTED-CORE-GUARD-RETIRED", "HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE",
   "UNAUTHORED-BRANCH-HALTED"];
+/** R3's four answer-check marks (spec §5.5), named so a later map mark cannot slip into the engine-1 pin unnoticed. */
+const R3_CHECK_MARKS = ["MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED"] as const;
 const KEYS = ["debateChrome.condition.verdictJudgeMissing", "debateChrome.condition.verdictJudgesUnavailable",
   "debateChrome.condition.verdictVotesIgnored", "debateChrome.condition.unassessedAtReducedWeight"] as const;
 // pre-flight PF-R2a3.8: folders only, so a Finder `.DS_Store` never reads as a locale.
@@ -40,11 +42,13 @@ describe("R2: the four engine marks (spec §4.7, §4.2a; INTERFACE §13)", () =>
     const at = CONDITION_MARKS.indexOf("PANEL-PARTIAL");
     expect(CONDITION_MARKS.slice(at - ENGINE_MARKS.length, at)).toEqual([...ENGINE_MARKS]);
     expect(CONDITION_MARKS.slice(-4)).toEqual(["HIDDEN-UNJUDGEABLE", "DERIVED-STANDING-UNREVIEWED", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"]);
-    expect(CONDITION_MARKS).toHaveLength(50);
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
   });
 
   it("engine 1 pin: every mark from before R2 keeps its relative order", () => {
-    expect(CONDITION_MARKS.filter((mark) => !(ENGINE_MARKS as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
+    // R3 (spec §5.5): the answer check's four marks are not engine-1 marks either.
+    expect(CONDITION_MARKS.filter((mark) => !(ENGINE_MARKS as readonly string[]).includes(mark)
+      && !(R3_CHECK_MARKS as readonly string[]).includes(mark))).toEqual(BEFORE_R2);
   });
 
   it("are wire vocabulary", () => {

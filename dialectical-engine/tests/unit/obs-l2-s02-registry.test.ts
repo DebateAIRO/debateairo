@@ -423,7 +423,8 @@ describe("S02 severity and unordered condition marks", () => {
     // vocabulary; only this count pin is stated by hand.
     // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
     // R2 (engine redesign, INTERFACE §13) minted four engine marks mid-list: 46 -> 50.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(50);
+    // R3 (engine redesign, spec §5.5) minted four answer-check marks mid-list: 50 -> 54.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );
