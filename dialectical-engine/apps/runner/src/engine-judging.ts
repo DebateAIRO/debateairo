@@ -15,8 +15,8 @@
  * a recorded failure included. A vote another write stored first (the record answers ALREADY_PRESENT) is read back and
  * its stored row decides, never this copy's fresh reply. Two stored seats of one maker (two copies after a mid-judging
  * reclaim): the earliest seat is the maker's vote and a later one is not counted (`storedSeatsOfRepeatedMakers`, R3 final
- * wave O2), so the count never refuses a resumed debate and never counts one maker twice. The run body supplies the I/O (`ask`, `record`, the recorded
- * rows), so this step is driven whole by `tests/unit/r2-judging-step.test.ts`.
+ * wave O2), so the count never refuses a resumed debate and never counts one maker twice. The run body supplies the I/O
+ * (`ask`, `record`, the recorded rows), so this step is driven whole by `tests/unit/r2-judging-step.test.ts`.
  */
 import {
   TypedDomainError,
