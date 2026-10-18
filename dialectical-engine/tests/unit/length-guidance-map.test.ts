@@ -22,8 +22,8 @@ import {
 } from "@debateai/register";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
 import {
-  createRunnerMapCaller, guidedMapBound, rootZeroKeepRoomMicros, rootZeroMapMaterialChars, rootZeroMapMaterialCharsFor,
-  rootZeroRoomAttempts, type MapStageDeps
+  createRunnerMapCaller, guidedMapBound, rootZeroEngineMaterialCharsFor, rootZeroKeepRoomMicros, rootZeroMapMaterialChars,
+  rootZeroMapMaterialCharsFor, rootZeroRoomAttempts, type MapStageDeps
 } from "../../apps/runner/src/map-stage.js";
 import { mapLengthAllowanceTokens } from "../../apps/api/src/ask-model-picker.js";
 
@@ -199,11 +199,12 @@ describe("a lengthed map call", () => {
     const seats = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"].map(price);
     const previewJudgeCeiling = Math.max(DEVELOPMENT_ORGAN_COST_BOUNDS.organs.JUDGE.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR);
     /** Root 0's kept room and the first lengthed list call (dearest seat) at one judge ceiling, on one plan's guidance. */
-    const at = (judgeTokenCeiling: number, plan: "free" | "plus") => {
+    const at = (judgeTokenCeiling: number, plan: "free" | "plus",
+      materialChars: Parameters<typeof rootZeroRoomAttempts>[0]["materialChars"] = rootZeroMapMaterialCharsFor(mapLimitsFor(true))) => {
       const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan, answerLength: "standard" });
       const room = rootZeroKeepRoomMicros({ prices: seats, ...rootZeroRoomAttempts({ questionLine: "Should cities price congestion?",
         argumentLanguageName: "English", questionLanguage: questionLanguageForBounds(), tokenCeiling: judgeTokenCeiling, lengthed: true,
-        materialChars: rootZeroMapMaterialCharsFor(mapLimitsFor(true)) }),
+        materialChars }),
         structureRepair: { price: price("claude-haiku-5-5"),
           attempt: { requestBytes: PREVIEW_REQUEST_BODY_MAX_BYTES, completionTokenCeiling: 32_768 } } });
       const spec = mapListSpec(ctx(LENGTH), { angleId: "g1", kind: "OPPOSITE_CASE",
@@ -259,6 +260,37 @@ describe("a lengthed map call", () => {
       expect(state.listCall).toBeLessThanOrEqual(paid.body);
       expect(state.room + state.listCall).toBeGreaterThan(paid.body);
       expect(await seamDecision(state, paid)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+    });
+
+    /** Ruling PF-R35.4 (a) (R3): engine 2's root-0 material — LG-C's room, the shared points room, plus the assumptions only. */
+    const engineChars = rootZeroEngineMaterialCharsFor(mapLimitsFor(true));
+    const firstBytes = (materialChars: NonNullable<Parameters<typeof rootZeroRoomAttempts>[0]["materialChars"]>) => rootZeroRoomAttempts({
+      questionLine: "Should cities price congestion?", argumentLanguageName: "English", questionLanguage: questionLanguageForBounds(),
+      tokenCeiling: previewJudgeCeiling, lengthed: true, materialChars }).first.requestBytes;
+
+    it("engine 2 (R3): root 0's kept room is LG-C's lengthed room plus the assumptions only; points raised share the points' room", () => {
+      const lengthed = rootZeroMapMaterialCharsFor(mapLimitsFor(true));
+      expect({ answer: engineChars.answer, points: engineChars.points }).toEqual(lengthed);
+      expect(engineChars.pointsRaised).toBe(engineChars.points); // one shared room, never added to the points'
+      // What one points room costs in root 0's request (LG-C's room less the same room with an empty points list).
+      const pointsRoomBytes = firstBytes(lengthed) - firstBytes({ ...lengthed, points: "[]".length });
+      // Engine 2 grows root 0's request ...
+      expect(firstBytes(engineChars)).toBeGreaterThan(firstBytes(lengthed));
+      // ... and, without the assumptions, by far less than a second points room (the I1 doubling this ruling avoids).
+      expect(firstBytes({ ...engineChars, assumptions: "[]".length }) - firstBytes(lengthed)).toBeLessThan(pointsRoomBytes);
+    });
+
+    it("engine 2 (R3, Known limits): on Free and at the paid 8,192 the first lengthed list call stays refused room-only, never a money stop", async () => {
+      for (const [ceiling, plan, money] of [[previewJudgeCeiling, "free", free], [4096, "free", free], [previewJudgeCeiling, "plus", paid]] as const) {
+        const state = at(ceiling, plan, engineChars);
+        expect(state.room).toBeGreaterThanOrEqual(at(ceiling, plan).room);
+        expect(state.listCall).toBeLessThanOrEqual(money.body);
+        expect(await seamDecision(state, money)).toBe("RUN_COST_ENVELOPE_ROOM_KEPT");
+      }
+      // Paid at 4,096: admitted exactly when the engine-2 room plus the call fits the paid body (the measured rule of the
+      // LG-C cases above), never a money stop.
+      const paid4096 = at(4096, "plus", engineChars);
+      expect(await seamDecision(paid4096, paid)).toBe(paid4096.room + paid4096.listCall <= paid.body ? "ADMITTED" : "RUN_COST_ENVELOPE_ROOM_KEPT");
     });
   });
 });
@@ -352,7 +384,10 @@ describe("the map's length wiring, end to end (R1c final wave B10)", () => {
     const runner = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     expect(runner.split("rootZeroMapMaterialCharsFor(").length - 1).toBe(1);
     expect(runner).toContain("const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));");
-    expect(runner.split("materialChars: rootMaterialChars }").length - 1).toBe(1);
+    // R3 (pre-flight PF-R35.5): engine 2's root-0 bound is computed once beside LG-C's and read by the room and rootLegOf's engine branch.
+    expect(runner.split("materialChars: rootEngineMaterialChars ?? rootMaterialChars }").length - 1).toBe(1);
+    expect(runner.split("rootZeroEngineMaterialCharsFor(").length - 1).toBe(1);
+    expect(runner.split("}, rootEngineMaterialChars!)").length - 1).toBe(1);
     expect(runner.split("mapPoints: position.mapPoints }, rootMaterialChars)").length - 1).toBe(1);
   });
 });

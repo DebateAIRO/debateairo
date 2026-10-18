@@ -5,7 +5,7 @@ import {
   TypedDomainError, type QuestionLanguage
 } from "@debateai/kernel";
 import {
-  MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
+  MAP_ENGINE_LIMITS, MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
   type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapLimits, type MapResult, type MapRunInput,
   type MapSeat, type MapStep
 } from "@debateai/map";
@@ -46,6 +46,12 @@ export type MapStageDeps = Readonly<{
   roomKept?: (error: unknown) => boolean;
   /** Length guidance: the run's frozen numbers (map thinking room, runaway factor); absent or null = today's bounds. */
   lengthGuidance?: LengthGuidance | null;
+  /**
+   * Engine 2 (engine INTERFACE §2.2): the seal an engine-2 map call records (`engineContractHash()`, from the runner's
+   * engine settings). A map call whose spec is engine 2 (`spec.engine`) records it; every other map call records
+   * `mapContractHash` as today.
+   */
+  engineContractHash?: string;
 }>;
 /**
  * `settled()` (Task 1 note): resolves once every call this caller SENT has finished, whatever its outcome. When an
@@ -106,13 +112,17 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
     if (abandoned !== null) throw abandoned.error;
     const member = deps.memberOf(request.seat.aiRef);
     if (member === null || deps.sitsOut(request.seat.aiRef)) return { kind: "BUSY", code: MAKER_SAT_OUT };
+    // Engine 2: the seal that covers the call's contract. Unreachable without the engine settings (R1d refuses such a run
+    // first, ENGINE_RUNNER_UNCONFIGURED); a wiring defect would otherwise record the wrong seal, so it stops here.
+    const contractHash = request.spec.engine === true ? deps.engineContractHash : deps.mapContractHash;
+    if (contractHash === undefined) throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "An engine-2 map call needs the engine seal");
     try {
       const pieces = mapProviderPieces(request.spec);
       const response = await inTurn(() => member.provider.call({
         runId: deps.runId, subjectItemId: deps.subjectItemId, callSiteKey: request.callSiteKey, role: "JUDGE", lane: "served",
         bound: guidedMapBound(mapStageBound(deps.judgeBound, request.step, deps.longBounds), request.spec.replyWordsCeiling,
           deps.lengthGuidance ?? null),
-        contractHash: deps.mapContractHash,
+        contractHash,
         // Length guidance: the parts' words this call was told, recorded beside what it wrote.
         ...(request.spec.guidedWords === null ? {} : { guidedWords: request.spec.guidedWords }),
         // Length guidance L25 (pre-flight PF-C5.11): the most guided words this reply can hold, which the preview wrapper's
@@ -218,13 +228,14 @@ export function shapeRootMaterial(material: Readonly<{ assignedAnswer: string; m
     assignedAnswer = clipped;
   }
   if (assignedAnswer === material.assignedAnswer && material.mapPoints.length <= limits.points) return material;
-  let sides: { for: string[]; against: string[] };
+  let sides: { for: unknown[]; against: unknown[] };
   try {
     const parsed = JSON.parse(material.mapPoints) as unknown;
-    const strings = (value: unknown): string[] | null =>
-      Array.isArray(value) && value.every((entry) => typeof entry === "string") ? [...value as string[]] : null;
+    // Engine 2's labelled points are objects; engine 1's string arrays read exactly as before.
+    const entries = (value: unknown): unknown[] | null => Array.isArray(value) && value.every((entry) => typeof entry === "string"
+      || (typeof entry === "object" && entry !== null && !Array.isArray(entry))) ? [...value as unknown[]] : null;
     const record = parsed !== null && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
-    sides = { for: strings(record.for) ?? [], against: strings(record.against) ?? [] };
+    sides = { for: entries(record.for) ?? [], against: entries(record.against) ?? [] };
   } catch {
     sides = { for: [], against: [] };
   }
@@ -234,6 +245,50 @@ export function shapeRootMaterial(material: Readonly<{ assignedAnswer: string; m
     mapPoints = JSON.stringify(sides);
   }
   return Object.freeze({ assignedAnswer, mapPoints });
+}
+
+/**
+ * Engine 2 (R3): root 0's material limits. `answer` and `points` are LG-C's (`rootZeroMapMaterialCharsFor`). `pointsRaised`
+ * EQUALS `points` and is never added to it: it is the ONE room the labelled map points and the points raised SHARE
+ * (Ruling PF-R35.4 (a): no second points room; together they hold at most `pointsRaised + 2` characters, the `+ 2` being
+ * the empty list), so the room root 0 keeps under engine 2 is LG-C's plus the assumptions only. `assumptions` holds up
+ * to three of a claim's length.
+ */
+export type RootZeroEngineMaterialChars = Readonly<{ answer: number; points: number; pointsRaised: number; assumptions: number }>;
+
+/**
+ * Engine 2 (spec §5.2 items 2, 6; Review Focus 5): the room root 0 keeps covers the fixed-words call. The answer's room is
+ * LG-C's (twice the runaway claim limit): every chosen, reserve, merged or filled answer is within it by its schema, so the
+ * words are never clipped. Task 12's bound frames the shared room at both extreme splits (all sided, the raised list
+ * empty; none sided, all raised); every character frames at the same bytes, so every split in between is covered.
+ */
+export function rootZeroEngineMaterialCharsFor(limits: MapLimits): RootZeroEngineMaterialChars {
+  const base = rootZeroMapMaterialCharsFor(limits);
+  return Object.freeze({ answer: base.answer, points: base.points, pointsRaised: base.points,
+    assumptions: MAP_ENGINE_LIMITS.assumptionsMax * (limits.claimMaxChars + 8) + 8 });
+}
+
+/** A JSON list trimmed whole from its end until it fits `room` characters (an unreadable list reads as none). */
+function listWithin(json: string, room: number): string {
+  let entries: unknown[];
+  try { const parsed = JSON.parse(json) as unknown; entries = Array.isArray(parsed) ? [...parsed] : []; } catch { entries = []; }
+  let text = JSON.stringify(entries);
+  while (text.length > room && entries.length > 0) { entries.pop(); text = JSON.stringify(entries); }
+  return text;
+}
+
+/**
+ * Engine 2's root material, held within root 0's room: the chosen words WHOLE (P2.6: "the code sets the words"); the
+ * labelled map points by today's rule (`shapeRootMaterial`, whole points dropped from the longer side) within the shared
+ * room; then the points raised, whole points dropped from their end, in what is left of it; the assumptions trimmed whole
+ * from their end. Code only selects and orders whole items (G1); it never cuts inside a text.
+ */
+export function shapeEngineRootMaterial(material: Readonly<{ assignedAnswer: string; mapPoints: string; pointsRaised: string; assumptions: string }>,
+  limits: RootZeroEngineMaterialChars): Readonly<{ assignedAnswer: string; mapPoints: string; pointsRaised: string; assumptions: string }> {
+  const mapPoints = shapeRootMaterial({ assignedAnswer: "", mapPoints: material.mapPoints }, { answer: limits.answer, points: limits.points }).mapPoints;
+  return Object.freeze({ assignedAnswer: material.assignedAnswer, mapPoints,
+    pointsRaised: listWithin(material.pointsRaised, limits.pointsRaised + "[]".length - mapPoints.length),
+    assumptions: listWithin(material.assumptions, limits.assumptions) });
 }
 
 /** Room for the target's own `model` member, which `rootPositionRequestBytesBound` leaves empty. */
@@ -266,8 +321,11 @@ export function rootZeroRoomRefs<S>(input: Readonly<{
 type RootZeroRequestInput = Readonly<{
   questionLine: string; argumentLanguageName: string; completionTokenCeiling: number; questionLanguage?: QuestionLanguage | null;
   lengthed?: boolean;
-  /** Root 0's map material limits (`rootZeroMapMaterialCharsFor`); absent = today's `rootZeroMapMaterialChars`. */
-  materialChars?: Readonly<{ answer: number; points: number }>;
+  /**
+   * Root 0's map material limits (`rootZeroMapMaterialCharsFor`); absent = today's `rootZeroMapMaterialChars`. With
+   * `pointsRaised` and `assumptions` (engine 2, `rootZeroEngineMaterialCharsFor`), the fixed-words leg is framed too.
+   */
+  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
 }>;
 
 /**
@@ -304,10 +362,12 @@ export type RootZeroAttempt = Readonly<{ requestBytes: number; completionTokenCe
  * after a reply that failed its check). The backup answering after a billed failure of the main is the first packet at
  * the first bound, under both. Each is sized the conservative way the first attempt is (`rootPositionRequestBytesBound`),
  * and each frames the run's lock when it has one (PF-L38: `rootZeroRoomLock`) and, on a run with a length receipt
- * (`lengthed`), the lengthed variant at its bound target (spec 2026-10-15 §3.2).
+ * (`lengthed`), the lengthed variant at its bound target (spec 2026-10-15 §3.2). With `pointsRaised` and `assumptions`
+ * (engine 2, `rootZeroEngineMaterialCharsFor`), the fixed-words leg is framed too.
  */
 export function rootZeroRoomAttempts(input: Readonly<{ questionLine: string; argumentLanguageName: string; tokenCeiling: number;
-  questionLanguage?: QuestionLanguage | null; lengthed?: boolean; materialChars?: Readonly<{ answer: number; points: number }> }>):
+  questionLanguage?: QuestionLanguage | null; lengthed?: boolean;
+  materialChars?: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }> }>):
   Readonly<{ first: RootZeroAttempt; retries: readonly RootZeroAttempt[] }> {
   const question = { questionLine: input.questionLine, argumentLanguageName: input.argumentLanguageName,
     questionLanguage: input.questionLanguage ?? null, ...(input.lengthed === true ? { lengthed: true } : {}),
@@ -370,13 +430,16 @@ export async function resolveShapeMap(input: Readonly<{
   answerCount: () => number;
   runMap: () => Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>>;
   spendStopOfCode: (code: string) => EnvelopeStopKind | null;
+  /** Engine 2: the stored also-raised list lists unchosen answers (spec §5.2 item 8). */
+  unchosenAnswers?: boolean;
 }>): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> {
   const storedStop = (stored: MapResult): EnvelopeStopKind | null =>
     stored.stoppedBy === null ? null : input.spendStopOfCode(stored.stoppedBy);
   const stored = await input.store.readMapResultForRun(input.runId);
   if (stored !== null) return Object.freeze({ result: stored, spendStop: storedStop(stored) });
   const own = await input.runMap();
-  const written = await input.store.writeMapRun({ runId: input.runId, result: own.result, answerCount: input.answerCount() });
+  const written = await input.store.writeMapRun({ runId: input.runId, result: own.result, answerCount: input.answerCount(),
+    ...(input.unchosenAnswers === true ? { unchosenAnswers: true } : {}) });
   if (written === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
   if (written !== "ALREADY_PRESENT") return own;
   const winner = await input.store.readMapResultForRun(input.runId);

@@ -1,4 +1,4 @@
-import { MAP_LIMITS, type MapChoice, type MapKeyPoint } from "@debateai/map";
+import { MAP_LIMITS, type MapChoice, type MapKeyPoint, type MapRestsOn } from "@debateai/map";
 
 /**
  * Debate shape (spec 2026-10-12 §3.3) — THE PLAN, in the runner's own vocabulary: P roots (plan positions 0..P−1) and
@@ -25,8 +25,20 @@ export interface ShapeLeg {
   readonly callSiteKey: string;
 }
 export type ShapePointSpec = Readonly<{ polarity: "support" | "attack"; consideration: string | null; keyPointId: string | null }>;
+/** Engine 2 (spec §5.2 rule 4): a key point given to a position's writer UNSIDED, with what it rests on. */
+export type ShapeRaisedPoint = Readonly<{ text: string; restsOn: MapRestsOn | null }>;
 export type ShapePositionPlan = Readonly<{ answerId: string | null; statement: string | null; mapPoints: string | null;
-  points: readonly ShapePointSpec[]; rivalIndex: number }>;
+  points: readonly ShapePointSpec[]; rivalIndex: number;
+  /** Engine 2 only: the chosen answer's assumptions (AI-written), for its writer. */
+  assumptions?: readonly string[];
+  /** Engine 2 only: the points raised to its writer unsided. */
+  pointsRaised?: readonly ShapeRaisedPoint[] }>;
+
+/** Today's generic legs for a position with no chosen points: K alternating attack / support, no consideration. */
+export function shapeGenericPoints(k: number): readonly ShapePointSpec[] {
+  return Object.freeze(Array.from({ length: k }, (_point, at): ShapePointSpec =>
+    Object.freeze({ polarity: at % 2 === 0 ? "attack" : "support", consideration: null, keyPointId: null })));
+}
 export type ShapeScrutinySlots = Readonly<{ start: number; nodesPerDebate: number; roundsPerNode: number; count: number }>;
 export type ShapePlan = Readonly<{ rootCount: number; legs: readonly ShapeLeg[]; scrutiny: ShapeScrutinySlots; totalPlannedNodes: number }>;
 
@@ -92,8 +104,11 @@ export function shapeRivalRing(preferred: readonly (number | null)[]): readonly 
  * false (engine 1): the chooser's rival, else the next position, value for value as before R2.
  */
 export function shapePositionsFromMap(input: Readonly<{ choice: MapChoice; keyPoints: readonly MapKeyPoint[]; answers: number;
-  pointsPerAnswer: number; ring?: boolean }>): readonly ShapePositionPlan[] {
+  pointsPerAnswer: number; ring?: boolean;
+  /** Engine 2 (R3): labelled points, generic legs for an unsided answer, its points raised and assumptions. */
+  engineMap?: boolean }>): readonly ShapePositionPlan[] {
   const claimOf = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint.claim] as const));
+  const keyPointOf = new Map(input.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
   const answers = input.choice.answers.slice(0, input.answers);
   // The chooser's named rival as an index; an id not among the answers, or the answer itself, names none.
   const named = answers.map((answer, index): number | null => {
@@ -103,13 +118,24 @@ export function shapePositionsFromMap(input: Readonly<{ choice: MapChoice; keyPo
   const ring = input.ring === true && answers.length >= 2 ? shapeRivalRing(named) : null;
   return Object.freeze(answers.map((answer, index): ShapePositionPlan => {
     const claims = (ids: readonly string[]) => ids.flatMap((id) => claimOf.get(id) ?? []);
+    const labelled = (ids: readonly string[]) => ids.flatMap((id) => { const keyPoint = keyPointOf.get(id);
+      return keyPoint === undefined ? [] : [{ text: keyPoint.claim, rests_on: keyPoint.restsOn ?? null }]; });
+    const sidedPoints = shapeRoundOnePoints(answer.forKeyPointIds, answer.againstKeyPointIds, input.pointsPerAnswer)
+      .flatMap((point) => { const claim = claimOf.get(point.keyPointId); return claim === undefined ? [] : [Object.freeze({ ...point, consideration: claim })]; });
+    const engine = input.engineMap === true;
     return Object.freeze({
       answerId: answer.answerId,
       statement: answer.statement,
-      mapPoints: JSON.stringify({ for: claims(answer.forKeyPointIds), against: claims(answer.againstKeyPointIds) }),
-      points: Object.freeze(shapeRoundOnePoints(answer.forKeyPointIds, answer.againstKeyPointIds, input.pointsPerAnswer)
-        .flatMap((point) => { const claim = claimOf.get(point.keyPointId); return claim === undefined ? [] : [Object.freeze({ ...point, consideration: claim })]; })),
-      rivalIndex: ring === null ? named[index] ?? nextRival(index, answers.length) : ring[index]!
+      mapPoints: engine ? JSON.stringify({ for: labelled(answer.forKeyPointIds), against: labelled(answer.againstKeyPointIds) })
+        : JSON.stringify({ for: claims(answer.forKeyPointIds), against: claims(answer.againstKeyPointIds) }),
+      // Spec §5.2 rule 4: an unsided answer (code-chosen, code-filled, or a merged replacement) gets today's generic legs.
+      points: Object.freeze(engine && sidedPoints.length === 0 ? [...shapeGenericPoints(input.pointsPerAnswer)] : sidedPoints),
+      rivalIndex: ring === null ? named[index] ?? nextRival(index, answers.length) : ring[index]!,
+      ...(engine ? {
+        assumptions: Object.freeze([...(answer.assumptions ?? [])]),
+        pointsRaised: Object.freeze((answer.pointsRaised ?? []).flatMap((id) => { const keyPoint = keyPointOf.get(id);
+          return keyPoint === undefined ? [] : [Object.freeze({ text: keyPoint.claim, restsOn: keyPoint.restsOn ?? null })]; }))
+      } : {})
     });
   }));
 }
@@ -124,8 +150,7 @@ export function shapePositionsForTodaysOpening(input: Readonly<{ answers: number
     ? shapeRivalRing(Array.from({ length: input.answers }, () => null)) : null;
   return Object.freeze(Array.from({ length: input.answers }, (_unused, index): ShapePositionPlan => Object.freeze({
     answerId: null, statement: null, mapPoints: null,
-    points: Object.freeze(Array.from({ length: input.pointsPerAnswer }, (_point, at): ShapePointSpec =>
-      Object.freeze({ polarity: at % 2 === 0 ? "attack" : "support", consideration: null, keyPointId: null }))),
+    points: shapeGenericPoints(input.pointsPerAnswer),
     rivalIndex: ring === null ? nextRival(index, input.answers) : ring[index]!
   })));
 }

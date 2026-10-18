@@ -1,6 +1,6 @@
 import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
 import type { VerdictState } from "@debateai/contract";
-import { mapAlsoRaisedOf, type MapResult } from "@debateai/map";
+import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
   withoutStoryNodeIds,
@@ -301,10 +301,17 @@ export type StoryMapSource = Pick<MapResult, "keyPoints" | "mergedAnswers" | "ch
  */
 export function storyAlsoRaisedFrom(
   map: StoryMapSource | null,
-  arguedAnswers: number
+  arguedAnswers: number,
+  /**
+   * Engine 2 (spec §5.2 item 8): unchosen answers too, never one the answer check failed (deviation 8), by its words
+   * (`mapCheckFailedStatements`) and by the merged answer behind it (`mapCheckFailedMergedAnswerIds`, amendment A9-1).
+   */
+  engine?: Readonly<{ checkFailed: readonly string[]; checkFailedMergedAnswerIds: readonly string[] }>
 ): readonly { readonly claim: string; readonly raisedBy: number }[] | undefined {
   if (map === null || map.choice === null) return undefined;
-  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers })
+  return Object.freeze(mapAlsoRaisedOf({ choice: map.choice, keyPoints: map.keyPoints, mergedAnswers: map.mergedAnswers, arguedAnswers,
+    ...(engine === undefined ? {} : { unchosenAnswers: true as const, checkFailed: engine.checkFailed,
+      checkFailedMergedAnswerIds: engine.checkFailedMergedAnswerIds, internalNames: MAP_ENGINE_INTERNAL_FIELD_NAMES }) })
     .map((entry) => Object.freeze({ claim: withoutNodeIds(entry.claim), raisedBy: Math.max(1, new Set(entry.makers).size) })));
 }
 

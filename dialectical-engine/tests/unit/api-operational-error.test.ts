@@ -165,6 +165,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "EMPTY_EVENT_STREAM",
   "EMPTY_OVERLAY_OWNER",
   "EMPTY_PROPAGATION",
+  "ENGINE_MAP_CHECK_UNBUDGETED",
   "ENGINE_RUNNER_UNCONFIGURED",
   "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
   "ENGINE_CATCH_UP_RULE_MISSING",
@@ -236,6 +237,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
   "JUDGES_VERDICT_INPUT_INVALID",
+  "JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED",
   // FW-B / F-I2: the judgement package's own closed-table refusal
   // (packages/judgement/src/index.ts) and the five door refusals below reach
   // this boundary through the gateway, so they belong in the alphabet.
@@ -261,6 +263,8 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
+  "MAP_CHECK_ENGINE_ONLY",
+  "MAP_ENGINE_REQUIRES_LENGTH",
   "MAP_GAP_ITEM_UNKNOWN",
   "MAP_RECORD_INVALID",
   "MAP_REPLY_UNREADABLE",

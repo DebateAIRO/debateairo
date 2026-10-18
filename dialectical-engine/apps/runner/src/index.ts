@@ -192,7 +192,9 @@ import {
   verdictDerivationOfJudges
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
-import { MapChoiceRepository, mapAnswersArgued, mapLimitsFor, type MapResult } from "@debateai/map";
+import {
+  MapChoiceRepository, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor, type MapResult
+} from "@debateai/map";
 import {
   argumentLanguageDirective,
   questionLanguageFromRun,
@@ -258,8 +260,8 @@ import {
   type ScrutinyCandidate
 } from "./shape-select.js";
 import {
-  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroKeepRoomMicros, rootZeroMapMaterialCharsFor,
-  rootZeroRoomAttempts, rootZeroRoomRefs, runMapStage, shapeRootMaterial
+  createRunnerMapCaller, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroKeepRoomMicros,
+  rootZeroMapMaterialCharsFor, rootZeroRoomAttempts, rootZeroRoomRefs, runMapStage, shapeEngineRootMaterial, shapeRootMaterial
 } from "./map-stage.js";
 import {
   buildScrutinyLegs, buildShapePlan, shapeLegCanRun, shapePositionCount, shapePositionsForTodaysOpening, shapePositionsFromMap,
@@ -5588,6 +5590,13 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED",
         "This run was admitted with engine 2, and this runner has no sealed engine contracts");
     }
+    /**
+     * Engine redesign R3 (Ruling PF-R35.4 (a), pre-flight PF-R35.5): engine 2's root-0 material bound, computed ONCE, as
+     * LG-C's `rootMaterialChars` is: root 0's kept room and the engine branch of `rootLegOf` read this one value. Null on
+     * engine 1 or without the shape (LG-C's value stands).
+     */
+    const rootEngineMaterialChars = engine.engine === 2 && shapeShape !== null
+      ? rootZeroEngineMaterialCharsFor(mapLimitsFor(lengthGuidance !== null)) : null;
     const shapeSettings = shapeShape === null ? null : debateShapeSettingsOf(run.depthParams);
     const expansionDepth = resolveExpansionDepth(run.depthParams);
     /**
@@ -6165,6 +6174,15 @@ export class WalkingSkeletonRunner {
     const shapeRun = shapeShape !== null && shapeSettings !== null && this.settings.debateShape != null && effectiveMakerCount >= 2
       ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
       : null;
+    /**
+     * Engine redesign R3 (spec 2026-10-15 §5): engine 2's map answer step — new shape only. The receipt's engine (never
+     * the row) decides; the receipt counted ONE answer check (R1d `sites.answerCheck`). A receipt that did not count it
+     * never sends it: the run stops before the map (deviation 10).
+     */
+    const engineMap = engine.engine === 2 && shapeRun !== null;
+    if (engine.engine === 2 && shapeRun !== null && engine.sites.answerCheck !== 1) {
+      throw new TypedDomainError("ENGINE_MAP_CHECK_UNBUDGETED", "The run's receipt does not count the map's answer check");
+    }
     /**
      * The answer writer's target (spec 2026-10-15 §3.2 notes): the length row's words for every debate with it (they win
      * over the shape's), else a shaped run's answer length (today's "about N words"), else none (today's v4 packet; pre-flight PF-C3.2).
@@ -7285,7 +7303,7 @@ export class WalkingSkeletonRunner {
           tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
           lengthed: lengthGuidance !== null,
           // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
-          materialChars: rootMaterialChars }),
+          materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
           structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
@@ -7314,7 +7332,10 @@ export class WalkingSkeletonRunner {
           // T12-R1: a refusal only because of root 0's room stops the map, never the arguing.
           roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT,
           // Length guidance (spec 2026-10-15 §3.3): the receipt's numbers size each map call's allowance.
-          lengthGuidance
+          lengthGuidance,
+          // Engine redesign R3: an engine-2 map call records the engine seal (R1d's per-run refusal above guarantees the
+          // engine settings for an engine receipt).
+          ...(engineMap ? { engineContractHash: this.settings.engine!.engineContractHash } : {})
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
@@ -7325,7 +7346,9 @@ export class WalkingSkeletonRunner {
             gapRoundsMax: shapeRun.shape.gapRounds, maxAnswers: shapeRun.shape.answers, pointsPerAnswer: shapeRun.shape.pointsPerAnswer,
             // Length guidance (spec 2026-10-15 §3.2): the receipt's map targets; absent = today's map.
             ...(lengthGuidance === null ? {} : { length: Object.freeze({ targets: lengthGuidance.map,
-              charactersPerWord: lengthGuidance.charactersPerWord }) })
+              charactersPerWord: lengthGuidance.charactersPerWord }) }),
+            // Engine redesign R3 (spec §5): the v2 contracts, no code-sided points, and ONE answer check after choose.
+            ...(engineMap && engine.engine === 2 ? { engine: { answerCheckCandidates: engine.answerCheck.candidates } } : {})
           } });
           return Object.freeze({ result, spendStop: mapCaller.spendStop() });
         } catch (error) {
@@ -7345,7 +7368,9 @@ export class WalkingSkeletonRunner {
         // Pre-flight PF-B31: never fewer than two positions (buildShapePlan refuses fewer; the receipt's answers is ≥ 2).
         // Ruling T-P5: never more than the map stores either (`shapePositionCount` holds MAP_LIMITS.chooseAnswersMax).
         answerCount: () => shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut)),
-        spendStopOfCode: (code) => expansionPhaseStop(new TypedDomainError(code, code))
+        spendStopOfCode: (code) => expansionPhaseStop(new TypedDomainError(code, code)),
+        // Engine redesign R3 (spec §5.2 item 8): the stored also-raised list lists unchosen answers under engine 2.
+        unchosenAnswers: engineMap
       });
       shapeMapResult = resolved.result;
       mapSpendStop = resolved.spendStop;
@@ -7409,7 +7434,7 @@ export class WalkingSkeletonRunner {
       : shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut));
     const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
       : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
-        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
+        answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2, engineMap });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
@@ -7566,6 +7591,15 @@ export class WalkingSkeletonRunner {
       const position = shapePositions?.[rootIndex];
       if (position === undefined || position.statement === null || position.mapPoints === null) {
         return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
+      }
+      if (engineMap) {
+        // P2.6 (spec §5.2 item 6): the map's chosen words, whole; the writer writes only the case (judge.assigned-root.*.v2).
+        // The ONE engine-2 bound computed above (pre-flight PF-R35.5); non-null whenever engineMap.
+        const material = shapeEngineRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints,
+          pointsRaised: JSON.stringify((position.pointsRaised ?? []).map((point) => ({ text: point.text, rests_on: point.restsOn }))),
+          assumptions: JSON.stringify(position.assumptions ?? []) }, rootEngineMaterialChars!);
+        return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
+          engine: { pointsRaised: material.pointsRaised, assumptions: material.assumptions } };
       }
       const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
@@ -11319,7 +11353,9 @@ export class WalkingSkeletonRunner {
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
               // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
               // Ruling W-CUT: a chosen answer past the positions argued is listed too (the page's stored list agrees).
-              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0),
+              alsoRaised: storyAlsoRaisedFrom(shapeMapArgued ? debateShapeMap : null, shapeMapPositions?.length ?? 0,
+                engineMap ? { checkFailed: mapCheckFailedStatements(debateShapeMap?.answerCheck),
+                  checkFailedMergedAnswerIds: mapCheckFailedMergedAnswerIds(debateShapeMap?.answerCheck) } : undefined),
               // Owner ruling C-STORY: one plain sentence when the answers came from a map fallback, read from the map's
               // whole result (debateShapeMap is null on a fallback); undefined on today's run.
               answersNote: storyAnswersNoteFrom(shapeMapResult,
@@ -11678,6 +11714,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "EMPTY_EVENT_STREAM",
   "EMPTY_OVERLAY_OWNER",
   "EMPTY_PROPAGATION",
+  "ENGINE_MAP_CHECK_UNBUDGETED",
   "ENGINE_RUNNER_UNCONFIGURED",
   "ENVELOPE_EXHAUSTED_WITHOUT_VERIFIED_COMPONENTS",
   "ENGINE_CATCH_UP_RULE_MISSING",
@@ -11749,6 +11786,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
   "JUDGES_VERDICT_INPUT_INVALID",
+  "JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED",
   // FW-B / F-I2: the judgement package's closed leg table refuses an undeclared
   // material name (packages/judgement/src/index.ts) on the way INTO the frame,
   // so the refusal travels the same path a schema failure does.
@@ -11774,6 +11812,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
+  "MAP_CHECK_ENGINE_ONLY",
+  "MAP_ENGINE_REQUIRES_LENGTH",
   "MAP_GAP_ITEM_UNKNOWN",
   "MAP_RECORD_INVALID",
   "MAP_REPLY_UNREADABLE",
