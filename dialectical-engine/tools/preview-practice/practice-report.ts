@@ -630,6 +630,20 @@ export function reportMarkdown(report: PracticeReport): string {
     }
     lines.push("");
   }
+  // Task 17a (D5): wording N's counts per arm (the answers word for word are in report.json `wording`).
+  const wordingTotals = report.wordingTotals as readonly Readonly<{ arm: string; questions: number; checked: number; rejected: number;
+    notAnAnswer: number; addedFact: number; noCost: number; premiseExempt: number; assumptions: readonly number[] }>[] | undefined;
+  if (wordingTotals !== undefined && wordingTotals.length > 0) {
+    lines.push("Wording N (D5; counts only, the debated answers word for word are in report.json `wording`; C2 the sealed wording, C2N wording N):", "",
+      "| arm | questions | checked | rejected | not an answer | adding a fact | no cost named | premise exempt | assumptions per answer (mean) |",
+      "|---|---|---|---|---|---|---|---|---|");
+    for (const row of wordingTotals) {
+      const mean = row.assumptions.length === 0 ? "none" : (row.assumptions.reduce((sum, n) => sum + n, 0) / row.assumptions.length).toFixed(1);
+      lines.push(`| ${row.arm} | ${String(row.questions)} | ${String(row.checked)} | ${String(row.rejected)} | ${String(row.notAnAnswer)} | `
+        + `${String(row.addedFact)} | ${String(row.noCost)} | ${String(row.premiseExempt)} | ${mean} |`);
+    }
+    lines.push("");
+  }
   // Debate mode only: the formats report's own `parallel` is a yes/no (models at once, practice-samples-log.ts).
   const parallel = typeof report.parallel === "object" && report.parallel !== null ? report.parallel as PracticeParallelBlock : undefined;
   if (parallel !== undefined) lines.push(...practiceParallelLines(parallel));

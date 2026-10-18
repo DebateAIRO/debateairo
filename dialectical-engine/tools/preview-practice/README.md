@@ -211,6 +211,14 @@ To build `report.json` and `report.md` again from a folder's `openings.jsonl` (n
 acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
 folder holds one.
 
+Arms `C2` and `C2N` (Task 17a, D5's comparison, named only with `--arms`; refused with `--dry`): the angle map on engine 2,
+in the sealed wording (C2) and in wording N (C2N: the four answer-writing instructions name the failing forms, ids
+`<id>.wording-n`, never sealed, practice only). Both are judged by the same sealed answer check. `report.json` `wording`
+lists each question's debated answers word for word with the check's codes; `wordingTotals` and report.md give D1's
+counts per wording (rejections by test, premise challenges exempt, assumptions per answer). The owner reads the answers
+and marks the hedged or circular ones; the wording with fewer of them and fewer check rejections ships (as NEW sealed
+ids, a later task).
+
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
 (angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
@@ -947,7 +955,8 @@ Optional flags:
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
-  (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  (default all four; they always run in the order T, A, B, C, C2, C2N; C2 and C2N run only when named, never with
+  `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
   formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and

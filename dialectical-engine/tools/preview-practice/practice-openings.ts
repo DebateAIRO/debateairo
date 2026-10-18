@@ -49,7 +49,8 @@ import {
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
 import { replyContentOf } from "./practice-lanes.js";
 import type { OpeningsArmLine, OpeningsArmNote, OpeningsBusyWait, OpeningsCall, OpeningsCallStatus, OpeningsStep } from "./practice-openings-log.js";
-import { OPENINGS_ARMS, OPENINGS_QUESTIONS, type OpeningsArm, type OpeningsQuestion } from "./practice-openings-questions.js";
+import { practiceWordingMapExtras, practiceWordingNCaller } from "./practice-map-wording.js";
+import { OPENINGS_ARMS, OPENINGS_ENGINE_ARMS, OPENINGS_QUESTIONS, type OpeningsArm, type OpeningsQuestion } from "./practice-openings-questions.js";
 import { reportableReplyText } from "./practice-redaction.js";
 import { PracticeRefusal } from "./practice-settings.js";
 
@@ -74,7 +75,8 @@ export type OpeningsRunInput = Readonly<{
   arms: readonly OpeningsArm[];
   /** The judge organ's bound (the preview policy raises it to its 8,192-token floor). */
   bound: CallBound;
-  contractHashes: Readonly<{ judge: string; map: string }>;
+  /** `engine`: engineContractHash(), the seal an engine-2 map call records (arms C2, C2N; Task 17a). */
+  contractHashes: Readonly<{ judge: string; map: string; engine?: string }>;
   /** Test seam and --dry: the policy's resend wait and the busy waits. */
   sleep?: (milliseconds: number) => Promise<void>;
   random?: () => number;
@@ -120,10 +122,11 @@ export function openingsQuestionRotations(questions: readonly OpeningsQuestion[]
   return Object.freeze(rotations);
 }
 
-/** The arms asked: each one of T, A, B, C, at most once (checked with the questions, before the first call). */
+/** The arms asked: each one of T, A, B, C, C2, C2N, at most once (checked with the questions, before the first call). */
 function openingsAssertArms(arms: readonly OpeningsArm[]): void {
-  if (arms.some((arm) => !(OPENINGS_ARMS as readonly string[]).includes(arm)) || new Set(arms).size !== arms.length) {
-    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, each once)");
+  const known: readonly string[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS];
+  if (arms.some((arm) => !known.includes(arm)) || new Set(arms).size !== arms.length) {
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, each once)");
   }
 }
 
@@ -249,16 +252,22 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
   };
 
   const targetByRef = new Map(input.targets.map((target) => [target.providerRef, target] as const));
-  /** The map's caller: each step as role JUDGE on the served lane (the preview's format repair applies), the map's contract hash. */
+  /**
+   * The map's caller: each step as role JUDGE on the served lane (the preview's format repair applies), the map's contract
+   * hash; an engine-2 step records the engine seal instead (a wording-N call keeps `spec.engine`, so it records the engine
+   * seal too; its own `.wording-n` id says it is not that seal's text).
+   */
   const mapCaller = (arm: OpeningsArm, question: OpeningsQuestion): MapCaller => Object.freeze({
     call: <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
+      const contractHash = request.spec.engine === true ? input.contractHashes.engine : input.contractHashes.map;
+      if (contractHash === undefined) return Promise.resolve({ kind: "FAILED", code: "PRACTICE_OPENINGS_ENGINE_UNSEALED" });
       const target = targetByRef.get(request.seat.aiRef);
       if (target === undefined) return Promise.resolve({ kind: "FAILED", code: "PRACTICE_OPENINGS_UNKNOWN_SEAT" });
       return oneCall<T>({ arm, question, step: request.step, callSiteKey: request.callSiteKey, target, shown: request.shown, order: request.order },
         async (gateway) => {
           const pieces = mapProviderPieces(request.spec);
           const response = await gateway.call({ runId, subjectItemId: randomUUID(), callSiteKey: request.callSiteKey, role: "JUDGE", lane: "served",
-            bound: openingsStepBound(input.bound, request.step), contractHash: input.contractHashes.map, providerRef: target.providerRef, packet: pieces.framed.packet,
+            bound: openingsStepBound(input.bound, request.step), contractHash, providerRef: target.providerRef, packet: pieces.framed.packet,
             classifyContent: pieces.classifyContent, buildRepairPacket: pieces.buildRepairPacket });
           return pieces.readAccepted(response.content);
         });
@@ -316,9 +325,11 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
       const mapInput: MapRunInput = {
         questionLine: question.questionLine, languageName: question.languageName, languageTag: question.languageTag,
         seats: seats.map((target) => Object.freeze({ aiRef: target.providerRef, maker: target.maker })),
-        caller: mapCaller(arm, question), seed: `${question.id}|${arm}`,
+        // Task 17a (D5): C2N's calls go out in wording N; C2 and C2N run engine 2 (practiceWordingMapExtras; {} for T, A, B, C).
+        caller: arm === "C2N" ? practiceWordingNCaller(mapCaller(arm, question)) : mapCaller(arm, question), seed: `${question.id}|${arm}`,
         gapRoundsMax: openingsGapRoundsMax(arm),
-        maxAnswers: OPENINGS_MAP_SIZES.maxAnswers, pointsPerAnswer: OPENINGS_MAP_SIZES.pointsPerAnswer
+        maxAnswers: OPENINGS_MAP_SIZES.maxAnswers, pointsPerAnswer: OPENINGS_MAP_SIZES.pointsPerAnswer,
+        ...practiceWordingMapExtras(arm)
       };
       const result: MapResult = arm === "A" ? await mapRunSnowball(mapInput)
         : arm === "B" ? await mapRunBlindLists(mapInput) : await mapRunAngleMap(mapInput);

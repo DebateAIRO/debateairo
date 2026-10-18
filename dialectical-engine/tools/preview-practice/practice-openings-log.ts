@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
 import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
+import { practiceWordingRows, practiceWordingTotals } from "./practice-map-wording.js";
 import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
 import {
   GATES,
@@ -267,6 +268,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       notes: openingsCount(ownLines.flatMap((line) => line.notes.map((note) => note.note)))
     });
   });
+  const wording = practiceWordingRows(armLines);
   return Object.freeze({
     schema: PRACTICE_REPORT_SCHEMA, mode: "openings", dry: start.dry, ...verdict,
     startedAt: start.startedAt, finishedAt: ending.finishedAt.toISOString(),
@@ -274,6 +276,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     models: start.models, questions: start.questions, questionDigests: start.questionDigests, arms: start.arms, busyModels: busy,
     callsByModel, repairKindsByModel: practiceRepairKindsByModel(tries),
     byArm,
+    // Task 17a (D5): wording N's comparison, only when an engine-2 arm ran (the debated answers word for word are for the
+    // owner's reading; report.md prints counts only).
+    ...(wording.length === 0 ? {} : { wording, wordingTotals: practiceWordingTotals(wording) }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
       remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null,
       // The formats report's own check (report.md prints it per gate): the gate's count before less after.

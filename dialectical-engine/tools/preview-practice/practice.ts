@@ -60,6 +60,7 @@ import {
 } from "@debateai/providers";
 import { readOperatorCommandEnvironment } from "@debateai/register";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
+import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { practiceRemainingPorts } from "./practice-ask-composition.js";
 import { runPracticeDebate } from "./practice-debate.js";
 import {
@@ -76,6 +77,7 @@ import { PRACTICE_CONTRACT_HASHES, PRACTICE_LANES, type PracticeLane } from "./p
 import { openingsDryConfig, openingsDryPorts, openingsDryTargets } from "./practice-openings-dry.js";
 import { OPENINGS_FILE, OPENINGS_SCHEMA, OpeningsLog, openingsReportFromLog, readOpeningsLog } from "./practice-openings-log.js";
 import {
+  OPENINGS_ENGINE_ARMS,
   openingsArmsFromFlag,
   openingsQuestionDigests,
   openingsQuestionsFromFlag,
@@ -373,7 +375,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     await runPracticeOpenings({
       config: setup.config, targets: setup.targets, ports: setup.ports, observer: setup.watched,
       questions: setup.questions, arms: setup.arms, bound: policy.bounds.JUDGE,
-      contractHashes: { judge: PRACTICE_CONTRACT_HASHES.judge, map: mapPromptContractHash() },
+      contractHashes: { judge: PRACTICE_CONTRACT_HASHES.judge, map: mapPromptContractHash(), engine: engineContractHash() },
       ...(setup.sleep === undefined ? {} : { sleep: setup.sleep }),
       ...(options.random === undefined ? {} : { random: options.random }),
       progress: log, shouldStop: () => stopRequested, stopSignal: interrupted.signal, busyWaitMs: setup.busyWaitMs,
@@ -481,6 +483,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // a refused value is never repeated (practice-openings-questions.ts).
     const openingsQuestions = args.mode === "openings" ? openingsQuestionsFromFlag(args.flags.get("--questions")) : [];
     const openingsArms = args.mode === "openings" ? openingsArmsFromFlag(args.flags.get("--arms")) : [];
+    // Task 17a (D5): the engine-2 arms answer v2 forms only through the real gates; the dry script answers engine 1's.
+    if (args.switches.has("--dry") && openingsArms.some((arm) => (OPENINGS_ENGINE_ARMS as readonly string[]).includes(arm))) {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms C2, C2N (not read by openings --dry)");
+    }
     // Checked here so a bad selection writes nothing; checked again by the engine before the first call.
     openingsQuestionRotations(openingsQuestions);
     if (args.flags.has("--levels") && args.mode !== "formats") {
