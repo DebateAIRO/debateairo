@@ -284,6 +284,7 @@ import {
   runPointInvestigations, type PointInvestigationRow
 } from "./engine-investigations.js";
 import { engineMaterialGraphOf, engineMaterialInvestigationsOf, engineMaterialSourceOf, readEngineReviews } from "./engine-material-reader.js";
+import { engineMapFactsOf, engineSourceWithMap, type EngineMapFacts } from "./engine-map-facts.js";
 import {
   comparingJudgeCodeDefect,
   comparingJudgesSourceOf,
@@ -7723,6 +7724,17 @@ export class WalkingSkeletonRunner {
      * reviews are taken in — is today's serial order whatever order the calls finished in.
      */
     const authoredNodes = new Map<number, AuthoredDebateNode>();
+    /**
+     * Engine redesign R3 (spec §5.2 items 2, 6; cross-plan ruling PF-R41.7): the map's words, assumptions and bases for
+     * every reader (investigations, judges, the writer's verdict material, the story), from the nodes saved so far
+     * (`authoredNodes`, synchronous: never a chain's pending slot, pre-flight PF-R35.10). Read after the arguing, when every
+     * position and point is saved. Null on engine 1, today's opening or a map fallback.
+     */
+    const engineMapFactsNow = (): EngineMapFacts | null => engineMap && shapeMapArgued && shapePositions !== null && shapePlan !== null
+      && debateShapeMap !== null
+      ? engineMapFactsOf({ positions: shapePositions, legs: shapePlan.legs, keyPoints: debateShapeMap.keyPoints,
+        nodeIdAt: (position) => authoredNodes.get(position)?.nodeId ?? null })
+      : null;
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
     // minted, never to the work item the judge was called with (codex T4-r1 B2).
@@ -9476,7 +9488,7 @@ export class WalkingSkeletonRunner {
       // they order the candidates; the investigator's material carries no number.
       const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
       const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
-      const source = engineMaterialSourceOf(engineMaterialGraphOf({
+      const source = engineSourceWithMap(engineMaterialSourceOf(engineMaterialGraphOf({
         question: run.questionLine,
         rootCount,
         authored: authoredNodes,
@@ -9484,7 +9496,7 @@ export class WalkingSkeletonRunner {
         snapshot: materialisedSnapshot,
         facts,
         honestFinalStrength: honestScores
-      }), reviews, new Map());
+      }), reviews, new Map()), engineMapFactsNow());
       const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
         charactersPerWord: lengthGuidance.charactersPerWord });
       /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
@@ -9639,9 +9651,9 @@ export class WalkingSkeletonRunner {
         facts: engineServeLinked.facts,
         honestFinalStrength: strengthOf
       });
-      const source = engineMaterialSourceOf(graph,
+      const source = engineSourceWithMap(engineMaterialSourceOf(graph,
         await readEngineReviews(this.pool, run.runId, graph.points.map((point) => point.nodeId)),
-        engineMaterialInvestigationsOf(engineInvestigation?.rows ?? []));
+        engineMaterialInvestigationsOf(engineInvestigation?.rows ?? [])), engineMapFactsNow());
       // Only servable answers are compared (letters stay fixed); every point is ordered by THIS pass's honest final
       // strength (the propagation receipt is recorded after the label); a point that did not propagate (hidden, no base,
       // or abstained) goes last, and only a point that should have propagated and has no strength is a code defect
@@ -11350,6 +11362,7 @@ export class WalkingSkeletonRunner {
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
               positionNodeIds: makerPositionNodeIds,
+              ...(engineMap ? { positionWords: engineMapFactsNow()?.wordsByRootNodeId } : {}),
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
               // raised, not debated" paragraph, only when the map's own answers were argued; undefined otherwise.
               // Ruling W-CUT: a chosen answer past the positions argued is listed too (the page's stored list agrees).

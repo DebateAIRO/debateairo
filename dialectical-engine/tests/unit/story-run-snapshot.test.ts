@@ -312,6 +312,14 @@ describe("buildStoryRunSnapshot", () => {
     // Task M7: and the run's cost fallback over the same makers, untouched.
     expect(snapshot.costFallback).toBe(costFallback);
   });
+
+  it("engine 2 names a position by the map's words (R3, P2.6); without positionWords the claim is the node's statement", () => {
+    const built = buildStoryRunSnapshot({ ...source(), positionWords: new Map([[ROOT, "Only on night lines."]]) });
+    expect(built.nodes.find((node) => node.nodeId === ROOT)!.claim).toBe("Only on night lines.");
+    const today = buildStoryRunSnapshot(source());
+    expect(built.nodes.find((node) => node.nodeId === CHILD)!.claim).toBe(today.nodes.find((node) => node.nodeId === CHILD)!.claim);
+    expect(today.nodes.find((node) => node.nodeId === ROOT)!.claim).not.toBe("Only on night lines.");
+  });
 });
 
 /**

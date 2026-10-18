@@ -340,6 +340,7 @@ apps/runner/src/engine-contracts.ts
 apps/runner/src/engine-investigations.ts
 apps/runner/src/engine-judging.ts
 apps/runner/src/engine-links.ts
+apps/runner/src/engine-map-facts.ts
 apps/runner/src/engine-material-reader.ts
 apps/runner/src/engine-reduce.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts

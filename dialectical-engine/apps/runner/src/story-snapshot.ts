@@ -108,6 +108,8 @@ export interface StorySnapshotSource {
     readonly panelDispersion: number | null;
   }[];
   readonly positionNodeIds: ReadonlySet<string>;
+  /** Engine 2 + map (R3, P2.6): a position's words, by root node id; absent = the node's statement (today). */
+  readonly positionWords?: ReadonlyMap<string, string> | undefined;
   readonly baseStrengths: readonly { readonly nodeId: string; readonly baseStrength: number | null }[];
   readonly finalStrengths: readonly { readonly nodeId: string; readonly strength: number }[];
   /** Every arrow of the debate's graph, whatever order they were read in. */
@@ -379,7 +381,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     servedStatement: Object.freeze(source.servedSegments.map((segment) => segment.text)),
     nodes: Object.freeze(source.authored.map((node) => Object.freeze({
       nodeId: node.nodeId,
-      claim: node.statement,
+      claim: source.positionNodeIds.has(node.nodeId) ? (source.positionWords?.get(node.nodeId) ?? node.statement) : node.statement,
       isPosition: source.positionNodeIds.has(node.nodeId),
       wayOfKnowing: node.wayOfKnowing,
       baseScore: baseById.get(node.nodeId) ?? null,
