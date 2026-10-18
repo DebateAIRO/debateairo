@@ -345,6 +345,9 @@ export function liveTreeFromState(
     const generation: Generation | null = live.text.length === 0
       ? null
       : { id: "streaming", model_id: "streaming", role: "streaming", argument: live.text, worker_id: "", created_at: "" };
+    // A node scored before any of its text reached the page is waiting for the settled read,
+    // not an empty argument: it shows as pending, never as "No strong argument found".
+    const status = liveStatus(live.lifecycle);
     return {
       id: nodeId,
       debate_id: rootId,
@@ -355,7 +358,7 @@ export function liveTreeFromState(
       depth,
       position,
       claim: live.text,
-      status: liveStatus(live.lifecycle),
+      status: status === "complete" && live.text.length === 0 ? "pending" : status,
       materialized_path: path,
       active_generation_id: generation === null ? null : generation.id,
       active_generation: generation,

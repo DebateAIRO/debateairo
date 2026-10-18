@@ -261,6 +261,7 @@ function ThreadRowCard({
             </div>
           ) : state === "pending" ? (
             <div className="nodePending">
+              <span className="srOnly">{t(debateChromeCatalog, "debateChrome.loading")}</span>
               <div className="skel" style={{ height: 13, borderRadius: 4, width: "92%", marginBottom: 7 }} />
               <div className="skel" style={{ height: 13, borderRadius: 4, width: "60%" }} />
             </div>

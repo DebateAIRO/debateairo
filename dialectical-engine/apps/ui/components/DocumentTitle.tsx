@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { HIDDEN_BY_DIALOG_ATTRIBUTE } from "@/components/dialogSurface";
 
 const PAGE_HEADING = "#main-content h1, #main-content [role='heading'][aria-level='1']";
+// An open dialog hides the page from screen readers, but the tab is still that page.
+const NOT_THE_PAGE_HEADING = `[hidden], [inert], [aria-hidden='true']:not([${HIDDEN_BY_DIALOG_ATTRIBUTE}])`;
 
 function pageHeadingText(): string {
   for (const heading of document.querySelectorAll<HTMLElement>(PAGE_HEADING)) {
-    if (heading.closest("[hidden], [aria-hidden='true'], [inert]") !== null) continue;
+    if (heading.closest(NOT_THE_PAGE_HEADING) !== null) continue;
     const text = (heading.textContent ?? "").replace(/\s+/g, " ").trim();
     if (text !== "") return text;
   }

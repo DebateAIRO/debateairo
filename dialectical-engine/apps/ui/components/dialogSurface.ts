@@ -31,6 +31,12 @@ const isLiveRegion = (element: Element): boolean =>
   element.hasAttribute("aria-live") || /^(status|alert|log)$/.test(element.getAttribute("role") ?? "");
 
 /**
+ * Marks what an open dialog hid, beside `aria-hidden`, so the page is still the page underneath:
+ * DocumentTitle keeps the tab title on the page's h1 while a drawer is open.
+ */
+export const HIDDEN_BY_DIALOG_ATTRIBUTE = "data-hidden-by-dialog";
+
+/**
  * While `active`, hides everything outside `containerRef` from assistive technology, so a
  * screen reader cannot wander out of an open modal (VoiceOver otherwise leaves it with
  * VO-Shift-Up or through the rotor, `aria-modal` notwithstanding). It sets `aria-hidden` and
@@ -50,7 +56,10 @@ export function useHideOutside(containerRef: React.RefObject<HTMLElement | null>
         // Hidden by its own markup: never this hook's to undo.
         if (count === 0 && sibling.getAttribute("aria-hidden") === "true") continue;
         hiddenBy.set(sibling, count + 1);
-        if (count === 0) sibling.setAttribute("aria-hidden", "true");
+        if (count === 0) {
+          sibling.setAttribute("aria-hidden", "true");
+          sibling.setAttribute(HIDDEN_BY_DIALOG_ATTRIBUTE, "");
+        }
         hidden.push(sibling);
       }
     }
@@ -62,6 +71,7 @@ export function useHideOutside(containerRef: React.RefObject<HTMLElement | null>
         } else {
           hiddenBy.delete(sibling);
           sibling.removeAttribute("aria-hidden");
+          sibling.removeAttribute(HIDDEN_BY_DIALOG_ATTRIBUTE);
         }
       }
     };

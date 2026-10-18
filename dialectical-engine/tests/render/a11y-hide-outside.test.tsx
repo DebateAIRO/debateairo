@@ -7,6 +7,7 @@
  */
 import { act, useRef } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { DocumentTitle } from "../../apps/ui/components/DocumentTitle.js";
 import { useHideOutside } from "../../apps/ui/components/dialogSurface.js";
 import { mount, unmount } from "./task11-harness.js";
 
@@ -82,5 +83,45 @@ describe("useHideOutside", () => {
 
     await act(async () => mounted!.root.render(<Page outer={false} inner={false} />));
     expect(hidden("top")).toBe(false);
+  });
+});
+
+describe("the tab title under an open dialog (2026-10-18)", () => {
+  function TitledPage({ open }: { open: boolean }) {
+    return (
+      <div>
+        <DocumentTitle brand="Brand" />
+        <header id="top">Top</header>
+        <main id="main-content">
+          <h1>Question of the page</h1>
+          {open ? <Surface label="drawer" /> : null}
+        </main>
+      </div>
+    );
+  }
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+  it("keeps the page's h1 in the title while a dialog hides the page", async () => {
+    mounted = await mount(<TitledPage open={false} />);
+    await settle();
+    expect(document.title).toBe("Question of the page — Brand");
+
+    await act(async () => mounted!.root.render(<TitledPage open />));
+    await settle();
+    expect(document.querySelector("h1")?.getAttribute("aria-hidden")).toBe("true");
+    expect(document.title).toBe("Question of the page — Brand");
+  });
+
+  it("still skips an h1 hidden by its own markup", async () => {
+    mounted = await mount(
+      <div>
+        <DocumentTitle brand="Brand" />
+        <main id="main-content">
+          <div aria-hidden="true"><h1>Decorative heading</h1></div>
+        </main>
+      </div>
+    );
+    await settle();
+    expect(document.title).toBe("Brand");
   });
 });

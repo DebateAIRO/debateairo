@@ -452,6 +452,7 @@ function NodeHonestyDetails({
         ? t(catalog, "debateDrawers.node.reviewCouldNotAssess")
         : null;
   const rows = v3NodeHonestyRows(v3, composeCatalog, locale);
+  const textLang = useDebateTextLang();
 
   return (
     <section aria-label={t(catalog, "debateDrawers.node.honestyAriaLabel")} className="drawerHonesty">
@@ -482,7 +483,7 @@ function NodeHonestyDetails({
           </>
         )}
       </div>
-      {v3.review === null ? null : <div className="drawerFindingText" data-ai-generated="true">{v3.review.reasons.join(" ")}</div>}
+      {v3.review === null ? null : <div className="drawerFindingText" {...textLang} data-ai-generated="true">{v3.review.reasons.join(" ")}</div>}
 
       <table className="drawerRecordTable" data-drawer-section-table>
         <tbody>

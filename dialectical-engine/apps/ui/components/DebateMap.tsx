@@ -216,7 +216,7 @@ export function DebateMap({
                 composeCatalog={composeCatalog}
               />
             ) : null}
-            <div className="mapReadoutClaim" data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
+            <div className="mapReadoutClaim" {...textLang} data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
               <span>{t(catalog, "debateViews.mapInteractionHint")}</span>
               <span style={{ flex: 1 }} />
