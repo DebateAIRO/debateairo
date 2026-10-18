@@ -4,7 +4,7 @@
 // completed (`runShapeDebate`, pre-flight PF-B53: P2L Task 17 calls it too). Plan Task 15 Step 1, written in Task 13.
 import { createHash } from "node:crypto";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { MAP_ENGINE_CONTRACT_IDS, mapContractNameOf, mapPromptContractHash } from "@debateai/map";
+import { mapContractNameOf, mapPromptContractHash } from "@debateai/map";
 import { readPromptFrame, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
   debateShapePolicyStartValues, engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveDebateShape,
@@ -71,23 +71,6 @@ const lockedCodeOf = (chat: string): string | null => {
 };
 const mapProseOf = (chat: string) => lockedCodeOf(chat)?.split("-")[0]?.toLowerCase() === "ro" ? MAP_PROSE.ro : MAP_PROSE.en;
 
-/**
- * Engine redesign R3 (Task 17): the map numbers its items in an order seeded by the RUN id (packages/map/src/items.ts
- * `mapAssignItemIds`, seed `run.runId`), so the merge is shown the same points and answers in another order on every run,
- * and the engine script's merge (which groups and numbers in the order shown) would argue other answers with other points
- * each run. The harness hands the script the merge's points and candidate answers in text order instead, so the scripted
- * map, and every judge's material after it, depends on what was raised, never on the run's seed: a debate on a fixed
- * question argues the same map every run (ruling W4's fixed question, tests/integration/r2-engine-debate.test.ts).
- */
-function inTextOrder(material: Readonly<{ contractId: string; fields: readonly FramedMaterialField[] }>): readonly FramedMaterialField[] {
-  if (material.contractId !== MAP_ENGINE_CONTRACT_IDS.merge) return material.fields;
-  // By text; two items of the same text keep the order shown (their ids say nothing the merge needs).
-  const sorted = (content: string, text: "claim" | "answer") => JSON.stringify((JSON.parse(content) as Record<string, string>[])
-    .sort((a, b) => (a[text]! < b[text]! ? -1 : a[text]! > b[text]! ? 1 : 0)));
-  return material.fields.map((entry) => entry.name === "points" ? { ...entry, content: sorted(entry.content, "claim") }
-    : entry.name === "candidate_answers" ? { ...entry, content: sorted(entry.content, "answer") } : entry);
-}
-
 export type ShapeScriptOptions = Readonly<{
   fail?: ReadonlySet<"ANGLES" | "MERGE" | "CHOOSE" | "LISTS_BUT_ONE" | "CHOOSE_ONE_ANSWER">;
   stopAt?: "MERGE"; stopCloseCallAfter?: number; reviews?: "agree" | "dispute"; panelSpread?: boolean;
@@ -121,7 +104,7 @@ export function scriptedShapeAnswers(question: string, options: ShapeScriptOptio
     if (request.kind === "MAP") {
       const material = readFramedMaterial(wirePacket(chat));
       // Engine redesign R3: an engine-2 map contract (map.*.v2, map.check.v1) is answered by the engine script.
-      const engineReply = engineMapScriptedContent(material.contractId, inTextOrder(material), options.engineMap ?? {});
+      const engineReply = engineMapScriptedContent(material.contractId, material.fields, options.engineMap ?? {});
       if (engineReply !== null) return fail.has("CHOOSE") && material.contractId === "map.choose.v2" ? { content: "not json" } : { content: engineReply };
       const contractId = material.contractId;
       // LG-C Task 14: today's map contract or its length variant, by name (Task 17's lengthed shaped run).

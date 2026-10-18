@@ -85,6 +85,7 @@ import {
   type GateProvider,
   type GateRequest
 } from "./preview-gate-stubs.js";
+import { fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -499,6 +500,12 @@ export function previewDebateHarness(input: Readonly<{
      * tests/support/storyEncryptedOwner.ts provisions it); absent, today's legacy asker.
      */
     owner?: Readonly<{ userId: string; ownerRef: string; sessionId: string }>;
+    /**
+     * R3 Task 17 fix round 1 (ruling R3-T17.1): the run's id, fixed, so everything the engine seeds by it (the map's item
+     * order, the grading, review and attack seats) is the same on every run. Needs the test file's node:crypto mock
+     * (tests/support/fixed-run-id.ts); absent, startRun mints a random id as today.
+     */
+    runId?: string;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -512,6 +519,7 @@ export function previewDebateHarness(input: Readonly<{
     const panel = admission.panelRefs.map((ref) => panelMember(ref, asOf));
     const rotated = admission.pin ?? pickRotatedRoles({ panel, counts: {}, seed: roleRotationSeed({ as_of: asOf, question_line: question }) });
     if (rotated === null) throw new Error("test: four makers always rotate");
+    if (admission.runId !== undefined) nextRandomUUIDIs(admission.runId);
     const runId = await new RunRepository(pool()).startRun({
       questionLine: question,
       ...(admission.owner === undefined
@@ -531,6 +539,7 @@ export function previewDebateHarness(input: Readonly<{
       }),
       registerVersion: 1, batteryVersion: "s00", batteryRows
     });
+    if (admission.runId !== undefined) fixedRunIdTaken(admission.runId, runId);
     await insertRunRoleRotation(pool(), { runId, ...rotationPinFields(rotated) });
     const workItemId = await new WorkItemRepository(pool()).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `preview-busy-model-run:${runId}`

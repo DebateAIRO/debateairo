@@ -7,7 +7,7 @@
 // floor; a "cannot assess" point gets one investigation and stays at reduced weight, is resolved, or is read as
 // disputed; a debate whose middle answer sat out shows the owner the same counted votes the served verdict counted.
 // Integration suites are skipped by the CI gate: run this file by hand, alone.
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { migrate, ServeDisclosureRepository } from "@debateai/db";
 // (pre-flight PF-R2b7.20) B3's rule name, imported, never restated.
 import { ENGINE2_REDUCER_VERSION, SERVED_ROOT_SELECTION_RULE_JUDGES } from "@debateai/kernel";
@@ -32,6 +32,14 @@ import {
 import { requestedReviewEdges, reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import { scriptedAnswers } from "../support/scripted-answers.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+
+// R3 Task 17 fix round 1 (ruling R3-T17.1): the new-shape case argues on a FIXED run id (tests/support/fixed-run-id.ts),
+// so the map's item order and the grading, review and attack seats, all seeded by the run id, are the same on every run.
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
+  const { randomUUIDWithFixedRunId } = await import("../support/fixed-run-id.js");
+  return { ...actual, default: actual, randomUUID: randomUUIDWithFixedRunId(actual.randomUUID) };
+});
 
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
@@ -62,6 +70,12 @@ afterEach(async () => { await Promise.all(stubClosers.splice(0).map((close) => c
 afterAll(async () => { await database?.stop(); });
 
 type Before = (request: GateRequest, chat: string) => GateOverride | null;
+/**
+ * R3 Task 17 fix round 1 (ruling R3-T17.1): the new-shape case's fixed run id. With the fixed question, its margin is
+ * -0.397 on every run (the judges' A trails the strength leader); the id was chosen as the first of 00…01 to 00…08 whose
+ * debate keeps W4's scenario (four of the eight do), measured twice, identical.
+ */
+const W4_RUN_ID = "00000000-0000-4000-8000-000000000001";
 /** One engine-2 debate, admitted with the receipt's length and engine members, argued to a completed answer. */
 async function argueEngine2(input: Readonly<{
   label: string; shaped?: boolean; panelRefs?: readonly string[]; pin?: RotatedRoles; before?: Before; noDigest?: boolean;
@@ -70,6 +84,8 @@ async function argueEngine2(input: Readonly<{
 
   /** Models the gates refuse unbilled after their claim probe (the run-resilience script); absent: none. */
   unbilled?: readonly string[];
+  /** R3 Task 17 fix round 1 (ruling R3-T17.1): a fixed run id (tests/support/fixed-run-id.ts); absent, a random one. */
+  runId?: string;
 }>) {
   const panelRefs = input.panelRefs ?? PANEL_REFS;
   const makers = new Set(panelRefs.map((ref) => configured(ref).maker)).size;
@@ -79,7 +95,8 @@ async function argueEngine2(input: Readonly<{
     panelRefs, depth: 1, length: LENGTH, engine,
     ...(input.question === undefined ? {} : { question: input.question }),
     ...(shape === undefined ? {} : { shape, settings: STANDARD }),
-    ...(input.pin === undefined ? {} : { pin: input.pin })
+    ...(input.pin === undefined ? {} : { pin: input.pin }),
+    ...(input.runId === undefined ? {} : { runId: input.runId })
   });
   const scripted = shape === undefined ? scriptedAnswers(debate.question) : scriptedShapeAnswers(debate.question);
   const before = input.before;
@@ -135,8 +152,10 @@ describe("engine 2 end to end (spec §14.2)", () => {
       const run = await argueEngine2({
         label: shaped ? "e2-shape" : "e2-today", shaped,
         // Ruling W4: a fixed question (digits only, so it reads as no named language), so the rotation, and with it the
-        // strength leader, is the same on every run: the judges' A is not the leader.
-        ...(shaped ? { question: "preview-busy-model-e2-shape-1003" } : {}),
+        // strength leader, is the same on every run: the judges' A is not the leader. R3 Task 17 fix round 1 (ruling
+        // R3-T17.1): with the real v2 map the engine also seeds by the RUN id (the map's item order; the grading, review
+        // and attack seats), so the case argues on a fixed run id too, and the whole debate is the same on every run.
+        ...(shaped ? { question: "preview-busy-model-e2-shape-1003", runId: W4_RUN_ID } : {}),
         // The new shape: every judge names the kind "factual", so the story's one shape is the judges' (B9).
         ...(shaped ? { before: (request: GateRequest) => request.kind === "VERDICT_JUDGE"
           ? { content: stubComparingJudgeVote("A", { questionKind: "factual" }) } : null } : {})
@@ -207,12 +226,6 @@ describe("engine 2 end to end (spec §14.2)", () => {
           && material(request).contractId.startsWith("judge.assigned-root."));
         expect(positions.length).toBeGreaterThan(0);
         for (const request of positions) expect(material(request).contractId).toMatch(/^judge\.assigned-root\.(unknown|resolved)\.v2$/u);
-        // R3 Task 17 — OPEN, FOR THE CONTROLLER'S RULING (task-17-report.md, "W4"): now that this case runs the REAL v2 map,
-        // the map's item order and the seats that grade, review and attack each node follow the RUN id (mapAssignItemIds,
-        // seatRotationOffset), so the fixed question no longer fixes the strength leader. Measured: with the harness's
-        // text-ordered merge (debate-shape-harness.ts `inTextOrder`) this case passed 14 of 15 runs; of six logged
-        // margins, five were -0.32 to -0.19 and one +0.004 (the failure). Before it, the sign changed run to run. These W4
-        // lines are kept unchanged, never weakened, until the ruling.
         // Ruling W4 (B12 Minor 1, whole-branch review): the judges' winner is NOT the strength leader here (its strongest
         // rival finished above it, so the receipt's margin is negative), and the served answer, the label and the story's
         // material all follow the judges' winner, never the leader.

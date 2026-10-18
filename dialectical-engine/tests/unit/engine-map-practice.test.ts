@@ -32,12 +32,21 @@ describe("practice: engine 2's map", () => {
 
   it("a recheck reads an engine-2 reply by engine 2's readings only; engine 1's readings know no check (pre-flight PF-R35.15)", () => {
     expect(recheckReply("MAP:list:0", LIST, null, true, true).issues).toEqual([]);
-    // DEVIATION from the brief (reported in task-17-report.md, for the controller's ruling): the brief pinned
+    // DEVIATION from the brief, accepted by controller ruling R3-T17.2: the brief pinned
     // `recheckReply("MAP:list:0", LIST, null, true, false).issues.length > 0`, but engine 1's lengthed reading ACCEPTS a v2
-    // list (actual issues: []) by dropping the unasked `rests_on` keys. That difference is a repair, which the re-check does
-    // not list and the repair reading names: engine 1's reading needs INNER_UNASKED_KEYS, engine 2's none.
+    // list (actual issues: []) by DROPPING the unasked `rests_on` keys. That difference is a repair, which the re-check does
+    // not list and the repair reading names, so a re-read that forgot the engine flag stays visible: engine 1's reading
+    // reports INNER_UNASKED_KEYS (rests_on dropped), engine 2's reports no repair (rests_on kept, as its schema asks).
     expect(recheckReply("MAP:list:0", LIST, null, true, false).issues).toEqual([]);
     expect(practiceJsonRepairOf(LIST, "stop", "MAP:list:0", null, true, false)).toBe("INNER_UNASKED_KEYS");
+    expect(practiceJsonRepairOf(LIST, "stop", "MAP:list:0", null, true, true)).toBeNull();
+    // Engine 2's reading requires rests_on on every point (a list without it is refused there, accepted by engine 1's), so
+    // its "no repair" means every rests_on was read and kept.
+    const withoutRestsOn = JSON.stringify({ ...JSON.parse(LIST) as object, points: (JSON.parse(LIST) as { points: Record<string, unknown>[] })
+      .points.map(({ rests_on: _dropped, ...point }) => point) });
+    expect(recheckReply("MAP:list:0", withoutRestsOn, null, true, true).issues)
+      .toEqual(["invalid_value@points.0.rests_on", "invalid_value@points.1.rests_on", "invalid_value@points.2.rests_on"]);
+    expect(recheckReply("MAP:list:0", withoutRestsOn, null, true, false).issues).toEqual([]);
     expect(recheckReply("MAP:check", CHECK, null, true, true).issues).toEqual([]);
     expect(recheckReply("MAP:check", CHECK, null, true, false).issues).toEqual(["UNMAPPED"]);
   });
