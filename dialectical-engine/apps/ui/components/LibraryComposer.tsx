@@ -129,7 +129,7 @@ export function LibraryComposer({
           </button>
         </div>
         <RoomNotice room={room} catalog={roomCatalog} locale={locale} />
-        {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
+        {error ? <div className="error" role="alert" style={{ marginTop: 12 }}>{error}</div> : null}
         {consent.declined ? (
           <p className="sensitiveConsentDeclined" role="status">{t(catalog, "home.sensitiveConsent.declined")}</p>
         ) : null}

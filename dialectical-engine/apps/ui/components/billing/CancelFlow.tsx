@@ -113,7 +113,7 @@ export function CancelFlow({
           <div className="billingField">
             <label htmlFor="cancel-email">{t(catalog, "billing.cancelPage.email")}</label>
             <input id="cancel-email" type="email" autoComplete="email" value={email}
-              onChange={(event) => setEmail(event.target.value)} required />
+              onChange={(event) => setEmail(event.target.value)} required aria-invalid="false" />
           </div>
           <div className="billingActions">
             <button type="submit" className="btn btnDark" disabled={busy}>{t(catalog, "billing.cancelPage.send")}</button>

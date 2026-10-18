@@ -1339,7 +1339,7 @@ describe("story v4 — the material's key lists keep their exact values", () => 
       "also_raised", "answers_note", "prior_objection"
     ]);
     expect(STORY_ENGINE_TOKENS).toEqual([
-      "SUPPORTED", "CONTESTED", "UNSUPPORTED", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE", "LOOKED_UP", "RAN", "REASONING",
+      "SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE", "LOOKED_UP", "RAN", "REASONING",
       "known_by", "set_aside", "best_case", "objection_to", "review_reasons", "judge_spread", "within_tie_margin",
       "rule_in_words", "winner_id", "winner_final", "runner_up_id", "runner_up_final", "confidence_band", "positions_argued",
       "tie_margin", "low_cut", "high_cut", "position_ref", "served_statement", "also_raised", "answers_note", "prior_objection"

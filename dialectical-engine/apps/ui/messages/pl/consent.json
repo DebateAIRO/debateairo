@@ -16,5 +16,6 @@
   "consent.policy.close": "Zamknij",
   "consent.policy.questions": "Pytania:",
   "consent.policy.gateHint": "Aby kontynuować, przewiń do końca polityki.",
+  "consent.policy.gateOpened": "To już koniec. Możesz teraz kontynuować.",
   "consent.policy.acknowledge": "Zapoznałem(-am) się"
 }

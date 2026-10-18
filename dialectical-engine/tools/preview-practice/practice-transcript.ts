@@ -27,6 +27,7 @@ import {
   structureRepairOriginalKey,
   type PromptPacket
 } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
 import { ServeRepository } from "@debateai/serve";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import { vendorUsage } from "./practice-gate-observer.js";
@@ -35,18 +36,49 @@ import {
   issueListFromParseError,
   practiceFinishReasonOf,
   practiceJsonRepairOf,
+  practiceMapEngineOf,
   practiceMapKeyPointIdsOf,
   practiceMapLengthedOf,
   practiceModelOfRef,
   practiceReplyFormOf,
   replyContentOf
 } from "./practice-lanes.js";
+import { buildTranscriptEngineGraph, readEngineGraphSource, type TranscriptEngineGraph } from "./practice-engine-graph.js";
 import { practiceGuidedWordsOfFields } from "./practice-length.js";
 import { redactNamedKeyShapes } from "./practice-redaction.js";
 import { practiceTryTier } from "./practice-tokens.js";
 
 export const PRACTICE_TRANSCRIPT_SCHEMA = "preview-practice-transcript-v1";
 export const PRACTICE_TRANSCRIPT_FILE = "transcript.json";
+
+/**
+ * Engine redesign R2b (B11b, D3): the comparing judges' recorded votes, content-free columns only (the reasons are
+ * encrypted content and are not needed): the judges' order practice re-asks each judge from the saved transcript, after
+ * the throwaway database is gone. The stored `counted` / `not_counted_reason` hint is not selected (controller ruling
+ * R2b-B5.1, R2b final wave P12): a reader that needs which votes counted recounts with recountJudgesVotes.
+ */
+export const PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL = `SELECT judge_seat, maker, provider_ref, model_id, chosen_letter, conditional,
+       question_kind, same_as FROM ledger.verdict_vote WHERE run_id=$1 ORDER BY judge_seat`;
+
+export type TranscriptJudgeVote = Readonly<{
+  seat: number; maker: string; providerRef: string; modelId: string; letter: string | null; conditional: boolean | null;
+  questionKind: string | null; sameAs: readonly (readonly string[])[];
+}>;
+
+/** The run's recorded votes in seat order (none on engine 1, or when no judge was seated). */
+export async function readTranscriptJudgeVotes(pool: Pick<Pool, "query">, runId: string): Promise<readonly TranscriptJudgeVote[]> {
+  const rows = (await pool.query<{ judge_seat: number; maker: string; provider_ref: string; model_id: string;
+    chosen_letter: string | null; conditional: boolean | null; question_kind: string | null; same_as: unknown }>(
+    PRACTICE_TRANSCRIPT_JUDGE_VOTES_SQL, [runId])).rows;
+  return Object.freeze(rows.map((row) => Object.freeze({
+    seat: row.judge_seat, maker: row.maker, providerRef: row.provider_ref, modelId: row.model_id, letter: row.chosen_letter,
+    conditional: row.conditional, questionKind: row.question_kind,
+    sameAs: Object.freeze(Array.isArray(row.same_as)
+      ? row.same_as.filter((group): group is string[] => Array.isArray(group) && group.every((letter) => typeof letter === "string"))
+        .map((group) => Object.freeze([...group]))
+      : [])
+  })));
+}
 
 /** One ledger row of a model call, as stored (ledger.ledger_entry). */
 export type TranscriptLedgerRow = Readonly<{
@@ -208,6 +240,14 @@ export type PracticeTranscript = Readonly<{
      * item (each point and candidate answer with the AI that wrote it), as P2b's readers return them, decrypted.
      */
     map?: unknown;
+    /**
+     * R2 (E12, INTERFACE §15.3), both engines: every node (hidden ones too), edge, review, grader's assessment and
+     * investigation, and the served base and final strengths, for the `rescore` mode. Absent when the run served no
+     * propagation (then `unavailable` says so).
+     */
+    engineGraph?: TranscriptEngineGraph;
+    /** Engine 2 only (B11b, D3): the comparing judges' recorded votes; absent when the run recorded none (today's keys). */
+    judgeVotes?: readonly TranscriptJudgeVote[];
   }>;
   /** What this file could not hold, and why. */
   unavailable: readonly string[];
@@ -277,7 +317,9 @@ export function buildTranscriptAttempts(input: Readonly<{
     const jsonRepair = entry.outcome === "OK" && content !== null
       ? practiceJsonRepairOf(content, finishReason, entry.callSiteKey, mapKeyPointIds,
         // Length guidance (spec 2026-10-15 §3.9): a map call asked under a length variant is re-read with the runaway limits.
-        messageList !== null && practiceMapLengthedOf(messageList as Parameters<typeof practiceMapLengthedOf>[0])) : null;
+        messageList !== null && practiceMapLengthedOf(messageList as Parameters<typeof practiceMapLengthedOf>[0]),
+        // Engine redesign R3: an engine-2 map call is re-read by engine 2's readings only.
+        messageList !== null && practiceMapEngineOf(messageList as Parameters<typeof practiceMapEngineOf>[0])) : null;
     return Object.freeze({
       sequence: Number(entry.sequence),
       ledgerEntryId: entry.ledgerEntryId,
@@ -399,6 +441,8 @@ export function buildPracticeTranscript(input: Readonly<{
   story: unknown;
   unavailable: readonly string[];
   map?: unknown;
+  engineGraph?: TranscriptEngineGraph;
+  judgeVotes?: readonly TranscriptJudgeVote[];
   now?: Date;
 }>): PracticeTranscript {
   const bytes = (text: string | null | undefined) => (text === null || text === undefined ? 0 : Buffer.byteLength(text, "utf8"));
@@ -416,7 +460,9 @@ export function buildPracticeTranscript(input: Readonly<{
     }),
     attempts: input.attempts,
     structure: Object.freeze({ answer: input.answer, inspection: input.inspection, story: input.story,
-      ...(input.map === undefined ? {} : { map: input.map }) }),
+      ...(input.map === undefined ? {} : { map: input.map }),
+      ...(input.engineGraph === undefined ? {} : { engineGraph: input.engineGraph }),
+      ...(input.judgeVotes === undefined || input.judgeVotes.length === 0 ? {} : { judgeVotes: input.judgeVotes }) }),
     unavailable: Object.freeze([...input.unavailable])
   });
 }
@@ -450,6 +496,15 @@ export function writePracticeTranscript(directory: string, transcript: PracticeT
     throw error;
   }
   return Object.freeze({ path, bytes: Buffer.byteLength(text, "utf8"), blanked });
+}
+
+/**
+ * R2a final wave (Ruling (A15 Minors) 1): how an `unavailable` line names what broke a block: a typed refusal by its code
+ * (ENGINE_FACTS_INVALID, not "TypedDomainError"), any other error by its class, never its message.
+ */
+export function practiceUnavailableName(error: unknown): string {
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error ? error.name : "UNKNOWN";
 }
 
 /**
@@ -497,10 +552,28 @@ export async function recordPracticeTranscript(input: Readonly<{
       }
     } catch (error) {
       map = null;
-      unavailable.push(`structure.map: ${error instanceof Error ? error.name : "UNKNOWN"}`);
+      unavailable.push(`structure.map: ${practiceUnavailableName(error)}`);
     }
   }
+  // R2 (E12): the graph `rescore` reads. A reading that breaks costs only this block, never the transcript.
+  let engineGraph: TranscriptEngineGraph | null = null;
+  try {
+    engineGraph = buildTranscriptEngineGraph(await readEngineGraphSource(input.pool, input.run.runId,
+      input.run.panel.map((member) => member.providerRef)));
+    if (engineGraph === null) unavailable.push("structure.engineGraph: the run served no propagation, so there is nothing to rescore");
+    else if (engineGraph.unreadVoices.length > 0) {
+      unavailable.push(`structure.engineGraph.voices: ${String(engineGraph.unreadVoices.length)} grader replies could not be read `
+        + "again by their step's reader (listed in structure.engineGraph.unreadVoices)");
+    }
+  } catch (error) {
+    unavailable.push(`structure.engineGraph: ${practiceUnavailableName(error)}`);
+  }
+  // Engine redesign R2b (B11b, D3): the judges' votes, read before the database goes. A read that breaks costs only them.
+  let judgeVotes: readonly TranscriptJudgeVote[] = [];
+  try { judgeVotes = await readTranscriptJudgeVotes(input.pool, input.run.runId); } catch (error) {
+    unavailable.push(`structure.judgeVotes: ${practiceUnavailableName(error)}`);
+  }
   const transcript = buildPracticeTranscript({ run: input.run, attempts, answer: input.answer, inspection, story: input.story, unavailable,
-    ...(input.map === undefined ? {} : { map }) });
+    ...(input.map === undefined ? {} : { map }), ...(engineGraph === null ? {} : { engineGraph }), judgeVotes });
   return Object.freeze({ ...writePracticeTranscript(input.directory, transcript), attempts: attempts.length });
 }

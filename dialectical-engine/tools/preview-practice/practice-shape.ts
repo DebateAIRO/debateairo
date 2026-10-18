@@ -22,7 +22,10 @@ import {
   type Scrutiny
 } from "@debateai/contract";
 import { debateShapeInForce, parseDebateShapePolicy, type DebateShapeCeilingInput, type DebateShapePolicy } from "@debateai/register";
-import { MAP_MARKS, mapAnswersArgued, readMapChoiceForRun, readMapItemsForRun } from "@debateai/map";
+import {
+  MAP_MARKS, MAP_OPPOSITE_SEPARATORS, MAP_OPPOSITE_TEMPLATES, mapAnswersArgued, readMapChoiceForRun, readMapItemsForRun
+} from "@debateai/map";
+import { structureRepairOriginalKey } from "@debateai/providers";
 import { PracticeRefusal } from "./practice-settings.js";
 import { PRACTICE_MAP_STEPS, practiceMapStepOf, type PracticeMapStep } from "./practice-lanes.js";
 
@@ -115,6 +118,17 @@ export type PracticeShapeFacts = Readonly<{
   choice: Readonly<{ opening: string; answers: number; alsoRaised: number }> | null;
   /** The run's map calls in ledger order, every try. */
   mapCallSiteKeys: readonly string[];
+  /** Engine 2 (R3): the answer check's codes (core.map_answer_check), null without one (engine 1). */
+  answerCheckCodes: readonly string[] | null;
+  /** Engine 2 (R3, D1): how many answers the checker exempted from the third test (its own null); null without a check. */
+  checkPremiseExempt: number | null;
+  /** Engine 2 (R3, D1): the chooser's assumptions per debated answer (counts only), in root order; null without a check. */
+  assumptionsPerAnswer: readonly number[] | null;
+  /**
+   * Engine 2 (R3; carried from Tasks 7 and 8, PF-R33.13): how many answers the run DEBATED that are the code's TEMPLATE
+   * fill (`practiceTemplateFillsDebated`); absent without a check (engine 1) or a stored choice.
+   */
+  templateFillsDebated?: number;
 }>;
 
 /**
@@ -147,12 +161,22 @@ export type PracticeShapeBlock = Readonly<{
   /** SCRUTINY-EXTENDED marks: one per scrutinised node, i.e. the points scrutiny examined further (P2b), not extra exchanges. */
   scrutinyExtensions: number;
   mapCallsByStep: Readonly<Record<PracticeMapStep, number>>;
+  /** Engine 2 (R3, INTERFACE §15.4, D1): the answer check, counted from its stored codes; null without a check (engine 1). */
+  answerCheck: PracticeAnswerCheckBlock | null;
+  /** R3 (INTERFACE §15.4): whether the merge and the choose fell back in this debate (0 or 1 each). */
+  mapFallbacks: PracticeMapFallbacks;
   /** Why the new shape did not run (the verdict's SHAPE_NOT_EXERCISED reason); null when it ran or nothing was admitted. */
   notExercised: string | null;
 }>;
 
-/** P2b's map choice as the practice counts it (structurally P2b's `MapChoiceRecord`, packages/map/src/repository.ts). */
-export type PracticeMapChoice = Readonly<{ opening: string; answers: readonly unknown[]; alsoRaised: readonly unknown[] }>;
+/**
+ * P2b's map choice as the practice counts it (structurally P2b's `MapChoiceRecord`, packages/map/src/repository.ts).
+ * Engine 2 (R3): an answer may carry the chooser's `assumptions` (Task 11's `MapChoiceAnswerRecord.assumptions?`); its
+ * `statement` and `filled` are read only to count the code's own TEMPLATE fills (`practiceTemplateFillsDebated`).
+ */
+export type PracticeMapChoice = Readonly<{ opening: string;
+  answers: readonly Readonly<{ assumptions?: readonly unknown[] | undefined; statement?: string; filled?: boolean }>[];
+  alsoRaised: readonly unknown[] }>;
 export type PracticeMapReaders = Readonly<{
   choice(runId: string): Promise<PracticeMapChoice | null>;
   items(runId: string): Promise<readonly unknown[]>;
@@ -164,6 +188,79 @@ export function practiceMapReaders(pool: Pool): PracticeMapReaders {
     choice: (runId: string) => readMapChoiceForRun(pool, runId),
     items: (runId: string) => readMapItemsForRun(pool, runId)
   });
+}
+
+/**
+ * INTERFACE §15.4 (R3) and D1: the answer check, counted from its stored codes (core.map_answer_check) and the answer's
+ * marks. Each of the three tests is counted on its own (an outcome names each failed test: `NOT_AN_ANSWER+NO_COST`);
+ * `premiseExempt` is how many answers the checker itself exempted from the third test (its `null`), and
+ * `assumptionsPerAnswer` one count per debated answer, in root order. Counts of the checker's and the chooser's verdicts
+ * only: code judges none (G1). `premiseExempt` / `assumptionsPerAnswer` null: not read.
+ * Carried into Task 17 (each present only when the caller read it): `emptyReasons`, the check's refused empty reasons
+ * (`practiceCheckEmptyReasons`, Task 4), and `templateFillsDebated`, the code's TEMPLATE fills the run debated
+ * (`practiceTemplateFillsDebated`, Tasks 7 and 8).
+ */
+export type PracticeAnswerCheckBlock = Readonly<{ checked: number; rejected: number; notAnAnswer: number; addedFact: number; noCost: number;
+  premiseExempt: number | null; replaced: number; dropped: number; keptUnchecked: number; unavailable: number;
+  assumptionsPerAnswer: readonly number[] | null; emptyReasons?: number; templateFillsDebated?: number }>;
+export function practiceAnswerCheckBlock(codes: readonly string[] | null, marks: Readonly<Record<string, number>>,
+  read: Readonly<{ premiseExempt: number | null; assumptionsPerAnswer: readonly number[] | null; emptyReasons?: number;
+    templateFillsDebated?: number }>): PracticeAnswerCheckBlock | null {
+  if (codes === null) return null;
+  const tests = (code: string): readonly string[] => (code.split(":")[1] ?? "").split(">")[0]!.split("+");
+  const action = (code: string) => code.split(">")[1] ?? null;
+  const failing = (test: string) => codes.filter((code) => tests(code).includes(test)).length;
+  return Object.freeze({
+    checked: codes.filter((code) => !tests(code).includes("UNCHECKED")).length,
+    rejected: codes.filter((code) => !tests(code).includes("UNCHECKED") && !tests(code).includes("PASSED")).length,
+    notAnAnswer: failing("NOT_AN_ANSWER"),
+    addedFact: failing("ADDED_FACT"),
+    noCost: failing("NO_COST"),
+    premiseExempt: read.premiseExempt,
+    replaced: codes.filter((code) => /^c[1-4]$/u.test(action(code) ?? "")).length,
+    dropped: codes.filter((code) => action(code) === "DROPPED").length,
+    keptUnchecked: codes.filter((code) => action(code) === "KEPT").length,
+    unavailable: marks.MAP_CHECK_UNAVAILABLE ?? 0,
+    assumptionsPerAnswer: read.assumptionsPerAnswer === null ? null : Object.freeze([...read.assumptionsPerAnswer]),
+    ...(read.emptyReasons === undefined ? {} : { emptyReasons: read.emptyReasons }),
+    ...(read.templateFillsDebated === undefined ? {} : { templateFillsDebated: read.templateFillsDebated })
+  });
+}
+
+/** INTERFACE §15.4 (R3): whether the merge and the choose fell back in this debate (0 or 1 each); rates are read over runs. */
+export type PracticeMapFallbacks = Readonly<{ merge: number; choose: number }>;
+export function practiceMapFallbacks(marks: Readonly<Record<string, number>>): PracticeMapFallbacks {
+  return Object.freeze({ merge: Math.min(1, marks.MAP_MERGE_FALLBACK ?? 0), choose: Math.min(1, marks.MAP_CHOOSE_FALLBACK ?? 0) });
+}
+
+/** A refused try of the answer check, as the debate's call analysis lists it (`PracticeFailure`'s codes, no model text). */
+export type PracticeCheckFailure = Readonly<{ callSiteKey: string; issues: readonly string[]; recheckIssues: readonly string[] }>;
+/** An empty (or blank) check reason, as engine 2's check schema refuses it (`min(1)` after trimming): at `checks.<n>.reason`. */
+const EMPTY_CHECK_REASON = /^too_small@checks\.\d+\.reason$/u;
+/**
+ * Carried from Task 4 (PF-R3-2.13): how many empty reasons (`"reason": ""`) the checker wrote, counted over every refused
+ * try of `MAP:check` (its structure-repair tries included, LG-A), from the try's own stored issues, else its re-check.
+ * A refused empty reason is re-asked, so this counts the slips, never an outcome. Codes only.
+ */
+export function practiceCheckEmptyReasons(failures: readonly PracticeCheckFailure[]): number {
+  return failures.filter((failure) => structureRepairOriginalKey(failure.callSiteKey) === "MAP:check")
+    .reduce((sum, failure) => sum + (failure.issues.length > 0 ? failure.issues : failure.recheckIssues)
+      .filter((issue) => EMPTY_CHECK_REASON.test(issue)).length, 0);
+}
+
+/**
+ * Carried from Tasks 7 and 8 (PF-R33.13): how many answers the run DEBATED that are the code's last-resort TEMPLATE fill
+ * (ANSWERS_FILLED, detail TEMPLATE): a filled answer whose words are the code-owned template of a site locale
+ * (`MAP_OPPOSITE_TEMPLATES`: its `lead` and separator before an answer, or its `empty` text alone). Fills DEBATED, not
+ * fills MADE: the mark's detail is not stored (core.map_choice keeps the codes, serve.condition_mark `ANSWERS_FILLED:CHOOSE`),
+ * and a TEMPLATE fill the check replaced holds the candidate's words with `filled: false`, so it is not counted here while
+ * its ANSWERS_FILLED mark stays. Code recognising its own text: no judgment (G1).
+ */
+export function practiceTemplateFillsDebated(answers: PracticeMapChoice["answers"]): number {
+  const templates = Object.entries(MAP_OPPOSITE_TEMPLATES).map(([locale, template]) => Object.freeze({ empty: template.empty,
+    lead: `${template.lead}${Object.hasOwn(MAP_OPPOSITE_SEPARATORS, locale) ? MAP_OPPOSITE_SEPARATORS[locale]! : ": "}` }));
+  return answers.filter((answer) => answer.filled === true && typeof answer.statement === "string"
+    && templates.some((template) => answer.statement === template.empty || answer.statement!.startsWith(template.lead))).length;
 }
 
 function recordOf(value: unknown): Readonly<Record<string, unknown>> | null {
@@ -195,13 +292,23 @@ export async function readPracticeShapeFacts(pool: Pick<Pool, "query">, runId: s
     `SELECT call_site_key FROM ledger.ledger_entry
       WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE 'MAP:%' ORDER BY sequence`, [runId])).rows;
   const choice = await readers.choice(runId);
+  // Engine 2 (R3, INTERFACE §15.4, D1): the check's stored codes and the premise-exempt ids the checker answered null for
+  // (both codes only, core.map_answer_check), and, only when a check row exists, the assumptions per debated answer.
+  const checkRow = (await pool.query<{ answer_check: string[]; premise_exempt: string[] }>(
+    "SELECT answer_check, premise_exempt FROM core.map_answer_check WHERE run_id=$1", [runId])).rows[0];
   return Object.freeze({
     storedDepthParams: recordOf(run?.depth_params),
     sizes: shape === undefined ? null : sizesOf(shape),
     marks: Object.freeze(Object.fromEntries(marks.map((row) => [row.mark, row.n]))),
     choice: choice === null ? null
       : Object.freeze({ opening: choice.opening, answers: choice.answers.length, alsoRaised: choice.alsoRaised.length }),
-    mapCallSiteKeys: Object.freeze(keys.map((row) => row.call_site_key))
+    mapCallSiteKeys: Object.freeze(keys.map((row) => row.call_site_key)),
+    answerCheckCodes: checkRow === undefined ? null : Object.freeze([...checkRow.answer_check]),
+    checkPremiseExempt: checkRow === undefined ? null : checkRow.premise_exempt.length,
+    assumptionsPerAnswer: checkRow === undefined || choice === null ? null
+      : Object.freeze(choice.answers.map((answer) => answer.assumptions?.length ?? 0)),
+    // Carried from Tasks 7 and 8: engine 2 only (a check row), from the stored choice the practice already read.
+    ...(checkRow === undefined || choice === null ? {} : { templateFillsDebated: practiceTemplateFillsDebated(choice.answers) })
   });
 }
 
@@ -211,10 +318,12 @@ const MAP_UNAVAILABLE = "MAP_UNAVAILABLE_TODAYS_OPENING";
 export function practiceShapeBlock(input: Readonly<{
   source: PracticeShapeSource; registerVersion: string; row: PracticeShapeRowChange | null; asked: PracticeShapeAsk;
   facts: PracticeShapeFacts | null; unreadable?: string;
+  /** Carried from Task 4: the check's refused empty reasons (`practiceCheckEmptyReasons`); shown only with a check. */
+  checkEmptyReasons?: number;
 }>): PracticeShapeBlock {
   const facts = input.facts;
   const marks = facts?.marks ?? {};
-  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, choose: 0 };
+  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, choose: 0, check: 0 };
   for (const key of facts?.mapCallSiteKeys ?? []) {
     const step = practiceMapStepOf(key);
     if (step !== null) byStep[step] += 1;
@@ -247,6 +356,11 @@ export function practiceShapeBlock(input: Readonly<{
     panelCloseCallExtensions: marks["PANEL-CLOSE-CALL-EXTENDED"] ?? 0,
     scrutinyExtensions: marks["SCRUTINY-EXTENDED"] ?? 0,
     mapCallsByStep: Object.freeze(byStep),
+    answerCheck: practiceAnswerCheckBlock(facts?.answerCheckCodes ?? null, marks, { premiseExempt: facts?.checkPremiseExempt ?? null,
+      assumptionsPerAnswer: facts?.assumptionsPerAnswer ?? null,
+      ...(input.checkEmptyReasons === undefined ? {} : { emptyReasons: input.checkEmptyReasons }),
+      ...(facts?.templateFillsDebated === undefined ? {} : { templateFillsDebated: facts.templateFillsDebated }) }),
+    mapFallbacks: practiceMapFallbacks(marks),
     notExercised
   });
 }
@@ -271,6 +385,25 @@ export function practiceShapeLines(block: PracticeShapeBlock): readonly string[]
     `- sizes on the run's receipt: ${sizes}`,
     `- opening used: ${block.opening ?? "none"}`,
     `- map calls (every try, as the ledger recorded them): ${steps}`,
+    ...(block.answerCheck === null ? [] : [(() => {
+      const check = block.answerCheck;
+      const per = check.assumptionsPerAnswer;
+      const assumptions = per === null ? "unread" : per.length === 0 ? "none debated"
+        : `${per.join(", ")} (mean ${(per.reduce((sum, n) => sum + n, 0) / per.length).toFixed(1)}, max ${String(Math.max(...per))})`;
+      // Carried from Tasks 4, 7 and 8: each only when it was read.
+      const carried = [
+        ...(check.emptyReasons === undefined ? [] : [`${String(check.emptyReasons)} empty ${check.emptyReasons === 1 ? "reason" : "reasons"} refused`]),
+        ...(check.templateFillsDebated === undefined ? []
+          : [`${String(check.templateFillsDebated)} template ${check.templateFillsDebated === 1 ? "fill" : "fills"} debated`])
+      ];
+      return `- answer check: ${String(check.checked)} checked, ${String(check.rejected)} rejected (${String(check.notAnAnswer)} not an answer, `
+        + `${String(check.addedFact)} adding a fact, ${String(check.noCost)} with no cost named), `
+        + `${check.premiseExempt === null ? "unread" : String(check.premiseExempt)} exempt as premise challenges; `
+        + `${String(check.replaced)} replaced, ${String(check.dropped)} dropped, ${String(check.keptUnchecked)} kept, `
+        + `${String(check.unavailable)} unavailable; assumptions per answer ${assumptions}`
+        + carried.map((part) => `; ${part}`).join("");
+    })()]),
+    `- map fallbacks: merge ${String(block.mapFallbacks.merge)}, choose ${String(block.mapFallbacks.choose)}`,
     `- chosen answers: ${counted(block.chosenAnswers)}; also raised, not debated: ${counted(block.alsoRaised)}`,
     `- map marks: ${marks.length === 0 ? "none" : marks.map(([mark, n]) => `${mark} x${String(n)}`).join(", ")}`,
     `- points whose close call called for extra graders: ${String(block.panelCloseCallExtensions)}; points scrutinised further: ${String(block.scrutinyExtensions)}`,

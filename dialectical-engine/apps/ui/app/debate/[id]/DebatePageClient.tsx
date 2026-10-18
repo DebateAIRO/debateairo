@@ -94,7 +94,8 @@ import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import type { LocaleCode } from "@/lib/i18n/locales";
-import { questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
+import { localeDirection, questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
+import { DebateTextLocaleProvider } from "@/components/debateTextLang";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import { AlsoRaisedList } from "@/components/AlsoRaisedList";
@@ -121,6 +122,8 @@ import type {
   ScoringVisibilityState
 } from "@/lib/scoringResponse";
 import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scoringStatusCopy";
+import { useDialogSurface } from "@/components/dialogSurface";
+import { useSelectionChallenge } from "@/lib/useSelectionChallenge";
 
 export function debateAfterRunTerminalFailure(debate: DebateDetail, reason: string): DebateDetail {
   return {
@@ -1387,7 +1390,14 @@ export default function DebatePageClient({
     ? {}
     : { onChallengeNode: (node: DebateNode, anchor: HTMLElement) => openChallenge(node, anchor) };
 
-  function onProseSelect(node: DebateNode, _event: MouseEvent) {
+  // A keyboard or screen-reader selection inside an argument's prose opens the same challenge a
+  // mouse selection does (the views' onMouseUp handles the mouse).
+  useSelectionChallenge(!publicMode && popover === null, (nodeId) => {
+    const node = findNode(debate?.tree ?? null, nodeId);
+    if (node) onProseSelect(node);
+  });
+
+  function onProseSelect(node: DebateNode, _event?: MouseEvent) {
     if (publicMode) return;
     const selection = window.getSelection();
     const text = selection?.toString().trim();
@@ -1455,7 +1465,7 @@ export default function DebatePageClient({
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <div className="error">{error}</div>
+          <div className="error" role="alert">{error}</div>
           <Link className="btn" href="/" style={{ marginTop: 16 }}>
             {t(debateChromeCatalog, "debateChrome.backToLibrary")}
           </Link>
@@ -1478,11 +1488,17 @@ export default function DebatePageClient({
   }
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
+  const runStatusText = statusLabel(debate.run_state ?? debate.status, timeCatalog);
+  // The debate's own text (topic, claims, arguments) is tagged with the language it was argued
+  // in, so a screen reader reads it in that language's voice (components/debateTextLang.tsx).
+  const debateTextLocale = readQuestionLocale ?? storyLocale;
+  const debateTextDir = localeDirection(debateTextLocale);
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = formatScoringConfidenceCopy(debateChromeCatalog);
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
   return (
     <PositionTitlesContext.Provider value={positionTitles}>
+    <DebateTextLocaleProvider value={debateTextLocale}>
     <div
       className="debateView"
       data-public-mode={publicMode ? "true" : "false"}
@@ -1493,19 +1509,23 @@ export default function DebatePageClient({
       data-adaptive-depth-dry-run-state={adaptiveDepthDryRunState.status}
       data-actions-collapsed={headerActionsCollapsed ? "true" : "false"}
     >
+      <h1 className="srOnly" lang={debateTextLocale} dir={debateTextDir}>{debate.topic}</h1>
+      <p className="srOnly" role="status">
+        {runStatusText}
+      </p>
       {/* ---- top bar ---- */}
       <header className="debateTopBar" data-debate-reference-chrome ref={debateHeaderRef}>
         <div className="debateTopIdentityRow" ref={debateHeaderIdentityRef}>
           <BrandMark />
           <span className="debateTopDivider" aria-hidden />
           <div className="debateTopClaim" ref={debateHeaderClaimRef}>
-            <span className="debateTopTitle">{debate.topic}</span>
+            <span className="debateTopTitle" aria-hidden="true">{debate.topic}</span>
             <span className="debateTopTitle debateTopTitleMeasure" aria-hidden ref={debateHeaderTitleMeasureRef}>
               {debate.topic}
             </span>
-            <span className={`pill ${statusKind}`}>
+            <span className={`pill ${statusKind}`} aria-hidden="true">
               <span className="dot" />
-              {statusLabel(debate.run_state ?? debate.status, timeCatalog)}
+              {runStatusText}
             </span>
             {completionReason ? (
               <span className="topSwitchStatus" role="status" title={completionReason}>
@@ -1526,10 +1546,13 @@ export default function DebatePageClient({
               className="debateScoringPill"
               data-debate-scoring-pill
               aria-label={t(chromeCatalog, "chrome.openScoringDiagnostics")}
+              aria-describedby="debate-scoring-count"
               onClick={() => setScoringDiagnosticsOpen(true)}
             >
               <span className="debateScoringDot" aria-hidden />
-              {t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}
+              {/* The count is the pill's only visible text; the name says what the button does,
+                  so the count travels as its description instead of being dropped. */}
+              <span id="debate-scoring-count">{t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}</span>
             </button>
           </ScoringErrorBoundary>
           {hasTree ? (
@@ -1750,7 +1773,7 @@ export default function DebatePageClient({
 
       {error ? (
         <div className="debateError">
-          <div className="error">{error}</div>
+          <div className="error" role="alert">{error}</div>
         </div>
       ) : null}
 
@@ -1985,6 +2008,7 @@ export default function DebatePageClient({
           catalog={miscCatalog}
           debateChromeCatalog={debateChromeCatalog}
           composeCatalog={composeCatalog}
+          publicCatalog={publicCatalog}
           floorShown={floorView !== null}
         />
       ) : null}
@@ -2021,6 +2045,7 @@ export default function DebatePageClient({
         </div>
       )}
     </div>
+    </DebateTextLocaleProvider>
     </PositionTitlesContext.Provider>
   );
 }
@@ -2247,6 +2272,7 @@ export function ScoringDiagnosticsDrawer({
   onClose: () => void;
   catalog?: MessageCatalog;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const data = scoringState.data;
   const error = refreshState.error || scoringState.error || data?.reason ||
     t(catalog, "debateChrome.error.noScoringError");
@@ -2273,6 +2299,8 @@ export function ScoringDiagnosticsDrawer({
     <>
       <div className="drawerScrim" onClick={onClose} />
       <aside
+        ref={dialogRef}
+        tabIndex={-1}
         className="drawer scroll"
         role="dialog"
         aria-modal

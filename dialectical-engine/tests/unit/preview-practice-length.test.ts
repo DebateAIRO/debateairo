@@ -218,6 +218,7 @@ describe("the practice re-check reads a lengthed map reply under the lengthed li
 
   it("the debate report passes the call's own lengthed reading to the re-check", () => {
     const source = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
-    expect(source).toContain("await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),\n          await mapLengthedOf(entry.attempt_id, entry.call_site_key)).issues");
+    // R3's final wave (P17) added the call's engine flag after the lengthed reading; the lengthed reading is still passed.
+    expect(source).toContain("await reviewEdgeCountOf(entry.attempt_id, entry.call_site_key),\n          await mapLengthedOf(entry.attempt_id, entry.call_site_key), mapEngine).issues");
   });
 });

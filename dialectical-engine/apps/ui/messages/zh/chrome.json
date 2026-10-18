@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "界面语言",
   "chrome.searchLanguage": "搜索语言或代码",
   "chrome.changeLanguage": "更改语言",
+  "chrome.skipToContent": "跳到主要内容",
   "chrome.europe": "欧洲",
   "chrome.asia": "亚洲",
   "chrome.middleEast": "中东",

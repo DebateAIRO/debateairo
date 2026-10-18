@@ -1400,6 +1400,40 @@ html.theme-transition-fallback body *::after {
   width: 100%;
 }
 
+/* The page's one <main>. It is a column flexbox too, so every page root lays out exactly as it
+   did as a direct child of `.appShell`. It takes focus only from the skip link. */
+.appMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+.appMain:focus {
+  outline: none;
+}
+
+/* Hidden until it has keyboard focus, then shown over the top bar. */
+.skipLink {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--core);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skipLink:focus,
+.skipLink:focus-visible {
+  transform: none;
+}
+
 /* `/` serves two different specified chromes (ADR-002 §"The `/` chrome adjudication").
    When the landing is the document, the layout's global bar must not render above it. */
 .appShell:has([data-landing-section]) > .topBar { display: none; }
@@ -1522,6 +1556,10 @@ html.theme-transition-fallback body *::after {
   background: var(--surface-2);
 }
 .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -2202,6 +2240,9 @@ a:focus-visible {
 }
 .authPrimary:hover:not(:disabled) { transform: translateY(-1px); }
 .authPrimary:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Locked but still in the Tab order (aria-disabled, so its reason is heard): looks the same. */
+.authPrimary[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.authPrimary[aria-disabled="true"]:hover { transform: none; }
 
 .authTextButton {
   padding: 0;
@@ -4267,6 +4308,14 @@ a:focus-visible {
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--text-2);
+}
+
+/* R2 honesty panel: how well each answer's case held up, as a bar (the score is never printed). */
+.drawerComparisonMeter {
+  display: block;
+  inline-size: 100%;
+  block-size: 6px;
+  margin-top: 6px;
 }
 
 .recommendationsPanel {
@@ -7556,7 +7605,8 @@ a:focus-visible {
   background: var(--dispute-bg);
   color: var(--dispute-text);
 }
-.libStatus[data-state="contested"] {
+.libStatus[data-state="contested"],
+.libStatus[data-state="split"] {
   border-color: var(--dispute-border);
   background: var(--dispute-bg);
   color: var(--dispute-text);
@@ -8391,6 +8441,31 @@ a:focus-visible {
   box-shadow: none;
 }
 .threadMetaRow { flex-wrap: nowrap; gap: 6px; }
+/* A finished card's claim is its heading and comes first in the DOM, so a screen reader
+   meets the claim before the stance, model, scores and review that belong to it. `order`
+   keeps those on top for the eye; flex margins do not collapse, so the title's top margin
+   goes to keep the block spacing it had. */
+.threadCard,
+.node[data-claim-first] {
+  display: flex;
+  flex-direction: column;
+}
+.threadCard > .threadMetaRow,
+.threadCard > .positionTitle,
+.threadCard > .nodeReviewLine,
+.node[data-claim-first] > .roleBadge,
+.node[data-claim-first] > .nodeArgHeader,
+.node[data-claim-first] > .positionTitle,
+.node[data-claim-first] > .nodeScoreRow {
+  order: -1;
+}
+.threadCard > .positionTitle,
+.node[data-claim-first] > .positionTitle {
+  margin-top: 0;
+}
+.node[data-claim-first] > .roleBadge {
+  align-self: flex-start;
+}
 .nodeReviewLine {
   display: flex;
   align-items: center;
@@ -8775,6 +8850,7 @@ a:focus-visible {
 }
 
 .publicVerdictPill[data-verdict="contested"],
+.publicVerdictPill[data-verdict="split"],
 .publicVerdictPill[data-verdict="unsupported"] {
   border-color: var(--dispute-border);
   background: var(--dispute-bg);
@@ -9293,6 +9369,7 @@ a:focus-visible {
 }
 .storyPanelLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
 .storyPanelLabel[data-verdict="contested"],
+.storyPanelLabel[data-verdict="split"],
 .storyPanelLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
 /* A soft shade at the top or bottom edge shows that more text is there to
    scroll to; the local covers hide it at either end. */
@@ -9413,6 +9490,7 @@ a:focus-visible {
 }
 .floorAnswerLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
 .floorAnswerLabel[data-verdict="contested"],
+.floorAnswerLabel[data-verdict="split"],
 .floorAnswerLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
 .floorAnswerLead { margin: 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
 .floorAnswerStatement { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }
@@ -10655,6 +10733,23 @@ a:focus-visible {
   padding: 16px 24px 8px;
 }
 
+
+/* Split moves focus to the claim it now shows; a heading is not a control, so no ring. */
+.splitFocusClaim:focus,
+.splitFocusRootClaim:focus {
+  outline: none;
+}
+
+/* Map segments are keyboard buttons; the focused one is drawn with a heavy ink edge. */
+.mapStage [role="button"]:focus {
+  outline: none;
+}
+
+.mapStage [role="button"]:focus-visible {
+  stroke: var(--ink);
+  stroke-width: 4px;
+}
+
 .policyBody:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
@@ -10801,6 +10896,12 @@ a:focus-visible {
    as the literal `.30`; the rung is a tie and the two spellings fall on opposite sides of it
    (CODE-REV-S02-C8-r1 B1). */
 .policyPrimary:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* Locked but still in the Tab order (aria-disabled, so its reason is heard): looks the same. */
+.policyPrimary[aria-disabled="true"] {
   opacity: .65;
   cursor: not-allowed;
 }

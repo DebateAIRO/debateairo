@@ -259,7 +259,9 @@ async function grant(
 async function encryptedSnapshot(
   publicationRef: string,
   runId: string,
-  marker: string
+  marker: string,
+  // Engine redesign R2 (B12): the snapshot's terminal, label and floor; absent: today's SERVED / SUPPORTED, no floor.
+  shape: Readonly<{ terminal?: string; verdict?: string | null; floor?: Readonly<Record<string, unknown>> }> = {}
 ): Promise<CryptoEnvelope> {
   const provision = await database.pool.query<{
     user_id: string;
@@ -291,14 +293,15 @@ async function encryptedSnapshot(
       question: `public question ${marker}`,
       published_at: "2026-08-24T00:00:00.000Z",
       answer: {
-        terminal: "SERVED",
-        verdict: "SUPPORTED",
-        verdict_available: true,
+        terminal: shape.terminal ?? "SERVED",
+        verdict: shape.verdict === undefined ? "SUPPORTED" : shape.verdict,
+        verdict_available: (shape.verdict === undefined ? "SUPPORTED" : shape.verdict) !== null,
         confidence_band: "moderate",
         summary_segments: [{ text: `public answer ${marker}` }],
         badges: [], residual_objections: [], reversal_point: "new evidence",
         as_of: "2026-08-24T00:00:00.000Z"
-      }
+      },
+      ...(shape.floor === undefined ? {} : { floor: shape.floor })
     });
   } finally {
     prepared.close();
@@ -928,6 +931,40 @@ describe("S8 publication on real PostgreSQL", () => {
     expect(chain).toHaveLength(Number(total.rows[0]?.count));
     expect(chain.some((event) => event.eventType === "debate.publication.published")).toBe(true);
     expect(verifyChain(chain)).toBe(true);
+  });
+
+  it("R2 (B12): a SPLIT answer and a SPLIT floor are published, read back by the public page, and listed as SPLIT", async () => {
+    const application = new PostgresPublicationApplication(repository, publicationCipher);
+    const leading = randomUUID();
+    const cases = [
+      ["split-served", { verdict: "SPLIT" }],
+      ["split-floor", { terminal: "COMPONENTS_ONLY", verdict: null,
+        floor: { verdict_state: "SPLIT", leading_node_id: leading, basis_incomplete: false } }]
+    ] as const;
+    const refs: string[] = [];
+    for (const [marker, shape] of cases) {
+      const identity = await createIdentity(marker);
+      const runId = await createRun(identity, marker);
+      const publicationRef = randomUUID();
+      refs.push(publicationRef);
+      // The snapshot's published_at (encryptedSnapshot's) must equal the publication's own time, or the public read refuses it.
+      const occurredAt = new Date("2026-08-24T00:00:00.000Z");
+      const grantToken = await grant(identity, runId, "PUBLISH", "p", occurredAt);
+      expect(await repository.publish({
+        runId, userId: identity.userId, ownerRef: identity.ownerRef, sessionId: identity.sessionId,
+        grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt, source, publicationRef,
+        expectedPseudonym: identity.pseudonym,
+        contentCiphertext: await encryptedSnapshot(publicationRef, runId, marker, shape)
+      })).toBe(true);
+    }
+    await expect(application.readPublicDebate(refs[0]!)).resolves.toMatchObject({
+      public_ref: refs[0], answer: { verdict: "SPLIT", verdict_available: true } });
+    await expect(application.readPublicDebate(refs[1]!)).resolves.toMatchObject({
+      public_ref: refs[1], answer: { verdict: null, verdict_available: false },
+      floor: { verdict_state: "SPLIT", leading_node_id: leading, basis_incomplete: false } });
+    const listed = (await application.list(50, 0)).items;
+    expect(listed.find((item) => item.public_ref === refs[0])).toMatchObject({ verdict: "SPLIT" });
+    expect(listed.find((item) => item.public_ref === refs[1])).toMatchObject({ verdict: null, floor_verdict: "SPLIT" });
   });
 
   it("unpublishes latest-wins, leaves the owner run intact, and rejects event/snapshot mutation and truncate", async () => {

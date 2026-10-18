@@ -1,6 +1,6 @@
 // Engine redesign R1d, Task 7 (spec §10; INTERFACE §3.4; decision 7): an engine-2 receipt prices the story's rounds twice
 // (the backup storyteller's whole second loop, the worst case); a receipt without the member prices exactly as today. The
-// engine's judge, investigation and check sites are NOT priced in R1d (R2): every debate count stays today's.
+// engine's judge, investigation and check sites were NOT priced in R1d; R2 B10 prices them (tests/unit/r2-estimate-sites.test.ts).
 import { describe, expect, it } from "vitest";
 import {
   computeStructuralCeilingBasis, debateShapePolicyStartValues, engineSettingsOf, engineVersionPolicyStartValues,
@@ -38,7 +38,6 @@ const shares = (basis: Readonly<Record<string, unknown>>, storyRounds = 2) => pr
   dearestFor: (models) => models.includes(MIMO) ? MIMO : models[0]! });
 const STORY_TYPES = new Set(["STORYTELLER", "STORYTELLER_RETRY", "STORY_CHECKER", "STORY_CHECKER_RETRY"]);
 const storyOf = (result: PreviewCallShares) => result.shares.filter((share) => STORY_TYPES.has(share.type));
-const debateOf = (result: PreviewCallShares) => result.shares.filter((share) => !STORY_TYPES.has(share.type));
 const storyAt = (rounds: bigint) => [
   { model: GLM, type: "STORYTELLER", numerator: rounds }, { model: GLM, type: "STORYTELLER_RETRY", numerator: rounds },
   { model: MIMO, type: "STORY_CHECKER", numerator: rounds }, { model: MIMO, type: "STORY_CHECKER_RETRY", numerator: rounds }
@@ -60,20 +59,19 @@ describe("a receipt without the engine member: today's numbers (row absent)", ()
 });
 
 describe("an engine-2 receipt: the story's rounds count twice (the backup storyteller's worst case)", () => {
-  it("the story calls double; every debate call stays today's (the engine's sites are priced by R2)", () => {
+  it("the story calls double; the debate gains exactly the engine's sites (2 judges, 2 investigations at two makers, no map)", () => {
     expect(calls(engine2).story).toBe(16);
-    expect(calls(engine2).debate).toBe(calls(lengthOnly).debate);
+    expect(calls(engine2).debate).toBe(calls(lengthOnly).debate + 4);
     expect(calls(engine2).probes).toBe(calls(lengthOnly).probes);
-    expect(calls(engine2).unbilledRetries).toBe(calls(lengthOnly).unbilledRetries);
-    expect(calls(engine2).total).toBe(calls(lengthOnly).total + 8);
+    expect(calls(engine2).unbilledRetries).toBe(calls(lengthOnly).unbilledRetries + 4);
+    expect(calls(engine2).total).toBe(calls(lengthOnly).total + 8 + 8);
     expect(calls(engine2, 0).story).toBe(0);
   });
 
-  it("the story shares double over the same denominator; every other share is the length-only receipt's", () => {
+  it("the story shares double (story rounds over each receipt's own denominator)", () => {
     const engine = shares(engine2), plain = shares(lengthOnly);
-    expect(engine.denominator).toBe(plain.denominator);
     expect(storyOf(engine)).toEqual(storyAt(4n * engine.denominator));
-    expect(debateOf(engine)).toEqual(debateOf(plain));
+    expect(storyOf(plain)).toEqual(storyAt(2n * plain.denominator));
     expect(storyOf(shares(engine2, 0))).toEqual([]);
   });
 
@@ -94,9 +92,9 @@ describe("an engine-2 receipt: the story's rounds count twice (the backup storyt
   });
 
   it("at the basis ceiling the engine's receipt is priced at the length-only one plus exactly the engine's added attempts", () => {
-    // Task 7 review 1 (final wave B5): an exact value, not a lower bound. Per step (above) R1d prices no engine site; the
-    // basis ceiling reads max_model_attempts, which holds the engine's attempts (4 sites x 3 = 12 here), so it is exactly
-    // the length-only value plus the receipt's added_model_attempts (R2 replaces this pin).
+    // Task 7 review 1 (final wave B5): an exact value, not a lower bound. The basis ceiling reads max_model_attempts, which
+    // holds the engine's attempts (4 sites x 3 = 12 here), so it is exactly the length-only value plus the receipt's
+    // added_model_attempts (R2 B10 keeps this pin: the per-step count's 4 engine sites stay below the ceiling).
     const added = (engine2.engine as { sites: { added_model_attempts: number } }).sites.added_model_attempts;
     expect(added).toBe(12);
     expect(calls(engine2, 2, "BASIS_CEILING").debate).toBe(calls(lengthOnly, 2, "BASIS_CEILING").debate + added);
@@ -107,9 +105,9 @@ describe("an engine-2 receipt: the story's rounds count twice (the backup storyt
     const engine = engine2.engine as Readonly<Record<string, unknown>>;
     // The parser's TypedDomainError carries the code on `.code` (its message is a sentence).
     expect(() => calls({ ...engine2, engine: { ...engine, version: 9 } }))
-      .toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+      .toThrowError(expect.objectContaining({ code: "ASK_MODEL_ASSIGNMENT_INVALID", message: expect.stringMatching(/malformed engine member/u) }));
     const { length: _dropped, ...withoutLength } = engine2;
-    expect(() => calls(withoutLength)).toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+    expect(() => calls(withoutLength)).toThrowError(expect.objectContaining({ code: "ASK_MODEL_ASSIGNMENT_INVALID", message: expect.stringMatching(/malformed engine member/u) }));
   });
 });
 
@@ -119,9 +117,12 @@ describe("the picker's receipt readers accept an engine-bearing receipt (apps/ap
     expect(admittedShapeOf(engine2)).toBeNull();
   });
 
-  it("expectedCallsByRoleFromBasis counts no engine site in R1d (R2 replaces this pin)", () => {
-    expect(expectedCallsByRoleFromBasis(shapedEngine)).toEqual(expectedCallsByRoleFromBasis(shapedLength));
-    expect(expectedCallsByRoleFromBasis(engine2)).toEqual(expectedCallsByRoleFromBasis(lengthOnly));
+  it("expectedCallsByRoleFromBasis counts the engine's sites (R2 B10)", () => {
+    const plain = expectedCallsByRoleFromBasis(lengthOnly);
+    expect(expectedCallsByRoleFromBasis(engine2)).toEqual({ ...plain, JUDGE: plain.JUDGE + 2, REVIEWER: plain.REVIEWER + 2 });
+    const shapedPlain = expectedCallsByRoleFromBasis(shapedLength);
+    expect(expectedCallsByRoleFromBasis(shapedEngine))
+      .toEqual({ ...shapedPlain, POSITION: shapedPlain.POSITION + 1, JUDGE: shapedPlain.JUDGE + 2, REVIEWER: shapedPlain.REVIEWER + 2 });
   });
 
   it("a shaped receipt with a malformed engine member is refused as a malformed receipt", () => {

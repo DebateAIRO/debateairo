@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 // UNION of both lanes: S06 needs the served-root rule vocabularies and the
 // retired-rule predicate; T6 needs PoolClient for its writer-resolved FK path.
-import type { DebateShapeMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
+import type { DebateShapeMark, EngineMark, ServedRootRule, ServedRootRuleHistory, WayOfKnowing } from "@debateai/kernel";
 import { isRetiredServedRootRule, TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import {
@@ -22,9 +22,15 @@ import {
   withWriteTransaction,
   type RunOwnershipInput
 } from "@debateai/db";
-import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
+import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
+import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+export {
+  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
+  type RootCallSite
+} from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -57,6 +63,7 @@ import {
 // T9's digest, roles and loop live in `./synthesis.ts`; the package publishes a
 // single entry point, so they are re-exported here.
 export * from "./synthesis.js";
+export * from "./engine-verdict.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -1320,12 +1327,15 @@ export type VerdictLabelTrigger =
   | "MARGIN_WITHIN_GAMMA"
   | "DISAGREEMENT_AT_THRESHOLD"
   | "AT_OR_ABOVE_HIGH_CUT"
-  | "MID_BAND";
+  | "MID_BAND"
+  // Engine 2 (R2b): the comparing judges decided (rung 5).
+  | EngineVerdictTrigger;
 
 export interface VerdictLabelDerivation {
-  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
-  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them. */
-  readonly rung: 0 | 1 | 2 | 3 | 4;
+  /** SPLIT ("Contested", owner ruling E8) only from the comparing judges; the ladder never gives it. */
+  readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
+  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2). */
+  readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
   readonly trigger: VerdictLabelTrigger;
   /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
   readonly basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[];
@@ -1420,9 +1430,16 @@ export function deriveHonestVerdict(input: {
   readonly usableBasis: boolean;
   readonly reasonRef: string;
   readonly labelBasis: VerdictLabelBasis | null;
+  /**
+   * Engine 2 (spec 2026-10-15 §4.4; R2b): the label the comparing judges' votes gave (`verdictDerivationOfJudges`),
+   * derived before synthesis exactly as the ladder's is. Exactly one of this and `labelBasis` names a servable answer's
+   * label (an answer that carries no label has neither: the unusable-basis return above comes first); absent on every
+   * engine-1 answer.
+   */
+  readonly judgesDerivation?: VerdictLabelDerivation | null;
 }):
   | {
-      readonly verdictState: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+      readonly verdictState: VerdictLabelDerivation["label"];
       readonly confidenceBand: null;
       readonly unavailable: null;
       readonly derivation: VerdictLabelDerivation;
@@ -1435,6 +1452,16 @@ export function deriveHonestVerdict(input: {
     } {
   if (!input.usableBasis) {
     return { verdictState: null, confidenceBand: null, unavailable: { reasonRef: input.reasonRef }, derivation: null };
+  }
+  const judgesDerivation = input.judgesDerivation ?? null;
+  if (judgesDerivation !== null) {
+    if (input.labelBasis !== null) {
+      throw new TypedDomainError(
+        "VERDICT_LABEL_BASIS_AMBIGUOUS",
+        "A servable answer's label comes from the ladder basis or from the comparing judges, never from both"
+      );
+    }
+    return { verdictState: judgesDerivation.label, confidenceBand: null, unavailable: null, derivation: judgesDerivation };
   }
   if (input.labelBasis === null) {
     throw new TypedDomainError(
@@ -1571,6 +1598,8 @@ export interface PersistServeInput {
    * DR-184 superseding path, which preserves the prior answer's projection.
    */
   readonly verdictLabelBasis?: VerdictLabelBasis | null;
+  /** Engine 2 (R2b): the comparing judges' label record instead of a ladder basis; absent on every engine-1 answer. */
+  readonly judgesDerivation?: VerdictLabelDerivation | null;
   /** DR-184: append a new immutable version of an already-served answer. */
   readonly supersedes?: { readonly answerId: string };
 }
@@ -1617,7 +1646,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark;
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED" | DebateShapeMark | EngineMark;
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1694,8 +1723,18 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "MAP_UNAVAILABLE_TODAYS_OPENING",
   "ANSWERS_FILLED",
   "CHOOSE_QUOTA_FILLED",
+  "MAP_CHECK_UNAVAILABLE",
+  "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED",
+  "MAP_ANSWER_KEPT_UNCHECKED",
   "PANEL-CLOSE-CALL-EXTENDED",
-  "SCRUTINY-EXTENDED"
+  "SCRUTINY-EXTENDED",
+  // Engine 2 (INTERFACE §13): each verdict mark names the served root in its record; the reduced-weight mark names its
+  // point and the cannot-assess review behind it.
+  "VERDICT-JUDGE-MISSING",
+  "VERDICT-JUDGES-UNAVAILABLE",
+  "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -1749,6 +1788,18 @@ export function assertRequiredConditionMarkRecords(
       throw new TypedDomainError(
         "DERIVED_STANDING_RECORD_INVALID",
         "Class D requires unjudged-review provenance, presentation inclusion, and a positive judged basis count"
+      );
+    }
+    // Engine 2 (spec §4.2a rule 3): a point kept at a reduced weight because its review LANDED as cannot-assess. The
+    // review arm only (its provenance is resolved from the ledger, `resolveTrueUnjudgedReasons`); no transport outcome,
+    // no call site, nothing excluded from the served number and no derived-standing count: it is neither class H nor D.
+    if (record.mark === "UNASSESSED-AT-REDUCED-WEIGHT" && (
+      record.reviewOutcome !== "cannot-assess" || record.terminalTransportOutcome != null || record.callSiteKey != null
+      || record.excludedFromServedNumber != null || record.judgedBasisCount != null
+    )) {
+      throw new TypedDomainError(
+        "UNASSESSED_CONDITION_MARK_RECORD_INVALID",
+        "A reduced-weight record names its cannot-assess review and nothing else"
       );
     }
     if (record.mark === "UNAUTHORED-BRANCH-HALTED" && (
@@ -1832,8 +1883,10 @@ export async function resolveTrueUnjudgedReasons(
   // being unrepresentable at T6's call site.
   records: readonly PersistableConditionMarkRecord[]
 ): Promise<readonly UnjudgedReasonProvenance[]> {
+  // Engine 2: the reduced-weight record names a landed cannot-assess review too, so its provenance is resolved the same way.
   const carriesUnjudgedReason = (record: PersistableConditionMarkRecord): boolean =>
-    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED";
+    record.mark === "HIDDEN-UNJUDGEABLE" || record.mark === "DERIVED-STANDING-UNREVIEWED"
+    || record.mark === "UNASSESSED-AT-REDUCED-WEIGHT";
   const subjects = [...new Set(records.filter(carriesUnjudgedReason).map((record) => record.subjectRef))];
   const landed = new Map<string, { readonly nodeReviewId: string; readonly outcome: string }>();
   if (subjects.length > 0) {
@@ -2079,7 +2132,8 @@ export class ServeRepository {
         && input.servedNumber !== null
         && (input.result.terminal === "SERVED" || input.result.terminal === "DOWNGRADED"),
       reasonRef: `serve-gate:${input.result.gateTrace.at(-1) ?? input.result.terminal}`,
-      labelBasis: input.verdictLabelBasis ?? null
+      labelBasis: input.verdictLabelBasis ?? null,
+      judgesDerivation: input.judgesDerivation ?? null
     });
     // The mark and the label are ONE decision. A derivation that says the basis
     // was incomplete while the answer's marks stay silent is the facsimile shape
@@ -2137,7 +2191,8 @@ export class ServeRepository {
         composed_text_id: string | null;
         conformance_record_id: string | null;
         serve_state: "COMPOSED" | "RECOMPOSED_ONCE" | "COMPONENTS_ONLY";
-        verdict_state: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
+        // B4 Minor 2 (R2b final wave P2): the contract's closed list, so a fifth state cannot be missed here.
+        verdict_state: VerdictState | null;
         verdict_unavailable: { readonly reason_ref: string } | null;
       }>(
         `SELECT answer_id, answer_version, run_id, work_item_id,
@@ -2724,6 +2779,15 @@ export class ServeRepository {
       // A21, ruling F20 (the one R2 exception): the pinned core.run_role_assignment row rides this
       // single SELECT as a subselect instead of a second readRunRoleAssignment query per answer read.
       role_assignment_row: PinnedRoleAssignmentRow | null;
+      // R2 (INTERFACE §9.8), like F20: the plain vote columns ride this one SELECT; the reasons stay sealed.
+      // An empty array for every engine-1 run (no vote row). (pre-flight PF-R2b4.5) The stored `counted` column is a
+      // hint and is not selected: the projection recounts (controller ruling R2b-B5.1).
+      verdict_votes: Array<{
+        judge_seat: number; maker: string; chosen_root_node_id: string | null; chosen_letter: string | null;
+        conditional: boolean | null; same_as: string[][]; question_kind: string | null;
+      }>;
+      // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
+      root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
       `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
@@ -2754,7 +2818,23 @@ export class ServeRepository {
                         'strength', pinned.strength,
                         'stepped_down', pinned.stepped_down)
                  FROM core.run_role_assignment AS pinned
-                WHERE pinned.run_id = run.run_id) AS role_assignment_row
+                WHERE pinned.run_id = run.run_id) AS role_assignment_row,
+              (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'judge_seat', vote.judge_seat, 'maker', vote.maker,
+                        'chosen_root_node_id', vote.chosen_root_node_id::text,
+                        'chosen_letter', vote.chosen_letter, 'conditional', vote.conditional,
+                        'same_as', vote.same_as, 'question_kind', vote.question_kind) ORDER BY vote.judge_seat), '[]'::jsonb)
+                 FROM ledger.verdict_vote AS vote
+                WHERE vote.run_id = run.run_id) AS verdict_votes,
+              (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'node_id', root.node_id::text, 'call_site_key', entry.call_site_key)
+                        ORDER BY root.created_at_seq, entry.sequence), '[]'::jsonb)
+                 FROM core.node AS root
+                 JOIN ledger.ledger_entry AS entry
+                   ON entry.run_id = root.run_id AND entry.raw_artifact_ref = root.provenance_ref
+                  AND entry.action_kind = 'MODEL_CALL'
+                WHERE root.run_id = run.run_id AND root.parent_node_id IS NULL AND root.generation_status <> 'stale'
+                  AND EXISTS (SELECT 1 FROM ledger.verdict_vote AS seated WHERE seated.run_id = run.run_id)) AS root_sites
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
@@ -2835,6 +2915,21 @@ export class ServeRepository {
                 number.producer, number.replay_handle, number.provenance_ref
        ORDER BY number.served_number_id`,
       [row.answer_id, row.answer_version]
+    );
+    // Follow-up N1: the served answer as recorded (the position the served number's source_ref names), so the panel
+    // leads with it even after a review catch-up refreshed the strengths; null for an answer with no served number.
+    const servedRootNodeId = servedPositionOf(nodes, edges, numbers.rows.map((number) => number.source_ref));
+    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
+    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
+    // vote row). (pre-flight PF-R2b4.5)
+    const judgesComparison = judgesComparisonOf(
+      row.verdict_votes.map((vote) => ({
+        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
+        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
+      })),
+      nodes, edges,
+      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
+      servedRootNodeId
     );
     const currentRead = version === undefined;
     const eventStreams = numbers.rows.map((number) => number.events.map((event) => ({
@@ -3040,7 +3135,8 @@ export class ServeRepository {
       as_of: row.as_of.toISOString(),
       staleness_state: staleness.state,
       relevant_as_of: staleness.relevantAsOf,
-      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment })
+      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment }),
+      ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison })
     };
     });
   }

@@ -15,6 +15,7 @@ import {
   withQuestionLanguageField,
   type DebateRole,
   type LengthGuide,
+  type PointInvestigationMaterial,
   type QuestionLanguage,
   type ReviewOutcome,
   type WayOfKnowing
@@ -38,6 +39,7 @@ import {
 } from "@debateai/providers";
 import {
   JUDGE_WAYS_OF_KNOWING,
+  JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS,
   JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   JUDGE_LEG_CONSIDERATION_LENGTH_MATERIAL_FIELDS,
   JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS,
@@ -45,6 +47,7 @@ import {
   JUDGE_LEG_MATERIAL_FIELDS,
   PANEL_LENGTH_PROMPT_CONTRACT,
   PANEL_PROMPT_CONTRACT,
+  judgeAssignedRootV2PromptContract,
   judgeConsiderationPromptContract,
   judgePromptContract,
   reviewPromptContract,
@@ -73,9 +76,22 @@ import {
   type JudgeAssessment,
   type NormalizedClaim
 } from "./s04.js";
+import {
+  POINT_INVESTIGATION_PROMPT_CONTRACT,
+  POINT_INVESTIGATION_PROSE,
+  POINT_INVESTIGATION_READING,
+  pointInvestigationContentIssues,
+  pointInvestigationMaterialFields,
+  pointInvestigationReplySchema,
+  type PointInvestigationReply
+} from "./investigation.js";
 
 export * from "./s04.js";
 export * from "./prompts.js";
+export * from "./investigation.js";
+export * from "./comparing-judges.js";
+export * from "./engine-repository.js";
+export * from "./honest-score.js";
 
 /**
  * S2-3 (goal-v4 T4): `RAN` left the judge's output vocabulary. The constant that
@@ -254,7 +270,14 @@ export type JudgeLeg =
    * maker must make the strongest case for; `mapPoints` is the map's points as
    * one JSON text. Both are material, fenced like every other statement.
    */
-  | { readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string }
+  | {
+      readonly kind: "assigned-root"; readonly assignedAnswer: string; readonly mapPoints: string;
+      /**
+       * Engine 2 (spec 2026-10-15 §5.2 items 2, 6): present = the fixed-words contract (`judge.assigned-root.*.v2`) with
+       * the unsided points raised and the answer's assumptions, each a JSON text. Absent = today's leg, byte for byte.
+       */
+      readonly engine?: Readonly<{ pointsRaised: string; assumptions: string }> | undefined;
+    }
   /**
    * `consideration` (debate shape) is the one map point the reply is built on.
    * Absent = today's leg, byte for byte; present = the consideration variant
@@ -373,6 +396,33 @@ export interface NodeReviewInput extends JudgeSubjectInput {
   readonly edges: readonly ReviewedEdgeSubject[];
 }
 
+/** Engine 2 (spec §4.2b; INTERFACE §8.1): one investigation call. The material is AI-written text only. */
+export interface PointInvestigationInput {
+  readonly runId: string | null;
+  readonly subjectItemId: string;
+  /** `VERDICT:investigate:<n>` (a seat marker added by the seat caller on an assigned run). */
+  readonly callSiteKey: string;
+  readonly providerRef: string;
+  /** The engine seal (`engineContractHash`) that covers `verdict.investigate.v1`. */
+  readonly contractHash: string;
+  readonly bound: CallBound;
+  readonly material: PointInvestigationMaterial;
+  /** The receipt's `investigator` words (60 at the start values) and the run's language tag. */
+  readonly length: LengthGuide;
+  readonly argumentLanguageName?: string;
+  readonly questionLanguage?: QuestionLanguage;
+}
+
+export interface InvestigatedPoint {
+  readonly reply: PointInvestigationReply;
+  readonly provenanceRef: string;
+  readonly providerLedgerRef: string;
+  /** The model and maker that answered (the gateway's record, so a moved call names its real author). */
+  readonly model: string;
+  readonly maker: string;
+  readonly parseStrategy: StructuredParseStrategy;
+}
+
 /**
  * S2-2 / T3: what one panel member is asked. Structurally the review call's
  * SUBJECT inputs, because a member assesses the same node material — but the
@@ -410,7 +460,9 @@ export interface ReviewedNode {
  * closed material table it may send: a support or attack leg WITH a
  * consideration takes the debate shape's variant (`judgeConsiderationPromptContract`
  * + `JUDGE_LEG_CONSIDERATION_MATERIAL_FIELDS`); every other leg, a support or
- * attack leg without one included, takes today's contract and table. The framer
+ * attack leg without one included, takes today's contract and table. An
+ * assigned root WITH `engine` (engine redesign R3) takes the fixed-words
+ * contract (`judgeAssignedRootV2PromptContract` + its table), lengthed only. The framer
  * and the moment replay both read it, so the two cannot disagree.
  */
 export function judgeLegFrameSpec(
@@ -418,6 +470,11 @@ export function judgeLegFrameSpec(
   claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   lengthed = false
 ): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  if (leg.kind === "assigned-root" && leg.engine !== undefined) {
+    // Engine-2 contracts are always lengthed (engine INTERFACE §0): an untold length is a wiring defect, never sent.
+    if (!lengthed) throw new TypedDomainError("JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED", "An engine-2 position is always told its length");
+    return Object.freeze({ contract: judgeAssignedRootV2PromptContract(claim), materialFields: JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS });
+  }
   if ((leg.kind === "support" || leg.kind === "attack") && leg.consideration !== undefined) {
     return Object.freeze({
       contract: judgeConsiderationPromptContract(leg.kind, claim, lengthed),
@@ -432,9 +489,12 @@ export function judgeLegFrameSpec(
 
 /**
  * The closed material table, applied. A leg's fields are fixed by the table
- * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS`, or the consideration
- * variant's), and this function is the only place that fills them — so a new
- * field cannot reach a model without appearing in that table.
+ * `judgeLegFrameSpec` names (`JUDGE_LEG_MATERIAL_FIELDS` or its length variant,
+ * the consideration variants', or, for an engine-2 assigned root, the v2 table
+ * `JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS`: question_line, assigned_answer,
+ * map_points, points_raised, assumptions, length), and this function is the only
+ * place that fills them — so a new field cannot reach a model without appearing
+ * in that table.
  */
 function judgeLegMaterial(
   leg: JudgeLeg,
@@ -453,7 +513,11 @@ function judgeLegMaterial(
       ? [
           { name: "question_line", content: questionLine },
           { name: "assigned_answer", content: leg.assignedAnswer },
-          { name: "map_points", content: leg.mapPoints }
+          { name: "map_points", content: leg.mapPoints },
+          ...(leg.engine === undefined ? [] : [
+            { name: "points_raised", content: leg.engine.pointsRaised },
+            { name: "assumptions", content: leg.engine.assumptions }
+          ])
         ]
       : leg.kind === "support" || leg.kind === "attack"
         ? [
@@ -598,7 +662,12 @@ type RootPositionBoundInput = Readonly<{
   questionLine: string;
   argumentLanguageName: string;
   completionTokenCeiling: number;
-  assignedMaterialChars: Readonly<{ answer: number; points: number }>;
+  /**
+   * `pointsRaised` and `assumptions` (engine redesign R3, both or neither): the engine-2 fixed-words leg is framed too.
+   * `pointsRaised` is the ONE room its sided `map_points` and its `points_raised` list share (Ruling PF-R35.4 (a)): the
+   * two together hold at most `pointsRaised + 2` characters, which the runner's shaping keeps (`shapeEngineRootMaterial`).
+   */
+  assignedMaterialChars: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
   questionLanguage?: QuestionLanguage | null;
   /** Length guidance (spec 2026-10-15 §3.2): frame the lengthed variant with this target; absent or null, today's bytes. */
   length?: LengthGuide | null;
@@ -621,15 +690,30 @@ function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (fr
     || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
     throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
   }
+  const { pointsRaised, assumptions } = input.assignedMaterialChars;
+  const validSize = (size: number | undefined): boolean => size === undefined || (Number.isSafeInteger(size) && size >= 1);
+  if ((pointsRaised === undefined) !== (assumptions === undefined) || !validSize(pointsRaised) || !validSize(assumptions)) {
+    throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
+  }
   const legs: readonly JudgeLeg[] = [
     Object.freeze({ kind: "primary-root" }),
     Object.freeze({ kind: "assigned-root", assignedAnswer: "\u0001".repeat(answer), mapPoints: "\u0001".repeat(points) })
   ];
-  return Math.max(...legs.flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
+  // Engine 2 (R3): the fixed-words leg, framed with the bound length guide (it is always lengthed), so root 0's room is
+  // never below a real engine-2 position call (spec §10: never under-count). The sided points and the points raised
+  // share one room (Ruling PF-R35.4 (a)): it is framed at both extreme splits (all of it sided, the raised list empty;
+  // the sided list empty, all of it raised). Every character of the shared room frames at the same 7 bytes, so no split
+  // in between frames longer; the larger of the two is kept with the rest.
+  const fill = (chars: number): string => "\u0001".repeat(chars);
+  const engineLeg = (sided: number, raised: number, assumed: number): JudgeLeg => Object.freeze({ kind: "assigned-root",
+    assignedAnswer: fill(answer), mapPoints: fill(sided), engine: Object.freeze({ pointsRaised: fill(raised), assumptions: fill(assumed) }) });
+  const engineLegs: readonly JudgeLeg[] = pointsRaised === undefined || assumptions === undefined ? []
+    : [engineLeg(pointsRaised, 2, assumptions), engineLeg(2, pointsRaised, assumptions)];
+  return Math.max(...[...legs, ...engineLegs].flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
     model: "",
     max_tokens: input.completionTokenCeiling,
     messages: packetOf(framedJudgePrompt(leg, input.questionLine, input.argumentLanguageName, claim, input.questionLanguage ?? null,
-      input.length ?? null)).messages
+      leg.kind === "assigned-root" && leg.engine !== undefined ? (input.length ?? lengthGuideForBounds()) : (input.length ?? null))).messages
   }), "utf8"))));
 }
 
@@ -881,6 +965,61 @@ export class Judge {
         }
         return Object.freeze({ edgeId: edge.edgeId, bearing });
       }))
+    });
+  }
+
+  /**
+   * Engine 2 (spec §4.2b, E13): one investigation of a "cannot assess" point. It stands in for the review the point
+   * lacked, so it is a REVIEWER call (`VERDICT:investigate:` reads as REVIEWER, at the `reviewer` thinking level) on the
+   * served lane, under the engine seal. The request carries the framed answer form and `classifyContent`, so LG-A's
+   * repair order and the salvage apply: the code fixer; on an unreadable reply, A1's code rescue, then one
+   * structure-repair call, then B's short PATCH follow-up to the original AI (never a full re-ask); on a content
+   * refusal, one follow-up (pre-flight PF-R2a8.14). A reply still refused after that is
+   * POINT_INVESTIGATION_SCHEMA_FAILURE. No answer or vendor failure fails the debate (the runner reads it as
+   * INVESTIGATION_UNAVAILABLE and goes on); a code defect does (a named TypeError, rethrown by the runner's rule).
+   */
+  async investigatePoint(input: PointInvestigationInput): Promise<InvestigatedPoint> {
+    const framed = buildFramedPrompt({
+      contract: promptContractInArgumentLanguage(POINT_INVESTIGATION_PROMPT_CONTRACT, input.argumentLanguageName, input.questionLanguage),
+      material: withQuestionLanguageField(pointInvestigationMaterialFields(input.material, input.length), input.questionLanguage)
+    });
+    const inQuestionLanguage = replyLanguageCheckFor(input.material.question, input.questionLanguage, POINT_INVESTIGATION_PROSE);
+    const reading = rememberingAcceptedReply((content, reply) => classifyStructuredArtifact(content, pointInvestigationReplySchema,
+      reply, POINT_INVESTIGATION_READING, (value) => [...pointInvestigationContentIssues(value), ...inQuestionLanguage(value)]));
+    let response;
+    try {
+      response = await this.provider.call({
+        runId: input.runId,
+        subjectItemId: input.subjectItemId,
+        callSiteKey: input.callSiteKey,
+        role: "JUDGE",
+        lane: "served",
+        modelRole: "REVIEWER",
+        bound: input.bound,
+        contractHash: input.contractHash,
+        providerRef: input.providerRef,
+        packet: framed.packet,
+        guidedWords: input.length.words,
+        buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
+        classifyContent: reading.classifyContent
+      });
+    } catch (error) {
+      if (error instanceof ProviderContentUnacceptedError) {
+        throw new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", error.lastParseError);
+      }
+      throw error;
+    }
+    const parsed = parseStructuredArtifact(response.content, pointInvestigationReplySchema,
+      reading.acceptedAs(response.content).reply, POINT_INVESTIGATION_READING);
+    if (parsed.kind === "PARSE_FAILURE") throw new TypedDomainError("POINT_INVESTIGATION_PARSE_FAILURE", parsed.message);
+    if (parsed.kind === "SCHEMA_FAILURE") throw new TypedDomainError("POINT_INVESTIGATION_SCHEMA_FAILURE", parsed.message);
+    return Object.freeze({
+      reply: Object.freeze({ ...parsed.value }),
+      provenanceRef: response.rawArtifactRef,
+      providerLedgerRef: response.ledgerEntryRef,
+      model: response.model,
+      maker: response.maker,
+      parseStrategy: parsed.strategy
     });
   }
 
@@ -1232,6 +1371,24 @@ export class JudgementRepository {
        FROM ledger.node_review AS review
        JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
        WHERE review.run_id=$1 AND review.outcome = 'dispute'
+       ORDER BY review.at_seq`,
+      [runId]
+    );
+    return Object.freeze(result.rows.map((row) => row.node_id));
+  }
+
+  /**
+   * Engine 2 (spec 2026-10-15 §4.2a rule 3, ruling E6(3)) — the nodes whose cross-maker review came back
+   * `cannot-assess`. Engine 1 gives them no judged basis (`readReviewedNodeIds` leaves them out on purpose); engine 2
+   * keeps them in the graph at a reduced weight and discloses them, so it must name them. A separate read for the
+   * reason `readDisputedNodeIds` is one: each question gets its own positive predicate.
+   */
+  async readCannotAssessNodeIds(runId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ node_id: string }>(
+      `SELECT review.node_id::text
+       FROM ledger.node_review AS review
+       JOIN core.node AS node ON node.node_id=review.node_id AND node.generation_status <> 'stale'
+       WHERE review.run_id=$1 AND review.outcome = 'cannot-assess'
        ORDER BY review.at_seq`,
       [runId]
     );

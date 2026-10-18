@@ -16,5 +16,6 @@
   "consent.policy.close": "Sulje",
   "consent.policy.questions": "Kysyttävää:",
   "consent.policy.gateHint": "Jatka vierittämällä käytännön loppuun.",
+  "consent.policy.gateOpened": "Olet lopussa. Voit nyt jatkaa.",
   "consent.policy.acknowledge": "Olen lukenut sen"
 }

@@ -203,6 +203,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
       "packages/graph/src/index.ts",
+      // Engine verdict (0121): the investigation and vote repositories seal and read ledger.point_investigation /
+      // ledger.verdict_vote inside withRunContentLease, borrowed when the runner already holds it.
+      "packages/judgement/src/engine-repository.ts",
       "packages/judgement/src/index.ts",
       "packages/ledger/src/index.ts",
       "packages/liveness/src/index.ts",
@@ -253,6 +256,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // member's gateway it wraps, or refuses it before anything is sent. It opens no lease and reads no content.
       "apps/runner/src/run-sit-out.ts",
       "packages/evaluator/src/index.ts",
+      // Engine redesign R2b (B1): the comparing judges' call is sent through the gateway the runner hands it (the judge
+      // seat's own lane-wrapped member gateway, never the arguing judge's, inside the leased runner, naming the run). It
+      // opens no lease and reads no content of its own.
+      "packages/judgement/src/comparing-judges.ts",
       "packages/judgement/src/index.ts",
       "packages/providers/src/preview-test.ts",
       // LG-A (L32): the structure-repair wrapper hands each call, routed, to the target gateway it wraps, and sends the
@@ -270,6 +277,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(contents.get("apps/runner/src/map-stage.ts")).toMatch(/member\.provider\.call\(\{\s*runId: deps\.runId,/);
     expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(privatePrimitive);
     expect(contents.get("apps/runner/src/map-stage.ts")).not.toMatch(/withRunContentLease|ContentCipher|@debateai\/db/);
+    expect(contents.get("packages/judgement/src/comparing-judges.ts")).toMatch(/provider\.call\(\{\s*runId: input\.runId,/);
+    expect(contents.get("packages/judgement/src/comparing-judges.ts")).not.toMatch(privatePrimitive);
+    expect(contents.get("packages/judgement/src/comparing-judges.ts")).not.toMatch(/withRunContentLease|ContentCipher|@debateai\/db/);
     expect([...contents].filter(([,body]) => /from "\.\/map-stage\.js"/.test(body)).map(([path]) => path))
       .toEqual(["apps/runner/src/index.ts"]);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);

@@ -7,13 +7,14 @@ import {
   LENGTH_ALLOWANCE_LIMITS, TypedDomainError, answerRoomTokens, guidedAllowanceTokens, type DebateRole, type LengthGuidanceStep,
   type ModelStrength
 } from "@debateai/kernel";
-import { mapLargestReplyWordsCeiling } from "@debateai/map";
+import { mapEngineLargestReplyWordsCeiling, mapLargestReplyWordsCeiling } from "@debateai/map";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
 import {
   answerJobTokenCeilings,
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   DEBATE_SHAPE_FORMULA_VERSION,
   debateShapeSiteCounts,
+  engineOfRun,
   lengthGuidanceAllowanceTokens,
   readBundledModelScorecard,
   readEngineVersion,
@@ -21,6 +22,7 @@ import {
   type DebateShapeCeilingInput,
   type DebateShapePolicy,
   type DebateShapeSiteCounts,
+  type EngineSettings,
   type LengthGuidance,
   type LengthGuidancePolicy,
   type ModelScorecardReadResult
@@ -146,6 +148,8 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
  * debate. Length guidance (spec 2026-10-15 §3.3): with the receipt's `length` member each role is then raised to the
  * allowance the runner sends it (`lengthGuidanceAllowanceTokens`), and on a shaped run POSITION also to the map's
  * (`mapLengthAllowanceTokens`). A receipt with neither member keeps the sealed table (the same object).
+ * Engine redesign R2 (B10): with an engine-2 receipt JUDGE also holds the comparing judge's allowance and REVIEWER the
+ * investigator's (the steps those calls are sent at).
  */
 export function answerTokenCeilingsForBasis(
   ceilings: Readonly<Record<DebateRole, number>>,
@@ -164,19 +168,28 @@ export function answerTokenCeilingsForBasis(
   const guided = Object.fromEntries((Object.keys(ROLE_LENGTH_STEPS) as DebateRole[]).map((role) =>
     [role, lengthGuidanceAllowanceTokens(length, ROLE_LENGTH_STEPS[role], withShape[role])])) as Record<DebateRole, number>;
   // A shaped run's map calls are made by debaters (POSITION): they ask the map's own allowance (Task 14, `guidedMapBound`).
-  return Object.freeze(shaped === null ? guided
-    : { ...guided, POSITION: Math.max(guided.POSITION, mapLengthAllowanceTokens(length, withShape.POSITION)) });
+  // Engine redesign R2 (B10): an engine-2 receipt's comparing judges are JUDGE calls and its investigations REVIEWER
+  // calls (`expectedCallsByRoleFromBasis`), each at its own step's allowance (engine 1: today's table).
+  const engine = admittedEngineOf(basis);
+  const withEngine: Record<DebateRole, number> = engine === null ? guided : { ...guided,
+    JUDGE: Math.max(guided.JUDGE, lengthGuidanceAllowanceTokens(length, "comparing_judge", withShape.JUDGE)),
+    REVIEWER: Math.max(guided.REVIEWER, lengthGuidanceAllowanceTokens(length, "investigator", withShape.REVIEWER)) };
+  return Object.freeze(shaped === null ? withEngine
+    : { ...withEngine, POSITION: Math.max(withEngine.POSITION, mapLengthAllowanceTokens(length, withShape.POSITION, engine !== null)) });
 }
 
 /**
  * Length guidance (spec 2026-10-15 §3.3, §3.10): the most a map call asks with the row, from `todayTokens` (the bound it
  * is raised from): the map's thinking room + the runaway answer room of the largest reply any map contract can hold
  * (`mapLargestReplyWordsCeiling`), never below `todayTokens`, as the runner's `guidedMapBound` raises each map call. Shared
- * by the picker and the preview estimate.
+ * by the picker and the preview estimate. Engine redesign R3 (`engine`): under engine 2 a map call may be the answer
+ * check, whose reasons are guided by `checkReason`; the largest of every engine-2 map contract's ceiling is priced
+ * (`mapEngineLargestReplyWordsCeiling`), so the estimate never under-counts (spec §10). Engine 1: as before.
  */
-export function mapLengthAllowanceTokens(length: LengthGuidance, todayTokens: number): number {
+export function mapLengthAllowanceTokens(length: LengthGuidance, todayTokens: number, engine = false): number {
+  const targets = { targets: length.map, charactersPerWord: length.charactersPerWord };
   return guidedAllowanceTokens({ todayTokens, thinkingRoomTokens: length.thinkingRoom.map,
-    answerRoomTokens: answerRoomTokens(mapLargestReplyWordsCeiling({ targets: length.map, charactersPerWord: length.charactersPerWord }),
+    answerRoomTokens: answerRoomTokens(engine ? mapEngineLargestReplyWordsCeiling(targets) : mapLargestReplyWordsCeiling(targets),
       length.runawayMultiplier, length.tokensPerWord),
     capTokens: LENGTH_ALLOWANCE_LIMITS.capTokens });
 }
@@ -523,6 +536,30 @@ export function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Reado
   return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
 }
 
+function malformedEngine(reason: string): TypedDomainError {
+  return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, `The admitted structural basis carries a malformed engine member: ${reason}`);
+}
+
+/**
+ * Engine redesign R2 (INTERFACE §3.4): the run's engine-2 settings, read ONLY through the strict receipt parser
+ * (`parseCostEnvelopeBasis`, as `admittedShapeOf`, PF7) and the one engine reader (`engineOfRun`). A receipt without
+ * the `engine` member is engine 1 (null): today's split, byte for byte. A receipt whose member the parser refuses is
+ * refused, never priced as engine 1. The ONE shared reader: the picker and the preview estimate both read through it.
+ */
+export function admittedEngineOf(basis: Readonly<Record<string, unknown>>): EngineSettings | null {
+  if (basis.engine === undefined) return null;
+  let parsed: CostEnvelopeBasis;
+  try {
+    parsed = parseCostEnvelopeBasis(basis);
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === COST_ENVELOPE_UNRESOLVED) throw malformedEngine(error.message);
+    throw error;
+  }
+  const engine = engineOfRun(parsed);
+  if (engine.engine !== 2) throw malformedEngine("the receipt carries no engine member");
+  return engine;
+}
+
 function malformedLengthGuidance(reason: string): TypedDomainError {
   return new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, `The admitted structural basis carries malformed length guidance: ${reason}`);
 }
@@ -561,6 +598,9 @@ const ROLE_LENGTH_STEPS = Object.freeze({
  *                    (SERVE_LEG requires the two round bounds to be equal)
  * With a shape receipt (debate shape): POSITION = answers + map sites (the debaters also write the map),
  * CROSS_EXCHANGE = cross_nodes; SUPPORT_ATTACK is the rest of the author sites, as before.
+ * With an engine-2 receipt (engine redesign R2, INTERFACE §3.4): JUDGE also counts the comparing judges, REVIEWER the
+ * investigations at their cap (they stand in for the review a point lacked), POSITION the map's answer check (map
+ * sites are the debaters'); `sites` is frozen on the receipt at admission (R1d).
  */
 export function expectedCallsByRoleFromBasis(
   basis: Readonly<Record<string, unknown>>
@@ -571,6 +611,7 @@ export function expectedCallsByRoleFromBasis(
   }
   const { panel_size: panelSize, call_sites: sites, serve_leg: serveLeg } = parsed.data;
   const shaped = admittedShapeOf(basis);
+  const engineSites = admittedEngineOf(basis)?.sites ?? null;
   const positions = shaped === null ? panelSize : shaped.shape.answers + shaped.counts.mapSites;
   const crossExchange = shaped !== null ? shaped.counts.crossNodes : panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
   const supportAttack = sites.author - positions - crossExchange;
@@ -579,11 +620,11 @@ export function expectedCallsByRoleFromBasis(
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis does not split into roles");
   }
   return Object.freeze({
-    POSITION: positions,
+    POSITION: positions + (engineSites?.answerCheck ?? 0),
     SUPPORT_ATTACK: supportAttack,
     CROSS_EXCHANGE: crossExchange,
-    JUDGE: sites.panel,
-    REVIEWER: sites.reviewer,
+    JUDGE: sites.panel + (engineSites?.comparingJudges ?? 0),
+    REVIEWER: sites.reviewer + (engineSites?.investigations ?? 0),
     ANSWER_WRITER: perSynthesisRole,
     ANSWER_CHECKER: perSynthesisRole
   });

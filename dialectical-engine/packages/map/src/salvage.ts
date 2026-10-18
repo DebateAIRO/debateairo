@@ -1,5 +1,5 @@
 import { MAP_REPLY_SALVAGE_REPAIRS, type MapReplySalvageRepair } from "@debateai/providers";
-import type { MapChooseReply } from "./replies.js";
+import type { MapChooseReply, MapChooseReplyV2 } from "./replies.js";
 import { MAP_LEANS, MAP_LIMITS } from "./types.js";
 
 /**
@@ -110,6 +110,8 @@ function decodedSalvage(fix: (record: Record<string, unknown>, log: MapSalvageLo
 /** LG-A: the keys whose string values are ids the reply defines, and the keys whose values (a string or a list) name ids. */
 const MAP_ID_DEFINING_KEYS: ReadonlySet<string> = new Set(["angle_id", "key_point_id", "answer_id"]);
 const MAP_ID_NAMING_KEYS: ReadonlySet<string> = new Set(["member_item_ids", "for", "against", "strongest_rival"]);
+/** Ruling W2: the answer check's own naming keys (engine 2 only); every other salvage keeps the set above, as at BASE. */
+const MAP_CHECK_ID_NAMING_KEYS: ReadonlySet<string> = new Set([...MAP_ID_NAMING_KEYS, "check_id"]);
 
 /**
  * An id as the map's schema writes ids (`mapId` in replies.ts: `^[a-z0-9][a-z0-9-]{0,23}$`), pre-flight PF-A31 (ruling
@@ -132,7 +134,8 @@ function normalisedMapId(id: string): string {
  * two defined ids become one (the collision guard: `KP-1` beside `kp-1`, or `kp_1` beside `kp-1`, leaves the reply as
  * written); the schema then checks every id's shape as before.
  */
-function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog): Record<string, unknown> {
+function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog,
+  namingKeys: ReadonlySet<string> = MAP_ID_NAMING_KEYS): Record<string, unknown> {
   const defined: string[] = [];
   const collect = (node: unknown): void => {
     if (Array.isArray(node)) { node.forEach(collect); return; }
@@ -146,9 +149,9 @@ function normaliseMapIds(reply: Record<string, unknown>, log: MapSalvageLog): Re
   if (new Set(defined.map(normalisedMapId)).size !== new Set(defined).size) return reply;
   let changed = false;
   const rewrite = (node: unknown, key: string | null): unknown => {
-    if (Array.isArray(node)) return node.map((entry) => rewrite(entry, key !== null && MAP_ID_NAMING_KEYS.has(key) ? key : null));
+    if (Array.isArray(node)) return node.map((entry) => rewrite(entry, key !== null && namingKeys.has(key) ? key : null));
     if (isRecord(node)) return Object.fromEntries(Object.entries(node).map(([inner, value]) => [inner, rewrite(value, inner)]));
-    if (typeof node === "string" && key !== null && (MAP_ID_DEFINING_KEYS.has(key) || MAP_ID_NAMING_KEYS.has(key))) {
+    if (typeof node === "string" && key !== null && (MAP_ID_DEFINING_KEYS.has(key) || namingKeys.has(key))) {
       const next = normalisedMapId(node);
       if (next !== node) changed = true;
       return next;
@@ -233,6 +236,42 @@ export function mapChooseSalvage(keyPointIds: ReadonlySet<string> | null): MapRe
         return { ...answer, ...kept };
       });
       return Object.freeze({ value: log.repairs.length === 0 ? value : { ...value, answers }, repairs: log.repairs });
+    }
+  });
+}
+
+/**
+ * ENGINE 2: angles with no trims (LG-C's rule with the row), ids normalised (LG-A, ruling R6): exactly LG-C's
+ * `mapAnglesSalvageLengthed` (`salvage.ts:203-205`), since v2's angles schema IS LG-C's lengthed one. One behaviour in
+ * one place; Tasks 6 and 17 keep this name (pre-flight PF-R3-2.11).
+ */
+export const mapAnglesSalvageEngine = mapAnglesSalvageLengthed;
+
+/** ENGINE 2: the check's ids normalised in code ("A1" → "a1"); anything else is the schema's to refuse. Its own object (not an alias). */
+export const mapCheckSalvage = Object.freeze({
+  decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log, MAP_CHECK_ID_NAMING_KEYS))
+});
+
+/** ENGINE 2: today's choose salvage (ids normalised; unknown, repeated and two-sided ids dropped), over answers AND reserves. */
+export function mapChooseSalvageV2(keyPointIds: ReadonlySet<string> | null): MapReplySalvage<MapChooseReplyV2> {
+  const sides = <T extends Readonly<{ for: readonly string[]; against: readonly string[] }>>(entry: T, log: MapSalvageLog): T => {
+    const bothSides = new Set(entry.for.filter((id) => entry.against.includes(id)));
+    const keep = (ids: readonly string[]) => ids.filter((id, at) => ids.indexOf(id) === at && !bothSides.has(id)
+      && (keyPointIds === null || keyPointIds.has(id)));
+    const kept = { for: keep(entry.for), against: keep(entry.against) };
+    const dropped = kept.for.length !== entry.for.length || kept.against.length !== entry.against.length;
+    if (!dropped || kept.for.length + kept.against.length === 0) return entry;
+    log.note("MAP_IDS_DROPPED");
+    return { ...entry, ...kept };
+  };
+  return Object.freeze({
+    decoded: decodedSalvage((reply, log) => normaliseMapIds(reply, log)),
+    parsed: (value: MapChooseReplyV2): MapSalvaged<MapChooseReplyV2> => {
+      const log = new MapSalvageLog();
+      const answers = value.answers.map((answer) => sides(answer, log));
+      const reserves = value.reserve_answers?.map((reserve) => sides(reserve, log));
+      if (log.repairs.length === 0) return Object.freeze({ value, repairs: log.repairs });
+      return Object.freeze({ value: { ...value, answers, ...(reserves === undefined ? {} : { reserve_answers: reserves }) }, repairs: log.repairs });
     }
   });
 }

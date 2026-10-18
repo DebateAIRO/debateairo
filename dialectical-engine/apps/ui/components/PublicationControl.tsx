@@ -199,7 +199,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
               type="checkbox"
               checked={acknowledged}
               onChange={(event) => setAcknowledged(event.target.checked)}
-              required
+              required aria-invalid="false"
             />
             {selected === "PUBLISH"
               ? t(catalog, "public.publication.acknowledgePublish")
@@ -241,7 +241,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                   type="checkbox"
                   checked={deleteAcknowledged}
                   onChange={(event) => setDeleteAcknowledged(event.target.checked)}
-                  required
+                  required aria-invalid="false"
                 />
                 {t(catalog, "public.publication.deleteAcknowledgement")}
               </label>

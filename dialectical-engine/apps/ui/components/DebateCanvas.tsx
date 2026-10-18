@@ -13,6 +13,7 @@ import {
   roleOf,
   type PlacedClaim
 } from "@/lib/debatePresentation";
+import { outlineLevel } from "@/lib/debatePresentation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { PositionTitle } from "@/components/PositionTitle";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
@@ -33,6 +34,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
 // gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
@@ -269,6 +271,7 @@ function CanvasCard({
   composeCatalog,
   locale
 }: CanvasCardProps) {
+  const textLang = useDebateTextLang();
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
   const stance = role === "pov" ? "reasoning" : role;
@@ -380,6 +383,15 @@ function CanvasCard({
   }
 
   const openNodeDetails = () => onOpenNode(node.id);
+  const stanceLabel = role === "root" ? null : localizedRoleLabel(node, catalog, debateChromeCatalog);
+  const headingId = `canvas-arg-${node.id}`;
+  const detailsId = `canvas-details-${node.id}`;
+  const challengeId = `canvas-challenge-${node.id}`;
+  // A stopped or failed path has no footer buttons, so the card itself is the keyboard control.
+  const cardIsControl = role !== "root" && (state === "abandoned" || state === "failed");
+  // A finished argument's visible claim is its heading, first in the card's reading order so
+  // the stance, model and scores shown above it are read as part of this card.
+  const claimIsHeading = role !== "root" && state === "done";
 
   return (
     <div
@@ -393,13 +405,48 @@ function CanvasCard({
       data-low-strength={VERDICT_FIRST_UI_ENABLED && lowStrength ? "true" : undefined}
       data-set-aside={setAside ? "true" : undefined}
     >
+      {/* Screen readers get the tree as an outline: one heading per argument, its level is its
+          depth under the root claim (h2), so heading navigation shows which argument answers
+          which. A finished card's heading is its visible claim (inside the card, below); any
+          other card gets this hidden one, outside the card so a card that is itself a button
+          keeps it. The visible heading carries the stance in its one name (aria-label). */}
+      {stanceLabel !== null && !claimIsHeading ? (
+        <div className="srOnly" role="heading" aria-level={outlineLevel(placed.depth)} id={headingId} {...textLang}>
+          {node.claim ? `${stanceLabel}: ${node.claim}` : stanceLabel}
+        </div>
+      ) : null}
       <div
         className={`node${selected ? " selected" : ""}${scoreFilterMatch ? "" : " scoreFilteredOut"}`}
         style={innerStyle}
         data-bezel="core"
         data-score-filter-match={scoreFilterMatch ? "true" : "false"}
+        data-claim-first={claimIsHeading ? "true" : undefined}
         onClick={openIfDone}
+        role={cardIsControl ? "button" : undefined}
+        tabIndex={cardIsControl ? 0 : undefined}
+        onKeyDown={
+          cardIsControl
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openIfDone();
+                }
+              }
+            : undefined
+        }
       >
+        {claimIsHeading ? (
+          <div
+            className="nodeClaim treePreview"
+            role="heading"
+            {...textLang}
+            aria-level={outlineLevel(placed.depth)}
+            id={headingId}
+            aria-label={node.claim ? `${stanceLabel}: ${node.claim}` : (stanceLabel ?? undefined)}
+          >
+            {node.claim}
+          </div>
+        ) : null}
         <span
           className="nodeStanceTab"
           data-stance={stance}
@@ -440,7 +487,7 @@ function CanvasCard({
         {role === "root" ? (
           <>
             <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
-            <div className="nodeClaim root">{node.claim}</div>
+            <div className="nodeClaim root" role="heading" aria-level={2} {...textLang}>{node.claim}</div>
             <div className="nodeRootMeta">
               <span>{tPlural(catalog, "debateViews.claimCount", meta.claims, locale)}</span>
               <span className="sep">/</span>
@@ -473,7 +520,7 @@ function CanvasCard({
             <span className="nodeAbandonedMark" aria-hidden>⊗</span>
             <div>
               <div className="nodeAbandonedLabel">{t(catalog, "debateViews.stoppedPath")}</div>
-              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.abandonedArgument")}</div>
+              <div className="nodeAbandonedClaim" {...(node.claim ? textLang : {})}>{node.claim || t(catalog, "debateViews.abandonedArgument")}</div>
             </div>
           </div>
         ) : state === "failed" ? (
@@ -481,7 +528,7 @@ function CanvasCard({
             <span className="nodeAbandonedMark" aria-hidden>⚠</span>
             <div>
               <div className="nodeAbandonedLabel">{t(catalog, "debateViews.failedBranch")}</div>
-              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.generationFailed")}</div>
+              <div className="nodeAbandonedClaim" {...(node.claim ? textLang : {})}>{node.claim || t(catalog, "debateViews.generationFailed")}</div>
               <div className="metaLine" style={{ marginTop: 5 }}>
                 {t(catalog, "debateViews.generationFailedContinued")}
               </div>
@@ -490,7 +537,7 @@ function CanvasCard({
         ) : (
           <>
             <div className="nodeArgHeader">
-              <span className="roleBadge" style={{ color: pal?.text, background: pal?.bg, borderColor: pal?.border }}>
+              <span className="roleBadge" aria-hidden="true" style={{ color: pal?.text, background: pal?.bg, borderColor: pal?.border }}>
                 {pal?.arrow} {localizedRoleLabel(node, catalog, debateChromeCatalog)}
               </span>
               {generation || node.maker !== undefined ? (
@@ -565,24 +612,25 @@ function CanvasCard({
                 <div className="skel" style={{ height: 13, borderRadius: 4, width: "64%" }} />
               </div>
             ) : state === "streaming" ? (
-              <div className="nodeClaim streaming">
+              <div className="nodeClaim streaming" {...textLang}>
                 {generation?.argument || node.claim}
                 <span className="streamCursor" style={{ background: pal?.text }} />
               </div>
             ) : (
               <>
-                <div className="nodeClaim treePreview">{node.claim}</div>
                 <div className="nodeControls nodeReferenceFooter" data-reference-tree-footer>
                   {onChallengeNode ? (
                     <button
                       type="button"
                       className="nodeCtrl challenge"
+                      id={challengeId}
+                      aria-labelledby={`${challengeId} ${headingId}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         onChallengeNode(node, event.currentTarget);
                       }}
                     >
-                      ⚐ {t(catalog, "debateViews.challenge")}
+                      <span aria-hidden="true">⚐</span> {t(catalog, "debateViews.challenge")}
                     </button>
                   ) : (
                     <span
@@ -591,7 +639,7 @@ function CanvasCard({
                       tabIndex={-1}
                       style={{ opacity: 0.55 }}
                     >
-                      🔒 {t(catalog, "debateViews.challenge")}
+                      <span aria-hidden="true">🔒</span> {t(catalog, "debateViews.challenge")}
                     </span>
                   )}
                   {onChallengeNode ? (
@@ -602,14 +650,16 @@ function CanvasCard({
                       aria-disabled="true"
                       title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
                     >
-                      ↻ {t(catalog, "debateViews.regenerate")}
+                      <span aria-hidden="true">↻</span> {t(catalog, "debateViews.regenerate")}
                     </button>
                   ) : null}
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
                     className="nodeCtrl"
+                    id={detailsId}
                     aria-label={t(catalog, "debateViews.details")}
+                    aria-labelledby={`${detailsId} ${headingId}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       openNodeDetails();
@@ -719,7 +769,7 @@ function V3ScoreBadges({
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
+      aria-label={`${presentation.badges.map((badge) => badge.pillText).join(" ")}, ${t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}`}
       onClick={(event) => {
         event.stopPropagation();
         openNodeDetails();

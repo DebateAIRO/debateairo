@@ -26,6 +26,8 @@ import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegis
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { runPractice, type PracticeControl } from "../../tools/preview-practice/practice.js";
 import { practiceDebateGraph } from "../../tools/preview-practice/practice-lanes.js";
+import type { TranscriptEngineGraph } from "../../tools/preview-practice/practice-engine-graph.js";
+import { reproduceServedPropagation } from "../../tools/preview-practice/practice-rescore.js";
 import { PRACTICE_LANGUAGE_DRY_REWRITES, practiceLanguageDryReading } from "../../tools/preview-practice/practice-language.js";
 import { PRACTICE_LANGUAGE_CASES, PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
 import { startPreviewGateStubs, stubChatBody, stubMapContent, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
@@ -747,7 +749,7 @@ describe("preview practice: debate mode", () => {
       attempts: { sequence: number; providerRef: string; model: string; maker: string | null; family: string; outcome: string;
         replyForm: string | null; prompt: { messages: unknown[] } | null; reply: { content: string } | null;
         parse: { status: string | null } }[];
-      structure: { answer: { nodes?: unknown[] } | null; story: { outcome: string } | null };
+      structure: { answer: { nodes?: { node_id: string }[] } | null; story: { outcome: string } | null; engineGraph?: TranscriptEngineGraph };
       unavailable: string[];
     };
     expect(transcript.schema).toBe("preview-practice-transcript-v1");
@@ -777,6 +779,27 @@ describe("preview practice: debate mode", () => {
     expect(text).not.toContain(env.PRACTICE_DEEPINFRA_SOCKET);
     expect(text).not.toContain(env.PRACTICE_ANTHROPIC_SOCKET);
     expect(text).not.toContain("REDACTED");
+    // R2 (E12): the whole graph, read from the throwaway database before it went.
+    const graph = transcript.structure.engineGraph!;
+    expect(graph.engine).toBe(1);
+    const served = new Set(Object.keys(graph.served.finalStrength));
+    for (const node of transcript.structure.answer!.nodes!) expect(served.has(node.node_id)).toBe(true);
+    expect(graph.nodes.length).toBeGreaterThanOrEqual(served.size);
+    const rootIndexes = graph.nodes.filter((node) => node.kind === "ROOT").map((node) => node.rootIndex).sort((a, b) => a - b);
+    expect(rootIndexes).toEqual(rootIndexes.map((_, index) => index));
+    expect(graph.served.servedRootNodeId).not.toBeNull();
+    // Every judged node has its author's voice; every grader voice is another maker's.
+    for (const node of graph.nodes.filter((entry) => graph.served.baseStrength[entry.nodeId] !== undefined)) {
+      const voices = graph.voices.filter((voice) => voice.nodeId === node.nodeId);
+      expect(voices.filter((voice) => voice.isAuthor)).toHaveLength(1);
+      for (const voice of voices.filter((entry) => !entry.isAuthor)) expect(voice.maker).not.toBe(node.authorMaker);
+    }
+    expect(graph.unreadVoices).toEqual([]);
+    expect(graph.reviews.length).toBeGreaterThan(0);
+    // Pre-flight PF-R2a2.9: engine 1 never applies the dispute factor.
+    expect(graph.nodes.some((node) => node.disputeFactorApplied)).toBe(false);
+    // R2 (E12): the rescore gives back exactly what this run served (the engine's own arithmetic over its recorded inputs).
+    expect(reproduceServedPropagation(graph)).toMatchObject({ ok: true });
   }, 600_000);
 
   it("owner ruling 2026-10-12 (\"Fixed slips = warning\") and the patch follow-up: MiMo's first panel reply breaks the schema and the short patch follow-up fixes it: PASS_WITH_WARNINGS (exit 10), repaired by PATCH", async () => {
@@ -1041,7 +1064,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     expect(storytellerAlsoRaised(stubs.requests)).toBe(0);
     const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { registerVersion: string }; structure: object };
     expect(transcript.run.registerVersion).toBe("5");
-    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story"]);
+    // R2 (E12): a served run always carries the engine graph.
+    expect(Object.keys(transcript.structure)).toEqual(["answer", "inspection", "story", "engineGraph"]);
   }, 600_000);
 
   it("refuses a malformed --shape-policy before anything starts: HARNESS_ERROR (exit 40), no gate touched", async () => {
@@ -1196,6 +1220,10 @@ describe("engine 2's story (R1d)", () => {
     storyLengthByField?: { field: string; guidedWords: number | null }[];
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
+    investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
+    /** R2 B11: the comparing judges' block (engine 2 only). */
+    judgeVotes?: { model: string; maker: string; letter: string | null; counted: boolean | null }[];
+    labels?: { label: string; trigger: string; engine1LadderLabel: string | null } | null;
     admission: { panel: { providerRef: string; modelId: string }[];
       rotation: { answerWriter: string; answerChecker: string; storyteller: string; storyChecker: string } | null };
   };
@@ -1219,6 +1247,11 @@ describe("engine 2's story (R1d)", () => {
     expect(markdown).toContain("Story rounds (codes only;");
     expect(markdown).toContain(`Story outcomes: READY ${String(report.storyReadyRate!.ready)}, `);
     expect(markdown).toContain("Story length per AI and field");
+    // R2 (A17): the investigations block's reader swallows a failure the same way, so it is checked present here too;
+    // engine 1 runs no investigation.
+    expect(report.investigations).toBeDefined();
+    if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
+    expect(markdown).toContain("| cannot-assess reviews | asked |");
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>
@@ -1258,8 +1291,10 @@ describe("engine 2's story (R1d)", () => {
 
   it("R1d-1 --register-next --length-policy --engine-policy: storyteller v4 and checker v4 with their targets, no shape asked, the pack default stored, ask.engine 2: PASS (exit 0)", async () => {
     const { stubs, env, common, quiet, out } = await scenario();
+    const lines: string[] = [];
     const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
-      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--transcript"], env, quiet);
+      "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--transcript"], env,
+    { ...quiet, log: (line: string) => { lines.push(line); } });
     const report = outcome.report as unknown as EngineReport;
     expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
     expect(outcome.exitCode).toBe(0);
@@ -1297,6 +1332,17 @@ describe("engine 2's story (R1d)", () => {
     expect(report.storyLengthByField!.find((row) => row.field === "headline")?.guidedWords).toBe(15);
     expect(report.storyLengthByField!.find((row) => row.field === "long")?.guidedWords).toBeNull();
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // R2 B11 carry (B12): a real engine-2 practice debate's report carries the comparing judges' block, read from the
+    // throwaway database (its reader swallows a failure into a progress line and leaves the block out), with today's
+    // ladder from the receipt's engine1Ladder record. The stand-in judges answered, in the question's language.
+    expect(stubs.requests.filter((request) => request.kind === "VERDICT_JUDGE").length).toBeGreaterThan(0);
+    expect(stubs.requests.filter((request) => request.kind === "VERDICT_JUDGE").every((request) => request.answer === "OK")).toBe(true);
+    expect(lines.filter((line) => line.includes("could not be read"))).toEqual([]);
+    expect(report.judgeVotes?.length).toBeGreaterThan(0);
+    expect(report.judgeVotes!.every((vote) => vote.letter === "A")).toBe(true);
+    expect(report.labels).toMatchObject({ trigger: expect.stringMatching(/^JUDGES_/u),
+      engine1LadderLabel: expect.stringMatching(/^(SUPPORTED|CONTESTED|UNSUPPORTED)$/u) });
+    expect(readFileSync(join(out, "report.md"), "utf8")).toContain("Comparing judges (engine 2: the label comes from their votes;");
   }, 900_000);
 
   it("R1d-2 --length-policy alone: the story stays v3 with no length field, the other calls are told their lengths, ask.engine 1: PASS (exit 0)", async () => {

@@ -3,7 +3,7 @@ import { CaseLookup,OwnCaseLookup } from "@/components/support/CaseView";
 
 export default function HelpPage() {
   return (
-    <main className="supportPage" data-help-page>
+    <div className="supportPage" data-help-page>
       <Assistant
         fullPage
         auxiliaryContent={<>
@@ -11,6 +11,6 @@ export default function HelpPage() {
           <OwnCaseLookup />
         </>}
       />
-    </main>
+    </div>
   );
 }

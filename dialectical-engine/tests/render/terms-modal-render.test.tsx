@@ -18,6 +18,13 @@ import {
 } from "../../apps/ui/components/consent/TermsOfServiceModal.js";
 import { TERMS_JUMP, TERMS_SECTIONS } from "../../apps/ui/lib/termsOfService.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -231,7 +238,7 @@ describe("terms of service modal — rendered", () => {
 
     expect(textControls("Close").length).toBe(0);
     const button = acknowledgeButton();
-    expect(button.disabled).toBe(true);
+    expect(isLocked(button)).toBe(true);
     expect(button.getAttribute("aria-describedby")).toBe("terms-modal-gate-hint");
     expect(document.getElementById("terms-modal-gate-hint")!.textContent).toBe(
       "Scroll to the end of the policy to continue."
@@ -243,7 +250,7 @@ describe("terms of service modal — rendered", () => {
       dialog().querySelector(".policyBody")!.dispatchEvent(new Event("scroll", { bubbles: false }));
     });
 
-    expect(acknowledgeButton().disabled).toBe(false);
+    expect(isLocked(acknowledgeButton())).toBe(false);
     expect(document.getElementById("terms-modal-gate-hint")).toBeNull();
 
     await act(async () => {

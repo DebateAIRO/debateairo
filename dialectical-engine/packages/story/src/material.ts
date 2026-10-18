@@ -524,6 +524,39 @@ function storyNamed(ref: string | null): string {
   return ref === null ? "" : ` ${ref}`;
 }
 
+/**
+ * OWNER WORDING — approve before switch-on
+ *
+ * R2 (spec §4.4, INTERFACE §9.4): the comparing judges' six triggers, one plain sentence each, for the storyteller and
+ * the checker (AI-facing material, never shown to a reader). No number: the judges decided, and the counts stay out.
+ * Keyed by text because story may not import serve (tools/orphan-audit/src/index.ts row "story"); a unit test proves
+ * the keys are exactly serve's `ENGINE_VERDICT_TRIGGERS` (tests/unit/r2-story-engine.test.ts).
+ * Each sentence is true in every case `deriveJudgesVerdict` gives its trigger for a debate with two or more answers
+ * (controller ruling R2b-B9.1; pre-flight PF-R2b5.5):
+ * - "chose this answer" always includes a choice of an answer the judges counted as the same (ruling R2b-B2.1);
+ * - a choice does not count when the judge's own maker argued the answer chosen or one counted as the same as it
+ *   (R2b-B2.1), so JUDGES_NO_MAJORITY speaks of the counted choices (the answer most judges chose can lose) and
+ *   JUDGES_MAJORITY and JUDGES_VOTES_IGNORED name that case;
+ * - JUDGES_MAJORITY also covers every seated judge choosing this answer when fewer were seated than a clear answer needs;
+ * - JUDGES_NO_MAJORITY stays true with one seated judge: a lone counted choice settles nothing when the row asks more
+ *   than one agreeing judge for a close call (with a row asking one, it settles it: JUDGES_UNANIMOUS when the row's
+ *   clear-answer number is also one, else JUDGES_MAJORITY);
+ * - JUDGES_NO_MAJORITY's tie clause follows the count's tie-break (ruling R2b-B9.2): an even count goes to the answer
+ *   whose strongest case, among it and the answers counted as the same, held up best, and an exact tie of that to the
+ *   first in a fixed order (the node id), never to a claim that this answer's own case was the best.
+ * Not covered: a resumed one-answer debate handing in recorded votes (B2 gives JUDGES_UNAVAILABLE; a new debate with fewer
+ * than two answers asks no judge, so it is not reachable). tests/unit/r2-story-engine.test.ts checks each sentence's
+ * claims against every verdict B2 gives for one to five seated judges, own makers' judges included.
+ */
+export const STORY_ENGINE_TRIGGER_RULES: Readonly<Record<string, string>> = Object.freeze({
+  JUDGES_UNANIMOUS: "The label is SUPPORTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, and none of them found that it holds only in some cases.",
+  JUDGES_CONDITIONAL: "The label is CONTESTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, but at least one found that it holds in some cases and not in others.",
+  JUDGES_MAJORITY: "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer, or one the judges counted as the same, to settle it, but not clearly: too few judges could take part for the answer to be called clear, or at least one judge chose another answer, gave no usable choice, or chose an answer that its own maker had argued or that the judges counted as the same as one its maker had argued, which does not count.",
+  JUDGES_NO_MAJORITY: "The label is SPLIT because, among the choices of the judges who compared the answers side by side, no single answer got enough of those that counted to settle it (a choice does not count when the judge's own maker argued that answer or one counted as the same), and this answer, together with any answer the judges counted as the same, is the one the counted choices named most often or, where that was even, the one whose strongest case (with the answers counted as the same) held up best against the objections, or, where even that was even, the first in a fixed order.",
+  JUDGES_UNAVAILABLE: "The label is CONTESTED because no judge could compare the answers side by side, so this answer was chosen as the one whose case held up best against the objections, and without that comparison it cannot be called clear.",
+  JUDGES_VOTES_IGNORED: "The label is SPLIT because every judge who gave a usable choice chose an answer that a model of its own maker had argued, or one the judges counted as the same as such an answer, so no choice counted, and this answer was chosen as the one whose case held up best against the objections."
+});
+
 /** The rung and trigger `deriveVerdictLabel` recorded, in plain words. */
 function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, refs: StoryRuleRefs): string {
   const winner = storyNumberWords(basis.winner_strength);
@@ -533,7 +566,11 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, ref
   if (positionsArgued <= 1 || basis.runner_up_node_id === null) {
     sentences.push("Only one position was argued, so there is no runner-up and no margin between positions.");
   }
-  if (basis.trigger === "BASIS_INCOMPLETE") {
+  const judgesRule = Object.hasOwn(STORY_ENGINE_TRIGGER_RULES, basis.trigger) ? STORY_ENGINE_TRIGGER_RULES[basis.trigger] : undefined;
+  if (judgesRule !== undefined) {
+    // R2: an engine-2 label (rung 5) was decided by the comparing judges; the numbers' sentences do not apply.
+    sentences.push(judgesRule);
+  } else if (basis.trigger === "BASIS_INCOMPLETE") {
     const missing = [
       ...(basis.margin === null ? ["the margin over a runner-up"] : []),
       ...(basis.disagreement === null ? ["the judges' disagreement about the strongest position"] : [])
@@ -570,7 +607,9 @@ function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number, ref
   } else {
     sentences.push(`The label is ${basis.label}; the rule that decided is recorded as ${basis.trigger}.`);
   }
-  if (refs.alsoWithinTieMargin.length > 0) {
+  // Under the judges' rule no tie-margin sentence follows: the judges decided, not the margin (the judges' winner can
+  // finish below another answer, so "within the tie margin" would tell the storyteller that numbers decided).
+  if (judgesRule === undefined && refs.alsoWithinTieMargin.length > 0) {
     const others = refs.alsoWithinTieMargin.join(", ");
     sentences.push(
       `${others} also finished within the tie margin of the strongest position, behind the runner-up`

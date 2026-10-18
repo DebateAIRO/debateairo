@@ -40,12 +40,20 @@ export function conditionMarkLabel(
     case "CRITIQUE-UNAVAILABLE": return t(catalog, "debateChrome.condition.critiqueUnavailable");
     case "PANEL-PARTIAL": return t(catalog, "debateChrome.condition.panelPartial");
     case "PANEL-DEGRADED-SINGLE-VOICE": return t(catalog, "debateChrome.condition.panelDegradedSingleVoice");
+    case "VERDICT-JUDGE-MISSING": return t(catalog, "debateChrome.condition.verdictJudgeMissing");
+    case "VERDICT-JUDGES-UNAVAILABLE": return t(catalog, "debateChrome.condition.verdictJudgesUnavailable");
+    case "VERDICT-VOTES-IGNORED": return t(catalog, "debateChrome.condition.verdictVotesIgnored");
+    case "UNASSESSED-AT-REDUCED-WEIGHT": return t(catalog, "debateChrome.condition.unassessedAtReducedWeight");
     case "MAP_ANGLES_FALLBACK": return t(catalog, "debateChrome.condition.mapAnglesFallback");
     case "MAP_MERGE_FALLBACK": return t(catalog, "debateChrome.condition.mapMergeFallback");
     case "MAP_CHOOSE_FALLBACK": return t(catalog, "debateChrome.condition.mapChooseFallback");
     case "MAP_UNAVAILABLE_TODAYS_OPENING": return t(catalog, "debateChrome.condition.mapUnavailable");
     case "ANSWERS_FILLED": return t(catalog, "debateChrome.condition.answersFilled");
     case "CHOOSE_QUOTA_FILLED": return t(catalog, "debateChrome.condition.chooseQuotaFilled");
+    case "MAP_CHECK_UNAVAILABLE": return t(catalog, "debateChrome.condition.mapCheckUnavailable");
+    case "MAP_ANSWER_REPLACED": return t(catalog, "debateChrome.condition.mapAnswerReplaced");
+    case "MAP_ANSWER_DROPPED": return t(catalog, "debateChrome.condition.mapAnswerDropped");
+    case "MAP_ANSWER_KEPT_UNCHECKED": return t(catalog, "debateChrome.condition.mapAnswerKeptUnchecked");
     case "PANEL-CLOSE-CALL-EXTENDED": return t(catalog, "debateChrome.condition.closeCallExtended");
     case "SCRUTINY-EXTENDED": return t(catalog, "debateChrome.condition.scrutinyExtended");
     case "AMBIGUOUS_ATTRIBUTION": return t(catalog, "debateChrome.condition.ambiguousAttribution");
@@ -167,8 +175,9 @@ export function markLabelFromRecords(mark: ConditionMark, records: readonly Mark
  * the older evidence gate and made the banner say something false about a
  * label derived from propagated strength alone.
  *
- * The switch is exhaustive over the engine's label union — a fourth state fails
+ * The switch is exhaustive over the engine's label union — a fifth state fails
  * typecheck here rather than rendering as an unnamed verdict.
+ * R2 (ruling E8): SPLIT, "no majority", is the fourth state.
  */
 export function liveVerdictState(
   label: NonNullable<Answer["verdict_state"]>
@@ -177,6 +186,7 @@ export function liveVerdictState(
     case "SUPPORTED": return "supported";
     case "CONTESTED": return "contested";
     case "UNSUPPORTED": return "unsupported";
+    case "SPLIT": return "split";
   }
 }
 

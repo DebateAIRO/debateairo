@@ -63,8 +63,10 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
 
     expect(source).toMatch(
       // Debate shape (plan Task 13): the decision counts the servable ROOTS — the shape's P, or today's one per maker.
-      /const makerPositionServe = decideMakerPositionServe\(\{[\s\S]*?effectiveMakerCount: rootCount,[\s\S]*?runBodyBudgetStop,[\s\S]*?authoredMakerPositions,[\s\S]*?\}\);/u
+      // Engine redesign R2b: the inputs are named once, so engine 2's judges read the very decision that is then served.
+      /const serveDecisionInput = Object\.freeze\(\{[\s\S]*?effectiveMakerCount: rootCount,[\s\S]*?runBodyBudgetStop,[\s\S]*?authoredMakerPositions,[\s\S]*?\}\);/u
     );
+    expect(source).toMatch(/const makerPositionServe = decideMakerPositionServe\(\{\s*\.\.\.serveDecisionInput,/u);
     // The projection and the propagation are READ from the decision, never
     // recomputed beside it from the planned panel size.
     expect(source).toContain("snapshot = makerPositionServe.standing.snapshot;");

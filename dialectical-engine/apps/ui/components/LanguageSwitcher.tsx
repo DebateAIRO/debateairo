@@ -110,6 +110,7 @@ export function LanguageSwitcher() {
         className="languageSwitcherButton"
         title={t(catalog, "chrome.changeLanguage")}
         aria-label={t(catalog, "chrome.changeLanguage")}
+        aria-describedby={`${panelId}-current`}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls={panelId}
@@ -121,7 +122,9 @@ export function LanguageSwitcher() {
           }
         }}
       >
-        <span className="languageSwitcherCode">{current.code.toUpperCase()}</span>
+        <span className="languageSwitcherCode" aria-hidden="true">{current.code.toUpperCase()}</span>
+        {/* The button's description: the language in use, named in that language. */}
+        <span id={`${panelId}-current`} className="srOnly" lang={current.code}>{current.nativeName}</span>
         <span className="languageSwitcherCaret" aria-hidden>{languageSwitcherCaret(open)}</span>
       </button>
 
@@ -179,8 +182,9 @@ export function LanguageSwitcher() {
                     onFocus={() => setHighlightedCode(candidate.code as LocaleCode)}
                     onClick={() => select(candidate.code as LocaleCode)}
                   >
-                    <span className="languageSwitcherRowCode">{candidate.code.toUpperCase()}</span>
-                    <span className="languageSwitcherName">{candidate.nativeName}</span>
+                    <span className="languageSwitcherRowCode" aria-hidden="true">{candidate.code.toUpperCase()}</span>
+                    {/* Each name in its own language, so a screen reader speaks it with that voice. */}
+                    <span className="languageSwitcherName" lang={candidate.code}>{candidate.nativeName}</span>
                     <span className="languageSwitcherCheck" aria-hidden />
                   </button>
                 );

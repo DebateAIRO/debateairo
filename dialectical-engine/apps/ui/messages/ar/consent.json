@@ -16,5 +16,6 @@
   "consent.policy.close": "إغلاق",
   "consent.policy.questions": "للاستفسارات:",
   "consent.policy.gateHint": "مرّر إلى نهاية السياسة للمتابعة.",
+  "consent.policy.gateOpened": "وصلت إلى النهاية. يمكنك المتابعة الآن.",
   "consent.policy.acknowledge": "قرأت السياسة"
 }

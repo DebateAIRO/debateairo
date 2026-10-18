@@ -57,7 +57,10 @@ describe("S02 public debate answer surface", () => {
     expect.soft(text).toContain(publicDebate.question);
     expect.soft(text).toContain(publicDebate.author_pseudonym);
     expect.soft(text).toContain(new Date(publicDebate.published_at).toLocaleDateString());
-    expect.soft(text).toContain("SUPPORTED");
+    // R2 B8 fix 1: the verdict in words, never the state's code.
+    expect.soft(text).toContain(publicEnglish["public.story.label.supported"]);
+    // R2b final wave P8 (B8 re-review Minor 2): the state's words, never its code.
+    expect(text).not.toContain("SUPPORTED");
     expect.soft(text).toContain("moderate");
     expect.soft(text).toContain("The public summary remains readable.");
     expect.soft(text).toContain("Evidence checked");

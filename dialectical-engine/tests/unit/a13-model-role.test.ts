@@ -106,7 +106,8 @@ describe("A13 · every judgement-family call names its debate role", () => {
 
 describe("A13 · no served-lane call site can omit the role", () => {
   it.each([
-    ["packages/judgement/src/index.ts", 3],
+    ["packages/judgement/src/index.ts", 4],
+    ["packages/judgement/src/comparing-judges.ts", 1],
     ["apps/runner/src/index.ts", 2]
   ] as const)("%s names modelRole on the line after every served lane", (path, expected) => {
     const lines = readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), "utf8").split("\n");

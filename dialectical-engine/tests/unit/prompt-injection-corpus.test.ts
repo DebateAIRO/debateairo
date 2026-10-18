@@ -51,7 +51,7 @@ import {
   framedQuestionLanguageCheck
 } from "../../apps/api/src/question-language/fast-check.js";
 import type { StoryBody } from "@debateai/contract";
-import { replyLanguageExpectation } from "@debateai/kernel";
+import { LENGTH_GUIDANCE_START, replyLanguageExpectation } from "@debateai/kernel";
 import {
   mapChooseSpec,
   mapGapSpec,
@@ -550,6 +550,37 @@ const HAND_OFFS = [
     }
   },
   {
+    name: "judge:assigned-root v2 (points_raised — unsided points the map's models wrote)",
+    payloadIn: "points_raised",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const sink: PromptPacket[] = [];
+      await new Judge(capturingGateway(sink)).judge({
+        ...SUBJECT,
+        questionLine: QUESTION,
+        // The v2 contract is always lengthed (engine INTERFACE §0): without a length it throws before any call.
+        length: { words: 300, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord },
+        leg: { kind: "assigned-root", assignedAnswer: CLEAN_STATEMENT, mapPoints: "{\"for\":[],\"against\":[]}",
+          engine: { pointsRaised: JSON.stringify([{ text: attack, rests_on: "question" }]), assumptions: "[]" } }
+      }).catch(() => undefined);
+      return sink;
+    }
+  },
+  {
+    name: "judge:assigned-root v2 (assumptions — the chooser's assumptions, model-written)",
+    payloadIn: "assumptions",
+    render: async (attack: string): Promise<readonly PromptPacket[]> => {
+      const sink: PromptPacket[] = [];
+      await new Judge(capturingGateway(sink)).judge({
+        ...SUBJECT,
+        questionLine: QUESTION,
+        length: { words: 300, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord },
+        leg: { kind: "assigned-root", assignedAnswer: CLEAN_STATEMENT, mapPoints: "{\"for\":[],\"against\":[]}",
+          engine: { pointsRaised: "[]", assumptions: JSON.stringify([attack]) } }
+      }).catch(() => undefined);
+      return sink;
+    }
+  },
+  {
     name: "judge:review (statement — the reviewed maker's output)",
     payloadIn: "statement",
     render: async (attack: string): Promise<readonly PromptPacket[]> => {
@@ -876,8 +907,10 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // Whole-branch review m-8: 26 -> 33 and 20 -> 24, with the map's seven hand-offs: the snowball's points_so_far,
     // the merge's points and candidate_answers, and the gap round's and the choose step's key_points and answers
     // (points_so_far, candidate_answers, key_points and answers are new field names; points is the story's too).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(33);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(24);
+    // Engine redesign R3 Task 12: +2 rows, the v2 position leg's points_raised and assumptions (33 -> 35 and 24 -> 26:
+    // neither field name is any other row's payloadIn).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(35);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(26);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
@@ -983,10 +1016,12 @@ for (const row of HAND_OFFS) {
  * FW-B (final review B, Minor 4) — WHAT THIS ROW ACTUALLY MEASURES.
  *
  * The title used to read as "for every hand-off". It is not: only the JUDGE
- * rows (eight then; eleven since the debate shape's three) drive a gateway, and
+ * rows (eight then; eleven since the debate shape's three; thirteen since engine
+ * redesign R3's two v2 position rows) drive a gateway, and
  * only a gateway calls `buildRepairPacket`.
- * The other nine rows render one packet each, so `packets.slice(1)` was empty
- * for them and the loop asserted nothing at all — nine rows of silent pass.
+ * The other rows (nine when this was found; twenty-two of the thirty-five since
+ * R3) render one packet each, so `packets.slice(1)` was empty for them and the
+ * loop asserted nothing at all — nine rows of silent pass then.
  *
  * The count is asserted now, so the row states its own extent and a render that
  * quietly stops producing a repair packet turns it red instead of shrinking it.
@@ -1003,10 +1038,12 @@ for (const row of HAND_OFFS) {
 describe("V-11 layer 4 — the repair path carries no model text under attack", () => {
   it("never echoes the rejected output or the parse-error message", async () => {
     let repairPackets = 0;
+    const repairedBy: { row: string; contractId: string }[] = [];
     for (const row of HAND_OFFS) {
       const packets = await packetsFor(row, INJECTION_CORPUS[0]!.text);
       for (const packet of packets.slice(1)) {
         repairPackets += 1;
+        repairedBy.push({ row: row.name, contractId: assertFramedPrompt(packet).contractId });
         const joined = packet.messages.map((message) => message.content).join("\n");
         expect(joined).not.toContain("the model's rejected output");
         expect(joined).not.toContain("Expected string, received");
@@ -1016,7 +1053,15 @@ describe("V-11 layer 4 — the repair path carries no model text under attack", 
     // One repair packet per judge row, and the judge rows are the only ones
     // that produce one. A loop that asserted nothing would leave this at zero.
     expect(repairPackets).toBe(HAND_OFFS.filter(({ name }) => name.startsWith("judge:")).length);
-    expect(repairPackets).toBe(11);
+    expect(repairPackets).toBe(13);
+    // Each judge row carries exactly ONE repair packet, in row order, so no stray packet can hide behind the count.
+    expect(repairedBy.map(({ row }) => row)).toEqual(HAND_OFFS.filter(({ name }) => name.startsWith("judge:")).map(({ name }) => name));
+    // Engine redesign R3 Task 12 (ruling R3-T12.1): 11 -> 13 are the two v2 position rows, re-asked under the v2 contract,
+    // and no other row's repair is framed under it (the code classifier reads QUESTION as resolved).
+    expect(repairedBy.filter(({ contractId }) => /^judge\.assigned-root\.(unknown|resolved)\.v2$/u.test(contractId))).toEqual([
+      { row: "judge:assigned-root v2 (points_raised — unsided points the map's models wrote)", contractId: "judge.assigned-root.resolved.v2" },
+      { row: "judge:assigned-root v2 (assumptions — the chooser's assumptions, model-written)", contractId: "judge.assigned-root.resolved.v2" }
+    ]);
   });
 });
 

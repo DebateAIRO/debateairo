@@ -608,7 +608,7 @@ SEAT-PROPOSAL; contents RULED with the citations shown.
 | Field | Carries | Citation |
 |---|---|---|
 | `question_line` | the question as asked | `ui §1.2` Answer |
-| `verdict_state` | `SUPPORTED \| CONTESTED \| UNSUPPORTED` — **closed at three** | AC-66; DR-066(3); Plan.md §1.9 FLAG-2 |
+| `verdict_state` | `SUPPORTED \| CONTESTED \| UNSUPPORTED \| SPLIT` — **closed at four** (`SPLIT` by owner ruling **E8**, 2026-10-15, engine 2 only) | AC-66; DR-066(3); Plan.md §1.9 FLAG-2; **E8** |
 | `confidence_band` | an **ordered label**; cut points come from the register (question class × risk tier); `UNINSTRUMENTED` and DR-014 cap **the band, never the verdict state** | AC-66, AC-74; DR-063 VR-2; `spec §12.8` S-27 |
 | `band_ceiling` | `{label, basis}` — the way-of-knowing ceiling every band must name (§9.5). **DR-082/DR-086: a second independent gate that CAPS the band and wears its label — never a silent block.** Non-optional | AC-24; charter VR-2; **DR-082, DR-086** |
 | `abstention` | surface 1, or the typed empty | AC-65; DR-012 |
@@ -844,7 +844,7 @@ it**, and this contract does not depend on it.
 
 | Enum | Members | Single source | On the wire at |
 |---|---|---|---|
-| `verdict_state` | `SUPPORTED`, `CONTESTED`, `UNSUPPORTED` (**closed at three**) | GLOSSARY canonical verdict model, ratified by **DR-066(3)**; charter VR-2 | Answer, answer index |
+| `verdict_state` | `SUPPORTED`, `CONTESTED`, `UNSUPPORTED`, `SPLIT` (**closed at four**; `SPLIT` added by owner ruling **E8**, 2026-10-15: the comparing judges found no majority, engine 2 only — a vocabulary revision under §14.2, old values unchanged) | GLOSSARY canonical verdict model, ratified by **DR-066(3)**; charter VR-2; **E8** (`docs/superpowers/specs/2026-10-15-engine-redesign-design.md` §4.4) | Answer, answer index, public library, owner floor |
 | **abstention kind** | **5 members — imported by citation, never restated** | `spec §12.3` **Home 1** (AC-65, DR-051) | Answer, Node, index |
 | **condition marks** | **22 members — imported by citation, never restated** | `spec §12.3` **Home 2** (AC-65, DR-051; `spec §26` audit: *"22 marks enumerated; 0 ellipses"*) | `condition_marks[]` on Answer and Node |
 | **terminal routes** | **5 — imported by citation, never restated**: inert stop (Q1) · false-presupposition non-answer (Q3) · value→human (Q7, pure value acts only per DR-053) · `NOT_EMPIRICALLY_DECIDABLE` (Q9) · **depth-zero, no-justification-no-split (Q10)** | **`spec §12.3` Home 3** — **complete at five**, row 5 placed by **DR-099 / A-01** (follow-through DR-100); **DR-037** is the routes' authority and `spec §5.2` F-4 enumerates the same five under *"The five terminal routes code must enforce (DR-037)"* | Answer (a terminal route **is** the answer) — §10.1 |

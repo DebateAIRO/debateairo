@@ -100,6 +100,7 @@
   "public.story.label.supported": "Jasan odgovor",
   "public.story.label.contested": "Tijesna odluka",
   "public.story.label.unsupported": "Najbolja pretpostavka, slabi dokazi",
+  "public.story.label.split": "Osporeno",
   "public.story.writing": "Pišemo cijelu priču o ovoj raspravi…",
   "public.story.writingNote": "To obično traje nekoliko minuta. Stranica će se sama ažurirati.",
   "public.story.unavailable": "Cijela priča o ovoj raspravi nije dostupna. Umjesto nje prikazujemo sažetak rasprave.",

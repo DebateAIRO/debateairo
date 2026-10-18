@@ -160,6 +160,31 @@ export const JUDGE_LEG_LENGTH_MATERIAL_FIELDS: Readonly<Record<JudgeLegKind, rea
     Record<JudgeLegKind, readonly string[]>);
 
 /**
+ * ENGINE REDESIGN R3 (spec 2026-10-15 §5.2 item 6, §5.6; P2.6): the engine-2 position writer. Its answer is FIXED — the
+ * map's chosen words, sent whole — and it writes only the case. A NEW contract per claim branch (never an edit of
+ * `assigned-root`), sealed ONLY by engineContractHash (apps/runner/src/engine-contracts.ts): it is NOT appended to
+ * JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, so the judge seal does not move. Always lengthed (engine INTERFACE §0).
+ * OWNER WORDING — approve before switch-on (option 1, spec §5.6 'Position writer' draft, verbatim).
+ */
+export const JUDGE_ASSIGNED_ROOT_V2_DIRECTIVE = "Your answer is fixed: it is the answer you were assigned, word for word. "
+  + "Write the strongest case for it: the reasons and evidence that support it, and why the strongest objections do not "
+  + "overturn it. Do not restate, soften or change the answer itself. Use the points you were given where they help. When "
+  + "the case needs a fact the question does not give, say plainly that it is an assumption. Never mention the material "
+  + "you were given or how the debate works.";
+
+/** Its closed material table: today's three, the unsided points raised, the assumptions, the length (LG-C's field). */
+export const JUDGE_ASSIGNED_ROOT_V2_MATERIAL_FIELDS: readonly string[] = Object.freeze(
+  ["question_line", "assigned_answer", "map_points", "points_raised", "assumptions", "length"]);
+
+export function judgeAssignedRootV2PromptContract(claimType: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS): PromptContract {
+  return Object.freeze({
+    contractId: `judge.assigned-root.${claimType}.v2`,
+    instruction: [JUDGE_ASSIGNED_ROOT_V2_DIRECTIVE, JUDGE_INSTRUCTIONS, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claimType], LENGTH_SENTENCE_WRITING].join(" "),
+    answerForm: JUDGE_ANSWER_FORM
+  });
+}
+
+/**
  * Debate shape (spec §3.3 step 3): a support or attack reply built on ONE chosen
  * map point. It is a VARIANT contract (its own id, its own material table), not
  * an edit of the leg's directive, so today's support and attack legs keep their

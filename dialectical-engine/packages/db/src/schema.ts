@@ -436,6 +436,23 @@ export const mapPositionRepoint = core.table("map_position_repoint", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
+// Engine redesign R3 (0122): what each engine-2 point rests on, and the answer check's codes. Codes only, append-only.
+export const mapItemRestsOn = core.table("map_item_rests_on", {
+  runId: uuid("run_id").notNull(),
+  itemId: text("item_id").notNull(),
+  restsOn: text("rests_on").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+export const mapAnswerCheck = core.table("map_answer_check", {
+  runId: uuid("run_id").primaryKey(),
+  answerCheck: text("answer_check").array().notNull(),
+  checkerMaker: text("checker_maker"),
+  // Ruling (premiseExempt storage): the check ids the checker exempted from the third test (pre-flight consistency).
+  premiseExempt: text("premise_exempt").array().notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),
@@ -447,6 +464,48 @@ export const nodeReview = ledger.table("node_review", {
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
   contentCiphertext: jsonb("content_ciphertext"),
   contentAttestation: bytea("content_attestation")
+});
+
+// Engine verdict (0121, engine redesign R2): one row per investigated "cannot assess" point and one per seated
+// comparing judge. Append-only content carriers in 0063's mechanism: on an encrypted run `content` is the JSON sentinel
+// and the texts live in the envelope; every other column is a code, an id, a count or a flag.
+export const pointInvestigation = ledger.table("point_investigation", {
+  runId: uuid("run_id").notNull(),
+  nodeId: uuid("node_id").notNull(),
+  investigationOrder: smallint("investigation_order").notNull(),
+  result: text("result").notNull(),
+  basis: text("basis"),
+  maker: text("maker"),
+  providerRef: text("provider_ref"),
+  modelId: text("model_id"),
+  rawArtifactRef: uuid("raw_artifact_ref"),
+  leaderWithoutRootNodeId: uuid("leader_without_root_node_id"),
+  leaderWithRootNodeId: uuid("leader_with_root_node_id"),
+  standingsMoved: boolean("standings_moved"),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+export const verdictVote = ledger.table("verdict_vote", {
+  runId: uuid("run_id").notNull(),
+  judgeSeat: smallint("judge_seat").notNull(),
+  maker: text("maker").notNull(),
+  providerRef: text("provider_ref").notNull(),
+  modelId: text("model_id").notNull(),
+  rawArtifactRef: uuid("raw_artifact_ref"),
+  chosenLetter: text("chosen_letter"),
+  chosenRootNodeId: uuid("chosen_root_node_id"),
+  conditional: boolean("conditional"),
+  counted: boolean("counted").notNull(),
+  notCountedReason: text("not_counted_reason"),
+  questionKind: text("question_kind"),
+  sameAs: jsonb("same_as").notNull(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
 export const propagationRun = ledger.table("propagation_run", {

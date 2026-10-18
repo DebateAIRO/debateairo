@@ -6,9 +6,12 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 
+// OWNER WORDING — approve before R2b's upload (Q1 ships live, engine 1 included). Q1 option 1: CONTESTED's word becomes the locale's
+// close-call word, and SPLIT takes the old "Contested" word.
 const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
   supported: "debateDrawers.verdict.stronglySupported",
   contested: "debateDrawers.verdict.contested",
+  split: "debateDrawers.verdict.split",
   unsupported: "debateDrawers.verdict.weaklySupported",
   unavailable: "debateDrawers.verdict.analysisUnavailable",
   insufficient_scoring: "debateDrawers.verdict.insufficientScoring",
@@ -32,6 +35,7 @@ const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
  *   NOT a statement about whether evidence was looked up -- the sentence this
  *   replaced said exactly that, and it was false.
  * - "supported" needs no sentence: the band label already says it.
+ * - "split" (R2, ruling E8) carries no sentence: the coordinator's summary never holds it.
  *
  * The record is total over the union, so every state the mapping can produce
  * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
@@ -40,7 +44,9 @@ const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
 const STATE_SENTENCE_KEYS: Record<LiveVerdictState, string | null> = {
   supported: null,
   contested: "debateDrawers.verdict.contestedExplanation",
-  unsupported: "debateDrawers.verdict.unsupportedExplanation"
+  unsupported: "debateDrawers.verdict.unsupportedExplanation",
+  // R2: SPLIT ("no majority") never reaches this V2 banner; its badge says the word and no sentence is invented.
+  split: null
 };
 
 function formatConvergence(
@@ -76,11 +82,15 @@ export function VerdictBanner({
 }) {
   if (!verdict) return null;
 
-  // Unknown/future bands must never crash the banner: fall back to rendering
-  // the raw band value verbatim (honest, never a fabricated label).
-  const bandLabelKey = BAND_LABEL_KEYS[verdict.verdictBand];
-  const bandLabel = bandLabelKey ? t(catalog, bandLabelKey) : verdict.verdictBand;
-  const stateSentenceKey = verdict.verdictState ? STATE_SENTENCE_KEYS[verdict.verdictState] : null;
+  // Unknown/future bands must never crash the banner, and never print a code (the owner's "no codes in reader text";
+  // R2b final wave P8): a band outside the record reads as "analysis unavailable", never a fabricated label. Only the
+  // record's own keys count, so an inherited member's name ("constructor") is unknown too.
+  const bandLabelKey = Object.hasOwn(BAND_LABEL_KEYS, verdict.verdictBand)
+    ? BAND_LABEL_KEYS[verdict.verdictBand]
+    : BAND_LABEL_KEYS.unavailable;
+  const bandLabel = t(catalog, bandLabelKey);
+  const stateSentenceKey = verdict.verdictState && Object.hasOwn(STATE_SENTENCE_KEYS, verdict.verdictState)
+    ? STATE_SENTENCE_KEYS[verdict.verdictState] : null;
   const stateSentence = stateSentenceKey ? t(catalog, stateSentenceKey) : null;
 
   return (

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 export const ARCHIVE_KEYS = [
   "archive.pageTitle", "archive.generated", "archive.accountHeading", "archive.email", "archive.memberSince",
   "archive.debatesHeading", "archive.question", "archive.verdict", "archive.verdictSupported",
-  "archive.verdictContested", "archive.verdictUnsupported", "archive.story", "archive.arguments",
+  "archive.verdictContested", "archive.verdictUnsupported", "archive.verdictSplit", "archive.story", "archive.arguments",
   "archive.visibilityPublic", "archive.visibilityPrivate", "archive.unreadable", "archive.noDebates", "archive.filesNote"
 ] as const;
 

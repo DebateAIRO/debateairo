@@ -30,6 +30,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { pickRegion } from "../support/signupRegion.js";
 
+/**
+ * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a
+ * screen reader can reach it and hear why it is locked. Either way it must not act.
+ */
+const isLocked = (control: HTMLButtonElement | HTMLSelectElement): boolean =>
+  control.disabled || control.getAttribute("aria-disabled") === "true";
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -220,10 +227,10 @@ async function driveScrollToEnd(): Promise<void> {
 async function acknowledgePolicy(): Promise<void> {
   await clickElement(field("privacy-accepted"));
   expect(dialog(), "the acknowledgement route needs the policy open").not.toBeNull();
-  expect(policyButton("I have read it").disabled, "disabled before the end is reached").toBe(true);
+  expect(isLocked(policyButton("I have read it")), "disabled before the end is reached").toBe(true);
 
   await driveScrollToEnd();
-  expect(policyButton("I have read it").disabled, "enabled once the end is reached").toBe(false);
+  expect(isLocked(policyButton("I have read it")), "enabled once the end is reached").toBe(false);
 
   await clickElement(policyButton("I have read it"));
 
@@ -243,7 +250,7 @@ async function acknowledgeTerms(): Promise<void> {
   expect(dialog()!.getAttribute("aria-labelledby"), "the Terms, not the policy").toBe(
     "terms-modal-title"
   );
-  expect(policyButton("I have read it").disabled, "disabled before the end is reached").toBe(true);
+  expect(isLocked(policyButton("I have read it")), "disabled before the end is reached").toBe(true);
   await driveScrollToEnd();
   await clickElement(policyButton("I have read it"));
   expect(field("terms-accepted").checked, "acknowledging must tick the terms box").toBe(true);
@@ -268,7 +275,7 @@ async function mirrorArm(): Promise<void> {
     field("terms-accepted").checked,
     "the mirror arm needs the terms box ticked first — call acknowledgeTerms() before the route"
   ).toBe(true);
-  expect(createAccountButton().disabled, "Create account after the mirror arm").toBe(true);
+  expect(isLocked(createAccountButton()), "Create account after the mirror arm").toBe(true);
 }
 
 /**
@@ -470,9 +477,9 @@ describe("sign-up card ↔ privacy policy modal", () => {
       field("privacy-accepted")
     );
 
-    expect(createAccountButton().disabled, "still disabled with the Terms box empty").toBe(true);
+    expect(isLocked(createAccountButton()), "still disabled with the Terms box empty").toBe(true);
     await acknowledgeTerms();
-    expect(createAccountButton().disabled, "Create account with both boxes ticked").toBe(false);
+    expect(isLocked(createAccountButton()), "Create account with both boxes ticked").toBe(false);
   });
 
   /* S02-S54 — R08, R17. Against the pre-B1 rule this step's mirror arm is the one that fails
@@ -559,7 +566,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
       field("privacy-accepted")
     );
     // (f) the mirror arm
-    expect(createAccountButton().disabled, "Create account after Escape").toBe(true);
+    expect(isLocked(createAccountButton()), "Create account after Escape").toBe(true);
   });
 
   /* S02-S57 — R14 and the ARCH placement decision. No control inside the policy can submit
@@ -655,7 +662,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
 
     expect(field("privacy-accepted").checked, "the privacy box is genuinely ticked").toBe(true);
     expect(field("terms-accepted").checked, "the terms box is genuinely ticked").toBe(true);
-    expect(createAccountButton().disabled, "Create account with both boxes ticked").toBe(false);
+    expect(isLocked(createAccountButton()), "Create account with both boxes ticked").toBe(false);
   });
 
   /* S02-S29 — R17 case 5 (REQ-REV-01 B5), in R17's order with only the last movement
@@ -670,7 +677,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
 
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
-    expect(createAccountButton().disabled, "assignment announces nothing to React").toBe(true);
+    expect(isLocked(createAccountButton()), "assignment announces nothing to React").toBe(true);
 
     field("privacy-accepted").checked = false;
     field("terms-accepted").checked = false;
@@ -678,7 +685,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
     await acknowledgePolicy();
     await acknowledgeTerms();
 
-    expect(createAccountButton().disabled, "Create account after two real activations")
+    expect(isLocked(createAccountButton()), "Create account after two real activations")
       .toBe(false);
   });
 
@@ -693,7 +700,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
     await mount();
     await clickElement(field("privacy-accepted"));
     await driveScrollToEnd();
-    expect(policyButton("I have read it").disabled, "enabled at the end of the first read")
+    expect(isLocked(policyButton("I have read it")), "enabled at the end of the first read")
       .toBe(false);
 
     await clickElement(policyButton("×"));
@@ -704,7 +711,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
     await clickElement(field("privacy-accepted"));
 
     expect(dialog(), "the policy must reopen").not.toBeNull();
-    expect(policyButton("I have read it").disabled, "disabled again on a fresh read").toBe(true);
+    expect(isLocked(policyButton("I have read it")), "disabled again on a fresh read").toBe(true);
     expect(field("privacy-accepted").checked, "reopening ticks nothing").toBe(false);
   });
 });

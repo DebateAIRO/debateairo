@@ -18,13 +18,21 @@ import {
   type PromptContract,
   type PromptPacket
 } from "@debateai/providers";
-import { mapContractInLanguage, mapLengthContractsOf, mapPromptContracts, type MapContractName, type MapPromptContractSet } from "./prompts.js";
-import { mapGuidedWords, mapLengthField, mapReplyWordsCeiling, type MapLength } from "./length.js";
 import {
+  mapContractInLanguage, mapEnginePromptContracts, mapLengthContractsOf, mapPromptContracts, type MapContractName, type MapEngineContractName,
+  type MapPromptContractSet
+} from "./prompts.js";
+import {
+  mapEngineGuidedWords, mapEngineLengthField, mapEngineReplyWordsCeiling, mapGuidedWords, mapLengthField, mapReplyWordsCeiling, type MapLength
+} from "./length.js";
+import {
+  MAP_ENGINE_REPLY_SCHEMAS,
   MAP_LENGTHED_REPLY_SCHEMAS,
   mapAnglesCheck,
   mapAnglesReplySchema,
+  mapCheckCheck,
   mapChooseCheck,
+  mapChooseCheckV2,
   mapChooseReplySchema,
   mapClassifyReply,
   mapGapCheck,
@@ -35,18 +43,25 @@ import {
   mapMergeReplySchema,
   mapSnowballReplySchema,
   type MapAnglesReply,
+  type MapCheckReply,
   type MapChooseReply,
+  type MapChooseReplyV2,
   type MapGapReply,
+  type MapGapReplyV2,
   type MapListReply,
+  type MapListReplyV2,
   type MapMergeReply,
+  type MapMergeReplyV2,
   type MapReplyCheck,
-  type MapSnowballReply
+  type MapSnowballReply,
+  type MapSnowballReplyV2
 } from "./replies.js";
 import {
-  mapAnglesSalvage, mapAnglesSalvageLengthed, mapChooseSalvage, mapGapSalvage, mapGapSalvageLengthed, mapListSalvage, mapListSalvageLengthed,
-  mapMergeSalvage, type MapReplySalvage
+  mapAnglesSalvage, mapAnglesSalvageEngine, mapAnglesSalvageLengthed, mapCheckSalvage, mapChooseSalvage, mapChooseSalvageV2, mapGapSalvage,
+  mapGapSalvageLengthed, mapListSalvage, mapListSalvageLengthed, mapMergeSalvage, type MapReplySalvage
 } from "./salvage.js";
-import type { MapAngle, MapAnswerItem, MapItem, MapKeyPoint, MapMergedAnswer, MapPointItem, MapStep } from "./types.js";
+import { MAP_ENGINE_LIMITS, type MapAngle, type MapAnswerItem, type MapItem, type MapKeyPoint, type MapMergedAnswer, type MapPointItem,
+  type MapStep } from "./types.js";
 
 /** One map call, fully described: the contract (in the question's language), its material, its check. */
 export type MapStepSpec<T> = Readonly<{
@@ -60,6 +75,8 @@ export type MapStepSpec<T> = Readonly<{
   classify: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   /** The accepted reply's value; throws MAP_REPLY_UNREADABLE for a reply `classify` would refuse. */
   read: (content: string, reply?: ModelReplyFacts) => T;
+  /** Engine 2 (spec 2026-10-15 §5): framed under an engine-2 contract, so its call records the engine seal. */
+  engine?: true;
 }>;
 
 export type MapSpecContext = Readonly<{
@@ -79,6 +96,8 @@ export type MapSpecContext = Readonly<{
   contracts?: MapPromptContractSet;
   /** Length guidance (spec 2026-10-15 §3.2): the run's map targets; absent = today's map. */
   length?: MapLength;
+  /** Engine 2 (spec 2026-10-15 §5): the v2 contracts, schemas and checks. Needs `length`. */
+  engine?: true;
 }>;
 
 /**
@@ -115,6 +134,39 @@ function mapSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapContractName,
   });
 }
 
+const ENGINE_CLASSIFY = Object.freeze({ exactLimits: true });
+// The schemas are Task 4's once-built MAP_ENGINE_REPLY_SCHEMAS, never rebuilt per call (pre-flight PF-R33.11).
+
+/**
+ * ENGINE 2: one call under its v2 contract (sealed by engineContractHash; ctx.contracts is not read: deviation 11), the
+ * contract's own length parts before question_language, its guided words and reply ceiling, and a reading that keeps
+ * zod's limits so every refusal states its exact limit (P2.3).
+ */
+function mapEngineSpecOf<T>(step: MapStep, ctx: MapSpecContext, name: MapEngineContractName, material: readonly FramedMaterialField[],
+  schema: z.ZodType<T>, check: MapReplyCheck<T>, salvage: MapReplySalvage<T> = {}): MapStepSpec<T> {
+  const length = ctx.length;
+  if (length === undefined) {
+    throw new TypedDomainError("MAP_ENGINE_REQUIRES_LENGTH", "MAP_ENGINE_REQUIRES_LENGTH: an engine-2 map call is always told its length");
+  }
+  const lock = mapLockedLanguage(ctx);
+  const contract = mapContractInLanguage(mapEnginePromptContracts()[name], lock, ctx.languageName);
+  const told = [...material, mapEngineLengthField(name, length, ctx.languageTag)];
+  return Object.freeze({
+    step,
+    contract,
+    engine: true as const,
+    material: Object.freeze(withQuestionLanguageField(told, lock).map((entry) => Object.freeze({ ...entry }))),
+    guidedWords: mapEngineGuidedWords(name, length),
+    replyWordsCeiling: mapEngineReplyWordsCeiling(name, length),
+    classify: (content: string, reply?: ModelReplyFacts) => mapClassifyReply(content, reply, schema, check, salvage, ENGINE_CLASSIFY).classification,
+    read: (content: string, reply?: ModelReplyFacts) => {
+      const out = mapClassifyReply(content, reply, schema, check, salvage, ENGINE_CLASSIFY);
+      if (out.value === null) throw new TypedDomainError("MAP_REPLY_UNREADABLE", `MAP_REPLY_UNREADABLE: the ${step} reply did not pass its check`);
+      return out.value;
+    }
+  });
+}
+
 /** Length guidance: today's schema without the row; the runaway-limit schema (built once in replies.ts) with it. */
 const lengthed = (ctx: MapSpecContext): boolean => ctx.length !== undefined;
 
@@ -122,11 +174,20 @@ const mapQuestionField = (ctx: MapSpecContext): FramedMaterialField => ({ name: 
 const mapByItemId = <T extends MapItem>(list: readonly T[]): T[] => [...list].sort((a, b) => a.itemId.localeCompare(b.itemId));
 
 export function mapAnglesSpec(ctx: MapSpecContext): MapStepSpec<MapAnglesReply> {
+  if (ctx.engine === true) {
+    return mapEngineSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], MAP_ENGINE_REPLY_SCHEMAS.angles, mapAnglesCheck, mapAnglesSalvageEngine);
+  }
   return mapSpecOf("ANGLES", ctx, "angles", [mapQuestionField(ctx)], lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.angles : mapAnglesReplySchema, mapAnglesCheck,
     lengthed(ctx) ? mapAnglesSalvageLengthed : mapAnglesSalvage);
 }
 
-export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapStepSpec<MapListReply> {
+export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapStepSpec<MapListReply | MapListReplyV2> {
+  if (ctx.engine === true) {
+    return angle === null
+      ? mapEngineSpecOf("LIST", ctx, "listOpen", [mapQuestionField(ctx)], MAP_ENGINE_REPLY_SCHEMAS.list, mapListCheck(ctx.replyLanguage), mapListSalvageLengthed)
+      : mapEngineSpecOf("LIST", ctx, "listAngle", [mapQuestionField(ctx), { name: "angle_label", content: angle.label },
+        { name: "angle_focus", content: angle.focus }], MAP_ENGINE_REPLY_SCHEMAS.list, mapListCheck(ctx.replyLanguage), mapListSalvageLengthed);
+  }
   const schema = lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.list : mapListReplySchema;
   const salvage = lengthed(ctx) ? mapListSalvageLengthed : mapListSalvage;
   return angle === null
@@ -136,7 +197,12 @@ export function mapListSpec(ctx: MapSpecContext, angle: MapAngle | null): MapSte
 }
 
 /** Snowball (arm A): the claims so far as a short plain list, never who wrote them. */
-export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPointItem[]): MapStepSpec<MapSnowballReply> {
+export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPointItem[]): MapStepSpec<MapSnowballReply | MapSnowballReplyV2> {
+  if (ctx.engine === true) {
+    return mapEngineSpecOf("SNOWBALL", ctx, "listSnowball", [mapQuestionField(ctx),
+      { name: "points_so_far", content: JSON.stringify(mapByItemId(pointsSoFar).map((point) => point.claim)) }],
+    MAP_ENGINE_REPLY_SCHEMAS.snowball, mapListCheck(ctx.replyLanguage), mapListSalvageLengthed);
+  }
   return mapSpecOf("SNOWBALL", ctx, "listSnowball", [mapQuestionField(ctx),
     { name: "points_so_far", content: JSON.stringify(mapByItemId(pointsSoFar).map((point) => point.claim)) }],
   lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.snowball : mapSnowballReplySchema, mapListCheck(ctx.replyLanguage),
@@ -144,9 +210,19 @@ export function mapSnowballSpec(ctx: MapSpecContext, pointsSoFar: readonly MapPo
 }
 
 /** Merge: every item with its opaque id, in id order; never its author, list or angle. */
-export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): MapStepSpec<MapMergeReply> {
+export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): MapStepSpec<MapMergeReply | MapMergeReplyV2> {
   const points = mapByItemId(items.filter((item): item is MapPointItem => item.kind === "POINT"));
   const answers = mapByItemId(items.filter((item): item is MapAnswerItem => item.kind === "ANSWER"));
+  if (ctx.engine === true) {
+    return mapEngineSpecOf("MERGE", ctx, "merge", [mapQuestionField(ctx),
+      // P2.2: the merger writes rests_on per key point and is told to keep each point's basis, so it is shown each
+      // member's (null when its list said none) (pre-flight PF-R33.4). Engine 1's material below is unchanged.
+      { name: "points", content: JSON.stringify(points.map((point) => ({ item_id: point.itemId, claim: point.claim, why_it_matters: point.whyItMatters,
+        rests_on: point.restsOn ?? null }))) },
+      { name: "candidate_answers", content: JSON.stringify(answers.map((answer) => ({ item_id: answer.itemId, answer: answer.answer }))) }],
+    MAP_ENGINE_REPLY_SCHEMAS.merge, mapMergeCheck(new Set(points.map((point) => point.itemId)), new Set(answers.map((answer) => answer.itemId)), ctx.replyLanguage),
+    mapMergeSalvage);
+  }
   return mapSpecOf("MERGE", ctx, "merge", [mapQuestionField(ctx),
     { name: "points", content: JSON.stringify(points.map((point) => ({ item_id: point.itemId, claim: point.claim, why_it_matters: point.whyItMatters }))) },
     { name: "candidate_answers", content: JSON.stringify(answers.map((answer) => ({ item_id: answer.itemId, answer: answer.answer }))) }],
@@ -155,7 +231,13 @@ export function mapMergeSpec(ctx: MapSpecContext, items: readonly MapItem[]): Ma
 }
 
 /** Gap: plain labels only, never counts or authors. */
-export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[]): MapStepSpec<MapGapReply> {
+export function mapGapSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[]): MapStepSpec<MapGapReply | MapGapReplyV2> {
+  if (ctx.engine === true) {
+    return mapEngineSpecOf("GAP", ctx, "gap", [mapQuestionField(ctx),
+      { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => keyPoint.claim)) },
+      { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => answer.answer)) }],
+    MAP_ENGINE_REPLY_SCHEMAS.gap, mapGapCheck(ctx.replyLanguage), mapGapSalvageLengthed);
+  }
   return mapSpecOf("GAP", ctx, "gap", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => keyPoint.claim)) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => answer.answer)) }],
@@ -173,16 +255,51 @@ export type MapRaisedByCounts = "BLIND" | "ALL";
 
 /** Choose: each key point tagged by code with its distinct makers (blind by default) and its first fixed angle kind. */
 export function mapChooseSpec(ctx: MapSpecContext, keyPoints: readonly MapKeyPoint[], mergedAnswers: readonly MapMergedAnswer[],
-  options: Readonly<{ raisedByCounts?: MapRaisedByCounts }> = {}): MapStepSpec<MapChooseReply> {
+  options: Readonly<{ raisedByCounts?: MapRaisedByCounts; engine?: Readonly<{ framingChallenges: readonly string[] }> }> = {}):
+  MapStepSpec<MapChooseReply | MapChooseReplyV2> {
   const shownIds: ReadonlySet<string> = new Set(keyPoints.map((keyPoint) => keyPoint.keyPointId));
-  const raisedBy = (keyPoint: MapKeyPoint): number =>
-    (options.raisedByCounts === "ALL" ? keyPoint.makers : keyPoint.blindMakers).length;
+  const raisedBy = (makers: Readonly<{ blindMakers: readonly string[]; makers: readonly string[] }>): number =>
+    (options.raisedByCounts === "ALL" ? makers.makers : makers.blindMakers).length;
+  if (ctx.engine === true) {
+    // P2.4: each answer shows how many makers raised it (blind; arm A: all), each point what it rests on, and the gap
+    // rounds' framing challenges (stored but never read before engine 2).
+    return mapEngineSpecOf("CHOOSE", ctx, "choose", [mapQuestionField(ctx),
+      { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
+        raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null, rests_on: keyPoint.restsOn ?? null }))) },
+      // Ruling R3-T6.1 REVISED: map.choose.v2 says raised_by counts the AIs that raised an answer "on their own". That is
+      // true for engine 2 on every arm, arm A's "ALL" count included: the snowball v2 spec (mapSnowballSpec) shows a later
+      // AI only the earlier POINTS' claims, never the earlier candidate answers, so every AI that names an answer names
+      // it unprompted (a blind count would tell choose 0 for those). Pinned by engine-map-orchestrator's "snowball v2
+      // shows no candidate answers" case; if a change ever shows answers, that case fails and this sentence is revisited.
+      { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer,
+        raised_by: raisedBy(answer) }))) },
+      { name: "framing_challenges", content: JSON.stringify(options.engine?.framingChallenges ?? []) }],
+    MAP_ENGINE_REPLY_SCHEMAS.choose, mapChooseCheckV2(shownIds, ctx.replyLanguage), mapChooseSalvageV2(shownIds));
+  }
   return mapSpecOf("CHOOSE", ctx, "choose", [mapQuestionField(ctx),
     { name: "key_points", content: JSON.stringify(keyPoints.map((keyPoint) => ({ key_point_id: keyPoint.keyPointId, claim: keyPoint.claim,
       raised_by: raisedBy(keyPoint), angle_kind: keyPoint.fixedAngleKinds[0] ?? null }))) },
     { name: "answers", content: JSON.stringify(mergedAnswers.map((answer) => ({ answer_id: answer.answerId, answer: answer.answer }))) }],
   lengthed(ctx) ? MAP_LENGTHED_REPLY_SCHEMAS.choose : mapChooseReplySchema, mapChooseCheck(shownIds, ctx.replyLanguage),
   mapChooseSalvage(shownIds));
+}
+
+/**
+ * ENGINE 2 (spec §5.2 item 5, INTERFACE §10.4): the answer check. Each answer under its check id (chosen answers by
+ * their own a1..a4, candidates c1..c4); the checker sees the answers' words only, never who raised or chose them.
+ */
+export function mapCheckSpec(ctx: MapSpecContext, entries: readonly Readonly<{ checkId: string; answer: string }>[]): MapStepSpec<MapCheckReply> {
+  if (ctx.engine !== true) throw new TypedDomainError("MAP_CHECK_ENGINE_ONLY", "MAP_CHECK_ENGINE_ONLY: the answer check is an engine-2 call");
+  // R3 final wave P6 (Task 6 Minor 2): the ids are code's own (a1..a4, then c1..c4), so a bad, repeated or empty list is
+  // a code defect, never a reply to refuse: the call is not built.
+  const ids = entries.map((entry) => entry.checkId);
+  if (ids.length === 0 || ids.length > MAP_ENGINE_LIMITS.checkIdsMax || new Set(ids).size !== ids.length
+    || ids.some((id) => !/^(a[1-4]|c[1-4])$/u.test(id))) {
+    throw new TypedDomainError("MAP_CHECK_IDS_INVALID", "MAP_CHECK_IDS_INVALID: the check's ids are 1 to 8 distinct a1..a4 / c1..c4");
+  }
+  return mapEngineSpecOf("CHECK", ctx, "check", [mapQuestionField(ctx),
+    { name: "answers", content: JSON.stringify(entries.map((entry) => ({ check_id: entry.checkId, answer: entry.answer }))) }],
+  MAP_ENGINE_REPLY_SCHEMAS.check, mapCheckCheck(entries.map((entry) => entry.checkId), ctx.replyLanguage), mapCheckSalvage);
 }
 
 /**

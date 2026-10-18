@@ -68,7 +68,7 @@ export function StaffInvitationPanel({ client, catalog = staffEnglish }: {
     <h1 className="setCardTitle">{t(catalog, "staff.invitation")}</h1>
     <p role="status">{t(catalog, stage)}</p>
     {ready ? <form data-invitation-accept onSubmit={accept}>
-      <label><input type="checkbox" name="confirmed" required/>{t(catalog, "staff.confirm")}</label>
+      <label><input type="checkbox" name="confirmed" required aria-invalid="false"/>{t(catalog, "staff.confirm")}</label>
       <button className="setBtn setBtnPrimary" type="submit" disabled={busy}>{t(catalog, "staff.accept")}</button>
     </form> : null}
     <a className="setBtn setBtnQuiet" href="/admin/team">{t(catalog, "staff.teamLink")}</a>

@@ -22,6 +22,7 @@ import "./legal.css";
 import "./billing.css";
 import "./security-confirmation.css";
 import "./data-export.css";
+import { DocumentTitle } from "@/components/DocumentTitle";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -115,11 +116,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ConsentCatalogProvider catalog={consent}>
             <LegalDocumentsProvider locale={locale} privacy={privacy} terms={terms}>
               <div className="appShell">
+                {/* First in the Tab order: lets a keyboard or screen-reader user pass the bar. */}
+                <a className="skipLink" href="#main-content">
+                  {t(chrome, "chrome.skipToContent")}
+                </a>
                 <TopBar />
-                <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
+                {/* The one main landmark for every page; pages render divs inside it. */}
+                <main id="main-content" tabIndex={-1} className="appMain">
+                  <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
+                </main>
                 <CookieConsent />
                 <SiteFooter variant="line" />
                 <SupportConversationGuard />
+                <DocumentTitle brand="Dialectical Engine" />
+                {/* The one polite live region every page shares (see components/Toast.tsx). */}
+                <div id="app-announcer" className="srOnly" role="status" aria-live="polite" />
               </div>
             </LegalDocumentsProvider>
           </ConsentCatalogProvider>

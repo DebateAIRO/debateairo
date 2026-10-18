@@ -13,7 +13,7 @@ import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
 /**
- * Debate shape P2c (rulings C-DRAWER and C-TONE; pre-flight PF-C21, PF-C22): the eight shape marks are
+ * Debate shape P2c (rulings C-DRAWER and C-TONE; pre-flight PF-C21, PF-C22): the twelve shape marks are
  * information for the reader. The honesty drawer shows only their words: never the run id or node id a
  * record names, its reason code, or the raw mark in a tooltip. The node drawer shows them in the neutral
  * tone, not as a dispute. Every other mark keeps today's tooltip and tone.
@@ -49,7 +49,7 @@ function shapeRecord(mark: MarkRecord["mark"], scope: MarkRecord["scope"], subje
 }
 
 const BASE = buildFairShapedAnswer();
-/** The fixture's own two marks, all eight shape marks, and a map record and a scrutiny record as the runner writes them. */
+/** The fixture's own two marks, all twelve shape marks, and a map record and a scrutiny record as the runner writes them. */
 const SHAPED = buildFairShapedAnswer({
   condition_marks: [...BASE.condition_marks, ...DEBATE_SHAPE_MARKS],
   condition_mark_records: [
@@ -97,7 +97,7 @@ function expectNoInternals(text: string): void {
 }
 
 describe("debate shape P2c — the shape marks in the drawers", () => {
-  it("the honesty drawer shows only the words of the eight shape marks", () => {
+  it("the honesty drawer shows only the words of the twelve shape marks", () => {
     const drawer = honestyDrawer(SHAPED);
     const merge = words("debateChrome.condition.mapMergeFallback");
     const scrutiny = words("debateChrome.condition.scrutinyExtended");

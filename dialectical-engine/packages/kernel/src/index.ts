@@ -9,6 +9,7 @@ export type * from "./provider-funding.js";
 export * from "./region.js";
 export * from "./mail-address.js";
 export * from "./engine.js";
+export * from "./engine-material.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 
@@ -92,8 +93,14 @@ export type AbstentionKind = typeof ABSTENTION_KINDS[number];
  * (migrations). One declaration; every representation imports it.
  */
 export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
-/** The rule a NEW selection may record. The write vocabulary. */
-export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+/**
+ * Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' counted votes pick the served root; a tie, or no counted
+ * vote, goes to the higher honest final strength, then the lexicographic node id. A live rule beside today's: engine 1
+ * keeps recording SERVED_ROOT_SELECTION_RULE. Migration 0121_engine_verdict re-adds the DDL CHECK with it.
+ */
+export const SERVED_ROOT_SELECTION_RULE_JUDGES = "comparing-judges-votes-honest-strength-tiebreak" as const;
+/** The rules a NEW selection may record. The write vocabulary. */
+export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE | typeof SERVED_ROOT_SELECTION_RULE_JUDGES;
 
 /**
  * Rules that were lawful when older answers were sealed, and are therefore
@@ -112,6 +119,7 @@ export type RetiredServedRootRule = typeof RETIRED_SERVED_ROOT_RULES[number];
 /** Every value a sealed record may lawfully carry — the READ vocabulary. */
 export const SERVED_ROOT_RULE_HISTORY = Object.freeze([
   SERVED_ROOT_SELECTION_RULE,
+  SERVED_ROOT_SELECTION_RULE_JUDGES,
   ...RETIRED_SERVED_ROOT_RULES
 ] as const);
 export type ServedRootRuleHistory = ServedRootRule | RetiredServedRootRule;
@@ -148,6 +156,15 @@ export const CONDITION_MARKS = [
   "BACKUP-MODEL-USED",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
+  // Engine 2 (spec 2026-10-15 §4.7, §4.2a rule 3; INTERFACE §13): the comparing judges' three answer-scope disclosures
+  // (a judge failed after repairs; no judge could run; every vote was for the judge's own maker's answer) and the
+  // node-scope disclosure of a "cannot assess" point that stays in the graph at a reduced weight (engine 1 hides it,
+  // HIDDEN-UNJUDGEABLE). Placed HERE, mid-list beside the panel marks, NOT appended: the DR-176 tail is read
+  // positionally by `CONDITION_MARKS.slice(-4)`, and the shape marks are read right after PANEL-DEGRADED-SINGLE-VOICE.
+  "VERDICT-JUDGE-MISSING",
+  "VERDICT-JUDGES-UNAVAILABLE",
+  "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT",
   // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation
   // disclosures. PANEL-PARTIAL — some non-author members failed, the node was reduced on
   // the voices that parsed. PANEL-DEGRADED-SINGLE-VOICE — every non-author member failed,
@@ -164,6 +181,12 @@ export const CONDITION_MARKS = [
   "MAP_UNAVAILABLE_TODAYS_OPENING",
   "ANSWERS_FILLED",
   "CHOOSE_QUOTA_FILLED",
+  // Engine redesign R3 (spec 2026-10-15 §5.5): the map's answer check (answer scope). Placed HERE beside the other map
+  // marks, mid-list, never at the DR-176 tail read by `CONDITION_MARKS.slice(-4)`.
+  "MAP_CHECK_UNAVAILABLE",
+  "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED",
+  "MAP_ANSWER_KEPT_UNCHECKED",
   "PANEL-CLOSE-CALL-EXTENDED",
   "SCRUTINY-EXTENDED",
   "AMBIGUOUS_ATTRIBUTION",
@@ -242,8 +265,14 @@ export type ConditionMark = typeof CONDITION_MARKS[number];
 
 /** The debate shape's marks, in their CONDITION_MARKS order. */
 export const DEBATE_SHAPE_MARKS = Object.freeze(["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK",
-  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
+  "MAP_UNAVAILABLE_TODAYS_OPENING", "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED",
+  "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"] as const satisfies readonly ConditionMark[]);
 export type DebateShapeMark = typeof DEBATE_SHAPE_MARKS[number];
+
+/** Engine 2's marks (INTERFACE §13), in their CONDITION_MARKS order. Engine 1 never mints one. */
+export const ENGINE_MARKS = Object.freeze(["VERDICT-JUDGE-MISSING", "VERDICT-JUDGES-UNAVAILABLE", "VERDICT-VOTES-IGNORED",
+  "UNASSESSED-AT-REDUCED-WEIGHT"] as const satisfies readonly ConditionMark[]);
+export type EngineMark = typeof ENGINE_MARKS[number];
 
 export const RISK_TIERS = ["casual", "standard", "high-stakes"] as const;
 export type RiskTier = typeof RISK_TIERS[number];

@@ -61,6 +61,7 @@
   "done.hint": "Lozinka za web-stranicu ostaje ista. Pričekajte sljedeći novi kod iz zamjenske aplikacije za autentifikaciju prije prijave.",
   "login": "Natrag na prijavu",
   "deadline": "Završite prije",
+  "deadline.warning": "Ovaj oporavak istječe za otprilike minutu. Nakon toga morat ćete zatražiti novu poveznicu.",
   "restart.hint": "Postavljanje je prekinuto. Ovaj korak možete ponoviti do vremena prikazanog u nastavku; to se vrijeme ne mijenja.",
   "cancel": "Otkažite oporavak",
   "cancel.title": "Otkazati ovaj oporavak?",

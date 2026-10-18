@@ -304,7 +304,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 }} aria-busy={busy}>
  <div className="authField">
  <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>
- <input ref={codeField} className={method === 'totp' ? undefined : 'authRecoveryInput'} aria-invalid={!!codeError || undefined} aria-describedby={[method === 'totp' ? 'login-code-help' : '', codeError ? 'login-code-error' : ''].filter(Boolean).join(' ') || undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? undefined : 128} disabled={busy} autoFocus onChange={e => {
+ <input ref={codeField} className={method === 'totp' ? undefined : 'authRecoveryInput'} aria-invalid={!!codeError} aria-describedby={[method === 'totp' ? 'login-code-help' : '', codeError ? 'login-code-error' : ''].filter(Boolean).join(' ') || undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? undefined : 128} disabled={busy} autoFocus onChange={e => {
                     if (method !== 'totp') {
                         if (e.target.value !== code)
                             attempt.current.edited();
@@ -369,12 +369,12 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 cancelConditional();
                 setEmail(e.target.value);
                 setEmailError(null);
-            }} required aria-invalid={!!emailError || undefined} aria-describedby={emailError ? 'login-email-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-email-error" message={emailError}/></div>
+            }} required aria-invalid={!!emailError} aria-describedby={emailError ? 'login-email-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-email-error" message={emailError}/></div>
  <div className="authField"><label htmlFor="login-password">{t(catalog, "auth.password")}</label><input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={e => {
                 cancelConditional();
                 setPassword(e.target.value);
                 setPasswordError(null);
-            }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/></div>
+            }} required aria-invalid={!!passwordError} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/></div>
  <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
  {credentialsAnnouncer.region}
  </form>

@@ -6,6 +6,7 @@ import {
   type ContractClient
 } from "@debateai/contract";
 import { PaymentMarksGroup } from "@/components/SiteFooter";
+import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { phonePrefill, phoneTyped } from "@/lib/billing/callingCodes";
@@ -29,6 +30,11 @@ export type CheckoutConsents = Readonly<{ renewal: ConsentPair; immediateStart: 
 const REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA", "RO"]);
 const EMPTY_DETAILS: BillingDetails = Object.freeze({ firstName: "", lastName: "", phone: "", street: "", postalCode: "" });
 const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
+/** The fields a price needs, in page order: a refused "Show the full price" goes to the first one still wrong. */
+type CheckoutField = "country" | keyof BillingDetails | "region" | "city";
+const FIELD_ORDER: readonly CheckoutField[] = ["country", "firstName", "lastName", "phone", "street", "postalCode", "region", "city"];
+const FIELD_REQUIRED = "billing.checkout.fieldRequired";
+const COMPANY_IDS = ["checkout-company-name", "checkout-company-vat", "checkout-company-address"] as const;
 
 /** Leaves for the age gate's interstitial the way AuthGate does (no history entry back to a page that cannot pay). */
 const leaveFor = (href: string): void => { window.location.replace(href); };
@@ -75,6 +81,10 @@ export function CheckoutFlow({
   const [settled, setSettled] = useState<"SUCCEEDED" | "FAILED" | "TIMED_OUT" | null>(null);
   const [busy, setBusy] = useState(false);
   const [messageKey, setMessageKey] = useState<string | null>(null);
+  /** Set by a press on "Show the full price" while something is missing; each field then says what is wrong with it. */
+  const [showErrors, setShowErrors] = useState(false);
+  /** Always mounted and polite: the price when it arrives, its removal by an edit, and why a press was refused. */
+  const announcer = useFormAnnouncer();
   const started = useRef(false);
   /** Bumped by every edit, so a price asked before an edit never shows for the edited details. */
   const edits = useRef(0);
@@ -101,6 +111,22 @@ export function CheckoutFlow({
   const companyFields = [companyName, vatId, companyAddress].map(filled);
   const companyComplete = companyFields.every((value) => value !== "");
   const companyIncomplete = companyOpen && companyFields.some((value) => value !== "") && !companyComplete;
+  // The rules of addressComplete, field by field (a11y repair, 2026-10-15). A Bucharest county with no sector chosen,
+  // or a city that is no locality of the county, leaves the city wrong.
+  const missing: Partial<Record<CheckoutField, string>> = {};
+  if (country === "") missing.country = FIELD_REQUIRED;
+  if (filled(details.firstName) === "") missing.firstName = FIELD_REQUIRED;
+  if (filled(details.lastName) === "") missing.lastName = FIELD_REQUIRED;
+  if (!phoneTyped(details.phone)) missing.phone = "billing.checkout.phoneInvalid";
+  if (filled(details.street) === "") missing.street = FIELD_REQUIRED;
+  if (!postalOptional && filled(details.postalCode) === "") missing.postalCode = FIELD_REQUIRED;
+  if (asksRegion && filled(region) === "") missing.region = FIELD_REQUIRED;
+  if (filled(city) === "" || (romanian && filled(region) !== "" && !isRomanianInvoiceLocality(region, city))) missing.city = FIELD_REQUIRED;
+  const fieldError = (field: CheckoutField): string | undefined => {
+    const key = missing[field];
+    return showErrors && key !== undefined ? t(catalog, key) : undefined;
+  };
+  const companyFieldInvalid = (index: number): boolean => showErrors && companyIncomplete && companyFields[index] === "";
 
   /**
    * The quote seals the payer and the buyer it was priced for (NETOPIA's payer, the stored profile and every invoice
@@ -109,6 +135,8 @@ export function CheckoutFlow({
    */
   function edited(): void {
     edits.current += 1;
+    // The price, the two agreements and the payment button go with it; a screen reader is told so (a11y repair, 2026-10-15).
+    if (quote !== null) announcer.announce(t(catalog, "billing.checkout.priceCleared"));
     setQuote(null);
   }
 
@@ -150,6 +178,8 @@ export function CheckoutFlow({
       // The connection's first quote prices no payer, so an edit made while it loads leaves it standing.
       else if (edits.current !== asked) return;
       setQuote(answer);
+      // A price the person asked for is said as it appears; the connection's is simply part of the page on arrival.
+      if (!fromConnection) announcer.announce(totalSentence(answer));
     } catch (failure) {
       if (sessionEnded(failure)) {
         navigate(`/login?next=${encodeURIComponent(`/checkout?plan=${planId}`)}`);
@@ -212,16 +242,19 @@ export function CheckoutFlow({
     void requestQuote();
   }
 
-  const totalLine = quote === null ? "" : t(catalog, "billing.checkout.total", {
-    plan: name,
-    net: formatMoney(locale, quote.net, quote.currency),
-    taxLabel: taxLabel(catalog, locale, {
-      status: quote.tax_status, taxAmount: quote.tax, currency: quote.currency, taxName: quote.tax_name,
-      rateBasisPoints: quote.tax_rate_bp, country: quote.tax_country
-    }),
-    total: formatMoney(locale, quote.total, quote.currency),
-    day: renewDayLabel(locale, quote.renews_on)
-  });
+  function totalSentence(priced: Quote): string {
+    return t(catalog, "billing.checkout.total", {
+      plan: name,
+      net: formatMoney(locale, priced.net, priced.currency),
+      taxLabel: taxLabel(catalog, locale, {
+        status: priced.tax_status, taxAmount: priced.tax, currency: priced.currency, taxName: priced.tax_name,
+        rateBasisPoints: priced.tax_rate_bp, country: priced.tax_country
+      }),
+      total: formatMoney(locale, priced.total, priced.currency),
+      day: renewDayLabel(locale, priced.renews_on)
+    });
+  }
+  const totalLine = quote === null ? "" : totalSentence(quote);
 
   if (chargeRef !== null) {
     return (
@@ -260,25 +293,68 @@ export function CheckoutFlow({
   }
 
   const canQuote = !busy && addressComplete && !companyIncomplete;
+
+  /**
+   * "Show the full price" stays focusable (aria-disabled, a11y repair 2026-10-15), so a press made while a field is
+   * missing or wrong is answered here and asks for nothing: every such field says why, focus goes to the first, and
+   * the first reason is said (a press from inside that very field moves focus nowhere).
+   */
+  function askForPrice(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (busy) return;
+    if (canQuote) {
+      setShowErrors(false);
+      void requestQuote();
+      return;
+    }
+    setShowErrors(true);
+    const first = FIELD_ORDER.find((field) => missing[field] !== undefined);
+    const companyGap = companyIncomplete ? companyFields.findIndex((value) => value === "") : -1;
+    const target = first !== undefined ? `checkout-${first}` : companyGap >= 0 ? COMPANY_IDS[companyGap] : undefined;
+    if (target !== undefined) event.currentTarget.querySelector<HTMLElement>(`#${target}`)?.focus();
+    announcer.announce(first !== undefined ? t(catalog, missing[first]!)
+      : t(catalog, companyIncomplete ? "billing.checkout.companyIncomplete" : "billing.checkout.detailsRequired"));
+  }
   // The server refuses 422 BILLING_ADDRESS_REQUIRED for a quote that still lacks a payer field, so it never goes on.
   const canContinue = !busy && quote !== null && consents !== null && renewalAccepted && immediateAccepted
     && !quote.address_required && (!quote.country_confirm_needed || countryConfirmed);
+  // "Continue to payment" stays focusable too: while it is locked, this says why (as its description and
+  // when pressed), and a press moves focus to the first thing still missing.
+  const continueBlocker: { key: string; target: string } | null = busy || quote === null || consents === null ? null
+    : quote.address_required ? { key: "billing.checkout.detailsRequired", target: `checkout-${FIELD_ORDER.find((field) => missing[field] !== undefined) ?? FIELD_ORDER[0]}` }
+    : quote.country_confirm_needed && !countryConfirmed ? { key: "billing.checkout.confirmCountryRequired", target: "checkout-confirm-country" }
+    : !renewalAccepted ? { key: "billing.checkout.consentsRequired", target: "checkout-renewal" }
+    : !immediateAccepted ? { key: "billing.checkout.consentsRequired", target: "checkout-immediate" }
+    : null;
+  function pressLockedContinue(): void {
+    if (continueBlocker === null) return;
+    if (quote?.address_required) setShowErrors(true);
+    document.getElementById(continueBlocker.target)?.focus();
+    announcer.announce(t(catalog, continueBlocker.key));
+  }
 
   return (
     <section aria-labelledby="checkout-title">
       <p className="setEyebrow">{t(catalog, "billing.checkout.eyebrow")}</p>
       <h1 id="checkout-title" className="setTitle">{t(catalog, "billing.checkout.title", { plan: name })}</h1>
-      <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (canQuote) void requestQuote(); }}>
+      {/* noValidate: the browser's own bubbles would stop a press before askForPrice could explain it in the page. */}
+      <form noValidate onSubmit={askForPrice}>
         <div className="billingField">
           <label htmlFor="checkout-country">{t(catalog, "billing.checkout.country")}</label>
-          <select id="checkout-country" value={country} onChange={(event) => { edited(); changeCountry(event.target.value); }} required>
+          <select id="checkout-country" value={country} onChange={(event) => { edited(); changeCountry(event.target.value); }} required
+            aria-invalid={Boolean(fieldError("country"))} aria-describedby={fieldError("country") ? "checkout-country-error" : undefined}>
             <option value="" disabled>{t(catalog, "billing.checkout.country")}</option>
             {countries.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
           </select>
+          {fieldError("country") ? <p id="checkout-country-error" className="authFieldError">{fieldError("country")}</p> : null}
         </div>
         <h2 className="setSubtitle">{t(catalog, "billing.checkout.billingTitle")}</h2>
         <p className="billingNote">{t(catalog, "billing.checkout.billingNote")}</p>
         <BillingDetailsFields catalog={catalog} idPrefix="checkout" values={details} postalOptional={postalOptional}
+          errors={{
+            firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
+            street: fieldError("street"), postalCode: fieldError("postalCode")
+          }}
           onChange={(field, value) => { edited(); setDetails((current) => ({ ...current, [field]: value })); }} />
         {asksRegion ? (
           <div className="billingField">
@@ -290,25 +366,31 @@ export function CheckoutFlow({
                 if ((next === BUCHAREST_COUNTY) !== (region === BUCHAREST_COUNTY)) setCity("");
                 edited();
                 setRegion(next);
-              }} autoComplete="address-level1" required>
+              }} autoComplete="address-level1" required
+                aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined}>
                 <option value="" disabled>{t(catalog, "billing.checkout.county")}</option>
                 {ROMANIA_COUNTIES.map((county) => <option key={county} value={county}>{county}</option>)}
               </select>
             ) : (
-              <input id="checkout-region" value={region} onChange={(event) => { edited(); setRegion(event.target.value); }} autoComplete="address-level1" required />
+              <input id="checkout-region" value={region} onChange={(event) => { edited(); setRegion(event.target.value); }} autoComplete="address-level1" required
+                aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined} />
             )}
+            {fieldError("region") ? <p id="checkout-region-error" className="authFieldError">{fieldError("region")}</p> : null}
           </div>
         ) : null}
         <div className="billingField">
           <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
           {bucharest ? (
-            <select id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required>
+            <select id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
+              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined}>
               <option value="">{t(catalog, "billing.checkout.city")}</option>
               {BUCHAREST_SECTORS.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
             </select>
           ) : (
-            <input id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required />
+            <input id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
+              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined} />
           )}
+          {fieldError("city") ? <p id="checkout-city-error" className="authFieldError">{fieldError("city")}</p> : null}
         </div>
         <div className="billingActions">
           <button type="button" className="setBtn" aria-expanded={companyOpen} onClick={() => { edited(); setCompanyOpen(!companyOpen); }}>
@@ -319,22 +401,27 @@ export function CheckoutFlow({
           <>
             <div className="billingField">
               <label htmlFor="checkout-company-name">{t(catalog, "billing.checkout.companyName")}</label>
-              <input id="checkout-company-name" value={companyName} onChange={(event) => { edited(); setCompanyName(event.target.value); }} autoComplete="organization" />
+              <input id="checkout-company-name" value={companyName} onChange={(event) => { edited(); setCompanyName(event.target.value); }} autoComplete="organization"
+                aria-invalid={companyFieldInvalid(0)} aria-describedby={companyFieldInvalid(0) ? "checkout-company-error" : undefined} />
             </div>
             <div className="billingField">
               <label htmlFor="checkout-company-vat">{t(catalog, "billing.checkout.companyVatId")}</label>
-              <input id="checkout-company-vat" value={vatId} onChange={(event) => { edited(); setVatId(event.target.value); }} />
+              <input id="checkout-company-vat" value={vatId} onChange={(event) => { edited(); setVatId(event.target.value); }}
+                aria-invalid={companyFieldInvalid(1)} aria-describedby={companyFieldInvalid(1) ? "checkout-company-error" : undefined} />
             </div>
             <div className="billingField">
               <label htmlFor="checkout-company-address">{t(catalog, "billing.checkout.companyAddress")}</label>
-              <input id="checkout-company-address" value={companyAddress} onChange={(event) => { edited(); setCompanyAddress(event.target.value); }} autoComplete="street-address" />
+              <input id="checkout-company-address" value={companyAddress} onChange={(event) => { edited(); setCompanyAddress(event.target.value); }} autoComplete="street-address"
+                aria-invalid={companyFieldInvalid(2)} aria-describedby={companyFieldInvalid(2) ? "checkout-company-error" : undefined} />
             </div>
-            {companyIncomplete ? <p className="billingNote" role="status">{t(catalog, "billing.checkout.companyIncomplete")}</p> : null}
+            {companyIncomplete ? <p id="checkout-company-error" className="billingNote" role="status">{t(catalog, "billing.checkout.companyIncomplete")}</p> : null}
           </>
         ) : null}
         <div className="billingActions">
-          <button type="submit" className="btn" disabled={!canQuote}>{t(catalog, "billing.checkout.showPrice")}</button>
+          {/* aria-disabled, never disabled: Tab still reaches it, and askForPrice says what a press is missing. */}
+          <button type="submit" className="btn" aria-disabled={!canQuote || undefined}>{t(catalog, "billing.checkout.showPrice")}</button>
         </div>
+        {announcer.region}
       </form>
       {busy && quote === null ? <p className="billingStatus" role="status">{t(catalog, "billing.checkout.quoting")}</p> : null}
       {messageKey === null ? null : messageKey === "billing.checkout.reacceptRequired" ? (
@@ -353,26 +440,34 @@ export function CheckoutFlow({
               <p>{t(catalog, "billing.checkout.confirmCountry", {
                 ipCountry: countryName(locale, quote.ip_country), declaredCountry: countryName(locale, country)
               })}</p>
-              <button type="button" className="setBtn" aria-pressed={countryConfirmed} onClick={() => setCountryConfirmed(true)}>
+              <button type="button" id="checkout-confirm-country" className="setBtn" aria-pressed={countryConfirmed} onClick={() => setCountryConfirmed(true)}>
                 {t(catalog, "billing.checkout.confirmCountryYes")}
               </button>
             </div>
           ) : null}
           <label className="billingConsent">
-            <input type="checkbox" checked={renewalAccepted} onChange={(event) => setRenewalAccepted(event.target.checked)} />
+            <input type="checkbox" id="checkout-renewal" checked={renewalAccepted} onChange={(event) => setRenewalAccepted(event.target.checked)} />
             {/* Spec §2.18: the card-saving agreement names the monthly total (N20 adds {total} to the sentence). */}
             <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, quote.total, quote.currency) })}</span>
           </label>
           <label className="billingConsent">
-            <input type="checkbox" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
+            <input type="checkbox" id="checkout-immediate" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
             <span>{t(catalog, "billing.consent.immediateStart")}</span>
           </label>
           <h2 className="setSubtitle">{t(catalog, "billing.checkout.cardTitle")}</h2>
           <p className="billingNote">{t(catalog, "billing.checkout.cardNote")}</p>
           <div className="billingActions">
-            <button type="button" className="btn btnDark" disabled={!canContinue} onClick={() => { void continueToPayment(); }}>
+            <button
+              type="button"
+              className="btn btnDark"
+              disabled={busy}
+              aria-disabled={!canContinue || undefined}
+              aria-describedby={continueBlocker !== null ? "checkout-continue-hint" : undefined}
+              onClick={() => { if (canContinue) void continueToPayment(); else pressLockedContinue(); }}
+            >
               {t(catalog, "billing.checkout.continueToCard")}
             </button>
+            {continueBlocker !== null ? <span id="checkout-continue-hint" className="srOnly">{t(catalog, continueBlocker.key)}</span> : null}
           </div>
           {/* Spec §2.18: NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer. */}
           <PaymentMarksGroup marks={paymentMarks} />

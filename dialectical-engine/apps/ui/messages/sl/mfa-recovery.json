@@ -61,6 +61,7 @@
   "done.hint": "Geslo za spletno stran ostane enako. Pred prijavo počakajte na naslednjo novo kodo iz nadomestne aplikacije za preverjanje pristnosti.",
   "login": "Nazaj na prijavo",
   "deadline": "Dokončajte pred",
+  "deadline.warning": "Ta obnovitev poteče čez približno minuto. Nato boste morali zahtevati novo povezavo.",
   "restart.hint": "Nastavitev je bila prekinjena. Ta korak lahko ponovite do spodaj prikazanega časa; ta se ne spremeni.",
   "cancel": "Prekličite obnovitev",
   "cancel.title": "Želite preklicati to obnovitev?",

@@ -256,12 +256,13 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.setAside).toContainEqual({ nodeId: CHILD, reason: "UNAUTHORED-BRANCH-HALTED: Expansion under (a point) halted" });
   });
 
-  // Task 14 (Task 12 NOTE): the debate shape's eight marks are about how the debate was run (the map's fallbacks, the
-  // two extensions); their records carry codes only (`MAP_MERGE_FALLBACK:MERGE`, `SCRUTINY_EXTENDED:2`). The story is
+  // Task 14 (Task 12 NOTE): the debate shape's twelve marks (DEBATE_SHAPE_MARKS) are about how the debate was run (the
+  // map's fallbacks, R3's four answer-check marks, the two extensions); their records carry codes only (`MAP_MERGE_FALLBACK:MERGE`, `SCRUTINY_EXTENDED:2`). The story is
   // never handed them — neither the mark codes nor a record's reason — so the story writer never reads a raw code.
   it("never hands the story a debate-shape mark or its coded reason", () => {
     const shapeMarks = ["MAP_ANGLES_FALLBACK", "MAP_MERGE_FALLBACK", "MAP_CHOOSE_FALLBACK", "MAP_UNAVAILABLE_TODAYS_OPENING",
-      "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"];
+      "ANSWERS_FILLED", "CHOOSE_QUOTA_FILLED", "MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED",
+      "MAP_ANSWER_KEPT_UNCHECKED", "PANEL-CLOSE-CALL-EXTENDED", "SCRUTINY-EXTENDED"];
     const snapshot = buildStoryRunSnapshot({
       ...source(),
       answerMarks: ["BRANCH-FROZEN-LOW-LEVERAGE", ...shapeMarks],
@@ -275,6 +276,23 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.verdictBasis.marks).toEqual(["BRANCH-FROZEN-LOW-LEVERAGE"]);
     const freeText = JSON.stringify({ nodes: snapshot.nodes, setAside: snapshot.setAside, marks: snapshot.verdictBasis.marks });
     for (const code of [...shapeMarks, "SCRUTINY_EXTENDED", "PANEL_CLOSE_CALL_EXTENDED"]) expect(freeText).not.toContain(code);
+  });
+
+  // Engine redesign R3 (spec §5.5): the answer check's four marks are debate-shape marks too, so the story is never
+  // handed them either (the story's left-out list reads DEBATE_SHAPE_MARKS, not a hand-written list).
+  it("never hands the story one of the answer check's four marks or its coded reason", () => {
+    const checkMarks = ["MAP_CHECK_UNAVAILABLE", "MAP_ANSWER_REPLACED", "MAP_ANSWER_DROPPED", "MAP_ANSWER_KEPT_UNCHECKED"];
+    const snapshot = buildStoryRunSnapshot({
+      ...source(),
+      answerMarks: ["BRANCH-FROZEN-LOW-LEVERAGE", ...checkMarks],
+      conditionMarkRecords: [
+        ...source().conditionMarkRecords,
+        { mark: "MAP_ANSWER_REPLACED", scope: "answer", subjectRef: "run-1", reason: "MAP_ANSWER_REPLACED:CHECK", affectedNodeIds: [ROOT] }
+      ]
+    });
+    expect(snapshot.verdictBasis.marks).toEqual(["BRANCH-FROZEN-LOW-LEVERAGE"]);
+    const freeText = JSON.stringify({ nodes: snapshot.nodes, setAside: snapshot.setAside, marks: snapshot.verdictBasis.marks });
+    for (const code of [...checkMarks, "CHECK"]) expect(freeText).not.toContain(code);
   });
 
   it("lists set-aside branches from their records, never an answer-scoped mark", () => {
@@ -294,6 +312,14 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.resolveProvider?.("provider:b")).toBeNull();
     // Task M7: and the run's cost fallback over the same makers, untouched.
     expect(snapshot.costFallback).toBe(costFallback);
+  });
+
+  it("engine 2 names a position by the map's words (R3, P2.6); without positionWords the claim is the node's statement", () => {
+    const built = buildStoryRunSnapshot({ ...source(), positionWords: new Map([[ROOT, "Only on night lines."]]) });
+    expect(built.nodes.find((node) => node.nodeId === ROOT)!.claim).toBe("Only on night lines.");
+    const today = buildStoryRunSnapshot(source());
+    expect(built.nodes.find((node) => node.nodeId === CHILD)!.claim).toBe(today.nodes.find((node) => node.nodeId === CHILD)!.claim);
+    expect(today.nodes.find((node) => node.nodeId === ROOT)!.claim).not.toBe("Only on night lines.");
   });
 });
 

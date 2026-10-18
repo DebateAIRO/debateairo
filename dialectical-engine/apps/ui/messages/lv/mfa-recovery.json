@@ -61,6 +61,7 @@
   "done.hint": "Jūsu vietnes parole paliek tā pati. Pirms pierakstīšanās pagaidiet nākamo jauno kodu no jaunās autentifikācijas lietotnes.",
   "login": "Atpakaļ uz pierakstīšanos",
   "deadline": "Pabeigt pirms",
+  "deadline.warning": "Šī atkopšana beigsies apmēram pēc minūtes. Pēc tam jums būs jāpieprasa jauna saite.",
   "restart.hint": "Iestatīšana tika pārtraukta. Varat atkārtot šo soli līdz tālāk redzamajam laikam; šis laiks nemainās.",
   "cancel": "Atcelt atkopšanu",
   "cancel.title": "Vai atcelt šo atkopšanu?",

@@ -225,7 +225,10 @@ describe("chrome", () => {
     // which the anonymous suppression selector depends.
     const layoutSource = readFileSync(resolve(process.cwd(), "apps/ui/app/layout.tsx"), "utf8");
 
-    expect(layoutSource).toMatch(/<div className="appShell">\s*<TopBar \/>/);
+    // Only the skip link (first in the Tab order) may precede it; TopBar stays a direct child.
+    expect(layoutSource).toMatch(
+      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<a className="skipLink" href="#main-content">[^<]*<\/a>\s*<TopBar \/>/
+    );
   });
 
   it("pins the real signed-in render to zero landing markers", async () => {

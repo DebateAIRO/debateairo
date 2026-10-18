@@ -9,6 +9,7 @@ export * from "./salvage.js";
 export * from "./specs.js";
 export * from "./keypoints.js";
 export * from "./choose.js";
+export * from "./check.js";
 export * from "./roles.js";
 export * from "./orchestrator.js";
 export * from "./opposite-templates.js";

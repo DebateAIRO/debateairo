@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "INTERFACE LANGUAGE",
   "chrome.searchLanguage": "Search language or code",
   "chrome.changeLanguage": "Change language",
+  "chrome.skipToContent": "Skip to main content",
   "chrome.europe": "EUROPE",
   "chrome.asia": "ASIA",
   "chrome.middleEast": "MIDDLE EAST",

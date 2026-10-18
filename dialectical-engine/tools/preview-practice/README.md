@@ -162,6 +162,30 @@ a folder's `samples.jsonl` (nothing is sent; no socket or acknowledgement needed
 node_modules/.bin/tsx tools/preview-practice/practice.ts report --out "$P/formats-report"
 ```
 
+A debate's report also counts the "cannot assess" reviews and what was done about them (`investigations`, R2): how many
+points one more AI was asked to look into ("asked") and what it found (holds, fails, dead end), or that its answer was
+unavailable ("unavailable (call failed or money)": the call failed, or the money had run out; counted in "asked" too);
+how many could not be looked into (no AI of another maker was left, the debate's cap was reached; an answer itself is
+never investigated, nor a point that bears on no answer, so these add up to at most the "cannot assess" count); how
+many investigations changed which answer leads ("standings moved"); and their money and time. A point a later copy set
+aside after a crash is not counted (the time and money still include that copy's calls: that money was spent). On
+engine 1 only the "cannot assess" count is not zero. The per-AI table names the investigator (`INVESTIGATOR`) and the
+comparing judges (`VERDICT_JUDGE`) as their own steps.
+
+A debate on engine 2 also carries the comparing judges' block (`judgeVotes`, `labels`, `judgesSeconds`,
+`conditionalWinner`, R2): each judge's vote (which AI, the answer letter it chose, conditional or not, counted or why
+not, the kind of question it named), the label and what triggered it, what today's label ladder would have said over the
+same final strengths, and how long the judging took. Counts and codes only, never a judge's reasons. Which votes count is
+counted again from the stored votes by the same code that chose the served answer (each answer lettered by its place in
+the debate's plan; the stored "counted" column is only a hint and is never read); when that cannot be done honestly a
+vote shows "not recounted" and `conditionalWinner` is null. Counts for the comparison (D1): `labels.label` is this
+debate's label (add them up across reports for the label mix) and `conditionalWinner` says whether a conditional answer
+won: a majority of the counted judges who chose the winning answer (the answers the judges grouped with it included)
+called it conditional. That is a count, not the label rule: one conditional voter already makes a unanimous vote a
+"Close call". Answer-check rejections and assumptions per answer come with R3, the reach check with R4. On engine 1 the
+block is absent. A refused judge's or investigator's reply is re-checked with its own step's reading in the format
+tables (the judge's letter checks need the letters it was shown, and are not re-run).
+
 ### The openings record (openings mode)
 
 Every call is written to `openings.jsonl` in the `--out` folder the moment it finishes. Each line holds:
@@ -186,6 +210,16 @@ this repository. When a gate stops or halts (or Ctrl-C is pressed once), the arm
 To build `report.json` and `report.md` again from a folder's `openings.jsonl` (nothing is sent; no socket or
 acknowledgement needed), run `report --out` on that folder exactly as for formats: it reads `openings.jsonl` when the
 folder holds one.
+
+Arms `C2` and `C2N` (Task 17a, D5's comparison, named only with `--arms`; refused with `--dry`): the angle map on engine 2,
+in the sealed wording (C2) and in wording N (C2N: the four answer-writing instructions name the failing forms, ids
+`<id>.wording-n`, never sealed, practice only). Both are judged by the same sealed answer check. `report.json` `wording`
+lists each question's debated answers word for word with the check's codes; `wordingTotals` and report.md give D1's
+counts per wording (rejections by test, premise challenges exempt, assumptions per answer). The owner reads the answers
+and marks the hedged or circular ones; the wording with fewer of them and fewer check rejections ships (as NEW sealed
+ids, a later task). An arm that hits a practice refusal (the engine seal missing, or wording N's base no longer the
+shipped text) ends at once with no map; report.md lists it under "Refused arms" with its code, its Wording N row counts it
+as refused, and the run reads NOT_PROVEN (exit 30, `ARM_REFUSED:<arm>:<question>:<code>`), never PASS.
 
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
@@ -230,6 +264,13 @@ deleted a moment later), and it holds one JSON object:
   text), `story` (as stored; the story text when it is READY).
 - `unavailable`: what the file could not hold and why (for example: the site's reader lists only positions that got a
   judgement, so a position with none is seen only in `attempts`).
+
+`transcript.json` also holds `structure.engineGraph` (R2, both engines): every point the debate argued, the hidden
+ones too; every link with the bearing its reviewer measured (null when not measured) and whether it is a cross-reply's
+own support of its position; every review; every grader's own seven measures (`voices`, the author marked); each
+investigation's result; whether engine 2's dispute factor lowered each point's score; and the base and final strengths
+the engine served. It is what the `rescore` mode reads (no AI call). A grader reply its step's reader could not read
+again is listed in `unreadVoices`, and `rescore` then leaves that debate out and says why.
 
 Nothing is cut and model text is not blanked (the 64 KiB cap and the redaction of `report.json` do not apply). As a
 safety net, every string still goes through the named key shapes (a PEM block, a bearer or authorization header, a
@@ -308,6 +349,64 @@ how long each model's calls waited for a free slot in all (`waitedMsByModel`, mi
 how many times a model's "too busy" refusal made one call wait and try again while the model's other calls waited for
 it (`busyProbesByModel`).
 
+### The free re-scoring (rescore mode, R2)
+
+`rescore` reads every `transcript.json` under a folder again and asks no AI, spends nothing and opens no database:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts rescore --transcripts "$P" --out "$P/rescore"
+```
+
+First it checks that the engine's own arithmetic gives back exactly the strengths each debate served (no more than
+0.000000001 apart); a debate where it does not is listed as `PRACTICE_RESCORE_ENGINE1_MISMATCH` and not used. Then it scores
+each debate with engine 2's honest scores and link rules, a "cannot assess" link counting at 0.5, 0.66, 0.75 and 1.0, each
+with the investigations' outcomes applied and not, and writes `rescore.json` (every row) and `rescore.md` (counts and
+letters only): which answer leads by honest final strength, the gaps, whether the lead differs from what engine 1 served
+and from the start setting, and per debate how many investigations held, failed or stayed a dead end (`holds/fails/dead
+end`: what the "applied" rows applied). At 1.0 a point an investigation found to hold and a dead end weigh the same (both
+links at full weight); only a point found to fail still weighs less there (its disputed score). The comparing judges are not
+asked (that needs AI calls). Under engine 2 the served answer is the comparing judges' choice, so the first check takes the
+recorded served answer as theirs (never requiring it to lead by honest strength), and a change of the strength lead in the
+sweep is not a change of the served answer (rescore.md says so too). A transcript written before R2 has no
+engine graph: it is rebuilt from its answer and its calls when it can be, else listed as
+`PRACTICE_RESCORE_INPUT_INCOMPLETE <what>`. `--engine-policy FILE` picks the settings the sweep starts from (default
+`tools/preview-practice/engine-policy-start.json`). Exit 0 when every debate was rescored, 10 when some were listed, 20 when
+a debate's served numbers could not be given back, 30 when nothing could be rescored.
+
+### The judges' order (judge-order mode, R2b, owner ruling D3)
+
+Do the comparing judges lean on the order they read the answers in? `judge-order` takes saved engine-2 debates (debate
+mode with `--transcript`; their `transcript.json` holds the judges' recorded votes) and asks each judge that voted the
+very prompt it was sent, once more, with the answers in reverse order (each keeps its letter):
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --transcripts "$P" --out "$P/judge-order" \
+  --settings "$S" --gate-status-deepinfra "$D" --gate-status-anthropic "$A"
+```
+
+It spends real money: one judge call per recorded vote (about half a cent to a cent each), two with `--control`, which
+also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time, plus
+the repairs and retries a call may need (a reply in the wrong form is asked once more, a busy AI is tried again). Spend
+stays inside the owner's test budget in force that day, and the paid run waits for the owner's go. `--dry` answers from
+a script (every scripted judge picks the first answer shown) and spends nothing:
+
+```bash
+node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --dry --transcripts "$P" --out "$P/judge-order-dry"
+```
+
+Only the very prompt the judge read is sent again: a saved prompt that was redacted, no longer matches the fingerprint
+recorded when it was sent, or does not show the recorded letter is not asked (its code is listed under "Not asked"). Any
+vote not asked for a reason other than a judge that recorded no vote makes the verdict PASS_WITH_WARNINGS. A
+`transcript.json` right under `--transcripts` is listed under that folder's name.
+
+Per maker of the judge, `report.md` gives: the flip rate (the choice changed when the order was reversed; a move to
+another answer inside the judge's own same-answer group, `same_as`, counts as a flip too), the same with
+the order unchanged (`--control`), how often the choice was among the longest answers shown (both orders) beside the
+rate chance alone would give, and how often the judge called its choice conditional (both orders). An answer's length
+is the words of its answer, its case and its supporting points. Counts and codes only. These numbers go to the owner
+before any rule that asks the judges in both orders; nothing here changes how a debate is judged, and `rescore` never
+runs it.
+
 ### Tokens and words per AI and step (every debate, length guidance LG-B)
 
 `report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
@@ -382,7 +481,7 @@ block holds:
   points per answer, deeper points, gap rounds, the three settings, the opening);
 - `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
   answers to argue, and each AI argued its own position, as today;
-- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose), every try as the ledger recorded it;
+- `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, choose, check), every try as the ledger recorded it;
 - `chosenAnswers` and `alsoRaised`: how many different answers the map chose to argue, and how many points came up but
   were not debated. When fewer than two answers were chosen, the points are still counted here, but the story and the
   debate page show none of them (today's opening was argued instead);
@@ -391,6 +490,15 @@ block holds:
   (counted even when an extra grader then failed), and how many points scrutiny examined further (one count per point,
   not per exchange);
 - `notExercised`: why the new shape did not run, else null.
+
+Engine 2 (`--engine-policy`, with `--length-policy` and `--shape-policy`): the map ends with one `MAP:check` call (another maker than the chooser's); `report.json` carries `answerCheck` (checked; rejected, and per test: not an answer, adding a fact, no cost named; exempt as premise challenges; replaced, dropped, kept, unavailable; assumptions per debated answer) and `mapFallbacks` (merge, choose: 0 or 1 per debate). Counts only: the checker's and the chooser's own verdicts, never code's.
+The `answerCheck` block also carries two counts beside the tests: `emptyReasons`, how many empty reasons the checker
+wrote in its refused tries (each is refused and asked again, so this counts slips, not outcomes; a structure-repair try
+of an engine-2 map call is re-read with the readings of the call it repairs, since its own prompt names no map contract), and
+`templateFillsDebated`, how many of the answers the run debated are the code's own last-resort template ("The opposite of
+this answer: ..."). These are fills DEBATED: a template fill that the check replaced is not counted, though its
+`ANSWERS_FILLED` mark stays in `mapMarks` (which counts fills MADE, from any source). The block's `mapCallsByStep` gains
+`check`, and `report.md` gains an "answer check" line (engine 2 only) and a "map fallbacks" line.
 
 Map calls also count everywhere else, like any other call:
 
@@ -850,7 +958,8 @@ Optional flags:
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
-  (default all four; they always run in the order T, A, B, C), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  (default all four; they always run in the order T, A, B, C, C2, C2N; C2 and C2N run only when named, never with
+  `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
   formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
   Any other flag is refused in openings (for example `--question`, `--models` or `--samples`), and `--settings` and
@@ -1196,7 +1305,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 
 ## Files
 
-- `practice.ts`: the command (the four modes, the start checks, the report).
+- `practice.ts`: the command (the seven modes: formats, debate, openings, language, report, rescore and judge-order; the
+  start checks; the report).
 - `practice-runner-composition.ts`, `practice-ask-composition.ts`: the runner and the ask path exactly as the two
   `main.ts` files compose them on the preview, in local or hosted mode (hosted: the money wiring, with billing kept off
   in the ask). `tests/unit/preview-practice-wiring-drift.test.ts` fails if they drift.
@@ -1204,6 +1314,13 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   plan; `practice-side-by-side.ts`: the side-by-side page (`report --side-by-side`). `practice-debate.ts`,
   `practice-throwaway-db.ts`, `practice-register-import.ts`: the debate mode (`practice-debate.ts` also builds the
   report's two LG-A tables, `repairsByKind` and `unrepaired`); `practice-transcript.ts`: its `--transcript` file.
+- `practice-engine-graph.ts`: the transcript's engine graph (A15, `structure.engineGraph`); `practice-rescore.ts`: the
+  rescore mode (`rescore.json`, `rescore.md`).
+- `practice-investigations.ts`: the report's investigations block (`investigations`, R2: the "cannot assess" reviews and
+  what was done about them).
+- `practice-judges.ts`: the report's comparing judges block (`judgeVotes`, `labels`, `judgesSeconds`,
+  `conditionalWinner`, R2).
+- `practice-judge-order.ts`: the judges' order practice (D3).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
 - `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
@@ -1234,6 +1351,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
   `tests/unit/preview-practice-language.test.ts`,
   `tests/unit/preview-practice-side-by-side.test.ts`,
   `tests/unit/preview-practice-transcript.test.ts`,
+  `tests/unit/r2-practice-judge-order.test.ts`,
   `tests/unit/preview-practice-wiring-drift.test.ts`,
   `tests/unit/preview-practice-pins.test.ts`,
   `tests/unit/practice-story-length.test.ts`,

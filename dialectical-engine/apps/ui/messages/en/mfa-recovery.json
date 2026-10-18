@@ -61,6 +61,7 @@
   "done.hint": "Your website password stays the same. Wait for the next fresh code from the replacement authenticator before logging in.",
   "login": "Back to log in",
   "deadline": "Finish before",
+  "deadline.warning": "This recovery expires in about a minute. After that, you will need to request a new link.",
   "restart.hint": "Setup was interrupted. You can repeat this step until the time shown below; that time does not change.",
   "cancel": "Cancel recovery",
   "cancel.title": "Cancel this recovery?",

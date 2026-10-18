@@ -40,7 +40,9 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
     // Model scorecard A16: 37 -> 38 (BACKUP-MODEL-USED, minted mid-list beside
     // DEGRADED-DIVERSITY); the tail below is still read and still unchanged.
-    expect(CONDITION_MARKS).toHaveLength(46);
+    // R2 (engine redesign, INTERFACE §13) minted four engine marks mid-list: 46 -> 50.
+    // R3 (engine redesign, spec §5.5) minted four answer-check marks mid-list: 50 -> 54.
+    expect(CONDITION_MARKS).toHaveLength(54); // + R3's four answer-check marks (engine redesign spec §5.5)
     expect(CONDITION_MARKS).toContain("OWED-CHECK-UNEXECUTED");
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     // The retired `web/lib/v3Presentation` renderer and its label-text pin left

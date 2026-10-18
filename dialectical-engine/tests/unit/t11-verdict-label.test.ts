@@ -281,6 +281,9 @@ describe("T11 · the three-state label ladder", () => {
       expect(points).toBe(grid.length * quantities.length * dispersions.length);
       expect([...seenRungs].sort()).toEqual([0, 1, 2, 3, 4]);
       expect([...seenLabels].sort()).toEqual(["CONTESTED", "SUPPORTED", "UNSUPPORTED"]);
+      // R2b: SPLIT and rung 5 belong to the comparing judges; the engine-1 ladder never gives them.
+      expect(seenLabels.has("SPLIT")).toBe(false);
+      expect(seenRungs.has(5)).toBe(false);
     });
 
     it("treats NaN as an invalid input, never as an absent one", async () => {

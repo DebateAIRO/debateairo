@@ -34,7 +34,6 @@
  * before it starts.
  */
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
-import { parseCostEnvelopeBasis } from "@debateai/budget";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
@@ -60,11 +59,11 @@ import {
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import {
-  engineOfRun, lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
+  lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
   readSynthesisRoleControls, type DebateShapeCeilingInput, type EngineSettings
 } from "@debateai/register";
 import type { Pool, PoolClient } from "pg";
-import { admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
+import { admittedEngineOf, admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
 
 /**
  * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
@@ -564,8 +563,9 @@ function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
   } catch (error) {
-    // I1: a debate-shape receipt is never priced as today's (never-under-count): its split must read.
-    if (previewShapeOf(basis) !== null) throw error;
+    // I1: a debate-shape receipt is never priced as today's (never-under-count): its split must read. Engine redesign
+    // R2: nor is an engine-2 receipt (its member present), whatever made its split refuse.
+    if (previewShapeOf(basis) !== null || basis.engine !== undefined) throw error;
     return null;
   }
   const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
@@ -696,6 +696,15 @@ export function previewCallShares(input: Readonly<{
   // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
   // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
   const shaped = previewShapeOf(input.basis) !== null;
+  // Engine redesign R2 (INTERFACE §3.4; spec §10: the estimate stays a ceiling that never under-counts): an engine-2
+  // receipt's comparing judges, investigations (at their cap) and answer check are taken out of the even and grading
+  // shares below and charged per gate at its dearest panel member: min(g, judges) judge calls (never two judges of one
+  // maker, so a gate of g members holds at most g seats), every investigation and the check in full (any member may
+  // hold those seats). Engine 1: all three are 0n and every share below is today's.
+  const engineSites = previewEngineOf(input.basis)?.sites ?? null;
+  const judgeSites = BigInt(engineSites?.comparingJudges ?? 0);
+  const investigationSites = BigInt(engineSites?.investigations ?? 0);
+  const checkSites = BigInt(engineSites?.answerCheck ?? 0);
   if ((rotated || shaped) && input.dearestFor === undefined) throw new TypeError("PREVIEW_ROTATION_PRICER_MISSING");
   const askProbeModelIds = input.askProbeModelIds ?? [];
   const expected = previewExpectedCalls({ ...input, roleProviderRefs: rotated ? [] : input.roleProviderRefs,
@@ -741,15 +750,15 @@ export function previewCallShares(input: Readonly<{
         // leg's rule; and min(1, g / (J + E)) of the grading sites (`previewShapedGradingShare`), rounded up.
         const shape = previewShapeOf(input.basis)!;
         for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
-          addDebate(model, (BigInt(sites.authored) - mapLongSites) * debate * members);
+          addDebate(model, (BigInt(sites.authored) - mapLongSites - checkSites) * debate * members);
           const grading = previewShapedGradingShare({ gateMembers, graders: shape.graders, closeCallExtraGraders: shape.closeCallExtraGraders });
-          addDebate(model, (BigInt(sites.judge) * debate * members * grading.numerator + grading.denominator - 1n) / grading.denominator);
+          addDebate(model, ((BigInt(sites.judge) - judgeSites) * debate * members * grading.numerator + grading.denominator - 1n) / grading.denominator);
         }
       } else {
         // Every panel step but the reviews is shared evenly: each member states one position, authors its own
         // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
         // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
-        for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites) * debate);
+        for (const model of panelModels) addDebate(model, (BigInt(sites.panel - sites.reviewer) - mapLongSites - judgeSites - checkSites) * debate);
       }
       // A node's ONE review goes to a different maker taken in turn round the debate's seeded circle
       // (selectDifferentMakerReviewer, apps/runner/src/index.ts), even per author over a long debate but
@@ -759,7 +768,15 @@ export function previewCallShares(input: Readonly<{
       // reviews of the other members' nodes (a member never reviews its own maker's nodes, an even
       // 1/members of them). The careful side: with two gates a review is counted on both.
       for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
-        addDebate(model, BigInt(sites.reviewer) * debate * (gateMembers >= 2 ? members : members - 1n));
+        addDebate(model, (BigInt(sites.reviewer) - investigationSites) * debate * (gateMembers >= 2 ? members : members - 1n));
+      }
+      if (engineSites !== null) {
+        // R2: the engine's sites on each gate's dearest member (see above): a gate of g members can hold at most
+        // min(g, judges) judge seats; any member may take an investigation or the check, so each gate carries them all.
+        for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
+          const seats = BigInt(Math.min(gateMembers, engineSites.comparingJudges));
+          addDebate(model, (seats + investigationSites + checkSites) * debate * members);
+        }
       }
       if (shaped) {
         // X1: one merge and one choose per run; any member may hold the seat, so every gate carries each whole call.
@@ -1277,14 +1294,13 @@ function previewShapeOf(basis: Readonly<Record<string, unknown>>): DebateShapeCe
 }
 
 /**
- * Engine redesign (R1d; INTERFACE §3.4): the run's frozen engine member, read ONLY through the strict receipt parser (as
- * the shape is, controller ruling PF7); null for a receipt without it (engine 1). A malformed member, or one without the
- * length member, is refused (RUN_COST_ENVELOPE_UNRESOLVED), never priced as engine 1.
+ * Engine redesign (R1d; R2 B10, INTERFACE §3.4): the run's engine-2 settings from its receipt, read ONLY through the one
+ * shared strict reader (`admittedEngineOf`, as `previewShapeOf` reads `admittedShapeOf`); null for a receipt without the
+ * member (engine 1). A malformed member, or one without the length member, is refused ("malformed engine member"),
+ * never priced as engine 1.
  */
 function previewEngineOf(basis: Readonly<Record<string, unknown>>): EngineSettings | null {
-  if (basis.engine === undefined) return null;
-  const engine = engineOfRun(parseCostEnvelopeBasis(basis));
-  return engine.engine === 2 ? engine : null;
+  return admittedEngineOf(basis);
 }
 
 /**
@@ -1307,6 +1323,9 @@ export function previewShapeWriterBound(basis: Readonly<Record<string, unknown>>
  */
 const PREVIEW_LENGTH_DEBATE_STEPS = Object.freeze(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer"] as const);
 
+/** Engine redesign R2 (B10): an engine-2 receipt's comparing judges and investigators, priced as DEBATE calls too. */
+const PREVIEW_ENGINE_DEBATE_STEPS = Object.freeze(["comparing_judge", "investigator"] as const);
+
 /**
  * The output tokens one debate is priced at: the gate's, with the answer writer raised to the run's own writer bound
  * and the map's merge and choose to its map step bounds (X1), never below a debate call's. Length guidance (spec
@@ -1321,9 +1340,11 @@ export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, bas
     mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
   const length = admittedLengthOf(basis);
   if (length === null) return shaped;
-  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate)];
+  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate, previewEngineOf(basis) !== null)];
   return Object.freeze({ ...shaped,
-    debate: Math.max(...PREVIEW_LENGTH_DEBATE_STEPS.map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate)), ...mapTokens) });
+    // R2 B10: an engine-2 receipt's judge and investigator calls ask their own steps' allowance (engine 1: none added).
+    debate: Math.max(...[...PREVIEW_LENGTH_DEBATE_STEPS, ...(previewEngineOf(basis) === null ? [] : PREVIEW_ENGINE_DEBATE_STEPS)]
+      .map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate)), ...mapTokens) });
 }
 
 /** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */

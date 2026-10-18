@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
 import type { PracticeAttempt } from "./practice-formats.js";
 import type { PracticeGateName } from "./practice-gate-observer.js";
+import { practiceWordingRows, practiceWordingTotals } from "./practice-map-wording.js";
 import type { OpeningsArm, OpeningsQuestionDigest } from "./practice-openings-questions.js";
 import {
   GATES,
@@ -90,7 +91,12 @@ export type OpeningsCall = Readonly<{
  * own fallbacks. The run starts nothing after it.
  */
 export type OpeningsStopNote = Readonly<{ note: "STOPPED"; step: OpeningsStep | "MAP"; detail: string }>;
-export type OpeningsArmNote = MapNoteRecord | OpeningsStopNote;
+/**
+ * Ruling R3-T17a.2: a practice refusal inside the map's caller (the engine seal missing, wording N's base moved) ends the
+ * arm loudly: no map, and this note names the refusal's code. Never a silent map fallback.
+ */
+export type OpeningsRefusedNote = Readonly<{ note: "PRACTICE_REFUSED"; step: "MAP"; detail: string }>;
+export type OpeningsArmNote = MapNoteRecord | OpeningsStopNote | OpeningsRefusedNote;
 
 export type OpeningsArmLine = Readonly<{
   arm: OpeningsArm;
@@ -105,6 +111,8 @@ export type OpeningsArmLine = Readonly<{
   notes: readonly OpeningsArmNote[];
   /** The map without its call records (each call has its own line). */
   map: Omit<MapResult, "calls"> | null;
+  /** Arms C2 and C2N only (Task 17a): the seats the arm started with, so a seat that went busy in C2 shows in C2N. */
+  seats?: number;
 }>;
 
 export type OpeningsBusyWait = Readonly<{
@@ -222,6 +230,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     return [model, Object.freeze({ answered, skipped: mine.length - answered })];
   }));
   const answeredModels = new Set(calls.filter(openingsAnswered).map((call) => call.model));
+  // Ruling R3-T17a.4: an arm that ended on a practice refusal (its PRACTICE_REFUSED note) makes the run NOT_PROVEN.
+  const armsRefused = armLines.flatMap((line) => line.notes.flatMap((note) => (note.note === "PRACTICE_REFUSED"
+    ? [Object.freeze({ arm: line.arm, questionId: line.questionId, code: note.detail })] : [])));
   const formatFailures = calls.filter((call) => call.status === "FORMAT_FAILED").length;
   const failedCalls = calls.filter((call) => call.status === "CALL_FAILED").length;
   const verdict = practiceVerdict({
@@ -240,6 +251,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     gatePauses: gatePauses(ending.observer),
     notExercisedModels: start.models.filter((model) => !answeredModels.has(model) && !busy.includes(model)),
     busyModels: busy,
+    armsRefused: armsRefused.map((refused) => `${refused.arm}:${refused.questionId}:${refused.code}`),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + ending.observer.summary(gate).unbilled, 0),
     p90ByModel: p90ByModel(calls.map((call) => ({ model: call.model, latencies: call.attempts.map((attempt) => attempt.latencyMs) })))
   });
@@ -267,6 +279,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       notes: openingsCount(ownLines.flatMap((line) => line.notes.map((note) => note.note)))
     });
   });
+  const wording = practiceWordingRows(armLines);
   return Object.freeze({
     schema: PRACTICE_REPORT_SCHEMA, mode: "openings", dry: start.dry, ...verdict,
     startedAt: start.startedAt, finishedAt: ending.finishedAt.toISOString(),
@@ -274,6 +287,11 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     models: start.models, questions: start.questions, questionDigests: start.questionDigests, arms: start.arms, busyModels: busy,
     callsByModel, repairKindsByModel: practiceRepairKindsByModel(tries),
     byArm,
+    // Ruling R3-T17a.4 (N3): each refused arm with its refusal's code (report.md lists them under the per-arm table).
+    ...(armsRefused.length === 0 ? {} : { armsRefused }),
+    // Task 17a (D5): wording N's comparison, only when an engine-2 arm ran (the debated answers word for word are for the
+    // owner's reading; report.md prints counts only).
+    ...(wording.length === 0 ? {} : { wording, wordingTotals: practiceWordingTotals(wording) }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
       remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null,
       // The formats report's own check (report.md prints it per gate): the gate's count before less after.

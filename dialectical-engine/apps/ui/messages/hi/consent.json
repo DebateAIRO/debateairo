@@ -16,5 +16,6 @@
   "consent.policy.close": "बंद करें",
   "consent.policy.questions": "प्रश्न:",
   "consent.policy.gateHint": "जारी रखने के लिए नीति के अंत तक नीचे जाएँ।",
+  "consent.policy.gateOpened": "आप अंत तक पहुँच गए हैं। अब आप आगे बढ़ सकते हैं।",
   "consent.policy.acknowledge": "मैंने इसे पढ़ लिया है"
 }

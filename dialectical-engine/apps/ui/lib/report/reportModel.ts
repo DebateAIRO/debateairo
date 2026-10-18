@@ -422,7 +422,7 @@ function pointNote(mark: ConditionMark): PointNote | null {
     // could not be used and a backup that answered instead is said once for the
     // whole answer (its record names the served root), not about one point.
     case "BACKUP-MODEL-USED":
-    // Debate shape (Phase 2b): the six map marks are said once for the whole
+    // Debate shape (Phase 2b, R3): the ten map marks are said once for the whole
     // answer (their record names the served root's node), not about one point;
     // the two extensions are engine detail the page shows through the label only.
     case "MAP_ANGLES_FALLBACK":
@@ -431,8 +431,19 @@ function pointNote(mark: ConditionMark): PointNote | null {
     case "MAP_UNAVAILABLE_TODAYS_OPENING":
     case "ANSWERS_FILLED":
     case "CHOOSE_QUOTA_FILLED":
+    // Engine redesign R3 (spec §5.5): the answer check's four marks are said once for the whole answer too.
+    case "MAP_CHECK_UNAVAILABLE":
+    case "MAP_ANSWER_REPLACED":
+    case "MAP_ANSWER_DROPPED":
+    case "MAP_ANSWER_KEPT_UNCHECKED":
     case "PANEL-CLOSE-CALL-EXTENDED":
     case "SCRUTINY-EXTENDED":
+    // Engine 2 (R2): the three verdict marks describe how the verdict was reached, said once for the whole answer; the
+    // reduced-weight mark is shown on the debate page's label (a report point note later, with R4).
+    case "VERDICT-JUDGE-MISSING":
+    case "VERDICT-JUDGES-UNAVAILABLE":
+    case "VERDICT-VOTES-IGNORED":
+    case "UNASSESSED-AT-REDUCED-WEIGHT":
       return null;
   }
 }

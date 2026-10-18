@@ -36,10 +36,10 @@ const UNSUPPORTED_SENTENCE =
 const RETIRED_WITHHELD_SENTENCE = "no endorsed verdict is shown";
 const RETIRED_UNLOCK_SENTENCE = "To unlock an endorsed verdict";
 
-type EngineLabel = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
+type EngineLabel = "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
 
 const summary = (label: EngineLabel): VerdictSummary => ({
-  verdictBand: label === "SUPPORTED" ? "supported" : label === "CONTESTED" ? "contested" : "unsupported",
+  verdictBand: label === "SUPPORTED" ? "supported" : label === "CONTESTED" ? "contested" : label === "SPLIT" ? "split" : "unsupported",
   claimLanguage: `Engine label ${label} reached the banner.`,
   basis: {
     dialecticalStrength: 0.5,
@@ -78,7 +78,7 @@ describe("T11 · the live banner speaks the engine's own three words", () => {
 
     expect(liveVerdictState("CONTESTED")).toBe("contested");
     expect(html).toContain('data-verdict-state="contested"');
-    expect(html).toContain("Contested");
+    expect(html).toContain("Close call");
     expect(html).toContain("Engine label CONTESTED reached the banner.");
     expect(html).toContain(CONTESTED_SENTENCE);
     expect(html).not.toContain(UNSUPPORTED_SENTENCE);
@@ -100,11 +100,11 @@ describe("T11 · the live banner speaks the engine's own three words", () => {
     expect(html).not.toContain(RETIRED_UNLOCK_SENTENCE);
   });
 
-  it("maps the three engine labels onto three DISTINCT banner states", () => {
-    const states = (["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const).map(liveVerdictState);
+  it("maps the four engine labels onto four DISTINCT banner states", () => {
+    const states = (["SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT"] as const).map(liveVerdictState);
 
-    expect(new Set(states).size).toBe(3);
-    expect(states).toEqual(["supported", "contested", "unsupported"]);
+    expect(new Set(states).size).toBe(4);
+    expect(states).toEqual(["supported", "contested", "unsupported", "split"]);
   });
 
   it("renders a state-less summary exactly as before: claim language, no state, no sentence", () => {

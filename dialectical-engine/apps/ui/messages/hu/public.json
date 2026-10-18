@@ -100,6 +100,7 @@
   "public.story.label.supported": "Egyértelmű válasz",
   "public.story.label.contested": "Szoros döntés",
   "public.story.label.unsupported": "Legjobb becslés, gyenge bizonyítékok",
+  "public.story.label.split": "Vitatott",
   "public.story.writing": "Most írjuk a vita teljes történetét…",
   "public.story.writingNote": "Ez általában néhány percig tart. Az oldal magától frissül.",
   "public.story.unavailable": "Ehhez a vitához nem érhető el a teljes történet. Helyette a vita összefoglalóját mutatjuk.",

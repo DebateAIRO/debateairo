@@ -381,7 +381,7 @@ describe("verdict story — the story classifier", () => {
   describe("no code token of the material in any text (fix round 2: STORY_TEXT_ENGINE_TOKEN)", () => {
     it("holds the labels, the fates, the ways of knowing and the material's underscore keys", () => {
       for (const token of [
-        "SUPPORTED", "CONTESTED", "UNSUPPORTED", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE",
+        "SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE",
         "LOOKED_UP", "RAN", "REASONING",
         "known_by", "rule_in_words", "confidence_band", "judge_spread", "high_cut", "low_cut", "tie_margin"
       ]) {

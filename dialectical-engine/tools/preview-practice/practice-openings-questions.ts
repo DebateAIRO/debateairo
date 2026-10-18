@@ -40,8 +40,13 @@ export const OPENINGS_QUESTIONS: readonly OpeningsQuestion[] = Object.freeze([
 ]);
 
 export const OPENINGS_ARMS = Object.freeze(["T", "A", "B", "C"] as const);
-/** T: today's opening. A: snowball. B: blind lists. C: the angle map. */
-export type OpeningsArm = typeof OPENINGS_ARMS[number];
+/** Task 17a (D5): the engine-2 angle map in the sealed wording (C2) and in wording N (C2N); asked only when named. */
+export const OPENINGS_ENGINE_ARMS = Object.freeze(["C2", "C2N"] as const);
+/**
+ * T: today's opening. A: snowball. B: blind lists. C: the angle map. C2: the angle map on engine 2. C2N: C2 in wording N
+ * (practice only).
+ */
+export type OpeningsArm = typeof OPENINGS_ARMS[number] | typeof OPENINGS_ENGINE_ARMS[number];
 
 /** A question as the log pins it: its id and the first 12 hex characters of the SHA-256 of its question line. */
 export type OpeningsQuestionDigest = Readonly<{ id: string; sha256: string }>;
@@ -72,12 +77,16 @@ export function openingsQuestionsFromFlag(value: string | undefined): readonly O
   return Object.freeze(OPENINGS_QUESTIONS.filter((question) => ids.includes(question.id)));
 }
 
-/** The arms a run uses: all four, or the letters named (in the order T, A, B, C). */
+/**
+ * The arms a run uses: the four of OPENINGS_ARMS, or the arms named (in the order T, A, B, C, C2, C2N). The engine-2
+ * arms (C2, C2N) run only when named, so a plain openings run never spends on engine 2.
+ */
 export function openingsArmsFromFlag(value: string | undefined): readonly OpeningsArm[] {
   if (value === undefined) return OPENINGS_ARMS;
   const ids = openingsIds(value);
-  if (ids === null || ids.some((id) => !(OPENINGS_ARMS as readonly string[]).includes(id))) {
-    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, comma-separated, each once)");
+  const known: readonly OpeningsArm[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS];
+  if (ids === null || ids.some((id) => !(known as readonly string[]).includes(id))) {
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, comma-separated, each once)");
   }
-  return Object.freeze(OPENINGS_ARMS.filter((arm) => ids.includes(arm)));
+  return Object.freeze(known.filter((arm) => ids.includes(arm)));
 }

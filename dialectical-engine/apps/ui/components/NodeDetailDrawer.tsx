@@ -24,7 +24,7 @@ import {
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Answer } from "@debateai/contract";
-import { DEBATE_SHAPE_MARKS } from "@debateai/kernel";
+import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { ContractNode } from "@/lib/v3/adapter";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
@@ -34,6 +34,8 @@ import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
+import { useDialogSurface } from "@/components/dialogSurface";
+import { useDebateTextLang } from "@/components/debateTextLang";
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -45,8 +47,19 @@ function isSetAsidePath(node: DebateNode): boolean {
   );
 }
 
-/** Debate shape P2c (rulings C-TONE, C-DRAWER): the eight shape marks are information, not a dispute. */
+/** Debate shape P2c (rulings C-TONE, C-DRAWER): the twelve shape marks (R3 added the answer check's four) are information, not a dispute. */
 const SHAPE_MARKS: ReadonlySet<string> = new Set<string>(DEBATE_SHAPE_MARKS);
+
+/**
+ * R2a (Ruling W1, Ruling (A7 Minors) 1): engine 2's four marks carry no raw code as a tooltip either. A point a
+ * second AI model could not check reads like an under-explored one (gold); the three verdict marks are information.
+ */
+const ENGINE_MARK_TONES: Readonly<Record<string, "gold" | "neutral">> = Object.freeze({
+  "VERDICT-JUDGE-MISSING": "neutral",
+  "VERDICT-JUDGES-UNAVAILABLE": "neutral",
+  "VERDICT-VOTES-IGNORED": "neutral",
+  "UNASSESSED-AT-REDUCED-WEIGHT": "gold"
+} satisfies Record<(typeof ENGINE_MARKS)[number], "gold" | "neutral">);
 
 const DECISION_KIND_LABEL_KEYS: Record<string, string> = {
   continue: "debateDrawers.node.decisionContinue",
@@ -141,7 +154,9 @@ export function NodeDetailDrawer({
    */
   conditionRecords?: readonly Pick<Answer["condition_mark_records"][number], "mark" | "reason">[];
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   const { locale } = useChromeI18n();
+  const textLang = useDebateTextLang();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
@@ -231,6 +246,8 @@ export function NodeDetailDrawer({
         className="drawer scroll"
         data-drawer-panel
         data-design-turn="5"
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal
         aria-label={t(catalog, "debateDrawers.node.argumentDetail")}
@@ -280,9 +297,9 @@ export function NodeDetailDrawer({
               <p>{pathDecisionCopy(catalog, lifecycleDecision)}</p>
             </div>
           ) : null}
-          <div className="drawerClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
+          <div className="drawerClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
           {generation?.argument ? (
-            <div className="drawerProse" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} onMouseUp={onChallenge ? selectProse : undefined}>
+            <div className="drawerProse" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"} data-challenge-prose={node.id} onMouseUp={onChallenge ? selectProse : undefined}>
               {generation.argument}
             </div>
           ) : (
@@ -345,7 +362,7 @@ export function NodeDetailDrawer({
                     <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} className="modelPill metaLine" catalog={miscCatalog} composeCatalog={composeCatalog} />
                   ) : null}
                 </div>
-                <div className="compareClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
+                <div className="compareClaim" {...textLang} data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
               </div>
               <div className="compareCell">
                 <div className="compareCellHead">
@@ -378,7 +395,7 @@ export function NodeDetailDrawer({
                       <ModelMetaLine modelId={item.model_id} className="modelPill metaLine" catalog={miscCatalog} composeCatalog={composeCatalog} />
                       <span className="historyTag">{t(catalog, item.is_active ? "debateDrawers.node.active" : "debateDrawers.node.archived")}</span>
                     </div>
-                    <div className="historyCardBody" data-ai-generated="true">{item.argument}</div>
+                    <div className="historyCardBody" {...textLang} data-ai-generated="true">{item.argument}</div>
                   </button>
                 );
               })
@@ -484,15 +501,18 @@ function NodeHonestyDetails({
         <div className="drawerConditionPills">
           {v3.condition_marks.map((mark) => {
             const shape = SHAPE_MARKS.has(mark);
+            const engineTone = Object.hasOwn(ENGINE_MARK_TONES, mark) ? ENGINE_MARK_TONES[mark] : undefined;
             const tone = shape
               ? "neutral"
-              : mark === "UNFALSIFIED-AFTER-ROTATION"
-                ? "agree"
-                : mark === "UNDER-EXPLORED"
-                  ? "gold"
-                  : "dispute";
+              : engineTone !== undefined
+                ? engineTone
+                : mark === "UNFALSIFIED-AFTER-ROTATION"
+                  ? "agree"
+                  : mark === "UNDER-EXPLORED"
+                    ? "gold"
+                    : "dispute";
             return (
-              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={shape ? undefined : mark}>
+              <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={shape || engineTone !== undefined ? undefined : mark}>
                 {markLabelFromRecords(mark, conditionRecords, debateChromeCatalog)}
               </span>
             );

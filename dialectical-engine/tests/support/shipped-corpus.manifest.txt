@@ -337,6 +337,12 @@ apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
 apps/runner/src/engine-boot.ts
 apps/runner/src/engine-contracts.ts
+apps/runner/src/engine-investigations.ts
+apps/runner/src/engine-judging.ts
+apps/runner/src/engine-links.ts
+apps/runner/src/engine-map-facts.ts
+apps/runner/src/engine-material-reader.ts
+apps/runner/src/engine-reduce.ts
 apps/runner/src/hosted-provider-set-publish-cli.ts
 apps/runner/src/hosted-provider-set.ts
 apps/runner/src/hosted-register-publish-cli.ts
@@ -457,6 +463,7 @@ apps/ui/components/DebateThread.tsx
 apps/ui/components/DebateTree.tsx
 apps/ui/components/DebateWorkspaceDrawer.tsx
 apps/ui/components/DebatesBuffer.tsx
+apps/ui/components/DocumentTitle.tsx
 apps/ui/components/EmailSettings.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
@@ -515,6 +522,7 @@ apps/ui/components/auth/SocialCompleteFlow.tsx
 apps/ui/components/auth/SocialProviderButtons.tsx
 apps/ui/components/auth/TurnstileChallenge.tsx
 apps/ui/components/auth/VerificationResend.tsx
+apps/ui/components/auth/timedStep.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/BillingDetailsFields.tsx
 apps/ui/components/billing/CancelFlow.tsx
@@ -543,6 +551,8 @@ apps/ui/components/debateReferenceDesign.drawers.source-test.mjs
 apps/ui/components/debateReferenceDesign.public.source-test.mjs
 apps/ui/components/debateReferenceDesign.source-test.mjs
 apps/ui/components/debateReferenceDesign.views.source-test.mjs
+apps/ui/components/debateTextLang.tsx
+apps/ui/components/dialogSurface.ts
 apps/ui/components/landing/LandingChrome.tsx
 apps/ui/components/landing/LandingHero.tsx
 apps/ui/components/landing/LandingMethod.tsx
@@ -752,6 +762,7 @@ apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/turnstile.ts
 apps/ui/lib/types.ts
+apps/ui/lib/useSelectionChallenge.ts
 apps/ui/lib/v3/adapter.ts
 apps/ui/lib/v3/answerExport.ts
 apps/ui/lib/v3/census.ts
@@ -869,6 +880,7 @@ packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
 packages/contract/src/story.ts
+packages/contract/src/verdict-state.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
@@ -903,6 +915,8 @@ packages/db/src/migration-forward0117.ts
 packages/db/src/migration-forward0118.ts
 packages/db/src/migration-forward0119.ts
 packages/db/src/migration-forward0120.ts
+packages/db/src/migration-forward0121.ts
+packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -943,12 +957,17 @@ packages/geo/src/ip.ts
 packages/geo/src/lookup.ts
 packages/graph/src/index.ts
 packages/invoice-smartbill/src/index.ts
+packages/judgement/src/comparing-judges.ts
+packages/judgement/src/engine-repository.ts
+packages/judgement/src/honest-score.ts
 packages/judgement/src/index.ts
+packages/judgement/src/investigation.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
+packages/kernel/src/engine-material.ts
 packages/kernel/src/engine.ts
 packages/kernel/src/index.ts
 packages/kernel/src/length-guidance.ts
@@ -969,6 +988,7 @@ packages/mail-templates/src/locales.ts
 packages/mail-templates/src/order-text.ts
 packages/mail-templates/src/render.ts
 packages/mail-templates/src/templates.ts
+packages/map/src/check.ts
 packages/map/src/choose.ts
 packages/map/src/index.ts
 packages/map/src/internal-words.ts
@@ -1083,7 +1103,9 @@ packages/scorecard/src/picker.ts
 packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/role-rotation.ts
 packages/scorecard/src/schema.ts
+packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
+packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts

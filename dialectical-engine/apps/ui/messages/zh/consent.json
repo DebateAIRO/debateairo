@@ -16,5 +16,6 @@
   "consent.policy.close": "关闭",
   "consent.policy.questions": "如有疑问：",
   "consent.policy.gateHint": "请滚动至政策末尾以继续。",
+  "consent.policy.gateOpened": "已到达末尾。现在可以继续。",
   "consent.policy.acknowledge": "我已阅读"
 }

@@ -2,6 +2,7 @@
   "chrome.interfaceLanguage": "TEANGA AN CHOMHÉADAIN",
   "chrome.searchLanguage": "Cuardaigh teanga nó cód",
   "chrome.changeLanguage": "Athraigh teanga",
+  "chrome.skipToContent": "Léim chuig an bpríomhábhar",
   "chrome.europe": "AN EORAIP",
   "chrome.asia": "AN ÁISE",
   "chrome.middleEast": "AN MEÁNOIRTHEAR",

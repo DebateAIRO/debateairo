@@ -31,7 +31,7 @@ export default async function CheckoutReturnPage({
   if (!(await sessionConfirmed(sessionToken))) redirect(signIn);
   const billingCatalog = await loadNamespace(locale, "billing");
   return (
-    <main className="screen scroll billingPage">
+    <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <h1 className="setTitle">{t(billingCatalog, "billing.checkout.returnTitle")}</h1>
         {chargeRef === null
@@ -48,6 +48,6 @@ export default async function CheckoutReturnPage({
         <p className="billingActions"><a className="btn" href="/settings">{t(billingCatalog, "billing.checkout.goToSettings")}</a></p>
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
-    </main>
+    </div>
   );
 }

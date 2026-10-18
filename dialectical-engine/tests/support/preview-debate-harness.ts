@@ -77,6 +77,7 @@ import { createCallScheduler, type CallPriority, type CallScheduler, type Debate
 import { applyPreviewGateCapacities, previewCallSubjects, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
+import type { EngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
 import {
   startPreviewGateStubs,
   type GateDebateScripts,
@@ -84,6 +85,7 @@ import {
   type GateProvider,
   type GateRequest
 } from "./preview-gate-stubs.js";
+import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -326,6 +328,13 @@ export function previewDebateHarness(input: Readonly<{
        * wrapped by withStructureRepair (with the route's ceiling for root 0's room). Absent: no route, today's composition.
        */
       structureRepair?: boolean;
+      /**
+       * R2a final wave W2: the runner's engine settings (the seal its engine-2 calls carry), passed as main.ts passes
+       * `readEngineRunnerSettings`' answer. Absent: no engine settings, so an engine-2 receipt is refused (R1d B3).
+       */
+      engine?: EngineRunnerSettings;
+      /** R2 (B12): every composition budget's bound at one byte, so no digest can exist and the answer ends at its floor. */
+      noDigest?: boolean;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -445,6 +454,12 @@ export function previewDebateHarness(input: Readonly<{
       ...(options.resilience === undefined ? {} : { runResilience: options.resilience }),
       callScheduler,
       ...(options.debateShape === undefined ? {} : { debateShape: options.debateShape }),
+      ...(options.engine === undefined ? {} : { engine: options.engine }),
+      ...(options.noDigest === true ? { servePolicy: { ...fixture.servePolicy!, compositionBudgets: {
+        low: { ...fixture.servePolicy!.compositionBudgets.low, bound: 1 },
+        medium: { ...fixture.servePolicy!.compositionBudgets.medium, bound: 1 },
+        high: { ...fixture.servePolicy!.compositionBudgets.high, bound: 1 }
+      } } } : {}),
       ...(options.money === undefined ? {} : { providerPrices: options.money.providerPrices }),
       ...(options.money?.structureRepairCeiling === undefined ? {} : { structureRepairCeiling: options.money.structureRepairCeiling }),
       ...(options.structureRepair !== true || options.money?.structureRepairCeiling !== undefined ? {}
@@ -480,6 +495,17 @@ export function previewDebateHarness(input: Readonly<{
     length?: LengthGuidance;
     /** R1d final wave B3: engine 2 frozen on the receipt (`envelope_basis.engine`, needs `length`); absent, engine 1. */
     engine?: EngineSettings;
+    /**
+     * R2a final wave W2: an encrypted run's owner (the pool's content cipher must already name it, as
+     * tests/support/storyEncryptedOwner.ts provisions it); absent, today's legacy asker.
+     */
+    owner?: Readonly<{ userId: string; ownerRef: string; sessionId: string }>;
+    /**
+     * R3 Task 17 fix round 1 (ruling R3-T17.1): the run's id, fixed, so everything the engine seeds by it (the map's item
+     * order, the grading, review and attack seats) is the same on every run. Needs the test file's node:crypto mock
+     * (tests/support/fixed-run-id.ts); absent, startRun mints a random id as today.
+     */
+    runId?: string;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -493,21 +519,33 @@ export function previewDebateHarness(input: Readonly<{
     const panel = admission.panelRefs.map((ref) => panelMember(ref, asOf));
     const rotated = admission.pin ?? pickRotatedRoles({ panel, counts: {}, seed: roleRotationSeed({ as_of: asOf, question_line: question }) });
     if (rotated === null) throw new Error("test: four makers always rotate");
-    const runId = await new RunRepository(pool()).startRun({
-      questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId }, sessionId: `session:${askerId}`,
-      callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
-      tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
-      depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
-      envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
-        ...(admission.shape === undefined ? {} : { shape: admission.shape }),
-        ...(admission.length === undefined ? {} : { length: admission.length }),
-        ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
-      ...(admission.shape === undefined ? {} : {
-        argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
-        argumentLanguageName: (admission.language ?? { name: "English" }).name
-      }),
-      registerVersion: 1, batteryVersion: "s00", batteryRows
-    });
+    if (admission.runId !== undefined) nextRandomUUIDIs(admission.runId);
+    // R3 final wave P17 (Task 17 Minor 2): a start that throws never leaves the fixed id pending for a later randomUUID().
+    let runId: string;
+    try {
+      runId = await new RunRepository(pool()).startRun({
+        questionLine: question,
+        ...(admission.owner === undefined
+          ? { principal: { kind: "legacy" as const, legacyAskerId: askerId }, sessionId: `session:${askerId}` }
+          : { principal: { kind: "server" as const, userId: admission.owner.userId, ownerRef: admission.owner.ownerRef },
+            sessionId: admission.owner.sessionId }),
+        callerScope: "ASKER", asOf: new Date(asOf), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
+        tierProvenanceRef: `asker-declaration:${askerId}`, compositionBudgetTier: "high",
+        depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
+        envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
+          ...(admission.shape === undefined ? {} : { shape: admission.shape }),
+          ...(admission.length === undefined ? {} : { length: admission.length }),
+          ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
+        ...(admission.shape === undefined ? {} : {
+          argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
+          argumentLanguageName: (admission.language ?? { name: "English" }).name
+        }),
+        registerVersion: 1, batteryVersion: "s00", batteryRows
+      });
+    } finally {
+      if (admission.runId !== undefined) clearPendingRunId();
+    }
+    if (admission.runId !== undefined) fixedRunIdTaken(admission.runId, runId);
     await insertRunRoleRotation(pool(), { runId, ...rotationPinFields(rotated) });
     const workItemId = await new WorkItemRepository(pool()).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `preview-busy-model-run:${runId}`

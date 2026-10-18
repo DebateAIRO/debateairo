@@ -503,12 +503,12 @@ export function SubscriptionControls({
                 <div className="setField">
                   <label htmlFor="billing-withdraw-password">{t(catalog, "billing.subscription.password")}</label>
                   <input id="billing-withdraw-password" type="password" autoComplete="current-password"
-                    value={password} onChange={(event) => setPassword(event.target.value)} required />
+                    value={password} onChange={(event) => setPassword(event.target.value)} required aria-invalid="false" />
                 </div>
                 <div className="setField">
                   <label htmlFor="billing-withdraw-code">{t(catalog, "billing.subscription.code")}</label>
                   <input id="billing-withdraw-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
-                    value={code} onChange={(event) => setCode(event.target.value)} required />
+                    value={code} onChange={(event) => setCode(event.target.value)} required aria-invalid="false" />
                 </div>
               </div>
               <div className="setCardRow">

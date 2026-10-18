@@ -86,7 +86,7 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
     : view === "wrongAccount" ? t(catalog, "settings.export.download.wrongAccount")
     : view === "held" ? t(catalog, "settings.export.held")
     : view === "unavailable" ? t(catalog, "settings.export.unavailable") : null;
-  return <main className="setBody"><div className="setInner">
+  return <div className="setBody"><div className="setInner">
     <h1 className="setTitle exportPageTitle">{t(catalog, "settings.export.download.title")}</h1>
     <section className="setCard">
       {message ? <p className="setCardHint exportMessage" role="status">{message}</p> : null}
@@ -94,5 +94,5 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
       {view === "invalid" ? <form action="/settings" method="get" className="setCardRow"><button type="submit" className="setBtn" name="request-export" value="1">{t(catalog, "settings.export.requestAgain")}</button></form> : null}
       {(view === "noLink" || view === "incomplete" || view === "reopenFromEmail" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
     </section>
-  </div></main>;
+  </div></div>;
 }

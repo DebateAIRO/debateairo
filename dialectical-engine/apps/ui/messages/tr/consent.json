@@ -16,5 +16,6 @@
   "consent.policy.close": "Kapat",
   "consent.policy.questions": "Sorular:",
   "consent.policy.gateHint": "Devam etmek için politikanın sonuna kadar kaydırın.",
+  "consent.policy.gateOpened": "Sona ulaştınız. Artık devam edebilirsiniz.",
   "consent.policy.acknowledge": "Okudum"
 }

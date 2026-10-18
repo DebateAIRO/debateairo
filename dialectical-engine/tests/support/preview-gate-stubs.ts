@@ -18,15 +18,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
-import { mapContractNameOf } from "@debateai/map";
+import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
+import { COMPARING_JUDGE_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
 import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
+import { engineMapScriptedContent } from "./engine-map-script.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
 import { openingsDryContent } from "../../tools/preview-practice/practice-openings-dry.js";
 
 export type GateProvider = "deepinfra" | "anthropic";
-export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "QUESTION_LANGUAGE" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE";
+export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "QUESTION_LANGUAGE" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE"
+  | "VERDICT_JUDGE" | "INVESTIGATE";
 /** A /complete request as the gate saw it (what a scenario's `override` is handed). */
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
@@ -244,6 +247,9 @@ export function stubStoryFor(chat: string, defaultShape: string): string {
  */
 export function stubMapContent(chat: string, serial: number): string {
   const frame = readFramedMaterial(wirePacket(chat));
+  // Engine redesign R3: an engine-2 map contract (map.*.v2, map.check.v1) is answered by the engine script; engine 1's
+  // ids (v1 and lengthed) read below exactly as before.
+  const engineReply = engineMapScriptedContent(frame.contractId, frame.fields); if (engineReply !== null) return engineReply;
   if (mapContractNameOf(frame.contractId) === "angles") {
     const locked = frame.fields.find((entry) => entry.name === "question_language")?.content;
     const code = locked === undefined ? null : (JSON.parse(locked) as { code?: unknown }).code;
@@ -289,6 +295,52 @@ export function stubQuestionLanguageContent(chat: string): string {
   const question = readFramedMaterial(wirePacket(chat)).fields.find((entry) => entry.name === "question_line")?.content ?? "";
   const code = detectArgumentLanguage(question).tag.split("-")[0]!.toLowerCase();
   return JSON.stringify({ main_language: code, languages_seen: [code], is_real_mix: false, proposed_question: null });
+}
+
+/** Engine redesign R2 (B12): the answer letters a comparing judge was shown, in ITS rotated order (field `answers`). */
+export function comparingJudgeLettersShown(chat: string): readonly string[] {
+  const answers = readFramedMaterial(wirePacket(chat)).fields.find((entry) => entry.name === "answers")?.content ?? "[]";
+  return (JSON.parse(answers) as { letter: string }[]).map((answer) => answer.letter);
+}
+/**
+ * Engine redesign R2 (B12): the judge's and the investigator's prose, in each language the stand-in writes. Both
+ * replies are language-checked (the judge's `reasons`, the investigator's `missing` / `found` / `reason`), so a
+ * Romanian practice debate's judge answers in Romanian, as every other stand-in reply does (stubReplyLanguage).
+ */
+const ENGINE_STUB_PROSE = Object.freeze({
+  en: Object.freeze({
+    reasons: (best: string) => `Answer ${best} stands up best to the strongest objection raised against it, which its own supporting points answer.`,
+    missing: "A reliable figure for the cost the point relies on.",
+    found: "The figure is reported in public statistics.",
+    deadEnd: "Nothing generally known settles that figure, so the point cannot be decided yet; a published cost study would decide it.",
+    holds: "With that figure, the point holds as it is stated.",
+    fails: "With that figure, the point does not hold as stated."
+  }),
+  ro: Object.freeze({
+    reasons: (best: string) => `Răspunsul ${best} rezistă cel mai bine în fața celei mai puternice obiecții ridicate împotriva lui, la care răspund chiar argumentele care îl susțin.`,
+    missing: "O cifră de încredere pentru costul pe care se sprijină argumentul.",
+    found: "Cifra apare în statisticile publice.",
+    deadEnd: "Nimic din ce se știe în general nu stabilește această cifră, așa că argumentul nu poate fi încă decis; un studiu publicat despre costuri l-ar decide.",
+    holds: "Cu această cifră, argumentul rezistă așa cum este formulat.",
+    fails: "Cu această cifră, argumentul nu rezistă așa cum este formulat."
+  })
+});
+/** Engine redesign R2 (B12): a comparing judge's valid reply (INTERFACE §9.2's answer form), English unless told. */
+export function stubComparingJudgeVote(best: string, options: Readonly<{
+  conditional?: boolean; questionKind?: string; language?: StubLanguage;
+}> = {}): string {
+  return JSON.stringify({
+    best, conditional: options.conditional ?? false, same_as: [],
+    reasons: ENGINE_STUB_PROSE[options.language ?? "en"].reasons(best),
+    question_kind: options.questionKind ?? "general"
+  });
+}
+/** Engine redesign R2 (B12): a point investigation's valid reply (INTERFACE §8.3's answer form), English unless told. */
+export function stubPointInvestigation(outcome: "holds" | "fails" | "dead_end", language: StubLanguage = "en"): string {
+  const prose = ENGINE_STUB_PROSE[language];
+  return JSON.stringify(outcome === "dead_end"
+    ? { missing: prose.missing, found: "", basis: "none", outcome, reason: prose.deadEnd }
+    : { missing: prose.missing, found: prose.found, basis: "established", outcome, reason: outcome === "holds" ? prose.holds : prose.fails });
 }
 
 /* ------------------------------------------------------------------ reading a request */
@@ -342,7 +394,14 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === STORY_CHECKER_CONTRACT_ID || contractId === STORY_CHECKER_V4_CONTRACT_ID) return "STORY_CHECKER";
   // Debate shape (plan Task 15): the map's six contracts, by their ids. The new judge contracts stay "JUDGE" below.
   if (mapContractNameOf(contractId) !== null) return "MAP";
+  // Engine redesign R3 (controller ruling R3-T14.2): engine 2's map contracts (map.*.v2, map.check.v1) are map requests too;
+  // unclassified, each was answered as an unexpected request (a vendor 500), so the map was unavailable.
+  if (mapEngineContractNameOf(contractId) !== null) return "MAP";
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
+  // Engine redesign R2 (plan Task B12): the comparing judge and the point investigation, by their contract ids, before
+  // any instruction sniffing (their instructions name none of the keys below).
+  if (contractId === COMPARING_JUDGE_CONTRACT_ID) return "VERDICT_JUDGE";
+  if (contractId === POINT_INVESTIGATION_CONTRACT_ID) return "INVESTIGATE";
   const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
@@ -456,6 +515,8 @@ export async function startPreviewGateStubs(input: Readonly<{
       case "COMPOSE": return stubComposition(language);
       case "MAP": return stubMapContent(chat, served);
       case "QUESTION_LANGUAGE": return stubQuestionLanguageContent(chat);
+      case "VERDICT_JUDGE": return stubComparingJudgeVote("A", { language });
+      case "INVESTIGATE": return stubPointInvestigation("dead_end", language);
       default: return null;
     }
   };

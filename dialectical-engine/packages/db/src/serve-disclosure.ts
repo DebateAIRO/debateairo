@@ -63,7 +63,7 @@ export type ServeDisclosureServeStop = typeof SERVE_DISCLOSURE_SERVE_STOPS[numbe
 export const SERVE_DISCLOSURE_FALLBACK_REASONS = Object.freeze(["MONEY", "ROLE_UNAVAILABLE"] as const);
 export type ServeDisclosureFallbackReason = typeof SERVE_DISCLOSURE_FALLBACK_REASONS[number];
 
-export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const);
+export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED", "SPLIT"] as const);
 export type ServeDisclosureFloorState = typeof SERVE_DISCLOSURE_FLOOR_STATES[number];
 
 export interface ServeDisclosureRecord {
@@ -486,11 +486,13 @@ export class ServeDisclosureRepository {
     floor: StoredServeFloor;
     registerVersion: number;
     disagreement: Readonly<{ kind: "MEASURED"; value: number }> | Readonly<{ kind: "ABSENT"; reason: string }>;
+    /** The rule the label receipt recorded for the floor's root (engine 2: the comparing judges'); null if none. */
+    servedRootRule: string | null;
   }> | null> {
     if (!UUID_TEXT.test(answerId)) return null;
-    const result = await this.pool.query<ServeDisclosureRow & { receipt_label: unknown }>(
+    const result = await this.pool.query<ServeDisclosureRow & { receipt_selection: unknown }>(
       `SELECT latest.*, (
-         SELECT receipt.served_root_selection -> 'verdictLabel'
+         SELECT receipt.served_root_selection
            FROM ledger.propagation_run AS receipt
           WHERE receipt.run_id = latest.run_id::uuid
             AND receipt.served_root_selection ->> 'servedNodeId' = latest.floor_leading_node_id
@@ -501,7 +503,7 @@ export class ServeDisclosureRepository {
             )
           ORDER BY receipt.at_seq DESC
           LIMIT 1
-       ) AS receipt_label
+       ) AS receipt_selection
          FROM (${SELECT_ROW}
                 WHERE disclosure.answer_id = $1
                 ORDER BY disclosure.answer_version DESC
@@ -512,7 +514,8 @@ export class ServeDisclosureRepository {
     if (row === undefined) return null;
     const floor = floorOf(storedFrom(row));
     if (floor === null) return null;
-    const receipt = row.receipt_label as { registerVersion?: unknown; disagreement?: unknown } | null;
+    const selection = row.receipt_selection as { rule?: unknown; verdictLabel?: unknown } | null;
+    const receipt = (selection?.verdictLabel ?? null) as { registerVersion?: unknown; disagreement?: unknown } | null;
     const disagreement = receipt?.disagreement as { kind?: unknown; value?: unknown; reason?: unknown } | undefined;
     const registerVersion = receipt?.registerVersion;
     const parsed = disagreement?.kind === "MEASURED" && typeof disagreement.value === "number"
@@ -526,7 +529,8 @@ export class ServeDisclosureRepository {
         "The stored serve disclosure's floor has no label receipt it can be re-derived from"
       );
     }
-    return Object.freeze({ floor, registerVersion, disagreement: parsed });
+    return Object.freeze({ floor, registerVersion, disagreement: parsed,
+      servedRootRule: typeof selection?.rule === "string" ? selection.rule : null });
   }
 
   /** The answer's latest row under the run's ownership predicate, or null. */

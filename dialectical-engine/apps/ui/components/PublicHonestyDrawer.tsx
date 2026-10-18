@@ -3,6 +3,8 @@
 import type { PublicDebate } from "@debateai/contract";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { storyLabelWords } from "@/lib/v3/storyWords";
+import { useDialogSurface } from "@/components/dialogSurface";
 
 export function PublicHonestyDrawer({
   answer,
@@ -22,10 +24,11 @@ export function PublicHonestyDrawer({
    */
   floorShown?: boolean;
 }) {
+  const dialogRef = useDialogSurface<HTMLElement>(onClose);
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "public.honesty.dialogAria")}>
+      <aside ref={dialogRef} tabIndex={-1} className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "public.honesty.dialogAria")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
             <div className="nodeEyebrow">{t(catalog, "public.honesty.publishedSnapshot")}</div>
@@ -45,7 +48,7 @@ export function PublicHonestyDrawer({
           </section>
           <section className="wsSection" aria-label={t(catalog, "public.honesty.verdict")}>
             <h3>{t(catalog, "public.honesty.verdict")}</h3>
-            <p data-ai-generated={answer.verdict_available && answer.verdict !== null ? "true" : undefined}>{answer.verdict_available ? (answer.verdict ?? t(catalog, "public.honesty.verdictUnavailable")) : t(catalog, "public.honesty.verdictUnavailable")}</p>
+            <p data-ai-generated={answer.verdict_available && answer.verdict !== null ? "true" : undefined}>{answer.verdict_available && answer.verdict !== null ? storyLabelWords(answer.verdict, catalog) : t(catalog, "public.honesty.verdictUnavailable")}</p>
             {answer.verdict === null && floorShown ? <p>{t(catalog, "public.honesty.floorShown")}</p> : null}
             {answer.confidence_band ? <p data-ai-generated="true">{t(catalog, "public.honesty.confidence", { confidence: answer.confidence_band })}</p> : null}
           </section>

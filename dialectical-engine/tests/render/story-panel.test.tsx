@@ -120,6 +120,7 @@ describe("StoryPanel in the question's language (R2, spec §14.2, §14.3)", () =
     expect(label("SUPPORTED")).toEqual(["supported", ro("public.story.label.supported")]);
     expect(label("CONTESTED")).toEqual(["contested", ro("public.story.label.contested")]);
     expect(label("UNSUPPORTED")).toEqual(["unsupported", ro("public.story.label.unsupported")]);
+    expect(label("SPLIT")).toEqual(["split", ro("public.story.label.split")]);
     expect(label(null)).toBeNull();
   });
 

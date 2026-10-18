@@ -346,7 +346,12 @@ export class LedgerRepository {
      * T10 (goal 188-195): the served-root decision — which root won, on what
      * rule, by what MARGIN over the runner-up, and whether the documented
      * tiebreak was applied. `null` on the DR-184 review catch-up path, which
-     * re-propagates without re-selecting a root.
+     * re-propagates without re-selecting a root. Under the comparing judges'
+     * rule (engine 2, `comparing-judges-votes-honest-strength-tiebreak`) the
+     * judges' votes chose the root: `runnerUp`, `margin` and `tiebreak` then
+     * describe the honest final strengths (the strongest other root, the served
+     * root's strength minus its, which may be negative, and whether the two were
+     * equal), never the vote.
      */
     readonly servedRootSelection?: Readonly<Record<string, unknown>> | null;
     readonly sensitivityRecords?: readonly {
@@ -561,6 +566,25 @@ export class LedgerRepository {
     );
     if (result.rows.length === 0) throw new TypedDomainError("STORED_RESULT_MISSING", `Run ${runId} has no stored propagation result`);
     return result.rows.map((row) => Object.freeze({ nodeId: row.node_id, strength: Number(row.strength) }));
+  }
+
+  /**
+   * R2 A8 (OVERVIEW §4 item 1: the review catch-up keeps the receipt's engine): the judgement-selection rule the run's
+   * latest propagation version recorded, or null when the run has none. The review catch-up reads it before it writes
+   * the next version, so an engine-2 debate's later versions carry the run's own rule, never the catch-up's boot rule.
+   * Only the run and the catch-up write `ledger.propagation_run`, so the latest one is the previous version's.
+   */
+  async readLatestJudgementSelectionRule(runId: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const result = await this.pool.query<{ judgement_selection_rule: Record<string, unknown> }>(
+      `SELECT propagation.judgement_selection_rule
+       FROM ledger.propagation_run AS propagation
+       WHERE propagation.run_id = $1
+       ORDER BY propagation.at_seq DESC
+       LIMIT 1`,
+      [runId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({ ...row.judgement_selection_rule });
   }
 
   async resumePartial(runId: string): Promise<{
