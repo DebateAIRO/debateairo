@@ -91,7 +91,12 @@ export type OpeningsCall = Readonly<{
  * own fallbacks. The run starts nothing after it.
  */
 export type OpeningsStopNote = Readonly<{ note: "STOPPED"; step: OpeningsStep | "MAP"; detail: string }>;
-export type OpeningsArmNote = MapNoteRecord | OpeningsStopNote;
+/**
+ * Ruling R3-T17a.2: a practice refusal inside the map's caller (the engine seal missing, wording N's base moved) ends the
+ * arm loudly: no map, and this note names the refusal's code. Never a silent map fallback.
+ */
+export type OpeningsRefusedNote = Readonly<{ note: "PRACTICE_REFUSED"; step: "MAP"; detail: string }>;
+export type OpeningsArmNote = MapNoteRecord | OpeningsStopNote | OpeningsRefusedNote;
 
 export type OpeningsArmLine = Readonly<{
   arm: OpeningsArm;
@@ -106,6 +111,8 @@ export type OpeningsArmLine = Readonly<{
   notes: readonly OpeningsArmNote[];
   /** The map without its call records (each call has its own line). */
   map: Omit<MapResult, "calls"> | null;
+  /** Arms C2 and C2N only (Task 17a): the seats the arm started with, so a seat that went busy in C2 shows in C2N. */
+  seats?: number;
 }>;
 
 export type OpeningsBusyWait = Readonly<{

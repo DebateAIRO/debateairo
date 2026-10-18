@@ -22,7 +22,8 @@ import {
   type MapCallRequest,
   type MapCaller,
   type MapResult,
-  type MapRunInput
+  type MapRunInput,
+  type MapStepSpec
 } from "@debateai/map";
 import {
   createPreviewGuardedFetch,
@@ -128,6 +129,17 @@ function openingsAssertArms(arms: readonly OpeningsArm[]): void {
   if (arms.some((arm) => !known.includes(arm)) || new Set(arms).size !== arms.length) {
     throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, each once)");
   }
+}
+
+/**
+ * The contract hash a map step records: an engine-2 step (`spec.engine`) the engine seal, any other step the map's hash.
+ * A wording-N call keeps `spec.engine`, so it records the engine seal too; its own `.wording-n` id says it is not that
+ * seal's text. An engine-2 step with no engine seal is a practice refusal (ruling R3-T17a.2: the arm ends on it, loudly).
+ */
+export function openingsMapContractHash(spec: Pick<MapStepSpec<unknown>, "engine">, hashes: OpeningsRunInput["contractHashes"]): string {
+  if (spec.engine !== true) return hashes.map;
+  if (hashes.engine === undefined) throw new PracticeRefusal("PRACTICE_OPENINGS_ENGINE_UNSEALED", "the engine-2 arms need the engine seal");
+  return hashes.engine;
 }
 
 /**
@@ -253,14 +265,12 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
 
   const targetByRef = new Map(input.targets.map((target) => [target.providerRef, target] as const));
   /**
-   * The map's caller: each step as role JUDGE on the served lane (the preview's format repair applies), the map's contract
-   * hash; an engine-2 step records the engine seal instead (a wording-N call keeps `spec.engine`, so it records the engine
-   * seal too; its own `.wording-n` id says it is not that seal's text).
+   * The map's caller: each step as role JUDGE on the served lane (the preview's format repair applies), with the hash
+   * `openingsMapContractHash` picks (its refusal ends the arm: the map's `abandon` below rethrows it).
    */
   const mapCaller = (arm: OpeningsArm, question: OpeningsQuestion): MapCaller => Object.freeze({
     call: <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
-      const contractHash = request.spec.engine === true ? input.contractHashes.engine : input.contractHashes.map;
-      if (contractHash === undefined) return Promise.resolve({ kind: "FAILED", code: "PRACTICE_OPENINGS_ENGINE_UNSEALED" });
+      const contractHash = openingsMapContractHash(request.spec, input.contractHashes);
       const target = targetByRef.get(request.seat.aiRef);
       if (target === undefined) return Promise.resolve({ kind: "FAILED", code: "PRACTICE_OPENINGS_UNKNOWN_SEAT" });
       return oneCall<T>({ arm, question, step: request.step, callSiteKey: request.callSiteKey, target, shown: request.shown, order: request.order },
@@ -326,17 +336,35 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
         questionLine: question.questionLine, languageName: question.languageName, languageTag: question.languageTag,
         seats: seats.map((target) => Object.freeze({ aiRef: target.providerRef, maker: target.maker })),
         // Task 17a (D5): C2N's calls go out in wording N; C2 and C2N run engine 2 (practiceWordingMapExtras; {} for T, A, B, C).
-        caller: arm === "C2N" ? practiceWordingNCaller(mapCaller(arm, question)) : mapCaller(arm, question), seed: `${question.id}|${arm}`,
+        // Ruling R3-T17a.1: C2N takes C2's seed, so both arms see the same items in the same order (only the wording differs).
+        caller: arm === "C2N" ? practiceWordingNCaller(mapCaller(arm, question)) : mapCaller(arm, question),
+        seed: `${question.id}|${arm === "C2N" ? "C2" : arm}`,
         gapRoundsMax: openingsGapRoundsMax(arm),
         maxAnswers: OPENINGS_MAP_SIZES.maxAnswers, pointsPerAnswer: OPENINGS_MAP_SIZES.pointsPerAnswer,
-        ...practiceWordingMapExtras(arm)
+        ...practiceWordingMapExtras(arm),
+        // Ruling R3-T17a.2: a practice refusal in the caller (the engine seal missing, wording N's base moved) is rethrown,
+        // never turned into a failed call and a map fallback.
+        abandon: (error) => error instanceof PracticeRefusal
       };
-      const result: MapResult = arm === "A" ? await mapRunSnowball(mapInput)
-        : arm === "B" ? await mapRunBlindLists(mapInput) : await mapRunAngleMap(mapInput);
+      // Task 17a: the engine-2 arms' lines say how many seats they started with (a seat busy in C2 sits out C2N).
+      const seated = (OPENINGS_ENGINE_ARMS as readonly string[]).includes(arm) ? { seats: seats.length } : {};
+      let result: MapResult;
+      try {
+        result = arm === "A" ? await mapRunSnowball(mapInput)
+          : arm === "B" ? await mapRunBlindLists(mapInput) : await mapRunAngleMap(mapInput);
+      } catch (error) {
+        if (!(error instanceof PracticeRefusal)) throw error;
+        // The arm ends here, loudly: no map, and its note names the refusal (the run goes on with the next arm).
+        emit({ arm, questionId: question.id, startedAt, finishedAt: new Date().toISOString(), outcome: "UNAVAILABLE", positions: 0,
+          marks: [], notes: withStop([Object.freeze({ note: "PRACTICE_REFUSED" as const, step: "MAP" as const, detail: error.code })], "MAP"),
+          map: null, ...seated });
+        input.progress?.(`${question.id} ${arm}: refused, ${error.code}`);
+        continue;
+      }
       const { calls: _calls, ...map } = result;
       void _calls; // each call has its own line already
       emit({ arm, questionId: question.id, startedAt, finishedAt: new Date().toISOString(), outcome: result.kind, positions: 0,
-        marks: result.marks, notes: withStop(result.notes, "MAP"), map });
+        marks: result.marks, notes: withStop(result.notes, "MAP"), map, ...seated });
       input.progress?.(`${question.id} ${arm}: ${result.kind}, marks ${result.marks.map((mark) => mark.mark).join(",") || "none"}`);
     }
   }

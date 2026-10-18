@@ -72,7 +72,9 @@ export function practiceWordingMapExtras(arm: OpeningsArm): Partial<Pick<MapRunI
  * report's own redaction, `reportableReplyText`, as every reply text in a report is), the codes, D1's counts.
  */
 export type PracticeWordingRow = Readonly<{ arm: "C2" | "C2N"; questionId: string; answers: readonly string[]; codes: readonly string[] | null;
-  answerCheck: PracticeAnswerCheckBlock | null }>;
+  answerCheck: PracticeAnswerCheckBlock | null;
+  /** The seats the arm started with (fix round 1): C2 runs first, so a seat that went busy in C2 shows as fewer in C2N. */
+  seats: number | null }>;
 
 type WordingAnswer = Readonly<{ statement: string; assumptions?: readonly unknown[] }>;
 
@@ -87,7 +89,7 @@ export function practiceWordingRows(lines: readonly OpeningsArmLine[]): readonly
     for (const mark of line.marks) marks[mark.mark] = (marks[mark.mark] ?? 0) + 1;
     return [Object.freeze({ arm: line.arm, questionId: line.questionId, answers: Object.freeze(answers.map((answer) => reportableReplyText(answer.statement))), codes,
       answerCheck: practiceAnswerCheckBlock(codes, marks, { premiseExempt: check === undefined ? null : check.premiseExempt?.length ?? 0,
-        assumptionsPerAnswer: answers.map((answer) => answer.assumptions?.length ?? 0) }) })];
+        assumptionsPerAnswer: answers.map((answer) => answer.assumptions?.length ?? 0) }), seats: line.seats ?? null })];
   }));
 }
 

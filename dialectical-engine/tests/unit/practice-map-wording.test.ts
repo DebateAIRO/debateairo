@@ -3,14 +3,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LENGTH_GUIDANCE_START, replyLanguageExpectation } from "@debateai/kernel";
 import {
-  MAP_ENGINE_CONTRACT_NAMES, MAP_ENGINE_INSTRUCTIONS, mapEngineContractNameOf, mapEnginePromptContracts, mapListSpec,
-  type MapCallOutcome, type MapCallRequest, type MapCaller, type MapEngineContractName, type MapSpecContext
+  MAP_ENGINE_CONTRACT_NAMES, MAP_ENGINE_INSTRUCTIONS, mapChooseSpec, mapEngineContractNameOf, mapEnginePromptContracts, mapListSpec,
+  mapSnowballSpec, type MapCallOutcome, type MapCallRequest, type MapCaller, type MapEngineContractName, type MapSpecContext
 } from "@debateai/map";
 import {
   MAP_WORDING_N_ID_SUFFIX, MAP_WORDING_N_INSTRUCTIONS, practiceWordingMapExtras, practiceWordingNCaller, practiceWordingRows, practiceWordingTotals
 } from "../../tools/preview-practice/practice-map-wording.js";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
 import type { OpeningsArmLine } from "../../tools/preview-practice/practice-openings-log.js";
+import { PracticeRefusal } from "../../tools/preview-practice/practice-settings.js";
 
 /** Spec §5.6 "Wording N": the clauses wording N adds, word for word (lists; choose). */
 const LIST_CLAUSE = "; but it may not say only that it depends or that the question is still open, and it never just restates the answer "
@@ -60,14 +61,25 @@ describe("wording N, practice only (spec §5.6, D5; Ruling PF-R3-2.3)", () => {
         expect(sent.spec.contract.contractId).toBe(mapEnginePromptContracts()[name].contractId);
       }
     });
-    // A real engine-2 list spec: its instruction starts with the shipped text and a space, and the wrapper keeps the rest.
-    const real = mapListSpec(ENGINE_CTX, null);
-    const name = mapEngineContractNameOf(real.contract.contractId)!;
-    expect(WRITING).toContain(name);
-    expect(real.contract.instruction.startsWith(`${MAP_ENGINE_INSTRUCTIONS[name]} `)).toBe(true);
-    await wrapped.call({ step: "LIST", callSiteKey: "MAP:list:0", seat: SEAT, order: 0, shown: "BLIND", spec: real });
-    expect(seen.at(-1)!.spec.contract.instruction)
-      .toBe(`${MAP_WORDING_N_INSTRUCTIONS[name]!}${real.contract.instruction.slice(MAP_ENGINE_INSTRUCTIONS[name].length)}`);
+    // The real engine-2 specs of all four writing steps (the angle list and the choose are the ones C2N sends; fix round 1,
+    // review Minor 7): each instruction starts with the shipped text and a space, and the wrapper keeps the rest.
+    const angle = Object.freeze({ angleId: "g1", kind: "SPECIFIC" as const, label: "Cost", focus: "What it costs a rider." });
+    const reals = [mapListSpec(ENGINE_CTX, angle), mapListSpec(ENGINE_CTX, null), mapSnowballSpec(ENGINE_CTX, []),
+      mapChooseSpec(ENGINE_CTX, [], [], { engine: { framingChallenges: [] } })];
+    expect(reals.map((real) => mapEngineContractNameOf(real.contract.contractId))).toEqual(["listAngle", "listOpen", "listSnowball", "choose"]);
+    for (const real of reals) {
+      const name = mapEngineContractNameOf(real.contract.contractId)!;
+      expect(real.contract.instruction.startsWith(`${MAP_ENGINE_INSTRUCTIONS[name]} `), name).toBe(true);
+      await wrapped.call({ step: "LIST", callSiteKey: "MAP:list:0", seat: SEAT, order: 0, shown: "BLIND", spec: real } as MapCallRequest<unknown>);
+      expect(seen.at(-1)!.spec.contract.instruction, name)
+        .toBe(`${MAP_WORDING_N_INSTRUCTIONS[name]!}${real.contract.instruction.slice(MAP_ENGINE_INSTRUCTIONS[name].length)}`);
+      expect(seen.at(-1)!.spec.contract.contractId, name).toBe(`${real.contract.contractId}${MAP_WORDING_N_ID_SUFFIX}`);
+    }
+    // A base that no longer starts with the shipped text is refused (a practice refusal: the openings run ends the arm on it).
+    const moved = requestOf("choose");
+    const drifted = { ...moved, spec: { ...moved.spec, contract: { ...moved.spec.contract, instruction: `Changed. ${moved.spec.contract.instruction}` } } };
+    expect(() => wrapped.call(drifted)).toThrow(PracticeRefusal);
+    expect(() => wrapped.call(drifted)).toThrow(/^PRACTICE_WORDING_N_BASE_CHANGED/u);
   });
 
   it("is never sealed and never shipped; engine 1's arms get no engine and no length", () => {
@@ -84,15 +96,17 @@ describe("wording N, practice only (spec §5.6, D5; Ruling PF-R3-2.3)", () => {
   });
 
   it("the report: per arm and question, the debated answers and the codes; per arm, D1's counts by test", () => {
-    const line = (arm: "C2" | "C2N", codes: Record<string, string>, premiseExempt: readonly string[]): OpeningsArmLine => ({
-      arm, questionId: "en-nuclear", startedAt: "2026-10-23T00:00:00.000Z", finishedAt: "2026-10-23T00:01:00.000Z", outcome: "MAP", positions: 0,
+    const line = (arm: "C2" | "C2N", codes: Record<string, string>, premiseExempt: readonly string[], seats = 5): OpeningsArmLine => ({
+      arm, questionId: "en-nuclear", seats, startedAt: "2026-10-23T00:00:00.000Z", finishedAt: "2026-10-23T00:01:00.000Z", outcome: "MAP", positions: 0,
       marks: [], notes: [],
       map: { choice: { answers: [{ answerId: "a1", statement: "Yes.", assumptions: ["A fact."] }, { answerId: "a2", statement: "No.", assumptions: [] }] },
         // A whole MapAnswerCheckResult (Task 1's members, premiseExempt included; FINAL Ruling D4(b) encoding).
         answerCheck: { checker: null, outcomes: codes, reasons: {}, candidates: [], replacements: [], premiseExempt } } as unknown as OpeningsArmLine["map"] });
-    const rows = practiceWordingRows([line("C2", { a1: "PASSED", a2: "NO_COST" }, ["a1"]), line("C2N", { a1: "PASSED", a2: "PASSED" }, []),
+    const rows = practiceWordingRows([line("C2", { a1: "PASSED", a2: "NO_COST" }, ["a1"]), line("C2N", { a1: "PASSED", a2: "PASSED" }, [], 4),
       { ...line("C2", {}, []), arm: "C" }]);
     expect(rows.map((row) => [row.arm, row.questionId, row.answers])).toEqual([["C2", "en-nuclear", ["Yes.", "No."]], ["C2N", "en-nuclear", ["Yes.", "No."]]]);
+    // Fix round 1 (review Minor 6): each row carries its arm's seat count, so a seat that went busy during C2 shows.
+    expect(rows.map((row) => row.seats)).toEqual([5, 4]);
     expect(rows[0]!.answerCheck).toMatchObject({ rejected: 1, noCost: 1, premiseExempt: 1, assumptionsPerAnswer: [1, 0] });
     expect(practiceWordingTotals(rows)).toEqual([
       { arm: "C2", questions: 1, checked: 2, rejected: 1, notAnAnswer: 0, addedFact: 0, noCost: 1, premiseExempt: 1, assumptions: [1, 0] },
