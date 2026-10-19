@@ -168,9 +168,9 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
 }
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "synthesisCheck" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "synthesisCheck" | "questionCheck" | "support";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "synthesisCheck", "support"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "support"]);
 
 /** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
 export type ContractFlag = "yes" | "no" | "unconfirmed";
@@ -365,8 +365,9 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
-  // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5).
-  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck"]),
+  // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5)
+  // and of the question check before a debate starts (synthesis-flag S04-R5; PP §5).
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck"]),
   purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",

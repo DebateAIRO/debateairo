@@ -551,7 +551,7 @@ describe("the model providers page lists the model families the product runs", (
     }
   });
 
-  it("names the five jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the six jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -560,6 +560,7 @@ describe("the model providers page lists the model families the product runs", (
         "Debate text — to judge and check the arguments",
         "The finished debate — to write the verdict story",
         "The synthesis of a finished debate — to check it for four categories",
+        "A question before a debate starts — to check whether the debate may start",
         "What you type in the support chat — to answer you"
       ].sort()
     );

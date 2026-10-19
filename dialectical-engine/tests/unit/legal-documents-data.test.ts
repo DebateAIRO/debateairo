@@ -139,7 +139,7 @@ describe("legal documents — generated data", () => {
 
     it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
       const reporting = texts(section(TERMS_OF_SERVICE, "10"));
-      expect(reporting.some((text) => text.startsWith("Statement of reasons.") && text.endsWith(
+      expect(reporting.some((text) => text.startsWith("Statement of reasons.") && text.includes(
         "through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court."
       ))).toBe(true);
       const outOfCourt = reporting.find((text) => text.startsWith("Out-of-court dispute settlement."));
@@ -273,12 +273,12 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    it("turns the collection table into thirteen rows joined with em dashes", () => {
+    it("turns the collection table into fourteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(13);
+      expect(table.items).toHaveLength(14);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });

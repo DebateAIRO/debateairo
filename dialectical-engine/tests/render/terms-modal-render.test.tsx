@@ -209,7 +209,7 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(109);
+    expect(dialog().querySelectorAll(".policyText").length).toBe(114);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 
