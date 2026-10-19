@@ -19,6 +19,7 @@ import {
   LEGAL_PAGES,
   MODEL_PROVIDERS,
   PROVIDER_REGISTER,
+  providerRegister,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -568,6 +569,22 @@ describe("the model providers page lists the model families the product runs", (
       const note = view.querySelectorAll(".legalProviderEntry")[index]?.querySelector(".legalProviderPurposes .legalFactNote");
       expect(note === null).toBe(entry.purposesConfirmed);
     });
+  });
+
+  // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every build's
+  // Register names that recipient for both purposes, whether or not the build offers Claude as a debate model.
+  it.each([
+    ["no flag (the real site)", undefined],
+    ["the first preview (GLM alone)", '["zai-org/GLM-5.3-Flash"]'],
+    ["a per-plan preview with DeepInfra only", '{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}'],
+    ["a per-plan preview with Claude Haiku 5.5", '{"free":["zai-org/GLM-5.3-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","gemini-3.8-flash"]}']
+  ])("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, flag) => {
+    const register = providerRegister(flag);
+    for (const purpose of ["synthesisCheck", "questionCheck"] as const) {
+      const rows = register.filter((entry) => entry.purposes.includes(purpose));
+      expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });
+    }
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {

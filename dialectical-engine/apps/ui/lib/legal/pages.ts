@@ -483,10 +483,16 @@ export function providerRegister(previewFreeModelIdsJson: string | undefined): r
         return [row];
     }
   });
+  // The two checks always call Claude Haiku 5.5 on Anthropic's API (synthesis-flag S01-R9, S04-R5), the model and
+  // contract the support chat uses. A build whose debates do not offer Claude Haiku 5.5 shows no Claude row, so the
+  // support chat's row names both checks there and the Register still names their recipient (REV-S03-p1 privacy N2).
+  const support = offers(PREVIEW_ANTHROPIC_MODEL)
+    ? SUPPORT_PROVIDER
+    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "support"]) });
   return Object.freeze([
     ...rows,
     ...(deepInfraModels.length === 0 ? [] : [Object.freeze({ ...DEEPINFRA_PROVIDER, models: deepInfraModels.join(", ") })]),
-    SUPPORT_PROVIDER
+    support
   ]);
 }
 

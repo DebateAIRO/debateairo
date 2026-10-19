@@ -161,7 +161,7 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     for (const phrase of ["debateai.locale", "queue"]) {
       expect(summary, `the 3.5 summary still names the 3.4 change "${phrase}"`).not.toContain(phrase);
     }
-    for (const keyword of ["synthesis", "approval", "section 7", "section 10"]) {
+    for (const keyword of ["question", "synthesis", "approval", "support chat", "section 7", "section 10"]) {
       expect(summary, `the 3.5 summary does not name the 3.5 change "${keyword}"`).toContain(keyword);
     }
   });

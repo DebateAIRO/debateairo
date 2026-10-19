@@ -137,6 +137,19 @@ describe("legal documents — generated data", () => {
       expect(list.items[1]!.startsWith("Moderation decisions about content and accounts.")).toBe(true);
     });
 
+    // FIX-SF-S03-p1 (t_89b5eedb): the statement-of-reasons paragraph promises exactly what S04-R11's refusal screens and
+    // S01-R39's deletion notice give, and ends with the help-screen sentence (the end anchor `includes` above does not keep).
+    it("pins the statement of reasons for a refused question and for a debate our check deletes, and its last sentence", () => {
+      const reasons = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.startsWith("Statement of reasons.")) ?? "";
+      expect(reasons).toContain(
+        "the screen that tells you is our statement of reasons for it: it says that the debate did not start, that our automatic check refused the question with no person involved, which rule of these Terms the question falls under, and how to complain through the route below. For a refused question we promise nothing more."
+      );
+      expect(reasons).toContain(
+        "When our check deletes a debate (section 9), the notice you see is our statement of reasons for it: it says what we did and how far it reaches, the facts we relied on, that no person was involved, which rule of these Terms applies, and how to complain through the route below; the other two routes this paragraph names stay open to you."
+      );
+      expect(reasons.endsWith("gets is help, not a statement of reasons.")).toBe(true);
+    });
+
     it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
       const reporting = texts(section(TERMS_OF_SERVICE, "10"));
       expect(reporting.some((text) => text.startsWith("Statement of reasons.") && text.includes(
