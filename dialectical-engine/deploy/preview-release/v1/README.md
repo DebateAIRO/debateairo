@@ -523,6 +523,19 @@ billing on. The repository side (the tools and these steps) is ready; every step
 server, by the owner or whoever runs it. No tool and no agent reads a key: the owner types or copies
 each key file. The owner approved documenting these steps here.
 
+**Done once, on 19 October 2026.** The preview was switched on release R18 (`438b4fd91`, no new code):
+register 15 is hosted with billing off, and register 16 has billing on. That first run corrected the
+steps below where the server differed from what they said:
+- the real Caddy file and how it is reloaded (H1, H4, rollback);
+- Postfix's size limit (H1);
+- a folder for this switch's outputs, when the release's own folder is already full (H1);
+- a runner that reports `failed` after a planned stop (H6, rollback);
+- the runner's prepare-only check, which cannot pass at that point (H6);
+- one guard that did not stop its block (H6);
+- the database login of H0.
+
+A later switch can follow the steps as they now stand.
+
 What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`):
 - publish kit v3 (`publish-register-v3.ts`), chosen by `native-plan --hosted-billing '<JSON>'`;
 - the environment rules for hosted mode (`environment.mjs`): sandbox-only billing values at fixed
@@ -550,7 +563,7 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 
 **The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`.
 
-| Input | Where it goes | Suggested (pending the owner's yes) |
+| Input | Where it goes | The preview's value (the owner, 14 October 2026) |
 |---|---|---|
 | Ceiling per debate | `perRunCeilingMicros` in `--hosted-billing` | `3000000` ($3) |
 | Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | `10000000` ($10) |
@@ -568,9 +581,18 @@ plus its story: with $3 per debate that is at least $3.66, and the plan refuses 
 ### H0. Server work this section only names
 
 - **The API's database login.** `debateai_prod_api_runtime` must be a member of
-  `debateai_billing_runtime` (migration 0093); measured missing on 2026-10-13. Re-run the preview's
-  principal provisioner. It also rotates the managed passwords: carry the new API and runner passwords
-  into `api.env` and `runner.env` without printing them. Then this prints `t`:
+  `debateai_billing_runtime` (migration 0093); measured missing on 2026-10-13. The production principal
+  provisioner (`pnpm db:provision-principals`) cannot run on the preview as it is built. It needs a
+  `debateai_prod_migrator` session with a bounded password and 19 database addresses in TLS form,
+  while the preview reaches the database as the `postgres` peer only. It would also rotate every
+  managed password. What was done instead, on 2026-10-14 with the owner's yes, is one grant as
+  `postgres`, which changes no password:
+
+  ```sh
+  runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "GRANT debateai_billing_runtime TO debateai_prod_api_runtime WITH ADMIN FALSE, INHERIT TRUE, SET TRUE"
+  ```
+
+  Then this prints `t` (it did on 2026-10-14 and 2026-10-19):
 
   ```sh
   runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT pg_has_role('debateai_prod_api_runtime','debateai_billing_runtime','MEMBER')"
@@ -581,10 +603,25 @@ plus its story: with $3 per debate that is at least $3.66, and the plan refuses 
 
 ### H1. Names and copies, in the release's root shell
 
-H0 must be finished first: the provisioner rotates the database passwords, and the copies below
-must hold the current ones (after any later rotation, take them again). Use the root shell of step 0
-(`LABEL`, `ART`, `CAPI`, `CUI`, `CRUN`, `rel`) and the publish sequence's names (`S`, `NP`, `nat`,
-`put`). Then:
+H0 must be finished first, and the copies below must hold the current passwords (after any later
+rotation, take them again). Use the root shell of step 0 (`LABEL`, `ART`, `CAPI`, `CUI`, `CRUN`, `rel`)
+and the publish sequence's names (`NP`, `nat`, `put`).
+
+The switch needs no new release. On 19 October 2026 it ran on the release the preview already ran
+(R18): set `LABEL` to the running release's label (the lock's `api` plan path names it). Then give this
+switch its own root-only archive folder `S`, so no older release's `native-plan.before.json` is
+overwritten. H6's outputs go into their own folder `ART1`, as H7's go into `ART2`. A release that is
+already running has its own `native-plan-plan.json`, `register-proposal.json` and `*-launch.json` in
+`$ART`. The tool never overwrites a file, and the launch plans' names are fixed. `$ART` itself is kept
+only for the source manifests and the UI build.
+
+```sh
+jq -r .services.api.basePlan.path /etc/debateai-v3-preview/lifecycle/release-lock.json   # names the running release's $ART
+S=/root/preview-archive/hosted-$(date -u +%Y%m%dT%H%M%SZ); ( set -euo pipefail; [ ! -e "$S" ]; install -d -o root -g root -m 0700 "$S"; echo "archive $S" )
+ART1="$ART-hosted-off"; ( set -euo pipefail; [ ! -e "$ART1" ]; install -d -o root -g root -m 0755 "$ART1"; echo "created $ART1" )
+```
+
+Then:
 
 ```sh
 E=/etc/debateai-v3-preview/auth-dev-v1
@@ -594,17 +631,30 @@ L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/previ
 AU=$(systemctl show -p User --value debateai-preview-api); AGRP=$(id -gn "$AU"); echo "the API runs as: $AU ($AGRP)"
 ```
 
-`$AU` must be a named account, never empty and never `root`: stop otherwise. Keep the state the
-rollback returns to (all four files must be new, so a second run never overwrites them):
+`$AU` must be a named account, never empty and never `root`: stop otherwise.
+
+**The preview's Caddy file is not `/etc/caddy/Caddyfile`.** That file is Caddy's unused stock example.
+The unit's drop-in `/etc/systemd/system/caddy.service.d/20-protected-preview.conf` starts Caddy with
+`/etc/debateai-v3-preview/public/Caddyfile` and reads `/etc/debateai-v3-preview/public/caddy.env` (the
+basic-auth user and its bcrypt hash). Its global block says `admin off` and the drop-in empties
+`ExecReload`, so Caddy cannot be reloaded, only restarted. Check this before H4:
+
+```sh
+systemctl cat caddy | grep -E '^(ExecStart|ExecReload|EnvironmentFile)='   # names /etc/debateai-v3-preview/public/Caddyfile and an empty ExecReload=
+C=/etc/debateai-v3-preview/public/Caddyfile
+```
+
+Keep the state the rollback returns to (every file must be new, so a second run never overwrites one):
 
 ```sh
 ( set -euo pipefail
-  for F in native-plan.before-hosted.json api.env.before-hosted runner.env.before-hosted release-lock.before-hosted.json Caddyfile.before-hosted; do [ ! -e "$S/$F" ]; done
+  for F in native-plan.before-hosted.json api.env.before-hosted runner.env.before-hosted release-lock.before-hosted.json Caddyfile.before-hosted postfix-main.cf.before-hosted; do [ ! -e "$S/$F" ]; done
   cp -a "$NP" "$S/native-plan.before-hosted.json"
   cp -a "$E/api.env" "$S/api.env.before-hosted"
   cp -a "$E/runner.env" "$S/runner.env.before-hosted"
   cp -a /etc/debateai-v3-preview/lifecycle/release-lock.json "$S/release-lock.before-hosted.json"
-  cp -a /etc/caddy/Caddyfile "$S/Caddyfile.before-hosted"
+  cp -a "$C" "$S/Caddyfile.before-hosted"
+  cp -a /etc/postfix/main.cf "$S/postfix-main.cf.before-hosted"
   echo "rollback state kept" )
 ```
 
@@ -626,7 +676,18 @@ built. The last line must show the API's Internet denial with loopback allowed (
 `InaccessiblePaths` entry covering `/var/lib/debateai-geoip` or `/etc/debateai-v3-preview/billing`.
 The Postfix limit matters because a billing email may carry the Terms PDF: the hand-off admits up to
 12 MiB, and Postfix's default (10240000 bytes) would bounce a message near the API's 8 MiB attachment
-limit. Anything else: stop and ask.
+limit. The preview had that default on 19 October 2026. Raise it (a reload, no downtime; the copy of
+`main.cf` above is the way back):
+
+```sh
+( set -euo pipefail
+  CUR=$(postconf -h message_size_limit)
+  if [ "$CUR" != 0 ] && [ "$CUR" -lt 12582912 ]; then postconf -e message_size_limit=12582912; systemctl reload postfix; fi
+  NOW=$(postconf -h message_size_limit); [ "$NOW" = 0 ] || [ "$NOW" -ge 12582912 ]
+  echo "postfix limit: $NOW" )
+```
+
+Anything else: stop and ask.
 
 ### H2. Country files
 
@@ -709,44 +770,118 @@ account.
 
 NETOPIA posts each payment message to `https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify`
 (the website's `/api` proxy in front of the API's route). NETOPIA has no basic-auth password, so that
-one POST must pass the gate; everything else stays behind it. In `/etc/caddy/Caddyfile` (keep a copy
-first: H1 kept `$S/Caddyfile.before-hosted`), inside the preview's site block, add the named matcher and its `handle`, and move the site's
-existing `basic_auth` and `reverse_proxy` blocks, unchanged, into a plain `handle` after it. The
-notify `handle` proxies to the same upstream with the same `header_up` lines as the existing
-`reverse_proxy` block, copied unchanged (a missing edge line makes the website refuse the hop):
+one POST must pass the gate; everything else stays behind it.
 
-```
-	@netopia_notify {
-		method POST
-		path /api/v1/billing/netopia/notify
-	}
-	handle @netopia_notify {
-		reverse_proxy <the existing upstream> {
-			<the existing reverse_proxy block's header_up lines, unchanged>
-		}
-	}
-	handle {
-		<the existing basic_auth block, unchanged>
-		<the existing reverse_proxy block, unchanged>
-	}
+The preview's site block in `$C` (H1) is one `route` block, and Caddy runs its lines in order:
+1. the wrong-host refusal;
+2. the origin check;
+3. `basic_auth`;
+4. the headers;
+5. the body limit;
+6. `reverse_proxy`.
+
+Add the notify matcher and its `handle` right after the line `respond @wrongHost "NOT_FOUND" 404`,
+before the origin check and `basic_auth`. Its `reverse_proxy` is a copy of the site's own block, with
+the same upstream and `header_up` lines (a missing edge line makes the website refuse the hop), plus the
+site's 1 MB body limit. This is what was added on 19 October 2026:
+
+```caddyfile
+        @netopia_notify {
+            method POST
+            path /api/v1/billing/netopia/notify
+        }
+        handle @netopia_notify {
+            request_body {
+                max_size 1MB
+            }
+            reverse_proxy 127.0.0.1:3100 {
+                header_up Host v3-preview.dezbatere.ro
+                header_up X-Forwarded-For {remote_host}
+                header_up X-Forwarded-Proto https
+                header_up X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}
+                header_up -Authorization
+            }
+        }
 ```
 
-The two `handle` blocks are mutually exclusive, so `basic_auth` never runs for that one POST and
-always runs for everything else. A `basic_auth` left outside the second `handle` would still gate the
-notify message. Then:
+`reverse_proxy` ends the request, so nothing after this `handle` runs for that one POST. Every other
+request goes on to the origin check and `basic_auth` exactly as before. The block sits before the
+origin check, which guards browsers. A message from server to server normally carries no `Origin`
+header, but if NETOPIA's ever does, payments must not start being refused. The message itself is
+checked by the API (NETOPIA's signature), not by the gate.
+
+Make the new file as a copy with the block inserted. The inserter refuses a file without that anchor
+line, or one that already has the block. It prints only the added lines:
 
 ```sh
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && systemctl reload caddy && echo "caddy reloaded"
+( set -euo pipefail; [ ! -e "$S/Caddyfile.hosted" ]
+/usr/bin/python3 -I - "$C" "$S/Caddyfile.hosted" <<'PY'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+text = open(src, encoding="utf-8").read()
+anchor = '        respond @wrongHost "NOT_FOUND" 404\n'
+if text.count(anchor) != 1 or '@netopia_notify' in text:
+    sys.exit("anchor not found exactly once, or already edited: stop")
+block = """        @netopia_notify {
+            method POST
+            path /api/v1/billing/netopia/notify
+        }
+        handle @netopia_notify {
+            request_body {
+                max_size 1MB
+            }
+            reverse_proxy 127.0.0.1:3100 {
+                header_up Host v3-preview.dezbatere.ro
+                header_up X-Forwarded-For {remote_host}
+                header_up X-Forwarded-Proto https
+                header_up X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}
+                header_up -Authorization
+            }
+        }
+"""
+open(dst, "w", encoding="utf-8").write(text.replace(anchor, anchor + block))
+PY
+chmod 0644 "$S/Caddyfile.hosted"
+diff "$C" "$S/Caddyfile.hosted" | grep '^[<>]' || true )
+grep -A 6 '^        reverse_proxy' "$C"   # the live block: its upstream and header_up lines must equal the inserted ones
+```
+
+Expect 16 lines starting with `>` and none with `<`. If the live `reverse_proxy` block differs from
+the inserted one, stop and edit the copy by hand so the two match.
+
+Check the copy before it goes live. `caddy.env` holds a bcrypt hash (`$2a$…`), so load it the way
+systemd does, with `systemd-run`. Never load it with the shell's `.`: the shell would read `$2` as a
+variable and break the hash.
+
+```sh
+cad() { systemd-run --quiet --pipe --wait --collect -p EnvironmentFile=/etc/debateai-v3-preview/public/caddy.env /usr/bin/caddy "$@"; }
+cad validate --config "$S/Caddyfile.hosted" --adapter caddyfile >/dev/null 2>&1 && echo "caddy validate: ok"
+cad adapt --config "$S/Caddyfile.hosted" --adapter caddyfile 2>/dev/null | jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'
+```
+
+The second line prints the handlers' order (names only, no hash). On 19 October 2026 it printed
+`subroute > subroute > static_response > subroute > request_body > reverse_proxy > static_response >
+authentication > ...`: the notify's `request_body > reverse_proxy` come before `authentication`, the
+password gate.
+
+Put it in place. Caddy runs with `admin off`, so it is restarted, not reloaded, which takes about a
+second:
+
+```sh
+( set -euo pipefail; install -o root -g root -m 0644 "$S/Caddyfile.hosted" "$C.new"; mv "$C.new" "$C"; cmp "$S/Caddyfile.hosted" "$C"; systemctl restart caddy; sleep 3; systemctl is-active caddy )
 for M in GET POST; do printf '%s / ' "$M"; curl -s -o /dev/null -w '%{http_code}\n' -X "$M" https://v3-preview.dezbatere.ro/; done
 printf 'GET notify '; curl -s -o /dev/null -w '%{http_code}\n' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify
 printf 'POST other '; curl -s -o /dev/null -w '%{http_code}\n' -X POST https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notifyx
 printf 'POST notify '; curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' --data '{}' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify
 ```
 
-The first four must print `401` (the gate). The last must NOT be `401`: `404` while the API is still
-in local mode (the route is not served), `503` once it runs hosted with NETOPIA's settings (an
-unsigned message: "try again", logged once as `billing.notice.unverified` with
-`NOTICE_HEADER_MISSING`). To undo: put `$S/Caddyfile.before-hosted` back and reload.
+The first four must print `401` (the gate). The last must NOT be `401`:
+- `404` while the API is still in local mode (the route is not served; measured on 19 October 2026);
+- `503` once it runs hosted with NETOPIA's settings. That is an unsigned message ("try again"), logged
+  once as `billing.notice.unverified` with `NOTICE_HEADER_MISSING`.
+
+Anything else: undo. The undo puts `$S/Caddyfile.before-hosted` back with the same `install`/`mv`
+line, then runs `systemctl restart caddy`.
 
 ### H5. The key files (the owner, by hand; never printed, never on a command line)
 
@@ -779,17 +914,22 @@ public key. To replace a key later, remove that one file first, then write it ag
 
 ### H6. Hosted, billing off: the provider-only version
 
-This is "Publishing a new register version on the preview" above, steps 1 to 6, with three changes.
+This is "Publishing a new register version on the preview" above, steps 1 to 6, with the changes
+below. Every file this publication writes goes into `$ART1` (H1), not `$ART`. In steps 1 to 6, read
+`$ART1` wherever an output is written or read: the plan, the proposal, the publish and verify plans,
+the proofs and the three launch plans. Keep `$ART` for the source manifests and the UI build.
 
-**Step 1, the plan, carries the owner's inputs** (the values below are the suggested ones: use the
-owner's). The kit rebuilds the answer checker and role rotation from the plan, never from the base: if
-the live version runs the DeepSeek checker or rotation off, add the same `--checker deepseek
---deepseek-enabled-on-gate yes` or `--role-rotation off` here (and in H7), or the delta shows those rows
-changing back. The call-concurrency row is carried from the base as always:
+**Step 1, the plan, carries the owner's inputs** (the preview's values below). The kit rebuilds the
+answer checker and role rotation from the plan, never from the base. So if the live version runs the
+DeepSeek checker or rotation off, add the same `--checker deepseek --deepseek-enabled-on-gate yes` or
+`--role-rotation off` here (and in H7). Otherwise the delta shows those rows changing back. The last
+release's own plan line shows which: on 19 October 2026 the preview ran the DeepSeek checker (R17's and
+R18's plans), so both hosted plans carried it. The call-concurrency row is carried from the base as
+always:
 
 ```sh
 HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
-rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --hosted-billing "$HB" --out "$ART/native-plan-plan.json"
+rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART1/native-plan-plan.json"
 ```
 
 **Step 2, the owner's review.** Besides what the release itself changes, expect exactly:
@@ -801,7 +941,16 @@ rel native-plan --operation plan --from "$S/native-plan.before.json" --source-ma
 - `nodeRuntimeVersion`: its source reference only.
 
 The proposal's composer is `preview-register-composer-v3`. `publish` (step 3) copies the inputs from
-the plan; it refuses `--hosted-billing` itself.
+the plan; it refuses `--hosted-billing` itself. On 19 October 2026, on base 14, the delta held exactly
+these four rows (`deltaSha256` `91b9bf14…a397`), and version 15 was published.
+
+**Step 3, the downtime: a runner from before #177 reports `failed` when stopped.** The release
+runbook's downtime also stops the runner. A runner built before #177 (R18 and older) exits 1 on that
+planned stop, so `systemctl is-active debateai-preview-runner` prints `failed`, not `inactive`. The
+owner then gets a "debateai-preview-runner failed" email from the alert unit. Both are harmless. Accept
+`inactive` or `failed` as "stopped". Step 6's `try-restart` restarts only a running unit, so a runner
+left `failed` stays down: start it with `systemctl start debateai-preview-runner` once `PINNED` is
+`yes` and no debate runs.
 
 **Step 5 also switches the mode and adds the hosted settings.** In place of step 5's lines, with `V`
 from step 3 (the POS signature is not a secret: NETOPIA prints it in its admin):
@@ -811,7 +960,7 @@ from step 3 (the POS signature is not a secret: NETOPIA prints it in its admin):
   [ -n "${V:-}" ]
   for F in "$E/api.env" "$E/runner.env"; do
     sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/; s/^DEBATEAI_DEPLOYMENT_MODE=local\$/DEBATEAI_DEPLOYMENT_MODE=hosted/" "$F"
-    [ "$(grep -c "^REGISTER_VERSION=$V\$" "$F")" = 1 ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$F")" = 1 ]
+    [ "$(grep -c "^REGISTER_VERSION=$V\$" "$F")" = 1 ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$F")" = 1 ] || exit 1
   done
   printf '%s\n' 'GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb' 'TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt' \
     'NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com' "NETOPIA_API_KEY_PATH=$B/netopia-api-key" "NETOPIA_IPN_KEYS_PATH=$B/netopia-ipn-keys.pem" >> "$E/api.env"
@@ -820,18 +969,24 @@ from step 3 (the POS signature is not a secret: NETOPIA prints it in its admin):
 grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d   # must print nothing
 ```
 
+The `|| exit 1` matters. Under `set -e`, a failed test in the middle of an `a && b` list does not
+stop the block, so without it the block would print its last line even when an env file was not
+switched.
+
 Then run the two SAME checks of `deploy/preview-auth-dev/v1/README.md` "Operator checks before the
 first start" (the preview configuration and team; the mode and register version): both must print
-`SAME`. The launchers refuse anything outside the rules (a live NETOPIA base, a key file elsewhere,
-three of NETOPIA's four settings, the moved clock), with `PREVIEW_API_STARTUP_REFUSED` and nothing
-more. The runner's prepare-only launcher checks runner.env without starting it:
+`SAME`. The launchers refuse anything outside the rules, with `PREVIEW_API_STARTUP_REFUSED` and nothing
+more: a live NETOPIA base, a key file elsewhere, three of NETOPIA's four settings, or the moved clock.
 
-```sh
-runuser -u debateai-preview-runner -- "$N" "$CRUN/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs" --plan "$ART/runner-launch.json"
-```
+**Do not run the runner's prepare-only launcher here** (`launch-runner.mjs --plan`, no `--start`). It
+refuses a database proof (native attestation) older than 180 seconds (`native-attestation.mjs`). The
+launch plans carry the proof made in step 4, and building them takes longer than that, so the check
+always prints `PREVIEW_RUNNER_PREPARATION_REFUSED` at this point. The running release's own plan
+refuses too, for the same reason (measured 19 October 2026). The real start makes a fresh proof first
+(prestart) and checks `runner.env` there, refusing a wrong one with `PREVIEW_RUNNER_STARTUP_REFUSED`.
 
-One `preview-auth-dev-runner-prepared-v1` line means accepted. Then step 6 unchanged (pin all three,
-restart the API, the website, then the runner when no debate is running).
+Then step 6 (pin all three, restart the API and the website, then the runner when no debate is
+running, as step 3's note says).
 
 **Check the hosted start, provider-only:**
 
@@ -848,9 +1003,15 @@ proxy like the API (Node's proxy switch), except the notify probe, which goes to
 systemd-run --pipe --wait --collect --uid="$AU" --gid="$AGRP" --property=EnvironmentFile="$E/api.env" --setenv=NODE_USE_ENV_PROXY=1 --setenv=HTTPS_PROXY=http://127.0.0.1:3180 '--setenv=NO_PROXY=localhost,127.0.0.1,[::1],v3-preview.dezbatere.ro' --working-directory="$CAPI/dialectical-engine" "$N" --import tsx apps/api/src/billing/check-cli.ts
 ```
 
-With billing off, the NETOPIA lines (settings, key files, the key accepted, the notify address) must
-be ticks; the Quaderno, SmartBill and owner lines show their settings missing until step H7. Start a
-short debate as usual: it must finish as it did in local mode.
+With billing off, the NETOPIA lines must be ticks: the settings, the key files, the key accepted and
+the notify address. Until step H7, six lines show a cross; on 19 October 2026 the check ended with
+"6 of 16 checks need attention":
+- the Quaderno, SmartBill and owner lines, whose settings are missing;
+- `BILLING_STAGE_LIVE_INVOICER_REFUSED` (it compares NETOPIA's sandbox with the Quaderno and SmartBill
+  settings that H7 adds);
+- the plans line (EUR and RON prices are placeholders on this host).
+
+Start a short debate as usual: it must finish as it did in local mode.
 
 ### H7. Billing on
 
@@ -859,26 +1020,32 @@ short debate as usual: it must finish as it did in local mode.
    overwrites a file and the launch plans' names are fixed: in steps 1 to 6 read `$ART2` wherever an
    output is written or read, and keep `$ART` only for the source manifests and the UI build. Run the
    publish sequence's preamble again first (it archives the provider-only verify plan as
-   `$S/native-plan.before.json`; H1's `native-plan.before-hosted.json` stays untouched).
+   `$S/native-plan.before.json`; H1's `native-plan.before-hosted.json` stays untouched). Keep this
+   step's own way back too: the env files and the lock as they are with billing off. Give the plan
+   H6's checker and rotation flags (`--checker deepseek --deepseek-enabled-on-gate yes` on 19 October
+   2026).
 
    ```sh
    ART2="$ART-billing-on"; ( set -euo pipefail; [ ! -e "$ART2" ]; install -d -o root -g root -m 0755 "$ART2"; echo "created $ART2" )
+   ( set -euo pipefail; for F in api.env.before-billing-on runner.env.before-billing-on release-lock.before-billing-on.json; do [ ! -e "$S/$F" ]; done
+     cp -a "$E/api.env" "$S/api.env.before-billing-on"; cp -a "$E/runner.env" "$S/runner.env.before-billing-on"; cp -a /etc/debateai-v3-preview/lifecycle/release-lock.json "$S/release-lock.before-billing-on.json"; echo "billing-off state kept" )
    HB='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
-   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --hosted-billing "$HB" --out "$ART2/native-plan-plan.json"
+   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART2/native-plan-plan.json"
    ```
 
    The owner's review expects `billingPolicy` changed (reason
    `owner-hosted-billing-input`: `enabled` becomes `true` and `"US"` joins `withdrawal_countries`, on
    this sandbox host only) and `nodeRuntimeVersion`'s source reference; with the same ceilings, nothing
-   else.
+   else. That is what the delta held on 19 October 2026 (`deltaSha256` `20967aed…c61c`), and version 16
+   was published.
 
 2. **Steps 3 and 4** unchanged. **Step 5:** `REGISTER_VERSION` in both files as step 5 says, and the
    rest of the billing settings in `api.env`:
 
    ```sh
    ( set -euo pipefail
-     [ -n "${V:-}" ] && [ -n "${QACCOUNT:-}" ]
-     [ "$(grep -cE '^(QUADERNO_|SMARTBILL_|OWNER_REPORT_EMAIL_PATH=)' "$E/api.env")" = 0 ]
+     [ -n "${V:-}" ] && [ -n "${QACCOUNT:-}" ] || exit 1
+     [ "$(grep -cE '^(QUADERNO_|SMARTBILL_|OWNER_REPORT_EMAIL_PATH=)' "$E/api.env" || true)" = 0 ]
      for F in "$E/api.env" "$E/runner.env"; do sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" "$F"; [ "$(grep -c "^REGISTER_VERSION=$V\$" "$F")" = 1 ]; done
      printf '%s\n' "QUADERNO_API_BASE_URL=https://$QACCOUNT.sandbox-quadernoapp.com/api" "QUADERNO_API_KEY_PATH=$B/quaderno-api-key" \
        'SMARTBILL_API_BASE_URL=https://smartbill.invalid' "SMARTBILL_CREDENTIALS_PATH=$B/smartbill-credentials" \
@@ -887,19 +1054,28 @@ short debate as usual: it must finish as it did in local mode.
    grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d   # must print nothing
    ```
 
-3. **Step 6** unchanged. Two minutes after the API's start, read its billing journal (the kit's
-   §14.9 "Before step 1", for this unit):
+   Without the `|| exit 1` on the first line, an empty `V` would not stop the block (the failed test
+   sits in the middle of an `&&` list), and `sed` would write an empty `REGISTER_VERSION=`. A
+   `QUADERNO_`/`SMARTBILL_` count of 0 makes `grep -c` exit 1, hence the `|| true` inside that test.
+   `QACCOUNT` is H3's: set it again if this is a new shell.
+
+3. **Step 6**, with H6's note on a runner that reports `failed` when stopped. Two minutes after the
+   API's start, read its billing journal (the kit's §14.9 "Before step 1", for this unit):
 
    ```sh
    journalctl --no-pager -u debateai-preview-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-preview-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
    ```
 
    Only `billing.notice.unverified` lines with `NOTICE_HEADER_MISSING` (one per check run) are
-   expected; any other line: look it up in `deploy/vps/README.md` §14.8's journal table.
+   expected; any other line: look it up in `deploy/vps/README.md` §14.8's journal table. Among all of
+   that start's billing lines, `billing.card.purged` (the daily card cleanup) and
+   `billing.tax_summary.queued` are normal too (both seen on 19 October 2026).
 
 4. **The billing check** again (the command of H6). Every line must be a tick except the plans line
    ("…placeholders…": this host keeps the engine's own price list), as on the hosted kit's sandbox
-   server (`deploy/vps/README.md` §14.9).
+   server (`deploy/vps/README.md` §14.9). On 19 October 2026 it ended "1 of 16 checks need attention",
+   that plans line. The check reads Quaderno's key file but does not call Quaderno, so the first
+   quote on the pricing page is the first proof that Quaderno's sandbox accepts the key.
 
 ### H8. The US test purchase
 
@@ -912,9 +1088,14 @@ receipt (M2) at that allow-listed inbox; Settings shows the saved card; the invo
 sandbox. Then, on a second allow-listed account (the first already has Plus), the 3-D Secure test card
 9900 0091 8421 4768: write down how the bank's check looked. A Romanian buyer's purchase goes to the
 dummy SmartBill and fails harmlessly: do not pay as one here. Renewals need the moved billing clock,
-which stays refused.
+which stays refused. `mail-recipient.json` allows four addresses (stored as SHA-256 hashes). Two of
+them are verification-forward aliases, and mail to those arrives in the forward target's inbox
+(`verificationForwardTarget`, the one address the file holds in plain text).
 
 ### Rolling back to local mode on register 12
+
+The heading keeps its old name. The register this returns to is the one the preview ran before H6:
+14 on 19 October 2026, not 12.
 
 Restores the files kept in H1 and the release pinned before H6, then restarts. The hosted versions
 stay sealed and unused; the billing rows written in the sandbox stay in the database (local mode reads
@@ -941,21 +1122,33 @@ put "$S/native-plan.before-hosted.json" \
 
 If `R0` prints `null`, the lock had no runner before: leave the runner pin and drop-in lines out.
 Then restart the runner exactly as step 6's runner lines say (only when `PINNED` is `yes` and no
-debate is running), and check that `grep -c '^DEBATEAI_DEPLOYMENT_MODE=local$' "$E/api.env" "$E/runner.env"`
-prints 1 for each file. The egress proxy and the Caddy exemption may stay (in local mode the API
-makes no https call and answers the notify path `404`); to remove them: `systemctl disable --now
-debateai-preview-egress.service`, delete `60-hosted-egress.conf`, put `$S/Caddyfile.before-hosted`
-back and reload Caddy.
+debate is running). If it is not running (`failed` after a planned stop, H6's step 3 note), start it
+with `systemctl start debateai-preview-runner` instead. Then check that
+`grep -c '^DEBATEAI_DEPLOYMENT_MODE=local$' "$E/api.env" "$E/runner.env"` prints 1 for each file.
+
+The egress proxy, the Caddy exemption and Postfix's limit may stay: in local mode the API makes no
+https call and answers the notify path `404`. To remove them:
+- run `systemctl disable --now debateai-preview-egress.service` and delete `60-hosted-egress.conf`;
+- put `$S/Caddyfile.before-hosted` back into `/etc/debateai-v3-preview/public/Caddyfile` and run
+  `systemctl restart caddy` (Caddy runs with `admin off`, so there is no reload);
+- for Postfix, put `$S/postfix-main.cf.before-hosted` back and run `systemctl reload postfix`.
 
 **After a rollback, later publications still use kit v3.** The newest sealed version is a hosted one,
 and kit v2 refuses it as a base (billing on, or the story money row it does not build). Plan from the
 kept verify plan that names it, with `--hosted-billing` (`"billing":"off"` to stay off); the release
 tool refuses a plan from a hosted base without it (`HOSTED_BILLING_REQUIRED`).
 
-**What only the server proves:** the API and the runner booting hosted on the new versions; the
-egress proxy's real DNS and TLS path to NETOPIA's and Quaderno's sandboxes; the Caddy exemption; the
-billing check's ticks; the provisioner fix; real mail delivery of a templated message through Postfix
-to an allow-listed inbox; and the US purchase end to end. The unit tests
+**What only the server proves:**
+- the API and the runner booting hosted on the new versions;
+- the egress proxy's real DNS and TLS path to NETOPIA's and Quaderno's sandboxes;
+- the Caddy exemption;
+- the billing check's ticks;
+- the database login fix (H0);
+- real mail delivery of a templated message through Postfix to an allow-listed inbox;
+- the US purchase end to end.
+
+On 19 October 2026 the boots, NETOPIA's path, the exemption, the ticks and the login were proven.
+Quaderno's path, mail delivery and the purchase come with H8. The unit tests
 (`preview-register-publish-v3`, `preview-release-artifacts`, `preview-auth-dev-environment`,
 `preview-egress-proxy`, `preview-auth-dev-mail`) and the PostgreSQL 18 integration test
 (`tests/integration/preview-register-publish-v3.test.ts`: provider-only then billing on, each version
