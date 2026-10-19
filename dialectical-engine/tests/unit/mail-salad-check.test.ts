@@ -207,7 +207,7 @@ describe("S01-C02 tree fixtures: the exit code and the failing message (C02.3 i)
     expect(run.stdout).toContain("(f) bg §17 pointer sentence is the English sentence");
   });
 
-  it("unparseable-version (F-V): a version line the legal generator cannot parse fails class (e), though it has the 3.4 literal", () => {
+  it("unparseable-version (F-V): a version line the legal generator cannot parse fails class (e), though it has the 3.5 literal", () => {
     const run = runGate(["--locale", "bg", "--root", resolve(FIXTURES, "unparseable-version"), "--en-root", EN_TREE]);
     expect(run.status).toBe(1);
     expect(run.stdout).toContain("(e) bg privacy-policy.md: the legal generator cannot parse the version line");
@@ -221,8 +221,8 @@ describe("S01-C02 tree fixtures: the exit code and the failing message (C02.3 i)
       "(a) bg auth.common.signoff is empty or not a string",
       "(e) bg cookie purpose cell equals English",
       "(e) bg §13 block 2 equals English",
-      "(e) bg privacy-policy.md version is 3.3, want 3.4",
-      "(f) bg terms-of-service.md version is 2.2, want 2.3",
+      "(e) bg privacy-policy.md version is 3.3, want 3.5",
+      "(f) bg terms-of-service.md version is 2.2, want 2.4",
       "(f) bg §17 pointer sentence is the English sentence",
       "(g) bg legal.cookies.locale.purpose equals English",
     ]);

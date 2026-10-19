@@ -317,14 +317,14 @@ export function checkLocale({ root, enRoot = root, cc }) {
         problems.push(`(e) ${cc} §13 block 2 equals English`);
       }
     }
-    versionOf(localePP, problems, `(e) ${cc} privacy-policy.md`, "3.4");
+    versionOf(localePP, problems, `(e) ${cc} privacy-policy.md`, "3.5");
   }
 
   // (f): Terms version and the §17 pointer to Privacy Policy section 13.
   const englishTerms = tryRead(enRoot, tosPath("en"), problems, "(f) en");
   const localeTerms = tryRead(root, tosPath(cc), problems, `(f) ${cc}`);
   if (englishTerms !== null && localeTerms !== null) {
-    versionOf(localeTerms, problems, `(f) ${cc} terms-of-service.md`, "2.3");
+    versionOf(localeTerms, problems, `(f) ${cc} terms-of-service.md`, "2.4");
     const englishS17 = sectionOf(englishTerms, "17", "18");
     const localeS17 = sectionOf(localeTerms, "17", "18");
     if (englishS17 === null) problems.push("(f) en terms-of-service.md has no §17 between ## 17. and ## 18.");
