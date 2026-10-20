@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "النشر",
   "INCIDENT_SURFACE_SIGN_IN": "تسجيل الدخول",
   "INCIDENT_SURFACE_WHOLE_SITE": "الموقع بالكامل",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine غير متاح في بلدك بعد."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine غير متاح في بلدك بعد.",
+  "OFF_TOPIC": "لا يمكنني المساعدة إلا في Dialectical Engine: حسابك والخطط والمناظرات والنشر وسياساتنا. لا يمكنني المساعدة في ذلك.",
+  "OFF_TOPIC_PART": "لا يمكنني المساعدة إلا في Dialectical Engine، لذلك لم أجب عن باقي رسالتك.",
+  "CRISIS_SUPPORT": "ما كتبته يبدو مؤلمًا جدًا، ولست مضطرًا إلى مواجهة ذلك وحدك. هنا يمكنك التواصل مع شخص ما الآن.",
+  "THREAT_LINE": "لا يمكنني المساعدة في ذلك. إذا كان هناك من قد يتعرض للأذى، فمن فضلك اطلب المساعدة فورًا."
 }

@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "publicering",
   "INCIDENT_SURFACE_SIGN_IN": "inloggning",
   "INCIDENT_SURFACE_WHOLE_SITE": "hela webbplatsen",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine är ännu inte tillgängligt i ditt land."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine är ännu inte tillgängligt i ditt land.",
+  "OFF_TOPIC": "Jag kan bara hjälpa till med Dialectical Engine: ditt konto, abonnemang, debatter, publicering och våra policyer. Det kan jag inte hjälpa till med.",
+  "OFF_TOPIC_PART": "Jag kan bara hjälpa till med Dialectical Engine, så jag har inte besvarat resten av ditt meddelande.",
+  "CRISIS_SUPPORT": "Det du skrev låter väldigt smärtsamt, och du behöver inte klara det här ensam. Här kan du nå någon just nu.",
+  "THREAT_LINE": "Det kan jag inte hjälpa till med. Om någon kan komma till skada, var snäll och sök hjälp direkt."
 }

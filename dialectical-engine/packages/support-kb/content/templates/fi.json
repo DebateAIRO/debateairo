@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "julkaisemiseen",
   "INCIDENT_SURFACE_SIGN_IN": "sisäänkirjautumiseen",
   "INCIDENT_SURFACE_WHOLE_SITE": "koko sivustoon",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole vielä saatavilla maassasi."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole vielä saatavilla maassasi.",
+  "OFF_TOPIC": "Voin auttaa vain Dialectical Engine -asioissa, jotka koskevat tiliänne, tilauspaketteja, väittelyjä, julkaisemista ja käytäntöjämme. En voi auttaa teitä siinä.",
+  "OFF_TOPIC_PART": "Voin auttaa vain Dialectical Engine -asioissa, joten en ole vastannut viestinne muuhun osaan.",
+  "CRISIS_SUPPORT": "Kirjoittamasi kuulostaa hyvin kipeältä, eikä sinun tarvitse kohdata sitä yksin. Täältä saat yhteyden johonkuhun juuri nyt.",
+  "THREAT_LINE": "En voi auttaa sinua siinä. Jos joku voi loukkaantua, ole hyvä ja hae heti apua."
 }

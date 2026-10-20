@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "việc xuất bản",
   "INCIDENT_SURFACE_SIGN_IN": "việc đăng nhập",
   "INCIDENT_SURFACE_WHOLE_SITE": "toàn bộ trang web",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine hiện chưa có tại quốc gia của bạn."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine hiện chưa có tại quốc gia của bạn.",
+  "OFF_TOPIC": "Tôi chỉ có thể hỗ trợ về Dialectical Engine: tài khoản của bạn, các gói, các cuộc tranh luận, việc xuất bản và các chính sách của chúng tôi. Tôi không thể hỗ trợ việc đó.",
+  "OFF_TOPIC_PART": "Tôi chỉ có thể hỗ trợ về Dialectical Engine, nên tôi đã không trả lời phần còn lại trong tin nhắn của bạn.",
+  "CRISIS_SUPPORT": "Những gì bạn viết nghe rất đau đớn, và bạn không phải đối mặt với nó một mình. Đây là nơi bạn có thể liên hệ với ai đó ngay lúc này.",
+  "THREAT_LINE": "Tôi không thể hỗ trợ việc đó. Nếu có ai đó có thể bị thương, xin hãy tìm sự giúp đỡ ngay."
 }

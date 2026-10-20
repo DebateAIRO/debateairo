@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "a publicação",
   "INCIDENT_SURFACE_SIGN_IN": "o início de sessão",
   "INCIDENT_SURFACE_WHOLE_SITE": "todo o site",
-  "COUNTRY_UNAVAILABLE": "O Dialectical Engine ainda não está disponível no seu país."
+  "COUNTRY_UNAVAILABLE": "O Dialectical Engine ainda não está disponível no seu país.",
+  "OFF_TOPIC": "Só posso ajudar com o Dialectical Engine: a sua conta, os planos, os debates, a publicação e as nossas políticas. Não posso ajudar com isso.",
+  "OFF_TOPIC_PART": "Só posso ajudar com o Dialectical Engine, por isso não respondi ao resto da sua mensagem.",
+  "CRISIS_SUPPORT": "O que escreveu parece muito doloroso, e não tem de enfrentar isto sem apoio. Aqui pode contactar alguém agora mesmo.",
+  "THREAT_LINE": "Não posso ajudar com isso. Se alguém puder ficar ferido, por favor, peça ajuda de imediato."
 }

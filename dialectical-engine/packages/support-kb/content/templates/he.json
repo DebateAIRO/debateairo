@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "פרסום",
   "INCIDENT_SURFACE_SIGN_IN": "כניסה לחשבון",
   "INCIDENT_SURFACE_WHOLE_SITE": "האתר כולו",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine עדיין לא זמין במדינה שלך."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine עדיין לא זמין במדינה שלך.",
+  "OFF_TOPIC": "באפשרותי לסייע רק ב־Dialectical Engine: החשבון שלך, התוכניות, הדיונים, הפרסום והמדיניות שלנו. אין לי אפשרות לסייע בכך.",
+  "OFF_TOPIC_PART": "באפשרותי לסייע רק ב־Dialectical Engine, ולכן לא עניתי על שאר הודעתך.",
+  "CRISIS_SUPPORT": "מה שכתבתם נשמע כואב מאוד, ואתם לא צריכים להתמודד עם זה לבד. כאן תוכלו ליצור קשר עם מישהו עכשיו.",
+  "THREAT_LINE": "אין לי אפשרות לסייע בכך. אם מישהו עלול להיפגע, אנא פנו מיד לקבלת עזרה."
 }

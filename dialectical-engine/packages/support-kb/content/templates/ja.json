@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "公開",
   "INCIDENT_SURFACE_SIGN_IN": "サインイン",
   "INCIDENT_SURFACE_WHOLE_SITE": "サイト全体",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engineは、お住まいの国ではまだご利用いただけません。"
+  "COUNTRY_UNAVAILABLE": "Dialectical Engineは、お住まいの国ではまだご利用いただけません。",
+  "OFF_TOPIC": "対応できるのは、Dialectical Engineに関すること（アカウント、プラン、ディベート、公開、当社のポリシー）のみです。それについては対応できません。",
+  "OFF_TOPIC_PART": "対応できるのはDialectical Engineに関することのみですので、メッセージの残りの部分には回答していません。",
+  "CRISIS_SUPPORT": "書かれた内容は、とてもつらいことのように思えます。ひとりで抱え込まなくて大丈夫です。今すぐ誰かに連絡できる窓口は、こちらです。",
+  "THREAT_LINE": "それについては対応できません。誰かに危害が及ぶおそれがある場合は、今すぐ助けを求めてください。"
 }

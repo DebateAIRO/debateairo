@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "publikavimą",
   "INCIDENT_SURFACE_SIGN_IN": "prisijungimą",
   "INCIDENT_SURFACE_WHOLE_SITE": "visą svetainę",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine jūsų šalyje dar nepasiekiama."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine jūsų šalyje dar nepasiekiama.",
+  "OFF_TOPIC": "Galiu padėti tik su Dialectical Engine: jūsų paskyra, planais, debatais, publikavimu ir mūsų politikomis. Negaliu jums su tuo padėti.",
+  "OFF_TOPIC_PART": "Galiu padėti tik su Dialectical Engine, todėl į likusią jūsų pranešimo dalį neatsakiau.",
+  "CRISIS_SUPPORT": "Tai, ką parašėte, skamba labai skaudžiai ir jums nereikia su tuo susidurti vieniems. Čia galite dabar pat su kuo nors susisiekti.",
+  "THREAT_LINE": "Negaliu jums su tuo padėti. Jei kas nors galėtų nukentėti, prašome nedelsdami kreiptis pagalbos."
 }

@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "a közzétételt",
   "INCIDENT_SURFACE_SIGN_IN": "a bejelentkezést",
   "INCIDENT_SURFACE_WHOLE_SITE": "a teljes webhelyet",
-  "COUNTRY_UNAVAILABLE": "A Dialectical Engine az Ön országában még nem érhető el."
+  "COUNTRY_UNAVAILABLE": "A Dialectical Engine az Ön országában még nem érhető el.",
+  "OFF_TOPIC": "Csak a Dialectical Engine témakörében tudok segíteni: az Ön fiókja, az előfizetési csomagok, a viták, a közzététel és az irányelveink. Ebben nem tudok segíteni.",
+  "OFF_TOPIC_PART": "Csak a Dialectical Engine témakörében tudok segíteni, ezért az üzenetének többi részére nem válaszoltam.",
+  "CRISIS_SUPPORT": "Amit írt, nagyon fájdalmasnak hangzik, és nem kell egyedül szembenéznie vele. Itt most elérhet valakit.",
+  "THREAT_LINE": "Ebben nem tudok segíteni. Ha valaki megsérülhet, kérem, azonnal kérjen segítséget."
 }

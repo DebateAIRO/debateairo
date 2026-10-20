@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "yayımlamayı",
   "INCIDENT_SURFACE_SIGN_IN": "oturum açmayı",
   "INCIDENT_SURFACE_WHOLE_SITE": "sitenin tamamını",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine henüz ülkenizde kullanılamıyor."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine henüz ülkenizde kullanılamıyor.",
+  "OFF_TOPIC": "Yalnızca Dialectical Engine ile ilgili konularda yardımcı olabilirim: hesabınız, planlar, tartışmalar, yayımlama ve politikalarımız. Bu konuda yardımcı olamam.",
+  "OFF_TOPIC_PART": "Yalnızca Dialectical Engine ile ilgili konularda yardımcı olabildiğim için mesajınızın geri kalanını yanıtlamadım.",
+  "CRISIS_SUPPORT": "Yazdıklarınız çok acı verici görünüyor ve bununla tek başınıza yüzleşmek zorunda değilsiniz. İşte şu anda birine ulaşabileceğiniz yerler.",
+  "THREAT_LINE": "Bu konuda yardımcı olamam. Birinin zarar görme ihtimali varsa, lütfen hemen yardım alın."
 }

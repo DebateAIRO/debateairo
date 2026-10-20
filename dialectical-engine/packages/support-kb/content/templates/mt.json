@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "il-pubblikazzjoni",
   "INCIDENT_SURFACE_SIGN_IN": "id-dħul",
   "INCIDENT_SURFACE_WHOLE_SITE": "is-sit kollu",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine għadu mhux disponibbli f’pajjiżek."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine għadu mhux disponibbli f’pajjiżek.",
+  "OFF_TOPIC": "Nista' ngħin biss dwar Dialectical Engine: il-kont tiegħek, il-pjanijiet, id-dibattiti, il-pubblikazzjoni u l-politiki tagħna. Ma nistax ngħin b'dan.",
+  "OFF_TOPIC_PART": "Nista' ngħin biss dwar Dialectical Engine, għalhekk ma weġibtx għall-bqija tal-messaġġ tiegħek.",
+  "CRISIS_SUPPORT": "Dak li ktibt jinstema’ ta’ uġigħ kbir, u m’għandekx għalfejn tiffaċċjah waħdek. Hawn fejn tista’ tikkuntattja lil xi ħadd issa stess.",
+  "THREAT_LINE": "Ma nistax ngħin b’dan. Jekk xi ħadd jista’ jiġi mweġġa’, jekk jogħġbok fittex għajnuna minnufih."
 }

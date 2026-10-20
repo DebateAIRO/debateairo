@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "publicēšanu",
   "INCIDENT_SURFACE_SIGN_IN": "pierakstīšanos",
   "INCIDENT_SURFACE_WHOLE_SITE": "visu vietni",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine jūsu valstī vēl nav pieejams."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine jūsu valstī vēl nav pieejams.",
+  "OFF_TOPIC": "Varu palīdzēt tikai ar Dialectical Engine: jūsu kontu, plāniem, debatēm, publicēšanu un mūsu politikām. Ar to nevaru jums palīdzēt.",
+  "OFF_TOPIC_PART": "Varu palīdzēt tikai ar Dialectical Engine, tāpēc neesmu atbildējis uz pārējo jūsu ziņojuma daļu.",
+  "CRISIS_SUPPORT": "Tas, ko uzrakstījāt, izklausās ļoti sāpīgi, un jums ar to nav jātiek galā vienatnē. Šeit varat jau tagad sazināties ar kādu.",
+  "THREAT_LINE": "Ar to nevaru jums palīdzēt. Ja kāds varētu ciest, lūdzu, nekavējoties meklējiet palīdzību."
 }

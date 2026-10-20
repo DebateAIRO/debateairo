@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "发布",
   "INCIDENT_SURFACE_SIGN_IN": "登录",
   "INCIDENT_SURFACE_WHOLE_SITE": "整个网站",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine 尚未在您所在的国家/地区推出。"
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine 尚未在您所在的国家/地区推出。",
+  "OFF_TOPIC": "我只能协助处理 Dialectical Engine 相关的事项：您的账户、套餐、辩论、发布和我们的政策。我无法协助处理这件事。",
+  "OFF_TOPIC_PART": "我只能协助处理 Dialectical Engine 相关的事项，因此没有回答您消息中的其余部分。",
+  "CRISIS_SUPPORT": "您写下的内容听起来非常痛苦，您不必独自面对。以下是您现在就能联系到他人的途径。",
+  "THREAT_LINE": "我无法协助处理这件事。如果有人可能受到伤害，请立即寻求帮助。"
 }

@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "objavljivanje",
   "INCIDENT_SURFACE_SIGN_IN": "prijavu",
   "INCIDENT_SURFACE_WHOLE_SITE": "cijelo web-mjesto",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine još nije dostupan u vašoj zemlji."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine još nije dostupan u vašoj zemlji.",
+  "OFF_TOPIC": "Mogu Vam pomoći samo s Dialectical Engine: Vašim računom, planovima, raspravama, objavljivanjem i našim politikama. S tim Vam ne mogu pomoći.",
+  "OFF_TOPIC_PART": "Mogu Vam pomoći samo s Dialectical Engine pa je ostatak Vaše poruke ostao bez odgovora.",
+  "CRISIS_SUPPORT": "Ono što ste napisali zvuči vrlo bolno i ne morate se s time suočiti sami. Ovdje možete odmah stupiti u kontakt s nekim.",
+  "THREAT_LINE": "S tim vam ne mogu pomoći. Ako bi netko mogao biti povrijeđen, molim vas, odmah potražite pomoć."
 }

@@ -25,5 +25,9 @@
   "INCIDENT_SURFACE_PUBLISHING": "publikování",
   "INCIDENT_SURFACE_SIGN_IN": "přihlášení",
   "INCIDENT_SURFACE_WHOLE_SITE": "celý web",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine zatím ve vaší zemi není k dispozici."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine zatím ve vaší zemi není k dispozici.",
+  "OFF_TOPIC": "Mohu pomáhat pouze s Dialectical Engine: vaším účtem, tarify, debatami, publikováním a našimi zásadami. Nemohu vám s tím pomoci.",
+  "OFF_TOPIC_PART": "Mohu pomáhat pouze s Dialectical Engine, proto zbytek vaší zprávy zůstal bez odpovědi.",
+  "CRISIS_SUPPORT": "To, co píšete, zní velmi bolestně a nemusíte to zvládat bez pomoci. Tady se můžete právě teď s někým spojit.",
+  "THREAT_LINE": "Nemohu vám s tím pomoci. Pokud by někomu mohlo být ublíženo, vyhledejte prosím ihned pomoc."
 }
