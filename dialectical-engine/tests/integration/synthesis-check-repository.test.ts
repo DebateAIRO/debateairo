@@ -1,11 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { configureContentEncryption, contentCipherFor, createPool, encryptAttestedContentForRun,
   migrate, type Pool } from "@debateai/db";
 import { ServeRepository, SynthesisCheckRepository } from "@debateai/serve";
+import { WorkItemRepository } from "@debateai/battery";
 import type { SynthesisCheckOutcome } from "@debateai/contract";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { persistTerminalRun } from "../support/settledRun.js";
+import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner,
   type StoryEncryptedOwner
@@ -173,6 +174,22 @@ describe("synthesis check repository under debateai_runtime", () => {
     const claims = await repository.claimNextRequests(10, 60_000);
     expect(claims.some((claim) => claim.answerId === answer.answerId)).toBe(true);
     expect(claims.find((claim) => claim.answerId === answer.answerId)?.startedAt).toBeInstanceOf(Date);
+    const unsettledRunId = await createEncryptedStoryRun(database.pool, owner, `Unsettled ${randomUUID()}?`);
+    const unsettledWorkItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId: unsettledRunId, batteryRowId: "Q1", nodeSet: [], commandKey: `synthesis-unsettled:${randomUUID()}`
+    });
+    const unsettled = await persistTerminalAnswer({
+      pool: database.pool, runId: unsettledRunId, workItemId: unsettledWorkItemId,
+      fixtureKey: randomUUID(),
+      factBundle: {
+        facts: [], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+        reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null },
+        memoryDisclosure: null
+      }
+    });
+    await repository.insertRequest({ runId: unsettledRunId, answerId: unsettled.answerId, answerVersion: 1 });
+    expect((await repository.claimNextRequests(10, 60_000))
+      .some((claim) => claim.answerId === unsettled.answerId)).toBe(false);
     const stale = await fixture();
     await database.pool.query(
       `INSERT INTO serve.synthesis_check_request(
@@ -221,6 +238,10 @@ describe("synthesis check repository under debateai_runtime", () => {
     expect(await repository.readAnswerAccess({ runId: answer.runId, deadlineMs: 1_500 })).toBe("REMOVED");
     const refused = await fixture();
     const refusedAttempt = await publishAttempt(refused);
+    const noticesBefore = (await database.pool.query<{ n: number }>(
+      `SELECT count(*)::integer AS n FROM serve.synthesis_check_removal_notice WHERE owner_ref=$1`,
+      [owner.ownerRef]
+    )).rows[0]!.n;
     await database.pool.query(`CREATE FUNCTION serve.test_refuse_check_removal() RETURNS trigger
       LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'TEST_REMOVAL_REFUSED'; END $$`);
     await database.pool.query(`CREATE TRIGGER test_refuse_check_removal BEFORE INSERT ON serve.synthesis_check_removal_request
@@ -229,6 +250,10 @@ describe("synthesis check repository under debateai_runtime", () => {
       await expect(repository.insertResult(resultInput(refused, refusedAttempt.attemptId, flagged))).rejects.toThrow("TEST_REMOVAL_REFUSED");
       expect(await repository.readRecords({ ...refused, maxVersion: 1 })).toEqual([]);
       expect(await repository.runRemovedByCheck(refused.runId)).toBe(false);
+      expect((await database.pool.query<{ n: number }>(
+        `SELECT count(*)::integer AS n FROM serve.synthesis_check_removal_notice WHERE owner_ref=$1`,
+        [owner.ownerRef]
+      )).rows[0]!.n).toBe(noticesBefore);
     } finally {
       await database.pool.query(`DROP TRIGGER test_refuse_check_removal ON serve.synthesis_check_removal_request`);
       await database.pool.query(`DROP FUNCTION serve.test_refuse_check_removal()`);
@@ -247,6 +272,34 @@ describe("synthesis check repository under debateai_runtime", () => {
       [randomUUID(), expired.runId, expired.answerId]
     );
     expect(await repository.readAnswerAccess({ ...expired, deadlineMs: 1_500 })).toBe("SHOW");
+    const extended = await fixture();
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_check_request(
+         request_id,run_id,answer_id,answer_version,requested_at
+       ) VALUES ($1,$2,$3,1,clock_timestamp()-interval '2 seconds')`,
+      [randomUUID(), extended.runId, extended.answerId]
+    );
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_check_attempt(
+         attempt_id,run_id,answer_id,answer_version,origin,started_at
+       ) VALUES ($1,$2,$3,1,'PUBLISH',clock_timestamp()-interval '1.2 seconds')`,
+      [randomUUID(), extended.runId, extended.answerId]
+    );
+    expect(await repository.readAnswerAccess({ ...extended, deadlineMs: 1_500 })).toBe("HELD");
+    const lateStart = await fixture();
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_check_request(
+         request_id,run_id,answer_id,answer_version,requested_at
+       ) VALUES ($1,$2,$3,1,clock_timestamp()-interval '2 seconds')`,
+      [randomUUID(), lateStart.runId, lateStart.answerId]
+    );
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_check_attempt(
+         attempt_id,run_id,answer_id,answer_version,origin,started_at
+       ) VALUES ($1,$2,$3,1,'PUBLISH',clock_timestamp()-interval '0.1 seconds')`,
+      [randomUUID(), lateStart.runId, lateStart.answerId]
+    );
+    expect(await repository.readAnswerAccess({ ...lateStart, deadlineMs: 1_500 })).toBe("SHOW");
     const attempt = await publishAttempt(fresh);
     await repository.insertResult(resultInput(fresh, attempt.attemptId));
     expect(await repository.readAnswerAccess({ ...fresh, deadlineMs: 60_000 })).toBe("SHOW");
@@ -283,7 +336,11 @@ describe("synthesis check repository under debateai_runtime", () => {
     expect(await repository.removalNoticeExists(owner.ownerRef)).toBe(true);
     expect(await repository.takeRemovalNotice(owner.ownerRef)).toBe(true);
     expect(await repository.removalNoticeExists(owner.ownerRef)).toBe(false);
-    expect(await repository.purgeExpiredRemovalNotices()).toBe(0);
+    await database.pool.query(
+      `INSERT INTO serve.synthesis_check_removal_notice(owner_ref,removed_at)
+       VALUES ($1,clock_timestamp()-interval '91 days')`, [owner.ownerRef]
+    );
+    expect(await repository.purgeExpiredRemovalNotices()).toBe(1);
   });
 
   it("ownerRefOfRun names the latest recorded owner", async () => {
@@ -306,21 +363,30 @@ describe("synthesis check repository under debateai_runtime", () => {
     const first = await publishAttempt(answer);
     const second = await publishAttempt(answer);
     await repository.insertResult(resultInput(answer, first.attemptId, unavailable));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     await repository.insertResult(resultInput(answer, second.attemptId,
       { verdict: "UNAVAILABLE", categories: [], failureCode: "HTTP_STATUS" }));
     const { verdictOfRecord } = await import("../../packages/serve/src/synthesis-check.js");
-    expect(verdictOfRecord(await repository.readRecords({ ...answer, maxVersion: 1 }), () => true)?.verdict)
-      .toBe("UNAVAILABLE");
+    const records = await repository.readRecords({ ...answer, maxVersion: 1 });
+    expect(records[0]?.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "HTTP_STATUS" });
+    expect(verdictOfRecord(records, () => true)?.checkedAt).toEqual(records[0]?.checkedAt);
   });
 
   it("readAnswerIndex as the owner lists synthesis_flag for FLAGGED and null for CLEAR", async () => {
     const bad = await fixture();
     const good = await fixture();
+    const noSynthesis = await fixture();
+    const noResult = await fixture();
+    const failed = await fixture();
     const badAttempt = await publishAttempt(bad);
     const goodAttempt = await publishAttempt(good);
     await repository.insertResult(resultInput(bad, badAttempt.attemptId,
       { verdict: "FLAGGED", categories: ["TERRORISM"] }));
     await repository.insertResult(resultInput(good, goodAttempt.attemptId));
+    await repository.insertResult(resultInput(noSynthesis, (await publishAttempt(noSynthesis)).attemptId,
+      { verdict: "NO_SYNTHESIS", categories: [] }));
+    await repository.insertResult(resultInput(failed, (await publishAttempt(failed)).attemptId, unavailable));
+    expect(await repository.runRemovedByCheck(bad.runId)).toBe(false);
     const inherited = await cloneVersion(bad);
     const inheritedAttempt = await publishAttempt(inherited);
     const resultId = await repository.readFinalResultId({ answerId: bad.answerId, synthesisOriginVersion: 1 });
@@ -329,11 +395,23 @@ describe("synthesis check repository under debateai_runtime", () => {
     const index = await new ServeRepository(runtime).readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, 100, 0);
     expect(index.items.find((item) => item.answer_id === bad.answerId)?.synthesis_flag).toEqual({ verdict: "FLAGGED" });
     expect(index.items.find((item) => item.answer_id === good.answerId)?.synthesis_flag).toBeNull();
+    for (const answer of [noSynthesis, noResult, failed]) {
+      expect(index.items.find((item) => item.answer_id === answer.answerId)?.synthesis_flag).toBeNull();
+    }
   });
 
   it("readAnswerIndex as account B lists none of account A's rows", async () => {
     const answer = await fixture();
-    const index = await new ServeRepository(runtime).readAnswerIndex({ ownerRef: randomUUID(), legacyAskerId: null }, 10, 0);
+    const otherOwnerRef = randomUUID();
+    await database.pool.query(
+      `INSERT INTO identity."user"(
+         user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+         phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+         adult_affirmed_at,created_at
+       ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+      [randomUUID(), randomBytes(32), `synthesis-${randomUUID()}`, randomUUID(), otherOwnerRef]
+    );
+    const index = await new ServeRepository(runtime).readAnswerIndex({ ownerRef: otherOwnerRef, legacyAskerId: null }, 10, 0);
     expect(index.items.some((item) => item.answer_id === answer.answerId)).toBe(false);
   });
 
