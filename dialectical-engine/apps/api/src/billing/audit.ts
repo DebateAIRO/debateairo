@@ -17,6 +17,8 @@ export type BillingAuditEvent =
   | "billing.refund.outcome_unknown"
   | "billing.chargeback"
   | "billing.country.refused"
+  /** Payment region blocks (spec 2026-10-20 §8): the code, the country and the region id only. */
+  | "billing.region.refused"
   | "billing.outbox.dead"
   /**
    * W12 (P2-I16): a job died but the owner's alert (O3) could not be queued (the dead-letter hook threw); the job stays
