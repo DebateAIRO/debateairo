@@ -1140,10 +1140,12 @@ export {
   countryRule,
   declaredRegionRule,
   readCountryPolicy,
+  regionRule,
   type CountryPolicy,
   type CountryPolicyValue,
   type CountryReason,
-  type CountryRule
+  type CountryRule,
+  type RegionRule
 } from "./country-policy.js";
 // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
 export {
