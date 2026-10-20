@@ -185,6 +185,20 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
             const value = checked(contract.StaffAuditQuerySchema, input);
             const query = new URLSearchParams({ limit: String(value.limit), ...(value.cursor === undefined ? {} : { cursor: value.cursor }) });
             return request(`/audit?${query}`, contract.StaffAuditPageSchema);
+        },
+        publicationReviews() {
+            return request("/publication-reviews", contract.PublicationReviewQueuePageSchema);
+        },
+        publicationReview(ref: string) {
+            return request(`/publication-reviews/${encodeURIComponent(ref)}`, contract.PublicationReviewSnapshotSchema);
+        },
+        approvePublicationReview(ref: string, input: Input<typeof contract.PublicationReviewApproveRequestSchema>) {
+            return request(`/publication-reviews/${encodeURIComponent(ref)}/approve`, contract.PublicationReviewDecisionResponseSchema,
+                "POST", checked(contract.PublicationReviewApproveRequestSchema, input), true);
+        },
+        refusePublicationReview(ref: string, input: Input<typeof contract.PublicationReviewRefuseRequestSchema>) {
+            return request(`/publication-reviews/${encodeURIComponent(ref)}/refuse`, contract.PublicationReviewDecisionResponseSchema,
+                "POST", checked(contract.PublicationReviewRefuseRequestSchema, input), true);
         }
     });
 }
