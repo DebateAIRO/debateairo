@@ -3266,7 +3266,8 @@ sudo -u postgres psql -d debateai -c "SELECT j.dead_at, c.payment_environment, j
 **Every other billing line records a normal event and needs nothing from you:** `billing.checkout.started` (a
 checkout began), `billing.payment.verified` (a payment went through), `billing.refund` (a refund was made), `billing.refund.recorded_by_owner` (you recorded a NETOPIA refund with
 `pnpm billing:refund-done`),
-`billing.country.refused` (a purchase the country rules refused), `billing.cancel` and `billing.cancel.revoked` (a
+`billing.country.refused` (a purchase the country rules refused), `billing.region.refused` (a purchase refused
+because its billing address is in a region closed for payment, §14.6), `billing.cancel` and `billing.cancel.revoked` (a
 cancel, and its undo), `billing.downgrade.scheduled`, `billing.upgrade.requested`, `billing.withdrawal` and
 `billing.withdrawal.settled` (a withdrawal recorded, and one you settled), `billing.card.change.started`,
 `billing.card.refused` (a new card from a blocked country), `billing.card.change.deferred` (a card change that waited
