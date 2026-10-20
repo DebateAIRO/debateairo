@@ -27,6 +27,7 @@ import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-as
 import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
+import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
@@ -66,6 +67,7 @@ import {
 export * from "./synthesis.js";
 export * from "./engine-verdict.js";
 export * from "./synthesis-check.js";
+export * from "./publication-review.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -3230,9 +3232,10 @@ export class ServeRepository {
       async () => {
       const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
       const checkRepository = new SynthesisCheckRepository(this.pool);
+      const reviewRepository = new PublicationReviewRepository(this.pool);
       const answers = await Promise.all(answerRows.map(async (row) => {
         const answer = await this.readAnswerProjection(row.answer_id, access);
-        if (answer === null) return { row, answer, synthesisFlag: null };
+        if (answer === null) return { row, answer, synthesisFlag: null, publicationReview: null };
         const records = await checkRepository.readRecords({
           runId: answer.run_ref, answerId: answer.answer_id, maxVersion: answer.answer_version
         });
@@ -3246,9 +3249,26 @@ export class ServeRepository {
         const verdict = verdictOfRecord(records, (origin) =>
           origin === answer.answer_version || originTexts.get(origin) === listedText
         );
+        const flagged = verdict?.verdict === "FLAGGED";
+        const publicationReview = flagged ? await (async () => {
+          const reviewRecords = access.ownerRef === null ? [] : await reviewRepository.readStates({
+            ownerRef: access.ownerRef, runId: answer.run_ref, answerId: answer.answer_id
+          });
+          const state = reviewStateOf(reviewRecords, verdict.synthesisOriginVersion);
+          const visibility = await this.pool.query<{ state: string }>(
+            `SELECT state FROM core.run_visibility_event
+             WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1`, [answer.run_ref]
+          );
+          return {
+            review_state: state.state,
+            asks_used: state.asksUsed,
+            visibility: visibility.rows[0]?.state === "PUBLISHED" ? "PUBLISHED" as const : "PRIVATE" as const
+          };
+        })() : null;
         return {
           row, answer,
-          synthesisFlag: verdict?.verdict === "FLAGGED" ? { verdict: "FLAGGED" as const } : null
+          synthesisFlag: flagged ? { verdict: "FLAGGED" as const } : null,
+          publicationReview
         };
       }));
       const runRepository = new RunRepository(this.pool);
@@ -3258,7 +3278,7 @@ export class ServeRepository {
         projection: await runRepository.readLoadingProjection(row.run_ref, access)
       })));
       return AnswerIndexSchema.parse({
-        items: answers.flatMap(({ answer, row, synthesisFlag }) => answer === null ? [] : [{
+        items: answers.flatMap(({ answer, row, synthesisFlag, publicationReview }) => answer === null ? [] : [{
           answer_id: answer.answer_id,
           run_ref: answer.run_ref,
           answer_version: answer.answer_version,
@@ -3269,6 +3289,7 @@ export class ServeRepository {
           staleness_state: answer.staleness_state,
           builds_on_previous: answer.builds_on_previous.value,
           synthesis_flag: synthesisFlag,
+          publication_review: publicationReview,
           created_at_sequence: Number(row.created_at_sequence),
           // DL3-F2: the row's own model lineage, derived here from the
           // projection this query has already decrypted and read. The library
