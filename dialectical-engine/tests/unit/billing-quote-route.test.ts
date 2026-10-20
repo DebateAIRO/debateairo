@@ -135,9 +135,10 @@ describe("payment region blocks: the real quote behind the route (spec 2026-10-2
   function realQuotes(country: string) {
     const tax = new FakeTaxEngine();
     const taxCalls = vi.fn();
+    const insertQuote = vi.fn(async () => {});
     const repository = {
       withTransaction: async <T>(fn: (client: never) => Promise<T>): Promise<T> => fn({} as never),
-      insertQuote: async () => {}, subscriptionForOwner: async () => null, ownerErasurePending: async () => false
+      insertQuote, subscriptionForOwner: async () => null, ownerErasurePending: async () => false
     } as unknown as Pick<BillingRepository, "withTransaction" | "insertQuote" | "subscriptionForOwner" | "ownerErasurePending">;
     const geo = new StubGeo();
     geo.country = country;
@@ -149,7 +150,7 @@ describe("payment region blocks: the real quote behind the route (spec 2026-10-2
         validateTaxId: (c, id) => { taxCalls("validateTaxId"); return tax.validateTaxId(c, id); }
       }
     });
-    return { api: harness(quotes), taxCalls };
+    return { api: harness(quotes), taxCalls, insertQuote };
   }
 
   it("refuses a Saskatchewan postal code with 403 REGION_PAYMENT_UNAVAILABLE, and never asks the tax engine", async () => {
@@ -157,6 +158,15 @@ describe("payment region blocks: the real quote behind the route (spec 2026-10-2
     const response = await post(api, { plan_id: "PLUS", country: "CA", postal_code: "S4P 3Y2", region: "SK" });
     expect([response.statusCode, response.json()]).toEqual([403, { error: "REGION_PAYMENT_UNAVAILABLE", message: "REGION_PAYMENT_UNAVAILABLE" }]);
     expect(taxCalls).not.toHaveBeenCalled();
+    await api.close();
+  });
+
+  it("refuses on the Saskatchewan postal code alone (no typed region): 403, no tax asked, no quote stored", async () => {
+    const { api, taxCalls, insertQuote } = realQuotes("CA");
+    const response = await post(api, { plan_id: "PLUS", country: "CA", postal_code: "S4P 3Y2" });
+    expect([response.statusCode, response.json()]).toEqual([403, { error: "REGION_PAYMENT_UNAVAILABLE", message: "REGION_PAYMENT_UNAVAILABLE" }]);
+    expect(taxCalls).not.toHaveBeenCalled();
+    expect(insertQuote).not.toHaveBeenCalled();
     await api.close();
   });
 

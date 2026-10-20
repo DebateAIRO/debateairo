@@ -8,7 +8,8 @@ import { decidePaymentRegion, regionRefusal } from "../../apps/api/src/billing/p
 import { QuoteService, type QuoteInput } from "../../apps/api/src/billing/quote.js";
 import { sealQuoteLocation, taxLocationOf, type QuoteLocation } from "../../apps/api/src/billing/records.js";
 import type { StoredTaxContext } from "../../apps/api/src/billing/stored-tax-context.js";
-import { gateCardAction } from "../../apps/api/src/billing/upgrade.js";
+import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
+import { gateCardAction, quoteUpgrade } from "../../apps/api/src/billing/upgrade.js";
 import {
   StubGeo,
   testBillingPlans,
@@ -229,5 +230,49 @@ describe("the upgrade quote's payment gate (gateCardAction) refuses a subscriber
     await expect(gate(storedLocation({ postalCode: "43004", region: "OH" }))).resolves.toBe("US");
     await expect(gate(storedLocation({ postalCode: "43004", region: "OH", company: { ...COMPANY, vatValidated: true } })))
       .rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+  });
+});
+
+describe("quoteUpgrade refuses a subscriber whose stored INITIAL quote is in a closed region", () => {
+  it("a Canary Islands subscriber: 403 REGION_PAYMENT_UNAVAILABLE, no tax asked, no quote stored", async () => {
+    const quoteId = "5f0c2a8e-8a61-4d1f-9a55-0d6f3a1b2d22";
+    const subscriptionId = "7b2c3d4e-5f60-4a71-8b92-000000000d22";
+    const location = storedLocation({ country: "ES", region: null, postalCode: "35001", city: "Las Palmas", ipCountry: "ES" });
+    const sealed = sealQuoteLocation(TEST_RECORDS_KEY, quoteId, location);
+    const initialQuote = {
+      quoteId, ownerRef: OWNER, planId: "PLUS", kind: "SUBSCRIBE", currency: "EUR",
+      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId
+    } as unknown as QuoteRow;
+    const state = {
+      subscriptionId, ownerRef: OWNER, planId: "PLUS", status: "ACTIVE", currency: "EUR",
+      currentPeriodStart: new Date(NOW.getTime() - 10 * 86_400_000), currentPeriodEnd: new Date(NOW.getTime() + 20 * 86_400_000),
+      renewalPostponedUntil: null
+    };
+    const insertQuote = vi.fn(async () => {});
+    const taxQuote = vi.fn(async () => { throw new Error("NOT_REACHED"); });
+    const audit: Audited[] = [];
+    const geo = new StubGeo();
+    geo.country = "ES";
+    const deps = {
+      billing: {
+        subscriptionForOwner: async (owner: string) => (owner === OWNER ? state : null),
+        ownerErasurePending: async () => false,
+        chargesForSubscription: async () => [{ kind: "INITIAL", quoteId, periodStart: state.currentPeriodStart }],
+        subscriptionEvents: async () => [{ kind: "ACTIVATED", data: { recurring_net_micros: 20_000_000 } }],
+        quote: async (ref: string, owner: string) => (ref === quoteId && owner === OWNER ? initialQuote : null),
+        customerByOwner: async () => ({ customerId: "c" }),
+        latestProfile: async () => null,
+        withTransaction: async <T>(fn: (client: PoolClient) => Promise<T>): Promise<T> => fn({} as PoolClient),
+        insertQuote
+      },
+      plans: testBillingPlans, policy: testBillingPolicy, tax: { quote: taxQuote }, recordsKey: TEST_RECORDS_KEY,
+      legal: { requiresReacceptance: async () => false }, countryPolicy: testClosedRegionsPolicy, geo,
+      audit: (event: string, fields: Record<string, BillingAuditField>) => { audit.push({ event, ...fields }); }
+    } as unknown as SubscriptionRouteDeps;
+    await expect(quoteUpgrade(deps, { ownerRef: OWNER, planId: "PRO", ip: "198.51.100.7", now: NOW }))
+      .rejects.toMatchObject({ status: 403, code: "REGION_PAYMENT_UNAVAILABLE" });
+    expect(insertQuote).not.toHaveBeenCalled();
+    expect(taxQuote).not.toHaveBeenCalled();
+    expect(audit).toEqual([{ event: "billing.region.refused", code: "REGION_PAYMENT_UNAVAILABLE", country: "ES", region: "ES-CN" }]);
   });
 });
