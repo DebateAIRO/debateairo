@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 
 /**
@@ -67,7 +68,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -120,7 +122,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -167,7 +170,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -210,7 +214,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -253,7 +258,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -296,7 +302,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -528,7 +535,46 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh and the engine's map answer step (0122, below) the twelfth");
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121 or 0122, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("chains support answer scope 0126 after 0122 with the recipe, prior manifest and effective verifier", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    const previous = plan.forwardChain[names.indexOf("0122_engine_map_check.sql")];
+    const step = plan.forwardChain[names.indexOf("0126_support_answer_scope.sql")];
+    expect(names.indexOf("0126_support_answer_scope.sql")).toBe(names.indexOf("0122_engine_map_check.sql") + 1);
+    const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0126.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "support-answer-scope-forward0126-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0122_engine_map_check.sql",
+        manifestSha256: sha256(await bytesOf("lineage/engine-map-check-forward0122.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      },
+      migration: { name: "0126_support_answer_scope.sql", sha256: sha256(await bytesOf("0126_support_answer_scope.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-111.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql")) }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/support-answer-scope-forward0126.json")));
+    expect(step!.previousName).toBe(previous!.name);
+    expect(step!.previousManifestSha256).toBe(previous!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(previous!.verifierSha256);
+    expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
+    expect(step!.replayVerifierSql).toBeUndefined();
+    const withoutConstraint = { query: async () => ({ rows: [] }) } as unknown as PoolClient;
+    await expect(step!.postconditionEvidence(withoutConstraint)).rejects.toThrow("MIGRATION_FORWARD0126_POSTCONDITION_OBJECTS");
+  });
+
+  it("documents 0126 as the support outcome check step after 0122", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The support answer scope (0126)"));
+    expect(section.startsWith("## The support answer scope (0126)")).toBe(true);
+    for (const needle of ["0122", "0126_support_answer_scope.sql", "support-answer-scope-forward0126.json",
+      "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0126.ts", "support.message",
+      "support_message_outcome_ck", "MIGRATION_FORWARD0126_", "`STEPS`", "renumber"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the engine's map answer step (0122, below) the twelfth and the support answer scope (0126, below) the thirteenth");
+  });
+
+  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122 or 0126, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -664,6 +710,13 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0122_MANIFEST");
       // The same refusal when 0121's own manifest changes under 0122: 0121 stays valid, 0122 alone refuses.
       await refusal("lineage/engine-verdict-forward0121.json", (text) => `${text}\n`, "MIGRATION_FORWARD0122_MANIFEST");
+      await refusal("0126_support_answer_scope.sql", (text) => `${text} `, "MIGRATION_FORWARD0126_SOURCE_DIGEST");
+      await refusal("lineage/support-answer-scope-forward0126.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0121_engine_verdict.sql";
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0126_MANIFEST");
+      await refusal("lineage/engine-map-check-forward0122.json", (text) => `${text}\n`, "MIGRATION_FORWARD0126_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
