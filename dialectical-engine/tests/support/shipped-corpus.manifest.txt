@@ -172,6 +172,7 @@ apps/api/src/support/answer.ts
 apps/api/src/support/c3-admission.ts
 apps/api/src/support/cases.ts
 apps/api/src/support/classify.ts
+apps/api/src/support/crisis-first.ts
 apps/api/src/support/degraded.ts
 apps/api/src/support/draft-screens.ts
 apps/api/src/support/escalation.ts

@@ -98,6 +98,8 @@ import {
   engineInForce,
   readLengthGuidancePolicy,
   lengthGuidedFirstCallCeiling,
+  readSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyStartValues,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -1414,6 +1416,9 @@ const supportCases = createSupportCaseService({
   }
 });
 const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
+const supportNoSourceCheckPolicy = await boot.run("support-no-source-check-policy", async () =>
+  (await readSupportNoSourceCheckPolicy(pool, environment.REGISTER_VERSION))
+    ?? supportNoSourceCheckPolicyStartValues());
 const supportAnswers = createSupportAnswerService({
   entries: supportKnowledge.entries,
   requireStructuredDraft: true,
@@ -1422,6 +1427,7 @@ const supportAnswers = createSupportAnswerService({
   reportDraftDiagnostic: reportSupportDraftDiagnostic,
   queue: supportRelayQueue,
   degraded: supportDegraded,
+  noSourceCheck: { timeoutMs: supportNoSourceCheckPolicy.timeoutMs },
   modelFor: () => supportAdmittedModel
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);

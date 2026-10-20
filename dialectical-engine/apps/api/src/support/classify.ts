@@ -356,6 +356,12 @@ export function supportSensitiveIntentFamily(message: string): SupportSensitiveI
   return sensitiveIntentFamilyFromViews(prepareMessage(message).ordinaryViews);
 }
 
+/** Checks the self-harm family without allowing an earlier family to hide it. */
+export function supportSelfHarmPatternMatch(message: string): boolean {
+  return SENSITIVE_INTENT_PATTERNS["self-harm"].some((pattern) =>
+    prepareMessage(message).ordinaryViews.some((view) => pattern.test(view)));
+}
+
 function detectPreparedLanguage(prepared: PreparedMessage): SupportCorpusLanguage {
   if (prepared.ordinaryViews.some((text) => /[ăâîșşțţ]/u.test(text))) return "ro";
   const tokens = prepared.ordinaryViews.flatMap((text) => text.match(/[\p{L}]+/gu) ?? []);

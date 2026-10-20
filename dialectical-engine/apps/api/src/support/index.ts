@@ -7,6 +7,7 @@ import { clientIpNetworkScope,normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
 import { classifySupportMessage,supportIntentSurface } from "./classify.js";
+import { recognisedSupportCrisis } from "./crisis-first.js";
 import { evaluateEscalation } from "./escalation.js";
 import { classifyPublicGuideBoundary,privateRecordRefusal } from "./public-guide-boundary.js";
 import { SupportCaseError,type SupportCaseAccessPort } from "./cases.js";
@@ -546,6 +547,62 @@ export function installSupportRoutes(
           at: now
         });
         return rateLimited(reply, responseLanguage);
+      }
+      const crisisRecogniser = recognisedSupportCrisis(body.text);
+      if (crisisRecogniser !== null) {
+        const previousMessages = application.cases === undefined
+          ? []
+          : await application.messages.listSession({ sessionId: found.sessionId });
+        const priorOutcomes = previousMessages
+          .filter((message) => message.role === "assistant")
+          .map((message) => message.outcome);
+        const escalation = evaluateEscalation({
+          message: body.text,
+          classification: classification.outcome,
+          outcomes: priorOutcomes,
+          previousOutcomes: priorOutcomes,
+          ratings: [], toolCalls: [], requestedHuman: false
+        });
+        const todaysBranchEscalates = !(
+          (publicGuideBoundary.kind === "PRIVATE_RECORD_REQUEST"
+            && classification.outcome !== "REFUSE_INJECTION"
+            && classification.outcome !== "REFUSE_SAFETY")
+          || classification.securityNavigation === "FORGOT_PASSWORD"
+          || classification.securityOperation === "CREDENTIAL_OPERATION"
+        );
+        const userMessageId = randomUUID();
+        await application.messages.write({
+          messageId: userMessageId, sessionId: found.sessionId, role: "user",
+          text: body.text, outcome: "CRISIS", language: responseLanguage,
+          detectedLanguage: classification.language, overrideLanguage,
+          receivedAt: now, firstTokenAt: null, completedAt: now
+        });
+        const text = supportTemplate("CRISIS_SUPPORT", responseLanguage);
+        const assistantMessageId = randomUUID();
+        await application.messages.write({
+          messageId: assistantMessageId, sessionId: found.sessionId, role: "assistant",
+          text, outcome: "CRISIS", language: responseLanguage,
+          detectedLanguage: classification.language, overrideLanguage,
+          receivedAt: now, firstTokenAt: null, completedAt: now
+        });
+        const generation = escalation?.predicate === "E1"
+          && classification.outcome !== "INCIDENT"
+          && classification.outcome !== "REFUSE_ZONE"
+          && classification.outcome !== "REFUSE_INJECTION"
+          && classification.outcome !== "REFUSE_SAFETY"
+          ? "message:" + userMessageId : undefined;
+        const opened = escalation !== null && todaysBranchEscalates
+          ? await openEscalatedCase(
+            application, found, responseLanguage, escalation.predicate, now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages", ipSha256),
+            generation
+          )
+          : null;
+        return reply.send({
+          message_id: assistantMessageId, outcome: "CRISIS", text,
+          can_escalate: true, sources: [], actions: [],
+          ...openedCaseReceipt(opened, responseLanguage)
+        });
       }
       if (publicGuideBoundary.kind === "PRIVATE_RECORD_REQUEST"
         && classification.outcome !== "REFUSE_INJECTION"
