@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth and the synthesis check (0123, below) the thirteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0123, below) the thirteenth and the publication review (0124, below) the fourteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0123: 0123,
-   `synthesis-check-forward0123.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0123 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0124: 0124,
+   `publication-review-forward0124.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0124 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -220,6 +220,15 @@ model-spend source list with `SYNTHESIS_CHECK` and grants the three erasure func
 `debateai_erasure_runtime`. If an earlier pending step takes 0123 first, renumber this step and recompute
 its manifest and chain pins before merge.
 
+## The publication review (0124)
+
+The fourteenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
+It extends the staff capability and staff-action lists and installs two sever triggers so key destruction removes the run-linked review rows.
+The Ask consumes a PUBLISH grant; no identity step-up object changes.
+Its manifest is `publication-review-forward0124.json`, and its loader is `packages/db/src/migration-forward0124.ts`.
+It keeps the previous effective verifier because it adds no billing relation or function.
+A hosted deploy applies it with `pnpm db:migrate`.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -228,9 +237,9 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0123: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0124: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
-the reclaim resume, the reply measures, the engine verdict, the engine's map answer step and the synthesis check keep) still runs at the end
+the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the synthesis check and the publication review keep) still runs at the end
 of every `migrate()`.
 
 ## Merge order: check the preview first
