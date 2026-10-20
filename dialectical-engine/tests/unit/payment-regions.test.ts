@@ -251,6 +251,22 @@ describe("the typed region (US and Canada only, exact code or full name)", () =>
     expect(regionsAt(country, null, region)).toEqual([]);
   });
 
+  it.each([
+    ["US", "New  Jersey", "US-NJ"], ["US", "Rhode-Island", "US-RI"],
+    ["US", "Hawaiʻi", "US-HI"], ["US", "Hawai'i", "US-HI"], ["US", "Hawai’i", "US-HI"],
+    ["CA", "Nouvelle Écosse", "CA-NS"], ["CA", "Colombie Britannique", "CA-BC"],
+    ["CA", "Terre Neuve et Labrador", "CA-NL"], ["CA", "Île du Prince Édouard", "CA-PE"],
+    ["CA", "Terre‑Neuve–et—Labrador", "CA-NL"], ["CA", "Colombie‐Britannique", "CA-BC"]
+  ])("%s %j → %s (spacing and punctuation variants of the whole name)", (country, region, id) => {
+    expect(regionsAt(country, null, region)).toEqual([id]);
+  });
+
+  it.each([
+    ["US", "New Jersey City"], ["US", "Maryland Heights"], ["CA", "Saskatoon"], ["US", "Washington DC area"]
+  ])("%s %j → still no region: the tolerance never matches a part of the text", (country, region) => {
+    expect(regionsAt(country, null, region)).toEqual([]);
+  });
+
   it("matches the whole name: Indiana is Indiana, never Iowa (IA) by substring", () => {
     expect(regionsAt("US", null, "Indiana")).toEqual(["US-IN"]);
   });

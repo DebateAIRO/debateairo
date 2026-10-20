@@ -123,7 +123,13 @@ const usByZip3: ReadonlyMap<string, PaymentRegionId> = new Map(US_ZIP3_RANGES.sp
 const caByFirstLetter: ReadonlyMap<string, PaymentRegionId> = new Map(CA_FIRST_LETTERS.split(", ")
   .map((entry) => [entry.slice(0, 1), `CA-${entry.slice(2)}`] as const));
 
-const nameKey = (text: string): string => text.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+/**
+ * The whole name, compared whole (never a part of it): accents dropped, apostrophes (' ’ ʻ) dropped so "Hawaiʻi"
+ * is "Hawaii", and every run of spaces, hyphens (- ‐ ‑ – —) and dots made one space, on the table's names and the
+ * typed text alike; so "Rhode-Island" and "Terre Neuve et Labrador" match, "New Jersey City" still does not.
+ */
+const nameKey = (text: string): string => text.normalize("NFD").replace(/\p{M}/gu, "").replace(/['’ʻ]/gu, "")
+  .replace(/[\s\-‐‑–—.]+/gu, " ").trim().toLowerCase();
 
 const typedNames: Readonly<Record<"US" | "CA", ReadonlyMap<string, PaymentRegionId>>> = {
   US: new Map(US_STATES.flatMap((state) =>
