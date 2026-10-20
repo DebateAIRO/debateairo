@@ -122,5 +122,14 @@
   "home.crisisSupport.misread": "Jei neteisingai supratome jūsų klausimą, galite jį performuluoti.",
   "home.crisisSupport.back": "Grįžti prie mano klausimo",
   "home.crisisSupport.chooseCountry": "Pasirinkite savo šalį, kad pamatytumėte jos pagalbos linijas.",
-  "home.crisisSupport.emergencyAnywhere": "Jei jums ar kam nors kitam gresia tiesioginis pavojus, nedelsdami skambinkite vietiniu skubios pagalbos numeriu."
+  "home.crisisSupport.emergencyAnywhere": "Jei jums ar kam nors kitam gresia tiesioginis pavojus, nedelsdami skambinkite vietiniu skubios pagalbos numeriu.",
+  "home.flag.flagged": "Pažymėta",
+  "home.removal.title": "Ištrynėme šią diskusiją",
+  "home.removal.what": "Mes jos nelaikome ir jos negalima atkurti.",
+  "home.removal.reach": "Ištrinta tik ši diskusija. Jūsų paskyra ir kitos diskusijos nebus paveiktos.",
+  "home.removal.facts": "Automatiškai tikrindami jo išvadą nustatėme „polinkį į savižudybę ar kitų žmonių žalojimą“. Niekas mums apie tai nepranešė ir niekas neperskaitė.",
+  "home.removal.automatic": "Šis sprendimas buvo priimtas automatizuotu įrankiu, nedalyvaujant jokiam asmeniui.",
+  "home.removal.ground": "Pagrindas: mūsų paslaugų teikimo sąlygų 9 skyrius (diskusijos dėl mūsų čekio ištrynimo).",
+  "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius rašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti diskusijos.",
+  "home.removal.close": "Užverti"
 }

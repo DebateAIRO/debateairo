@@ -123,7 +123,14 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         catch (failure) {
             if (active.current) {
                 setProof(null);
-                if ((action === 'PUBLISH' || action === 'UNPUBLISH') && failure instanceof ContractHttpError && failure.statement) {
+                if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'DEBATE_REMOVED_BY_CHECK' && 'target_run_id' in grant) {
+                    window.location.assign(`/debate/${grant.target_run_id}`);
+                    return;
+                }
+                if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_APPROVAL_REQUIRED') {
+                    setStatus(t(publicCatalog, 'public.publication.approvalRequired'));
+                }
+                else if ((action === 'PUBLISH' || action === 'UNPUBLISH') && failure instanceof ContractHttpError && failure.statement) {
                     setStatement(failure.statement);
                     setStatus(null);
                 }

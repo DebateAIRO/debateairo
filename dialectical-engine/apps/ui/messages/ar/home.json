@@ -124,5 +124,14 @@
   "home.crisisSupport.misread": "إذا أسأنا فهم سؤالك، يمكنك إعادة صياغته.",
   "home.crisisSupport.back": "العودة إلى سؤالي",
   "home.crisisSupport.chooseCountry": "اختر بلدك لترى خطوط المساعدة فيه.",
-  "home.crisisSupport.emergencyAnywhere": "إذا كنت أنت أو أي شخص آخر في خطر مباشر، فاتصل برقم الطوارئ المحلي الآن."
+  "home.crisisSupport.emergencyAnywhere": "إذا كنت أنت أو أي شخص آخر في خطر مباشر، فاتصل برقم الطوارئ المحلي الآن.",
+  "home.flag.flagged": "تمت المتابعة/ مميز",
+  "home.removal.title": "لقد حذفنا هذه المناقشة",
+  "home.removal.what": "نحن لا نحتفظ به، ولا يمكن استعادته.",
+  "home.removal.reach": "تم حذف هذه المناقشة فقط. لم يتم المساس بحسابك ومناقشاتك الأخرى.",
+  "home.removal.facts": "وجد فحصنا التلقائي لاستنتاجه \"ميولًا إلى الانتحار أو إيذاء الآخرين\". لم يبلغنا بها أحد، ولم يقرأها أحد.",
+  "home.removal.automatic": "تم اتخاذ هذا القرار بواسطة أداة آلية، دون مشاركة أي شخص.",
+  "home.removal.ground": "الأرضية: بنود الخدمة الخاصة بنا، القسم 9 (يناقش حذف الشيك الخاص بنا).",
+  "home.removal.complain": "لتقديم شكوى، اكتب إلى office@dezbatere.ro في غضون ستة أشهر. لا يمكن للشكوى أن تعيد النقاش.",
+  "home.removal.close": "خاتمة"
 }

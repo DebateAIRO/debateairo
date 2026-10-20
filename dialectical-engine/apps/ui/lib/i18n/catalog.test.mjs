@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { LOCALES } from "./locales.ts";
 
-const namespaces = ["chrome", "home", "newDebate", "time"];
+const namespaces = ["chrome", "home", "newDebate", "public", "time"];
 const messagesRoot = join(process.cwd(), "messages");
 const readCatalog = (locale, namespace) => JSON.parse(
   readFileSync(join(messagesRoot, locale, `${namespace}.json`), "utf8")

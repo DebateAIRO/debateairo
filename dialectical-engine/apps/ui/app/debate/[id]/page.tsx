@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import type { Answer, AnswerFloor, DebateMapView } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
+import { createServerContractClient } from "@/lib/serverApi";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
+import { CheckRemovalNotice, CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
+import { AiNotice } from "@/components/AiNotice";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -43,6 +47,7 @@ export default async function DebatePage({
     loadNamespace(locale, "home"),
     loadNamespace(locale, "newDebate")
   ]);
+  const countryHint = readCrisisCountryHint(await headers());
 
   // The accepted ask already owns a durable run id. Do not make the client
   // transition wait behind the runner's private-content lease: mount the
@@ -51,6 +56,7 @@ export default async function DebatePage({
   // retain the full asker-scoped SSR read below.
   if (starting) {
     return (
+      <CrisisCountryHintProvider countryHint={countryHint}>
       <DebatePageGate
         id={id}
         initialDebate={null}
@@ -70,6 +76,7 @@ export default async function DebatePage({
         initialFloor={null}
         initialMapView={null}
       />
+      </CrisisCountryHintProvider>
     );
   }
   const token = readSessionCookie(cookieStore);
@@ -115,6 +122,17 @@ export default async function DebatePage({
       initialError = runFailureMessage(result.reason, debateChromeCatalog);
       initialPending = false;
     } else if (result.kind === "not_found") {
+      try {
+        const taken = await createServerContractClient(fetch, token, userAgent, readTrustedClientIp(await headers())).takeRemovalNotice();
+        if (taken.notice) {
+          return <div className="debateView">
+            <div className="debateAiDisclosure"><AiNotice catalog={homeCatalog} /></div>
+            <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={countryHint} />
+          </div>;
+        }
+      } catch {
+        // A missing run with an unavailable notice read remains a normal 404.
+      }
       notFound();
     }
   }
@@ -126,6 +144,7 @@ export default async function DebatePage({
   const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
 
   return (
+    <CrisisCountryHintProvider countryHint={countryHint}>
     <DebatePageGate
       id={id}
       initialDebate={initialDebate}
@@ -146,5 +165,6 @@ export default async function DebatePage({
       initialFloor={initialFloor}
       initialMapView={initialMapView}
     />
+    </CrisisCountryHintProvider>
   );
 }
