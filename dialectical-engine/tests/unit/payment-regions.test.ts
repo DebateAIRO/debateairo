@@ -122,6 +122,15 @@ describe("postal code formats", () => {
       expect(at(country, "   ", null)).toEqual({ kind: "REGIONS", regions: [] });
     }
   });
+
+  it.each(["-", "--", " - "])("a postal code of only dashes %j is present but empty after normalisation → POSTCODE_INVALID", (postalCode) => {
+    for (const country of ["US", "CA", "ES", "FR", "FI", "GR", "IT", "DE"]) {
+      expect(at(country, postalCode, null)).toEqual({ kind: "POSTCODE_INVALID", regions: [] });
+    }
+    expect(at("CA", postalCode, "Sask.")).toEqual({ kind: "POSTCODE_INVALID", regions: [] });
+    expect(at("CA", postalCode, "Saskatchewan")).toEqual({ kind: "POSTCODE_INVALID", regions: ["CA-SK"] });
+    expect(at("RO", postalCode, null)).toEqual({ kind: "REGIONS", regions: [] });
+  });
 });
 
 describe("Canada: the postal code's first letter (Canada Post)", () => {

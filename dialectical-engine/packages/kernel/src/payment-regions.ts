@@ -160,9 +160,12 @@ function typedRegionsOf(country: string, region: string | null): readonly Paymen
 export function paymentRegionsOf(address: PaymentRegionAddress): PaymentRegions {
   const country = address.country.trim().toUpperCase();
   const typed = typedRegionsOf(country, address.region);
-  const code = address.postalCode === null ? "" : normalisePostalCode(address.postalCode);
   const format = POSTCODE_FORMATS[country];
-  if (code === "" || format === undefined) return { kind: "REGIONS", regions: typed };
+  // Absent = null or blank. A present code that normalises to nothing ("-") is checked, so it can't slip through.
+  if (address.postalCode === null || address.postalCode.trim() === "" || format === undefined) {
+    return { kind: "REGIONS", regions: typed };
+  }
+  const code = normalisePostalCode(address.postalCode);
   if (!format.test(code)) return { kind: "POSTCODE_INVALID", regions: typed };
   return { kind: "REGIONS", regions: [...new Set([...typed, ...postalRegionsOf(country, code)])].sort() };
 }
