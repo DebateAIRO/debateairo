@@ -71,9 +71,9 @@
   - `PAYMENT_REGION_IDS: readonly string[]`, the closed list from Global Constraints, sorted.
   - `type PaymentRegionId = string` (a member of that list).
   - `POSTCODE_CHECKED_COUNTRIES: ReadonlySet<string>` = `US, CA, ES, FR, FI, GR, IT, DE`.
-  - `paymentRegionsOf(address: Readonly<{ country: string; postalCode: string | null; region: string | null }>): Readonly<{ kind: "POSTCODE_INVALID" } | { kind: "REGIONS"; regions: readonly PaymentRegionId[] }>`
-    - It returns every region either signal names, de-duplicated (empty for a mainland address).
-    - It returns `POSTCODE_INVALID` only when the country is in `POSTCODE_CHECKED_COUNTRIES`, a postal code is present, and it doesn't fit after normalisation.
+  - `paymentRegionsOf(address: Readonly<{ country: string; postalCode: string | null; region: string | null }>): Readonly<{ kind: "POSTCODE_INVALID"; regions: readonly PaymentRegionId[] } | { kind: "REGIONS"; regions: readonly PaymentRegionId[] }>`
+    - `REGIONS` holds every region either signal names, de-duplicated (empty for a mainland address).
+    - `POSTCODE_INVALID` is returned when the country is in `POSTCODE_CHECKED_COUNTRIES`, a postal code is present, and it doesn't fit after normalisation. Its `regions` are the ones the **typed region** names, so a closed region can still refuse (preflight ruling R1).
 
 - [ ] **Step 1: Write the failing tests** in `tests/unit/payment-regions.test.ts`:
   - **Normalisation:** upper-case; spaces and dashes removed; a leading country prefix `F`, `E`, `D`, `I`, `GR`, `AX` or `FI` followed by `-` is stripped.
@@ -98,6 +98,7 @@
     - `Saskatchewan`/`sk` → `CA-SK`; `maryland`/`MD` → `US-MD`;
     - `Indiana`, `Maine St`, `Hawaiian Gardens`, `Washington DC area` → no region (no substrings).
   - **Both signals:** `{CA, T5J0N3, "Saskatchewan"}` → regions contain `CA-SK` and `CA-AB`.
+  - **Bad postal code, closed typed region:** `{US, 2903, "Rhode Island"}` → `POSTCODE_INVALID` with regions `[US-RI]`.
   - **Closed-list sanity:** every id the mapping can return is in `PAYMENT_REGION_IDS`, and the list has 51 US + 12 CA + 14 EU-territory ids = **77**.
 
 - [ ] **Step 2: Run the test, expect FAIL** (module missing): `node_modules/.bin/vitest run tests/unit/payment-regions.test.ts`
@@ -177,7 +178,10 @@
 - Consumes: `paymentRegionsOf` (Task 1); `regionRule`, `CountryPolicy` (Task 2).
 - Produces: `decidePaymentRegion(input: Readonly<{ policy: CountryPolicy; location: Readonly<{ country: string; postalCode: string | null; region: string | null; company: unknown | null }>; postcodeMustFit: boolean }>): Readonly<{ kind: "ALLOW" } | { kind: "REFUSE"; code: "REGION_PAYMENT_UNAVAILABLE"; region: PaymentRegionId } | { kind: "POSTCODE_INVALID" }>`
   - A region refuses when its rule has `pay: false` and either `buyers` is `"all"` or `location.company !== null`.
-  - With `postcodeMustFit: false`, a `POSTCODE_INVALID` answer from the geography is read as no region.
+  - The order (preflight ruling R1):
+    1. Any refusing region among the geography's `regions` → `REFUSE`, even when the postal code doesn't fit.
+    2. Else a `POSTCODE_INVALID` answer → `POSTCODE_INVALID` when `postcodeMustFit` is true.
+    3. Else `ALLOW`.
 - Produces: `regionRefusal(decision, country, audit): BillingRefusal`. It writes one `billing.region.refused` audit line and returns `BillingRefusal(403, "REGION_PAYMENT_UNAVAILABLE")`.
 
 - [ ] **Step 1: Write the failing tests:**
@@ -185,6 +189,7 @@
     - `CA S4P3Y2` → REFUSE `CA-SK`.
     - `US 43004` consumer → ALLOW; with a company → REFUSE `US-OH`.
     - `US 2903` with `postcodeMustFit: true` → `POSTCODE_INVALID`; with `false` → ALLOW.
+    - `US 2903` + typed `Rhode Island` → REFUSE `US-RI`, with either `postcodeMustFit` value.
     - `RO 010011` → ALLOW.
     - A policy without `regions` → ALLOW for every case.
   - **Quote route:**
