@@ -1193,6 +1193,14 @@ export {
   type PublicationCheckPolicy,
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
+export {
+  QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  QUESTION_CHECK_POLICY_ROW_KEY,
+  questionCheckPolicyFromValue,
+  readQuestionCheckPolicy,
+  type QuestionCheckPolicy,
+  type QuestionCheckPolicyValue
+} from "./question-check-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,
