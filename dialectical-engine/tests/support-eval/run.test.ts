@@ -63,7 +63,7 @@ describe("SUP-01 support eval release gate", () => {
     })).toContain("forbidden_tools");
   });
 
-  it("emits a strict four-key draft using only the opaque references in the output contract", () => {
+  it("emits a strict seven-key draft using only the opaque references in the output contract", () => {
     const sourceReferences = [
       "s-10000000000040008000000000000001-1",
       "s-10000000000040008000000000000001-2"
@@ -83,10 +83,11 @@ describe("SUP-01 support eval release gate", () => {
       }).packet
     });
     const draft = JSON.parse(completion.text) as Record<string,unknown>;
-    expect(Object.keys(draft).sort()).toEqual(["actionIds","kind","sourceIds","text"]);
+    expect(Object.keys(draft).sort()).toEqual(["actionIds","crisis","kind","offTopic","sourceIds","text","threat"]);
     expect(draft).toEqual({
       kind:"answer",text:"Answer based only on the reviewed public help.",
-      sourceIds:sourceReferences,actionIds:actionReferences
+      sourceIds:sourceReferences,actionIds:actionReferences,
+      offTopic:"none",crisis:false,threat:false
     });
     for (const canonical of ["getting-started-debate","start-debate","owner-debate"]) {
       expect(completion.text).not.toContain(canonical);

@@ -92,7 +92,10 @@ export type SupportMessageOutcome =
   | "REFUSE_OTHER_USER"
   | "ANSWER_OWN_STATE"
   | "ANSWER_INCIDENT"
-  | "NO_INCIDENT";
+  | "NO_INCIDENT"
+  | "OFF_TOPIC"
+  | "CRISIS"
+  | "THREAT";
 export type SupportMessageWrite = Readonly<{
   messageId: string;
   sessionId: string;

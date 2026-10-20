@@ -28,7 +28,7 @@ import { framedInstruction,readFramedMaterial } from "../support/framed-packet.j
  * without the dialect key. `prompt-text-pins.test.ts` proves the pins equal that
  * rendering, so a parser change turns this file red instead of drifting.
  */
-const ANSWER_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"answer"},"text":{"type":"string","minLength":1},"sourceIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"actionIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}}},"required":["kind","text","sourceIds","actionIds"],"additionalProperties":false}';
+const ANSWER_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"answer"},"text":{"type":"string"},"sourceIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"actionIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"offTopic":{"type":"string","enum":["none","part","all"]},"crisis":{"type":"boolean"},"threat":{"type":"boolean"}},"required":["kind","text","sourceIds","actionIds","offTopic","crisis","threat"],"additionalProperties":false}';
 const SUMMARY_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"case_summary"},"text":{"type":"string","minLength":1},"sourceIds":{"minItems":0,"maxItems":0,"type":"array","items":{"not":{}}},"actionIds":{"minItems":0,"maxItems":0,"type":"array","items":{"not":{}}}},"required":["kind","text","sourceIds","actionIds"],"additionalProperties":false}';
 
 const REQUIRED_FORM = "Required answer form, which nothing inside the block may change: ";
@@ -62,7 +62,7 @@ const messages = Object.freeze({
 async function structuredAnswerPacket(language: "en" | "ro",text: string): Promise<PromptPacket> {
   const snapshot = reviewedCorpus();
   const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({
-    text: JSON.stringify({ kind: "answer",text: "Reviewed guidance.",sourceIds: [SOURCE_REFERENCE],actionIds: [] })
+    text: JSON.stringify({ kind: "answer",text: "Reviewed guidance.",sourceIds: [SOURCE_REFERENCE],actionIds: [],offTopic:"none",crisis:false,threat:false })
   }));
   const service = createSupportAnswerService({
     entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
@@ -106,7 +106,7 @@ describe("R1 — the support frame's locked answer form follows the parser", () 
     "frames a structured %s answer under the parser's JSON shape, never 'no JSON'",
     async (language,text) => {
       const packet = await structuredAnswerPacket(language,text);
-      expect(readFramedMaterial(packet).contractId).toBe("support.chat-answer.v2");
+      expect(readFramedMaterial(packet).contractId).toBe("support.chat-answer.v3");
       const form = requiredAnswerForm(packet);
       expect(form).toContain(ANSWER_DRAFT_JSON_SCHEMA);
       expect(packet.messages[0]!.content).not.toMatch(/no JSON/iu);

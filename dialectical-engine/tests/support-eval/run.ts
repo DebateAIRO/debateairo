@@ -367,7 +367,8 @@ export function createDeterministicStructuralCompletion(input: Readonly<{
       ? "Răspuns bazat numai pe ajutorul public verificat."
       : "Answer based only on the reviewed public help.",
     sourceIds:outputReferences(system,"sourceIds"),
-    actionIds:outputReferences(system,"actionIds")
+    actionIds:outputReferences(system,"actionIds"),
+    offTopic:"none",crisis:false,threat:false
   }) });
 }
 

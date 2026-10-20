@@ -23,6 +23,18 @@ const schema = z.object({
   sourceIds: z.array(identifier).max(3),
   actionIds: z.array(identifier).max(3)
 }).strict();
+const answerV3Schema = z.object({
+  kind: z.literal("answer"), text: z.string(),
+  sourceIds: z.array(identifier).max(3), actionIds: z.array(identifier).max(3),
+  offTopic: z.enum(["none", "part", "all"]), crisis: z.boolean(), threat: z.boolean()
+}).strict();
+const answerV3MarksSchema = z.object({
+  kind: z.literal("answer"), offTopic: z.enum(["none", "part", "all"]),
+  crisis: z.boolean(), threat: z.boolean()
+});
+const noSourceJudgementSchema = z.object({
+  judgement: z.enum(["app_related", "off_topic", "crisis", "threat"])
+}).strict();
 const caseSummarySchema = z.object({
   kind: z.literal("case_summary"),
   text: z.string().min(1),
@@ -42,9 +54,10 @@ const caseSummarySchema = z.object({
  * `tests/unit/prompt-text-pins.test.ts` then refuse until a NEW sealed contract
  * version is minted for it.
  */
-export function supportDraftJsonShape(kind: "answer" | "case_summary"): string {
+export function supportDraftJsonShape(kind: "answer" | "answer_v3" | "case_summary" | "no_source_judgement"): string {
   const { $schema: _dialect, ...shape } = z.toJSONSchema(
-    kind === "answer" ? schema : caseSummarySchema
+    kind === "answer" ? schema : kind === "answer_v3" ? answerV3Schema
+      : kind === "no_source_judgement" ? noSourceJudgementSchema : caseSummarySchema
   ) as Readonly<Record<string,unknown>>;
   return JSON.stringify(shape);
 }
@@ -61,6 +74,37 @@ export type SupportDraft = Readonly<{
   sourceIds: readonly string[];
   actionIds: readonly string[];
 }>;
+export type SupportDraftMarks = Readonly<{ offTopic: "none" | "part" | "all"; crisis: boolean; threat: boolean }>;
+export type SupportNoSourceJudgement = "app_related" | "off_topic" | "crisis" | "threat";
+export function supportDraftRoute(marks: SupportDraftMarks): "CRISIS" | "THREAT" | "OFF_TOPIC" | "ANSWER" {
+  return marks.crisis ? "CRISIS" : marks.threat ? "THREAT"
+    : marks.offTopic === "all" ? "OFF_TOPIC" : "ANSWER";
+}
+export function parseSupportDraftV3(raw: string, internalIds: readonly string[] = []): Readonly<{ marks: SupportDraftMarks; draft: SupportDraft | null }> | null {
+  if ([...raw].length > MAX_RAW_CODE_POINTS) return null;
+  try {
+    const decoded: unknown = JSON.parse(raw);
+    const marked = answerV3MarksSchema.safeParse(decoded);
+    if (!marked.success) return null;
+    const marks = Object.freeze({ offTopic: marked.data.offTopic, crisis: marked.data.crisis, threat: marked.data.threat });
+    if (supportDraftRoute(marks) !== "ANSWER") return Object.freeze({ marks, draft: null });
+    const parsed = answerV3Schema.safeParse(decoded);
+    if (!parsed.success || !screenSupportModelText(parsed.data.text, internalIds)) return null;
+    const draft: SupportDraft = Object.freeze({
+      kind: "answer", text: parsed.data.text,
+      sourceIds: Object.freeze([...parsed.data.sourceIds]),
+      actionIds: Object.freeze([...parsed.data.actionIds])
+    });
+    return Object.freeze({ marks, draft });
+  } catch { return null; }
+}
+export function parseSupportNoSourceJudgement(raw: string): SupportNoSourceJudgement | null {
+  if ([...raw].length > MAX_RAW_CODE_POINTS) return null;
+  try {
+    const parsed = noSourceJudgementSchema.safeParse(JSON.parse(raw) as unknown);
+    return parsed.success ? parsed.data.judgement : null;
+  } catch { return null; }
+}
 export type SupportCaseSummaryDraft = Readonly<{
   kind: "case_summary";
   text: string;
@@ -351,12 +395,29 @@ export function screenSupportModelText(value: string,internalIds: readonly strin
 }
 
 const ANSWER_KEYS = Object.freeze(["actionIds","kind","sourceIds","text"]);
+const ANSWER_V3_KEYS = Object.freeze(["actionIds","crisis","kind","offTopic","sourceIds","text","threat"]);
 
 export function diagnoseSupportDraft(
   raw: string,
   allowedSourceIds: readonly string[],
   allowedActionIds: readonly string[],
   narrativeInternalIds: readonly string[] = [...allowedSourceIds,...allowedActionIds]
+): SupportDraftDiagnostic {
+  return diagnoseDraft(raw,allowedSourceIds,allowedActionIds,narrativeInternalIds,false);
+}
+
+export function diagnoseSupportDraftV3(
+  raw: string,
+  allowedSourceIds: readonly string[],
+  allowedActionIds: readonly string[],
+  narrativeInternalIds: readonly string[] = [...allowedSourceIds,...allowedActionIds]
+): SupportDraftDiagnostic {
+  return diagnoseDraft(raw,allowedSourceIds,allowedActionIds,narrativeInternalIds,true);
+}
+
+function diagnoseDraft(
+  raw: string,allowedSourceIds: readonly string[],allowedActionIds: readonly string[],
+  narrativeInternalIds: readonly string[],v3: boolean
 ): SupportDraftDiagnostic {
   const fenced = raw.trimStart().startsWith("```") || raw.trimEnd().endsWith("```");
   const base: Omit<SupportDraftDiagnostic,"code" | "predicate"> = {
@@ -377,7 +438,7 @@ export function diagnoseSupportDraft(
     return result("SCHEMA_INVALID","SCHEMA",{ ...base,jsonValid: true });
   }
   const row = decoded as Readonly<Record<string,unknown>>;
-  const exactKeys = Object.keys(row).sort().join("\0") === ANSWER_KEYS.join("\0");
+  const exactKeys = Object.keys(row).sort().join("\0") === (v3 ? ANSWER_V3_KEYS : ANSWER_KEYS).join("\0");
   const kindValid = row.kind === "answer";
   const textCodePoints = typeof row.text === "string" ? [...row.text].length : null;
   const sourceIds = Array.isArray(row.sourceIds) ? row.sourceIds : [];
@@ -395,9 +456,16 @@ export function diagnoseSupportDraft(
       (id): id is string => typeof id === "string" && actionSet.has(id)
     ).length
   };
-  if (!exactKeys) return result("KEY_SET_INVALID","EXACT_KEY_SET",values);
+  if (!v3 && !exactKeys) return result("KEY_SET_INVALID","EXACT_KEY_SET",values);
   if (!kindValid) return result("KIND_INVALID","KIND",values);
-  const parsed = schema.safeParse(decoded);
+  if (v3) {
+    const marked = answerV3MarksSchema.safeParse(decoded);
+    if (marked.success && supportDraftRoute(marked.data) !== "ANSWER") {
+      return result("ACCEPTED","ACCEPTED",values);
+    }
+  }
+  if (!exactKeys) return result("KEY_SET_INVALID","EXACT_KEY_SET",values);
+  const parsed = (v3 ? answerV3Schema : schema).safeParse(decoded);
   if (!parsed.success) return result("SCHEMA_INVALID","SCHEMA",values);
   const unsafeText = screenCategory(parsed.data.text,narrativeInternalIds);
   if (unsafeText !== null) return result(unsafeText.code,unsafeText.predicate,values);

@@ -2667,7 +2667,7 @@ describe("SUP-01 support routes", () => {
     const complete = vi.fn(async () => Object.freeze({
       text: JSON.stringify({
         kind: "answer",text: unsafe,
-        sourceIds: ["getting-started-debate"],actionIds: ["start-debate"]
+        sourceIds: ["getting-started-debate"],actionIds: ["start-debate"],offTopic:"none",crisis:false,threat:false
       }),
       usage: Object.freeze({ input_tokens: 13,output_tokens: 7,cost_usd: 0.002 })
     }));
@@ -2750,7 +2750,7 @@ describe("SUP-01 support routes", () => {
             kind: "answer",
             text: "Open the new debate page to start.",
             sourceIds: [MODEL_SOURCE_REFERENCE],
-            actionIds: [MODEL_ACTION_REFERENCE]
+            actionIds: [MODEL_ACTION_REFERENCE],offTopic:"none",crisis:false,threat:false
           }),
           usage: Object.freeze({ input_tokens: 9,output_tokens: 11,cost_usd: 0.001 })
         });
@@ -2847,7 +2847,7 @@ describe("SUP-01 support routes", () => {
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:answerText,
-        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE]
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE],offTopic:"none",crisis:false,threat:false
       })
     }));
     const answer = createSupportAnswerService({
@@ -2880,7 +2880,7 @@ describe("SUP-01 support routes", () => {
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:"Alege Creează un cont.",
-        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE]
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[MODEL_ACTION_REFERENCE],offTopic:"none",crisis:false,threat:false
       })
     }));
     const answer = createSupportAnswerService({
@@ -2917,7 +2917,7 @@ describe("SUP-01 support routes", () => {
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:unsafe,
-        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[]
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
       }),usage:Object.freeze({ input_tokens:7,output_tokens:9,cost_usd:0.001 })
     }));
     const answer = createSupportAnswerService({
@@ -2957,7 +2957,7 @@ describe("SUP-01 support routes", () => {
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:draftText,
-        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[]
+        sourceIds:[MODEL_SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
       }),usage:Object.freeze({ input_tokens:5,output_tokens:8,cost_usd:0.001 })
     }));
     const answer = createSupportAnswerService({
@@ -3006,7 +3006,7 @@ describe("SUP-01 support routes", () => {
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",
             text: "JSON export requires a served answer and readable ledger digest.",
-            sourceIds: [MODEL_SOURCE_REFERENCE],actionIds: []
+            sourceIds: [MODEL_SOURCE_REFERENCE],actionIds: [],offTopic:"none",crisis:false,threat:false
           }) });
         }
       }),modelReferenceFactory,

@@ -45,7 +45,7 @@ describe("SUP-06 automatic degraded state", () => {
       modelFor: () => ({ complete: async () => ({
         text: JSON.stringify({
           kind: "answer",text: "Type your password here.",
-          sourceIds: [ENTRY.id],actionIds: []
+          sourceIds: [ENTRY.id],actionIds: [],offTopic:"none",crisis:false,threat:false
         }),
         usage: { input_tokens: 3,output_tokens: 4,cost_usd: 0.001 }
       }) })
