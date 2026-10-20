@@ -120,5 +120,14 @@
   "home.crisisSupport.misread": "Jos ymmärsimme kysymyksesi väärin, voit muotoilla sen uudelleen.",
   "home.crisisSupport.back": "Takaisin kysymykseeni",
   "home.crisisSupport.chooseCountry": "Valitse maasi, niin näet sen auttavat puhelimet.",
-  "home.crisisSupport.emergencyAnywhere": "Jos sinä tai joku muu on välittömässä vaarassa, soita heti oman maasi hätänumeroon."
+  "home.crisisSupport.emergencyAnywhere": "Jos sinä tai joku muu on välittömässä vaarassa, soita heti oman maasi hätänumeroon.",
+  "home.flag.flagged": "Ilmoitettu",
+  "home.removal.title": "Poistimme tämän keskustelun",
+  "home.removal.what": "Emme säilytä sitä, eikä sitä voida palauttaa.",
+  "home.removal.reach": "Vain tämä keskustelu poistettiin. Tilisi ja muut keskustelusi ovat koskemattomia.",
+  "home.removal.facts": "Automaattinen päätelmien tarkistus havaitsi \"taipumuksia itsemurhaan tai muiden ihmisten vahingoittamiseen\". Kukaan ei ilmoittanut siitä meille, eikä kukaan lukenut sitä.",
+  "home.removal.automatic": "Tämä päätös tehtiin automaattisella työkalulla, johon ei osallistunut ketään.",
+  "home.removal.ground": "Perustelut: Käyttöehtojemme kohta 9 (keskustelujen tarkistus poistetaan).",
+  "home.removal.complain": "Voit tehdä valituksen kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa. Kantelu ei voi tuoda keskustelua takaisin.",
+  "home.removal.close": "Sulje"
 }

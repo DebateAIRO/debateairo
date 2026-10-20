@@ -120,5 +120,14 @@
   "home.crisisSupport.misread": "Ha félreértettük a kérdését, átfogalmazhatja.",
   "home.crisisSupport.back": "Vissza a kérdésemhez",
   "home.crisisSupport.chooseCountry": "Válassza ki az országát, hogy lássa az ottani segélyvonalakat.",
-  "home.crisisSupport.emergencyAnywhere": "Ha Ön vagy valaki más közvetlen veszélyben van, most azonnal hívja a helyi segélyhívó számot."
+  "home.crisisSupport.emergencyAnywhere": "Ha Ön vagy valaki más közvetlen veszélyben van, most azonnal hívja a helyi segélyhívó számot.",
+  "home.flag.flagged": "Megjelölt",
+  "home.removal.title": "Töröltük ezt a vitát",
+  "home.removal.what": "Nem tartjuk meg, és nem lehet visszaállítani.",
+  "home.removal.reach": "Csak ezt a vitát törölték. A fiókod és a többi vitád érintetlen.",
+  "home.removal.facts": "Az automatikus ellenőrzésünk a vita következtetésében az „öngyilkosságra vagy mások bántására irányuló hajlamok” kategóriát találta. Senki nem jelentette be nekünk, és senki nem olvasta el.",
+  "home.removal.automatic": "Ezt a döntést egy automatizált eszközzel hozták meg, személy bevonása nélkül.",
+  "home.removal.ground": "Indokolás: Általános Szerződési Feltételeink, 9. szakasz (a csekkünk törlésével kapcsolatos viták).",
+  "home.removal.complain": "Ha panaszt szeretnél tenni, írj a office@dezbatere.ro címre hat hónapon belül. A panasz nem hozhatja vissza a vitát.",
+  "home.removal.close": "Bezárás"
 }

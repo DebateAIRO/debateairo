@@ -120,5 +120,14 @@
   "home.crisisSupport.misread": "Hebben we uw vraag verkeerd begrepen? Dan kunt u hem anders formuleren.",
   "home.crisisSupport.back": "Terug naar mijn vraag",
   "home.crisisSupport.chooseCountry": "Kies uw land om de hulplijnen daar te zien.",
-  "home.crisisSupport.emergencyAnywhere": "Bent u of is iemand anders in direct gevaar? Bel dan nu het alarmnummer in uw land."
+  "home.crisisSupport.emergencyAnywhere": "Bent u of is iemand anders in direct gevaar? Bel dan nu het alarmnummer in uw land.",
+  "home.flag.flagged": "Gemarkeerd",
+  "home.removal.title": "We hebben dit debat verwijderd",
+  "home.removal.what": "We houden het niet en het kan niet worden hersteld.",
+  "home.removal.reach": "Alleen dit debat is verwijderd. Je account en je andere debatten zijn onaangetast.",
+  "home.removal.facts": "Onze automatische controle van de conclusie vond \"neigingen tot zelfmoord of het schaden van andere mensen\". Niemand heeft het aan ons gemeld en niemand heeft het gelezen.",
+  "home.removal.automatic": "Deze beslissing werd genomen door een geautomatiseerde tool, waarbij geen persoon betrokken was.",
+  "home.removal.ground": "Grond: onze Gebruiksvoorwaarden, sectie 9 (debates our check deletes).",
+  "home.removal.complain": "Schrijf binnen zes maanden naar office@dezbatere.ro om een klacht in te dienen. Een klacht kan het debat niet terugbrengen.",
+  "home.removal.close": "Sluiten"
 }

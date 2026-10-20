@@ -456,6 +456,7 @@ apps/ui/components/AuthShell.tsx
 apps/ui/components/BackupEmailVerification.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
+apps/ui/components/CheckRemovalNotice.tsx
 apps/ui/components/CrisisSupport.tsx
 apps/ui/components/DataExportCard.tsx
 apps/ui/components/DateOfBirthField.tsx
@@ -508,6 +509,7 @@ apps/ui/components/StaffInvitationPanel.tsx
 apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisPanel.tsx
+apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx

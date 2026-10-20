@@ -207,5 +207,7 @@
   "public.publication.contentCheck.automated": "Bu karar otomatik bir araç tarafından verildi. Henüz bir insan tarafından incelenmedi.",
   "public.publication.contentCheck.stillPrivate": "Tartışmanız gizli ve değişmeden kalır. Yalnızca siz görebilirsiniz.",
   "public.publication.contentCheck.appeal": "Bu kararın bir insan tarafından incelenmesini istemek için altı ay içinde office@dezbatere.ro adresine yazın.",
-  "public.publication.contentCheck.unavailable": "İçerik denetimi şu anda kullanılamıyor, bu nedenle hiçbir şey yayımlanmadı. Tartışmanız gizli kalır. Birkaç dakika sonra tekrar deneyin."
+  "public.publication.contentCheck.unavailable": "İçerik denetimi şu anda kullanılamıyor, bu nedenle hiçbir şey yayımlanmadı. Tartışmanız gizli kalır. Birkaç dakika sonra tekrar deneyin.",
+  "public.publication.approvalRequired": "Bu tartışma yayımlanmadan önce onayımızı gerektirir.",
+  "public.publication.checkingDebate": "Tartışma kontrol ediliyor…"
 }

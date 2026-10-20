@@ -46,6 +46,7 @@ function LibraryRow({
   status,
   state,
   generatedStatus = false,
+  flagged = false,
   confidenceBand,
   catalog,
   composeCatalog
@@ -58,15 +59,17 @@ function LibraryRow({
   status: string;
   state: "complete" | "generating" | "failed" | "contested" | "unsupported" | "split";
   generatedStatus?: boolean;
+  flagged?: boolean;
   confidenceBand?: string | null;
   catalog: MessageCatalog;
   composeCatalog: MessageCatalog;
 }) {
   const [byBefore, byAfter] = t(catalog, "home.by", { name: "\u0000" }).split("\u0000");
   return (
-    <Link className="libRow" href={href} data-library-row data-bezel="shell" style={{ background: "var(--shell)" }}>
+    <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined} style={{ background: "var(--shell)" }}>
       <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
         <div className="libRowBody">
+          {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{t(catalog, "home.flag.flagged")}</span></div> : null}
           <div className="libRowClaim">{claim}</div>
           <p className="libRowMeta">
             {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
@@ -101,12 +104,14 @@ export function DebatesBuffer({
   catalog,
   timeCatalog,
   locale,
+  checkingLabel,
   composeCatalog = composeEnglish
 }: {
   readonly debates: readonly DebateSummary[];
   catalog: MessageCatalog;
   timeCatalog: MessageCatalog;
   locale: string;
+  checkingLabel: string;
   /** The reader's `compose` catalogue: model family names on the row dots. */
   composeCatalog?: MessageCatalog;
 }) {
@@ -115,6 +120,7 @@ export function DebatesBuffer({
   }
   return debates.map((debate) => {
     const failed = debate.status === "failed";
+    const checking = debate.synthesis_check === "CHECKING";
     const waitsUntil = debate.status === "waiting" ? debate.waits_until ?? null : null;
     // Budget spec §2.11: a waiting debate says when it will start (C). The time
     // is formatted in the reader's browser, in their own zone. Final review
@@ -139,8 +145,9 @@ export function DebatesBuffer({
         claim={debate.topic}
         meta={meta}
         models={debate.models}
-        status={statusLabel(debate.status, timeCatalog)}
-        state={failed ? "failed" : isComplete(debate.status) ? "complete" : "generating"}
+        status={checking ? checkingLabel : statusLabel(debate.status, timeCatalog)}
+        state={checking ? "generating" : failed ? "failed" : isComplete(debate.status) ? "complete" : "generating"}
+        flagged={!checking && debate.synthesis_flag?.verdict === "FLAGGED"}
         catalog={catalog}
         composeCatalog={composeCatalog}
       />

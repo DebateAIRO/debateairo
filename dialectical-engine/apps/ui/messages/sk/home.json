@@ -122,5 +122,14 @@
   "home.crisisSupport.misread": "Ak sme vašu otázku pochopili nesprávne, môžete ju preformulovať.",
   "home.crisisSupport.back": "Späť k mojej otázke",
   "home.crisisSupport.chooseCountry": "Vyberte svoju krajinu a zobrazia sa jej linky pomoci.",
-  "home.crisisSupport.emergencyAnywhere": "Ak ste vy alebo niekto iný v bezprostrednom ohrození, zavolajte hneď miestne číslo tiesňového volania."
+  "home.crisisSupport.emergencyAnywhere": "Ak ste vy alebo niekto iný v bezprostrednom ohrození, zavolajte hneď miestne číslo tiesňového volania.",
+  "home.flag.flagged": "S príznakom",
+  "home.removal.title": "Túto diskusiu sme vymazali",
+  "home.removal.what": "Neuchovávame ho a nedá sa obnoviť.",
+  "home.removal.reach": "Iba táto diskusia bola odstránená. Váš účet a vaše ďalšie diskusie sú nedotknuté.",
+  "home.removal.facts": "Naša automatická kontrola jej záveru zistila „tendencie k samovražde alebo ubližovaniu iným ľuďom“. Nikto nám to nenahlásil a nikto si to neprečítal.",
+  "home.removal.automatic": "Toto rozhodnutie bolo vykonané automatizovaným nástrojom bez účasti žiadnej osoby.",
+  "home.removal.ground": "Dôvod: naše zmluvné podmienky, oddiel 9 (debaty o odstránení šeku).",
+  "home.removal.complain": "Ak chcete podať sťažnosť, napíšte na adresu office@dezbatere.ro do šiestich mesiacov. Sťažnosť nemôže vrátiť diskusiu späť.",
+  "home.removal.close": "Zatvoriť"
 }

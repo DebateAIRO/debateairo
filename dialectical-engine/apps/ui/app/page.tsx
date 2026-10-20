@@ -8,6 +8,8 @@ import { LibraryComposer } from "@/components/LibraryComposer";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
+import { RemovalNoticeLatch } from "@/components/CheckRemovalNotice";
+import { SynthesisHoldRefresher } from "@/components/SynthesisHoldRefresher";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { ContractHttpError } from "@debateai/contract";
@@ -64,11 +66,12 @@ export default async function HomePage({
   const token = readSessionCookie(cookieStore);
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const [homeCatalog, timeCatalog, chromeCatalog, composeCatalog] = await Promise.all([
+  const [homeCatalog, timeCatalog, chromeCatalog, composeCatalog, publicCatalog] = await Promise.all([
     loadNamespace(locale, "home"),
     loadNamespace(locale, "time"),
     loadNamespace(locale, "chrome"),
-    loadNamespace(locale, "compose")
+    loadNamespace(locale, "compose"),
+    loadNamespace(locale, "public")
   ]);
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
   if (token === null) {
@@ -94,6 +97,7 @@ export default async function HomePage({
   let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
   let publishedError: string | null = null;
+  let removalNoticeTaken = false;
   try {
     published = await createServerContractClient(fetch, undefined, userAgent, clientIp).readPublicDebates(50, 0);
   } catch {
@@ -108,6 +112,13 @@ export default async function HomePage({
       sessionConfirmed = true;
     } catch {
       error = t(catalog, "home.sessionUnconfirmed");
+    }
+  }
+  if (sessionConfirmed && tab === "yours") {
+    try {
+      removalNoticeTaken = (await createServerContractClient(fetch, token, userAgent, clientIp).takeRemovalNotice()).notice;
+    } catch {
+      removalNoticeTaken = false;
     }
   }
   // Age gate (8k): a signed-in account created before the date-of-birth field answers its
@@ -206,7 +217,9 @@ export default async function HomePage({
         {tab === "yours" ? (
           sessionConfirmed ? (
             <div className="libList recentList">
-              <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog} />
+              <SynthesisHoldRefresher active={debates.some((debate) => debate.synthesis_check === "CHECKING")} />
+              <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale}
+                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} />
             </div>
           ) : (
             <p className="tabEmptyHint">{t(catalog, "home.signInHint")}</p>
@@ -223,6 +236,7 @@ export default async function HomePage({
           </>
         )}
       </div>
+      <RemovalNoticeLatch taken={removalNoticeTaken} catalog={catalog} locale={locale} countryHint={crisisCountryHint} />
       <SupportWidget />
     </div>
   );

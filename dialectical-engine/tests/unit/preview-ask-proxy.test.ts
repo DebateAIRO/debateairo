@@ -14,7 +14,7 @@ describe('finite installed preview ask ceiling',()=>{
   const {PREVIEW_MODEL_ROSTER_FLAGS}=await import('../../deploy/'+'preview-auth-dev/v1/environment.mjs');
   for(const value of [...Object.values(PREVIEW_MODEL_ROSTER_FLAGS) as string[],'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}'])expect(previewAskProxyCeiling({method:'POST',path:['v1','asks'],origin},value)).toBe(1260000);
  });
- it.each([{method:'POST',path:['v1','asks'],origin,want:1260000},{method:'POST',path:['v1','asks'],origin:'https://other.test',want:30000},{method:'POST',path:['v1','runs','synthetic','publish'],origin,want:85000},{method:'GET',path:['v1','runs','synthetic','events'],origin,want:null}])('preserves route timeout classes %j',async input=>{
+ it.each([{method:'POST',path:['v1','asks'],origin,want:1260000},{method:'POST',path:['v1','asks'],origin:'https://other.test',want:30000},{method:'POST',path:['v1','runs','synthetic','publish'],origin,want:145000},{method:'GET',path:['v1','runs','synthetic','events'],origin,want:null}])('preserves route timeout classes %j',async input=>{
   const timeout=vi.spyOn(AbortSignal,'timeout');vi.stubGlobal('fetch',async()=>new Response('{}',{headers:{'content-type':'application/json'}}));
   const request=new Request(origin+'/api/'+input.path.join('/'),{method:input.method,headers:{origin:input.origin},...(input.method==='POST'?{body:'{}'}:{})});
   const response=await (input.method==='POST'?route.POST:route.GET)(request,{params:Promise.resolve({path:input.path})});expect(response.status).toBe(200);if(input.want===null)expect(timeout).not.toHaveBeenCalled();else expect(timeout).toHaveBeenCalledWith(input.want);
