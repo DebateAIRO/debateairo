@@ -95,6 +95,7 @@ import {
   PublicDebateSchema,
   RunEventSchema,
   RunProjectionSchema,
+  RemovalNoticeTakeSchema,
   RevokeAllSessionsSchema,
   SessionListSchema,
   SessionSchema,
@@ -135,6 +136,7 @@ import {
   type Node,
   type PlanTier,
   type PublicDebate,
+  type RemovalNoticeTake,
   type RunEvent,
   type RunProjection,
   type Session,
@@ -502,6 +504,7 @@ export interface ContractClient {
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
   readAnswer(answerId: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string): Promise<Answer>;
+  takeRemovalNotice(): Promise<RemovalNoticeTake>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -904,6 +907,7 @@ export function createContractClient(
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
     readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
+    takeRemovalNotice: () => request("/v1/account/removal-notice/take", RemovalNoticeTakeSchema, { method: "POST" }),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

@@ -67,7 +67,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -120,7 +121,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -167,7 +169,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -210,7 +213,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -253,7 +257,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -296,7 +301,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_synthesis_check.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -525,10 +531,49 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     for (const needle of ["0121", "0122_engine_map_check.sql", "engine-map-check-forward0122.json", "verify-effective-capabilities-111.sql",
       "packages/db/src/migration-forward0122.ts", "replayVerifierSql", "core.map_answer_check", "MIGRATION_FORWARD0122_", "`STEPS`", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh and the engine's map answer step (0122, below) the twelfth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth and the synthesis check (0123, below) the thirteenth");
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121 or 0122, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("chains the synthesis check 0123 after 0122: the recipe, 0122's manifest and the effective verifier 0122 keeps (0111's)", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-1);
+    const prior = plan.forwardChain.at(-2);
+    expect(step?.name).toBe("0123_synthesis_check.sql");
+    expect(prior?.name).toBe("0122_engine_map_check.sql");
+    const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0123.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "synthesis-check-forward0123-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0122_engine_map_check.sql",
+        manifestSha256: sha256(await bytesOf("lineage/engine-map-check-forward0122.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      },
+      migration: { name: "0123_synthesis_check.sql", sha256: sha256(await bytesOf("0123_synthesis_check.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-111.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql")) }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/synthesis-check-forward0123.json")));
+    expect(step!.previousManifestSha256).toBe(prior!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(prior!.verifierSha256);
+    expect(step!.replayVerifierSql).toBeUndefined();
+  });
+
+  it("documents the synthesis check 0123 as the step after 0122, with its manifest, its loader and the verifier it keeps", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The synthesis check (0123)"));
+    expect(section.startsWith("## The synthesis check (0123)")).toBe(true);
+    const own = section.slice(0, section.indexOf("\n## ", 1));
+    for (const needle of ["0122", "0123_synthesis_check.sql", "synthesis-check-forward0123.json",
+      "packages/db/src/migration-forward0123.ts", "MIGRATION_FORWARD0123_", "replayVerifierSql",
+      "verify-effective-capabilities-111.sql", "synthesis_check_request", "synthesis_check_attempt",
+      "synthesis_check_result", "synthesis_check_inheritance", "synthesis_check_removal_request",
+      "synthesis_check_removal_notice", "synthesis_check_erasure_binding", "SYNTHESIS_CHECK",
+      "debateai_erasure_runtime", "renumber", "`STEPS`"
+    ]) expect(own, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the engine's map answer step (0122, below) the twelfth and the synthesis check (0123, below) the thirteenth");
+  });
+
+  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122 or 0123, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -664,6 +709,16 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0122_MANIFEST");
       // The same refusal when 0121's own manifest changes under 0122: 0121 stays valid, 0122 alone refuses.
       await refusal("lineage/engine-verdict-forward0121.json", (text) => `${text}\n`, "MIGRATION_FORWARD0122_MANIFEST");
+      // 0123 binds both its own SQL and the exact 0122 manifest it follows.
+      await refusal("0123_synthesis_check.sql", (text) => `${text} `, "MIGRATION_FORWARD0123_SOURCE_DIGEST");
+      const verdictDigest = sha256(await bytesOf("lineage/engine-verdict-forward0121.json"));
+      await refusal("lineage/synthesis-check-forward0123.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0121_engine_verdict.sql";
+        manifest.previous.manifestSha256 = verdictDigest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0123_MANIFEST");
+      await refusal("lineage/engine-map-check-forward0122.json", (text) => `${text}\n`, "MIGRATION_FORWARD0123_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });

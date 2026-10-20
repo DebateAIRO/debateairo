@@ -50,20 +50,21 @@ describe("auth database batch: the forward step after NETOPIA's 0111", () => {
     // 0114 follows 0113 (spec 2026-10-11 Part 3); the data export's 0115 follows 0114 (V-41); the mail-locale step's 0116
     // follows 0115 (S01-C05); the debate shape's map 0117 follows 0116; the language check's site cost 0118 follows 0117;
     // the reclaim resume 0119 follows 0118; the reply measures 0120 follow 0119 (spec 2026-10-15); the engine verdict 0121
-    // follows 0120 (spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122), last (spec 2026-10-15
-    // engine redesign R3).
+    // follows 0120 (spec 2026-10-15 engine redesign R2), then the engine's map answer step 0122 (engine redesign R3),
+    // then the synthesis check 0123.
     const next = plan.forwardChain[plan.forwardChain.indexOf(step) + 1]!;
     expect(next.name).toBe("0113_billing_price_currencies.sql");
     expect(next.previousName).toBe(step.name);
-    expect(plan.forwardChain.at(-9)!.name).toBe("0114_role_rotation.sql");
-    expect(plan.forwardChain.at(-8)!.name).toBe("0115_data_export.sql");
-    expect(plan.forwardChain.at(-7)!.name).toBe("0116_mail_locale.sql");
-    expect(plan.forwardChain.at(-6)!.name).toBe("0117_debate_shape_map.sql");
-    expect(plan.forwardChain.at(-5)!.name).toBe("0118_language_check_spend.sql");
-    expect(plan.forwardChain.at(-4)!.name).toBe("0119_reclaim_resume.sql");
-    expect(plan.forwardChain.at(-3)!.name).toBe("0120_reply_measures.sql");
-    expect(plan.forwardChain.at(-2)!.name).toBe("0121_engine_verdict.sql");
-    expect(plan.forwardChain.at(-1)!.name).toBe("0122_engine_map_check.sql");
+    expect(plan.forwardChain.at(-10)!.name).toBe("0114_role_rotation.sql");
+    expect(plan.forwardChain.at(-9)!.name).toBe("0115_data_export.sql");
+    expect(plan.forwardChain.at(-8)!.name).toBe("0116_mail_locale.sql");
+    expect(plan.forwardChain.at(-7)!.name).toBe("0117_debate_shape_map.sql");
+    expect(plan.forwardChain.at(-6)!.name).toBe("0118_language_check_spend.sql");
+    expect(plan.forwardChain.at(-5)!.name).toBe("0119_reclaim_resume.sql");
+    expect(plan.forwardChain.at(-4)!.name).toBe("0120_reply_measures.sql");
+    expect(plan.forwardChain.at(-3)!.name).toBe("0121_engine_verdict.sql");
+    expect(plan.forwardChain.at(-2)!.name).toBe("0122_engine_map_check.sql");
+    expect(plan.forwardChain.at(-1)!.name).toBe("0123_synthesis_check.sql");
     const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
     expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
     expect(step.previousName).toBe(netopia.name);

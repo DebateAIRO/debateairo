@@ -738,6 +738,74 @@ export const answerStory = serve.table("answer_story", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
+/** S01 synthesis check (migration 0123): immutable request and check evidence. */
+export const synthesisCheckRequest = serve.table("synthesis_check_request", {
+  requestId: uuid("request_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const synthesisCheckAttempt = serve.table("synthesis_check_attempt", {
+  attemptId: uuid("attempt_id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  origin: text("origin").notNull(),
+  requestId: uuid("request_id").references(() => synthesisCheckRequest.requestId),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const synthesisCheckResult = serve.table("synthesis_check_result", {
+  resultId: uuid("result_id").primaryKey(),
+  attemptId: uuid("attempt_id").notNull().references(() => synthesisCheckAttempt.attemptId),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  synthesisOriginVersion: integer("synthesis_origin_version").notNull(),
+  final: boolean("final").notNull(),
+  failureCode: text("failure_code"),
+  policyVersion: text("policy_version").notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
+});
+
+export const synthesisCheckInheritance = serve.table("synthesis_check_inheritance", {
+  attemptId: uuid("attempt_id").primaryKey().references(() => synthesisCheckAttempt.attemptId),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  inheritedResultId: uuid("inherited_result_id").notNull().references(() => synthesisCheckResult.resultId),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const synthesisCheckRemovalRequest = serve.table("synthesis_check_removal_request", {
+  requestId: uuid("request_id").primaryKey(),
+  resultId: uuid("result_id").notNull().unique().references(() => synthesisCheckResult.resultId),
+  runId: uuid("run_id").notNull().unique().references(() => run.runId),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const synthesisCheckRemovalNotice = serve.table("synthesis_check_removal_notice", {
+  noticeId: uuid("notice_id").primaryKey().defaultRandom(),
+  ownerRef: uuid("owner_ref").notNull().references(() => identityUser.ownerRef, { onDelete: "cascade" }),
+  removedAt: timestamp("removed_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const synthesisCheckErasureBinding = identity.table("synthesis_check_erasure_binding", {
+  requestRef: uuid("request_ref").primaryKey(),
+  runId: uuid("run_id").notNull().unique().references(() => run.runId),
+  ownerRef: uuid("owner_ref").notNull().references(() => identityUser.ownerRef, { onDelete: "cascade" }),
+  auditId: uuid("audit_id").notNull().unique(),
+  auditActorRef: uuid("audit_actor_ref").notNull().unique(),
+  auditTargetRef: uuid("audit_target_ref").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true })
+});
+
 export const segmentSuppression = serve.table("segment_suppression", {
   answerId: uuid("answer_id").notNull(),
   answerVersion: integer("answer_version").notNull(),
