@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -152,27 +152,86 @@ describe("legal documents — generated data", () => {
 
     // FIX-SF-S03-p2 (t_e324a1d9, V-95's default): POST /v1/asks runs the crisis phrase check before the sensitive-data
     // consent rule (apps/api/src/index.ts:3542 before :3548; S04-R1), so every sentence saying question contents are used
-    // only with or after that consent states that one exception, in the same words.
-    it("states the crisis-phrase exception in every sentence that uses question contents only with or after the consent", () => {
-      const exception = ", except that our list of crisis phrases reads every question first, before that consent, only to show help numbers instead of a debate, and keeps nothing of it and sends it to no model";
-      const claims = allTexts(PRIVACY_POLICY)
+    // only with or after that consent states that one exception, in the same words. FIX-SF-S03-p3 (t_52ef891f N3): the
+    // filter is the class regex of the correctness lens's consent-sweep.py, over BOTH English documents.
+    const CRISIS_EXCEPTION = "our list of crisis phrases reads every question first, before that consent, only to show help numbers instead of a debate, and keeps nothing of it and sends it to no model";
+    it("states the crisis-phrase exception in every sentence, in either document, that uses question contents only with or after the consent", () => {
+      const absolute = /only with (?:your|that|the|such)|only after|only once|only if you (?:agree|consent)|until you (?:agree|consent)|not without (?:your|that) consent|only on (?:your|the) consent|with your (?:prior |separate |opt-in |explicit )?consent/i;
+      const claims = [...allTexts(PRIVACY_POLICY), ...allTexts(TERMS_OF_SERVICE)]
         .flatMap((text) => text.split(/(?<=[.;])\s+/))
-        .filter((sentence) => /question/.test(sentence) && /only (?:with your (?:[\w-]+ )?consent|after the separate consent)/.test(sentence));
+        .filter((sentence) => /consent/i.test(sentence) && absolute.test(sentence) && /question/i.test(sentence));
       expect(claims).toHaveLength(4);
-      for (const claim of claims) expect(claim, claim.slice(0, 90)).toContain(exception);
+      for (const claim of claims) expect(claim, claim.slice(0, 90)).toContain(`, except that ${CRISIS_EXCEPTION}`);
     });
 
-    // FIX-SF-S03-p2 (t_355a30d1, t_ecf5a65c): ToS §10 lists only the cases the support routes open by themselves —
-    // the message-reading rules read English and Romanian only, a password message returns early, and no route sends tool
-    // calls (apps/api/src/support/index.ts:570-598, :609; classify.ts:85-110, :392-402).
-    it("lists only the automatic support cases the routes open", () => {
+    // FIX-SF-S03-p3 (t_52ef891f N3): the same four members carry ONE rendering of the exception in every locale. The four
+    // member clauses are located in English by the exception (PP :269 is cut at its italic country markers); in each locale
+    // the longest span they share, as a share of the line, must stay near English's (measured 0.99-1.28 of English at
+    // FIX-SF-S03-p3; one member without it measures 0.08, one changed word 0.49).
+    it("renders the crisis-phrase exception in the same words in the four members, in every locale", () => {
+      const marker = /(?<!\*)\*[^*\n]{1,40}?[:：]\*(?!\*)/u;
+      const read = (locale: string) => readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/privacy-policy.md`), "utf8").split("\n");
+      const english = read("en");
+      const rows = english.flatMap((line, index) => (line.includes(CRISIS_EXCEPTION) ? [index] : []));
+      const members = rows.flatMap((index) => english[index].split(marker).flatMap((part, segment) => (part.includes(CRISIS_EXCEPTION) ? [[index, segment] as const] : [])));
+      expect(members).toHaveLength(4);
+      const shared = (parts: readonly string[]) => {
+        const shortest = parts.reduce((a, b) => (b.length < a.length ? b : a));
+        let best = "";
+        for (let i = 0; i < shortest.length; i += 1) {
+          let j = i + best.length + 1;
+          while (j <= shortest.length && parts.every((part) => part.includes(shortest.slice(i, j)))) { best = shortest.slice(i, j); j += 1; }
+        }
+        return best;
+      };
+      const base = CRISIS_EXCEPTION.length / english[rows[0]].length;
+      const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name) && name !== "en");
+      expect(locales).toHaveLength(34);
+      for (const locale of locales) {
+        const lines = read(locale);
+        const parts = members.map(([index, segment]) => lines[index].split(marker)[segment] ?? "");
+        const k = (shared(parts).length / lines[rows[0]].length) / base;
+        expect(k, `${locale} k=${k.toFixed(2)}`).toBeGreaterThan(0.75);
+      }
+    });
+
+    // FIX-SF-S03-p2 (t_355a30d1, t_ecf5a65c); FIX-SF-S03-p3 (V-102 (a), t_52ef891f N4, t_2dcad4c1, t_45b9c37c): ToS §10
+    // lists the automatic support cases as the support code opens them. Derived from the code: escalation.ts defines E1-E8;
+    // E1 is a visitor's own request, and every evaluateEscalation call in support/index.ts passes `toolCalls: []`, so E4
+    // never fires; the six others are listed, the three word rules (E8, E2, E3) under "Three of these rules read words"
+    // and the three others (E6, E5, E7) under "In any language", and the password early return opens no case itself.
+    it("lists the automatic support cases as the support code opens them", () => {
+      const escalation = readFileSync(resolve(process.cwd(), "apps/api/src/support/escalation.ts"), "utf8");
+      expect([...escalation.matchAll(/predicate: "(E\d)"/g)].map((match) => match[1]).sort()).toEqual(["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]);
+      const route = readFileSync(resolve(process.cwd(), "apps/api/src/support/index.ts"), "utf8");
+      const calls = [...route.matchAll(/evaluateEscalation\(\{/g)].map((match) => route.slice(match.index, route.indexOf("})", match.index)));
+      expect(calls).toHaveLength(3);
+      for (const call of calls) expect(call, call.slice(0, 60)).toMatch(/toolCalls: \[\]/);
       const risk = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.includes("In the support chat, our rules also open a case")) ?? "";
-      expect(risk).toContain("For a message in English or Romanian, they open one when");
-      expect(risk).toContain("and it is not also about your account");
-      expect(risk).toContain("to answer a question about our service");
-      expect(risk).toContain("A message about your password gets the steps to recover it and opens no case.");
-      expect(risk).not.toContain("resetting your password");
-      expect(risk).not.toContain("tries for you is refused");
+      const support = risk.slice(risk.indexOf("In the support chat, our rules also open a case"));
+      const words = support.indexOf("Three of these rules read words: the support chat has its own lists of English and Romanian words and phrases, and the lists find those words in a message written in any language.");
+      const anyLanguage = support.indexOf("In any language, a case also opens ");
+      expect(words).toBeGreaterThan(0);
+      expect(anyLanguage).toBeGreaterThan(words);
+      const byLists = support.slice(support.indexOf("By these lists, a case opens: "), support.indexOf(". ", support.indexOf("By these lists, a case opens: "))).replace("By these lists, a case opens: ", "").split("; ");
+      expect(byLists).toHaveLength(3);
+      expect(byLists[0]).toMatch(/^when they find in a message their words for deleting your account \(their words for closing it are not enough\), for a child's account, or for a legal or personal-data request/);
+      expect(byLists[1]).toMatch(/^when they read a message as a person thinking of suicide or self-harm, as a threat to you, or as someone forcing you to write, and do not also read it as being about your account \(one word such as "password" or "session" can be enough, even used in another sense\)$/);
+      expect(byLists[2]).toMatch(/^and when they read two of your messages as being about your account/);
+      const password = support.indexOf("When the lists recognise a message as a request to recover or reset a forgotten password, that message opens no case itself, though it can count as one of those two messages.");
+      expect(password).toBeGreaterThan(words);
+      expect(password).toBeLessThan(anyLanguage);
+      const others = support.slice(anyLanguage + "In any language, a case also opens ".length).replace(/\.$/, "").split("; ");
+      expect(others).toEqual([
+        "when the assistant has twice found nothing in our help articles to answer a question about our service",
+        "when you rate two answers in a row as unhelpful",
+        "or when you write again after the chat said its model is unavailable"
+      ]);
+      expect(support).not.toMatch(/tries for you|attempts for you|is refused|is declined/);
+      // The Policy's own case sentence (PP §3) carries the same two limits: the list's words reach a message in any
+      // language, and one account word keeps the case closed (t_45b9c37c).
+      const policy = allTexts(PRIVACY_POLICY).find((text) => text.includes("the chat also opens a case that a member of our team reads (Terms, section 10)")) ?? "";
+      expect(policy).toContain("When the support chat's own list of English and Romanian phrases recognises such a message, which it can do in a message written in any language, and its lists do not also read the message as being about your account (one word such as \"password\" or \"session\" can be enough, even used in another sense), the chat also opens a case");
     });
 
     it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
