@@ -134,6 +134,10 @@ VAT/tax ID, company address) is filled in. A consumer in Ohio can buy.
 - **The quote** (`apps/api/src/billing/quote.ts`, `QuoteService`), for a new subscription **and** for an upgrade
   quote.
 - **Checkout start**, which re-checks on the server, so a crafted request cannot skip the quote.
+- At checkout start the region check runs right after the country check and **before** the "confirm your country"
+  question: a refusal makes that question moot.
+- Ruling R5: the "check your postal code" answer (`BILLING_POSTCODE_INVALID`) is given only in a country where the
+  policy closes at least one region; elsewhere the postal code cannot change the outcome.
 - A new refusal code **`REGION_PAYMENT_UNAVAILABLE`** (HTTP 403), next to `COUNTRY_PAYMENT_UNAVAILABLE` in
   `apps/api/src/billing/refusal.ts` and `place.ts`. Also **`BILLING_POSTCODE_INVALID`** (HTTP 422) for a postal code
   that doesn't fit its country's format (§6), which the website maps to `billing.checkout.postalCodeInvalid`.

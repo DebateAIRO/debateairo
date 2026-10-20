@@ -83,8 +83,8 @@ Some places inside an open country need their own tax registration before the si
 Free plan; only paying is refused. The site finds the region from the billing address the buyer types (the
 postal code, or the state or province), not from the internet address.
 
-The example carries the owner's launch list of 20 October 2026 (the research is in the payment region blocks
-spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
+`country-policy.example.json` carries the owner's launch list of 20 October 2026 (the research is in the payment
+region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
 
 - Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
 - United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
