@@ -150,6 +150,31 @@ describe("legal documents — generated data", () => {
       expect(reasons.endsWith("gets is help, not a statement of reasons.")).toBe(true);
     });
 
+    // FIX-SF-S03-p2 (t_e324a1d9, V-95's default): POST /v1/asks runs the crisis phrase check before the sensitive-data
+    // consent rule (apps/api/src/index.ts:3542 before :3548; S04-R1), so every sentence saying question contents are used
+    // only with or after that consent states that one exception, in the same words.
+    it("states the crisis-phrase exception in every sentence that uses question contents only with or after the consent", () => {
+      const exception = ", except that our list of crisis phrases reads every question first, before that consent, only to show help numbers instead of a debate, and keeps nothing of it and sends it to no model";
+      const claims = allTexts(PRIVACY_POLICY)
+        .flatMap((text) => text.split(/(?<=[.;])\s+/))
+        .filter((sentence) => /question/.test(sentence) && /only (?:with your (?:[\w-]+ )?consent|after the separate consent)/.test(sentence));
+      expect(claims).toHaveLength(4);
+      for (const claim of claims) expect(claim, claim.slice(0, 90)).toContain(exception);
+    });
+
+    // FIX-SF-S03-p2 (t_355a30d1, t_ecf5a65c): ToS §10 lists only the cases the support routes open by themselves —
+    // the message-reading rules read English and Romanian only, a password message returns early, and no route sends tool
+    // calls (apps/api/src/support/index.ts:570-598, :609; classify.ts:85-110, :392-402).
+    it("lists only the automatic support cases the routes open", () => {
+      const risk = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.includes("In the support chat, our rules also open a case")) ?? "";
+      expect(risk).toContain("For a message in English or Romanian, they open one when");
+      expect(risk).toContain("and it is not also about your account");
+      expect(risk).toContain("to answer a question about our service");
+      expect(risk).toContain("A message about your password gets the steps to recover it and opens no case.");
+      expect(risk).not.toContain("resetting your password");
+      expect(risk).not.toContain("tries for you is refused");
+    });
+
     it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
       const reporting = texts(section(TERMS_OF_SERVICE, "10"));
       expect(reporting.some((text) => text.startsWith("Statement of reasons.") && text.includes(
