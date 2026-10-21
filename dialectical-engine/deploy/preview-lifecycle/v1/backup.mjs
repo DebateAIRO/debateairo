@@ -14,6 +14,8 @@
 // preview's folders, in one tar checked with tar -tvf), each file root-only 0600 and new, then their sums in
 // sha256sum format. The services keep running throughout. It is a last resort only (spec §11: going back is a
 // switch, not a restore). It writes only new files and deletes nothing.
+// The key stores are live: GNU tar exits 1 when a file changed while it was read ("file changed as we read it"), which
+// refuses KEYS_FAILED; then run it again into a NEW, empty out folder (the old one keeps what it wrote).
 import { constants, createReadStream } from 'node:fs';
 import { lstat, open, readdir, realpath, rename, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -163,10 +165,13 @@ const below = (path, roots) => cleanAbsolute(path) && roots.some(root => path.st
 /** A real key path the verbose tar listing can be read back for: no spaces, quotes or other odd characters. */
 const PLAIN_PATH = /^(?:\/[A-Za-z0-9._@+-]+)+$/;
 
-/** The KEY_STORE_KEYS values of the env files, each a clean absolute path strictly below one of `roots`; sorted, once each. */
+/**
+ * The KEY_STORE_KEYS values of the env files, each a clean absolute path strictly below one of `roots`; sorted, once
+ * each. `names`: the KEY_STORE_KEYS found, in that list's order (names only: the event may carry them, never a path).
+ */
 async function keyStorePaths(envPaths, uid, roots) {
   if (!Array.isArray(envPaths) || envPaths.length < 1) refuse('ENV_FILE_REFUSED');
-  const paths = new Set();
+  const paths = new Set(), names = new Set();
   for (const envPath of envPaths) {
     for (const line of (await readEnvFile(envPath, uid)).split('\n')) {
       const at = line.indexOf('=');
@@ -177,10 +182,11 @@ async function keyStorePaths(envPaths, uid, roots) {
       if (value.length > 1 && value.endsWith('/')) value = value.slice(0, -1);
       if (!below(value, roots)) refuse('KEY_PATH_REFUSED');
       paths.add(value);
+      names.add(line.slice(0, at));
     }
   }
   if (paths.size < 1) refuse('KEY_PATHS_NOT_FOUND');
-  return [...paths].sort();
+  return { paths: [...paths].sort(), names: KEY_STORE_KEYS.filter(name => names.has(name)) };
 }
 
 /**
@@ -256,7 +262,8 @@ const listingValid = toc => typeof toc === 'string' && /^; Archive created at /m
 /**
  * The online backup (side-by-side spec §12 step 7). Order: the folder, the env files and their key paths, the list of
  * databases, a check that no output name exists yet; only then the first file. A failure leaves what was written as
- * it is (it deletes nothing) and writes no sums file, so a half run never looks complete.
+ * it is (it deletes nothing) and writes no sums file, so a half run never looks complete. The key stores are live:
+ * GNU tar exits 1 on "file changed as we read it", which refuses KEYS_FAILED; retry into a NEW, empty out folder.
  */
 export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {} }) {
   const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0;
@@ -264,7 +271,8 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
   // The server layout has no keyRoots, so the server always uses KEY_ROOTS; a test layout points it at a temp copy.
   const roots = layout.keyRoots ?? KEY_ROOTS;
   await requireRootOnlyFolder(out, uid);
-  const keys = await realKeyPaths(await keyStorePaths(envPaths, uid, roots), roots);
+  const declared = await keyStorePaths(envPaths, uid, roots);
+  const keys = await realKeyPaths(declared.paths, roots);
   const listed = await run(psqlArgv(layout), { env: {}, stdin: Buffer.from(LIST_DATABASES, 'utf8'), timeoutMs: 15_000, maxOutputBytes: 64 * 1024 });
   if (!ok(listed)) refuse('DATABASE_LIST_FAILED');
   const databases = String(listed.stdout).split('\n').filter(Boolean);
@@ -299,7 +307,7 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
     fill: async (_fd, handle) => { for (let offset = 0; offset < sums.length;) offset += (await handle.write(sums, offset)).bytesWritten; return { code: 0 }; },
     check: async () => true
   });
-  return Object.freeze({ event: 'PREVIEW_ONLINE_BACKUP_OK', databases: Object.freeze(databases), files: Object.freeze(files.map(file => Object.freeze(file))) });
+  return Object.freeze({ event: 'PREVIEW_ONLINE_BACKUP_OK', databases: Object.freeze(databases), keys: Object.freeze(declared.names), files: Object.freeze(files.map(file => Object.freeze(file))) });
 }
 
 /** Exact argv shapes only: none (the nightly timer) or `--online <dir> --env <path> [--env <path>]`. */

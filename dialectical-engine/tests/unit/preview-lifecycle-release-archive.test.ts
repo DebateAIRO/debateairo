@@ -68,10 +68,10 @@ function server() {
 }
 
 const ok = (stdout = '') => ({ code: 0, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
-type Options = Partial<{ state: string; current: string | null; units: Record<string, string>; lstat: (path: string) => Promise<unknown> }>;
+type Options = Partial<{ state: string; current: string | null; units: Record<string, string>; lstat: (path: string) => Promise<unknown>; reloadFails: boolean }>;
 /** systemd and the release table behind `deps`; every unit is inactive and disabled unless `units` says otherwise. */
 function fakes(s: ReturnType<typeof server>, options: Options = {}) {
-  const o = { state: 'RETIRED', current: NEW_KEY as string | null, units: {} as Record<string, string>, ...options };
+  const o = { state: 'RETIRED', current: NEW_KEY as string | null, units: {} as Record<string, string>, reloadFails: false, ...options };
   const shown: string[] = [], systemctl: string[][] = [], asked: string[] = [];
   const run = async (argv: string[], opts: { env: Record<string, string> }) => {
     expect(argv[0]).toBe(common.LAYOUT.systemctl);
@@ -82,7 +82,7 @@ function fakes(s: ReturnType<typeof server>, options: Options = {}) {
       return ok(o.units[argv[2]!] ?? 'LoadState=loaded\nActiveState=inactive\nUnitFileState=disabled\n');
     }
     systemctl.push(argv.slice(1));
-    return ok();
+    return o.reloadFails ? { ...ok(), code: 1 } : ok();
   };
   const deps: Record<string, unknown> = {
     run,
@@ -133,16 +133,16 @@ describe('release-archive.mjs (side-by-side spec §10, plan D12)', () => {
     expect(result.moved).not.toContain(missing);
   });
 
-  const refusals: [string, (s: ReturnType<typeof server>) => Options, string, Record<string, unknown>][] = [
-    ['not retired', () => ({ state: 'DRAINING' }), 'ARCHIVE_REFUSED', { fields: ['state'] }],
-    ['the current release', () => ({ current: OLD_KEY }), 'ARCHIVE_REFUSED', { fields: ['current'] }],
-    ['an active unit', () => ({ units: { [`debateai-preview-runner@${OLD}.service`]: 'LoadState=loaded\nActiveState=deactivating\nUnitFileState=disabled\n' } }), 'ARCHIVE_REFUSED', { fields: [`active:debateai-preview-runner@${OLD}.service`] }],
-    ['an enabled timer', () => ({ units: { [`debateai-preview-runner-retire@${OLD}.timer`]: 'LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n' } }), 'ARCHIVE_REFUSED', { fields: [`enabled:debateai-preview-runner-retire@${OLD}.timer`] }],
-    ['an existing target', s => { mkdirSync(join(s.layout.configArchiveRoot, `${OLD}-config-${STAMP}`), { recursive: true, mode: 0o700 }); chmodSync(s.layout.configArchiveRoot, 0o700); return {}; }, 'ARCHIVE_REFUSED', { fields: ['configTo'] }],
+  const refusals: [string, (s: ReturnType<typeof server>) => Options, string, (s: ReturnType<typeof server>) => Record<string, unknown>][] = [
+    ['not retired', () => ({ state: 'DRAINING' }), 'ARCHIVE_REFUSED', () => ({ fields: ['state'] })],
+    ['the current release', () => ({ current: OLD_KEY }), 'ARCHIVE_REFUSED', () => ({ fields: ['current'] })],
+    ['an active unit', () => ({ units: { [`debateai-preview-runner@${OLD}.service`]: 'LoadState=loaded\nActiveState=deactivating\nUnitFileState=disabled\n' } }), 'ARCHIVE_REFUSED', () => ({ fields: [`active:debateai-preview-runner@${OLD}.service`] })],
+    ['an enabled timer', () => ({ units: { [`debateai-preview-runner-retire@${OLD}.timer`]: 'LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n' } }), 'ARCHIVE_REFUSED', () => ({ fields: [`enabled:debateai-preview-runner-retire@${OLD}.timer`] })],
+    ['an existing target', s => { mkdirSync(join(s.layout.configArchiveRoot, `${OLD}-config-${STAMP}`), { recursive: true, mode: 0o700 }); chmodSync(s.layout.configArchiveRoot, 0o700); return {}; }, 'ARCHIVE_REFUSED', () => ({ fields: ['configTo'] })],
     ['another device', s => {
       const other = common.envPathFor(s.layout, 'runner', OLD);
       return { lstat: async (path: string) => { const stat = await fsLstat(path); return path === other ? Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, { dev: stat.dev + 1 }) : stat; } };
-    }, 'ARCHIVE_CROSS_DEVICE', {}]
+    }, 'ARCHIVE_CROSS_DEVICE', s => ({ fields: [common.envPathFor(s.layout, 'runner', OLD)] })]
   ];
   it.each(refusals)('refuses %s and moves nothing', async (_name, setup, code, extra) => {
     const s = server();
@@ -150,10 +150,54 @@ describe('release-archive.mjs (side-by-side spec §10, plan D12)', () => {
     const before = s.tree();
     const lockBefore = readFileSync(s.layout.lockPath, 'utf8');
     const f = fakes(s, options);
-    await expect(archive.archiveRelease({ label: OLD, layout: s.layout, deps: f.deps, now: () => NOW })).rejects.toMatchObject({ code, ...extra });
+    await expect(archive.archiveRelease({ label: OLD, layout: s.layout, deps: f.deps, now: () => NOW })).rejects.toMatchObject({ code, ...extra(s) });
     expect(s.tree()).toEqual(before);
     expect(readFileSync(s.layout.lockPath, 'utf8')).toBe(lockBefore);
     expect(f.systemctl).toEqual([]);
+  });
+
+  it('a move failing mid-way names what moved and where, changes nothing else, and a second run finishes the job', async () => {
+    const s = server();
+    const fs = await import('node:fs/promises');
+    let calls = 0;
+    const f = fakes(s);
+    const flaky = async (from: string, to: string) => { if (++calls === 3) throw Object.assign(new Error('EIO'), { code: 'EIO' }); return fs.rename(from, to); };
+    const lockBefore = readFileSync(s.layout.lockPath, 'utf8');
+    const to = `${s.layout.archiveRoot}/${OLD}-${STAMP}`, configTo = `${s.layout.configArchiveRoot}/${OLD}-config-${STAMP}`;
+    const [first, second, ...rest] = [...archive.sourcesOf(s.layout, OLD).code, ...archive.sourcesOf(s.layout, OLD).config];
+    await expect(archive.archiveRelease({ label: OLD, layout: s.layout, deps: { ...f.deps, rename: flaky }, now: () => NOW }))
+      .rejects.toMatchObject({ code: 'ARCHIVE_MOVE_FAILED', moved: [first, second], to, configTo });
+    expect(readdirSync(to).sort()).toEqual([first!, second!].map(path => path.split('/').at(-1)).sort());
+    expect(readdirSync(configTo)).toEqual([]);
+    for (const path of rest) expect(existsSync(path), path).toBe(true);
+    for (const path of [first!, second!]) expect(existsSync(path), path).toBe(false);
+    expect(readFileSync(s.layout.lockPath, 'utf8')).toBe(lockBefore);
+    expect(f.systemctl).toEqual([]);
+    // Run again a second later: a new stamp, the two already moved are skipped, the rest moves, the label is unpinned.
+    const again = fakes(s);
+    const result = await archive.archiveRelease({ label: OLD, layout: s.layout, deps: again.deps, now: () => NOW + 1000 });
+    expect(result).toMatchObject({ to: `${s.layout.archiveRoot}/${OLD}-20261022T093016Z`, skipped: [first, second], moved: rest });
+    for (const path of rest) expect(existsSync(path), path).toBe(false);
+    expect(Object.keys(s.readLock().releases)).toEqual([NEW]);
+    expect(again.systemctl).toEqual([['daemon-reload']]);
+  });
+
+  it('a failed unpin or reload after the moves names every moved source and both targets', async () => {
+    const s = server();
+    const reload = fakes(s, { reloadFails: true });
+    const all = [...archive.sourcesOf(s.layout, OLD).code, ...archive.sourcesOf(s.layout, OLD).config];
+    await expect(archive.archiveRelease({ label: OLD, layout: s.layout, deps: reload.deps, now: () => NOW }))
+      .rejects.toMatchObject({ code: 'DAEMON_RELOAD_FAILED', moved: all, to: `${s.layout.archiveRoot}/${OLD}-${STAMP}`, configTo: `${s.layout.configArchiveRoot}/${OLD}-config-${STAMP}` });
+    expect(all).toHaveLength(18);
+    // The unpin ran before the reload, so the label is already gone from the lock.
+    expect(Object.keys(s.readLock().releases)).toEqual([NEW]);
+    const t = server();
+    const unpin = fakes(t);
+    const lockBefore = readFileSync(t.layout.lockPath, 'utf8');
+    await expect(archive.archiveRelease({ label: OLD, layout: t.layout, deps: { ...unpin.deps, unpinRelease: async () => { throw Object.assign(new Error('RELEASE_LOCK_UNREADABLE'), { code: 'RELEASE_LOCK_UNREADABLE' }); } }, now: () => NOW }))
+      .rejects.toMatchObject({ code: 'ARCHIVE_UNPIN_FAILED', moved: all.map(path => path.replace(s.base, t.base)), to: `${t.layout.archiveRoot}/${OLD}-${STAMP}`, configTo: `${t.layout.configArchiveRoot}/${OLD}-config-${STAMP}` });
+    expect(readFileSync(t.layout.lockPath, 'utf8')).toBe(lockBefore);
+    expect(unpin.systemctl).toEqual([]);
   });
 
   it('refuses an unreadable unit state, a label that is not a release label, and an unpinned label', async () => {
@@ -194,7 +238,9 @@ describe('release-archive.mjs (side-by-side spec §10, plan D12)', () => {
     expect(JSON.parse(lines[0]!)).toMatchObject({ event: 'PREVIEW_RELEASE_ARCHIVED', label: OLD });
   });
 
-  it('names the two archive roots in the server layout', () => {
+  it('names the two archive roots in the server layout and moves from prestart\'s releases folder', async () => {
+    const prestart = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+    expect(archive.sourcesOf(common.LAYOUT, OLD).code[0]).toBe(`${prestart.RELEASES_ROOT}/auth-dev-candidate-${OLD}-api`);
     expect(common.LAYOUT.archiveRoot).toBe('/opt/debateai-v3-preview/archive');
     expect(common.LAYOUT.configArchiveRoot).toBe('/root/preview-archive');
   });

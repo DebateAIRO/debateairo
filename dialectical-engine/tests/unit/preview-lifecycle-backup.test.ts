@@ -191,7 +191,7 @@ describe('online backup before side-by-side migrations', () => {
     for (const name of readdirSync(out)) expect(statSync(join(out, name)).mode & 0o777, name).toBe(0o600);
     for (const [name, text] of Object.entries(contents)) expect(readFileSync(join(out, name), 'utf8')).toBe(text);
     expect(readFileSync(join(out, 'online.sha256'), 'utf8')).toBe(Object.entries(contents).map(([name, text]) => `${sum(text)}  ${name}\n`).join(''));
-    expect(event).toEqual({ event: 'PREVIEW_ONLINE_BACKUP_OK', databases: ['debateai', 'hatchet', 'postgres'],
+    expect(event).toEqual({ event: 'PREVIEW_ONLINE_BACKUP_OK', databases: ['debateai', 'hatchet', 'postgres'], keys: ['USER_DEK_STORE_PATH', 'KEK_PATH', 'SUPPORT_KEK_PATH'],
       files: Object.entries(contents).map(([name, text]) => ({ name, bytes: Buffer.byteLength(text), sha256: sum(text) })) });
     expect(Object.isFrozen(event)).toBe(true);
   });
@@ -278,6 +278,8 @@ describe('online backup before side-by-side migrations', () => {
     ['a key archive whose key file is listed as a link', (t: Tree) => ({ tarList: verbose(t).replace(`-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}`, `lrwxrwxrwx root/root 0 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)} -> x`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a key archive that lists the store folder as a file', (t: Tree) => ({ tarList: verbose(t).replace(`drwx------ root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/`, `-rw------- root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a failing pg_dumpall', () => ({ fail: '/pg_dumpall' }), 'DUMP_FAILED', [...DUMPS, 'online-globals.sql']],
+    // Live key stores: GNU tar exits 1 on "file changed as we read it"; the run refuses and the retry takes a new folder.
+    ['a key store changing while tar reads it', () => ({ fail: '/usr/bin/tar' }), 'KEYS_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a database name that is not a plain name', () => ({ databases: 'debateai\nhost=evil\n' }), 'DATABASE_NAME_REFUSED', []],
     ['no database at all', () => ({ databases: '' }), 'DATABASE_LIST_FAILED', []]
   ])('refuses %s, deletes nothing it wrote and writes no sums', async (_name, options, code, left) => {
@@ -304,6 +306,8 @@ describe('online backup before side-by-side migrations', () => {
     const text = JSON.stringify(event);
     for (const path of [...Object.values(t.keys), t.base, t.out, 'debateai-v3-preview', 'postgresql://']) expect(text).not.toContain(path);
     expect(event.files.map((file: { name: string }) => file.name)).toEqual(['online-debateai.dump', 'online-hatchet.dump', 'online-postgres.dump', 'online-globals.sql', 'online-keys.tar']);
+    // The key-store names found, in KEY_STORE_KEYS order: names only.
+    expect(event.keys).toEqual(['USER_DEK_STORE_PATH', 'KEK_PATH', 'SUPPORT_KEK_PATH']);
   });
 
   it('the CLI takes `--online <dir> --env <path> [--env <path>]` and leaves the nightly invocation as it was', () => {

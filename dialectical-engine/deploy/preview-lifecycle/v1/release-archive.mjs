@@ -16,13 +16,11 @@ import { chmod, chown, lstat, mkdir, rename } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { LAYOUT, RELEASE_LABEL, currentDirFor, databaseAheadPathFor, ensureDirectory, envPathFor, logLine, nativePlanPathFor, runBounded, unitNameFor } from './common.mjs';
-import { readLock, unpinRelease } from './prestart.mjs';
+import { RELEASES_ROOT, readLock, unpinRelease } from './prestart.mjs';
 import { readCurrentRelease, readReleaseState } from './release-table.mjs';
 
 const SERVICES = Object.freeze(['api', 'ui', 'runner']);
 const RELEASE_KINDS = Object.freeze(['candidate', 'fallback']);
-/** The folder every release's code lives in (prestart.mjs RELEASES_ROOT); a test layout may point it elsewhere. */
-const RELEASES_ROOT = '/opt/debateai-v3-preview/releases';
 const UNIT_SHOW = Object.freeze(['LoadState', 'ActiveState', 'UnitFileState']);
 const ACTIVE_STATES = Object.freeze(['active', 'reloading', 'activating', 'deactivating', 'maintenance', 'refreshing']);
 const STOPPED_STATES = Object.freeze(['inactive', 'failed']);
@@ -37,6 +35,7 @@ class ArchiveRefusal extends Error {
 const refuse = (code, details) => { throw new ArchiveRefusal(code, details); };
 const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
 const unitDirOf = layout => layout.systemdUnitDir ?? '/etc/systemd/system';
+/** prestart.mjs RELEASES_ROOT on the server; a test layout may point it elsewhere. */
 const releasesRootOf = layout => layout.releasesRoot ?? RELEASES_ROOT;
 /** The UTC second of the run, `YYYYMMDDTHHMMSSZ`, as in the nightly backup's file names. */
 const utcStamp = ms => new Date(ms).toISOString().slice(0, 19).replace(/[-:]/g, '') + 'Z';
@@ -129,7 +128,9 @@ async function makeTarget(path, layout) {
 /**
  * The archive (D12). Every check runs before the first move; then each present source is renamed into its archive
  * folder under its own name, the release is unpinned (prestart.mjs unpinRelease re-checks RETIRED) and systemd
- * reloads. A move or the reload failing after the first move refuses with the list of what did move.
+ * reloads. A move, the unpin or the reload failing after the first move refuses with what did move and where it went
+ * (`moved`, `to`, `configTo`), so the owner can finish by hand or run the archive again: a second run takes a new stamp,
+ * moves what is left and skips what already went.
  */
 export async function archiveRelease({ label, layout = LAYOUT, deps = {}, now = Date.now }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
@@ -170,12 +171,15 @@ export async function archiveRelease({ label, layout = LAYOUT, deps = {}, now = 
   await makeTarget(configTo, layout);
   const moved = [];
   for (const [source, target] of plan) {
-    try { await io.rename(source, target); } catch { refuse('ARCHIVE_MOVE_FAILED', { moved }); }
+    try { await io.rename(source, target); } catch { refuse('ARCHIVE_MOVE_FAILED', { moved, to, configTo }); }
     moved.push(source);
   }
-  const { lockSha256 } = await io.unpinRelease({ label, layout, deps: { readReleaseState: io.readReleaseState } });
+  let lockSha256;
+  try {
+    ({ lockSha256 } = await io.unpinRelease({ label, layout, deps: { readReleaseState: io.readReleaseState } }));
+  } catch { refuse('ARCHIVE_UNPIN_FAILED', { moved, to, configTo }); }
   const reload = await io.run([layout.systemctl, 'daemon-reload'], { env: {}, timeoutMs: 90_000, maxOutputBytes: 4096 });
-  if (!reload || reload.timedOut || reload.overflow || reload.error || reload.code !== 0) refuse('DAEMON_RELOAD_FAILED', { moved });
+  if (!reload || reload.timedOut || reload.overflow || reload.error || reload.code !== 0) refuse('DAEMON_RELOAD_FAILED', { moved, to, configTo });
   return Object.freeze({ event: 'PREVIEW_RELEASE_ARCHIVED', label, releaseKey, to, configTo, moved: Object.freeze(moved), skipped: Object.freeze(skipped), lockSha256 });
 }
 
@@ -195,7 +199,9 @@ export async function main(argv, { platform = process.platform, uid = process.ge
     logLine(stdout, await archiveRelease({ label: args.label, layout, deps, now }));
     return 0;
   } catch (error) {
-    const details = error instanceof ArchiveRefusal ? { ...(error.fields ? { fields: error.fields } : {}), ...(error.moved ? { moved: error.moved } : {}) } : {};
+    const details = error instanceof ArchiveRefusal
+      ? { ...(error.fields ? { fields: error.fields } : {}), ...(error.moved ? { moved: error.moved, to: error.to, configTo: error.configTo } : {}) }
+      : {};
     logLine(stderr, { event: 'PREVIEW_RELEASE_ARCHIVE_REFUSED', ...(args ? { label: args.label } : {}), reason: typeof error?.code === 'string' && CODE.test(error.code) ? error.code : 'UNEXPECTED', ...details });
     return 1;
   }

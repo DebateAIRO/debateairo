@@ -32,7 +32,8 @@ const FRONT = ['api', 'ui'];
 const SLOTS = ['A', 'B'];
 /** Side-by-side spec §10: the release before, the current one, the next, and one being archived. */
 const MAX_RELEASES = 4;
-const RELEASES_ROOT = '/opt/debateai-v3-preview/releases';
+/** The folder every release's code lives in; release-archive.mjs moves a retired release's folders out of it. */
+export const RELEASES_ROOT = '/opt/debateai-v3-preview/releases';
 const SOURCE_ROOT = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const GIT = /^[a-f0-9]{40}$/;
