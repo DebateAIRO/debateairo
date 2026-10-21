@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import { readFileSync } from "node:fs";
 import { collectSnapshot, RAW_SECTIONS, type RawExportRows } from "../../apps/api/src/data-export/snapshot.js";
 
@@ -111,6 +112,29 @@ describe("data-export snapshot", () => {
     expect((await h.collect()).debates.debates).toEqual([]);
     expect(h.ownerView.resolveRunRef).toHaveBeenCalledWith("run-1");
     expect(h.ownerView.runKeyPresent).not.toHaveBeenCalled();
+    expect(h.ownerView.readRun).not.toHaveBeenCalled();
+  });
+
+  it("side-by-side C9 review: a bad re-admission chain exports the run as itself and prints one content-free line", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockRejectedValue(new TypedDomainError("RUN_SUPERSESSION_CHAIN_INVALID", "RUN_SUPERSESSION_CHAIN_INVALID"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const debates = (await h.collect()).debates.debates;
+      expect(debates.map((debate) => debate.reference)).toEqual(["run-1"]);
+      expect(h.ownerView.readRun).toHaveBeenCalledWith("owner-1", "run-1");
+      expect(error.mock.calls).toEqual([[JSON.stringify({ event: "api.data_export.run_ref_chain_invalid", code: "RUN_SUPERSESSION_CHAIN_INVALID" })]]);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("side-by-side C9 review: any other resolve failure still fails the export", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockRejectedValue(new TypedDomainError("RUN_SUPERSESSION_INVALID", "RUN_SUPERSESSION_INVALID"));
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED", cause: { code: "RUN_SUPERSESSION_INVALID" } });
+    h.ownerView.resolveRunRef.mockRejectedValue(new Error("RUN_SUPERSESSION_CHAIN_INVALID"));
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
     expect(h.ownerView.readRun).not.toHaveBeenCalled();
   });
 

@@ -4256,7 +4256,20 @@ export class ReleaseRoutedDispatcher implements Dispatcher {
     const closed = await this.#work.recordSetupFailure({
       runId: input.runId, ...firstRunJob(input.runId), reason: RELEASE_NOT_SERVED_SETUP_FAILURE
     });
-    if (closed) await this.#waive(input.runId);
+    if (closed) {
+      // C4 ruling: the job is closed and never claimed, so it holds no spend and a missing waiver costs the person
+      // nothing; a failed waiver write must not escape untyped. One content-free line lets the owner see it, the
+      // alert and the typed refusal below still follow.
+      try {
+        await this.#waive(input.runId);
+      } catch (error) {
+        const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.dispatch.release_not_served_waiver_failed", runId: input.runId, releaseKey: release.releaseKey,
+          sqlstate: typeof code === "string" ? code : null
+        })));
+      }
+    }
     const state = release.state?.state ?? null;
     console.error(JSON.stringify(Object.freeze({
       event: "api.dispatch.release_not_served", runId: input.runId, releaseKey: release.releaseKey, state, closed

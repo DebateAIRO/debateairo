@@ -32,6 +32,7 @@ function arrange(input: Readonly<{
   hosted?: boolean;
   closes?: boolean;
   clock?: () => number;
+  waiveFails?: Error;
 }>) {
   const sent: unknown[][] = [];
   const closedJobs: unknown[] = [];
@@ -47,7 +48,7 @@ function arrange(input: Readonly<{
     hosted: input.hosted ?? true,
     lookup,
     work: { recordSetupFailure: vi.fn(async (record) => { closedJobs.push(record); return input.closes ?? true; }) },
-    waive: async (runId) => { waived.push(runId); },
+    waive: async (runId) => { if (input.waiveFails !== undefined) throw input.waiveFails; waived.push(runId); },
     alert: createReleaseNotServedAlert({ ...(input.clock === undefined ? {} : { clock: input.clock }), write: (line) => alerts.push(line) })
   });
   const lines = () => error.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
@@ -143,6 +144,34 @@ describe("ReleaseRoutedDispatcher never sends to a release that no longer serves
       expect(alerts).toEqual([`DEBATEAI_RELEASE_NOT_SERVED ${JSON.stringify({ releaseKey: KEY, state: found?.state?.state ?? null })}`]);
     });
   }
+
+  it("a waiver write that fails after the close prints one content-free line, still alerts, still refuses typed (C4 ruling)", async () => {
+    const failure = Object.assign(new Error("permission denied for table model_spend_waiver"), { code: "42501" });
+    const { dispatcher, sent, closedJobs, alerts, lines } = arrange({
+      found: { releaseKey: KEY, state: state("RETIRED"), anyCurrent: true }, waiveFails: failure
+    });
+    const one = job();
+    const error = await refusal(dispatcher.dispatch(one));
+    expect(error).toBeInstanceOf(ReleaseNotServedError);
+    expect(error).toMatchObject({ code: "RELEASE_NOT_SERVED", runId: one.runId, releaseKey: KEY, closed: true });
+    expect(sent).toEqual([]);
+    expect(closedJobs).toHaveLength(1);
+    expect(lines()).toEqual([
+      { event: "api.dispatch.release_not_served_waiver_failed", runId: one.runId, releaseKey: KEY, sqlstate: "42501" },
+      { event: "api.dispatch.release_not_served", runId: one.runId, releaseKey: KEY, state: "RETIRED", closed: true }
+    ]);
+    expect(JSON.stringify(lines())).not.toContain("permission denied");
+    expect(alerts).toEqual([`DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":"${KEY}","state":"RETIRED"}`]);
+  });
+
+  it("a waiver failure with no SQL state prints sqlstate null", async () => {
+    const { dispatcher, lines } = arrange({
+      found: { releaseKey: KEY, state: state("RETIRED"), anyCurrent: true }, waiveFails: new TypeError("socket closed")
+    });
+    const error = await refusal(dispatcher.dispatch(job()));
+    expect(error).toBeInstanceOf(ReleaseNotServedError);
+    expect(lines()[0]).toMatchObject({ event: "api.dispatch.release_not_served_waiver_failed", sqlstate: null });
+  });
 
   it("writes no waiver when the job was claimed meanwhile (nothing closed)", async () => {
     const { dispatcher, sent, waived, lines } = arrange({ found: { releaseKey: KEY, state: state("RETIRED"), anyCurrent: true }, closes: false });

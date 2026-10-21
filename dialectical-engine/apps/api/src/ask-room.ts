@@ -130,6 +130,14 @@ export interface AskRoomEntitlements {
 }
 
 /**
+ * Side-by-side C8 review — the one lock that serializes the site's debate count, in every decision and every waker's
+ * start, across days. A leaf: always taken after the day and person locks (`#locked`), and nothing taken after it is
+ * taken before it by any other path (the decision's reads and writes on its own transaction, the first job's sequence
+ * row last). The single-key `bigint` form over `hashtextextended(<text>, 0)`, as tests/architecture/v28-advisory-lock-shape.test.ts explains.
+ */
+const SITE_CONCURRENT_DEBATES_LOCK = "SELECT pg_advisory_xact_lock(hashtextextended('debateai.site_concurrent_debates', 0))";
+
+/**
  * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8) — WHAT HOLDS EVERY NEW DEBATE BACK, read inside the
  * spend-decision lock on the decision's own transaction (`PostgresAskAdmissionGate`, ./release-state.ts):
  *
@@ -144,14 +152,6 @@ export interface AskRoomEntitlements {
  *
  * A room without a gate (every room before C8, and every test that builds none) decides exactly as before.
  */
-/**
- * Side-by-side C8 review — the one lock that serializes the site's debate count, in every decision and every waker's
- * start, across days. A leaf: always taken after the day and person locks (`#locked`), and nothing taken after it is
- * taken before it by any other path (the decision's reads and writes on its own transaction, the first job's sequence
- * row last). The single-key `bigint` form over `hashtextextended(<text>, 0)`, as tests/architecture/v28-advisory-lock-shape.test.ts explains.
- */
-const SITE_CONCURRENT_DEBATES_LOCK = "SELECT pg_advisory_xact_lock(hashtextextended('debateai.site_concurrent_debates', 0))";
-
 export interface AskAdmissionGate {
   readonly releaseKey: string;
   readonly siteConcurrentDebates: number;
