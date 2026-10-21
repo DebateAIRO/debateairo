@@ -11,7 +11,9 @@ import {
   assertBuildMatchesRelease,
   createReadinessResponder,
   installGracefulClose,
+  noteUnusableApiBase,
   parseWebsiteReleaseKey,
+  releaseHeaderFor,
   resolveBuildReleaseCode
 } from "../../apps/ui/release-edge.mjs";
 
@@ -92,6 +94,16 @@ describe("resolveBuildReleaseCode", () => {
   it("refuses an unresolved code in production, and gives the development code otherwise", () => {
     expect(codeOf(() => resolveBuildReleaseCode({}, null, { production: true }))).toBe("RELEASE_CODE_UNRESOLVED");
     expect(resolveBuildReleaseCode({}, null, { production: false })).toBe("000000000000");
+  });
+
+  it("reads the git head only when neither RELEASE_KEY nor DEBATEAI_SOURCE_REVISION is set (C12 review)", () => {
+    const head = vi.fn(() => `${CODE}${"d".repeat(28)}`);
+    expect(resolveBuildReleaseCode({ RELEASE_KEY: OWN }, head, { production: true })).toBe(CODE);
+    expect(resolveBuildReleaseCode({ DEBATEAI_SOURCE_REVISION: "f".repeat(40) }, head, { production: true }))
+      .toBe("f".repeat(12));
+    expect(head).not.toHaveBeenCalled();
+    expect(resolveBuildReleaseCode({}, head, { production: true })).toBe(CODE);
+    expect(head).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a malformed key or revision instead of falling past it", () => {
@@ -277,6 +289,77 @@ describe("installGracefulClose", () => {
   });
 });
 
+describe("noteUnusableApiBase (C12 review)", () => {
+  it("outside --dev names a missing or unusable API base in one content-free line, so a site stuck BOOTING says why", () => {
+    for (const apiBase of [undefined, "", "not a url", "ftp://127.0.0.1:8790"]) {
+      const warn = vi.fn();
+      expect(noteUnusableApiBase(apiBase, { development: false, warn }), String(apiBase)).toBe(true);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toEqual({ event: "ui.api_base.unusable", key: "DIALECTICAL_API_BASE" });
+    }
+  });
+
+  it("says nothing for a usable base, or under --dev", () => {
+    const warn = vi.fn();
+    expect(noteUnusableApiBase("http://127.0.0.1:8790", { development: false, warn })).toBe(false);
+    expect(noteUnusableApiBase(undefined, { development: true, warn })).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("releaseHeaderFor (C12 review)", () => {
+  it("names the website's release on its own pages and /readyz", () => {
+    for (const url of ["/", "/debate/x?y=1", "/readyz", "/apiary", "/_next/static/a.js"]) {
+      expect(releaseHeaderFor(OWN, url), url).toBe(OWN);
+    }
+  });
+
+  it("leaves a proxied /api answer to carry its API's own header, so a headerless API shows as missing", () => {
+    for (const url of ["/api", "/api/", "/api/v1/session", "/api?x=1", "/api/v1/runs/x/events?after=3"]) {
+      expect(releaseHeaderFor(OWN, url), url).toBeNull();
+    }
+  });
+
+  it("names nothing under --dev without a key", () => {
+    expect(releaseHeaderFor(null, "/")).toBeNull();
+  });
+});
+
+describe("next.config.mjs (C12 review)", () => {
+  afterEach(() => {
+    vi.doUnmock("../../apps/ui/release-edge.mjs");
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function loadConfig(env: Readonly<Record<string, string | undefined>>) {
+    const readGitHead = vi.fn(() => `${"c".repeat(12)}${"d".repeat(28)}`);
+    vi.resetModules();
+    vi.doMock("../../apps/ui/release-edge.mjs", async (importOriginal) => ({
+      ...await importOriginal<typeof import("../../apps/ui/release-edge.mjs")>(),
+      readGitHead
+    }));
+    vi.stubEnv("RELEASE_KEY", "");
+    vi.stubEnv("DEBATEAI_SOURCE_REVISION", "");
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value ?? "");
+    // @ts-expect-error -- next.config.mjs is plain JavaScript with no declaration file; only its `env` is read here.
+    const config = (await import("../../apps/ui/next.config.mjs")).default as { env: Record<string, string> };
+    return { code: config.env.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE, readGitHead };
+  }
+
+  it("reads git only when neither RELEASE_KEY nor DEBATEAI_SOURCE_REVISION is set", async () => {
+    const keyed = await loadConfig({ RELEASE_KEY: OWN });
+    expect(keyed.code).toBe(CODE);
+    expect(keyed.readGitHead).not.toHaveBeenCalled();
+    const revised = await loadConfig({ DEBATEAI_SOURCE_REVISION: "e".repeat(40) });
+    expect(revised.code).toBe("e".repeat(12));
+    expect(revised.readGitHead).not.toHaveBeenCalled();
+    const bare = await loadConfig({});
+    expect(bare.code).toBe("c".repeat(12));
+    expect(bare.readGitHead).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("the website edge is wired", () => {
   it("server.mjs reads the key before Next, checks the build outside --dev, answers /readyz first and closes on SIGTERM", async () => {
     const source = await readFile(new URL("../../apps/ui/server.mjs", import.meta.url), "utf8");
@@ -289,7 +372,12 @@ describe("the website edge is wired", () => {
     expect(source).toMatch(/if \(!development\) assertBuildMatchesRelease\(distDir, releaseKey\);/u);
     expect(at("assertBuildMatchesRelease(distDir, releaseKey)")).toBeLessThan(at("next({"));
     expect(at("if (readiness(request, response)) return;")).toBeLessThan(at("void handle(request, response)"));
-    expect(source).toContain('if (releaseKey !== null) response.setHeader("x-debateai-release", releaseKey);');
+    // C12 review: the website's own pages and /readyz name its release; a proxied /api answer carries its API's own.
+    expect(source).toContain("const ownRelease = releaseHeaderFor(releaseKey, request.url);");
+    expect(source).toContain('if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);');
+    expect(at("releaseHeaderFor(releaseKey, request.url)")).toBeLessThan(at("if (readiness(request, response)) return;"));
+    expect(source).toMatch(/noteUnusableApiBase\(apiBase, \{ development \}\);/u);
+    expect(at("noteUnusableApiBase(apiBase")).toBeLessThan(at("next({"));
     expect(at("installGracefulClose(")).toBeGreaterThan(at("server.listen(port, hostname)"));
   });
 
@@ -302,5 +390,6 @@ describe("the website edge is wired", () => {
     );
     const config = await readFile(new URL("../../apps/ui/next.config.mjs", import.meta.url), "utf8");
     expect(config).toContain("NEXT_PUBLIC_DEBATEAI_RELEASE_CODE: resolveBuildReleaseCode(process.env, gitHead)");
+    expect(config).toContain("const gitHead = () => readGitHead(");
   });
 });

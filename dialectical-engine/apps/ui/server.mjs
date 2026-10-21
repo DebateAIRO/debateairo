@@ -6,7 +6,9 @@ import {
   assertBuildMatchesRelease,
   createReadinessResponder,
   installGracefulClose,
-  parseWebsiteReleaseKey
+  noteUnusableApiBase,
+  parseWebsiteReleaseKey,
+  releaseHeaderFor
 } from "./release-edge.mjs";
 import { hardenIncomingProxyHeaders, parseTrustedProxies, readEdgeSecret } from "./trusted-client-ip.mjs";
 
@@ -46,10 +48,13 @@ process.env.DIALECTICAL_UI_EDGE = "server.mjs";
 const releaseKey = parseWebsiteReleaseKey(process.env.RELEASE_KEY, { development });
 const distDir = process.env.NEXT_DIST_DIR || ".next";
 if (!development) assertBuildMatchesRelease(distDir, releaseKey);
+// Spec §6: /readyz stays BOOTING without a usable API base; outside --dev the boot names that cause (C12 review).
+const apiBase = process.env.DIALECTICAL_API_BASE?.trim();
+noteUnusableApiBase(apiBase, { development });
 // Spec §6: SIGTERM turns /readyz to DRAINING before the server stops accepting.
 let draining = false;
 const readiness = createReadinessResponder({
-  apiBase: process.env.DIALECTICAL_API_BASE?.trim(),
+  apiBase,
   releaseKey,
   fetch: globalThis.fetch,
   draining: () => draining
@@ -65,9 +70,10 @@ const server = createServer((request, response) => {
   // replaces it on every route it matches; anything it does not match —
   // static chunks, a skipped middleware — still carries this one.
   response.setHeader("content-security-policy", FALLBACK_CONTENT_SECURITY_POLICY);
-  // Spec §7: every website answer names its release; a proxied /api answer carries its API's own (the same key when
-  // the pair is healthy, which /readyz checks).
-  if (releaseKey !== null) response.setHeader("x-debateai-release", releaseKey);
+  // Spec §7: every website answer names its release; a proxied /api answer carries only its API's own (the same key
+  // when the pair is healthy, which /readyz checks), so a headerless API shows as missing (C12 review).
+  const ownRelease = releaseHeaderFor(releaseKey, request.url);
+  if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);
   // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next.
   if (readiness(request, response)) return;
   void handle(request, response).catch((error) => {

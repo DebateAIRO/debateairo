@@ -32,6 +32,8 @@ const RELEASE_CODE_PATTERN = /^[0-9a-f]{12}$/u;
 /** A full or abbreviated git revision as an operator or `git rev-parse` gives it; only its first 12 are kept. */
 const SOURCE_REVISION_PATTERN = /^[0-9a-f]{12,64}$/iu;
 const READINESS_PATH = "/readyz";
+/** The same-origin proxy (app/api/[...path]/route.ts), whose answers carry their API's own release header. */
+const API_PATH = "/api";
 /** A reason from the API is passed on only in the shape of a code, at most this many (content-free, bounded). */
 const REASON_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 const MAX_REASONS = 16;
@@ -66,7 +68,8 @@ function codeOfKey(releaseKey) {
  * head; the development code when not production. A malformed RELEASE_KEY refuses RELEASE_KEY_INVALID and a malformed
  * DEBATEAI_SOURCE_REVISION refuses RELEASE_CODE_UNRESOLVED: a value that was set is never silently passed over. A
  * production build that finds none refuses RELEASE_CODE_UNRESOLVED. `production` defaults to NODE_ENV=production,
- * which `next build` sets.
+ * which `next build` sets. `gitHead` may be a function, called only when neither variable is set (C12 review: a build
+ * told its release never runs git).
  */
 export function resolveBuildReleaseCode(env, gitHead, { production = env.NODE_ENV === "production" } = {}) {
   const key = env.RELEASE_KEY;
@@ -79,7 +82,8 @@ export function resolveBuildReleaseCode(env, gitHead, { production = env.NODE_EN
     if (!SOURCE_REVISION_PATTERN.test(revision)) throw refuse("RELEASE_CODE_UNRESOLVED");
     return revision.slice(0, 12).toLowerCase();
   }
-  if (typeof gitHead === "string" && SOURCE_REVISION_PATTERN.test(gitHead)) return gitHead.slice(0, 12).toLowerCase();
+  const head = typeof gitHead === "function" ? gitHead() : gitHead;
+  if (typeof head === "string" && SOURCE_REVISION_PATTERN.test(head)) return head.slice(0, 12).toLowerCase();
   if (production) throw refuse("RELEASE_CODE_UNRESOLVED");
   return DEVELOPMENT_CODE;
 }
@@ -109,6 +113,31 @@ export function assertBuildMatchesRelease(distDir, releaseKey) {
     || stamp === null || typeof stamp !== "object" || stamp.releaseCode !== codeOfKey(releaseKey)) {
     throw refuse("RELEASE_KEY_BUILD_MISMATCH");
   }
+}
+
+/**
+ * Outside `--dev`, a missing or unusable DIALECTICAL_API_BASE (not an http(s) URL) is named once at boot in one
+ * content-free line (C12 review), so a website whose /readyz stays BOOTING says why. It warns rather than refuses, like
+ * the retired-setting line: the refusals above guard the edge itself (port, proxy trust, secret, release, build), while
+ * without an API base nothing unsafe is served — every proxied call already refuses DIALECTICAL_API_BASE_REQUIRED or
+ * _INVALID and /readyz stays not ready. Returns whether it warned.
+ */
+export function noteUnusableApiBase(apiBase, { development, warn = console.warn }) {
+  if (development === true || readinessUrl(apiBase) !== null) return false;
+  warn(JSON.stringify({ event: "ui.api_base.unusable", key: "DIALECTICAL_API_BASE" }));
+  return true;
+}
+
+/**
+ * The x-debateai-release value the edge presets on an answer (spec §7): the website's own key on its pages, assets and
+ * /readyz; none on a proxied /api answer, which carries only its API's own header through the proxy's allowlist, so an
+ * API that sends none shows as missing to the browser instead of borrowing the website's (C12 review). Null under --dev
+ * without a key.
+ */
+export function releaseHeaderFor(releaseKey, url) {
+  if (releaseKey === null) return null;
+  const path = typeof url === "string" ? url.split("?", 1)[0] : "";
+  return path === API_PATH || path.startsWith(`${API_PATH}/`) ? null : releaseKey;
 }
 
 /** The API's /readyz beside its other routes: the proxy's base (DIALECTICAL_API_BASE) plus `/readyz`; null if unusable. */
