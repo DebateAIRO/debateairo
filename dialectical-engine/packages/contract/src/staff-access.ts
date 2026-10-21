@@ -209,7 +209,9 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/team", "POST /v1/admin/team/invitations",
         "POST /v1/admin/team/invitations/accept/options", "POST /v1/admin/team/invitations/accept/verify", "POST /v1/admin/team/invitations/accept",
         "POST /v1/admin/owner-possession/options", "POST /v1/admin/owner-possession/verify",
-        "PATCH /v1/admin/team/{staffId}/grants", "POST /v1/admin/team/{staffId}/disable", "GET /v1/admin/audit"
+        "PATCH /v1/admin/team/{staffId}/grants", "POST /v1/admin/team/{staffId}/disable", "GET /v1/admin/audit",
+        "GET /v1/admin/publication-reviews", "GET /v1/admin/publication-reviews/{reviewRef}",
+        "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
