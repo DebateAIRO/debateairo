@@ -161,10 +161,11 @@ import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
-import { PostgresPublicationApplication } from "./publications.js";
+import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
-import { PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
-import { ownerSession } from "./owner-read.js";
+import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
+import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
 import { createSynthesisPublishGate } from "./synthesis-check/publish-gate.js";
@@ -1378,6 +1379,42 @@ const synthesisCheckDeps: SynthesisCheckDeps = {
 const readSynthesisAnswer = (runId: string, answerId: string, version: number, ownerRef: string) =>
   application.readAnswer(answerId, ownerSession(ownerRef, "00000000-0000-0000-0000-000000000000"),
     version, { ownerRef, legacyAskerId: null });
+const publicationReviewStaff = createPublicationReviewStaffService({
+  repository: publicationReviewRepository,
+  readVerdictCategories: ({ runId, answerId, originVersion }) =>
+    application.withContentLease(runId, async () => [
+      ...(verdictOfRecord(await synthesisCheckRepository.readRecords({ runId, answerId, maxVersion: originVersion }),
+        (version) => version === originVersion)?.categories ?? [])
+    ]),
+  readReviewBody: (opened) => application.withContentLease(opened.runId, async () => {
+    const session = ownerSession(opened.ownerRef, "00000000-0000-0000-0000-000000000000");
+    const ownership = { ownerRef: opened.ownerRef, legacyAskerId: null };
+    const reviewDeps = { application, synthesisAnswerAccess };
+    const current = await application.readAnswer(opened.answerId, session, undefined, ownership);
+    if (current === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const bound = current.answer_version;
+    const origin = await readSynthesisAnswer(opened.runId, opened.answerId, opened.originVersion, opened.ownerRef);
+    if (origin === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const originText = synthesisTextOf(origin);
+    for (let version = bound; version >= opened.originVersion; version--) {
+      const candidate = await readOwnerAnswer(reviewDeps, opened.answerId, version, session, ownership);
+      if (candidate === null || synthesisTextOf(candidate) !== originText) continue;
+      return {
+        answerVersion: candidate.answer_version,
+        body: await buildPublicDebateBody({
+          runId: opened.runId, answer: candidate,
+          owner: { userId: opened.ownerUserId, ownerRef: opened.ownerRef },
+          readers: {
+            stories: new RepositoryPublicationStoryReader(storyRepository),
+            repository: new PostgresPublicationRepository(pool, auditContextHasher), mapViews
+          },
+          source: { ip: "", userAgent: "", requestId: "staff-publication-review" }
+        })
+      };
+    }
+    throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+  })
+});
 const synthesisPublishGate = createSynthesisPublishGate({
   repository: synthesisCheckRepository,
   approvalCovers: input => publicationReviewRepository.approvalCovers(input),
@@ -1631,7 +1668,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
     publicAppUrl: environment.PUBLIC_APP_URL, workerId: randomUUID(),
     collect: (claim, workerId) => collectSnapshot({
       claim, workerId, source,
-      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, claim.sessionId),
+      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
@@ -1696,7 +1733,7 @@ const api = buildApi({
   consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
   ...(staffAccess === undefined ? {} : { staffAccess }),
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
-  ...(staffHttp === undefined ? {} : {staff: staffHttp}),
+  ...(staffHttp === undefined ? {} : { staff: { ...staffHttp, publicationReviews: publicationReviewStaff } }),
   legacyRunClaim,
   legal,
   emailChange,

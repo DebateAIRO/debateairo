@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Kemungkinan terorisme",
   "archive.category.hateSpeech": "ujaran kebencian dalam bentuk apa pun",
   "archive.category.suicideOrHarm": "kecenderungan bunuh diri atau menyakiti orang lain",
-  "archive.category.weaponsOrDrugs": "pembuatan senjata atau narkoba"
+  "archive.category.weaponsOrDrugs": "pembuatan senjata atau narkoba",
+  "archive.publicationReview": "Tinjauan publikasi",
+  "archive.reviewAsked": "Diminta",
+  "archive.reviewApproved": "Disetujui",
+  "archive.reviewRefused": "Ditolak"
 }

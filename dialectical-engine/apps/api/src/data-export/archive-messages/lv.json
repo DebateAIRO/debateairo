@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Iespējams terorisms",
   "archive.category.hateSpeech": "jebkāda veida naida runa",
   "archive.category.suicideOrHarm": "tieksme uz pašnāvību vai kaitējumu citiem cilvēkiem",
-  "archive.category.weaponsOrDrugs": "ieroču vai narkotiku izgatavošana"
+  "archive.category.weaponsOrDrugs": "ieroču vai narkotiku izgatavošana",
+  "archive.publicationReview": "Publicēšanas pārskatīšana",
+  "archive.reviewAsked": "Pieprasīts",
+  "archive.reviewApproved": "Apstiprināts",
+  "archive.reviewRefused": "Atteikts"
 }

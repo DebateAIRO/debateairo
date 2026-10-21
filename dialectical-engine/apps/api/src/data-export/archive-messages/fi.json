@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Mahdollinen terrorismi",
   "archive.category.hateSpeech": "kaikenlainen vihapuhe",
   "archive.category.suicideOrHarm": "itsetuhoisuus tai taipumus vahingoittaa muita ihmisiä",
-  "archive.category.weaponsOrDrugs": "aseiden tai huumeiden valmistaminen"
+  "archive.category.weaponsOrDrugs": "aseiden tai huumeiden valmistaminen",
+  "archive.publicationReview": "Julkaisun arviointi",
+  "archive.reviewAsked": "Pyydetty",
+  "archive.reviewApproved": "Hyväksytty",
+  "archive.reviewRefused": "Hylätty"
 }

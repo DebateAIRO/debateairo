@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Sceimhlitheoireacht fhéideartha",
   "archive.category.hateSpeech": "fuathchaint de chineál ar bith",
   "archive.category.suicideOrHarm": "claonadh chun féinmharaithe nó chun dochar a dhéanamh do dhaoine eile",
-  "archive.category.weaponsOrDrugs": "airm nó drugaí a dhéanamh"
+  "archive.category.weaponsOrDrugs": "airm nó drugaí a dhéanamh",
+  "archive.publicationReview": "Athbhreithniú foilsithe",
+  "archive.reviewAsked": "Iarrtha",
+  "archive.reviewApproved": "Faofa",
+  "archive.reviewRefused": "Diúltaithe"
 }

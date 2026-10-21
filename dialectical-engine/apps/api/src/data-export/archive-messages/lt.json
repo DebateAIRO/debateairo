@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Galimas terorizmas",
   "archive.category.hateSpeech": "bet kokia neapykantos kalba",
   "archive.category.suicideOrHarm": "polinkis į savižudybę ar kitų žmonių žalojimą",
-  "archive.category.weaponsOrDrugs": "ginklų ar narkotikų gamyba"
+  "archive.category.weaponsOrDrugs": "ginklų ar narkotikų gamyba",
+  "archive.publicationReview": "Publikavimo peržiūra",
+  "archive.reviewAsked": "Paprašyta",
+  "archive.reviewApproved": "Patvirtinta",
+  "archive.reviewRefused": "Atmesta"
 }
