@@ -61,6 +61,7 @@ import {
 } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
+import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
 import { createRunnerRetirementSignal, createTaskExecutionCounter } from "./runner-retirement.js";
@@ -688,5 +689,22 @@ announceRunnerReady({
   // Side-by-side spec §1: the ready line names the release this runner runs as.
   releaseKey: environment.RELEASE_KEY,
   startupDispatched: startupReconciliation.dispatched
+});
+// Side-by-side spec §2 (plan B D4): every five minutes this release re-sends its own lapsed CLAIMED items (a copy that
+// died mid-debate) under its own task name, not only at a fresh start; none while it retires (claims stopped, §4).
+const lapsedResend = startLapsedClaimResend({
+  work: new WorkItemRepository(pool, workFence),
+  dispatch: async ({ runId, workItemId }) => {
+    await hatchet.runNoWait(taskName, { runId, workItemId }, {
+      additionalMetadata: {
+        v3RunId: runId,
+        v3WorkItemId: workItemId,
+        sourceOfRecord: "core.work_item",
+        dispatchSource: "runner-lapsed-resend"
+      }
+    });
+  },
+  paused: () => retirementSignal.claimsStopped(),
+  log: (line) => console.warn(JSON.stringify(line))
 });
 await started;

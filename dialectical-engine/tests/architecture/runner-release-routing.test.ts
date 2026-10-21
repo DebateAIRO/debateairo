@@ -5,8 +5,9 @@ import { describe, expect, it } from "vitest";
 /**
  * Side-by-side spec §2: two releases live at once must never share a Hatchet task. With one shared name, either
  * release's worker could pick up the other's debates and their retries would flip between the two codes. So the runner
- * registers, and its start-up re-send dispatches, under `releaseTaskName(HATCHET_WORKFLOW_NAME, RELEASE_KEY)`: the base
- * name plus its own release key (`legacy` keeps the bare base name, today's single task).
+ * registers, and its start-up and five-minute lapsed-claim re-sends dispatch, under
+ * `releaseTaskName(HATCHET_WORKFLOW_NAME, RELEASE_KEY)`: the base name plus its own release key (`legacy` keeps the bare
+ * base name, today's single task).
  */
 
 const RUNNER_SOURCE = "apps/runner/src";
@@ -24,7 +25,11 @@ describe("the runner registers and re-sends under its release's own task name (s
   it("registers the task and re-sends open work under that name", async () => {
     const main = await readFile(RUNNER_MAIN, "utf8");
     expect(main).toContain("workflowName: taskName");
-    expect(main).toContain("hatchet.runNoWait(taskName, { runId, workItemId }");
+    // Two senders, both under the release's task name: the start-up re-send and the five-minute lapsed-claim re-send.
+    expect(occurrences(main, "runNoWait(")).toBe(2);
+    expect(occurrences(main, "hatchet.runNoWait(taskName, { runId, workItemId }")).toBe(2);
+    expect(occurrences(main, 'dispatchSource: "runner-startup-reconciliation"')).toBe(1);
+    expect(occurrences(main, 'dispatchSource: "runner-lapsed-resend"')).toBe(1);
     expect(main.indexOf(TASK_NAME)).toBeLessThan(main.indexOf("declareHatchetWalkingSkeletonTask("));
   });
 

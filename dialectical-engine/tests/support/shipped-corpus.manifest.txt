@@ -374,6 +374,7 @@ apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-replay.ts
 apps/runner/src/run-seats.ts
 apps/runner/src/run-sit-out.ts
+apps/runner/src/runner-lapsed-resend.ts
 apps/runner/src/runner-preview-team-gate.ts
 apps/runner/src/runner-ready.ts
 apps/runner/src/runner-retirement.ts
