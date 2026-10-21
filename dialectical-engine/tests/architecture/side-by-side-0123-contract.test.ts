@@ -7,7 +7,8 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 /**
  * 0123 (side-by-side uploads spec 2026-10-21 §1, §5; plan A, tasks A1-A5) is ONE chain step built section by section:
  * A1 gives it the release stamp on core.run and the encrypted insert path that writes it; A2 the release table, its view,
- * its two readers and its two serialized writers (§3). It is the drained transition
+ * its two readers and its two serialized writers (§3); A3 the re-admission records and the two new wait reasons (§4, §5).
+ * It is the drained transition
  * upload's step (`-- n1: drained`) and adds no billing object, so 0111's effective verifier stays in force
  * (`-- n1: keeps-verifier`, migrations/lineage/README.md step 3).
  */
@@ -113,10 +114,60 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("SIDE_BY_SIDE_RELEASE_TABLE_CONTRACT_INCOMPLETE");
     // The loader digests the table whole, the view, the four functions and the two roles.
     const loader = read("packages/db/src/migration-forward0123.ts");
-    expect(loader).toContain("const TABLES=['core.release_event'] as const;");
+    expect(loader).toContain("const TABLES=['core.release_event',"); // §4 appends core.run_supersession
     expect(loader).toContain("const VIEWS=['core.release_state_v'] as const;");
     expect(loader).toContain("const ROLES=['debateai_release_operator','debateai_release_owner'] as const;");
     expect(loader).toContain("'core.record_release_switch(text,text,timestamptz,text,bigint)'");
+  });
+
+  it("§4 adds the append-only supersession record, its guard, run ref resolution and the line without superseded runs", () => {
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS core.run_supersession (");
+    expect(sql).toContain("old_run_id uuid PRIMARY KEY REFERENCES core.run(run_id),");
+    expect(sql).toContain("new_run_id uuid NOT NULL UNIQUE REFERENCES core.run(run_id),");
+    expect(sql).toContain("CONSTRAINT run_supersession_reason_closed CHECK (reason IN ('READMITTED'))");
+    expect(sql).toContain("CONSTRAINT run_supersession_changes_the_run CHECK (old_run_id <> new_run_id)");
+    expect(sql).toContain("SELECT core.install_truncate_guard('core.run_supersession');");
+    expect(sql).toMatch(/CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON core\.run_supersession\s+FOR EACH STATEMENT EXECUTE FUNCTION core\.reject_mutation\(\);/u);
+    expect(sql).toMatch(/CREATE TRIGGER guard_run_supersession BEFORE INSERT ON core\.run_supersession\s+FOR EACH ROW EXECUTE FUNCTION core\.guard_run_supersession\(\);/u);
+    // The guard: one lock for every edge, the old run's wait row locked against a concurrent start, the refusal code.
+    const guard = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.guard_run_supersession()"));
+    expect(guard.slice(0, guard.indexOf("$$;"))).toContain(
+      "PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';");
+    expect(sql).toContain("ALTER FUNCTION core.resolve_run_ref(uuid) OWNER TO debateai_release_owner;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_runtime;");
+    expect(sql).toContain("GRANT SELECT, INSERT ON core.run_supersession TO debateai_runtime;");
+    expect(sql).toContain("GRANT SELECT ON core.run_supersession TO debateai_release_owner;");
+    // The view: 0083's, with one more clause, and 0083's grant re-asserted.
+    const view = sql.slice(sql.indexOf("CREATE OR REPLACE VIEW core.run_waiting_v AS"));
+    const original = read("migrations/0083_budget_holds_waiting_line.sql");
+    const before = original.slice(original.indexOf("CREATE OR REPLACE VIEW core.run_waiting_v AS"));
+    expect(view.slice(0, view.indexOf(";"))).toBe(`${before.slice(0, before.indexOf(";"))}
+  AND NOT EXISTS (SELECT 1 FROM core.run_supersession s WHERE s.old_run_id = wait.run_id)`);
+    expect(view).toContain("GRANT SELECT ON core.run_waiting_v TO debateai_runtime;");
+    // A-x1: the readmitted provision is the content role's alone, and the commit takes its marked intent.
+    expect(sql).toContain("ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.prepare_readmitted_run_key_provision(uuid,uuid) TO debateai_content_provision;");
+    expect(sql).toContain(") OR core.lock_readmitted_run_key_provision_for_commit(");
+    expect(sql).toContain("SIDE_BY_SIDE_READMISSION_CONTRACT_INCOMPLETE");
+    // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession'] as const;");
+    for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)",
+      "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)"]) {
+      expect(loader).toContain(`'${signature}'`);
+    }
+    expect(loader).toContain("const VIEWS=['core.release_state_v'] as const;");
+    expect(read("packages/db/src/index.ts")).toContain('"core.prepare_readmitted_run_key_provision(uuid,uuid)"');
+  });
+
+  it("§5 widens the wait reasons with SITE_BUSY and SWITCHING, NOT VALID then validated", () => {
+    expect(sql).toContain("AND strpos(pg_catalog.pg_get_constraintdef(check_constraint.oid), 'waits_for') > 0");
+    expect(sql).toContain("AND strpos(pg_catalog.pg_get_constraintdef(check_constraint.oid), 'person_recheck_at') = 0");
+    expect(sql).toContain("ADD CONSTRAINT run_wait_reason_waits_for_check CHECK (waits_for IN ('SITE','PERSON','SITE_BUSY','SWITCHING')) NOT VALID;");
+    expect(sql).toContain("ALTER TABLE core.run_wait_reason VALIDATE CONSTRAINT run_wait_reason_waits_for_check;");
+    expect(sql).toContain("SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE");
   });
 
   it("§2's closing check covers every role 0040's REVOKE names, not only PUBLIC and the runtime", () => {

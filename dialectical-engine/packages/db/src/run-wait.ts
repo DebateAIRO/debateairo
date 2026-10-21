@@ -6,19 +6,30 @@ import type { Pool, PoolClient } from "pg";
  * `core.run_wait` / `core.run_wait_start` / `core.run_wait_reason` are
  * append-only and content-free; the line is read through `core.run_waiting_v`,
  * which derives "still waiting" (no start, no FAILED job, content still live,
- * owner's account still active), the run's owner (its latest ownership event)
- * and why it waits (its latest reason), so no owner is ever stored beside a wait.
+ * owner's account still active, not superseded by a re-admitted run: 0123 §4),
+ * the run's owner (its latest ownership event) and why it waits (its latest
+ * reason), so no owner is ever stored beside a wait.
  */
 export type WaitingRunRef = Readonly<{ runId: string; waitingSince: Date }>;
 
 /**
  * Why a run waits (budget spec §2.3 rule 1). SITE: the site's day, or the line
  * ahead of it. PERSON: its own person's window is full; `personRecheckAt` is the
- * earliest instant that block can lift by itself.
+ * earliest instant that block can lift by itself. Side-by-side spec §9, §13
+ * (0123 §5): SITE_BUSY, the site runs as many debates as its runners take;
+ * SWITCHING, a release switch is under way. Every reason but PERSON is
+ * site-like to the readers below (`IS DISTINCT FROM 'PERSON'`), so such a run
+ * keeps its place in line and the waker still reads it; area C decides when
+ * each is written.
  */
 export type WaitReason =
   | Readonly<{ waitsFor: "SITE"; personRecheckAt: null }>
-  | Readonly<{ waitsFor: "PERSON"; personRecheckAt: Date }>;
+  | Readonly<{ waitsFor: "PERSON"; personRecheckAt: Date }>
+  | Readonly<{ waitsFor: "SITE_BUSY"; personRecheckAt: null }>
+  | Readonly<{ waitsFor: "SWITCHING"; personRecheckAt: null }>;
+
+/** The reasons that carry no recheck instant (0083's run_wait_reason_names_its_recheck). */
+const SITE_LIKE_REASONS: ReadonlySet<unknown> = new Set(["SITE", "SITE_BUSY", "SWITCHING"]);
 
 /** Where one page of the waker's read ended, in the line's own order: (waiting_since, run_id). */
 export type WaitingRunCursor = Readonly<{ waitingSince: Date; runId: string }>;
@@ -126,7 +137,7 @@ export class RunWaitRepository {
     reason: WaitReason & Readonly<{ at: Date }>
   ): Promise<void> {
     const person = reason?.waitsFor === "PERSON";
-    if ((reason?.waitsFor !== "SITE" && !person) || !validInstant(reason.at)
+    if ((!SITE_LIKE_REASONS.has(reason?.waitsFor) && !person) || !validInstant(reason.at)
       || (person ? !validInstant(reason.personRecheckAt) : reason.personRecheckAt !== null)) {
       throw new TypeError("RUN_WAIT_REASON_INVALID");
     }

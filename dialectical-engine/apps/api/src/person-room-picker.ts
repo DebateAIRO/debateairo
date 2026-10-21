@@ -77,6 +77,10 @@ function wakePlanInstant(preview: RoomPreview): Date {
       return reason.personRecheckAt;
     case "SITE":
       return preview.now;
+    // Side-by-side spec §9, §13 (0123 §5): site-like, like SITE; area C (plan C) decides when each is written.
+    case "SITE_BUSY":
+    case "SWITCHING":
+      return preview.now;
     default:
       return exhaustive(reason);
   }

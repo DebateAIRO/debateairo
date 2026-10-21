@@ -220,13 +220,21 @@ body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-
 (append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
 `core.read_release_state(text)` (EXECUTE for `debateai_runtime`) and the writers `core.record_release_switch` and
 `core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
-advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`. Its header declares
+advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`; §4 adds the re-admission
+record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
+`RUN_SUPERSESSION_INVALID` unless the old run still waits and the new run has no edge of its own; SELECT, INSERT for
+`debateai_runtime`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`, at most 16 hops), the readmitted
+run's key provision `core.prepare_readmitted_run_key_provision(uuid,uuid)` (EXECUTE for `debateai_content_provision`
+only) with its commit lock and the intent's marker column `readmitted_from_run_id`, and redefines `core.run_waiting_v`
+(0083's view plus "not superseded"); §5 widens `core.run_wait_reason`'s `waits_for` CHECK with `SITE_BUSY` and
+`SWITCHING` (NOT VALID, then validated). Its header declares
 `-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier
 functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
-`replayVerifierSql`: its postcondition is the column (type, NOT NULL, default), the CHECK (name, validation,
-definition), the redefined and added functions whole, the release table whole, the view (owner, ACL, definition) and the
-two roles' attributes and memberships. While the build is open each task appends its section and recomputes
+`replayVerifierSql`: its postcondition is the two columns (type, NOT NULL, default), the CHECK (name, validation,
+definition), the redefined and added functions whole, the release and supersession tables whole, the release view
+(owner, ACL, definition) and the two roles' attributes and memberships. `core.run_waiting_v` and the `waits_for` CHECK
+are checked by the closing block and by tests, not digested, so a later drained step may widen them again. While the build is open each task appends its section and recomputes
 `migration.sha256` with the one-liner at the end of this file; once merged, 0123 is never edited again. If `origin/dev`
 takes 0123 first, renumber this step (rename every file and constant that carries the number, recompute the manifest,
 re-pin the chain lists).
