@@ -10,14 +10,22 @@
 //             interval passes, and only then the old website and API stop. The old runner is never stopped: it finishes
 //             its own debates and retires by itself (spec §4). The backstop (switch + 27,000 s, an absolute UTC time
 //             that survives a reboot) and the boot target are written last;
+//   - switch --finish: the database write of a switch landed but the command did not get to the end (a crash or a lost
+//             ssh session after the write, SWITCH_OUTCOME_UNKNOWN, or BACKSTOP/TARGET in `bad`): the steps after the
+//             write run again (each one repeats safely): edge, old pair's stop, its record, backstop, boot target, checks;
 //   - rollback after a switch: the older release is staged again, its runner starts first (database-ahead mode, prestart),
 //             then its API and website, then the same switch the other way; before a switch: the new release goes away.
 //
 //   release-switch.mjs stage --label <new>
 //   release-switch.mjs seed --label <T>
 //   release-switch.mjs switch --to <new> --from <old> [--old-pair-stopped]
+//   release-switch.mjs switch --finish --to <new> --from <old>
 //   release-switch.mjs rollback --to <older> --from <newer>
 //   release-switch.mjs rollback --before-switch --label <new>
+//
+// One command at a time (D10 review): each takes ${lockRoot}/release-switch.lock (created exclusively, holding its pid,
+// removed when it ends); another command meanwhile refuses RELEASE_SWITCH_BUSY. A file left by a process that is gone
+// is still refused (the refusal says holderAlive false): the operator moves it aside, after checking no switch runs.
 //
 // Exit 0 with an empty `bad`; 2 when the command finished but a check after the database write failed (`bad` names it);
 // 1 on a refusal (nothing after the refusal happened). One JSON line per run: codes, labels, keys, counts and times only,
@@ -27,9 +35,12 @@
 // /readyz only, caddy-slots.mjs). Every request may wait out Caddy's 10 s hold, so each one gets 12 s. A website's own
 // answer always names its release in x-debateai-release, so an answer without that header is one Caddy made itself (no
 // slot ready when its hold ran out); those, timeouts and connection errors are the switch's edge failures. A website's
-// 503 during the break-before-make gap is an answer, not a failure. The operator watches the public site with a curl
-// loop of their own during the switch (the guide, D15); this tool holds no site password.
-import { readFile, lstat, readdir, readlink } from 'node:fs/promises';
+// 503 during the break-before-make gap is an answer, not a failure. There is no background poller (controller ruling,
+// D10 review): the edge is read during the confirmations and once after the stop. What a visitor sees during the switch
+// is watched by the operator's own curl loop against the public URL, with their own password (the guide, D15); this
+// tool holds no site password.
+import { constants } from 'node:fs';
+import { lstat, open, readFile, readdir, readlink, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
@@ -54,6 +65,8 @@ export const EDGE_SECRET_PATH = '/etc/debateai-v3-preview/ui-edge.caddy.secret';
 /** Written by the release check's maintenance gate (D11); while it exists no switch starts. */
 export const MAINTENANCE_PENDING_NAME = 'maintenance-pending';
 export const GATE_FILES_SCHEMA = 'preview-release-gate-files-v1';
+/** One release-switch command at a time: this file in the lock folder, created exclusively. */
+export const SWITCH_LOCK_NAME = 'release-switch.lock';
 const unitDirOf = layout => layout.systemdUnitDir ?? '/etc/systemd/system';
 const targetDropinOf = layout => `${unitDirOf(layout)}/${layout.unitPrefix.replace(/-$/, '')}.target.d/60-current-release.conf`;
 /** debateai-preview.target's drop-in naming the current release's website and API, so a boot starts that pair (§10). */
@@ -330,10 +343,14 @@ function stillDrains(events) {
   return last('DRAINING') > last('RETIRED');
 }
 
-/** The backstop of a draining release: its absolute time in the timer drop-in, then reload, enable, (re)start. */
+/**
+ * The backstop of a draining release: its absolute time in the timer drop-in, then reload, enable, (re)start. A time
+ * already past (a finish run more than 7.5 hours after the write) becomes one second from now: systemd never fires a
+ * calendar time that was past when it was armed, and the backstop is due.
+ */
 async function armBackstop(label, atMs, layout, io) {
   const timer = `${layout.unitPrefix}runner-retire@${label}.timer`;
-  const at = new Date(Math.ceil(atMs / 1000) * 1000);
+  const at = new Date(Math.ceil(Math.max(atMs, io.now() + 1000) / 1000) * 1000);
   await io.writeUnitFile(`${unitDirOf(layout)}/${timer}.d/50-at.conf`, renderBackstopDropin({ label, at }));
   // restart, not start: an instance that already elapsed (a label that drained once before) ignores a start (D7 note).
   for (const args of [['daemon-reload'], ['enable', timer], ['restart', timer]]) if (!await systemctl(args, layout, io)) refuse('BACKSTOP_FAILED');
@@ -353,10 +370,11 @@ async function stopPair(label, layout, io) {
   return true;
 }
 
-/** FRONT_PAIR_STOPPED for a draining release, unless its API's stop recorder (D7's ExecStopPost) already wrote it. */
+/** FRONT_PAIR_STOPPED for a draining release, unless its API's stop recorder (D7's ExecStopPost) already wrote it. Returns the state read. */
 async function recordPairStopped(releaseKey, recordedBy, io) {
   const { state, frontPairStopped } = await io.readReleaseState({ releaseKey });
   if (state === 'DRAINING' && !frontPairStopped) await recordEvent(io, { releaseKey, kind: 'FRONT_PAIR_STOPPED', recordedBy, written: after => after.frontPairStopped });
+  return state;
 }
 
 /** Every read-only condition of the switch (spec §6); SWITCH_PRECONDITION_FAILED names each one that fails. */
@@ -371,6 +389,13 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
   if (toRelease.slot === fromRelease.slot) fields.push('slot');
   if ((await io.readCurrentRelease())?.releaseKey !== fromKey) fields.push('current');
   if ((await io.readReleaseState({ releaseKey: toKey })).state !== 'STAGED') fields.push('state');
+  // At most two releases are live (0123): another pinned release that still drains (DRAINING, or staged again while it
+  // still drains) would make the database refuse RELEASE_SWITCH_CONFLICT; name it here instead (D10 review).
+  for (const other of Object.keys(lock.releases).filter(label => label !== to && label !== from)) {
+    const otherKey = lock.releases[other].releaseKey;
+    const { state } = await io.readReleaseState({ releaseKey: otherKey });
+    if (state === 'DRAINING' || (state === 'STAGED' && stillDrains(await io.readReleaseEvents({ releaseKey: otherKey })))) { fields.push('otherDraining'); break; }
+  }
   const runnerActive = await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active';
   if (!runnerActive) fields.push('runner');
   for (const service of ['api', 'ui']) if (await unitState(unitNameFor(layout, service, to), layout, io) !== 'active') fields.push(service);
@@ -422,39 +447,36 @@ async function revert({ to, toKey, fromKey, recordedBy, tally, layout, io }) {
 }
 
 /**
- * The switch itself, in order: preconditions; the one database write; the edge (three confirmations, then one more
- * health interval: every Caddy proxy block has its own checker, so the public route may lag the listener by one);
- * the old pair's stop; the backstop; the boot target; the gate files; the final checks. Everything after the database
- * write is done even when a step fails: a failed step is named in `bad`, never a reason to leave the rest undone.
+ * Everything after the database write (the switch, and `switch --finish` again later), after the edge confirmations:
+ * one more health interval (every Caddy proxy block has its own checker, so the public route may lag the listener by
+ * one); the old pair's stop and its record; the backstop (none for an old release that already RETIRED); the boot
+ * target; the gate files (a finish keeps the ones the switch wrote); the final checks. Every step repeats safely, and
+ * each one runs even when an earlier one failed: a failed step is named in `bad`, never a reason to leave the rest undone.
  */
-async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
-  requireLabel(to); requireLabel(from);
-  if (to === from) refuse('SWITCH_PRECONDITION_FAILED', ['labels']);
-  const recordedBy = rollback ? ROLLBACK_BY : RECORDED_BY;
-  const { toKey, fromKey } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
-  const tally = { edgeFailures: 0 };
-  await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy });
-  const switchedAt = new Date(io.now()).toISOString();
-  const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
-  if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
+async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, layout, io }) {
   await io.sleep(HEALTH_INTERVAL_S * 1000 + 500);
   const bad = [];
   const step = async (code, body) => { try { if (await body() === false) bad.push(code); } catch { bad.push(code); } };
   // The old website and API only; the old runner keeps finishing its debates and retires by itself (spec §4).
-  let pairStopped = false;
+  let pairStopped = false, fromState = null;
   await step('OLD_PAIR_STOP', async () => (pairStopped = await stopPair(from, layout, io)));
-  if (pairStopped) await step('FRONT_PAIR_STOPPED_RECORD', () => recordPairStopped(fromKey, recordedBy, io));
+  if (pairStopped) await step('FRONT_PAIR_STOPPED_RECORD', async () => { fromState = await recordPairStopped(fromKey, recordedBy, io); });
   let backstopAt = null;
   await step('BACKSTOP', async () => {
+    fromState ??= (await io.readReleaseState({ releaseKey: fromKey })).state;
+    if (fromState === 'RETIRED') return true;
     const current = await io.readCurrentRelease();
     if (current?.releaseKey !== toKey) return false;
     // The database clock: take-traffic-from is the switch's own clock_timestamp() + 5 s.
     backstopAt = await armBackstop(from, Date.parse(current.takeTrafficFrom) - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000, layout, io);
+    return true;
   });
   await step('TARGET', () => writeTarget(to, layout, io));
   await step('GATE_FILES', async () => {
+    const path = gateFilesPathFor(layout, toKey);
+    if (keepGateFiles && await io.pathExists(path)) return;
     const gates = await io.gateFilesDigest();
-    await io.writeStateFile(gateFilesPathFor(layout, toKey), `${JSON.stringify({ schema: GATE_FILES_SCHEMA, releaseKey: toKey, label: to, recordedAt: new Date(io.now()).toISOString(), gates })}\n`);
+    await io.writeStateFile(path, `${JSON.stringify({ schema: GATE_FILES_SCHEMA, releaseKey: toKey, label: to, recordedAt: new Date(io.now()).toISOString(), gates })}\n`);
   });
   // Final checks (spec §12 step 13.6). The old runner may already have retired (no open work left): that is fine.
   await step('RUNNER_FROM', async () => await unitState(unitNameFor(layout, 'runner', from), layout, io) === 'active'
@@ -467,7 +489,59 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
     return !answer.failed && answer.status === 200 && answer.release === toKey;
   });
   if (tally.edgeFailures !== 0) bad.push('EDGE_FAILURES');
-  return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad: Object.freeze(bad) });
+  return { backstopAt, bad: Object.freeze(bad) };
+}
+
+/**
+ * The switch itself, in order: preconditions; the one database write; the edge (three confirmations, or the revert);
+ * then afterWrite. A write whose outcome stays unknown names the finish command.
+ */
+async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
+  requireLabel(to); requireLabel(from);
+  if (to === from) refuse('SWITCH_PRECONDITION_FAILED', ['labels']);
+  const recordedBy = rollback ? ROLLBACK_BY : RECORDED_BY;
+  const { toKey, fromKey } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
+  const tally = { edgeFailures: 0 };
+  try {
+    await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy });
+  } catch (error) {
+    if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: release-switch.mjs switch --finish --to ${to} --from ${from}` });
+    throw error;
+  }
+  const switchedAt = new Date(io.now()).toISOString();
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
+  if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
+  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, layout, io });
+  return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
+}
+
+/**
+ * `switch --finish` (D10 review): the release table already names `to` current and `from` drains (or already retired),
+ * but the switch command did not get to its end. Read-only preconditions (FINISH_PRECONDITION_FAILED), then the edge must
+ * show `to` three times in a row (FINISH_EDGE_UNCONFIRMED otherwise, nothing stopped; there is no revert here: the
+ * database decided), then afterWrite. Never writes the release switch itself.
+ */
+export async function finishSwitch({ to, from, layout = LAYOUT, deps = {} }) {
+  requireLabel(to); requireLabel(from);
+  if (to === from) refuse('FINISH_PRECONDITION_FAILED', ['labels']);
+  const io = withDefaults(layout, deps);
+  const { lock } = await io.readLock(layout);
+  const toRelease = own(lock.releases, to), fromRelease = own(lock.releases, from);
+  const fields = [];
+  if (!toRelease) fields.push('to');
+  if (!fromRelease) fields.push('from');
+  if (fields.length) refuse('FINISH_PRECONDITION_FAILED', fields);
+  const toKey = toRelease.releaseKey, fromKey = fromRelease.releaseKey;
+  if (toRelease.slot === fromRelease.slot) fields.push('slot');
+  if ((await io.readCurrentRelease())?.releaseKey !== toKey) fields.push('current');
+  const { state } = await io.readReleaseState({ releaseKey: fromKey });
+  if (state !== 'DRAINING' && state !== 'RETIRED') fields.push('state');
+  if (fields.length) refuse('FINISH_PRECONDITION_FAILED', fields);
+  const tally = { edgeFailures: 0 };
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
+  if (edgeConfirmedMs === null) refuse('FINISH_EDGE_UNCONFIRMED', { edgeFailures: tally.edgeFailures });
+  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy: RECORDED_BY, tally, keepGateFiles: true, layout, io });
+  return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', to, from, toKey, fromKey, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
 }
 
 /** Side-by-side spec §6: switch the site from release `from` (current) to release `to` (STAGED, its three units up). */
@@ -533,7 +607,8 @@ async function waitUntilReady({ unit, ready, waitMs, code, layout, io }) {
  * staged again; its runner starts FIRST (prestart runs it in database-ahead mode) and must print its start line; then its
  * API (its start line) and its website (503, only NOT_CURRENT); then the switch with the roles reversed. The newer
  * release's runner keeps finishing what it started (O1). A rollback that stopped half way can be run again: an older
- * release already staged again (it still drains) is accepted, and only what is not running is started.
+ * release already staged again (STAGED, and it drained before: it was switched away from once, whether it retired since
+ * or not) is accepted, and only what is not running is started.
  */
 async function rollbackAfterSwitch({ to, from, layout, io }) {
   requireLabel(to); requireLabel(from);
@@ -548,7 +623,8 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
   if (toRelease.slot === fromRelease.slot) fields.push('slot');
   if ((await io.readCurrentRelease())?.releaseKey !== fromKey) fields.push('current');
   const { state } = await io.readReleaseState({ releaseKey: toKey });
-  const restaged = state === 'STAGED' && stillDrains(await io.readReleaseEvents({ releaseKey: toKey }));
+  // A half-done rollback left it STAGED; it drained before, and may have RETIRED in between (D10 review).
+  const restaged = state === 'STAGED' && (await io.readReleaseEvents({ releaseKey: toKey })).some(event => event.kind === 'DRAINING');
   if (state !== 'DRAINING' && state !== 'RETIRED' && !restaged) fields.push('state');
   let gatesActive = true;
   for (const gate of GATES) if (await io.gateState(gate) !== 'active') gatesActive = false;
@@ -561,7 +637,10 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
   const started = [];
   const unit = service => unitNameFor(layout, service, to);
   const start = async (service, ready, waitMs, code) => {
-    if (await unitState(unit(service), layout, io) === 'active') return;
+    const before = await unitState(unit(service), layout, io);
+    if (before === 'active') return;
+    // A unit left failed would still read failed while its start job waits in the queue: clear that first (D10 review).
+    if (before === 'failed' && !await systemctl(['reset-failed', unit(service)], layout, io)) refuse('ROLLBACK_START_FAILED', { service });
     if (!await systemctl(['start', '--no-block', unit(service)], layout, io)) refuse('ROLLBACK_START_FAILED', { service });
     await waitUntilReady({ unit: unit(service), ready, waitMs, code, layout, io });
     started.push(service);
@@ -636,6 +715,7 @@ function parseArguments(argv) {
   const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
   if (n === 3 && (a === 'stage' || a === 'seed') && b === '--label' && isLabel(c)) return { command: a, label: c };
   if ((n === 5 || (n === 6 && f === '--old-pair-stopped')) && a === 'switch' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'switch', to: c, from: e, oldPairStopped: n === 6 };
+  if (n === 6 && a === 'switch' && b === '--finish' && c === '--to' && isLabel(d) && e === '--from' && isLabel(f)) return { command: 'switch', to: d, from: f, finish: true };
   if (n === 5 && a === 'rollback' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'rollback', to: c, from: e };
   if (n === 4 && a === 'rollback' && b === '--before-switch' && c === '--label' && isLabel(d)) return { command: 'rollback', label: d, beforeSwitch: true };
   return refuse('ARGUMENTS_REFUSED');
@@ -643,10 +723,46 @@ function parseArguments(argv) {
 const COMMANDS = Object.freeze({
   stage: (args, layout, deps) => stageRelease({ label: args.label, layout, deps }),
   seed: (args, layout, deps) => seedRelease({ label: args.label, layout, deps }),
-  switch: (args, layout, deps) => switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps }),
+  switch: (args, layout, deps) => (args.finish ? finishSwitch({ to: args.to, from: args.from, layout, deps }) : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })),
   rollback: (args, layout, deps) => (args.beforeSwitch ? rollbackRelease({ from: args.label, beforeSwitch: true, layout, deps }) : rollbackRelease({ to: args.to, from: args.from, layout, deps }))
 });
 const FAILED_EVENT = Object.freeze({ stage: 'PREVIEW_RELEASE_STAGE_REFUSED', seed: 'PREVIEW_RELEASE_SEED_REFUSED', switch: 'PREVIEW_RELEASE_SWITCH_REFUSED', rollback: 'PREVIEW_RELEASE_ROLLBACK_REFUSED' });
+
+const PID_LINE = /^([1-9][0-9]{0,9})\n$/;
+/** The pid in a lock file, or null; and whether that process exists (EPERM: it exists, owned by someone else). */
+async function lockHolder(path) {
+  const text = await readFile(path, 'utf8').catch(() => '');
+  const match = PID_LINE.exec(text.slice(0, 32));
+  if (!match) return { holderPid: null, holderAlive: false };
+  const holderPid = Number(match[1]);
+  try { process.kill(holderPid, 0); return { holderPid, holderAlive: true }; } catch (error) { return { holderPid, holderAlive: error?.code === 'EPERM' }; }
+}
+
+/**
+ * Take the switch lock: create `path` exclusively (no symlink followed, 0600) with this process's pid. Resolves to the
+ * function that lets go: it removes the file only while it still holds this pid (if the operator moved it aside, the
+ * file now there is another command's). RELEASE_SWITCH_BUSY when the file exists; RELEASE_SWITCH_LOCK_FAILED otherwise.
+ */
+export async function acquireSwitchLock(path) {
+  let handle;
+  try {
+    handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  } catch (error) {
+    if (error?.code === 'EEXIST') refuse('RELEASE_SWITCH_BUSY', await lockHolder(path));
+    refuse('RELEASE_SWITCH_LOCK_FAILED');
+  }
+  const token = `${process.pid}\n`;
+  try {
+    await handle.write(token);
+    await handle.sync();
+  } catch {
+    await handle.close().catch(() => undefined);
+    await unlink(path).catch(() => undefined);
+    refuse('RELEASE_SWITCH_LOCK_FAILED');
+  }
+  await handle.close();
+  return async () => { if (await readFile(path, 'utf8').catch(() => null) === token) await unlink(path).catch(() => undefined); };
+}
 
 /** One JSON line per run: the result on stdout (exit 0, or 2 when `bad` is not empty), or one refusal on stderr (exit 1). */
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
@@ -654,7 +770,9 @@ export async function main(argv, { platform = process.platform, uid = process.ge
   try {
     args = parseArguments(argv);
     if (platform !== 'linux' || uid !== 0) refuse('ACTOR_REFUSED');
-    const result = await COMMANDS[args.command](args, layout, deps);
+    const release = await (deps.acquireLock ?? acquireSwitchLock)(`${layout.lockRoot}/${SWITCH_LOCK_NAME}`);
+    let result;
+    try { result = await COMMANDS[args.command](args, layout, deps); } finally { await release(); }
     logLine(stdout, result);
     return result.bad?.length ? 2 : 0;
   } catch (error) {

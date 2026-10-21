@@ -31,9 +31,9 @@ const COUNT = /^(?:0|[1-9][0-9]{0,15})$/;
 const EVENT_SEQ = /^[1-9][0-9]{0,18}$/;
 const TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
-// The database gives up before root does (15 s): once root has stopped waiting, the statement is
-// cancelled by its own 10 s limit, so a timed-out switch is a switch that did not happen. psql gives up
-// connecting after 5 s (PGCONNECT_TIMEOUT, psqlArgv). Error texts are the server's untranslated ones
+// The database gives up before root does (15 s): psql gives up connecting after 3 s (PGCONNECT_TIMEOUT,
+// psqlArgv) and the statement is cancelled by its own 10 s limit, so 3 + 10 s ends before root stops
+// waiting, and a timed-out switch is a switch that did not happen. Error texts are the server's untranslated ones
 // (lc_messages C), so the `ERROR:  <CODE>` match in query() holds whatever the server's language is.
 // A RELEASE_TABLE_UNREADABLE answer to a write can still hide a commit (the reply was lost after it):
 // every caller reads the table again before deciding (D3 review).
@@ -48,14 +48,14 @@ const requireKey = value => { if (!validKey(value)) refuse('RELEASE_KEY_INVALID'
 const requireRecordedBy = value => { if (typeof value !== 'string' || !RECORDED_BY.test(value)) refuse('RELEASE_EVENT_REFUSED'); return value; };
 
 /**
- * runuser -u postgres -- /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC PGCONNECT_TIMEOUT=5 <pgBin>/psql
+ * runuser -u postgres -- /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC PGCONNECT_TIMEOUT=3 <pgBin>/psql
  *   --no-psqlrc --no-align --tuples-only --quiet --field-separator=| -v ON_ERROR_STOP=1
  *   --host=<sock> --port=<port> --dbname=<db> <-v name=value …> -f -
  * `variables` are already checked by the caller; names are fixed identifiers of this file.
  */
 export function psqlArgv(layout, variables = []) {
   return [
-    layout.runuser, '-u', 'postgres', '--', layout.env, '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', 'PGCONNECT_TIMEOUT=5',
+    layout.runuser, '-u', 'postgres', '--', layout.env, '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', 'PGCONNECT_TIMEOUT=3',
     `${layout.pgBin}/psql`, '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
     `--host=${layout.pgSocketDir}`, `--port=${layout.pgPort}`, `--dbname=${layout.database}`,
     ...variables.flatMap(([name, value]) => ['-v', `${name}=${value}`]),

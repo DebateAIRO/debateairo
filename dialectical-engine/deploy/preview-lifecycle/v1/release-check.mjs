@@ -42,8 +42,11 @@ export const MIN_MAX_CONNECTIONS = 320, MIN_FREE_CONNECTIONS = 120;
 export const MIN_DISK_FREE_BYTES = 15e9, MIN_MEM_AVAILABLE_BYTES = 4 * 1024 ** 3;
 /** Ubuntu's flag for a pending reboot: infrastructure maintenance waits for it (spec §12 step 4). */
 export const REBOOT_REQUIRED_PATH = '/run/reboot-required';
-/** The operator folders the server runs from one shared copy: a change there needs the owner's review and a folder swap. */
-export const LIFECYCLE_FOLDERS = Object.freeze(['dialectical-engine/deploy/preview-lifecycle/', 'dialectical-engine/deploy/preview-auth-dev/']);
+/**
+ * The operator folders the server runs from one shared copy: a change there needs the owner's review and a folder swap.
+ * preview-release/ too: release-switch.mjs imports caddy-slots.mjs from it (controller ruling on D11).
+ */
+export const LIFECYCLE_FOLDERS = Object.freeze(['dialectical-engine/deploy/preview-lifecycle/', 'dialectical-engine/deploy/preview-auth-dev/', 'dialectical-engine/deploy/preview-release/']);
 export const RECEIPT_SCHEMA = 'preview-release-retirement-receipt-v1';
 const HASH = /^[a-f0-9]{64}$/;
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);

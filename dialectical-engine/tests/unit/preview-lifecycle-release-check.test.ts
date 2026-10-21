@@ -322,16 +322,19 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
     const newer = withFiles([
       { path: 'dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs', text: 'launch api 2' },
       { path: 'dialectical-engine/deploy/preview-lifecycle/v1/release-check.mjs', text: 'new file' },
+      // release-switch.mjs imports caddy-slots.mjs from the release folder: the server runs it from the same shared copy.
+      { path: 'dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs', text: 'caddy slots 2' },
       { path: 'dialectical-engine/packages/db/src/index.ts', text: 'db 2' }
     ], NEWER.files);
+    expect(check.LIFECYCLE_FOLDERS).toEqual(['dialectical-engine/deploy/preview-lifecycle/', 'dialectical-engine/deploy/preview-auth-dev/', 'dialectical-engine/deploy/preview-release/']);
     const refused = await run({ newerManifest: newer });
     expect(named(refused, 'LIFECYCLE_FILES')).toEqual({ name: 'LIFECYCLE_FILES', ok: false,
-      detail: 'changed: dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs, dialectical-engine/deploy/preview-lifecycle/v1/release-check.mjs' });
+      detail: 'changed: dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs, dialectical-engine/deploy/preview-lifecycle/v1/release-check.mjs, dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs' });
     const removed = await run({ newerManifest: manifestOf(NEW, NEWER.files.filter(file => !file.path.endsWith('prestart.mjs'))) });
     expect(named(removed, 'LIFECYCLE_FILES')).toMatchObject({ ok: false, detail: 'changed: dialectical-engine/deploy/preview-lifecycle/v1/prestart.mjs' });
     const reviewed = await run({ newerManifest: newer, lifecycleReviewed: true });
     expect(reviewed.verdict).toBe('SIDE_BY_SIDE');
-    expect(named(reviewed, 'LIFECYCLE_FILES')).toMatchObject({ ok: true, detail: 'changed (reviewed): 2 files' });
+    expect(named(reviewed, 'LIFECYCLE_FILES')).toMatchObject({ ok: true, detail: 'changed (reviewed): 3 files' });
     expect(named(await run(), 'LIFECYCLE_FILES')).toMatchObject({ ok: true, detail: 'unchanged' });
   });
 

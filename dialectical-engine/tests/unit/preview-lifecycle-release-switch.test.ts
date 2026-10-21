@@ -1,7 +1,7 @@
 // Side-by-side spec §6 (the break-before-make switch) and §11 (the way back). The switch is one database write, then
 // the edge must show the new release before anything stops; the old runner is never stopped by it.
 import { afterAll, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
@@ -9,18 +9,19 @@ const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs')
 const retire = await import('../../deploy/' + 'preview-lifecycle/v1/release-retire.mjs');
 
 const { HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS, EDGE_URL, TARGET_DROPIN,
-  MAX_LABEL_LENGTH, renderTargetDropin, renderBackstopDropin, stageRelease, seedRelease, switchRelease, rollbackRelease, gateFilesDigest, gateFilesPathFor, main } = releaseSwitch;
+  MAX_LABEL_LENGTH, renderTargetDropin, renderBackstopDropin, stageRelease, seedRelease, switchRelease, finishSwitch, rollbackRelease, gateFilesDigest, gateFilesPathFor, main } = releaseSwitch;
 const layout = common.LAYOUT;
 const GATES = retire.GATES as readonly { name: string; privateDir: string; folder: string; go: string }[];
 
 const OLD_KEY = ['r19', 'd50e33165a1b'].join('-');
 const NEW_KEY = ['r20', '0123456789ab'].join('-');
+const OLDER_KEY = ['r18', '00aa11bb22cc'].join('-');
 const SECRET = ['edge', 's'.repeat(48)].join('_');
 const START = Date.parse('2026-10-22T03:15:00.000Z');
 const DAY = 86_400_000;
 const U = (service: string, label: string) => `debateai-preview-${service}@${label}.service`;
-const KEYS: Record<string, string> = { 'old-v1': OLD_KEY, 'new-v1': NEW_KEY };
-const name = (key: string | null) => (key === OLD_KEY ? 'old' : key === NEW_KEY ? 'new' : String(key));
+const KEYS: Record<string, string> = { 'old-v1': OLD_KEY, 'new-v1': NEW_KEY, 'older-v1': OLDER_KEY };
+const name = (key: string | null) => (key === OLD_KEY ? 'old' : key === NEW_KEY ? 'new' : key === OLDER_KEY ? 'older' : String(key));
 const invocationId = (n: number) => n.toString(16).padStart(32, 'a');
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -41,13 +42,14 @@ type Options = Partial<{
   gates: Record<string, string>;
   maintenance: boolean;
   switchFails: 'CONFLICT' | 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'UNREADABLE_REREAD_FAILS';
-  eventFails: Record<string, 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED'>;
+  eventFails: Record<string, 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'REFUSED'>;
   stopRecorder: boolean;
   slots: Record<string, string>;
   openWork: Record<string, number>;
   startAnnounces: boolean;
   runnerDispatched: number;
   lockLabels: string[];
+  historyAt: number;
 }>;
 const fail = (code: string) => Object.assign(new Error(code), { code });
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
@@ -63,12 +65,13 @@ const AFTER_SWITCH_UNITS = { [U('runner', 'old-v1')]: 'inactive', [U('api', 'old
  */
 function host(options: Options = {}) {
   const o = { history: DEFAULT_HISTORY, units: {} as Record<string, string>, started: {} as Record<string, Record<string, unknown> | null>, gates: {} as Record<string, string>,
-    maintenance: false, eventFails: {} as Record<string, string>, stopRecorder: true, slots: { 'old-v1': 'A', 'new-v1': 'B' } as Record<string, string>,
+    maintenance: false, eventFails: {} as Record<string, string>, stopRecorder: true, slots: { 'old-v1': 'A', 'new-v1': 'B', 'older-v1': 'A' } as Record<string, string>,
     openWork: {} as Record<string, number>, startAnnounces: true, runnerDispatched: 0, lockLabels: ['old-v1', 'new-v1'], ...options };
   let clock = START, invocations = 0, switchCount = 0;
   const log: string[] = [], switchCalls: (string | null)[][] = [], timeouts: [string, number][] = [];
   const events: { key: string; kind: string; reason: string | null; at: number; ttf: number | null }[] = [];
-  for (const [key, kind, reason] of o.history) events.push({ key, kind, reason: reason ?? null, at: START - DAY + events.length * 1000, ttf: kind === 'CURRENT' ? START - DAY + events.length * 1000 + 5000 : null });
+  const base = o.historyAt ?? START - DAY;
+  for (const [key, kind, reason] of o.history) events.push({ key, kind, reason: reason ?? null, at: base + events.length * 1000, ttf: kind === 'CURRENT' ? base + events.length * 1000 + 5000 : null });
   const latest = (key: string, kinds: string[]) => { for (let i = events.length - 1; i >= 0; i--) if (events[i]!.key === key && kinds.includes(events[i]!.kind)) return i; return -1; };
   const stateOf = (key: string) => {
     const at = latest(key, ['STAGED', 'CURRENT', 'DRAINING', 'RETIRED']);
@@ -78,7 +81,7 @@ function host(options: Options = {}) {
     return { state: events[at]!.kind, frontPairStopped: after('FRONT_PAIR_STOPPED'), retireRequested: after('RETIRE_REQUESTED') };
   };
   const stillDraining = (key: string) => latest(key, ['DRAINING']) > latest(key, ['RETIRED']);
-  const currentKey = () => [OLD_KEY, NEW_KEY].find(key => stateOf(key).state === 'CURRENT') ?? null;
+  const currentKey = () => [OLD_KEY, NEW_KEY, OLDER_KEY].find(key => stateOf(key).state === 'CURRENT') ?? null;
   const push = (key: string, kind: string, reason: string | null = null, ttf: number | null = null) => events.push({ key, kind, reason, at: clock, ttf });
 
   const units: Record<string, string> = {};
@@ -144,9 +147,12 @@ function host(options: Options = {}) {
           if (api && o.stopRecorder && stateOf(KEYS[api[1]!]!).state === 'DRAINING' && !stateOf(KEYS[api[1]!]!).frontPairStopped) push(KEYS[api[1]!]!, 'FRONT_PAIR_STOPPED');
         }
       }
+      if (rest[0] === 'reset-failed' && units[rest[1]!] === 'failed') units[rest[1]!] = 'inactive';
       if (rest[0] === 'start') {
         expect(rest[1]).toBe('--no-block');
         const unit = rest[2]!, label = /@(.+)\.service$/.exec(unit)![1]!;
+        // A start queued on a unit left failed still reads failed until its job runs; reset-failed clears it first.
+        if (units[unit] === 'failed') return result();
         units[unit] = 'active';
         if (!unit.includes('-ui@')) announce(unit, o.startAnnounces ? (unit.includes('-runner@') ? { releaseKey: KEYS[label], startupDispatched: o.runnerDispatched } : { releaseKey: KEYS[label] }) : null);
       }
@@ -226,6 +232,7 @@ function host(options: Options = {}) {
       expect(recordedBy).toMatch(/^root:(release-switch|rollback)$/);
       const failure = o.eventFails[kind];
       if (failure === 'UNREADABLE') throw fail('RELEASE_TABLE_UNREADABLE');
+      if (failure === 'REFUSED') throw fail('RELEASE_EVENT_REFUSED');
       const { state } = stateOf(releaseKey);
       const allowed = kind === 'STAGED' ? ['UNKNOWN', 'DRAINING', 'RETIRED'].includes(state)
         : kind === 'DRAINING' ? state === 'STAGED' && stillDraining(releaseKey)
@@ -236,7 +243,8 @@ function host(options: Options = {}) {
       if (failure === 'UNREADABLE_BUT_COMMITTED') throw fail('RELEASE_TABLE_UNREADABLE');
     },
     readEdgeSecret: async () => { log.push('read:secret'); return SECRET; },
-    pathExists: async (path: string) => { log.push(`read:exists(${path})`); return o.maintenance && path === '/etc/debateai-v3-preview/lifecycle/maintenance-pending'; },
+    pathExists: async (path: string) => { log.push(`read:exists(${path})`); return (o.maintenance && path === '/etc/debateai-v3-preview/lifecycle/maintenance-pending') || Object.hasOwn(files, path); },
+    acquireLock: async () => async () => undefined,
     gateFilesDigest: async () => { log.push('read:gate-files'); return GATES.map(gate => ({ name: gate.name, goSha256: 'a'.repeat(64), folderSha256: 'b'.repeat(64) })); },
     writeUnitFile: async (path: string, text: string) => { log.push(`unitfile ${path}`); files[path] = text; },
     writeStateFile: async (path: string, text: string) => { log.push(`statefile ${path}`); files[path] = text; }
@@ -260,7 +268,8 @@ function host(options: Options = {}) {
     return out;
   };
   return {
-    deps, log, files, order, timeouts, units, stateOf, events,
+    deps, log, files, order, timeouts, units, stateOf, events, announce,
+    configure: (changes: Options) => { Object.assign(o, changes); },
     writes: () => log.filter(isWrite), stops: () => log.filter(entry => entry.startsWith('systemctl stop')), switchCalls: () => switchCalls,
     clock: () => clock, eventLog: () => events.map(event => `${name(event.key)} ${event.kind}${event.reason ? ` ${event.reason}` : ''}`)
   };
@@ -346,7 +355,11 @@ describe('the switch (side-by-side spec §6)', () => {
     ["to's website does not answer", { website: 'refused' }, 'website'],
     ['the edge does not serve the old release', { edgeBefore: caddy(502) }, 'edge'],
     ['a gate halted', { gates: { anthropic: 'halted' } }, 'gates'],
-    ['maintenance pending', { maintenance: true }, 'maintenance']
+    ['maintenance pending', { maintenance: true }, 'maintenance'],
+    ['another release still drains', { lockLabels: ['old-v1', 'new-v1', 'older-v1'],
+      history: [[OLDER_KEY, 'STAGED'], [OLDER_KEY, 'CURRENT'], [OLD_KEY, 'STAGED'], [OLD_KEY, 'CURRENT'], [OLDER_KEY, 'DRAINING'], [NEW_KEY, 'STAGED']] }, 'otherDraining'],
+    ['another release was staged again while it still drains', { lockLabels: ['old-v1', 'new-v1', 'older-v1'],
+      history: [[OLDER_KEY, 'STAGED'], [OLDER_KEY, 'CURRENT'], [OLD_KEY, 'STAGED'], [OLD_KEY, 'CURRENT'], [OLDER_KEY, 'DRAINING'], [OLDER_KEY, 'STAGED'], [NEW_KEY, 'STAGED']] }, 'otherDraining']
   ];
   it.each(PRECONDITION_CASES)('switch preconditions: refuses when %s, before any write or stop', async (_case, options, field) => {
     const h = host(options);
@@ -355,6 +368,12 @@ describe('the switch (side-by-side spec §6)', () => {
     expect(error.fields).toContain(field);
     expect(h.writes()).toEqual([]);
     expect(h.stops()).toEqual([]);
+  });
+
+  it('a third release that retired, or never served, does not block the switch', async () => {
+    const h = host({ lockLabels: ['old-v1', 'new-v1', 'older-v1'],
+      history: [[OLDER_KEY, 'STAGED'], [OLDER_KEY, 'CURRENT'], [OLD_KEY, 'STAGED'], [OLD_KEY, 'CURRENT'], [OLDER_KEY, 'DRAINING'], [OLDER_KEY, 'RETIRED', 'RUNNER_RETIRED'], [NEW_KEY, 'STAGED']] });
+    expect((await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps })).bad).toEqual([]);
   });
 
   it('starts nothing for the wrong arguments: odd or over-long labels, or the same label twice', async () => {
@@ -408,6 +427,14 @@ describe('the switch (side-by-side spec §6)', () => {
     expect(h.writes().slice(7, 10)).toEqual(['systemctl disable --now debateai-preview-runner-retire@new-v1.timer', 'systemctl disable --now debateai-preview-runner-retire-check@new-v1.timer', 'event(new STAGED)']);
   });
 
+  it('says so loudly when the way back cannot be written, and stops nothing', async () => {
+    const h = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], eventFails: { STAGED: 'UNREADABLE' } });
+    const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
+    expect(error).toMatchObject({ code: 'SWITCH_REVERT_FAILED', fields: { cause: 'RELEASE_TABLE_UNREADABLE', edgeFailures: 0 } });
+    expect(h.switchCalls()).toEqual([[NEW_KEY, OLD_KEY]]);
+    expect(h.stops()).toEqual([]);
+  });
+
   it('says so loudly when even the way back is not confirmed by the edge', async () => {
     const h = host({ edgeAfter: [[caddy(502)], [caddy(502)]] });
     const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
@@ -431,7 +458,8 @@ describe('the switch (side-by-side spec §6)', () => {
     const committed = host({ switchFails: 'UNREADABLE_BUT_COMMITTED' });
     expect((await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: committed.deps })).bad).toEqual([]);
     const unknown = host({ switchFails: 'UNREADABLE_REREAD_FAILS' });
-    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: unknown.deps }))).code).toBe('SWITCH_OUTCOME_UNKNOWN');
+    expect(await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: unknown.deps }))).toMatchObject({ code: 'SWITCH_OUTCOME_UNKNOWN',
+      fields: { next: `if the release table names ${NEW_KEY} current: release-switch.mjs switch --finish --to new-v1 --from old-v1` } });
     expect(unknown.stops()).toEqual([]);
   });
 
@@ -507,6 +535,62 @@ describe('the switch (side-by-side spec §6)', () => {
       return original(argv, opts);
     };
     expect((await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps })).bad).toEqual([]);
+  });
+});
+
+describe('finishing a switch whose database write landed (D10 review)', () => {
+  // The write made new current and old draining, then the command died (crash, ssh drop) before the stop.
+  const WRITTEN: [string, string, string?][] = [...DEFAULT_HISTORY, [NEW_KEY, 'CURRENT'], [OLD_KEY, 'DRAINING']];
+
+  it('finish after a crash between the write and the stop: edge, stop, backstop, target, gate files, final checks', async () => {
+    const h = host({ history: WRITTEN, historyAt: START - 60_000 });
+    const r = await finishSwitch({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(h.writes()).toEqual([
+      'systemctl stop debateai-preview-ui@old-v1.service debateai-preview-api@old-v1.service',
+      `unitfile ${BACKSTOP_DROPIN}`, 'systemctl daemon-reload',
+      'systemctl enable debateai-preview-runner-retire@old-v1.timer', 'systemctl restart debateai-preview-runner-retire@old-v1.timer',
+      `unitfile ${TARGET_DROPIN}`, 'systemctl daemon-reload', `statefile ${GATE_FILES}`
+    ]);
+    // The edge first (three confirmations, then one more health interval), and only then the stop.
+    const stopAt = h.log.indexOf('systemctl stop debateai-preview-ui@old-v1.service debateai-preview-api@old-v1.service');
+    expect(h.log.slice(0, stopAt).filter(entry => entry.startsWith('edge:'))).toEqual(Array(EDGE_CONFIRMATIONS).fill('edge:new'));
+    expect(h.log[stopAt - 1]).toBe('sleep 2500');
+    const ttf = h.events.find(event => event.key === NEW_KEY && event.kind === 'CURRENT')!.ttf!;
+    expect(r).toEqual({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', to: 'new-v1', from: 'old-v1', toKey: NEW_KEY, fromKey: OLD_KEY, edgeConfirmedMs: r.edgeConfirmedMs,
+      edgeFailures: 0, backstopAt: iso(Math.ceil((ttf - 5000 + BACKSTOP_S * 1000) / 1000) * 1000), bad: [] });
+    expect(h.stateOf(OLD_KEY)).toEqual({ state: 'DRAINING', frontPairStopped: true, retireRequested: false });
+    expect(h.switchCalls()).toEqual([]);
+  });
+
+  it('finish repeats only what is missing: the gate files of the switch are kept, a retired old release gets no backstop', async () => {
+    const h = host({ history: [...WRITTEN, [OLD_KEY, 'FRONT_PAIR_STOPPED'], [OLD_KEY, 'RETIRED', 'RUNNER_RETIRED']],
+      units: { [U('api', 'old-v1')]: 'inactive', [U('ui', 'old-v1')]: 'inactive', [U('runner', 'old-v1')]: 'inactive' } });
+    h.files[GATE_FILES] = '{"kept":true}\n';
+    const r = await finishSwitch({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(h.writes()).toEqual(['systemctl stop debateai-preview-ui@old-v1.service debateai-preview-api@old-v1.service', `unitfile ${TARGET_DROPIN}`, 'systemctl daemon-reload']);
+    expect(r).toMatchObject({ backstopAt: null, bad: [] });
+    expect(h.files[GATE_FILES]).toBe('{"kept":true}\n');
+  });
+
+  it('a backstop time already in the past is armed one second from now (it asks at once)', async () => {
+    const h = host({ history: WRITTEN });
+    const ttf = h.events.find(event => event.key === NEW_KEY && event.kind === 'CURRENT')!.ttf!;
+    h.deps.now = () => ttf + 2 * BACKSTOP_S * 1000;
+    const r = await finishSwitch({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(r.backstopAt).toBe(iso(Math.ceil((ttf + 2 * BACKSTOP_S * 1000 + 1000) / 1000) * 1000));
+  });
+
+  it('finish refuses when the table does not name `to` current, or `from` does not drain, before anything is written', async () => {
+    const h = host();
+    expect(await refusal(finishSwitch({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }))).toMatchObject({ code: 'FINISH_PRECONDITION_FAILED', fields: ['current', 'state'] });
+    expect((await refusal(finishSwitch({ to: 'new-v1', from: 'new-v1', layout, deps: h.deps }))).fields).toEqual(['labels']);
+    expect(h.writes()).toEqual([]);
+  });
+
+  it('finish stops nothing while the edge does not show `to`', async () => {
+    const h = host({ history: WRITTEN, edgeBefore: caddy(502) });
+    expect(await refusal(finishSwitch({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }))).toMatchObject({ code: 'FINISH_EDGE_UNCONFIRMED' });
+    expect(h.writes()).toEqual([]);
   });
 });
 
@@ -596,6 +680,30 @@ describe('the way back (side-by-side spec §11)', () => {
     expect(h.writes().filter(entry => entry.startsWith('event(') || entry.includes('runner@old'))).toEqual([]);
   });
 
+  it('a half-done rollback of a RETIRED older release runs again once its runner has announced its start', async () => {
+    const h = rollbackHost({ history: [...AFTER_SWITCH, [OLD_KEY, 'RETIRED', 'RUNNER_RETIRED']], startAnnounces: false });
+    expect((await refusal(rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps }))).code).toBe('ROLLBACK_RUNNER_NOT_STARTED');
+    expect(h.stateOf(OLD_KEY).state).toBe('STAGED');
+    // The runner was only slow (its prestart verifies first): its start line comes after the 240 s.
+    h.announce(U('runner', 'old-v1'), { releaseKey: OLD_KEY, startupDispatched: 0 });
+    h.configure({ startAnnounces: true });
+    const before = h.writes().length;
+    const r = await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps });
+    expect(r).toMatchObject({ event: 'PREVIEW_RELEASE_ROLLED_BACK', started: ['api', 'ui'], bad: [] });
+    expect(h.writes().slice(before).filter(entry => entry.startsWith('event('))).toEqual([]);
+  });
+
+  it('clears a failed unit before starting it, so a queued start is not read as failed', async () => {
+    const h = rollbackHost({ units: { ...AFTER_SWITCH_UNITS, [U('runner', 'old-v1')]: 'failed' } });
+    const r = await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps });
+    expect(r.started).toEqual(['runner', 'api', 'ui']);
+    const writes = h.writes();
+    expect(writes.slice(writes.indexOf('event(old STAGED)') + 1, writes.indexOf('event(old STAGED)') + 3)).toEqual([
+      'systemctl reset-failed debateai-preview-runner@old-v1.service', 'systemctl start --no-block debateai-preview-runner@old-v1.service']);
+    // A unit that is merely stopped is started without it.
+    expect(writes.filter(entry => entry.startsWith('systemctl reset-failed'))).toHaveLength(1);
+  });
+
   it.each([
     ['to is the current release', { history: DEFAULT_HISTORY, units: {} }, ['current', 'state']],
     ['to was never switched to', { history: [[NEW_KEY, 'STAGED'], [NEW_KEY, 'CURRENT'], [OLD_KEY, 'STAGED']] }, ['state']],
@@ -650,6 +758,15 @@ describe('the way back (side-by-side spec §11)', () => {
     expect(h.units[U('runner', 'old-v1')]).toBe('active');
     expect(h.stateOf(OLD_KEY)).toEqual({ state: 'DRAINING', frontPairStopped: true, retireRequested: false });
     expect(h.switchCalls()).toEqual([]);
+  });
+});
+
+describe('the way back when the database refuses', () => {
+  it('rollback before the switch stops nothing when the database refuses DRAINING', async () => {
+    const h = host({ history: [...AFTER_SWITCH, [OLD_KEY, 'STAGED']], units: { [U('runner', 'old-v1')]: 'active' }, eventFails: { DRAINING: 'REFUSED' } });
+    expect((await refusal(rollbackRelease({ from: 'old-v1', beforeSwitch: true, layout, deps: h.deps }))).code).toBe('RELEASE_EVENT_REFUSED');
+    expect(h.writes()).toEqual(['event(old DRAINING RESTAGE_ABANDONED)']);
+    expect(h.stateOf(OLD_KEY).state).toBe('STAGED');
   });
 });
 
@@ -720,9 +837,9 @@ describe('the HTTP reader', () => {
 
 describe('release-switch.mjs (root CLI)', () => {
   const sink = () => { const lines: string[] = []; return { lines, stream: { write: (text: string) => { lines.push(text); return true; } } }; };
-  const cli = async (argv: string[], deps: Record<string, any>, actor: { platform?: string; uid?: number } = {}) => {
+  const cli = async (argv: string[], deps: Record<string, any>, actor: { platform?: string; uid?: number } = {}, cliLayout: Record<string, unknown> = layout) => {
     const stdout = sink(), stderr = sink();
-    const code = await main(argv, { platform: 'linux', uid: 0, layout, deps, stdout: stdout.stream, stderr: stderr.stream, ...actor });
+    const code = await main(argv, { platform: 'linux', uid: 0, layout: cliLayout, deps, stdout: stdout.stream, stderr: stderr.stream, ...actor });
     return { code, stdout: stdout.lines.join(''), stderr: stderr.lines.join('') };
   };
 
@@ -755,15 +872,45 @@ describe('release-switch.mjs (root CLI)', () => {
     expect((await cli(['rollback', '--to', 'old-v1', '--from', 'new-v1'], host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS }).deps)).code).toBe(0);
     const before = await cli(['rollback', '--before-switch', '--label', 'new-v1'], host().deps);
     expect([before.code, JSON.parse(before.stdout).outcome]).toEqual([0, 'RETIRED']);
+    const finished = await cli(['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1'], host({ history: [...DEFAULT_HISTORY, [NEW_KEY, 'CURRENT'], [OLD_KEY, 'DRAINING']] }).deps);
+    expect([finished.code, JSON.parse(finished.stdout).event]).toEqual([0, 'PREVIEW_RELEASE_SWITCH_FINISHED']);
     const refused = await cli(['rollback', '--before-switch', '--label', 'old-v1'], host().deps);
     expect(JSON.parse(refused.stderr)).toEqual({ event: 'PREVIEW_RELEASE_ROLLBACK_REFUSED', label: 'old-v1', reason: 'ROLLBACK_PRECONDITION_FAILED', fields: ['state'] });
+  });
+
+  it('runs one command at a time: a lock file holding its pid, refused while held, removed when it ends', async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'release-switch-lock-')));
+    try {
+      const lockPath = join(root, 'release-switch.lock');
+      const h = host({ history: [] });
+      const deps: Record<string, any> = { ...h.deps };
+      delete deps.acquireLock;
+      let heldDuring: string | null = null;
+      const readLock = deps.readLock;
+      deps.readLock = async () => { heldDuring = readFileSync(lockPath, 'utf8'); return readLock(); };
+      const done = await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root });
+      expect([done.code, heldDuring]).toEqual([0, `${process.pid}\n`]);
+      expect(existsSync(lockPath)).toBe(false);
+      // A refused command lets go too.
+      expect((await cli(['stage', '--label', 'gone-v1'], deps, {}, { ...layout, lockRoot: root })).code).toBe(1);
+      expect(existsSync(lockPath)).toBe(false);
+      // Held by a live process: refused, and the holder's file stays as it was.
+      writeFileSync(lockPath, `${process.pid}\n`, { mode: 0o600 });
+      const busy = await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root });
+      expect([busy.code, JSON.parse(busy.stderr)]).toEqual([1, { event: 'PREVIEW_RELEASE_STAGE_REFUSED', label: 'new-v1', reason: 'RELEASE_SWITCH_BUSY', fields: { holderPid: process.pid, holderAlive: true } }]);
+      expect(readFileSync(lockPath, 'utf8')).toBe(`${process.pid}\n`);
+      // Left by a process that is gone: still refused (the operator moves it aside), and said so.
+      writeFileSync(lockPath, '2147483646\n');
+      expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({ holderPid: 2147483646, holderAlive: false });
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
   it('refuses wrong arguments and anyone but root on Linux, before touching anything', async () => {
     const h = host();
     for (const argv of [[], ['switch'], ['switch', '--to', 'new-v1'], ['switch', '--from', 'old-v1', '--to', 'new-v1'], ['switch', '--to', 'New', '--from', 'old-v1'],
       ['switch', '--to', 'new-v1', '--from', 'old-v1', '--force'], ['stage', '--label', '../x'], ['stage', '--label', 'a-'], ['seed'], ['rollback', '--to', 'old-v1'],
-      ['rollback', '--before-switch', '--to', 'new-v1'], ['rollback', '--label', 'new-v1', '--before-switch'], ['retire', '--label', 'new-v1']]) {
+      ['rollback', '--before-switch', '--to', 'new-v1'], ['rollback', '--label', 'new-v1', '--before-switch'], ['retire', '--label', 'new-v1'],
+      ['switch', '--finish', '--to', 'new-v1'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--finish'], ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped']]) {
       const out = await cli(argv, h.deps);
       expect([argv, out.code, JSON.parse(out.stderr).reason]).toEqual([argv, 1, 'ARGUMENTS_REFUSED']);
     }
