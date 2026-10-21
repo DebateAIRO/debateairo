@@ -21,10 +21,10 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * and adds staff.read_internal_funding_policy_at(bigint); §7 adds the append-only spend waiver ledger.model_spend_waiver
  * and redefines billing.read_internal_grant_spent in place so a waived run leaves a funded person's window. The view,
  * that CHECK, the two indexes on the marker and the seven redefinitions of §6 and §7 are checked by the closing block
- * and by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled). It adds no billing relation and no billing function, so the
- * effective verifier in force (0111's) stays in force and is named as its own. Its checks are its postcondition
- * (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later
- * section appends its objects to the lists below.
+ * and by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled).
+ * It adds no billing relation and no billing function, so the effective verifier in force (0111's) stays in force and
+ * is named as its own. Its checks are its postcondition (below), compared on every later migrate(); it has no
+ * supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';

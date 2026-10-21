@@ -2246,13 +2246,32 @@
       "roleName": "debateai_runtime",
       "source": "migrations/0123_side_by_side_releases.sql",
       "grants": [
+        "EXECUTE ON FUNCTION core.read_current_release()",
+        "EXECUTE ON FUNCTION core.read_release_state(text)",
+        "SELECT ON core.run_waiting_v",
         "EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)",
         "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)",
         "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
         "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
         "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
         "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)",
+        "SELECT, INSERT ON ledger.model_spend_waiver",
         "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0123_side_by_side_releases.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.resolve_run_ref(uuid)",
+        "SELECT, INSERT ON core.run_supersession"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0123_side_by_side_releases.sql",
+      "grants": [
+        "SELECT ON ledger.model_spend_waiver"
       ]
     }
   ],

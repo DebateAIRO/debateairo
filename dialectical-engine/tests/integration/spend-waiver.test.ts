@@ -166,10 +166,15 @@ describe("side-by-side §9, C10: a set-aside debate uses none of the person's qu
   });
 
   it("waivers are append-only", async () => {
-    // The owner (the migrator's superuser) included: the statement trigger and the truncate guard refuse it.
-    expect(await refusalCode(database.pool.query("UPDATE ledger.model_spend_waiver SET reason='OWNER_STOPPED'"))).not.toBe("NOT_REFUSED");
-    expect(await refusalCode(database.pool.query("DELETE FROM ledger.model_spend_waiver"))).not.toBe("NOT_REFUSED");
-    expect(await refusalCode(database.pool.query("TRUNCATE ledger.model_spend_waiver"))).not.toBe("NOT_REFUSED");
+    // The owner (the migrator's superuser) included: the statement trigger (0000's core.reject_mutation) refuses UPDATE
+    // and DELETE, and 0056's truncate guard (core.reject_truncate) refuses TRUNCATE, each with its own exact refusal.
+    await expect(database.pool.query("UPDATE ledger.model_spend_waiver SET reason='OWNER_STOPPED'"))
+      .rejects.toMatchObject({ code: "55000", message: "append-only or immutable table model_spend_waiver rejects UPDATE" });
+    await expect(database.pool.query("DELETE FROM ledger.model_spend_waiver"))
+      .rejects.toMatchObject({ code: "55000", message: "append-only or immutable table model_spend_waiver rejects DELETE" });
+    await expect(database.pool.query("TRUNCATE ledger.model_spend_waiver")).rejects.toMatchObject({
+      code: "55000", message: "TRUNCATE_REJECTED: append-only or immutable table ledger.model_spend_waiver rejects TRUNCATE"
+    });
     // And no runtime holds the privilege in the first place.
     for (const sql of ["UPDATE ledger.model_spend_waiver SET reason='OWNER_STOPPED'", "DELETE FROM ledger.model_spend_waiver", "TRUNCATE ledger.model_spend_waiver"]) {
       expect(await refusalCode(api.query(sql))).toBe("42501");
