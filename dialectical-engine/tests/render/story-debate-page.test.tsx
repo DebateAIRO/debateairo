@@ -392,11 +392,10 @@ describe("the owner page's server render loads the question's catalogue (page.ts
       answer: STORY_FIXTURE_ANSWER,
       questionLanguage: language
     });
-    const page = await DebatePage({
+    return await DebatePage({
       params: Promise.resolve({ id: STORY_FIXTURE_DEBATE_ID }),
       searchParams: Promise.resolve(searchParams)
-    }) as ReactElement<{ children: PageElement }>;
-    return page.props.children;
+    }) as PageElement;
   }
 
   it("hands a Romanian question under an English interface the Romanian public catalogue, and renders no strip on the server", async () => {

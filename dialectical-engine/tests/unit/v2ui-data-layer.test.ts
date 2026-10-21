@@ -284,6 +284,8 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toEqual({
       id: "answer:fair-test",
+      run_ref: "run:fair-test",
+      publication_review: null,
       topic: "Should the test question stand?",
       status: "complete",
       created_at: "",
