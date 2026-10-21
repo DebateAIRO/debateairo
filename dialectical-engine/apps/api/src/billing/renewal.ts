@@ -13,12 +13,13 @@ import { answeredOrderReused, netopiaLanguageOf } from "@debateai/payments-netop
 import type { BillingPlans, BillingPolicy, PlanId } from "@debateai/register";
 import type { BillingRecipientReader } from "./account-email.js";
 import { answerRejected, type BillingAudit } from "./audit.js";
+import { storeReportedCard } from "./card-store.js";
 import { enqueueEmail } from "./email-job.js";
 import { netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { planName, type BillingOrderText } from "./order-text.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { taxRefusalDetail } from "./quote.js";
-import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
+import { openCardToken, openQuoteLocation, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import { hostCommand, paidAndRefundedInFull } from "./refunds.js";
 import {
   CHARGE_RESUMED, NOT_SENT_CODES, OUR_SETUP_CODES, RESEND_STARTED, savedCardSendLeft
@@ -1052,24 +1053,12 @@ export class RenewalService {
   }
 
   /**
-   * Spec §2.9.2 step 4: a saved card in the answer becomes a `card_token` row at once (sealed, AAD naming the row),
-   * sourced from this charge; adoption is VERIFY_PAYMENT's settlement's (§2.15.2). One row per charge: a later probe of
-   * the same charge that carries a card again adds none.
+   * Spec §2.9.2 step 4: a saved card in the answer becomes a `card_token` row at once (`storeReportedCard`: sealed, AAD
+   * naming the row, sourced from this charge); adoption is VERIFY_PAYMENT's settlement's (§2.15.2). One row per charge:
+   * a later probe of the same charge that carries a card again adds none.
    */
   private async storeAnsweredCard(client: PoolClient, charge: ChargeRow, answer: PaymentReport, at: Date): Promise<void> {
-    const card = answer.savedCard;
-    if (card === null) return;
-    if ((await this.deps.repository.cardTokensFromCharge(client, charge.chargeId)).length > 0) return;
-    const customer = await this.deps.repository.customerByOwner(charge.ownerRef, client);
-    if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a charge without its customer");
-    const tokenId = randomUUID();
-    const sealed = sealCardToken(this.deps.recordsKey, tokenId, card.token);
-    await this.deps.repository.insertCardToken(client, {
-      tokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: charge.paymentEnvironment,
-      sourceChargeId: charge.chargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: answer.occurredAt ?? at,
-      tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId, expMonth: card.expMonth, expYear: card.expYear,
-      last4: card.last4, cardCountry: answer.cardCountry, createdAt: at
-    });
+    await storeReportedCard({ repository: this.deps.repository, recordsKey: this.deps.recordsKey }, client, charge, answer, at);
   }
 
   /**

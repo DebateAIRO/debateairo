@@ -13,6 +13,7 @@ import type { BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { PoolClient } from "pg";
 import { answerRejected, credentialsRefused, type BillingAudit } from "./audit.js";
 import { adoptingKindOf, chooseAdoptableToken, writeCardSaved, type AdoptingKind } from "./card-adoption.js";
+import { storeReportedCard } from "./card-store.js";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT, type RequestedRefundReason } from "./codes.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
@@ -70,6 +71,9 @@ const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPEN
 const BOUGHT_NOTHING: ReadonlySet<string> = new Set<string>([
   ...REFUND_REASONS_REFUSING_THE_PAYMENT, "DUPLICATE_PAYMENT", "UPGRADE_CLOSED", "CARD_CHECK_RELEASE"
 ]);
+
+/** B3: the read states whose saved card is kept (a payment that went through; a 0.00 card check is only authorised). */
+const CARD_BEARING_STATES: ReadonlySet<string> = new Set(["PAID", "AUTHORIZED"]);
 
 /** NETOPIA's success codes, never a refusal (as its answers read them, `answers.ts`). */
 const NOTICE_SUCCESS_CODES: ReadonlySet<string> = new Set(["00", "0"]);
@@ -250,7 +254,10 @@ export class VerifyPaymentHandler {
     if (charge === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
     if (!isThisPaymentSystem(charge, this.deps.netopia.paymentEnvironment)) return otherPaymentSystem(this.deps.audit, job.kind);
     const read = await this.readNetopiaStatus(charge, now);
-    if (read !== "UNREADABLE" && read !== "NO_SUCH_ORDER") return this.decideNetopia(job, charge, read, now, false);
+    if (read !== "UNREADABLE" && read !== "NO_SUCH_ORDER") {
+      await this.storeReadCard(charge, read, now);
+      return this.decideNetopia(job, charge, read, now, false);
+    }
     const code = read === "NO_SUCH_ORDER" ? "PAYMENT_NOT_FOUND" : "PAYMENT_STATUS_UNREADABLE";
     const retryAt = notFinalRetryAt(job.attempts, now);
     if (retryAt !== null) return Object.freeze({ kind: "RETRY" as const, code, retryAt });
@@ -266,6 +273,22 @@ export class VerifyPaymentHandler {
       }
     }
     return this.leftToChecks(charge, code);
+  }
+
+  /**
+   * B3 (NETOPIA answers 2026-10-21): NETOPIA sends the saved card only in its FIRST notice of a payment; resent copies
+   * carry none. So a card the status read carries for a payment that went through (PAID, or AUTHORIZED: a 0.00 card
+   * check's success) is stored now (`storeReportedCard`: one row per charge, sealed), in its own transaction under the owner lock, before
+   * the decision: the settlement then adopts it at the decision, a SUCCEEDED charge adopts it late (CARD_SAVED), and a
+   * card check's gate finds it. A refused or unfinished read's card is never kept. A stored notice's report never
+   * carries a card (`reportFromNotice`): the notice intake stored it already.
+   */
+  private async storeReadCard(charge: ChargeRow, report: PaymentReport, now: Date): Promise<void> {
+    if (report.savedCard === null || !CARD_BEARING_STATES.has(report.state)) return;
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, charge.ownerRef);
+      await storeReportedCard({ repository: this.deps.repository, recordsKey: this.deps.recordsKey }, client, charge, report, now);
+    });
   }
 
   /** Spec §2.8 step 2: one status read with the best ntpID (N-16), its `status_read` row; a payment error is UNREADABLE. */
