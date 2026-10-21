@@ -1088,6 +1088,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * Paid-plans spec §2.4.2 (B6) — WHAT ONE PERSON HAS SPENT IN A WINDOW: the RUN
    * and STORY charges of the runs `billing.run_charge_scope` pins to them whose
    * `recorded_at` falls in `[from, to)`. One indexed query per window.
+   * Side-by-side spec §9, C10 (0123 §7): a run with a spend waiver (set aside
+   * because of an upload) counts for neither branch; the INTERNAL branch's SQL
+   * reader excludes it itself. The site's day (`readDaySpentMicros`) still does.
    */
   async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number> {
     if (funding?.kind === "INTERNAL") {
@@ -1103,7 +1106,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
          AND scope.admitted_at < $3
          AND spend.spend_source IN ('RUN','STORY')
-         AND spend.recorded_at >= $2 AND spend.recorded_at < $3`,
+         AND spend.recorded_at >= $2 AND spend.recorded_at < $3
+         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`,
       [ownerRef, from, to]
     );
     return this.#total(result.rows[0]?.total);

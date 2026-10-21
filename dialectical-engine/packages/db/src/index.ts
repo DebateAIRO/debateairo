@@ -19,6 +19,7 @@ export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-e
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
+export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";

@@ -9,7 +9,7 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
  * A1 gives it the release stamp on core.run and the encrypted insert path that writes it; A2 the release table, its view,
  * its two readers and its two serialized writers (§3); A3 the re-admission records and the two new wait reasons (§4, §5);
  * A4 the funding functions redefined so a grant stays valid under the version it was issued with, and the funding
- * publication reader at a version (§6).
+ * publication reader at a version (§6); A5 the append-only spend waiver and the funded spend reader that honours it (§7).
  * It is the drained transition
  * upload's step (`-- n1: drained`) and adds no billing object, so 0111's effective verifier stays in force
  * (`-- n1: keeps-verifier`, migrations/lineage/README.md step 3).
@@ -167,7 +167,7 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("SIDE_BY_SIDE_READMISSION_CONTRACT_INCOMPLETE");
     // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
     const loader = read("packages/db/src/migration-forward0123.ts");
-    expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession'] as const;");
+    expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession',"); // §7 appends the waiver
     for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)", "core.refuse_starting_superseded_run()",
       "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)"]) {
       expect(loader).toContain(`'${signature}'`);
@@ -221,13 +221,50 @@ describe("0123: the side-by-side releases step", () => {
       if (signature !== "billing.guard_internal_charge_scope()") expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
     }
     expect(sql).not.toContain("GRANT EXECUTE ON FUNCTION billing.guard_internal_charge_scope()");
-    // No billing function is added: every billing function §6 names already exists in 0092/0093.
-    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION billing\.(?!reserve_internal_provider_call\(|read_internal_run_state\(|read_internal_allowance\(|guard_internal_charge_scope\()/u);
+    // No billing function is added: every billing function §6 and §7 name already exists in 0092/0093.
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION billing\.(?!reserve_internal_provider_call\(|read_internal_run_state\(|read_internal_allowance\(|guard_internal_charge_scope\(|read_internal_grant_spent\()/u);
     expect(sql).toContain("SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE");
     // The loader digests the new reader; the six redefinitions are checked by the closing block and the tests.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("'staff.read_internal_funding_policy_at(bigint)'");
     expect(loader).not.toContain("'billing.read_internal_allowance(uuid,timestamptz)'");
+  });
+
+  it("§7 adds the append-only spend waiver and redefines the funded spend reader to leave waived runs out, site-day readers untouched", () => {
+    const section = sql.slice(sql.indexOf("-- §7. The spend waiver"), sql.indexOf("-- THE CONTRACT THIS FILE CLAIMS"));
+    expect(section).toContain("CREATE TABLE IF NOT EXISTS ledger.model_spend_waiver (");
+    expect(section).toContain("run_id uuid PRIMARY KEY REFERENCES core.run(run_id),");
+    expect(section).toContain("recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),");
+    expect(section).toContain("CONSTRAINT model_spend_waiver_reason_closed CHECK (\n    reason IN ('BACKSTOP', 'OWNER_STOPPED', 'SETTINGS_VERSION_UNSUPPORTED', 'RELEASE_NOT_SERVED'))");
+    expect(section).toContain("SELECT core.install_truncate_guard('ledger.model_spend_waiver');");
+    expect(section).toMatch(/CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ledger\.model_spend_waiver\s+FOR EACH STATEMENT EXECUTE FUNCTION core\.reject_mutation\(\);/u);
+    expect(section).toContain("GRANT SELECT, INSERT ON ledger.model_spend_waiver TO debateai_runtime;");
+    expect(section).toContain("GRANT SELECT ON ledger.model_spend_waiver TO debateai_staff_security_owner;");
+    expect(section).toContain("GRANT SELECT ON ledger.model_spend_waiver TO debateai_replay;");
+    // The reasons are the TS list, verbatim (the runner lane's battery reuses SpendWaiverReason).
+    expect(read("packages/db/src/spend-waiver.ts")).toContain('["BACKSTOP", "OWNER_STOPPED", "SETTINGS_VERSION_UNSUPPORTED", "RELEASE_NOT_SERVED"] as const');
+    expect(read("packages/db/src/index.ts")).toContain('export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";');
+    // The funded reader: 0093's body byte for byte plus one clause, its owner, definer, path and grants re-asserted.
+    const original = read("migrations/0093_internal_provider_admission.sql");
+    const head = "CREATE OR REPLACE FUNCTION billing.read_internal_grant_spent(";
+    const before = original.slice(original.indexOf(head), original.indexOf("$$;", original.indexOf(head)));
+    const after = section.slice(section.indexOf(head), section.indexOf("$$;", section.indexOf(head)));
+    expect(after).toBe(`${before} AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver w WHERE w.run_id = s.run_id)\n`);
+    const signature = "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)";
+    expect(section).toContain(`ALTER FUNCTION ${signature} OWNER TO debateai_staff_security_owner;`);
+    expect(section).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,debateai_runtime,debateai_staff_recovery;`);
+    expect(section).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
+    // The commitments reader and every site-day reader stay as they were.
+    expect(sql).not.toContain("FUNCTION billing.read_internal_grant_commitments(");
+    expect(sql).toContain("SIDE_BY_SIDE_SPEND_WAIVER_CONTRACT_INCOMPLETE");
+    const store = read("packages/budget/src/model-spend.ts");
+    const owner = store.slice(store.indexOf("async readOwnerSpentMicros("), store.indexOf("async readOwnerCountedHoldsMicros("));
+    expect(owner).toContain("AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)");
+    expect(store.split("model_spend_waiver")).toHaveLength(2); // the subscription reader alone: no site-day reader names it
+    // The loader digests the table whole; the redefinition is checked by the closing block and these tests.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession','ledger.model_spend_waiver'] as const;");
+    expect(loader).not.toContain(`'${signature}'`);
   });
 
   it("§2's closing check covers every role 0040's REVOKE names, not only PUBLIC and the runtime", () => {

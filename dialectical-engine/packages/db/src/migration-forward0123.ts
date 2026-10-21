@@ -18,12 +18,13 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * redefines in place the five funding functions that tied a grant to the selection's or the run's version (billing's
  * reserve_internal_provider_call, read_internal_run_state, read_internal_allowance and guard_internal_charge_scope, and
  * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
- * and adds staff.read_internal_funding_policy_at(bigint). The view, that CHECK, the two indexes on the marker and §6's
- * six redefinitions are checked by the closing block and by tests, not digested, so a later drained step may widen or
- * redefine them again (as 0121's CHECKs are handled). It adds no billing relation and no billing function, so the
- * effective verifier in force (0111's) stays in force and is named as its own. Its checks are its postcondition
- * (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later
- * section appends its objects to the lists below.
+ * and adds staff.read_internal_funding_policy_at(bigint); §7 adds the append-only spend waiver ledger.model_spend_waiver
+ * and redefines billing.read_internal_grant_spent in place so a waived run leaves a funded person's window. The view,
+ * that CHECK, the two indexes on the marker and the seven redefinitions of §6 and §7 are checked by the closing block
+ * and by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled).
+ * It adds no billing relation and no billing function, so the effective verifier in force (0111's) stays in force and
+ * is named as its own. Its checks are its postcondition (below), compared on every later migrate(); it has no
+ * supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';
@@ -44,8 +45,8 @@ const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_
  'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.read_current_release()','core.read_release_state(text)',
  'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)',
  'core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)','staff.read_internal_funding_policy_at(bigint)'] as const;
-/** §3, §4: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 does. */
-const TABLES=['core.release_event','core.run_supersession'] as const;
+/** §3, §4, §7: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 does. */
+const TABLES=['core.release_event','core.run_supersession','ledger.model_spend_waiver'] as const;
 /** §3: the view 0123 adds (owner, ACL, definition). */
 const VIEWS=['core.release_state_v'] as const;
 /** §3: the two NOLOGIN NOINHERIT roles 0123 adds (their attributes and memberships). */
