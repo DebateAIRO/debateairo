@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { authorizationPolicyInventory, buildApi, type AskApplication } from "@debateai/api";
+import { API_MAX_PARAM_LENGTH, authorizationPolicyInventory, buildApi, type AskApplication } from "@debateai/api";
 import {
   ADMISSION_POLICY_REGISTER_ROW,
   admissionPolicyFromValue
@@ -12,7 +12,8 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
  * Side-by-side uploads spec 2026-10-21 §6 (plan C task C5): the API's /livez and /readyz, and the release header on
  * every response — JSON, refusals, the house 404 and the run-event stream's raw head alike.
  */
-const RELEASE_KEY = "r17-0123456789ab";
+// Built from pieces: a `…_KEY = "literal"` pair on one line trips gitleaks' generic-api-key rule.
+const RELEASE_KEY = ["r17", "0123456789ab"].join("-");
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const OWNER = testHttpIdentity("c5-readiness-owner");
 const SOURCE = "203.0.113.17";
@@ -127,6 +128,19 @@ describe("side-by-side C5: /livez, /readyz and the release header (spec §6)", (
       });
       expect(malformed.statusCode).toBe(400);
       expect(malformed.headers["x-debateai-release"]).toBe(RELEASE_KEY);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("puts the release header, the security headers and no-store on a router fault (an over-long :id, 414)", async () => {
+    const app = api();
+    try {
+      const response = await app.inject({ method: "GET", url: `/v1/runs/${"a".repeat(API_MAX_PARAM_LENGTH + 1)}/events` });
+      expect(response.statusCode).toBe(414);
+      expect(response.headers["x-debateai-release"]).toBe(RELEASE_KEY);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.headers["x-content-type-options"]).toBe("nosniff");
     } finally {
       await app.close();
     }

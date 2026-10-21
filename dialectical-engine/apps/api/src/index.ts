@@ -2175,6 +2175,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
+  /**
+   * The headers every answer carries: the security set, no-store, and (side-by-side spec §6, plan C5) the release that
+   * wrote it — the browser compares its code part. Set by the onSend hook below and by `frameworkErrors`, whose replies
+   * Fastify builds without onSend.
+   */
+  const setResponseHeaders = (reply: FastifyReply): void => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
+    reply.header("cache-control", "no-store");
+    if (options.releaseKey !== undefined) reply.header("x-debateai-release", options.releaseKey);
+  };
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
@@ -2187,11 +2197,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
      * them itself, and its 414 quotes the offending URL straight back at the
      * caller (L1-F6). They take the same constant typed envelopes here, and an
      * unrecognised one falls back to the constant 400 rather than a framework
-     * body. Nothing here echoes any part of the request.
+     * body. Nothing here echoes any part of the request. These replies skip the onSend hooks (Fastify builds them with
+     * no route context), so they set the common headers themselves (side-by-side C5 fix round 1).
      */
     frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
       const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
         ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      setResponseHeaders(reply);
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
     }
   });
@@ -2316,10 +2328,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
     : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
   api.addHook("onSend", async (request, reply, payload) => {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
-    reply.header("cache-control", "no-store");
-    // Side-by-side spec §6 (plan C5): every answer names the release that wrote it; the browser compares its code part.
-    if (options.releaseKey !== undefined) reply.header("x-debateai-release", options.releaseKey);
+    setResponseHeaders(reply);
     // Reissue the same opaque generation after successful cookie auth so the
     // browser transport observes the ruled sliding 14-day idle lifetime. The
     // conditional database refresh remains the sole authorization decision,
