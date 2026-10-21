@@ -33,6 +33,8 @@ class ArchiveRefusal extends Error {
   constructor(code, details) { super(code); this.name = 'ArchiveRefusal'; this.code = code; if (details) Object.assign(this, details); }
 }
 const refuse = (code, details) => { throw new ArchiveRefusal(code, details); };
+/** A typed refusal code; anything else is reported as UNEXPECTED (content-free logs). */
+const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
 const unitDirOf = layout => layout.systemdUnitDir ?? '/etc/systemd/system';
 /** prestart.mjs RELEASES_ROOT on the server; a test layout may point it elsewhere. */
@@ -129,8 +131,11 @@ async function makeTarget(path, layout) {
  * The archive (D12). Every check runs before the first move; then each present source is renamed into its archive
  * folder under its own name, the release is unpinned (prestart.mjs unpinRelease re-checks RETIRED) and systemd
  * reloads. A move, the unpin or the reload failing after the first move refuses with what did move and where it went
- * (`moved`, `to`, `configTo`), so the owner can finish by hand or run the archive again: a second run takes a new stamp,
- * moves what is left and skips what already went.
+ * (`moved`, `to`, `configTo`), so the owner can finish by hand. After ARCHIVE_MOVE_FAILED or ARCHIVE_UNPIN_FAILED the
+ * label is still pinned, so the archive can be run again: a second run takes a new stamp, moves what is left and skips
+ * what already went. ARCHIVE_UNPIN_FAILED carries prestart's own refusal code as `detail` when it has one. After
+ * DAEMON_RELOAD_FAILED the label is already unpinned, so a second run refuses RELEASE_LOCK_RELEASE_MISSING; the
+ * archive is finished by running `systemctl daemon-reload` by hand.
  */
 export async function archiveRelease({ label, layout = LAYOUT, deps = {}, now = Date.now }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
@@ -177,7 +182,9 @@ export async function archiveRelease({ label, layout = LAYOUT, deps = {}, now = 
   let lockSha256;
   try {
     ({ lockSha256 } = await io.unpinRelease({ label, layout, deps: { readReleaseState: io.readReleaseState } }));
-  } catch { refuse('ARCHIVE_UNPIN_FAILED', { moved, to, configTo }); }
+  } catch (error) {
+    refuse('ARCHIVE_UNPIN_FAILED', { moved, to, configTo, ...(typeof error?.code === 'string' && CODE.test(error.code) ? { detail: error.code } : {}) });
+  }
   const reload = await io.run([layout.systemctl, 'daemon-reload'], { env: {}, timeoutMs: 90_000, maxOutputBytes: 4096 });
   if (!reload || reload.timedOut || reload.overflow || reload.error || reload.code !== 0) refuse('DAEMON_RELOAD_FAILED', { moved, to, configTo });
   return Object.freeze({ event: 'PREVIEW_RELEASE_ARCHIVED', label, releaseKey, to, configTo, moved: Object.freeze(moved), skipped: Object.freeze(skipped), lockSha256 });
@@ -188,7 +195,6 @@ function parseArguments(argv) {
   if (argv.length === 3 && argv[0] === 'archive' && argv[1] === '--label' && isLabel(argv[2])) return { label: argv[2] };
   return refuse('ARGUMENTS_REFUSED');
 }
-const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
 /** One JSON line per run; 0 on success, 1 on any refusal. */
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, now = Date.now, stdout = process.stdout, stderr = process.stderr } = {}) {
@@ -200,7 +206,7 @@ export async function main(argv, { platform = process.platform, uid = process.ge
     return 0;
   } catch (error) {
     const details = error instanceof ArchiveRefusal
-      ? { ...(error.fields ? { fields: error.fields } : {}), ...(error.moved ? { moved: error.moved, to: error.to, configTo: error.configTo } : {}) }
+      ? { ...(error.fields ? { fields: error.fields } : {}), ...(error.moved ? { moved: error.moved, to: error.to, configTo: error.configTo } : {}), ...(error.detail ? { detail: error.detail } : {}) }
       : {};
     logLine(stderr, { event: 'PREVIEW_RELEASE_ARCHIVE_REFUSED', ...(args ? { label: args.label } : {}), reason: typeof error?.code === 'string' && CODE.test(error.code) ? error.code : 'UNEXPECTED', ...details });
     return 1;

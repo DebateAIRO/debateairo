@@ -195,7 +195,7 @@ describe('release-archive.mjs (side-by-side spec §10, plan D12)', () => {
     const unpin = fakes(t);
     const lockBefore = readFileSync(t.layout.lockPath, 'utf8');
     await expect(archive.archiveRelease({ label: OLD, layout: t.layout, deps: { ...unpin.deps, unpinRelease: async () => { throw Object.assign(new Error('RELEASE_LOCK_UNREADABLE'), { code: 'RELEASE_LOCK_UNREADABLE' }); } }, now: () => NOW }))
-      .rejects.toMatchObject({ code: 'ARCHIVE_UNPIN_FAILED', moved: all.map(path => path.replace(s.base, t.base)), to: `${t.layout.archiveRoot}/${OLD}-${STAMP}`, configTo: `${t.layout.configArchiveRoot}/${OLD}-config-${STAMP}` });
+      .rejects.toMatchObject({ code: 'ARCHIVE_UNPIN_FAILED', detail: 'RELEASE_LOCK_UNREADABLE', moved: all.map(path => path.replace(s.base, t.base)), to: `${t.layout.archiveRoot}/${OLD}-${STAMP}`, configTo: `${t.layout.configArchiveRoot}/${OLD}-config-${STAMP}` });
     expect(readFileSync(t.layout.lockPath, 'utf8')).toBe(lockBefore);
     expect(unpin.systemctl).toEqual([]);
   });
