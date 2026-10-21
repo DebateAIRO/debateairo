@@ -2,17 +2,18 @@ import { z } from "zod";
 import type { ActionBinding, Reason, SecurityReceipt, StaffCapability, DelegatedStaffCapability, StaffDisableMode } from "@debateai/kernel";
 import { PublicationReviewAuditEventSchema } from "./publication-review.js";
 export const StaffCapabilitySchema = z.enum([
-    "TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE", "ALLOWANCE_WRITE", "PUBLICATION_REVIEW"
+    "TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE", "ALLOWANCE_WRITE", "PUBLICATION_REVIEW", "THREAT_REPORT"
 ]) satisfies z.ZodType<StaffCapability>;
-const DelegatedStaffCapabilitySchema = z.enum(["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW"]) satisfies z.ZodType<DelegatedStaffCapability>;
-export const DelegatedStaffCapabilitiesSchema = z.array(DelegatedStaffCapabilitySchema).max(4)
+const DelegatedStaffCapabilitySchema = z.enum(["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW", "THREAT_REPORT"]) satisfies z.ZodType<DelegatedStaffCapability>;
+export const DelegatedStaffCapabilitiesSchema = z.array(DelegatedStaffCapabilitySchema).max(5)
     .refine((values) => new Set(values).size === values.length, "Capabilities must be unique");
 export const ActiveStaffCapabilitiesSchema = z.array(z.enum([
-    "TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW"
-])).max(7).refine((values) => new Set(values).size === values.length, "Capabilities must be unique");
+    "TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW", "THREAT_REPORT"
+])).max(8).refine((values) => new Set(values).size === values.length, "Capabilities must be unique");
 export const StaffActionSchema = z.enum([
     "TEAM_INVITE", "INVITATION_ACCEPT", "TEAM_GRANT", "TEAM_DISABLE", "EMERGENCY_DISABLE",
-    "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE"
+    "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE",
+    "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED"
 ]);
 const RevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -113,7 +114,8 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("EMERGENCY_DISABLE"), target_staff_id: z.uuid(), mode: z.literal("COMPROMISE"), ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("CREDENTIAL_REGISTER"), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_APPROVE"), review_ref: z.uuid(), operation_id: z.uuid() }).strict(),
-    z.object({ action: z.literal("PUBLICATION_REVIEW_REFUSE"), review_ref: z.uuid(), reason: z.string().trim().min(1).max(500), operation_id: z.uuid() }).strict()
+    z.object({ action: z.literal("PUBLICATION_REVIEW_REFUSE"), review_ref: z.uuid(), reason: z.string().trim().min(1).max(500), operation_id: z.uuid() }).strict(),
+    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -187,8 +189,26 @@ export const StaffAuditEventSchema = z.object({
         "OWNER_RECOVERED", "CREDENTIAL_REGISTERED", "CREDENTIAL_REVOKED", "ALLOWANCE_CONFIGURED", "ALLOWANCE_REVOKED"]),
     recorded_at: z.iso.datetime(), reason: ReasonSchema.nullable(), delivery_state: DeliveryStateSchema
 }).strict();
+export const ThreatReportAuditEventSchema = z.object({
+    event_id: z.uuid(), actor_staff_id: z.uuid(),
+    event: z.enum(["THREAT_REPORT_LIST", "THREAT_REPORT_READ", "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED"]),
+    threat_report_ref: z.uuid().nullable(), recorded_at: z.iso.datetime()
+}).strict();
 export const StaffAuditPageSchema = z.object({
-    events: z.array(z.union([StaffAuditEventSchema, PublicationReviewAuditEventSchema])).max(100), next_cursor: CursorSchema.nullable(), order: z.literal("RECORDED_AT_ID_ASC")
+    events: z.array(z.union([StaffAuditEventSchema, PublicationReviewAuditEventSchema, ThreatReportAuditEventSchema])).max(100), next_cursor: CursorSchema.nullable(), order: z.literal("RECORDED_AT_ID_ASC")
+}).strict();
+const ThreatReportBaseSchema = z.object({
+    report_ref: z.uuid(), kept_at: z.iso.datetime(), decision: z.enum(["UNREAD", "REPORTED", "NOT_REPORTED"]),
+    decided_at: z.iso.datetime().nullable()
+}).strict();
+export const ThreatReportListSchema = z.object({ reports: z.array(ThreatReportBaseSchema) }).strict();
+export const ThreatReportSchema = ThreatReportBaseSchema.extend({
+    question: z.string(), account: z.object({ email: z.email(), user_id: z.uuid().nullable() }).strict()
+}).strict();
+export const ThreatReportSummarySchema = z.object({ unread: z.number().int().nonnegative() }).strict();
+export const ThreatReportDecisionRequestSchema = z.object({
+    decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema,
+    operation_id: z.uuid(), proof: OpaqueHandleSchema
 }).strict();
 export type StaffActionIntent = z.infer<typeof StaffActionIntentSchema>;
 export type StaffPrerequisiteStepUpRequest = z.infer<typeof StaffPrerequisiteStepUpRequestSchema>;
@@ -211,7 +231,9 @@ export const staffContractInventory = Object.freeze({
         "POST /v1/admin/owner-possession/options", "POST /v1/admin/owner-possession/verify",
         "PATCH /v1/admin/team/{staffId}/grants", "POST /v1/admin/team/{staffId}/disable", "GET /v1/admin/audit",
         "GET /v1/admin/publication-reviews", "GET /v1/admin/publication-reviews/{reviewRef}",
-        "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse"
+        "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse",
+        "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
+        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -223,12 +245,13 @@ export const staffContractInventory = Object.freeze({
         OwnerPossessionOptionsRequestSchema, OwnerPossessionVerifyRequestSchema, OwnerPossessionResponseSchema,
         StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationOptionsResponseSchema, StaffInvitationVerifyRequestSchema,
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
-        StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, StaffAuditPageSchema
+        StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
+        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema
     })
 });
 
 /** Funded v2 is explicitly selected; the historical core-A schemas above stay strict. */
-export const FundedActiveStaffCapabilitiesSchema = z.array(StaffCapabilitySchema).max(8)
+export const FundedActiveStaffCapabilitiesSchema = z.array(StaffCapabilitySchema).max(9)
     .refine(values => new Set(values).size === values.length, "Capabilities must be unique");
 export const FundedStaffActionSchema = z.enum([
     ...StaffActionSchema.options, "ALLOWANCE_CONFIGURE", "ALLOWANCE_REVOKE"

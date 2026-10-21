@@ -9,7 +9,7 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
-  "DATA_EXPORT"
+  "DATA_EXPORT", "THREAT_REPORT_WAITING"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -342,5 +342,9 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     catalogue: "mail", subject: "mail.export.subject",
     paragraphs: ["mail.export.requested", "mail.export.linkLead", "mail.export.validity", "mail.export.notYou"],
     params: { requested: "date", expires: "datetime", downloadUrl: "url" }
+  }),
+  THREAT_REPORT_WAITING: define({
+    catalogue: "owner", subject: "owner.threatReport.subject",
+    paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}
   })
 });

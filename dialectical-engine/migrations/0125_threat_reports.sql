@@ -376,9 +376,19 @@ GRANT SELECT (erasure_id, user_id, prepared_at, cancelled_at, committed_at)
 
 CREATE OR REPLACE FUNCTION staff.keep_threat_report(p_question text, p_account uuid) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
-DECLARE v_ref uuid;
+DECLARE v_ref uuid; v_account uuid := p_account;
 BEGIN
-  INSERT INTO staff.threat_report(question, account_user_id) VALUES (p_question, p_account)
+  IF p_account IS NOT NULL THEN
+    -- Serialize a keep with the email hold: a keep before the hold is swept up by it;
+    -- a keep after the hold sees the open prepared erasure and carries no account.
+    PERFORM pg_advisory_xact_lock(hashtextextended('staff:threat-report-erasure:' || p_account::text,0));
+    IF EXISTS (SELECT 1 FROM identity.account_erasure_request
+      WHERE user_id=p_account AND prepared_at IS NOT NULL
+        AND cancelled_at IS NULL AND committed_at IS NULL) THEN
+      v_account:=NULL;
+    END IF;
+  END IF;
+  INSERT INTO staff.threat_report(question, account_user_id) VALUES (p_question, v_account)
     RETURNING report_ref INTO v_ref;
   INSERT INTO staff.threat_report_alert(recipient_staff_id)
     SELECT staff_id FROM staff.subject
@@ -490,6 +500,11 @@ DECLARE v_user uuid; v_count integer;
 BEGIN
   SELECT user_id INTO v_user FROM identity.account_erasure_request
     WHERE erasure_id=p_erasure_id AND prepared_at IS NOT NULL
+      AND cancelled_at IS NULL AND committed_at IS NULL;
+  IF NOT FOUND THEN RAISE EXCEPTION 'THREAT_REPORT_HOLD_NOT_ERASING' USING ERRCODE='42501'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('staff:threat-report-erasure:' || v_user::text,0));
+  PERFORM 1 FROM identity.account_erasure_request
+    WHERE erasure_id=p_erasure_id AND user_id=v_user AND prepared_at IS NOT NULL
       AND cancelled_at IS NULL AND committed_at IS NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'THREAT_REPORT_HOLD_NOT_ERASING' USING ERRCODE='42501'; END IF;
   UPDATE staff.threat_report SET held_email=p_email,account_user_id=NULL
