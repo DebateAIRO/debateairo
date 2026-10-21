@@ -7,6 +7,7 @@ import { useHideOutside } from "@/components/dialogSurface";
 import {
   CRISIS_LINES,
   FIND_A_HELPLINE_URL,
+  STABLE_CRISIS_COUNTRY_OPTIONS,
   crisisCountryOptions,
   formatCrisisHours,
   resolveCrisisCountry,
@@ -119,8 +120,13 @@ export function CrisisHelpNumbers({ catalog, locale, countryHint }: Readonly<{
   countryHint: string | null;
 }>): React.ReactElement {
   const [country, setCountry] = React.useState<string>(() =>
-    resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
-  const options = crisisCountryOptions(locale);
+    resolveCrisisCountry({ hint: countryHint, locale }) ?? "");
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => {
+    setHydrated(true);
+    setCountry(resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
+  }, [countryHint, locale]);
+  const options = hydrated ? crisisCountryOptions(locale) : STABLE_CRISIS_COUNTRY_OPTIONS;
   const entry = country === "" ? undefined : CRISIS_LINES[country];
   return <>
     <label className="crisisSupportCountry">

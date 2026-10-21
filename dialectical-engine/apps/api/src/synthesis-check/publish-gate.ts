@@ -58,17 +58,19 @@ export function createSynthesisPublishGate(input: Readonly<{
         const prior = await readDecision();
         if (prior !== null) return prior;
         const deadlineAt = new Date(target.startedAt.getTime() + input.deadlineMs);
+        let waitedForCheck = false;
         while (input.clock().getTime() < deadlineAt.getTime()) {
           const inFlight = await input.repository.readInFlightAttempts({
             answerId: target.answer.answer_id, maxVersion: target.answer.answer_version,
             deadlineMs: input.deadlineMs
           });
           if (inFlight.length === 0) break;
+          waitedForCheck = true;
           await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, deadlineAt.getTime() - input.clock().getTime()));
           const observed = await readDecision();
           if (observed !== null) return observed;
         }
-        if (input.clock().getTime() >= deadlineAt.getTime()) return "UNAVAILABLE";
+        if (waitedForCheck || input.clock().getTime() >= deadlineAt.getTime()) return "UNAVAILABLE";
         const attempt = await input.repository.startPublishAttempt({
           runId: target.runId, answerId: target.answer.answer_id,
           answerVersion: target.answer.answer_version

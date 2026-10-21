@@ -2,11 +2,13 @@
 import { createHash } from "node:crypto";
 import { act } from "react";
 import { isValidElement } from "react";
-import { createRoot } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CrisisSupportDialog } from "../../apps/ui/components/CrisisSupport";
 import { CheckRemovalNotice, RemovalNoticeLatch } from "../../apps/ui/components/CheckRemovalNotice";
+import { ModeToggle } from "../../apps/ui/components/ModeToggle";
+import { CRISIS_LINES, STABLE_CRISIS_COUNTRY_OPTIONS } from "../../apps/ui/lib/crisisLines";
 import HomePage from "../../apps/ui/app/page";
 import home from "../../apps/ui/messages/en/home.json";
 
@@ -36,9 +38,41 @@ describe("S01 removal notice", () => {
 
   it("shows help numbers with the hinted country first", () => {
     const html = notice();
+    expect(new Set(STABLE_CRISIS_COUNTRY_OPTIONS.map((option) => option.code)))
+      .toEqual(new Set(Object.keys(CRISIS_LINES)));
     expect(html).toContain('class="crisisSupportCountry"');
     expect(html).toMatch(/<option value="US" selected="">/);
     expect(html).toContain('class="crisisSupportLines"');
+  });
+
+  it("hydrates the notice when browser country and ICU names differ from the server", async () => {
+    const page = <div><header className="debateTopBar"><ModeToggle compact /></header>
+      <CheckRemovalNotice catalog={home} locale="en" countryHint={null} onClose={() => {}} /></div>;
+    const markup = renderToString(page);
+    const node = document.createElement("div");
+    node.innerHTML = markup;
+    document.body.append(node);
+    const priorLanguages = Object.getOwnPropertyDescriptor(navigator, "languages");
+    Object.defineProperty(navigator, "languages", { configurable: true, value: ["en-US"] });
+    const originalOf = Intl.DisplayNames.prototype.of;
+    vi.spyOn(Intl.DisplayNames.prototype, "of").mockImplementation(function (this: Intl.DisplayNames, code: string) {
+      return code === "HK" ? "Hong Kong" : originalOf.call(this, code);
+    });
+    const recovered: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(node, page,
+        { onRecoverableError: (error) => recovered.push(error) }); });
+      expect(recovered).toEqual([]);
+      expect(node.querySelector('[data-mode-toggle="true"]')).not.toBeNull();
+      expect(node.querySelector<HTMLSelectElement>("select")?.value).toBe("US");
+    } finally {
+      await act(async () => { root?.unmount(); });
+      vi.restoreAllMocks();
+      if (priorLanguages) Object.defineProperty(navigator, "languages", priorLanguages);
+      else delete (navigator as { languages?: readonly string[] }).languages;
+      node.remove();
+    }
   });
 
   it("orders the title, explanation, help numbers, five reasons and Close", () => {

@@ -6,7 +6,6 @@ import type { PromptPacket } from "../../packages/providers/src/index.js";
 import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
 import { describe, expect, it } from "vitest";
 import * as judgeTransport from "../../apps/api/src/publication-check/judge-transport.js";
-import { SYNTHESIS_CHECK_CATEGORY_WORDS, SYNTHESIS_CHECK_CATEGORIES } from "../../packages/contract/src/synthesis-check.js";
 
 const answerFor = (packet: PromptPacket, flags = [0, 0, 0, 0], call = judgeCallValue(readPromptFrame(packet).fence)) =>
   `{"call":"${call}","TERRORISM":${flags[0]},"HATE_SPEECH":${flags[1]},"SUICIDE_OR_HARM_TO_OTHERS":${flags[2]},"WEAPONS_OR_DRUGS":${flags[3]}}`;
@@ -56,9 +55,10 @@ describe("synthesis check core", () => {
     // Property: the model receives the approved code and phrase for each category.
     const { synthesisCheckContract } = await import("../../apps/api/src/synthesis-check/policy.js");
     const instruction = synthesisCheckContract().instruction;
-    for (const category of SYNTHESIS_CHECK_CATEGORIES) {
-      expect(instruction).toContain(`${category}: ${SYNTHESIS_CHECK_CATEGORY_WORDS[category]}`);
-    }
+    expect(instruction).toContain("TERRORISM: Possible terrorism");
+    expect(instruction).toContain("HATE_SPEECH: hate speech of any kind");
+    expect(instruction).toContain("SUICIDE_OR_HARM_TO_OTHERS: tendencies to suicide or harming other people");
+    expect(instruction).toContain("WEAPONS_OR_DRUGS: crafting weapons or drugs");
   });
 
   it("the instruction contains S01-R11's sentence, character for character, after the fourth phrase, and neither of its two earlier wordings", async () => {
@@ -68,8 +68,8 @@ describe("synthesis check core", () => {
     const sentence = 'A debate about violence as a subject of history, law, ethics, politics, current affairs or public policy, including whether a state, an army or the police should use force, is not "harming other people" by its subject alone; its synthesis counts as "harming other people" when it urges or plans harm to a person, or when it concludes that a state, an army, the police or anyone else should use force against people.';
     const v62FirstWording = 'A debate about violence as a subject of history, law, ethics, politics, current affairs or public policy, including whether a state, an army or the police should use force, is not "harming other people" unless its synthesis urges or plans harm to a person.';
     const v73Wording = 'A debate about violence as a subject of history, law, ethics, politics, current affairs or public policy, including whether a state, an army or the police should use force, is not "harming other people" by its subject alone; its synthesis counts as "harming other people" when it urges or plans harm to a person, or when it concludes that a state, an army or the police should use force.';
-    expect(instruction.indexOf(sentence)).toBeGreaterThan(instruction.indexOf(SYNTHESIS_CHECK_CATEGORY_WORDS.WEAPONS_OR_DRUGS));
-    expect(instruction.indexOf(SYNTHESIS_CHECK_CATEGORY_WORDS.WEAPONS_OR_DRUGS)).toBeGreaterThanOrEqual(0);
+    expect(instruction.indexOf(sentence)).toBeGreaterThan(instruction.indexOf("WEAPONS_OR_DRUGS: crafting weapons or drugs"));
+    expect(instruction.indexOf("WEAPONS_OR_DRUGS: crafting weapons or drugs")).toBeGreaterThanOrEqual(0);
     expect(instruction.includes(v62FirstWording)).toBe(false);
     expect(instruction.includes(v73Wording)).toBe(false);
     expect(instruction.includes("unless its synthesis urges or plans harm to a person.")).toBe(false);
@@ -189,6 +189,20 @@ describe("synthesis check core", () => {
     const result = await runSynthesisCheck(f.deps, f.input);
     expect(result.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" });
     expect(Date.now() - started).toBeLessThan(1500);
+  });
+
+  it("a packet sent to a timed-out model records one estimated site spend entry", async () => {
+    // Property: the ledger charges a sent request even when the provider's reply is unavailable.
+    const { runSynthesisCheck } = await import("../../apps/api/src/synthesis-check/check.js");
+    const f = checkFixture({ complete: async () => new Promise(() => {}), deadlineMs: 100,
+      deadlineAt: new Date(Date.now() + 100) });
+    const result = await runSynthesisCheck(f.deps, f.input);
+    expect(result.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" });
+    expect(f.packets).toHaveLength(1);
+    expect(f.records).toHaveLength(1);
+    expect(f.records[0]).toMatchObject({ spendSource: "SYNTHESIS_CHECK", runId: "run-1",
+      providerRef: "anthropic", outputTokens: 192 });
+    expect(Number(f.records[0]?.inputTokens)).toBeGreaterThan(0);
   });
 
   it("a day pot at or over its ceiling records UNAVAILABLE MONEY_REFUSED with no model call", async () => {

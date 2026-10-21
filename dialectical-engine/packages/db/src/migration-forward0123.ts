@@ -21,6 +21,8 @@ const FUNCTIONS = [
   "core.enforce_erasure_barrier_synthesis_check_result()",
   "core.enforce_synthesis_check_inheritance()",
   "core.enforce_synthesis_check_removal_request()",
+  "serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean)",
+  "serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
   "core.prepare_synthesis_check_erasures(integer)",
   "core.pending_synthesis_check_erasure_cleanup(integer)",
   "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",

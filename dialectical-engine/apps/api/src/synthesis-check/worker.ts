@@ -20,7 +20,7 @@ export class SynthesisCheckWorker {
   async runOnce(): Promise<void> {
     try {
       const claims = await this.deps.repository.claimNextRequests(SYNTHESIS_CHECK_MAX_IN_FLIGHT, this.deps.deadlineMs);
-      const removals = await Promise.all(claims.map(async (claim): Promise<boolean> => {
+      const processClaim = async (claim: typeof claims[number]): Promise<boolean> => {
         try {
           const ownerRef = await this.deps.repository.ownerRefOfRun(claim.runId);
           if (ownerRef === null) {
@@ -87,6 +87,19 @@ export class SynthesisCheckWorker {
             ? "SYNTHESIS_CHECK_ANSWER_UNREADABLE" : "SYNTHESIS_CHECK_UNEXPECTED");
           return false;
         }
+      };
+      const byAnswer = new Map<string, typeof claims>();
+      for (const claim of claims) {
+        const group = byAnswer.get(claim.answerId) ?? [];
+        group.push(claim);
+        byAnswer.set(claim.answerId, group);
+      }
+      const removals = await Promise.all([...byAnswer.values()].map(async (group) => {
+        let removed = false;
+        for (const claim of group.sort((a, b) => a.answerVersion - b.answerVersion)) {
+          removed = await processClaim(claim) || removed;
+        }
+        return removed;
       }));
       if (removals.some(Boolean)) {
         try { await this.deps.erasure.reconcile(100); }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { configureContentEncryption, contentCipherFor, createPool, migrate, withRunContentLease, isRunContentLeaseHeld,
+import { configureContentEncryption, contentCipherFor, createPool, encryptAttestedContentForRun, migrate, withRunContentLease, isRunContentLeaseHeld,
   PostgresSynthesisCheckErasureRepository, SynthesisCheckErasureCoordinator, type Pool } from "@debateai/db";
 import { FileRunContentKeyStore } from "@debateai/crypto";
 import { ServeRepository, SynthesisCheckRepository, synthesisTextOf } from "@debateai/serve";
@@ -11,7 +11,7 @@ import type { SynthesisCheckCategory } from "@debateai/contract";
 import { buildApi, type ApiOptions } from "../../apps/api/src/index.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import type { SynthesisPublishGate } from "../../apps/api/src/synthesis-check/publish-gate.js";
-import { createSynthesisAnswerAccess, OPEN_SYNTHESIS_ANSWER_ACCESS, type SynthesisAnswerAccess } from "../../apps/api/src/synthesis-check/hold.js";
+import { createSynthesisAnswerAccess, type SynthesisAnswerAccess } from "../../apps/api/src/synthesis-check/hold.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
@@ -56,6 +56,49 @@ async function settled() {
   const answer = await serve.readAnswerProjection(answerId, { ownerRef: owner.ownerRef, legacyAskerId: null }, 1);
   if (answer === null) throw new Error("TEST_ANSWER_MISSING");
   return { runId, answerId, answerVersion: 1, answer };
+}
+
+async function heldComposedVersion() {
+  const first = await settled();
+  const composedId = randomUUID();
+  const composed = await encryptAttestedContentForRun(database.pool, first.runId,
+    "serve.composed_text", composedId, { segments: [{ segment_id: randomUUID(),
+      text: "A held synthesis", load_bearing: true, served_number_refs: [] }] });
+  const rawId = randomUUID();
+  const raw = await encryptAttestedContentForRun(database.pool, first.runId,
+    "ledger.raw_artifact", rawId, { rawText: "fixture", metadataJson: {} });
+  const sealedAnswer = await encryptAttestedContentForRun(database.pool, first.runId,
+    "serve.answer", `${first.answerId}:2`, { answerForm: null });
+  if (composed === null || raw === null || sealedAnswer === null) throw new Error("TEST_CONTENT_CIPHER_MISSING");
+  await database.pool.query(`INSERT INTO ledger.raw_artifact
+    (raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,raw_text,metadata_json,
+     parse_status,input_hash,input_hash_version,contract_hash,content_hash,content_hash_version,at_seq,
+     content_ciphertext,content_attestation)
+    VALUES ($1,$2,$3,'test','test','test','test','⟦DEBATEAI:CIPHERTEXT:V1⟧',
+      '{}'::jsonb,'PARSED','test',1,'test','test',1,ledger.allocate_sequence(),$4::jsonb,$5)`,
+    [rawId, randomUUID(), first.runId, JSON.stringify(raw.envelope), raw.attestation]);
+  await database.pool.query(`INSERT INTO serve.composed_text
+    (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
+    SELECT $2,fact_bundle_id,'[]'::jsonb,$3,1,$4::jsonb,$5 FROM serve.answer
+    WHERE answer_id=$1 AND answer_version=1`,
+    [first.answerId, composedId, rawId, JSON.stringify(composed.envelope), composed.attestation]);
+  await database.pool.query(`INSERT INTO serve.answer (
+    answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,
+    answer_form,condition_marks,fact_bundle_id,composed_text_id,conformance_record_id,
+    sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,
+    verdict_unavailable,memory_disclosure,content_ciphertext,content_attestation
+  ) SELECT answer_id,2,run_id,work_item_id,terminal,'COMPOSED',verdict_state,
+    answer_form,condition_marks,fact_bundle_id,$2,conformance_record_id,
+    ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,
+    builds_on_previous,badges,verdict_unavailable,memory_disclosure,$3::jsonb,$4
+    FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
+    [first.answerId, composedId, JSON.stringify(sealedAnswer.envelope), sealedAnswer.attestation]);
+  const answer = await serve.readAnswerProjection(first.answerId, { ownerRef: owner.ownerRef, legacyAskerId: null }, 2);
+  if (answer === null) throw new Error("TEST_ANSWER_MISSING");
+  const target = { ...first, answerVersion: 2, answer };
+  await repository.insertRequest(target);
+  expect(await repository.readAnswerAccess({ ...target, deadlineMs: 60_000 })).toBe("HELD");
+  return target;
 }
 
 type Target = Awaited<ReturnType<typeof settled>>;
@@ -152,6 +195,42 @@ describe("synthesis publish gate under debateai_runtime", () => {
     expect(calls).toBe(0);
   });
 
+  it("Publish reads a stored synthesis beneath a fresh hold and checks it", async () => {
+    const { createSynthesisPublishGate } = await import("../../apps/api/src/synthesis-check/publish-gate.js");
+    const target = await heldComposedVersion();
+    let calls = 0;
+    const gate = createSynthesisPublishGate({
+      repository,
+      readAnswerVersions: async (_runId, answerId, maxVersion, ownerRef) => {
+        const texts = new Map<number, string | null>();
+        for (let version = 1; version <= maxVersion; version++) {
+          const stored = await serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, version);
+          if (stored === null) throw new Error("TEST_ANSWER_UNREADABLE");
+          texts.set(version, synthesisTextOf(stored));
+        }
+        return texts;
+      },
+      check: {
+        port: () => ({ providerRef: "anthropic", modelId: "claude-haiku-5-5",
+          complete: async ({ packet }: { packet: PromptPacket; signal: AbortSignal }) => {
+            calls++;
+            expect(readPromptFrame(packet).fields).toEqual([{ name: "synthesis", content: "A held synthesis" }]);
+            const call = judgeCallValue(readPromptFrame(packet).fence);
+            return { text: `{"call":"${call}","TERRORISM":0,"HATE_SPEECH":1,"SUICIDE_OR_HARM_TO_OTHERS":0,"WEAPONS_OR_DRUGS":0}` };
+          } }),
+        deadlineMs: 60_000, recordSpend: async () => {},
+        priceOf: () => ({ inputUsdPerM: "0.10", outputUsdPerM: "0.50" }),
+        clock: () => new Date(), log: () => {}
+      },
+      deadlineMs: 60_000, clock: () => new Date(), sleep: async () => {}
+    });
+    expect(await gate.decide({ runId: target.runId, answer: target.answer,
+      contentLease: lease(target), startedAt: new Date() })).toBe("APPROVAL_REQUIRED");
+    expect(calls).toBe(1);
+    expect((await repository.readRecords({ ...target, maxVersion: 2 }))[0]?.outcome)
+      .toEqual({ verdict: "FLAGGED", categories: ["HATE_SPEECH"] });
+  });
+
   it("a stored harmful flag removes the debate before a model call", async () => {
     const target = await settled();
     await final(target, "FLAGGED", ["SUICIDE_OR_HARM_TO_OTHERS"]);
@@ -174,7 +253,16 @@ describe("synthesis publish gate under debateai_runtime", () => {
     });
     expect(await access.takeRemovalNotice(owner.ownerRef)).toBe(true);
     const afterNotice = await routeDecision(target, gate, access);
-    expect(afterNotice).toEqual(await routeDecision(target, gate, OPEN_SYNTHESIS_ANSWER_ACCESS));
+    const privatelyDeleted = await settled();
+    const privateKeys = new FileRunContentKeyStore(owner.secretRoot,
+      {} as ConstructorParameters<typeof FileRunContentKeyStore>[1], async () => owner.userId);
+    expect(await privateKeys.destroy(privatelyDeleted.runId)).toBe("DESTROYED");
+    await database.pool.query(`INSERT INTO serve.private_run_erasure_tombstone
+      (run_id,completed_at,destroyed_key_count,already_absent_key_count)
+      VALUES ($1,clock_timestamp(),1,0)`, [privatelyDeleted.runId]);
+    expect(await repository.runRemovedByCheck(privatelyDeleted.runId)).toBe(false);
+    const privateDeleteResponse = await routeDecision(privatelyDeleted, gate, access);
+    expect(afterNotice).toEqual(privateDeleteResponse);
     expect(afterNotice.publicationCalls).toBe(0);
   });
 
@@ -230,6 +318,27 @@ describe("synthesis publish gate under debateai_runtime", () => {
     } });
     expect(await gate.decide({ runId: target.runId, answer: target.answer, contentLease: lease(target), startedAt: new Date() })).toBe("APPROVAL_REQUIRED");
     expect((await repository.readRecords({ ...target, maxVersion: 1 })).filter((record) => record.final)).toHaveLength(1);
+  });
+
+  it("a Publish pressed during a harmful in-flight check answers 410 and publishes nothing", async () => {
+    const target = await settled();
+    const attempt = await repository.startPublishAttempt(target);
+    let modelCalls = 0;
+    const gate = await gateFor({ text: "Harmful synthesis", flags: [0, 0, 0, 0],
+      onModel: () => modelCalls++, sleep: async () => {
+        await repository.insertResult({
+          ...target, attemptId: attempt.attemptId, synthesisOriginVersion: 1,
+          outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] },
+          modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
+          policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000
+        });
+      } });
+    expect(await routeDecision(target, gate)).toEqual({
+      status: 410, body: { error: "DEBATE_REMOVED_BY_CHECK", message: "DEBATE_REMOVED_BY_CHECK" },
+      publicationCalls: 0
+    });
+    expect(modelCalls).toBe(0);
+    expect(await repository.runRemovedByCheck(target.runId)).toBe(true);
   });
 
   it("waits for an in-flight clear verdict then proceeds", async () => {

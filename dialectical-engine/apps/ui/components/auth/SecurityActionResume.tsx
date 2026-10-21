@@ -15,7 +15,7 @@ import { refusalMessage } from '../DataExportCard';
 import { formatDate } from '@/lib/i18n/translate';
 export type SecurityResumeHandler = (authorization: StepUpAuthorizationRequest, initialProof: ConfirmedSecurityAction) => void | Promise<void>;
 /** Task12 consumes onResume for its profile/method/provider panels; proof remains one-use and exact. */
-export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, locale, client = contractClient, takeProof = takeSocialStepUp, onResume }: {
+export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, locale, client = contractClient, takeProof = takeSocialStepUp, onResume, onRemovedByCheck }: {
     catalog: MessageCatalog;
     settingsCatalog: MessageCatalog;
     publicCatalog: MessageCatalog;
@@ -23,6 +23,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
     client?: ContractClient;
     takeProof?: () => StepUpResponse | null;
     onResume?: SecurityResumeHandler;
+    onRemovedByCheck?: (runId: string) => void;
 }) {
     const started = useRef(false);
     const consumed = useRef(false);
@@ -157,7 +158,8 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                     return;
                 }
                 if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'DEBATE_REMOVED_BY_CHECK' && 'target_run_id' in grant) {
-                    window.location.assign(`/debate/${grant.target_run_id}`);
+                    if (onRemovedByCheck) onRemovedByCheck(grant.target_run_id);
+                    else window.location.assign(`/debate/${grant.target_run_id}`);
                     return;
                 }
                 if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_APPROVAL_REQUIRED') {

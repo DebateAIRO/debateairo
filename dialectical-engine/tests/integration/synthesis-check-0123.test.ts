@@ -202,7 +202,7 @@ describe("0123 synthesis check records and runtime boundaries", () => {
     await expect(withRuntime((client) => client.query("DELETE FROM serve.synthesis_check_removal_request WHERE run_id=$1", [run.runId]))).rejects.toMatchObject({ code: "42501" });
   });
 
-  it("an inheritance is refused with 23514 SYNTHESIS_CHECK_INHERITANCE_INVALID unless the inherited result is final, of the same answer and of an earlier version", async () => {
+  it("inheritance requires a final result of the same answer, at an earlier version or from a losing same-version attempt", async () => {
     const run = await seedRun(), other = await seedRun();
     await secondVersion(run);
     const unavailable = await insertAttempt(run), otherAttempt = await insertAttempt(other);
@@ -218,6 +218,12 @@ describe("0123 synthesis check records and runtime boundaries", () => {
     await expect(tryInherit(otherId)).rejects.toMatchObject({ code: "23514", message: "SYNTHESIS_CHECK_INHERITANCE_INVALID" });
     const earlier = await insertAttempt(run), earlierId = await insertResult(run,earlier.attemptId);
     await tryInherit(earlierId);
+    const loser = await insertAttempt(run);
+    await query(`INSERT INTO serve.synthesis_check_inheritance
+      (attempt_id,run_id,answer_id,answer_version,inherited_result_id) VALUES($1,$2,$3,1,$4)`,
+      [loser.attemptId,run.runId,run.answerId,earlierId]);
+    expect((await query(`SELECT count(*)::int AS n FROM serve.synthesis_check_inheritance
+      WHERE attempt_id=$1`, [loser.attemptId])).rows[0].n).toBe(1);
   });
 
   it("take answers true once and false after; an expired notice is neither taken nor existing and the purge deletes it; the runtime cannot SELECT the notice table (42501)", async () => {

@@ -210,7 +210,7 @@
   "public.publication.contentCheck.stillPrivate": "Ваша дискуссия остаётся приватной и неизменной. Только вы можете её видеть.",
   "public.publication.contentCheck.appeal": "Чтобы попросить человека пересмотреть это решение, напишите на office@dezbatere.ro в течение шести месяцев.",
   "public.publication.contentCheck.unavailable": "Проверка контента сейчас недоступна, поэтому ничего не было опубликовано. Ваша дискуссия остаётся приватной. Попробуйте снова через несколько минут.",
-  "public.publication.approvalRequired": "Для публикации этих дебатов требуется наше предварительное одобрение.",
+  "public.publication.approvalRequired": "Эти дебаты требуют нашего одобрения, прежде чем их можно будет опубликовать.",
   "public.publication.checkingDebate": "Проверяем дебаты…",
   "public.publicationReview.askButton": "Запросить одобрение",
   "public.publicationReview.askWarning": "Член нашей команды прочитает эти дебаты, чтобы решить, можно ли их публиковать.",

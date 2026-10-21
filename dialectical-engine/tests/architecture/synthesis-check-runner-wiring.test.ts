@@ -32,4 +32,16 @@ describe("synthesis check request runner wiring", () => {
     });
     expect(afterLease(source)).toBe(afterLease(base));
   });
+
+  it("persists the check request and wins settlement before awaiting the optional story", async () => {
+    const source = await readFile(runnerPath, "utf8");
+    const persist = source.indexOf('const persisted = await runnerStage("ANSWER_PERSIST_FAILED"');
+    const request = source.indexOf("synthesisCheckRequest: true", persist);
+    const settle = source.indexOf("const wonSettlement = await this.#work.settle(", request);
+    const story = source.indexOf("await storyWriter.writeAfterSettle(settled.input)", settle);
+    expect(persist).toBeGreaterThanOrEqual(0);
+    expect(request).toBeGreaterThan(persist);
+    expect(settle).toBeGreaterThan(request);
+    expect(story).toBeGreaterThan(settle);
+  });
 });
