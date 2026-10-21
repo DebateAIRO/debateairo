@@ -1368,9 +1368,10 @@ export class BillingRepository {
    * P16b (R2 Q-1, D6a's 4b): subscriptions whose dunning runs, or ended, with no charge. P11a's `failUnpricedAttempt`
    * writes a charge-less attempt through `writeDunningAttempt`, whose PAST_DUE / ENDED data then name a `reason`
    * where a charged attempt names its `charge_id`: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it),
-   * or `RETRY_TOTAL_CHANGED` (W5, P2-M10: a retry with no priced attempt to copy was priced afresh at a total other
-   * than the announced one, which A7 forbids charging). The latest status event of each subscription decides: a
-   * PAST_DUE still in force, or an ENDED(DUNNING) since `since`.
+   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a retry with no priced attempt to copy was priced afresh at a total other
+   * than the announced one, which A7 forbids charging), or `REFUSAL_NOT_RETRIED` (B2, NETOPIA answers 2026-10-21,
+   * Q15: the latest refusal was not code 20, so the maintenance pass sent nothing). The latest status event of each
+   * subscription decides: a PAST_DUE still in force, or an ENDED(DUNNING) since `since`.
    * Nothing was charged; the person got M5A–C (and M6 at the end). Content-free: ids, codes and times.
    */
   async chargelessDunning(since: Date): Promise<Array<{

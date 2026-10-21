@@ -86,7 +86,8 @@ export function practiceDebateQuestion(id: string): PracticeDebateQuestion {
 
 /**
  * The question-language practice's fixed cases (question-language spec 2026-10-13; P2L cross-plan amendment P2d-3):
- * P2L's table word for word, then the two cases the P2L final review asked for (I3, I1). Each says the site language
+ * P2L's table word for word, then the two cases the P2L final review asked for (I3, I1), then the stray-letter case (the
+ * reply-language check's rule for Chinese, Japanese and Korean letters, PR #194). Each says the site language
  * it is asked on, the lock the site must reach, and whether the one-language offer must be made. Our own questions,
  * never anyone's; mode `language` asks them all, and a practice debate may ask one of them by its id.
  */
@@ -113,5 +114,12 @@ export const PRACTICE_LANGUAGE_CASES: readonly PracticeLanguageCase[] = Object.f
     fastCheck: "OFF" }),
   // P2L final review I1: Sorani Kurdish in Arabic letters, on the Arabic site (not an always-ask site). The lock is "ku"
   // (ISO 639-1), never "ckb"; the kernel then expects Arabic letters from the question's own script.
-  Object.freeze({ id: "lang-ku-arab", site: "ar", questionLine: "ئایا دەبێت باجی کاربۆن زیاد بکرێت؟", expectedLock: "ku", offerExpected: false })
+  Object.freeze({ id: "lang-ku-arab", site: "ar", questionLine: "ئایا دەبێت باجی کاربۆن زیاد بکرێت؟", expectedLock: "ku", offerExpected: false }),
+  // The stray-letter rule (PR #194; its final review): an English question ABOUT an East-Asian topic, which invites an AI
+  // to add a term in its own script, such as "hukou (户口)". The rule refuses Chinese, Japanese and Korean letters in
+  // English text (outside quotation marks), so a gloss costs one short follow-up; no practice question had invited one.
+  // The owners may reword it, but only in Latin letters: such letters in the question itself switch the rule off.
+  Object.freeze({ id: "lang-en-hukou", site: "en",
+    questionLine: "Should China abolish the hukou household registration system to reduce inequality between cities and the countryside?",
+    expectedLock: "en", offerExpected: false })
 ]);

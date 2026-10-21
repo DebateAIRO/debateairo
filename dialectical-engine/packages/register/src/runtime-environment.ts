@@ -386,6 +386,23 @@ export function loadBillingRefundDoneEnvironment() {
   return parseBillingRefundDoneEnvironment(process.env);
 }
 
+/**
+ * B1 part 2 (NETOPIA answers 2026-10-21, Q22): `pnpm billing:renewal-resume` reads `NETOPIA_API_BASE_URL` from the API's
+ * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required. C6: it
+ * also reads the OWNER-RUN sandbox's optional `BILLING_STAGE_CLOCK_OFFSET_DAYS`, so its marker is dated on the API's
+ * billing clock (`billingClock`, which refuses it against live).
+ */
+export function parseBillingRenewalResumeEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
+    BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional()
+  }, source));
+}
+
+export function loadBillingRenewalResumeEnvironment() {
+  return parseBillingRenewalResumeEnvironment(process.env);
+}
+
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
@@ -498,6 +515,12 @@ const apiEnvironmentShape = {
     NETOPIA_POS_SIGNATURE: z.string().min(1).optional(),
     NETOPIA_API_KEY_PATH: z.string().min(1).optional(),
     NETOPIA_IPN_KEYS_PATH: z.string().min(1).optional(),
+    /**
+     * B3a (NETOPIA answers 2026-10-21): the folder where a verified NETOPIA message the database could not take is kept,
+     * sealed, until it is stored (NETOPIA sends the saved card only in its first message). Optional: absent, nothing is
+     * kept (one boot line says so); set, it must be an existing folder the API can write, or the API refuses to start.
+     */
+    BILLING_NOTICE_SPOOL_PATH: z.string().min(1).optional(),
     /**
      * OWNER-RUN sandbox only (spec 2026-10-05 §2.3, README §14.9): whole days added to the billing jobs' clock.
      * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is one of NETOPIA's

@@ -660,6 +660,14 @@
           "condition": "package script billing:check"
         },
         {
+          "component": "apps/api:billing-renewal-resume-cli",
+          "sourceFile": "apps/api/src/billing/renewal-resume-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_RENEWAL_RESUME_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:renewal-resume"
+        },
+        {
           "component": "tools/billing:netopia-sandbox",
           "sourceFile": "tools/billing/netopia-sandbox.ts",
           "environmentKey": "DATABASE_URL",

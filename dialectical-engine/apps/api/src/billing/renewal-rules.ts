@@ -28,14 +28,42 @@ export function renewalPendingUntil(
 }
 
 /**
+ * B2: the reason of a charge-less attempt recorded without a charge because the latest refusal is not worth retrying
+ * (Task 2 writes it); such an attempt is never retried automatically, only after a card change.
+ */
+export const REFUSAL_NOT_RETRIED = "REFUSAL_NOT_RETRIED";
+
+/** The failed-charge codes that carry NETOPIA's own refusal (its refusal code, when it named one). */
+const NETOPIA_REFUSALS: ReadonlySet<string> = new Set([
+  "PAYMENT_DECLINED", "PAYMENT_FAILED", "PAYMENT_EXPIRED", "AUTHENTICATION_REQUIRED"
+]);
+
+/**
+ * B2, NETOPIA answers 2026-10-21 (Q15): whether a failed renewal attempt may be retried automatically on the dunning
+ * days. Only refusal code `"20"` (insufficient funds) is worth retrying: any other NETOPIA refusal (a stolen, blocked
+ * or closed card, a refusal with no code) waits for a card change. Our own failures, where NETOPIA never refused
+ * (nothing reached it: `NO_TRANSACTION`, `CARD_NOT_SAVED`; the tax service down; a changed total), retry as before.
+ * An attempt recorded as `REFUSAL_NOT_RETRIED` never is.
+ */
+export function autoRetryAllowed(
+  failure: Readonly<{ chargeErrorCode: string | null; declineCode: string | null; reason: string | null }>
+): boolean {
+  if (failure.reason === REFUSAL_NOT_RETRIED) return false;
+  if (failure.chargeErrorCode !== null && NETOPIA_REFUSALS.has(failure.chargeErrorCode)) return failure.declineCode === "20";
+  return true;
+}
+
+/**
  * Where a subscription's dunning stands, read from the history, never from charge rows (Q-1: an attempt the tax
  * service could not price has none): when its first attempt failed (the latest PAST_DUE's `first_failed_at`, else the
- * fold's `pastDueSince`), when the latest attempt failed (that PAST_DUE's own `at`) and how many attempts failed (its
- * `attempt`, else the fold's `retryIndex + 1`). Null while the subscription is not PAST_DUE.
+ * fold's `pastDueSince`), when the latest attempt failed (that PAST_DUE's own `at`), how many attempts failed (its
+ * `attempt`, else the fold's `retryIndex + 1`) and whether the latest may be retried automatically (B2: its
+ * `auto_retry`; a PAST_DUE written before that key existed reads `true`, so a dunning under way keeps retrying). Null
+ * while the subscription is not PAST_DUE.
  */
 export function dunningProgress(
   events: ReadonlyArray<SubscriptionEvent>, state: Pick<SubscriptionState, "status" | "pastDueSince" | "retryIndex">
-): Readonly<{ firstFailedAt: Date; lastFailedAt: Date; failedAttempts: number }> | null {
+): Readonly<{ firstFailedAt: Date; lastFailedAt: Date; failedAttempts: number; autoRetry: boolean }> | null {
   if (state.status !== "PAST_DUE" || state.pastDueSince === null) return null;
   const latest = [...events].reverse().find((event) => event.kind === "PAST_DUE");
   if (latest === undefined) return null;
@@ -44,7 +72,8 @@ export function dunningProgress(
   return Object.freeze({
     firstFailedAt: recorded !== null && !Number.isNaN(recorded.getTime()) ? recorded : state.pastDueSince,
     lastFailedAt: latest.at,
-    failedAttempts: typeof attempt === "number" && Number.isSafeInteger(attempt) && attempt >= 1 ? attempt : state.retryIndex + 1
+    failedAttempts: typeof attempt === "number" && Number.isSafeInteger(attempt) && attempt >= 1 ? attempt : state.retryIndex + 1,
+    autoRetry: latest.data.auto_retry !== false
   });
 }
 
