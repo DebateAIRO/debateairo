@@ -834,7 +834,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(section).toContain("test ! -e /etc/debateai/api-previous/kek.bin");
     // The restart comes BEFORE the rotation command, which is the order that
     // makes the changeover work at all.
-    const restart = section.indexOf("systemctl restart debateai-api debateai-runner");
+    const restart = section.indexOf("systemctl restart debateai-api@$label debateai-runner@$label");
     const rotate = section.indexOf("rotate-kek-cli.ts");
     expect(restart).toBeGreaterThan(-1);
     expect(rotate).toBeGreaterThan(restart);
@@ -1110,6 +1110,120 @@ describe("VPS baseline: runbook and environment templates", () => {
   });
 });
 
+/**
+ * Side-by-side spec §10, Phase 3 (plan D17): the public server's runbook for releases that run side by side. Each
+ * release lives in its own folder and runs as `<unit>@<label>`; an upgrade never changes code under a running
+ * release, never stops a busy runner, and switches the front break-before-make through Caddy.
+ */
+describe("VPS baseline: side-by-side upgrades on the public server (side-by-side spec §10)", () => {
+  const readme = read("deploy/vps/README.md");
+  const between = (from: string, to: string): string => {
+    const start = readme.indexOf(from);
+    expect(start, from).toBeGreaterThan(-1);
+    const end = readme.indexOf(to, start + from.length);
+    expect(end, to).toBeGreaterThan(start);
+    return readme.slice(start, end);
+  };
+  const shBlocks = (text: string): string[] => [...text.matchAll(/```sh\n([\s\S]*?)```/gu)].map((match) => match[1] ?? "");
+
+  it("§5 has the side-by-side section, in its order, before every per-release upgrade section", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    const steps = [
+      "install -D -m 0644 deploy/vps/compose.prod.yaml /etc/debateai/hatchet/compose.prod.yaml",
+      "git -c tar.umask=0022 -C /opt/debateai/dialectical-engine archive --format=tar",
+      "install --frozen-lockfile --offline",
+      "/etc/debateai/releases/$new/api.env",
+      "/etc/debateai/releases/$new/runner.env",
+      "/etc/debateai/releases/$new/ui.env",
+      "release.mjs check",
+      "fresh yes",
+      "§9 \"The online backup before side-by-side migrations\"",
+      "db:migrate",
+      "register:publish-hosted --file /etc/debateai/register/hosted-register.json",
+      "release.mjs stage --label $new",
+      "systemctl start debateai-runner@$new",
+      "systemctl start debateai-api@$new debateai-ui@$new",
+      "release.mjs switch --to $new --from $label",
+      "RETIRE_REQUESTED",
+      "receipt",
+      "mv /opt/debateai/releases/$old /opt/debateai/archive/"
+    ];
+    let previous = -1;
+    for (const step of steps) {
+      const at = section.indexOf(step, previous + 1);
+      expect(at, step).toBeGreaterThan(previous);
+      previous = at;
+    }
+    expect(readme.indexOf("### Side-by-side upgrades")).toBeGreaterThan(readme.indexOf("## 5. Application units"));
+    expect(readme.indexOf("### Side-by-side upgrades")).toBeLessThan(readme.indexOf("### Upgrading to"));
+    // The release tool's commands that are not built yet say so (side-by-side plan D16b).
+    expect(section).toContain("built in the follow-up task D16b");
+    // The release folder is root's and never edited in place; the archive is a move, never a delete.
+    expect(section).toContain("never edited in place");
+    for (const block of shBlocks(section)) expect(block, block).not.toMatch(/\brm\s|\bunlink\b|shred/u);
+  });
+
+  it("the section never stops a busy runner by hand and names the backstop's 25 minutes", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    expect(section).toContain("Never `systemctl stop` a busy `debateai-runner@`");
+    expect(section).toMatch(/25 minutes/u);
+    expect(section).toContain("7.5 hours");
+    for (const block of shBlocks(section)) {
+      expect(block, block).not.toMatch(/systemctl (stop|restart|kill)[^\n]*debateai-runner/u);
+    }
+  });
+
+  it("every per-release upgrade section points to the side-by-side order in its first line", () => {
+    const headings = [...readme.matchAll(/^(#{3,4}) (Upgrading [^\n]+)$/gmu)];
+    expect(headings.length).toBeGreaterThanOrEqual(15);
+    for (const heading of headings) {
+      const after = readme.slice((heading.index ?? 0) + heading[0].length).replace(/^\n+/u, "");
+      expect(after.split("\n")[0], heading[2]).toBe(
+        "> Order: §5 \"Side-by-side upgrades\" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs."
+      );
+    }
+  });
+
+  it("every command on an application unit names a release instance", () => {
+    const bare = /(systemctl|journalctl)[^`\n]*?\bdebateai-(api|ui|runner)\b(?![@\w-])/gu;
+    expect([...readme.matchAll(bare)].map((match) => match[0])).toEqual([]);
+    // The current release's label is found, not typed: the enabled API instance, exactly one.
+    expect(readme).toContain(
+      "set -- /etc/systemd/system/multi-user.target.wants/debateai-api@*.service && test \"$#\" -eq 1 && test -e \"$1\" && label=${1##*/debateai-api@} && label=${label%.service} && echo \"current release: $label\""
+    );
+  });
+
+  it("§1 states the one-API rule and the boot order without a hard Hatchet dependency", () => {
+    const topology = between("## 1. Topology", "## 2. Host preparation");
+    expect(topology).toContain("One API serves at a time");
+    expect(topology).toContain("break-before-make");
+    expect(topology).toContain("`Wants=`");
+    expect(topology).not.toContain("`Requires=`");
+    expect(topology).toContain("`debateai-api@<label>.service`");
+    expect(between("## 2. Host preparation", "## 3.")).toContain("systemd 254 or later");
+  });
+
+  it("§6 restarts Caddy and never reloads it (admin off)", () => {
+    const caddy = between("## 6. Caddy", "## 7. Mail");
+    expect(shBlocks(caddy).join("\n")).toContain("systemctl restart caddy");
+    expect(readme).not.toMatch(/systemctl reload caddy|reload Caddy/u);
+    expect(caddy).toContain("`admin off`");
+    expect(caddy).toContain("127.0.0.1:3090");
+  });
+
+  it("§9's online backup dumps, archives the custody tree and sums it, encrypted, without the off-host copy", () => {
+    const section = between("### The online backup before side-by-side migrations", "### Restore drill");
+    const block = shBlocks(section).join("\n");
+    for (const needle of [
+      "set -euo pipefail", ". /etc/debateai/backup.conf", "pg_dumpall --globals-only", "pg_dump --format=custom",
+      "tar -cf -", "age -r \"$BACKUP_DATA_RECIPIENT\"", "sha256sum", "ONLINE_BACKUP_OK"
+    ]) expect(block, needle).toContain(needle);
+    expect(block.indexOf("pg_dump --format=custom")).toBeLessThan(block.indexOf("tar -cf -"));
+    for (const forbidden of ["rclone", "scp", "BACKUP_ESCROW_RECIPIENT"]) expect(block, forbidden).not.toContain(forbidden);
+    expect(section).toContain("`backup.sh`");
+  });
+});
+
 describe("VPS baseline: the country data refresh (paid plans G4)", () => {
   it("ships the script, the unit and the timer", () => {
     for (const file of ["deploy/vps/geoip-refresh.sh", "deploy/vps/systemd/debateai-geoip-refresh.service",
@@ -1162,7 +1276,7 @@ describe("VPS baseline: the country data refresh (paid plans G4)", () => {
     const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
     expect(enable).toContain("debateai-geoip-refresh.timer");
     expect(readme.indexOf("systemctl start debateai-geoip-refresh.service"))
-      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api"));
+      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api@$label"));
     expect(readme.indexOf("systemctl start debateai-geoip-refresh.service")).toBeGreaterThan(-1);
   });
 });

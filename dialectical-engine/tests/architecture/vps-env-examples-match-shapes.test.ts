@@ -73,12 +73,13 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
     // unit cannot write the folder, so the API would refuse to start), and the line is added on a new line, once.
     const steps = [
       `install -d -m 0700 -o debateai-api -g debateai-api ${path}`,
-      "install -m 0644 deploy/vps/systemd/debateai-api.service /etc/systemd/system/",
+      "install -m 0644 deploy/vps/systemd/debateai-api@.service /etc/systemd/system/",
       "systemctl daemon-reload",
-      "systemctl show -p ReadWritePaths debateai-api",
+      "systemctl show -p ReadWritePaths debateai-api@$label",
       `grep -q '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env || printf '\\nBILLING_NOTICE_SPOOL_PATH=%s\\n' ${path} >> /etc/debateai/api.env`,
       "grep -c '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env",
-      "systemctl restart debateai-api"
+      // The current release's API (README §5 "The current release"): the only one serving.
+      "systemctl restart debateai-api@$label"
     ];
     const block = readme.slice(readme.indexOf(steps[0]!), readme.indexOf("```", readme.indexOf(steps[0]!)));
     expect(block.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("stat "))).toEqual(steps);
