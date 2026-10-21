@@ -2664,6 +2664,19 @@ A country in the "pay off until the tax registration is done" group opens like t
 
 Signing up stays as it was. A country can never have `pay: true` with `signup: false`; the publish refuses it.
 
+**Opening a region.** Some regions of an open country stay closed for payment until the company registers for tax
+there: for example Maryland (`US-MD`), Saskatchewan (`CA-SK`) or the Canary Islands (`ES-CN`). They are listed in
+`countryPolicy.regions`; the full launch list is in `deploy/vps/register/README.md`, "Closing payment in a region".
+People there can sign up and use Free; only paying is refused. To open one:
+
+1. Register for tax there.
+2. In the file's `countryPolicy.regions`, delete that region's entry. (Ohio, `US-OH`, is closed for business buyers
+   only; deleting its entry opens it for them too.)
+3. Publish as in §14.4. The new version replaces the old one; a sealed version is never edited.
+
+The publish refuses a region id the code does not know, and a region entry with `signup` or `blocked`: a region
+never closes sign-up.
+
 ### 14.7 The company details and the card marks
 
 **The company details.** The legal notice (`/legal`), the footer, the invoices and every email use the company
@@ -3253,7 +3266,8 @@ sudo -u postgres psql -d debateai -c "SELECT j.dead_at, c.payment_environment, j
 **Every other billing line records a normal event and needs nothing from you:** `billing.checkout.started` (a
 checkout began), `billing.payment.verified` (a payment went through), `billing.refund` (a refund was made), `billing.refund.recorded_by_owner` (you recorded a NETOPIA refund with
 `pnpm billing:refund-done`),
-`billing.country.refused` (a purchase the country rules refused), `billing.cancel` and `billing.cancel.revoked` (a
+`billing.country.refused` (a purchase the country rules refused), `billing.region.refused` (a purchase refused
+because its billing address is in a region closed for payment, §14.6), `billing.cancel` and `billing.cancel.revoked` (a
 cancel, and its undo), `billing.downgrade.scheduled`, `billing.upgrade.requested`, `billing.withdrawal` and
 `billing.withdrawal.settled` (a withdrawal recorded, and one you settled), `billing.card.change.started`,
 `billing.card.refused` (a new card from a blocked country), `billing.card.change.deferred` (a card change that waited

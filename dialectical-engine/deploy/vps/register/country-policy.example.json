@@ -73,6 +73,32 @@
     "us_states": {
       "TN": { "signup": false, "pay": false, "reason": "TERMS_EXCLUDED" }
     },
+    "regions": {
+      "CA-SK": { "pay": false, "reason": "TAX_NOT_READY" },
+      "CA-MB": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-DC": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-HI": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-MD": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-RI": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-VT": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-WV": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-NJ": { "pay": false, "reason": "TAX_NOT_READY" },
+      "US-OH": { "pay": false, "reason": "TAX_NOT_READY", "buyers": "business" },
+      "ES-CN": { "pay": false, "reason": "TAX_NOT_READY" },
+      "ES-CE": { "pay": false, "reason": "TAX_NOT_READY" },
+      "ES-ML": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FR-971": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FR-972": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FR-973": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FR-974": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FR-976": { "pay": false, "reason": "TAX_NOT_READY" },
+      "FI-01": { "pay": false, "reason": "TAX_NOT_READY" },
+      "GR-69": { "pay": false, "reason": "TAX_NOT_READY" },
+      "IT-LIVIGNO": { "pay": false, "reason": "TAX_NOT_READY" },
+      "IT-CAMPIONE": { "pay": false, "reason": "TAX_NOT_READY" },
+      "DE-HELGOLAND": { "pay": false, "reason": "TAX_NOT_READY" },
+      "DE-BUESINGEN": { "pay": false, "reason": "TAX_NOT_READY" }
+    },
     "unknown_ip": "REFUSE",
     "tor": "REFUSE"
   }

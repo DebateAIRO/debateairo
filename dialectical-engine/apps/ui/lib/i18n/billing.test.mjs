@@ -95,13 +95,13 @@ const REQUIRED = [
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
   "billing.checkout.postalCode", "billing.checkout.city", "billing.checkout.county",
   "billing.checkout.billingTitle", "billing.checkout.billingNote", "billing.checkout.firstName", "billing.checkout.lastName",
-  "billing.checkout.phone", "billing.checkout.street", "billing.checkout.postalCodeOptional", "billing.checkout.phoneInvalid",
+  "billing.checkout.phone", "billing.checkout.street", "billing.checkout.postalCodeOptional", "billing.checkout.postalCodeInvalid", "billing.checkout.phoneInvalid",
   "billing.checkout.detailsRequired", "billing.checkout.upgradeSucceeded", "billing.subscription.upgradePay",
   "billing.card.checkCard", "billing.card.taxPlaceNote",
   "billing.checkout.companyToggle", "billing.checkout.companyName",
   "billing.checkout.companyVatId", "billing.checkout.companyAddress", "billing.checkout.companyIncomplete",
   "billing.checkout.showPrice", "billing.checkout.quoting",
-  "billing.checkout.countryUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
+  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
   "billing.checkout.confirmCountryRequired",
   "billing.checkout.taxLabel", "billing.checkout.taxReverseCharge", "billing.checkout.noTax", "billing.checkout.total",
   "billing.consent.renewal", "billing.consent.immediateStart", "billing.checkout.continueToCard",
@@ -166,6 +166,14 @@ test("the spec's sentences G2, G3, B1–B5 read exactly as approved in English (
   assert.equal(english["billing.checkout.subscribeAndPay"], "Subscribe and pay");
   assert.equal(english["billing.checkout.waitingForBank"], "Waiting for your bank to confirm…");
   assert.equal(english["billing.checkout.willEmail"], "We'll email you as soon as your bank confirms.");
+});
+
+test("the closed-region and postal-code refusals read exactly as the owner approved in English (2026-10-20)", () => {
+  const english = catalogue("en");
+  // REGION_PAYMENT_UNAVAILABLE (403): payment is closed in the billing address's region; sign-up never is.
+  assert.equal(english["billing.checkout.regionUnavailable"], "Paid plans aren't available in your region yet. You can keep using the Free plan.");
+  // BILLING_POSTCODE_INVALID (422): the postal code does not fit its country's format.
+  assert.equal(english["billing.checkout.postalCodeInvalid"], "Please check your postal code.");
 });
 
 test("Romanian names the order button as Terms §12 requires", () => {

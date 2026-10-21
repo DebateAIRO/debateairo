@@ -42,7 +42,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `configuredProviderSet` | `requiredDistinctMakers` and the vendor list: `providerRef`, `adapterKind` (`openai-compatible-http`), `maker`, `vetting` | `buildConfiguredProviderSetDeploymentRow` — `PROVIDER_VENDOR_NOT_VETTED` |
 | `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md`; optionally, all three or none, the budget rule's `admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person` (the example carries 9500, 11500 and 1; see "The band, holds and the waiting line" in `deploy/vps/README.md`). A file with the three band members must also carry `askRoomReads` (next row) | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
 | `askRoomReads` | optional, but required whenever `costEnvelopePolicy` carries the band: how many times one person may read the room (the "is there room for my question" check that the new-debate page and the home page's question box both make) in a window: a signed-in account is counted by its owner, a visitor who has not signed in by their browser session. Written as `{ "key": "owner", "limit": …, "window_ms": …, "capacity": … }`. The example carries an EXAMPLE budget, 60 reads a minute per person (`"limit": 60, "window_ms": 60000`) for up to 65,536 people at once (`"capacity": 65536`); set your own. It is added to the code-owned `admissionPolicy` row as its `ask_room_reads` member; every other member of that row stays as the engine has it. See "The room read's budget" below | the register's own parser — `ADMISSION_POLICY_INVALID` (a key other than `owner`, a limit of 0, an extra field or a `null` member); the band without it, `ASK_ROOM_ADMISSION_UNSEALED` (by the plan, by the publish's boot check and again when the API starts) |
-| `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; `us_states` (optional) overrides the United States for a state a person declares at sign-up (never `blocked`; today Tennessee is closed); unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
+| `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; `us_states` (optional) overrides the United States for a state a person declares at sign-up (never `blocked`; today Tennessee is closed); `regions` (optional) closes payment, never sign-up, in a part of an open country, found from the buyer's billing address: each entry is a region id (`US-MD`, `CA-SK`, `ES-CN`, ...; the code's closed list) with `pay`, the reason, and `"buyers": "business"` when only business buyers are refused (left out: every buyer), never `signup` or `blocked` (see "Closing payment in a region" below); unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out; in `regions`, an id the code does not know, a rule with `signup` or `blocked`, and `buyers` other than `"business"`) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
 | `billingPlans` | optional: the paid plans: each plan's net price in USD, EUR and RON (whole cents or bani), the monthly credit (always USD), day and week shares, the finish edge, Free's fixed gauges, and `currency_by_country` (which currency each tax country pays in; any other country pays the `default`), as the register row stores them. Left out, the engine's own row is sealed, whose EUR and RON prices are placeholders | the register's own parser — `BILLING_PLANS_INVALID` |
@@ -75,6 +75,29 @@ the Terms' list of served countries matches the switches, the Privacy Policy say
 are looked up locally, and the two data files are installed and refreshed. The go-live checklist
 carries the four as lines 27–30. Then copy the member into the hosted file's top-level object and publish; a changed
 switch later is a new version, never an edit of a sealed one.
+
+## Closing payment in a region
+
+Some places inside an open country need their own tax registration before the site may sell there. The
+`regions` member of `countryPolicy` closes payment in them. People there can still sign up and use the
+Free plan; only paying is refused. The site finds the region from the billing address the buyer types (the
+postal code, or the state or province), not from the internet address.
+
+`country-policy.example.json` carries the owner's launch list of 20 October 2026 (the research is in the payment
+region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
+
+- Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
+- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
+  business buyers only;
+- the EU places outside the EU VAT area: `ES-CN` (Canary Islands), `ES-CE` (Ceuta), `ES-ML` (Melilla),
+  `FR-971` (Guadeloupe, with Saint-Martin and Saint-Barthélemy), `FR-972` (Martinique), `FR-973` (French
+  Guiana), `FR-974` (Réunion), `FR-976` (Mayotte), `FI-01` (Åland), `GR-69` (Mount Athos), `IT-LIVIGNO`,
+  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen).
+
+Each entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
+region once the company is registered there, delete its entry from the hosted file and publish: that new
+version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). A file whose
+`countryPolicy` has no `regions` member closes no region.
 
 ## The room read's budget
 

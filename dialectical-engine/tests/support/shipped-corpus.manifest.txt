@@ -973,6 +973,7 @@ packages/kernel/src/index.ts
 packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
+packages/kernel/src/payment-regions.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/question-language.ts
 packages/kernel/src/region.ts

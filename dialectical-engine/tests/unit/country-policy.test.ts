@@ -8,8 +8,10 @@ import {
   declaredRegionRule,
   loadBootstrapRegister,
   readCountryPolicy,
+  regionRule,
   type CountryPolicy
 } from "@debateai/register";
+import { PAYMENT_REGION_IDS } from "@debateai/kernel";
 import { decideAsk, decideCardCountry, decidePayment, decideSignup } from "@debateai/geo";
 import { buildDevelopmentDeploymentRegisterPublicationRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { parseHostedRegisterFile, planHostedRegisterPublication } from "../../apps/runner/src/hosted-register-publish.js";
@@ -240,5 +242,94 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     const bytes = Buffer.from(JSON.stringify(withNull), "utf8");
     await expect((async () => planHostedRegisterPublication(parseHostedRegisterFile(bytes)))())
       .rejects.toMatchObject({ code: "COUNTRY_POLICY_INVALID" });
+  });
+});
+
+/**
+ * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026, spelled out here
+ * on purpose (never derived from the code), so a changed code row fails this test.
+ */
+const CLOSED = { pay: false, reason: "TAX_NOT_READY" } as const;
+const LAUNCH_REGIONS = {
+  "CA-SK": CLOSED, "CA-MB": CLOSED,
+  "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED, "US-NJ": CLOSED,
+  "US-OH": { pay: false, reason: "TAX_NOT_READY", buyers: "business" },
+  "ES-CN": CLOSED, "ES-CE": CLOSED, "ES-ML": CLOSED,
+  "FR-971": CLOSED, "FR-972": CLOSED, "FR-973": CLOSED, "FR-974": CLOSED, "FR-976": CLOSED,
+  "FI-01": CLOSED, "GR-69": CLOSED, "IT-LIVIGNO": CLOSED, "IT-CAMPIONE": CLOSED, "DE-HELGOLAND": CLOSED, "DE-BUESINGEN": CLOSED
+} as const;
+
+function invalidRegions(regions: unknown): string | undefined {
+  return invalid((value) => { value.regions = regions; });
+}
+
+describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", () => {
+  it("carries exactly the owner's launch list of 20 October 2026, every id a known region", () => {
+    expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions).toEqual(LAUNCH_REGIONS);
+    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(24);
+    for (const id of Object.keys(LAUNCH_REGIONS)) expect(PAYMENT_REGION_IDS, id).toContain(id);
+  });
+
+  it("parses a value with regions: buyers defaults to all, and regionRule reads one region or null", () => {
+    const closed = { pay: false, reason: "TAX_NOT_READY", buyers: "all" };
+    expect(Object.keys(policy.regions).sort()).toEqual(Object.keys(LAUNCH_REGIONS).sort());
+    expect(regionRule(policy, "US-MD")).toEqual(closed);
+    expect(regionRule(policy, "CA-SK")).toEqual(closed);
+    expect(regionRule(policy, "ES-CN")).toEqual(closed);
+    expect(regionRule(policy, "US-OH")).toEqual({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
+    // An open region, and a string that is no region id at all, have no rule: the country's rule decides.
+    expect(regionRule(policy, "US-TX")).toBeNull();
+    expect(regionRule(policy, "CA-ON")).toBeNull();
+    expect(regionRule(policy, "toString")).toBeNull();
+    // A pay switch that is on is a valid rule too (nothing refuses it), and is read back as written.
+    const open = countryPolicyFromValue(
+      { ...COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, regions: { "US-MD": { pay: true, reason: "OFFERED" } } }, "test"
+    );
+    expect(open.regions).toEqual({ "US-MD": { pay: true, reason: "OFFERED", buyers: "all" } });
+  });
+
+  it("still parses a value without regions, the shape of every older sealed version, with regions = {}", () => {
+    expect(invalid((value) => { delete value.regions; })).toBeUndefined();
+    const { regions: _regions, ...older } = COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+    const parsed = countryPolicyFromValue(older, "older");
+    expect(parsed.regions).toEqual({});
+    expect(regionRule(parsed, "US-MD")).toBeNull();
+  });
+
+  it("refuses an id the code does not know: a made-up one, the wrong case, half of the shared Canadian id", () => {
+    expect(invalidRegions({ "CA-NT-NU": CLOSED, "IT-LIVIGNO": CLOSED })).toBeUndefined();
+    for (const id of ["US-ZZ", "us-md", "ES-CANARY", "CA-NT", "CA-NU", "US", "FR-975", ""]) {
+      expect(invalidRegions({ [id]: CLOSED }), id).toBe("COUNTRY_POLICY_INVALID");
+    }
+  });
+
+  it("refuses a region rule with blocked or signup: sign-up is never gated by region", () => {
+    expect(invalidRegions({ "US-MD": CLOSED })).toBeUndefined();
+    for (const extra of [{ blocked: true }, { blocked: false }, { signup: true }, { signup: false }]) {
+      expect(invalidRegions({ "US-MD": { ...CLOSED, ...extra } }), JSON.stringify(extra)).toBe("COUNTRY_POLICY_INVALID");
+    }
+  });
+
+  it("refuses buyers other than \"business\" (absent means all buyers), and any other malformed rule", () => {
+    for (const buyers of ["all", "consumer", "BUSINESS", null, true]) {
+      expect(invalidRegions({ "US-OH": { ...CLOSED, buyers } }), String(buyers)).toBe("COUNTRY_POLICY_INVALID");
+    }
+    expect(invalidRegions({ "US-MD": { reason: "TAX_NOT_READY" } })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({ "US-MD": { pay: false } })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({ "US-MD": { pay: "false", reason: "TAX_NOT_READY" } })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({ "US-MD": { pay: false, reason: "CLOSED" } })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({ "US-MD": { ...CLOSED, note: "x" } })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({ "US-MD": null })).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions(null)).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions([])).toBe("COUNTRY_POLICY_INVALID");
+    expect(invalidRegions({})).toBeUndefined();
+  });
+
+  it("the hosted kit's country-policy.example.json parses, and its regions equal the code row's", async () => {
+    const switches = await readExample(COUNTRY_POLICY_EXAMPLE) as { countryPolicy: { regions?: unknown } };
+    const parsed = countryPolicyFromValue(switches.countryPolicy, "example");
+    expect(switches.countryPolicy.regions).toEqual(LAUNCH_REGIONS);
+    expect(switches.countryPolicy.regions).toEqual(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions);
+    expect(parsed.regions).toEqual(policy.regions);
   });
 });
