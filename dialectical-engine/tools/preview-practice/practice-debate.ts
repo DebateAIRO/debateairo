@@ -14,6 +14,7 @@ import { QuestionLanguageChoiceNeeded } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE } from "@debateai/kernel";
 import type { Session } from "@debateai/contract";
 import {
   DEBATE_SHAPE_POLICY_ROW_KEY,
@@ -216,6 +217,8 @@ export type PracticeDebateResult = Readonly<{
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
   unrepaired?: readonly PracticeUnrepairedRow[];
+  /** The stray-letter rule (PR #194): the replies refused for their language and their short follow-ups, per AI and step. */
+  languageFollowUps?: readonly PracticeLanguageFollowUpRow[];
   /**
    * Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask).
    * Absent when every count is 0, so a run with no rescue reports exactly as before.
@@ -283,6 +286,8 @@ export type PracticeTryRecord = Readonly<{
   repairs: readonly string[] | null; failureClass: string | null;
   /** The first issue of a refusal as `code@path`; null for an accepted reply. */
   issue: string | null;
+  /** Every issue of a refusal as `code@path` (`issue` is the first); absent where only the first was kept. */
+  issues?: readonly string[];
   /** A refused reply's own text (already through `reportableReplyText`); null for an accepted one. */
   replyText: string | null;
 }>;
@@ -413,6 +418,45 @@ export function practiceUnrepairedRows(tries: readonly PracticeTryRecord[]): rea
   return Object.freeze(rows);
 }
 
+/**
+ * The reply-language check's two codes: the shared check's (kernel), and MAP_WRONG_LANGUAGE, the map's own name for the
+ * same refusal (its short follow-up says the same sentence).
+ */
+const LANGUAGE_REFUSAL_CODES = Object.freeze([TEXT_NOT_IN_QUESTION_LANGUAGE, "MAP_WRONG_LANGUAGE"] as const);
+
+/**
+ * Information only, per AI, step and code: `refused`, the replies a reply-language refusal named (alone or beside other
+ * issues); `followUps`, those the same call asked again by the short follow-up (its next try a PATCH); `accepted`, those
+ * follow-ups whose reply was accepted. The measure of the stray-letter rule (PR #194): a Chinese, Japanese or Korean
+ * gloss in English or Romanian text is refused there, and the short follow-up asks for just that piece again.
+ */
+export type PracticeLanguageFollowUpRow = Readonly<{ model: string; step: PracticeStep; code: string; refused: number; followUps: number;
+  accepted: number }>;
+
+export function practiceLanguageFollowUpRows(tries: readonly PracticeTryRecord[]): readonly PracticeLanguageFollowUpRow[] {
+  const byCall = new Map<string, PracticeTryRecord[]>();
+  for (const attempt of tries) byCall.set(attempt.callKey, [...(byCall.get(attempt.callKey) ?? []), attempt]);
+  const counts = new Map<string, { model: string; step: PracticeStep; code: string; refused: number; followUps: number; accepted: number }>();
+  for (const attempt of tries) {
+    const issues = attempt.issues ?? (attempt.issue === null ? [] : [attempt.issue]);
+    const code = LANGUAGE_REFUSAL_CODES.find((candidate) => issues.some((issue) => issue.startsWith(`${candidate}@`)));
+    if (code === undefined) continue;
+    const call = byCall.get(attempt.callKey)!;
+    const next = call[call.indexOf(attempt) + 1];
+    const step = practiceStepOf(attempt.callSiteKey);
+    const key = `${attempt.model}\u0000${step}\u0000${code}`;
+    const row = counts.get(key) ?? { model: attempt.model, step, code, refused: 0, followUps: 0, accepted: 0 };
+    row.refused += 1;
+    if (next?.replyForm === "PATCH") {
+      row.followUps += 1;
+      if (next.outcome === "OK") row.accepted += 1;
+    }
+    counts.set(key, row);
+  }
+  return Object.freeze([...counts.values()].sort((a, b) => a.model.localeCompare(b.model) || a.step.localeCompare(b.step)
+    || a.code.localeCompare(b.code)).map((row) => Object.freeze(row)));
+}
+
 
 function usageOf(metadata: unknown): { input: number; output: number } {
   const usage = typeof metadata === "object" && metadata !== null ? (metadata as { usage?: unknown }).usage : undefined;
@@ -429,7 +473,8 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
   "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
-  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">
+  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "languageFollowUps" | "structureRescues" | "tokensByModelAndStep"
+  | "lengthByModelAndStep">
   & Readonly<{ answerWritersServed: readonly string[] }>> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
@@ -570,11 +615,12 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         await mapLengthedOf(entry.attempt_id, entry.call_site_key), mapEngine);
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
-    let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;
+    let refused: Readonly<{ issue: string | null; issues: readonly string[]; replyText: string }> | null = null;
     if (formatFailed && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
       const content = replyContentOf(stored.rawText);
-      refused = Object.freeze({ issue: issueListFromParseError(stored.parseErrorDetail)[0] ?? null, replyText: reportableReplyText(content) });
+      const issues = issueListFromParseError(stored.parseErrorDetail);
+      refused = Object.freeze({ issue: issues[0] ?? null, issues, replyText: reportableReplyText(content) });
       failureCallKeys.push(callKey);
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
@@ -588,7 +634,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     // repair model's copy, whose own code repairs are counted under that model).
     records.push(Object.freeze({ callKey, model: recordModel, callSiteKey: entry.call_site_key, outcome: entry.outcome,
       parseStatus: artifact === undefined ? null : parseStatus, replyForm, repairs: artifact?.reply_repairs ?? null,
-      failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, replyText: refused?.replyText ?? null }));
+      failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, ...(refused === null ? {} : { issues: refused.issues }),
+      replyText: refused?.replyText ?? null }));
   }
   const callList = [...calls.entries()];
   const structureRescues = practiceStructureRescues(records, run);
@@ -617,6 +664,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
+    languageFollowUps: practiceLanguageFollowUpRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
     tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured),
     // Ruling A1 (Task 21 review): the models that served the final writer, for the pins only (not a report member).

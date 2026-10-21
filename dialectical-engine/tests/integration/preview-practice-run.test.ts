@@ -1179,7 +1179,7 @@ describe("preview practice: language mode, the question language (P2L)", () => {
     // ELD_SITE); lang-zh-short is worked out with the fast check off, so its script decides (LOCAL_ELD).
     expect(report.cases.map((entry) => [entry.id, entry.lockSource])).toEqual([["lang-ro-plain", "FAST"], ["lang-ro-en-mix", "OFFER"],
       ["lang-en-on-ro", "FAST"], ["lang-short-code", "FAST"], ["lang-sr-latn", "FAST"], ["lang-id", "FAST"], ["lang-ro-borrowed", "FAST"],
-      ["lang-zh-short", "LOCAL_ELD"], ["lang-ku-arab", "FAST"]]);
+      ["lang-zh-short", "LOCAL_ELD"], ["lang-ku-arab", "FAST"], ["lang-en-hukou", "FAST"]]);
     // The fast check is asked for EVERY case, whatever eld said; one planner call (with any repair) per case; nothing else.
     expect(stubs.requests.filter((request) => request.kind === "QUESTION_LANGUAGE" && request.answer === "OK")).toHaveLength(PRACTICE_LANGUAGE_CASES.length);
     expect(report.cases.every((entry) => entry.fastCheck.outcome !== "DOWN")).toBe(true);

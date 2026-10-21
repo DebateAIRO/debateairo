@@ -307,6 +307,12 @@ structure-repair call on Haiku, PATCH, FULL, LENGTH_RETRY, or NONE), whether the
 characters (report.json only). A call fixed by the structure-repair call is one call of the original AI, repaired: a
 warning, never a failure. `report.md` shows the counts and the codes only.
 
+`languageFollowUps` (the stray-letter rule, PR #194; information only): per AI, step and code, the replies refused for
+text in another language or script (`TEXT_NOT_IN_QUESTION_LANGUAGE`, or `MAP_WRONG_LANGUAGE`, the map's name for the
+same refusal), how many of them the same call asked again by the short follow-up, and how many of those follow-ups came
+back accepted. Every admitted debate has it, so an empty list means none. `report.md` shows it as "Reply-language
+refusals".
+
 How a slip was fixed (patch follow-up, owner design 2026-10-12; information only, the verdict is the same either way).
 When a reply was a readable answer with only some parts wrong, the app first sends a SHORT follow-up: the AI gets its
 own answer back and is asked only for the wrong parts (for example `{"value_laden": true}`), which the app puts into
@@ -609,7 +615,7 @@ With the new shape on, the site fixes the language of each question before the d
 - With no fast AI (a signed-out person, or no paid AI), eld and the question's alphabet decide, else the site's
   language.
 
-`language` mode checks this on nine fixed questions, with no debate and no database:
+`language` mode checks this on ten fixed questions, with no debate and no database:
 
 - For each question: eld's reading, the fast AI's reading (always asked here, so its reading is written down even when
   eld was sure), and one call to the AI that plans a debate's angles (the AIs take turns).
@@ -631,9 +637,20 @@ With the new shape on, the site fixes the language of each question before the d
 | `lang-ro-borrowed` | ro | ro | no |
 | `lang-zh-short` | en | zh | no |
 | `lang-ku-arab` | ar | ku | no |
+| `lang-en-hukou` | en | en | no |
 
 `lang-zh-short` is a short Chinese question, worked out as if there were no fast AI. `lang-ku-arab` is Kurdish
 (Sorani) written in Arabic letters, asked on the Arabic site: it must lock Kurdish (`ku`).
+
+`lang-en-hukou` is for the reply-language check's stray-letter rule (PR #194). The rule refuses Chinese, Japanese or
+Korean letters written outside quotation marks into text in a language with another alphabet (English or Romanian, for
+example), and the usual short follow-up asks the AI for that piece again. The practice debates so far asked about
+nuclear power, buses, the euro, moving abroad and social media, so no AI had a reason to add such a term on purpose.
+This one asks, in English, whether China should abolish its "hukou" household registration system, so an AI may well
+write "hukou (户口)". At the next release, run the release's practice debate once with
+`--question lang-en-hukou` (each paid run needs the owner's yes), and read "Reply-language refusals" in `report.md`.
+The owners may reword it, but only in Latin letters: such letters in the question itself switch the rule off for the
+whole debate.
 
 The verdict:
 
@@ -967,8 +984,9 @@ Optional flags:
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/openings.jsonl when DIR holds one
   (an openings run), else from DIR/samples.jsonl. `report --side-by-side FILE --out DIR` writes only
   DIR/side-by-side.html from a formats samples log (see S-6b).
-- debate: `--depth 1|2`, `--question ro|en` or one of the comparison's ids (`ro-euro`, `ro-strainatate`, `en-nuclear`,
-  `en-social-media-age`, see S-8), `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
+- debate: `--depth 1|2`, `--question ro|en`, one of the comparison's ids (`ro-euro`, `ro-strainatate`, `en-nuclear`,
+  `en-social-media-age`, see S-8) or a language case's id (for example `lang-en-hukou`, see "The question language"),
+  `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
   once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
   across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
   formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
@@ -1323,7 +1341,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-judge-order.ts`: the judges' order practice (D3).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
-- `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
+- `practice-language.ts`: the question language: mode `language` (the ten cases, the lock as the site works it
   out, `language.jsonl`, the report) and debate mode's `--site-language` and `--language-choice`.
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
