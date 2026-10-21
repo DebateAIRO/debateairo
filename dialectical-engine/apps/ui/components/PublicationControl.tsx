@@ -213,7 +213,9 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button className="button" disabled={!acknowledged || busy}>
               {busy
-                ? t(catalog, selected === "PUBLISH" ? "public.publication.checkingDebate" : "public.publication.authorizing")
+                ? selected === "PUBLISH"
+                  ? t(catalog, "public.publication.checkingDebate")
+                  : t(catalog, "public.publication.authorizing")
                 : selected === "PUBLISH"
                   ? t(catalog, "public.publication.publishPublicly")
                   : t(catalog, "public.publication.unpublish")}

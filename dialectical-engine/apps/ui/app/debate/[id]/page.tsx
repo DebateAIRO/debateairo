@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { ComponentProps } from "react";
 import type { Answer, AnswerFloor, DebateMapView } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
@@ -15,6 +16,12 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 
 export const dynamic = "force-dynamic";
+
+function DebatePageWithCountryHint({ countryHint, ...gateProps }: ComponentProps<typeof DebatePageGate> & { countryHint: string | null }) {
+  return <CrisisCountryHintProvider countryHint={countryHint}>
+    <DebatePageGate {...gateProps} />
+  </CrisisCountryHintProvider>;
+}
 
 export default async function DebatePage({
   params,
@@ -36,7 +43,8 @@ export default async function DebatePage({
     publicCatalog,
     composeCatalog,
     homeCatalog,
-    newDebateCatalog
+    newDebateCatalog,
+    chromeCatalog
   ] = await Promise.all([
     loadNamespace(locale, "time"),
     loadNamespace(locale, "debateChrome"),
@@ -45,7 +53,8 @@ export default async function DebatePage({
     loadNamespace(locale, "public"),
     loadNamespace(locale, "compose"),
     loadNamespace(locale, "home"),
-    loadNamespace(locale, "newDebate")
+    loadNamespace(locale, "newDebate"),
+    loadNamespace(locale, "chrome")
   ]);
   const countryHint = readCrisisCountryHint(await headers());
 
@@ -56,8 +65,8 @@ export default async function DebatePage({
   // retain the full asker-scoped SSR read below.
   if (starting) {
     return (
-      <CrisisCountryHintProvider countryHint={countryHint}>
-      <DebatePageGate
+      <DebatePageWithCountryHint
+        countryHint={countryHint}
         id={id}
         initialDebate={null}
         initialAnswer={null}
@@ -76,7 +85,6 @@ export default async function DebatePage({
         initialFloor={null}
         initialMapView={null}
       />
-      </CrisisCountryHintProvider>
     );
   }
   const token = readSessionCookie(cookieStore);
@@ -126,7 +134,7 @@ export default async function DebatePage({
         const taken = await createServerContractClient(fetch, token, userAgent, readTrustedClientIp(await headers())).takeRemovalNotice();
         if (taken.notice) {
           return <div className="debateView">
-            <div className="debateAiDisclosure"><AiNotice catalog={homeCatalog} /></div>
+            <div className="debateAiDisclosure"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} /></div>
             <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={countryHint} />
           </div>;
         }
@@ -144,8 +152,8 @@ export default async function DebatePage({
   const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
 
   return (
-    <CrisisCountryHintProvider countryHint={countryHint}>
-    <DebatePageGate
+    <DebatePageWithCountryHint
+      countryHint={countryHint}
       id={id}
       initialDebate={initialDebate}
       initialAnswer={initialAnswer}
@@ -165,6 +173,5 @@ export default async function DebatePage({
       initialFloor={initialFloor}
       initialMapView={initialMapView}
     />
-    </CrisisCountryHintProvider>
   );
 }

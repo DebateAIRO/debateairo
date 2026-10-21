@@ -126,6 +126,10 @@ import { formatScoringConfidenceCopy, formatScoringStatusCopy } from "@/lib/scor
 import { useDialogSurface } from "@/components/dialogSurface";
 import { useSelectionChallenge } from "@/lib/useSelectionChallenge";
 
+function DebateLocaleAndModeControls() {
+  return <><LanguageSwitcher /><ModeToggle compact /></>;
+}
+
 export function debateAfterRunTerminalFailure(debate: DebateDetail, reason: string): DebateDetail {
   return {
     ...debate,
@@ -1538,7 +1542,7 @@ export default function DebatePageClient({
           <BrandMark />
           {removedByCheck ? null : <div className="debateTopClaim"><span className="debateTopTitle">{debate?.topic}</span></div>}
         </div>
-        <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><LanguageSwitcher /><ModeToggle compact /></div>
+        <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><DebateLocaleAndModeControls /></div>
       </header>
       <div className="debateAiDisclosure">
         <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
@@ -1671,8 +1675,7 @@ export default function DebatePageClient({
             </div>
           ) : null}
           <AccountMenu catalog={chromeCatalog} />
-          <LanguageSwitcher />
-          <ModeToggle compact />
+          <DebateLocaleAndModeControls />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
             <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
               <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
