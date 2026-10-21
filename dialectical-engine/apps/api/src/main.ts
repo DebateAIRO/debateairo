@@ -58,7 +58,8 @@ import {
 } from "@debateai/crypto";
 import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
-import { readRoleRotationCounts } from "@debateai/db";
+import { readRoleRotationCounts, recordSpendWaiver } from "@debateai/db";
+import { WorkItemRepository } from "@debateai/battery";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -126,9 +127,11 @@ import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
-  HatchetDispatcher,
+  createReleaseNotServedAlert,
   installPublicationJudgeSwitchSignal,
   PostgresAskApplication,
+  PostgresRunReleaseLookup,
+  ReleaseRoutedDispatcher,
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
@@ -478,7 +481,18 @@ const hatchet = new Hatchet({
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
+// Side-by-side spec §2, §4 (plan C task C4): every send goes to the run's OWN release's task, read per send; a release
+// that no longer serves the run is never sent to (its never-claimed job closed FAILED, its waiver written, one owner
+// line per key per half hour). recordSetupFailure is not fenced by release, so the default repository can close it.
+const dispatcher = new ReleaseRoutedDispatcher({
+  client: hatchet,
+  workflowName: environment.HATCHET_WORKFLOW_NAME,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  lookup: new PostgresRunReleaseLookup(pool),
+  work: new WorkItemRepository(pool),
+  waive: async (runId) => { await recordSpendWaiver(pool, runId, "RELEASE_NOT_SERVED"); },
+  alert: createReleaseNotServedAlert()
+});
 const deploymentMakers = await boot.run("deployment-makers", () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION));
 const discoveryPolicy = await boot.run("discovery-policy", () => readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION));
 /**

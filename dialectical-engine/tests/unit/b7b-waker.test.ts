@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient, QueryResult } from "pg";
-import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
+import { PostgresAskApplication, ReleaseNotServedError, type RunCreationSettings } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
 import type { WaitingRun } from "@debateai/db";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue } from "@debateai/register";
@@ -44,6 +44,8 @@ function arrange(input: {
   readonly pages: ReadonlyArray<ReadonlyArray<WaitingRun>>;
   readonly outcomes?: Readonly<Record<string, Outcome>>;
   readonly dispatchFails?: ReadonlySet<string>;
+  /** Side-by-side C4: the runs whose release no longer serves them (the routed dispatcher closed the job and refused). */
+  readonly notServed?: ReadonlySet<string>;
   /** Important 4: the started runs whose first job is still READY past the bound (the repository's answer). */
   readonly stalled?: ReadonlyArray<string>;
 }) {
@@ -95,6 +97,7 @@ function arrange(input: {
     stubPool(),
     { dispatch: vi.fn(async ({ runId, workItemId }) => {
       if (input.dispatchFails?.has(runId) === true) throw new Error("test: the job system refused");
+      if (input.notServed?.has(runId) === true) throw new ReleaseNotServedError(runId, "r16-0123456789ab", true);
       if (workItemId !== `job:${runId}`) throw new Error("test: dispatched a job the tick did not queue");
       dispatched.push(runId);
     }) },
@@ -156,6 +159,24 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 1 });
     expect(recorded).toEqual([{ runId: a.runId, batteryRowId: "Q1", commandKey: `S00:${a.runId}:Q1`, reason: "RUN_SETUP_FAILED:DISPATCH" }]);
     expect(dispatched).toEqual([b.runId]);
+  });
+
+  it("counts a run whose release no longer serves it failed, records no DISPATCH failure over it, and goes on (side-by-side C4)", async () => {
+    // The routed dispatcher already closed the job FAILED as RUN_SETUP_FAILED:RELEASE_NOT_SERVED and wrote the waiver.
+    const [a, b] = [waitingRun({ legacyAskerId: "legacy:a" }), waitingRun({ legacyAskerId: "legacy:b" })];
+    const { application, dispatched, recorded, lines } = arrange({ pages: [[a, b]], notServed: new Set([a.runId]) });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 2, started: 1, skipped: 0, failed: 1, stopped: false, redispatched: 0 });
+    expect(recorded).toEqual([]);
+    expect(dispatched).toEqual([b.runId]);
+    expect(lines()).toContainEqual({ event: "api.wait.release_not_served", runId: a.runId, releaseKey: "r16-0123456789ab", closed: true });
+    expect(lines().some((line) => line.event === "api.wait.started" && line.runId === a.runId)).toBe(false);
+  });
+
+  it("gives a tick with failed: 1, started: 0 when the only run's release no longer serves it (side-by-side C4)", async () => {
+    const a = waitingRun({ legacyAskerId: "legacy:a" });
+    const { application, recorded } = arrange({ pages: [[a]], notServed: new Set([a.runId]) });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ failed: 1, started: 0 });
+    expect(recorded).toEqual([]);
   });
 
   it("leaves a run whose start threw in line for the next tick, logging ids and codes only", async () => {
@@ -249,6 +270,17 @@ describe("Important 4: the waker hands a stalled first job to the job system aga
     // Not remembered as handed over: the next tick tries again.
     expect(lines().filter((line) => line.event === "api.wait.redispatch_failed")).toHaveLength(2);
     expect(dispatched).toEqual([]);
+  });
+});
+
+describe("side-by-side C4: a stalled start whose release no longer serves it", () => {
+  it("is logged, counted nowhere, never recorded FAILED again, and not remembered as handed over", async () => {
+    const stalled = randomUUID();
+    const { application, dispatched, recorded, lines } = arrange({ pages: [], stalled: [stalled], notServed: new Set([stalled]) });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
+    expect(recorded).toEqual([]);
+    expect(dispatched).toEqual([]);
+    expect(lines()).toEqual([{ event: "api.wait.release_not_served", runId: stalled, releaseKey: "r16-0123456789ab", closed: true }]);
   });
 });
 

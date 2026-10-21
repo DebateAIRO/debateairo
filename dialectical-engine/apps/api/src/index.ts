@@ -2,7 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
-import type { ReleaseWatcher } from "./release-state.js";
+import type { ReleaseLifecycleState, ReleaseState, ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -203,6 +203,7 @@ import {
   MIN_AGE,
   parseDeclaredRegion,
   parseReleaseKey,
+  releaseTaskName,
   TypedDomainError,
   type DeclaredRegion,
   type RiskTier,
@@ -4105,25 +4106,163 @@ export interface Dispatcher {
   dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void>;
 }
 
-export class HatchetDispatcher implements Dispatcher {
-  constructor(
-    private readonly client: Pick<Hatchet, "runNoWait">,
-    private readonly workflowName: string
-  ) {
-    if (workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+/**
+ * Side-by-side spec §2, §4 (plan C task C4) — A SEND THE RUN'S RELEASE NO LONGER SERVES. The routed dispatcher has
+ * already closed the run's never-claimed first job FAILED (`RUN_SETUP_FAILED:RELEASE_NOT_SERVED`) and written its waiver
+ * when `closed`; `closed` is false when a runner claimed the job meanwhile (that debate is under way) or it was settled.
+ * Every send site handles it: the asker reads QUEUED (the debate page says it did not start), the waker counts it
+ * failed, the stalled-start re-send logs it, and none records a DISPATCH failure over it.
+ */
+export class ReleaseNotServedError extends TypedDomainError {
+  constructor(readonly runId: string, readonly releaseKey: string, readonly closed: boolean) {
+    super("RELEASE_NOT_SERVED", "The run's release no longer serves it");
+  }
+}
+
+/** A run's own release (`core.run.release_key`), that release's state (null: never recorded, or `legacy`), and whether any release is current. */
+export interface RunReleaseLookup {
+  lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null>;
+}
+
+/** The four lifecycle words 0123's state reader answers with (packages/db's readReleaseState checks the same set). */
+const RELEASE_LIFECYCLE_STATES: ReadonlySet<string> = new Set<ReleaseLifecycleState>(["STAGED", "CURRENT", "DRAINING", "RETIRED"]);
+
+/**
+ * The lookup over 0123 (A-x2: the API's runtime login reads `core.run.release_key` and executes both definer readers),
+ * one statement per send on the runtime pool; null when there is no such run. Results are frozen.
+ */
+export class PostgresRunReleaseLookup implements RunReleaseLookup {
+  constructor(private readonly pool: Pick<Pool, "query">) {}
+
+  async lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null> {
+    const result = await this.pool.query<{
+      release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null; any_current: boolean;
+    }>(
+      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested,
+              EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
+       FROM core.run AS run
+       LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
+       WHERE run.run_id = $1`,
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    if (row.state !== null && !RELEASE_LIFECYCLE_STATES.has(row.state)) throw new TypeError("RELEASE_STATE_ROW_INVALID");
+    return Object.freeze({
+      releaseKey: row.release_key,
+      state: row.state === null ? null : Object.freeze({
+        state: row.state as ReleaseLifecycleState,
+        frontPairStopped: row.front_pair_stopped === true,
+        retireRequested: row.retire_requested === true
+      }),
+      anyCurrent: row.any_current === true
+    });
+  }
+}
+
+/**
+ * Side-by-side spec §4: a release serves its runs while it is CURRENT, and while it DRAINS until root asks it to retire
+ * (its runner still claims and finishes its own debates). With no release recorded anywhere a local deployment is
+ * today's single-release world, and every run is served; a hosted one fails closed (plan C's area constraint).
+ */
+export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyCurrent: boolean; hosted: boolean }>): boolean {
+  if (input.state?.state === "CURRENT") return true;
+  if (input.state?.state === "DRAINING" && !input.state.retireRequested) return true;
+  return !input.anyCurrent && !input.hosted;
+}
+
+/** Spec §4 / plan D: one owner mail per release key per half hour at most, so a burst of refused sends is one line. */
+const RELEASE_NOT_SERVED_ALERT_WINDOW_MS = 1_800_000;
+
+/**
+ * Side-by-side spec §4 (plan C task C4) — THE OWNER HEARS OF A REFUSED SEND. The API emails nobody about releases: it
+ * prints `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per
+ * `windowMs` in this process, and plan D's root-side watcher mails the owner from it. Content-free: a key we mint and a
+ * lifecycle word.
+ */
+export function createReleaseNotServedAlert(options: Readonly<{
+  clock?: () => number; windowMs?: number; write?: (line: string) => void;
+}> = {}): Readonly<{ note(releaseKey: string, state: ReleaseLifecycleState | null): void }> {
+  const clock = options.clock ?? Date.now;
+  const windowMs = options.windowMs ?? RELEASE_NOT_SERVED_ALERT_WINDOW_MS;
+  const write = options.write ?? ((line: string) => { process.stderr.write(`${line}\n`); });
+  const lastAt = new Map<string, number>();
+  return Object.freeze({
+    note(releaseKey: string, state: ReleaseLifecycleState | null): void {
+      const now = clock();
+      const last = lastAt.get(releaseKey);
+      if (last !== undefined && now - last < windowMs) return;
+      lastAt.set(releaseKey, now);
+      write(`DEBATEAI_RELEASE_NOT_SERVED ${JSON.stringify({ releaseKey, state })}`);
+    }
+  });
+}
+
+/** The failure reason a refused send closes the run's first job with (plain failure sentences read it NOT_STARTED). */
+const RELEASE_NOT_SERVED_SETUP_FAILURE = "RUN_SETUP_FAILED:RELEASE_NOT_SERVED";
+
+/**
+ * Side-by-side spec §2, §3, §4 (plan C task C4) — EVERY SEND IS ROUTED BY THE RUN'S OWN RELEASE. Two releases live at
+ * once never share a Hatchet task, so each send reads the run's `release_key` and that release's state and sends to
+ * `releaseTaskName(base, release_key)` (`legacy` keeps the bare base name) while that release serves the run
+ * (`releaseServes`). Otherwise nothing is sent (O1: a debate is never touched by another release's code), and the send
+ * is refused loudly and harmlessly: the never-claimed first job is closed FAILED as RUN_SETUP_FAILED:RELEASE_NOT_SERVED
+ * (`recordSetupFailure` closes a READY job only, and is not fenced by release, so the API's legacy-fenced repository
+ * closes another release's job without widening any claim fence), the run's waiver is written when that closed it
+ * (spec §9: never the person's quota), one content-free journal line, the owner alert, and ReleaseNotServedError. A run
+ * that does not exist is RUN_NOT_FOUND, and nothing is sent or closed. This is the API's only sender (the unrouted
+ * dispatcher it replaces is deleted), so no path bypasses the routing.
+ */
+export class ReleaseRoutedDispatcher implements Dispatcher {
+  readonly #client: Pick<Hatchet, "runNoWait">;
+  readonly #workflowName: string;
+  readonly #hosted: boolean;
+  readonly #lookup: RunReleaseLookup;
+  readonly #work: Pick<WorkItemRepository, "recordSetupFailure">;
+  readonly #waive: (runId: string) => Promise<void>;
+  readonly #alert: ReturnType<typeof createReleaseNotServedAlert>;
+
+  constructor(options: Readonly<{
+    client: Pick<Hatchet, "runNoWait">; workflowName: string; hosted: boolean;
+    lookup: RunReleaseLookup; work: Pick<WorkItemRepository, "recordSetupFailure">;
+    waive: (runId: string) => Promise<void>; alert: ReturnType<typeof createReleaseNotServedAlert>;
+  }>) {
+    if (options.workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+    this.#client = options.client;
+    this.#workflowName = options.workflowName;
+    this.#hosted = options.hosted;
+    this.#lookup = options.lookup;
+    this.#work = options.work;
+    this.#waive = options.waive;
+    this.#alert = options.alert;
   }
 
   async dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void> {
-    await this.client.runNoWait(this.workflowName, {
-      runId: input.runId,
-      workItemId: input.workItemId
-    }, {
-      additionalMetadata: {
-        v3RunId: input.runId,
-        v3WorkItemId: input.workItemId,
-        sourceOfRecord: "core.work_item"
-      }
+    const release = await this.#lookup.lookup(input.runId);
+    if (release === null) throw new TypedDomainError("RUN_NOT_FOUND", "The run to send does not exist");
+    if (releaseServes({ state: release.state, anyCurrent: release.anyCurrent, hosted: this.#hosted })) {
+      await this.#client.runNoWait(releaseTaskName(this.#workflowName, release.releaseKey), {
+        runId: input.runId,
+        workItemId: input.workItemId
+      }, {
+        additionalMetadata: {
+          v3RunId: input.runId,
+          v3WorkItemId: input.workItemId,
+          sourceOfRecord: "core.work_item"
+        }
+      });
+      return;
+    }
+    const closed = await this.#work.recordSetupFailure({
+      runId: input.runId, ...firstRunJob(input.runId), reason: RELEASE_NOT_SERVED_SETUP_FAILURE
     });
+    if (closed) await this.#waive(input.runId);
+    const state = release.state?.state ?? null;
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.dispatch.release_not_served", runId: input.runId, releaseKey: release.releaseKey, state, closed
+    })));
+    this.#alert.note(release.releaseKey, state);
+    throw new ReleaseNotServedError(input.runId, release.releaseKey, closed);
   }
 }
 
@@ -4779,6 +4918,13 @@ function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: 
   return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
 }
 
+/** Side-by-side C4: the waker's line for a start or re-send its run's release no longer serves (ids we mint only). */
+function logReleaseNotServed(error: ReleaseNotServedError): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.wait.release_not_served", runId: error.runId, releaseKey: error.releaseKey, closed: error.closed
+  })));
+}
+
 /** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
 export type WaitingLineTick = Readonly<{
   /** The runs the tick looked at (only those worth trying: never a person-blocked run that is not due). */
@@ -5081,7 +5227,13 @@ export class PostgresAskApplication implements AskApplication {
       // The job is READY: the next ask's estimate holds this debate from here on.
       await previewAdmissionLock?.release();
       setupStep = "DISPATCH";
-      await this.dispatcher.dispatch({ runId, workItemId });
+      try {
+        await this.dispatcher.dispatch({ runId, workItemId });
+      } catch (error) {
+        // Side-by-side C4: the routed dispatcher already closed the job (RELEASE_NOT_SERVED) and wrote the waiver; the
+        // asker reads QUEUED, the debate page says it did not start, and no DISPATCH failure is recorded over it.
+        if (!(error instanceof ReleaseNotServedError)) throw error;
+      }
     } catch (error) {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
@@ -5376,8 +5528,11 @@ export class PostgresAskApplication implements AskApplication {
     try {
       await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.workItemId });
     } catch (error) {
-      await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
-      throw error;
+      // Side-by-side C4: a send the run's release no longer serves already closed the job and wrote the waiver: QUEUED.
+      if (!(error instanceof ReleaseNotServedError)) {
+        await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
+        throw error;
+      }
     }
     // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
     if (pinned.personRoomTight === true) {
@@ -5476,8 +5631,13 @@ export class PostgresAskApplication implements AskApplication {
           await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
           started += 1;
           console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
-        } catch {
+        } catch (error) {
           failed += 1;
+          // Side-by-side C4: the job already carries RELEASE_NOT_SERVED (and the run its waiver); no DISPATCH over it.
+          if (error instanceof ReleaseNotServedError) {
+            logReleaseNotServed(error);
+            continue;
+          }
           await this.#recordRunSetupFailure(run.runId, "DISPATCH");
         }
       }
@@ -5528,6 +5688,11 @@ export class PostgresAskApplication implements AskApplication {
       try {
         await this.dispatcher.dispatch({ runId: job.runId, workItemId: job.workItemId });
       } catch (error) {
+        // Side-by-side C4: the run's release no longer serves it; the dispatcher closed what it could. Counted nowhere.
+        if (error instanceof ReleaseNotServedError) {
+          logReleaseNotServed(error);
+          continue;
+        }
         console.error(JSON.stringify(Object.freeze({
           event: "api.wait.redispatch_failed", runId: job.runId, diagnostic: apiOperationalErrorDiagnostic(error)
         })));
