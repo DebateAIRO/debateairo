@@ -91,9 +91,9 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  * A pass that throws is logged (BACKSTOP_FAILED) and runs again at the next read; every step is safe to repeat.
  * `stop()` ends a backstop between steps: the process is ending on its own signal.
  *
- * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, how it retired, counts, a
- * SQLSTATE. A failure on the way out (RETIREMENT_ANNOUNCE_FAILED, RETIREMENT_STOP_FAILED) is logged and rejects
- * `retired`.
+ * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, the release's lifecycle state (only on
+ * RETIRE_REQUEST_IGNORED), how it retired, counts, a SQLSTATE. A failure on the way out (RETIREMENT_ANNOUNCE_FAILED,
+ * RETIREMENT_STOP_FAILED) rejects `retired`, then is logged.
  */
 export const RUNNER_RETIRED_PROCESS_EVENT = "debateai:runner-retired" as const;
 export const RUNNER_RETIREMENT_TIMING = Object.freeze({
@@ -228,8 +228,22 @@ export function startRunnerRetirement(input: Readonly<{
     if (stopped) return;
     timer = clock.setTimeout(() => { timer = undefined; resolve(); }, ms);
   });
-  // main.ts never awaits `retired`: a worker that fails to stop is the launcher's to see, never an unhandled rejection.
+  // main.ts never awaits `retired`, so a worker.stop() that rejects is seen only as the RETIREMENT_STOP_FAILED line:
+  // the launcher already heard the event and ends PREVIEW_RUNNER_RETIRED, exit 0, once its 30 s settle bound passes
+  // (exit 1 only if main itself rejects). The trade-off is deliberate: a worker that will not stop after a clean
+  // retirement is a hang, not a failed release, so it is said loudly but emails no one. Never an unhandled rejection.
   retired.catch(() => undefined);
+  /**
+   * A way-out failure's line, written AFTER `retired` is rejected and never thrown: a throwing log sink can neither
+   * leave `retired` pending nor reach the tick's catch, which would reset `retiring` and announce a second time.
+   */
+  const sayOnTheWayOut = (event: "RETIREMENT_ANNOUNCE_FAILED" | "RETIREMENT_STOP_FAILED"): void => {
+    try {
+      input.log(Object.freeze({ kind: KIND, event }));
+    } catch {
+      // `retired` already carries the failure; the line is best effort.
+    }
+  };
 
   const retire = async (how: "DRAINED" | "BACKSTOP"): Promise<void> => {
     retiring = true;
@@ -240,15 +254,15 @@ export function startRunnerRetirement(input: Readonly<{
       input.emit(Object.freeze({ releaseKey: input.releaseKey }));
     } catch (error) {
       // The launcher may not know: stopping the worker now would read as a failure. Loud, and the worker is left as is.
-      input.log(Object.freeze({ kind: KIND, event: "RETIREMENT_ANNOUNCE_FAILED" }));
       refuse(error);
+      sayOnTheWayOut("RETIREMENT_ANNOUNCE_FAILED");
       return;
     }
     try {
       await input.stopWorker();
     } catch (error) {
-      input.log(Object.freeze({ kind: KIND, event: "RETIREMENT_STOP_FAILED" }));
       refuse(error);
+      sayOnTheWayOut("RETIREMENT_STOP_FAILED");
       return;
     }
     settle(how);

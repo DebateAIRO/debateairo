@@ -43,9 +43,11 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
     allowances: FundingAllowancePort; entitlements: FundingEntitlementPort; plans: BillingPlans;
     closeBasisPoints: number;
   }>) {
-    this.customer = new BillingPersonAllowanceSource({ ...options, entitlements: {
-      current: async (owner, now) => { const value = await options.entitlements.current(owner, now); if (value === null) throw unavailable(); return value; }
-    } });
+    // The subscription path reads exactly as the plain source does: an owner with no windows row has no personal limit
+    // (`[]`). Only a NEW ask refuses a missing row (resolveAskFunding), since its run needs a basis to pin.
+    this.customer = new BillingPersonAllowanceSource({
+      entitlements: options.entitlements, plans: options.plans, closeBasisPoints: options.closeBasisPoints
+    });
   }
   private checkBasis(basis: FundingBasis | null): FundingBasis {
     if (basis === null || (basis.kind === "INTERNAL" ? !UUID.test(basis.grantId) || !UUID.test(basis.grantEventId)

@@ -28,6 +28,8 @@ function source(current: InternalGrant | null = grant, basis: FundingBasis | nul
     versions?: Readonly<Record<number, ReturnType<typeof policyOf> | null>>;
     selection?: Readonly<{ registerVersion: number; policy: ReturnType<typeof policyOf> }> | null;
     calls?: { readPolicy: number; readPolicyAt: number[] };
+    /** null: the owner has no windows row (the entitlement port answers null). */
+    entitlement?: null;
   }> = {}) {
   const Constructor = (billingCore as unknown as { FundingAwarePersonAllowanceSource: new(input: unknown) => Funding })
     .FundingAwarePersonAllowanceSource;
@@ -41,7 +43,8 @@ function source(current: InternalGrant | null = grant, basis: FundingBasis | nul
       return policy === undefined || policy === null ? null : { registerVersion: version, policy };
     },
     current: async () => current, forRun: async () => pinned },
-    entitlements: { current: async () => ({ planId: "FREE", eventId, periodAnchorAt: new Date("2026-10-01T10:00:00Z"), monthCreditOverrideMicros: null }),
+    entitlements: { current: async () => more.entitlement === null ? null
+      : ({ planId: "FREE", eventId, periodAnchorAt: new Date("2026-10-01T10:00:00Z"), monthCreditOverrideMicros: null }),
       readRunFundingBasis: async () => basis }, plans, closeBasisPoints: 9500 });
 }
 describe("finite internal windows preserve the grant rather than a subscription", () => {
@@ -145,6 +148,30 @@ describe("side-by-side §9: a grant stays valid under the funding version it was
     expect(await off.resolveAskFunding(ownerRef, now)).toEqual({ kind: "SUBSCRIPTION", planId: "FREE", entitlementEventId: eventId });
     // A new ask never reads a grant's version policy once funding is off.
     expect(calls.readPolicyAt).toEqual([2]);
+  });
+
+  it("a grant longer than its own version's maximumLifetimeMs (1 day; the grant runs ~8 days) is refused, run-pinned or new", async () => {
+    const oneDay = { maximumLifetimeMs: 86_400_000 };
+    await expect(source(grant, pin, grant, oneDay).read(ownerRef, now, { runId }))
+      .rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
+    await expect(source(grant, null, grant, oneDay).read(ownerRef, now))
+      .rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
+  });
+
+  // Exact parity with the plain BillingPersonAllowanceSource: no windows row means no personal limit ([]) on the read
+  // path, while a NEW ask with neither a grant nor a windows row is still refused at resolveAskFunding.
+  it("a SUBSCRIPTION-pinned run whose owner has no windows row reads [] (no personal limit), never a refusal", async () => {
+    const subscription = { kind: "SUBSCRIPTION", planId: "FREE", entitlementEventId: eventId } as const;
+    expect(await source(grant, subscription, grant, {}, { entitlement: null }).read(ownerRef, now, { runId })).toEqual([]);
+    // Funding switched off: a new ask takes the subscription path, also [] with no row.
+    expect(await source(null, null, grant, {}, { entitlement: null, selection: null }).read(ownerRef, now)).toEqual([]);
+  });
+
+  it("a new ask with no grant and no windows row is still refused at resolveAskFunding", async () => {
+    await expect(source(null, null, grant, {}, { entitlement: null }).resolveAskFunding(ownerRef, now))
+      .rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
+    await expect(source(null, null, grant, {}, { entitlement: null, selection: null }).resolveAskFunding(ownerRef, now))
+      .rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
   });
 
   it("a grant whose day exceeds its week is refused, run-pinned or new", async () => {

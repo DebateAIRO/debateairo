@@ -191,7 +191,7 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
     expect(await store.setAsideOpenWork(R1, "BACKSTOP")).toBe(0);
     expect(await waivers()).toHaveLength(7);
     // Another release's key is refused before anything is written (O1: never another release's debates).
-    await expect(store.setAsideOpenWork(R2, "BACKSTOP")).rejects.toThrow("RETIREMENT_RELEASE_KEY_MISMATCH");
+    await expect(store.setAsideOpenWork(R2, "BACKSTOP")).rejects.toThrow(new TypeError("RETIREMENT_RELEASE_KEY_MISMATCH"));
     expect(await jobRow(b2.workItemId)).toMatchObject({ state: "CLAIMED" });
     expect(await waivers()).toHaveLength(7);
   });
