@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { WorkItemFence } from "@debateai/battery";
+import { WorkItemRepository, type WorkItemFence } from "@debateai/battery";
 import { readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
 
 /**
@@ -78,8 +78,21 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *  · a release with no row (`legacy`, dev, tests) is never retired;
  *  · a retire request on a release that is not DRAINING is ignored (plan B D5) and said once.
  *
- * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, how it retired, a SQLSTATE. A
- * failure on the way out (RETIREMENT_ANNOUNCE_FAILED, RETIREMENT_STOP_FAILED) is logged and rejects `retired`.
+ * Part 3, spec §4 "the backstop is a request, not a kill": root records "retire now" for a DRAINING release (switch
+ * plus 7.5 hours), and the runner honours it at the next read, a request standing since before this process started
+ * included, whether or not its front pair is recorded stopped yet (root stops the old pair anyway):
+ *   1. it stops claiming and stops new model calls (BACKSTOP_STARTED);
+ *   2. it lets the calls in flight settle: every 5 s it reads the task counter, until no task runs or 1,200 s have
+ *      passed (the gate's call deadline; BACKSTOP_SETTLE_EXPIRED). A call in flight is never killed;
+ *   3. it records what is left FAILED as RUN_SET_ASIDE:BACKSTOP with each run's waiver in the same transaction
+ *      (spec §9: no quota use; the site day keeps counting real spend), retried every 5 s on failure, never skipped
+ *      (BACKSTOP_SET_ASIDE_FAILED, then BACKSTOP_SET_ASIDE with the count);
+ *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP".
+ * `stop()` ends a backstop between steps: the process is ending on its own signal.
+ *
+ * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, how it retired, counts, a
+ * SQLSTATE. A failure on the way out (RETIREMENT_ANNOUNCE_FAILED, RETIREMENT_STOP_FAILED) is logged and rejects
+ * `retired`.
  */
 export const RUNNER_RETIRED_PROCESS_EVENT = "debateai:runner-retired" as const;
 export const RUNNER_RETIREMENT_TIMING = Object.freeze({
@@ -100,16 +113,42 @@ export type ReleaseRetirementFacts = Readonly<{
 export type RunnerRetirementStore = Readonly<{
   /** The release's facts, read in ONE `REPEATABLE READ READ ONLY` transaction. */
   readFacts(releaseKey: string): Promise<ReleaseRetirementFacts>;
+  /**
+   * The backstop's step 3: every open work item of this runner's release FAILED as RUN_SET_ASIDE:BACKSTOP, each page
+   * with its runs' waivers in one write transaction; how many items it set aside.
+   */
+  setAsideOpenWork(releaseKey: string, reason: "BACKSTOP"): Promise<number>;
 }>;
+
+/** Items per set-aside transaction: the store pages while a full page comes back. */
+const SET_ASIDE_PAGE_SIZE = 100;
 
 /**
  * The facts in one snapshot: a FRONT_PAIR_STOPPED row is never seen without every admission committed before it (a
  * debate admitted a second before the pair stopped is counted as open work, never missed between two reads). Needs
  * EXECUTE on `core.read_release_state` and SELECT on `core.work_item` and `core.run` (the runner runtime login has all
- * three). `fence` is the runner's own work fence (spec §3), kept for the backstop's set-aside (plan B Task B11).
+ * three). `fence` is the runner's own work fence (spec §3): the backstop's set-aside writes only its release's work,
+ * never under another worker's live claim, and refuses any other release key before it writes (O1). The set-aside
+ * needs UPDATE on `core.work_item` and INSERT on `ledger.model_spend_waiver` (debateai_runtime has both).
  */
-export function postgresRunnerRetirementStore(pool: Pool, fence: WorkItemFence): RunnerRetirementStore {
+export function postgresRunnerRetirementStore(
+  pool: Pool,
+  fence: WorkItemFence,
+  options: Readonly<{ pageSize?: number }> = {}
+): RunnerRetirementStore {
+  const work = new WorkItemRepository(pool, fence);
+  const pageSize = options.pageSize ?? SET_ASIDE_PAGE_SIZE;
   return Object.freeze({
+    async setAsideOpenWork(releaseKey: string, reason: "BACKSTOP"): Promise<number> {
+      if (releaseKey !== fence.releaseKey) throw new TypeError("RETIREMENT_RELEASE_KEY_MISMATCH");
+      let count = 0;
+      for (;;) {
+        // Spec §4 steps 1-4 and §9 "the waiver": each page's FAILED rows and waivers commit together.
+        const page = await work.setAsideOpenWork({ reason, limit: pageSize });
+        count += page.length;
+        if (page.length < pageSize) return count;
+      }
+    },
     async readFacts(releaseKey: string): Promise<ReleaseRetirementFacts> {
       const client = await pool.connect();
       try {
@@ -183,6 +222,11 @@ export function startRunnerRetirement(input: Readonly<{
   let settle: (how: "DRAINED" | "BACKSTOP") => void = () => undefined;
   let refuse: (error: unknown) => void = () => undefined;
   const retired = new Promise<"DRAINED" | "BACKSTOP">((resolve, reject) => { settle = resolve; refuse = reject; });
+  /** Resolves after `ms`, or never once `stop()` ran (it clears the timer): the backstop then ends where it waits. */
+  const wait = (ms: number): Promise<void> => new Promise((resolve) => {
+    if (stopped) return;
+    timer = clock.setTimeout(() => { timer = undefined; resolve(); }, ms);
+  });
   // main.ts never awaits `retired`: a worker that fails to stop is the launcher's to see, never an unhandled rejection.
   retired.catch(() => undefined);
 
@@ -209,6 +253,41 @@ export function startRunnerRetirement(input: Readonly<{
     settle(how);
   };
 
+  /** Part 3 (spec §4, the backstop): runs once; the poll chain is not re-armed after it (`retiring`). */
+  const backstop = async (facts: ReleaseRetirementFacts): Promise<void> => {
+    retiring = true;
+    input.signal.stopClaims();
+    input.signal.stopCalls();
+    const startedAt = clock.now();
+    input.log(Object.freeze({
+      kind: KIND, event: "BACKSTOP_STARTED", executing: input.executions.count(), openWork: facts.openWork
+    }));
+    for (;;) {
+      const executing = input.executions.count();
+      if (executing === 0) break;
+      const left = RUNNER_RETIREMENT_TIMING.settleMs - (clock.now() - startedAt);
+      if (left <= 0) {
+        input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_SETTLE_EXPIRED", executing }));
+        break;
+      }
+      await wait(Math.min(RUNNER_RETIREMENT_TIMING.settleCheckMs, left));
+    }
+    let count: number;
+    for (;;) {
+      if (stopped) return;
+      try {
+        count = await input.store.setAsideOpenWork(input.releaseKey, "BACKSTOP");
+        break;
+      } catch (error) {
+        input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_SET_ASIDE_FAILED", ...sqlStateOf(error) }));
+        await wait(RUNNER_RETIREMENT_TIMING.settleCheckMs);
+      }
+    }
+    input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_SET_ASIDE", count }));
+    if (stopped) return;
+    await retire("BACKSTOP");
+  };
+
   const tick = async (): Promise<void> => {
     let facts: ReleaseRetirementFacts;
     try {
@@ -221,6 +300,10 @@ export function startRunnerRetirement(input: Readonly<{
     if (facts.retireRequested && facts.state !== "DRAINING" && facts.state !== null && !ignoredSaid) {
       ignoredSaid = true;
       input.log(Object.freeze({ kind: KIND, event: "RETIRE_REQUEST_IGNORED", state: facts.state }));
+    }
+    if (facts.state === "DRAINING" && facts.retireRequested) {
+      await backstop(facts);
+      return;
     }
     const drained = facts.state === "DRAINING" && facts.frontPairStopped && facts.openWork === 0;
     if (drained && input.executions.count() === 0) {

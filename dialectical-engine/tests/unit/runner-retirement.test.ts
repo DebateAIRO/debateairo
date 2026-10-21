@@ -100,6 +100,8 @@ const drained = (overrides: Partial<ReleaseRetirementFacts> = {}): ReleaseRetire
 function monitor(options: Readonly<{
   facts: (read: number) => Promise<ReleaseRetirementFacts>;
   running?: (read: number) => number;
+  /** The backstop's set-aside: `setAside(n)` answers the n-th call (1-based). */
+  setAside?: (call: number) => Promise<number>;
 }>) {
   const time = fakeClock();
   const signal = createRunnerRetirementSignal();
@@ -108,6 +110,7 @@ function monitor(options: Readonly<{
   const lines: Array<Readonly<Record<string, string | number>>> = [];
   const announced: Array<Readonly<{ line: string; claimsStopped: boolean }>> = [];
   const emitted: Array<Readonly<{ releaseKey: string }>> = [];
+  const setAsides: Array<Readonly<{ key: string; reason: string; at: number }>> = [];
   let outcome: string | undefined;
   const retirement = startRunnerRetirement({
     releaseKey: KEY,
@@ -115,6 +118,11 @@ function monitor(options: Readonly<{
       readFacts: (releaseKey) => {
         reads.push({ key: releaseKey, at: time.now() });
         return options.facts(reads.length);
+      },
+      setAsideOpenWork: (releaseKey, reason) => {
+        setAsides.push({ key: releaseKey, reason, at: time.now() });
+        order.push("setAside");
+        return (options.setAside ?? (async () => 0))(setAsides.length);
       }
     },
     executions: { count: () => (options.running ?? (() => 0))(reads.length) },
@@ -126,7 +134,7 @@ function monitor(options: Readonly<{
     clock: time.clock
   });
   void retirement.retired.then((how) => { outcome = how; });
-  return { time, signal, retirement, reads, order, lines, announced, emitted, outcome: () => outcome };
+  return { time, signal, retirement, reads, order, lines, announced, emitted, setAsides, outcome: () => outcome };
 }
 
 describe("a draining release's runner retires by itself (side-by-side §4)", () => {
@@ -195,7 +203,7 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     const lines: Array<Readonly<Record<string, string | number>>> = [];
     const retirement = startRunnerRetirement({
       releaseKey: KEY,
-      store: { readFacts: async () => { reads.push(time.now()); return drained(); } },
+      store: { readFacts: async () => { reads.push(time.now()); return drained(); }, setAsideOpenWork: async () => 0 },
       executions: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => { order.push("stopWorker"); throw failure; },
@@ -222,7 +230,7 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     const failure = new Error("stdout closed");
     const retirement = startRunnerRetirement({
       releaseKey: KEY,
-      store: { readFacts: async () => drained() },
+      store: { readFacts: async () => drained(), setAsideOpenWork: async () => 0 },
       executions: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => { order.push("stopWorker"); },
@@ -293,7 +301,8 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
           const facts = drained({ state: "CURRENT" });
           if (reads.length > 1) return Promise.resolve(facts);
           return new Promise((resolve) => { time.clock.setTimeout(() => resolve(facts), 90_000); });
-        }
+        },
+        setAsideOpenWork: async () => 0
       },
       executions: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
@@ -323,5 +332,107 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     expect(run.reads.map((read) => read.at)).toEqual([60_000, 120_000]);
     expect(run.order).toEqual([]);
     expect(run.signal.claimsStopped()).toBe(false);
+  });
+});
+
+/**
+ * Side-by-side spec §4, "the backstop is a request, not a kill": root records "retire now" for the draining release,
+ * and the runner honours it — it stops claiming and stops new calls, lets calls in flight settle (at most 1,200 s,
+ * checked every 5 s), sets what is left aside FAILED with the waiver (§9: no quota use), and retires. The set-aside
+ * is retried every 5 s until it is written, never skipped.
+ */
+describe("the backstop is a request the runner honours (side-by-side §4)", () => {
+  const requested = (overrides: Partial<ReleaseRetirementFacts> = {}) =>
+    drained({ retireRequested: true, openWork: 2, ...overrides });
+  const line = (event: string, extra: Readonly<Record<string, string | number>> = {}) =>
+    ({ kind: "DEBATEAI_RUNNER_RETIREMENT", event, ...extra });
+
+  it("stops claims and calls at once, waits for the call in flight, sets the rest aside, then retires", async () => {
+    let executing = 1;
+    const run = monitor({ facts: async () => requested(), running: () => executing, setAside: async () => 2 });
+    await run.time.advance(60_000);
+    expect(run.signal.claimsStopped()).toBe(true);
+    expect(run.signal.callsStopped()).toBe(true);
+    expect(run.lines).toEqual([line("BACKSTOP_STARTED", { executing: 1, openWork: 2 })]);
+    for (let step = 0; step < 3; step += 1) await run.time.advance(5_000);
+    expect(run.setAsides).toEqual([]);
+    expect(run.order).toEqual([]);
+
+    executing = 0;
+    await run.time.advance(5_000);
+    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 80_000 }]);
+    expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
+    expect(run.lines).toEqual([
+      line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
+      line("BACKSTOP_SET_ASIDE", { count: 2 }),
+      line("RETIRING", { how: "BACKSTOP" })
+    ]);
+    expect(run.announced).toEqual([{ line: 'DEBATEAI_RUNNER_RETIRED {"releaseKey":"r1-aaaaaaaaaaaa"}\n', claimsStopped: true }]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+    // The poll chain ended with the request: no read and no second set-aside after it.
+    await run.time.advance(300_000);
+    expect(run.reads).toHaveLength(1);
+    expect(run.setAsides).toHaveLength(1);
+  });
+
+  it("waits at most 1,200 s for a task still running, then sets the rest aside (the task is never killed)", async () => {
+    const run = monitor({ facts: async () => requested(), running: () => 1, setAside: async () => 2 });
+    await run.time.advance(60_000);
+    await run.time.advance(1_199_999);
+    expect(run.setAsides).toEqual([]);
+    expect(run.lines).toEqual([line("BACKSTOP_STARTED", { executing: 1, openWork: 2 })]);
+    await run.time.advance(1);
+    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 1_260_000 }]);
+    expect(run.lines).toEqual([
+      line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
+      line("BACKSTOP_SETTLE_EXPIRED", { executing: 1 }),
+      line("BACKSTOP_SET_ASIDE", { count: 2 }),
+      line("RETIRING", { how: "BACKSTOP" })
+    ]);
+    expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+  });
+
+  it("a set-aside that fails is retried every 5 s and never skipped; the worker stops only after it is written", async () => {
+    const refused = () => Object.assign(new Error("could not serialize access"), { code: "40001" });
+    const run = monitor({
+      facts: async () => requested(),
+      setAside: async (call) => { if (call <= 2) throw refused(); return 2; }
+    });
+    await run.time.advance(60_000);
+    expect(run.setAsides.map((call) => call.at)).toEqual([60_000]);
+    expect(run.order).toEqual(["setAside"]);
+    await run.time.advance(5_000);
+    expect(run.setAsides.map((call) => call.at)).toEqual([60_000, 65_000]);
+    await run.time.advance(4_999);
+    expect(run.order).toEqual(["setAside", "setAside"]);
+    await run.time.advance(1);
+    expect(run.setAsides.map((call) => call.at)).toEqual([60_000, 65_000, 70_000]);
+    expect(run.order).toEqual(["setAside", "setAside", "setAside", "announce", "emit", "stopWorker"]);
+    expect(run.lines).toEqual([
+      line("BACKSTOP_STARTED", { executing: 0, openWork: 2 }),
+      line("BACKSTOP_SET_ASIDE_FAILED", { sqlState: "40001" }),
+      line("BACKSTOP_SET_ASIDE_FAILED", { sqlState: "40001" }),
+      line("BACKSTOP_SET_ASIDE", { count: 2 }),
+      line("RETIRING", { how: "BACKSTOP" })
+    ]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+  });
+
+  it("a front pair not yet recorded stopped does not delay it (root asked; the old pair is stopped anyway)", async () => {
+    const run = monitor({ facts: async () => requested({ frontPairStopped: false, openWork: 1 }), setAside: async () => 1 });
+    await run.time.advance(60_000);
+    expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+  });
+
+  it("stop() during the wait ends it: nothing is set aside and the worker is left to its signal", async () => {
+    const run = monitor({ facts: async () => requested(), running: () => 1, setAside: async () => 2 });
+    await run.time.advance(60_000);
+    run.retirement.stop();
+    await run.time.advance(1_500_000);
+    expect(run.setAsides).toEqual([]);
+    expect(run.order).toEqual([]);
+    expect(run.outcome()).toBeUndefined();
   });
 });

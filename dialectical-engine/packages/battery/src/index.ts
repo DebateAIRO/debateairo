@@ -1,6 +1,12 @@
 import { LEGACY_RELEASE_KEY, parseReleaseKey, type ActivationState } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  recordSpendWaiver,
+  SPEND_WAIVER_REASONS,
+  withWriteTransaction,
+  type SpendWaiverReason
+} from "@debateai/db";
 
 export {
   SplitLifecycleProjection,
@@ -276,14 +282,25 @@ export type WorkItemFence = Readonly<{ releaseKey: string; workerId?: string }>;
 export const RUN_SET_ASIDE = "RUN_SET_ASIDE";
 
 /**
- * Why a run was set aside — exactly the reasons a spend waiver may carry (plan A's `ledger.model_spend_waiver` CHECK;
- * INTERFACE "Database"), so B11 writes the waiver with the same word it records here.
+ * Why a run was set aside — the reasons a spend waiver may carry, one list (plan A's `SPEND_WAIVER_REASONS`, the
+ * `ledger.model_spend_waiver` CHECK; INTERFACE "Database"), so the waiver carries the word the FAILED row records.
  */
-export type SetAsideReason = "BACKSTOP" | "OWNER_STOPPED" | "SETTINGS_VERSION_UNSUPPORTED" | "RELEASE_NOT_SERVED";
+export type SetAsideReason = SpendWaiverReason;
 
-const SET_ASIDE_REASONS: ReadonlySet<string> = new Set<SetAsideReason>([
-  "BACKSTOP", "OWNER_STOPPED", "SETTINGS_VERSION_UNSUPPORTED", "RELEASE_NOT_SERVED"
-]);
+const SET_ASIDE_REASONS: ReadonlySet<string> = new Set<string>(SPEND_WAIVER_REASONS);
+
+/**
+ * Spec §9 "the waiver": a set-aside run never uses the person's quota. One waiver per distinct run of `runIds`,
+ * written on the client of the transaction that wrote their FAILED rows, so both commit together or not at all.
+ * Idempotent: a run that already has a waiver keeps its first reason (ON CONFLICT (run_id) DO NOTHING).
+ */
+async function waiveSetAsideRuns(
+  client: PoolClient,
+  runIds: readonly string[],
+  reason: SetAsideReason
+): Promise<void> {
+  for (const runId of new Set(runIds)) await recordSpendWaiver(client, runId, reason);
+}
 
 /** The terminal reason a set-aside writes: `RUN_SET_ASIDE:<waiver reason>` (plan B D7: the site reads it SET_ASIDE). */
 export function runSetAsideReason(reason: SetAsideReason): string {
@@ -291,7 +308,7 @@ export function runSetAsideReason(reason: SetAsideReason): string {
   return `RUN_SET_ASIDE:${reason}`;
 }
 
-/** One work item a set-aside wrote FAILED, and its run (B11 writes that run's waiver on the same transaction). */
+/** One work item a set-aside wrote FAILED, and its run (whose waiver was written on the same transaction). */
 export type SetAsideWorkItem = Readonly<{ runId: string; workItemId: string }>;
 
 function assertWorkLimit(limit: number, what: string): void {
@@ -676,9 +693,8 @@ export class WorkItemRepository {
    * Spec §4 steps 1-4 (the backstop): records this fence's release's open work — READY, or CLAIMED by this worker or
    * with the claim lapsed, never settled — FAILED with `runSetAsideReason(reason)`, at most `limit` items, oldest
    * first; the caller pages while a full page comes back. Another worker's live claim is left alone (D2).
-   * Spec §9 "the waiver": a set-aside run never uses the person's quota. This form writes only the FAILED rows, on a
-   * transaction the caller owns and commits, so the waiver of every returned run (B11: one per distinct `runId`)
-   * commits with them or not at all.
+   * Spec §9 "the waiver": a set-aside run never uses the person's quota. On the caller's transaction this writes the
+   * FAILED rows AND one waiver per distinct returned run, so both commit together or not at all.
    */
   async setAsideOpenWorkOn(
     client: PoolClient,
@@ -707,17 +723,14 @@ export class WorkItemRepository {
        SELECT work_item_id, run_id FROM set_aside ORDER BY created_at_seq, work_item_id`,
       [this.#fence.releaseKey, terminalReason, input.limit, this.#fence.workerId]
     );
+    await waiveSetAsideRuns(client, result.rows.map((row) => row.run_id), input.reason);
     return Object.freeze(result.rows.map((row) => Object.freeze({
       runId: row.run_id,
       workItemId: row.work_item_id
     })));
   }
 
-  /**
-   * `setAsideOpenWorkOn` in its own write transaction. NOT YET COMPLETE: it writes the FAILED rows without the spend
-   * waiver; B11 MUST add each returned run's waiver on the same client before anything calls it (spec §9: a set-aside
-   * run never uses the person's quota). Until then only tests call it.
-   */
+  /** `setAsideOpenWorkOn` in its own write transaction: the FAILED rows and their runs' waivers commit together. */
   async setAsideOpenWork(input: Readonly<{ reason: SetAsideReason; limit: number }>): Promise<readonly SetAsideWorkItem[]> {
     return withWriteTransaction(this.pool, (client) => this.setAsideOpenWorkOn(client, input));
   }
@@ -726,8 +739,8 @@ export class WorkItemRepository {
    * Spec §4, §9: sets one open work item of `runId` aside — FAILED with `runSetAsideReason(reason)` — only when its run
    * belongs to this fence's release and it is not settled. `readyOnly` limits it to a job never claimed (plan C's
    * RELEASE_NOT_SERVED path builds the repository with the run's own release as the fence); otherwise a CLAIMED item
-   * qualifies too, except under another worker's live claim (D2). On the caller's transaction, so the run's waiver
-   * commits with it (B11). True when this call wrote it.
+   * qualifies too, except under another worker's live claim (D2). On the caller's transaction, with the run's waiver
+   * (spec §9) when it wrote the item, so both commit together. True when this call wrote it.
    */
   async setAsideWorkItemOn(
     client: PoolClient,
@@ -746,14 +759,12 @@ export class WorkItemRepository {
               AND NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)))`,
       [input.workItemId, input.runId, terminalReason, this.#fence.releaseKey, this.#fence.workerId, input.readyOnly]
     );
-    return result.rowCount === 1;
+    if (result.rowCount !== 1) return false;
+    await waiveSetAsideRuns(client, [input.runId], input.reason);
+    return true;
   }
 
-  /**
-   * `setAsideWorkItemOn` in its own write transaction. NOT YET COMPLETE: it writes the FAILED row without the spend
-   * waiver; B11 MUST add the run's waiver on the same client before anything calls it (plan C's RELEASE_NOT_SERVED path
-   * included). Until then only tests call it.
-   */
+  /** `setAsideWorkItemOn` in its own write transaction: the FAILED row and the run's waiver commit together. */
   async setAsideWorkItem(
     input: Readonly<{ runId: string; workItemId: string; reason: SetAsideReason; readyOnly: boolean }>
   ): Promise<boolean> {
