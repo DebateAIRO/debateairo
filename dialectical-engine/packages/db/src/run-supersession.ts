@@ -8,9 +8,11 @@ import { TypedDomainError } from "@debateai/kernel";
  * touched. `core.run_supersession` records old → new (reason READMITTED), append-only. Its guard refuses
  * RUN_SUPERSESSION_INVALID unless the old run still waits (a wait row and no start row: a started debate is never
  * re-admitted, ruling O1) and the new run has no edge of its own (so no cycle); a second edge out of a run is the
- * primary key's 23505. `core.run_waiting_v` no longer lists a superseded run. `core.resolve_run_ref` follows the chain to
- * the newest run, at most 16 hops (RUN_SUPERSESSION_CHAIN_INVALID beyond). Both are the API runtime's (EXECUTE /
- * SELECT, INSERT for debateai_runtime). Refusals named here surface as TypedDomainError with the SQL code as `code`;
+ * primary key's 23505; once superseded, a run's start is refused RUN_SUPERSEDED. `core.run_waiting_v` no longer lists a
+ * superseded run. `core.resolve_run_ref` follows the chain to the newest run, at most 16 hops
+ * (RUN_SUPERSESSION_CHAIN_INVALID beyond). Both are the API's alone (SELECT, INSERT / EXECUTE for
+ * debateai_billing_runtime, which the API's login holds and the runner's does not; 42501 for the runner).
+ * Refusals named here surface as TypedDomainError with the SQL code as `code`;
  * every other error (a key violation, a permission refusal) is rethrown unchanged.
  */
 const SUPERSESSION_REFUSALS: ReadonlySet<string> = new Set(["RUN_SUPERSESSION_INVALID", "RUN_SUPERSESSION_CHAIN_INVALID"]);

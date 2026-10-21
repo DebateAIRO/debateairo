@@ -11,7 +11,8 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * writes it; §3 adds the release table core.release_event, its view core.release_state_v, its two readers and its two
  * serialized writers, owned by the new NOLOGIN role debateai_release_owner (the writers callable by
  * debateai_release_operator); §4 adds the re-admission record core.run_supersession with its guard
- * core.guard_run_supersession(), core.resolve_run_ref(uuid), the readmitted run's key provision and its commit lock (with
+ * core.guard_run_supersession(), the start guard core.refuse_starting_superseded_run() (its trigger on core.run_wait_start
+ * is checked by the closing block), core.resolve_run_ref(uuid), the readmitted run's key provision and its commit lock (with
  * the intent's marker column core.run_key_provision_intent.readmitted_from_run_id), and redefines core.run_waiting_v; §5
  * widens core.run_wait_reason's waits_for CHECK. The view and that CHECK are checked by the closing block and by tests,
  * not digested, so a later drained step may widen them again (as 0121's CHECKs are handled). It adds no billing relation
@@ -29,13 +30,13 @@ const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_
 /** §1: the CHECKs 0123 adds, as table.constraint. */
 const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
 /**
- * §2: the function 0123 redefines in place, §3: the four it adds, §4: the four it adds (whole: owner, definer, path,
+ * §2: the function 0123 redefines in place, §3: the four it adds, §4: the five it adds (whole: owner, definer, path,
  * volatility, definition, ACL).
  */
 const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_run_supersession()',
  'core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','core.prepare_readmitted_run_key_provision(uuid,uuid)',
  'core.read_current_release()','core.read_release_state(text)','core.record_release_event(text,text,text,text)',
- 'core.record_release_switch(text,text,timestamptz,text,bigint)','core.resolve_run_ref(uuid)'] as const;
+ 'core.record_release_switch(text,text,timestamptz,text,bigint)','core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)'] as const;
 /** §3, §4: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 digests its own. */
 const TABLES=['core.release_event','core.run_supersession'] as const;
 /** §3: the view 0123 adds (owner, ACL, definition). */

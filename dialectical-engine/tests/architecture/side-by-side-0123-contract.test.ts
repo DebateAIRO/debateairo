@@ -136,8 +136,13 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';");
     expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';");
     expect(sql).toContain("ALTER FUNCTION core.resolve_run_ref(uuid) OWNER TO debateai_release_owner;");
-    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_runtime;");
-    expect(sql).toContain("GRANT SELECT, INSERT ON core.run_supersession TO debateai_runtime;");
+    // The API's role alone records and resolves (controller ruling 2026-10-22): the runner holds debateai_runtime only.
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_billing_runtime;");
+    expect(sql).toContain("GRANT SELECT, INSERT ON core.run_supersession TO debateai_billing_runtime;");
+    expect(sql).not.toMatch(/GRANT [^;]*ON (FUNCTION core\.resolve_run_ref\(uuid\)|core\.run_supersession) TO debateai_runtime;/u);
+    // A superseded run never starts: a new trigger on 0083's start table, no 0083 object redefined.
+    expect(sql).toMatch(/CREATE TRIGGER refuse_starting_superseded_run BEFORE INSERT ON core\.run_wait_start\s+FOR EACH ROW EXECUTE FUNCTION core\.refuse_starting_superseded_run\(\);/u);
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSEDED';");
     expect(sql).toContain("GRANT SELECT ON core.run_supersession TO debateai_release_owner;");
     // The view: 0083's, with one more clause, and 0083's grant re-asserted.
     const view = sql.slice(sql.indexOf("CREATE OR REPLACE VIEW core.run_waiting_v AS"));
@@ -154,7 +159,7 @@ describe("0123: the side-by-side releases step", () => {
     // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession'] as const;");
-    for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)",
+    for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)", "core.refuse_starting_superseded_run()",
       "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)"]) {
       expect(loader).toContain(`'${signature}'`);
     }

@@ -223,7 +223,9 @@ body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-
 advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`; §4 adds the re-admission
 record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
 `RUN_SUPERSESSION_INVALID` unless the old run still waits and the new run has no edge of its own; SELECT, INSERT for
-`debateai_runtime`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`, at most 16 hops), the readmitted
+the API's role `debateai_billing_runtime` only), the start guard `core.refuse_starting_superseded_run()` (a trigger on
+`core.run_wait_start` refusing `RUN_SUPERSEDED`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`,
+EXECUTE for `debateai_billing_runtime`, at most 16 hops), the readmitted
 run's key provision `core.prepare_readmitted_run_key_provision(uuid,uuid)` (EXECUTE for `debateai_content_provision`
 only) with its commit lock and the intent's marker column `readmitted_from_run_id`, and redefines `core.run_waiting_v`
 (0083's view plus "not superseded"); §5 widens `core.run_wait_reason`'s `waits_for` CHECK with `SITE_BUSY` and

@@ -471,7 +471,10 @@ GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO deba
 -- X → Y needs Y without an outgoing edge). The guard takes ONE advisory lock, so two edges written at once are checked
 -- one after the other, and it locks the old run's wait row FOR UPDATE, which waits for a transaction starting that run
 -- (its run_wait_start insert holds KEY SHARE on the row) and then reads its start. The primary key refuses a second edge
--- out of a run (23505), UNIQUE new_run_id a second edge into one. The API runtime writes the edge inside START.
+-- out of a run (23505), UNIQUE new_run_id a second edge into one. The API writes the edge inside START, as
+-- debateai_billing_runtime: the API's own capability role (0093; the API's login holds it, the runner's does not), so
+-- the runner can neither record nor resolve a supersession (least privilege, controller ruling 2026-10-22 on A-x2).
+-- The other direction is guarded too: once a run is superseded, starting it is refused RUN_SUPERSEDED (below).
 CREATE TABLE IF NOT EXISTS core.run_supersession (
   old_run_id uuid PRIMARY KEY REFERENCES core.run(run_id),
   new_run_id uuid NOT NULL UNIQUE REFERENCES core.run(run_id),
@@ -516,7 +519,7 @@ CREATE TRIGGER guard_run_supersession BEFORE INSERT ON core.run_supersession
 -- input itself when it has no edge, without checking that such a run exists. Re-admission happens once per upload a
 -- debate waits through, so a chain longer than 16 is a fault, never a real history: RUN_SUPERSESSION_CHAIN_INVALID
 -- (55000). The guard already makes a cycle impossible; the bound also stops one written past it. Owned by
--- debateai_release_owner (SELECT on the table, nothing else), callable by the runtime.
+-- debateai_release_owner (SELECT on the table, nothing else), callable by the API's role alone.
 CREATE OR REPLACE FUNCTION core.resolve_run_ref(p_run_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -543,11 +546,37 @@ END;
 $$;
 ALTER FUNCTION core.resolve_run_ref(uuid) OWNER TO debateai_release_owner;
 REVOKE ALL ON FUNCTION core.resolve_run_ref(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_billing_runtime;
 
 REVOKE ALL ON core.run_supersession FROM PUBLIC;
-GRANT SELECT, INSERT ON core.run_supersession TO debateai_runtime;
+GRANT SELECT, INSERT ON core.run_supersession TO debateai_billing_runtime;
 GRANT SELECT ON core.run_supersession TO debateai_release_owner;
+
+-- A SUPERSEDED RUN NEVER STARTS (the reverse of the guard above, controller ruling 2026-10-22). A BEFORE INSERT row
+-- trigger on 0083's core.run_wait_start (a new trigger: no 0083 object is redefined) refuses RUN_SUPERSEDED (23514)
+-- when the run has a supersession row. It first takes KEY SHARE on the run's wait row, which waits for a transaction
+-- writing an edge out of that run (the guard holds the row FOR UPDATE) and then reads its committed edge; the other
+-- order is the guard's (it waits for this start's KEY SHARE, then reads the start). A definer, because the row lock and
+-- the read of core.run_supersession need rights the runtime (the waker's role) does not hold; it reads ids only.
+CREATE OR REPLACE FUNCTION core.refuse_starting_superseded_run()
+RETURNS trigger
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+BEGIN
+  PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.run_id FOR KEY SHARE;
+  IF EXISTS (SELECT 1 FROM core.run_supersession AS edge WHERE edge.old_run_id = NEW.run_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSEDED';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.refuse_starting_superseded_run() FROM PUBLIC;
+DROP TRIGGER IF EXISTS refuse_starting_superseded_run ON core.run_wait_start;
+CREATE TRIGGER refuse_starting_superseded_run BEFORE INSERT ON core.run_wait_start
+  FOR EACH ROW EXECUTE FUNCTION core.refuse_starting_superseded_run();
 
 -- THE LINE AS IT IS READ, a superseded run excluded: 0083:127-171's view, its columns in the same order, plus the last
 -- NOT EXISTS (a superseded run's new run takes its place in line; the old one never starts). 0063's rule is broken
@@ -735,10 +764,11 @@ REVOKE ALL ON FUNCTION core.lock_readmitted_run_key_provision_for_commit(uuid,uu
   FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,
     debateai_replay,debateai_publication_cleanup,debateai_content_provision;
 
--- THE API RUNTIME'S READS (addendum A-x2). The runtime (the API's login and the runner's, both members of
--- debateai_runtime alone) reads core.run.release_key, calls §3's two readers and core.resolve_run_ref, and writes
--- core.run_supersession (all granted above). Its table-wide SELECT on core.run (0000:301) already covers the stamp, so no
--- column grant is added; the closing block checks that the runtime can read it, with the rest of its reach.
+-- THE RUNTIMES' REACH (addendum A-x2, controller ruling 2026-10-22). Both the API's login and the runner's hold
+-- debateai_runtime: it reads core.run.release_key and calls §3's two readers (the runner's retirement reads its
+-- release's state). Only the API's role, debateai_billing_runtime (a member of debateai_runtime, 0093), also writes
+-- core.run_supersession and calls core.resolve_run_ref (granted above). The runtime's table-wide SELECT on core.run
+-- (0000:301) already covers the stamp, so no column grant is added; the closing block checks all of it.
 
 -- §5. Two new wait reasons (spec §9, §13; INTERFACE "Database") -------------------------------------------------------
 -- SITE_BUSY: the site runs as many debates as its runners take (plan C, SITE_CONCURRENT_DEBATES). SWITCHING: a release
@@ -781,6 +811,7 @@ DECLARE
   v_resolve regprocedure := to_regprocedure('core.resolve_run_ref(uuid)');
   v_readmit regprocedure := to_regprocedure('core.prepare_readmitted_run_key_provision(uuid,uuid)');
   v_readmit_lock regprocedure := to_regprocedure('core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)');
+  v_start_guard regprocedure := to_regprocedure('core.refuse_starting_superseded_run()');
 BEGIN
   -- §1: the stamp column, its default, and its validated shape CHECK.
   IF NOT EXISTS (
@@ -845,11 +876,12 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_RELEASE_TABLE_CONTRACT_INCOMPLETE';
   END IF;
   -- §4: the supersession table with its keys, its two CHECKs and its three triggers (append-only statement trigger,
-  -- truncate guard, the BEFORE INSERT row guard, a pinned-path definer); its ACL exactly SELECT, INSERT for the runtime
-  -- and SELECT for debateai_release_owner; core.resolve_run_ref owned by that role, a STABLE definer with the pinned
-  -- path, callable by the runtime alone; the line excluding superseded runs, readable by the runtime; the readmitted
-  -- provision callable by the content-provision role alone, its commit lock by nobody, §2's commit taking it, and the
-  -- intent's marker column; and the runtime reaching the stamp and the two release readers (addendum A-x2).
+  -- truncate guard, the BEFORE INSERT row guard, a pinned-path definer); its ACL exactly SELECT, INSERT for the API's
+  -- role debateai_billing_runtime and SELECT for debateai_release_owner; core.resolve_run_ref owned by that role, a
+  -- STABLE definer with the pinned path, callable by the API's role and not by the runtime (the runner); the start guard
+  -- on core.run_wait_start; the line excluding superseded runs, readable by the runtime; the readmitted provision
+  -- callable by the content-provision role alone, its commit lock by nobody, §2's commit taking it, and the intent's
+  -- marker column; and the runtime reaching the stamp and the two release readers (addendum A-x2).
   IF to_regclass('core.run_supersession') IS NULL
     OR (SELECT count(*) FROM pg_constraint
         WHERE conrelid = to_regclass('core.run_supersession')
@@ -864,18 +896,26 @@ BEGIN
                 AND (tgtype & 26) = 26)
             OR (tgname = 'reject_truncate' AND (tgtype & 1) = 0 AND (tgtype & 34) = 34)
             OR (tgname = 'guard_run_supersession' AND tgfoid = v_guard AND (tgtype & 1) = 1 AND (tgtype & 6) = 6))) <> 3
-    OR v_guard IS NULL OR v_resolve IS NULL OR v_readmit IS NULL OR v_readmit_lock IS NULL
+    OR v_guard IS NULL OR v_resolve IS NULL OR v_readmit IS NULL OR v_readmit_lock IS NULL OR v_start_guard IS NULL
     OR (SELECT count(*) FROM pg_proc AS p
-        WHERE p.oid = ANY(ARRAY[v_guard, v_resolve, v_readmit, v_readmit_lock]) AND p.prosecdef
+        WHERE p.oid = ANY(ARRAY[v_guard, v_resolve, v_readmit, v_readmit_lock, v_start_guard]) AND p.prosecdef
           AND p.proconfig = ARRAY['search_path=pg_catalog']
-          AND p.provolatile = CASE WHEN p.oid = v_resolve THEN 's' ELSE 'v' END) <> 4
+          AND p.provolatile = CASE WHEN p.oid = v_resolve THEN 's' ELSE 'v' END) <> 5
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_trigger
+      WHERE tgrelid = 'core.run_wait_start'::regclass AND tgname = 'refuse_starting_superseded_run' AND NOT tgisinternal
+        AND tgenabled IN ('O', 'A') AND tgfoid = v_start_guard AND (tgtype & 1) = 1 AND (tgtype & 6) = 6)
+    OR has_function_privilege('public', v_start_guard, 'EXECUTE')
     OR (SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid = v_resolve) <> 'debateai_release_owner'
     OR ARRAY(SELECT pg_get_userbyid(a.grantee) || ':' || a.privilege_type
              FROM pg_class AS c, aclexplode(c.relacl) AS a
              WHERE c.oid = to_regclass('core.run_supersession') AND a.grantee <> c.relowner ORDER BY 1)
-       IS DISTINCT FROM ARRAY['debateai_release_owner:SELECT', 'debateai_runtime:INSERT', 'debateai_runtime:SELECT']
+       IS DISTINCT FROM ARRAY['debateai_billing_runtime:INSERT', 'debateai_billing_runtime:SELECT',
+         'debateai_release_owner:SELECT']
+    OR has_table_privilege('debateai_runtime', 'core.run_supersession', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     OR has_function_privilege('public', v_resolve, 'EXECUTE')
-    OR NOT has_function_privilege('debateai_runtime', v_resolve, 'EXECUTE')
+    OR has_function_privilege('debateai_runtime', v_resolve, 'EXECUTE')
+    OR NOT has_function_privilege('debateai_billing_runtime', v_resolve, 'EXECUTE')
     OR has_function_privilege('public', v_guard, 'EXECUTE')
     OR strpos(pg_get_viewdef('core.run_waiting_v'::regclass), 'run_supersession') = 0
     OR NOT has_table_privilege('debateai_runtime', 'core.run_waiting_v', 'SELECT')

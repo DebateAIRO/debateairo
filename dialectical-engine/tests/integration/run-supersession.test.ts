@@ -11,8 +11,9 @@ import { startContentRunFixture, type ContentRunFixture } from "../support/conte
  * guard refuses an edge unless the old run is still waiting (a wait row, no start row) and the new run has no edge of
  * its own, so a started debate is never re-admitted (plan A review focus 4) and no cycle can form. core.resolve_run_ref
  * follows the chain (at most 16 hops); core.run_waiting_v no longer lists a superseded run. The wait reasons widen with
- * SITE_BUSY and SWITCHING. An owner's encrypted waiting run gets its new run's key provision without a live session
- * (A-x1), and the API runtime reaches exactly what re-admission needs (A-x2). CI skips this directory; run it alone.
+ * SITE_BUSY and SWITCHING. A superseded run's start is refused RUN_SUPERSEDED. An owner's encrypted waiting run gets
+ * its new run's key provision without a live session (A-x1); only the API's role records and resolves supersessions,
+ * while both runtimes read the stamp and the release state (A-x2). CI skips this directory; run it alone.
  */
 let fixture: ContentRunFixture;
 const waits = (): RunWaitRepository => new RunWaitRepository(fixture.database.pool);
@@ -182,6 +183,48 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
       expect((await pool.query("SELECT count(*)::int AS n FROM core.run_supersession WHERE old_run_id=$1", [w])).rows[0].n)
         .toBe(0);
     }
+  });
+
+  it("a superseded run is never started", async () => {
+    const pool = fixture.database.pool;
+    const w = await waitingRun(), n = await waitingRun();
+    await supersede(w, n);
+    const error = await refusal(inTransaction((client) => waits().markStarted(client, w, new Date())));
+    expect(codeOf(error)).toBe("23514");
+    expect((error as Error).message).toBe("RUN_SUPERSEDED");
+    expect((await pool.query("SELECT count(*)::int AS n FROM core.run_wait_start WHERE run_id=$1", [w])).rows[0].n).toBe(0);
+    // Its new run starts as usual.
+    await inTransaction((client) => waits().markStarted(client, n, new Date()));
+    expect(await waits().isWaiting(pool, n)).toBe(false);
+  });
+
+  it("a start written while the run is being superseded waits for that edge, then refuses", async () => {
+    const pool = fixture.database.pool;
+    const w = await waitingRun(), n = await waitingRun();
+    const first = await pool.connect(), second = await pool.connect();
+    let clean = false;
+    try {
+      await first.query("BEGIN");
+      await recordRunSupersession(first, { oldRunId: w, newRunId: n });
+      const pid = (await second.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+      await second.query("BEGIN");
+      const racing = waits().markStarted(second, w, new Date()).then(() => "written", (error: unknown) => error);
+      for (let tries = 0; ; tries += 1) {
+        const waiting = (await pool.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'", [pid])).rows[0]!.n;
+        if (waiting === 1) break;
+        if (tries > 200) throw new Error("the start never waited");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await first.query("COMMIT");
+      expect(((await racing) as Error).message).toBe("RUN_SUPERSEDED");
+      await second.query("ROLLBACK");
+      clean = true;
+    } finally {
+      first.release(!clean);
+      second.release(!clean);
+    }
+    expect((await pool.query("SELECT count(*)::int AS n FROM core.run_wait_start WHERE run_id=$1", [w])).rows[0].n).toBe(0);
   });
 
   it("supersession is append-only", async () => {
@@ -369,17 +412,19 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
     expect(await intents()).toBe(before);
   });
 
-  it("the runtime reaches exactly what re-admission needs", async () => {
+  it("only the API's role records and resolves; both runtimes read the stamp and the release state", async () => {
     const pool = fixture.database.pool;
     const grants = (await pool.query<Record<string, boolean>>(`
       SELECT
-        has_table_privilege('debateai_runtime','core.run_supersession','SELECT') AS supersession_select,
-        has_table_privilege('debateai_runtime','core.run_supersession','INSERT') AS supersession_insert,
-        has_table_privilege('debateai_runtime','core.run_supersession','UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS supersession_more,
+        has_table_privilege('debateai_billing_runtime','core.run_supersession','SELECT') AS supersession_select,
+        has_table_privilege('debateai_billing_runtime','core.run_supersession','INSERT') AS supersession_insert,
+        has_table_privilege('debateai_billing_runtime','core.run_supersession','UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS supersession_more,
+        has_table_privilege('debateai_runtime','core.run_supersession','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS runner_supersession,
         has_column_privilege('debateai_runtime','core.run','release_key','SELECT') AS release_key_select,
         has_function_privilege('debateai_runtime','core.read_current_release()','EXECUTE') AS read_current,
         has_function_privilege('debateai_runtime','core.read_release_state(text)','EXECUTE') AS read_state,
-        has_function_privilege('debateai_runtime','core.resolve_run_ref(uuid)','EXECUTE') AS resolve,
+        has_function_privilege('debateai_billing_runtime','core.resolve_run_ref(uuid)','EXECUTE') AS resolve,
+        has_function_privilege('debateai_runtime','core.resolve_run_ref(uuid)','EXECUTE') AS runner_resolve,
         has_function_privilege('public','core.resolve_run_ref(uuid)','EXECUTE') AS resolve_public,
         has_function_privilege('debateai_content_provision','core.prepare_readmitted_run_key_provision(uuid,uuid)','EXECUTE') AS readmit_provision,
         has_function_privilege('debateai_runtime','core.prepare_readmitted_run_key_provision(uuid,uuid)','EXECUTE') AS readmit_runtime,
@@ -388,20 +433,32 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
         has_function_privilege('public','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','EXECUTE') AS lock_public
     `)).rows[0];
     expect(grants).toEqual({
-      supersession_select: true, supersession_insert: true, supersession_more: false, release_key_select: true,
-      read_current: true, read_state: true, resolve: true, resolve_public: false,
+      supersession_select: true, supersession_insert: true, supersession_more: false, runner_supersession: false,
+      release_key_select: true, read_current: true, read_state: true, resolve: true, runner_resolve: false, resolve_public: false,
       readmit_provision: true, readmit_runtime: false, readmit_public: false, lock_provision: false, lock_public: false
     });
-    // And it works as the runtime: record an edge, resolve it, read the line and the stamp.
+    // And it works as the API's role: record an edge, resolve it, read the line, the stamp and the release state.
     const w = await waitingRun();
     const n = await waitingRun();
-    await asRole("debateai_runtime", async (client) => {
+    await asRole("debateai_billing_runtime", async (client) => {
       await client.query("BEGIN");
       await recordRunSupersession(client, { oldRunId: w, newRunId: n });
       await client.query("COMMIT");
       expect(await resolveRunRef(client, w)).toBe(n);
       expect(await waits().isWaiting(client, w)).toBe(false);
       expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
+      expect((await client.query("SELECT count(*)::int AS n FROM core.read_current_release()")).rows).toEqual([{ n: 0 }]);
     });
+    // The runner's role reads the stamp and its release state, and can neither record nor resolve.
+    const m = await waitingRun();
+    await asRole("debateai_runtime", async (client) => {
+      expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
+      expect((await client.query("SELECT count(*)::int AS n FROM core.read_release_state('r17-0123456789ab')")).rows).toEqual([{ n: 0 }]);
+      expect(codeOf(await refusal(resolveRunRef(client, w)))).toBe("42501");
+      await client.query("BEGIN");
+      expect(codeOf(await refusal(recordRunSupersession(client, { oldRunId: n, newRunId: m })))).toBe("42501");
+      await client.query("ROLLBACK");
+    });
+    expect(await resolveRunRef(fixture.database.pool, n)).toBe(n);
   });
 });
