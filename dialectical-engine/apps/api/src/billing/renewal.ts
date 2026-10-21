@@ -21,7 +21,7 @@ import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import { hostCommand, paidAndRefundedInFull } from "./refunds.js";
 import {
-  NOT_SENT_CODES, OUR_SETUP_CODES, RESEND_STARTED, savedCardSendLeft
+  CHARGE_RESUMED, NOT_SENT_CODES, OUR_SETUP_CODES, RESEND_STARTED, savedCardSendLeft
 } from "./renewal-markers.js";
 import {
   dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingUntil
@@ -133,22 +133,28 @@ const HOUR_MS = 3_600_000;
 const PAYMENT_LOOK_BACK_MS = 30 * DAY_MS;
 
 /**
- * The owner's next steps for the O3 codes this file raises (English only, owner-facing, content-free). The check
- * command is README §14.8's host form on its own line (F8's rule, ruling PR-56).
+ * The owner's next steps for the O3 codes this file raises (English only, owner-facing, content-free). Each owner
+ * command is README §14.8's host form on its own line (F8's rule, ruling PR-56). B1 part 2 (NETOPIA answers 2026-10-21,
+ * Q22: at most 3 saved-card tries a day): a renewal refused for our own setup is held for the owner, so both refusals
+ * end with the check command and then the resume command (`pnpm billing:renewal-resume`).
  */
 export const OWNER_STEPS: Readonly<Record<
   "CHARGE_CONFIGURATION_REFUSED" | "CHARGE_CREDENTIALS_REFUSED" | "RENEWAL_OUTCOME_OPEN" | "ORDER_REUSED", string
 >> = Object.freeze({
   CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused a renewal because of our own setup (the merchant settings, recurring"
     + " payments not switched on for the account, or a code we do not know). Nothing was charged and the customer was"
-    + " not emailed; the plan is kept for 72 hours and the renewal is tried again every hour. Run the check command"
-    + " below as root on the server, then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n"
-    + `  ${hostCommand("billing:check")}`,
-  CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key. Nothing was charged and the customer was not emailed; the"
-    + " plan is kept for 72 hours and the renewal is tried again every hour. Replace the key with the guided setup"
-    + " (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run the check command below as root on"
-    + " the server.\n"
-    + `  ${hostCommand("billing:check")}`,
+    + " not emailed. NETOPIA allows only 3 tries a day on a saved card, so this renewal is not tried again by itself: it"
+    + " waits for you. The person keeps the plan for 72 hours from the renewal date; after that the paid features pause"
+    + " until the renewal goes through. Run the check command below as root on the server and fix the setting in"
+    + " NETOPIA's admin (or ask NETOPIA about the code). Then run the second command: it sends every renewal held like"
+    + " this once more.\n"
+    + `  ${hostCommand("billing:check")}\n  ${hostCommand("billing:renewal-resume")}`,
+  CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key. Nothing was charged and the customer was not emailed. This"
+    + " renewal is not tried again by itself: it waits for you. The person keeps the plan for 72 hours from the renewal"
+    + " date; after that the paid features pause until the renewal goes through. Replace the key with the guided setup"
+    + " (deploy/vps/billing-setup.sh --replace netopia), restart the API and run the check command below as root on the"
+    + " server. Then run the second command: it sends every renewal held like this once more.\n"
+    + `  ${hostCommand("billing:check")}\n  ${hostCommand("billing:renewal-resume")}`,
   RENEWAL_OUTCOME_OPEN: "This renewal's outcome is still open at the end of its 72-hour window (24 hours for a"
     + " retry): NETOPIA holds the order, or its status could not be read. It is never closed by itself; it is read again"
     + " every hour and settles as soon as NETOPIA reports a final status. Paid access followed the window. Look the"
@@ -997,7 +1003,8 @@ export class RenewalService {
   /**
    * Ruling C-8 / D5 5i: nothing was charged. The request stands (a REQUESTED with why), the renewal itself is held (Q-1),
    * no email reaches the person; a refused key or a refusal of our own settings emails the owner at once (O3, once per
-   * code and hour) and a refused key raises the operator alarm.
+   * code and hour) and a refused key raises the operator alarm. B1 part 2 (NETOPIA answers 2026-10-21, Q22): such a
+   * refusal is then never sent again by itself (`recoverNetopiaCharge`); the O3 names the owner's resume command.
    */
   private async notSent(charge: ChargeRow, state: SubscriptionState, code: string, now: Date): Promise<void> {
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
@@ -1105,25 +1112,38 @@ export class RenewalService {
 
   /**
    * When a NETOPIA attempt's window ends: the renewal itself at Q-1's 72 hours past its due instant, a retry 24 hours
-   * after its first marker. Null for a charge with no marker yet.
+   * after its first marker. Null for a charge with no marker yet. B1 part 2 (NETOPIA answers 2026-10-21, Q22): the
+   * owner's resume gives the charge a fresh day: with a `CHARGE_RESUMED`, the window ends at the later of that end and
+   * 24 hours after the newest resume, so a renewal resumed after its 72 hours is still sent, not closed NO_TRANSACTION.
    */
   private paymentWindowEnd(charge: ChargeWithEvents, state: SubscriptionState): Date | null {
-    if (charge.attempt === 1) return renewalPendingUntil(state, charge.periodStart);
-    const first = charge.events.find((event) => event.kind === "REQUESTED") ?? null;
-    return first === null ? null : new Date(first.at.getTime() + DAY_MS);
+    let end: Date | null;
+    if (charge.attempt === 1) end = renewalPendingUntil(state, charge.periodStart);
+    else {
+      const first = charge.events.find((event) => event.kind === "REQUESTED") ?? null;
+      end = first === null ? null : new Date(first.at.getTime() + DAY_MS);
+    }
+    const resumed = charge.events.filter((event) => event.kind === "REQUESTED" && event.errorCode === CHARGE_RESUMED).at(-1);
+    if (resumed === undefined) return end;
+    const resumedEnd = new Date(resumed.at.getTime() + DAY_MS);
+    return end === null || resumedEnd.getTime() > end.getTime() ? resumedEnd : end;
   }
 
   /**
    * N11 (spec §2.9.3, ruling C-8): the recovery of an open NETOPIA renewal charge, always on its own orderID.
    * 1. A call marker with no outcome after 10 minutes: the process died during the call (SUBMIT_INTERRUPTED, held).
-   * 2. Calls that all proved nothing was sent: retried on the not-sent backoff (1, 5, 15, 60 minutes, then hourly).
-   *    At the window's end an outage closes FAILED(NO_TRANSACTION) and the dunning starts (Q-1); our own setup's refusal
-   *    never does: the owner is told once and the hourly retries go on.
+   * 2. Calls that all proved nothing was sent: an outage is retried on the not-sent backoff (1, 5, 15, 60 minutes, then
+   *    hourly), and at the window's end it closes FAILED(NO_TRANSACTION) and the dunning starts (Q-1). B1 part 2 (NETOPIA
+   *    answers 2026-10-21, Q22: at most 3 saved-card tries a day): our own setup's refusal (`OUR_SETUP_CODES`) is never
+   *    sent again by itself and never closed; the owner was told at the refusal (O3), and the charge waits for the
+   *    owner's resume command. A `CHARGE_RESUMED` is sent again at once, still through `resend` (the daily cap, the card
+   *    and the payer apply), within the fresh day `paymentWindowEnd` gives it.
    * 3. A call that may have reached NETOPIA: a status read a minute after the unknown, then hourly; a report decides.
    *    After 30 quiet minutes (then hourly), a resend with the same orderID (NETOPIA processes it or answers 56).
    *    At the window's end a fresh read (one made at or after it, then hourly) decides: NO_SUCH_ORDER closes
    *    FAILED(NO_TRANSACTION) unless NETOPIA confirmed the order exists (PR-27); an unreadable or confirmed order is
-   *    never closed (O3 RENEWAL_OUTCOME_OPEN); a report is recorded.
+   *    never closed (O3 RENEWAL_OUTCOME_OPEN); a report is recorded. Its status reads go on whatever its last call was;
+   *    a resend waits for the owner after our own setup's refusal (as in 2), and follows a resume at once.
    * A plan no longer renewable (cancelled, ended, moved on) is never sent again; with nothing ever sent it closes now.
    */
   private async recoverNetopiaCharge(charge: ChargeWithEvents, now: Date): Promise<boolean> {
@@ -1132,6 +1152,9 @@ export class RenewalService {
     if (last === undefined) return false;
     const blind = charge.events.filter((event) => event.kind === "SUBMIT_UNKNOWN");
     const notSentLast = last.kind === "REQUESTED" && last.errorCode !== null && NOT_SENT_CODES.has(last.errorCode);
+    // B1 part 2 (Q22): held for the owner after our own setup's refusal; released by the owner's resume.
+    const waitsForOwner = notSentLast && OUR_SETUP_CODES.has(last.errorCode!);
+    const resumed = notSentLast && last.errorCode === CHARGE_RESUMED;
     if (last.kind === "REQUESTED" && !notSentLast) {
       if (now.getTime() - last.at.getTime() < 10 * 60_000) return false;
       await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
@@ -1148,19 +1171,19 @@ export class RenewalService {
     const windowOver = windowEnd !== null && now.getTime() >= windowEnd.getTime();
     const live = (charge.attempt === 1 ? fresh.status === "ACTIVE" : fresh.status === "PAST_DUE")
       && !fresh.cancelRequested && fresh.currentPeriodEnd?.getTime() === charge.periodStart.getTime();
+    // The calls that failed before reaching NETOPIA (the owner's resume is no call, so it does not lengthen the backoff).
     const notSentCount = trail.filter((event) => event.kind === "REQUESTED" && event.errorCode !== null
-      && NOT_SENT_CODES.has(event.errorCode)).length;
+      && event.errorCode !== CHARGE_RESUMED && NOT_SENT_CODES.has(event.errorCode)).length;
     if (blind.length === 0) {
       // Every call proved nothing was sent: no money can be on this order.
       if (!live) {
         await this.refused(charge, "NO_TRANSACTION", null, now);
         return true;
       }
-      if (windowOver) {
-        if (!OUR_SETUP_CODES.has(last.errorCode ?? "")) return this.closeStuck(charge, last.errorCode ?? "CHARGE_NOT_SENT", now);
-        await this.outcomeOpen(charge, now);
-      }
-      if (now.getTime() - last.at.getTime() < notSentBackoffMs(notSentCount)) return false;
+      // Held for the owner: no resend and no close; the O3 at the refusal already told the owner, so none at the end.
+      if (waitsForOwner) return false;
+      if (windowOver) return this.closeStuck(charge, last.errorCode ?? "CHARGE_NOT_SENT", now);
+      if (!resumed && now.getTime() - last.at.getTime() < notSentBackoffMs(notSentCount)) return false;
       return this.resend(charge, fresh, now, "CARD_NOT_SAVED_CLOSES");
     }
     const lastBlind = blind.at(-1)!;
@@ -1182,9 +1205,9 @@ export class RenewalService {
         return false;
       }
     }
-    if (!live || windowOver) return false;
+    if (!live || windowOver || waitsForOwner) return false;
     const resends = trail.filter((event) => event.kind === "REQUESTED" && event.errorCode === RESEND_STARTED).length;
-    const quietMs = notSentLast ? notSentBackoffMs(notSentCount) : resends === 0 ? 30 * 60_000 : HOUR_MS;
+    const quietMs = resumed ? 0 : notSentLast ? notSentBackoffMs(notSentCount) : resends === 0 ? 30 * 60_000 : HOUR_MS;
     if (now.getTime() - last.at.getTime() < quietMs) return false;
     return this.resend(charge, fresh, now, "CARD_NOT_SAVED_WAITS");
   }

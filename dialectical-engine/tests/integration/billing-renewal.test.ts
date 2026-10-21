@@ -4,6 +4,7 @@ import { addBusinessDays, computeWindows, decimalToMicros, foldSubscription } fr
 import { createPool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPlans } from "@debateai/register";
+import { resumeHeldRenewals } from "../../apps/api/src/billing/renewal-resume.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { testBillingPlans } from "../support/billingFixtures.js";
 import { kindsOf, startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
@@ -231,7 +232,7 @@ describe("P11a monthly renewal", () => {
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ cause: "RENEWED", paidThrough: charge!.periodEnd });
   });
 
-  it("keeps the plan through a 429 and then a refused key: no FAILED, no PAST_DUE, no M5, and the alarm (D5 5i)", async () => {
+  it("keeps the plan through a 429 and then a refused key: no FAILED, no PAST_DUE, no M5, and the alarm (D5 5i); the owner's resume sends it again (B1)", async () => {
     const { paid } = await dueNow();
     h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
@@ -248,8 +249,17 @@ describe("P11a monthly renewal", () => {
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ACTIVE");
     expect((await h.outboxRows(charge!.chargeId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5"))).toEqual([]);
     expect(h.auditLines).toContainEqual(expect.objectContaining({ event: "billing.payment.credentials_refused" }));
-    // The key is fixed: the next eligible tick charges it, once.
+    // B1 part 2 (NETOPIA answers 2026-10-21, Q22): a refused key is not tried again by itself, even once it is fixed.
     h.clock.advance(6 * MINUTE);
+    await h.renewal.runOnce();
+    h.clock.advance(HOUR);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(2);
+    // The owner fixed the key and runs the resume command: the next tick charges it, once.
+    expect(await resumeHeldRenewals({
+      repository: h.repository, jobs: h.jobs, paymentEnvironment: "sandbox", clock: h.clock.read, audit: h.audit
+    })).toEqual({ resumed: 1, busy: 0 });
+    h.clock.advance(MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(3);
     expect(await h.eventKinds(charge!.chargeId)).toContain("SUBMITTED");

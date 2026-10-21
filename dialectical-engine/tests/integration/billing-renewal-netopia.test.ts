@@ -17,6 +17,7 @@ import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, sealCardToken, sealQuoteLocation, type BillingProfile } from "../../apps/api/src/billing/records.js";
 import { RenewalService } from "../../apps/api/src/billing/renewal.js";
+import { resumeHeldRenewals } from "../../apps/api/src/billing/renewal-resume.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 
@@ -333,59 +334,145 @@ describe("B2 NETOPIA's refusal code travels with the failed attempt", () => {
   });
 });
 
-describe("N11 ruling C-8: a refusal caused by our own setup never starts the failed-payment emails", () => {
-  it("holds a configuration refusal, retries it on the not-sent backoff with the same orderID, emails the owner once an hour, and never dunns it", async () => {
+/**
+ * Ruling C-8, B1 part 2 (NETOPIA answers 2026-10-21, Q22: at most 3 saved-card tries a day): a refusal caused by our own
+ * setup never starts the failed-payment emails, and is never sent again by itself: it waits for the owner's resume
+ * command (`resumeHeldRenewals`, `pnpm billing:renewal-resume`). The tests run in this order: a resume releases every
+ * held renewal of the database, so the first two count on no earlier test leaving one held.
+ */
+describe("N11 ruling C-8, B1: a refusal caused by our own setup waits for the owner", () => {
+  /** This payer's saved-card calls, in the order they were made (the port also serves the file's other plans). */
+  const sendsOf = (run: Due) => run.payments.charges.filter((sent) => sent.payer.email === run.email);
+  /** The 60-second renewal tick, sampled every 10 minutes from `from` to `to` (both included) after `start`. */
+  const tick = async (run: Due, start: number, from: number, to: number) => {
+    for (let elapsed = from; elapsed <= to; elapsed += 10 * MINUTE) {
+      run.clock.now = new Date(start + elapsed);
+      await run.renewal.runOnce();
+    }
+  };
+  const resume = (run: Due) => resumeHeldRenewals({
+    repository: run.repository, jobs: new BillingJobQueries(database.pool), paymentEnvironment: "sandbox",
+    clock: () => run.clock.now, audit: run.audit
+  });
+  const pendingHolds = async (run: Due) => (await database.pool.query<{ holds: number }>(
+    "SELECT count(*)::int AS holds FROM billing.entitlement_event WHERE owner_ref = $1::uuid AND cause = 'RENEWAL_PENDING'",
+    [run.ownerRef]
+  )).rows[0]!.holds;
+  const renewalCharge = async (run: Due) => (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+    .find((row) => row.kind === "RENEWAL" && row.attempt === 1)!;
+  /** Every saved-card call of this payer answers `answer` (the setting is wrong until the test fixes it). */
+  const answerAll = (run: Due, answer: ChargeAnswer) => {
+    for (let call = 0; call < 200; call += 1) run.payments.answer(run.email, answer);
+  };
+
+  it("code 99: one send in 72 hours, one O3 naming the resume command, no M5, one hold, the charge kept open; a resume sends it once more on the same orderID, and a second resume sends nothing (Review Focus 5)", async () => {
     const run = await due();
-    // Five minutes into the next whole hour, so the retries below stay inside one hour ("once per code and hour").
-    run.clock.now = new Date(Math.ceil(run.clock.now.getTime() / HOUR) * HOUR + 5 * MINUTE);
-    run.payments.answer(run.email, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "32"));
-    const charge = await renewNow(run);
+    let fixed = false;
+    answerAll(run, (input) => fixed ? report(input.orderId, "PENDING") : paymentError("PAYMENT_CONFIGURATION_REFUSED", "99"));
+    const start = run.clock.now.getTime();
+    await tick(run, start, 0, 72 * HOUR);
+    const charge = await renewalCharge(run);
+    expect(sendsOf(run)).toHaveLength(1);
     expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED"]);
-    expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
-    expect(await run.entitlements.current(run.ownerRef, run.clock.now)).toMatchObject({ cause: "RENEWAL_PENDING" });
     const reference = `charge ${charge.chargeId}`;
-    expect(await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference)).toHaveLength(1);
-    expect((await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference))[0]?.payload).toMatchObject({
-      "param.paymentAlert": "true", recipient: "OWNER"
-    });
-    // 1 minute is the first not-sent wait: nothing before it.
-    run.clock.now = new Date(run.clock.now.getTime() + 30_000);
-    expect(await run.renewal.recoverOpenCharge(charge.chargeId)).toBe(false);
-    run.payments.answer(run.email, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "32"));
-    run.clock.now = new Date(run.clock.now.getTime() + MINUTE);
-    expect(await run.renewal.recoverOpenCharge(charge.chargeId)).toBe(true);
-    expect(run.payments.chargesOf(charge.chargeId)).toHaveLength(2);
-    // Still the same hour: no second O3 for this code.
-    expect(await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference)).toHaveLength(1);
-    // The window ends: a configuration refusal is never closed into the dunning; the owner hears the outcome is open.
-    run.payments.answer(run.email, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "32"));
-    run.clock.now = new Date(run.seeded.periodEnd.getTime() + 72 * HOUR + MINUTE);
-    await run.renewal.recoverOpenCharge(charge.chargeId);
-    expect((await trail(charge.chargeId)).some((entry) => entry.startsWith("FAILED"))).toBe(false);
+    const alerts = await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.payload).toMatchObject({ "param.paymentAlert": "true", recipient: "OWNER" });
+    expect(String(alerts[0]?.payload["param.nextSteps"])).toContain("/usr/bin/pnpm billing:renewal-resume");
+    // The owner was told at the refusal: no second O3 at the window's end.
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(0);
     expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
-    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(1);
-  });
+    expect(await kindsOf(run)).not.toContain("PAST_DUE");
+    expect(await pendingHolds(run)).toBe(1);
 
-  it("raises the key alarm and an O3 for refused credentials, and only waits out an outage", async () => {
-    const keyRun = await due();
-    keyRun.payments.answer(keyRun.email, () => paymentError("PAYMENT_CREDENTIALS_REFUSED"));
-    const keyCharge = await renewNow(keyRun);
-    expect(await trail(keyCharge.chargeId)).toEqual(["REQUESTED", "REQUESTED:CHARGE_CREDENTIALS_REFUSED"]);
-    expect(keyRun.audit.events.map((entry) => entry.event)).toContain("billing.payment.credentials_refused");
-    expect(await ownerAlerts("CHARGE_CREDENTIALS_REFUSED", `charge ${keyCharge.chargeId}`)).toHaveLength(1);
+    // The owner fixed the setting and runs the resume command: the next tick sends the same order once more, at once.
+    fixed = true;
+    run.clock.now = new Date(start + 72 * HOUR + 5 * MINUTE);
+    expect(await resume(run)).toEqual({ resumed: 1, busy: 0 });
+    expect(run.audit.events).toContainEqual({ event: "billing.renewal.resumed", fields: { resumed: 1, busy: 0 } });
+    expect((await trail(charge.chargeId)).at(-1)).toBe("REQUESTED:CHARGE_RESUMED");
+    expect(sendsOf(run)).toHaveLength(1);
+    // Review Focus 5: run again before the tick, it releases nothing more (one marker, one send).
+    expect(await resume(run)).toEqual({ resumed: 0, busy: 0 });
+    expect((await trail(charge.chargeId)).filter((entry) => entry === "REQUESTED:CHARGE_RESUMED")).toHaveLength(1);
+    run.clock.now = new Date(start + 72 * HOUR + 6 * MINUTE);
+    await run.renewal.runOnce();
+    expect(sendsOf(run).map((sent) => sent.orderId)).toEqual([charge.chargeId, charge.chargeId]);
+    expect(await trail(charge.chargeId)).toEqual([
+      "REQUESTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED", "REQUESTED:CHARGE_RESUMED", "REQUESTED:RESEND_STARTED", "SUBMITTED"
+    ]);
+    expect(await verifyJobs(charge.chargeId)).toHaveLength(1);
 
-    const outage = await due();
-    outage.payments.answer(outage.email, () => paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "ECONNREFUSED"));
-    const outageCharge = await renewNow(outage);
-    expect(await trail(outageCharge.chargeId)).toEqual(["REQUESTED", "REQUESTED:CHARGE_NOT_SENT"]);
-    expect(await ownerAlerts("CHARGE_NOT_SENT", `charge ${outageCharge.chargeId}`)).toHaveLength(0);
-    // Q-1: an outage that outlasts the window closes NO_TRANSACTION and the normal dunning starts.
-    outage.payments.answer(outage.email, () => paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "ECONNREFUSED"));
-    outage.clock.now = new Date(outage.seeded.periodEnd.getTime() + 72 * HOUR + MINUTE);
-    await outage.renewal.recoverOpenCharge(outageCharge.chargeId);
-    expect((await trail(outageCharge.chargeId)).at(-1)).toBe("FAILED:NO_TRANSACTION");
-    expect(await emails(`M5A:${outageCharge.chargeId}`)).toHaveLength(1);
-  });
+    // Review Focus 5: run twice, the second run releases nothing and nothing more is sent.
+    expect(await resume(run)).toEqual({ resumed: 0, busy: 0 });
+    await tick(run, start, 72 * HOUR + 10 * MINUTE, 74 * HOUR);
+    expect(sendsOf(run)).toHaveLength(2);
+  }, 600_000);
+
+  it("a resume after the 72-hour window still sends (a fresh day, not NO_TRANSACTION); refused again, it is held again", async () => {
+    const run = await due();
+    answerAll(run, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "99"));
+    const start = run.clock.now.getTime();
+    await tick(run, start, 0, 80 * HOUR);
+    const charge = await renewalCharge(run);
+    expect(sendsOf(run)).toHaveLength(1);
+    expect((await trail(charge.chargeId)).some((entry) => entry.startsWith("FAILED"))).toBe(false);
+
+    run.clock.now = new Date(start + 80 * HOUR + 5 * MINUTE);
+    expect(await resume(run)).toEqual({ resumed: 1, busy: 0 });
+    run.clock.now = new Date(start + 80 * HOUR + 6 * MINUTE);
+    await run.renewal.runOnce();
+    expect(sendsOf(run).map((sent) => sent.orderId)).toEqual([charge.chargeId, charge.chargeId]);
+    expect(await trail(charge.chargeId)).toEqual([
+      "REQUESTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED", "REQUESTED:CHARGE_RESUMED", "REQUESTED:RESEND_STARTED",
+      "REQUESTED:CHARGE_CONFIGURATION_REFUSED"
+    ]);
+    // Held again, past the resumed day's end too: no further send, never closed, no M5.
+    await tick(run, start, 80 * HOUR + 10 * MINUTE, 110 * HOUR);
+    expect(sendsOf(run)).toHaveLength(2);
+    expect((await trail(charge.chargeId)).at(-1)).toBe("REQUESTED:CHARGE_CONFIGURATION_REFUSED");
+    expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
+    expect(await kindsOf(run)).not.toContain("PAST_DUE");
+  }, 600_000);
+
+  it("refused credentials: the key alarm, one O3 naming the resume command, and exactly one send in 72 hours", async () => {
+    const run = await due();
+    answerAll(run, () => paymentError("PAYMENT_CREDENTIALS_REFUSED", "401"));
+    const start = run.clock.now.getTime();
+    await tick(run, start, 0, 72 * HOUR);
+    const charge = await renewalCharge(run);
+    expect(sendsOf(run)).toHaveLength(1);
+    expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "REQUESTED:CHARGE_CREDENTIALS_REFUSED"]);
+    expect(run.audit.events).toContainEqual({ event: "billing.payment.credentials_refused", fields: { operation: "charge" } });
+    const alerts = await ownerAlerts("CHARGE_CREDENTIALS_REFUSED", `charge ${charge.chargeId}`);
+    expect(alerts).toHaveLength(1);
+    expect(String(alerts[0]?.payload["param.nextSteps"])).toContain("/usr/bin/pnpm billing:renewal-resume");
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", `charge ${charge.chargeId}`)).toHaveLength(0);
+    expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
+    expect(await pendingHolds(run)).toBe(1);
+  }, 600_000);
+
+  it("an outage is unchanged: resent on the 1, 5, 15, 60-minute backoff, then at the window's end NO_TRANSACTION and the dunning", async () => {
+    const run = await due();
+    const sentAt: number[] = [];
+    answerAll(run, () => {
+      sentAt.push(run.clock.now.getTime());
+      return paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "ECONNREFUSED");
+    });
+    const start = run.clock.now.getTime();
+    await tick(run, start, 0, 72 * HOUR + 10 * MINUTE);
+    const charge = await renewalCharge(run);
+    expect(sendsOf(run)).toHaveLength(sentAt.length);
+    // Sampled every 10 minutes: the 1- and 5-minute waits end at the next tick, the 15-minute one two ticks later.
+    const gaps = sentAt.slice(1).map((at, index) => (at - sentAt[index]!) / MINUTE);
+    expect(gaps.slice(0, 3)).toEqual([10, 10, 20]);
+    expect(new Set(gaps.slice(3))).toEqual(new Set([60]));
+    expect(sentAt.length).toBeGreaterThanOrEqual(70);
+    expect(await ownerAlerts("CHARGE_NOT_SENT", `charge ${charge.chargeId}`)).toHaveLength(0);
+    expect((await trail(charge.chargeId)).at(-1)).toBe("FAILED:NO_TRANSACTION");
+    expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
+    expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(1);
+  }, 600_000);
 });
 
 describe("N11 an unknown outcome is probed on the same orderID (spec §2.9.3)", () => {

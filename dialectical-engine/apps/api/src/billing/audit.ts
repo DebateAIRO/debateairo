@@ -83,6 +83,12 @@ export type BillingAuditEvent =
    * the last 24 hours (NETOPIA allows 3 a day). The attempt, when the caller names it; nothing else.
    */
   | "billing.renewal.send_capped"
+  /**
+   * B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner ran `pnpm billing:renewal-resume`. `resumed` counts the
+   * renewals held by our own setup's refusal that were released for one more send, `busy` the open renewals whose
+   * subscription was being worked on at that moment; nothing else.
+   */
+  | "billing.renewal.resumed"
   /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
   | "billing.renewal.recovered_earlier"
   /**

@@ -386,6 +386,20 @@ export function loadBillingRefundDoneEnvironment() {
   return parseBillingRefundDoneEnvironment(process.env);
 }
 
+/**
+ * B1 part 2 (NETOPIA answers 2026-10-21, Q22): `pnpm billing:renewal-resume` reads `NETOPIA_API_BASE_URL` from the API's
+ * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required.
+ */
+export function parseBillingRenewalResumeEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url()
+  }, source));
+}
+
+export function loadBillingRenewalResumeEnvironment() {
+  return parseBillingRenewalResumeEnvironment(process.env);
+}
+
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),

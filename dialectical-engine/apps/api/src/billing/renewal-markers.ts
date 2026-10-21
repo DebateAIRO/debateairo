@@ -10,11 +10,33 @@ import type { ChargeEventRow } from "@debateai/db";
  * the send count below and any other reader of the markers need nothing from the renewal service.
  */
 export const RESEND_STARTED = "RESEND_STARTED";
+/**
+ * B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner's resume command (`pnpm billing:renewal-resume`) released a
+ * renewal held by our own setup's refusal for one more send. The marker itself sends nothing, so it is a not-sent
+ * marker; the resend that follows writes its own `RESEND_STARTED`.
+ */
+export const CHARGE_RESUMED = "CHARGE_RESUMED";
 export const NOT_SENT_CODES: ReadonlySet<string> = new Set([
-  "CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"
+  "CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED", CHARGE_RESUMED
 ]);
-/** C-8: the not-sent markers that are our own setup: never closed into the dunning, and the owner is emailed. */
+/**
+ * C-8: the not-sent markers that are our own setup: never closed into the dunning, and the owner is emailed. B1 part 2
+ * (Q22): never sent again by itself either (`heldForOwner`).
+ */
 export const OUR_SETUP_CODES: ReadonlySet<string> = new Set(["CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"]);
+
+/**
+ * B1 part 2 (NETOPIA answers 2026-10-21, Q22: at most 3 saved-card tries a day): whether this charge waits for the
+ * owner. Nothing settled it or linked it to a payment (no SUCCEEDED, FAILED or SUBMITTED), and its last call marker or
+ * outcome (the last REQUESTED or SUBMIT_UNKNOWN) is NETOPIA's refusal of our own key or settings (`OUR_SETUP_CODES`).
+ * Such a renewal is never sent again by itself, since the same setting would refuse it again and spend a try; the
+ * owner's resume command (`CHARGE_RESUMED`) releases it for one more send.
+ */
+export function heldForOwner(events: ReadonlyArray<Pick<ChargeEventRow, "kind" | "errorCode">>): boolean {
+  if (events.some((event) => event.kind === "SUCCEEDED" || event.kind === "FAILED" || event.kind === "SUBMITTED")) return false;
+  const last = events.filter((event) => event.kind === "REQUESTED" || event.kind === "SUBMIT_UNKNOWN").at(-1);
+  return last !== undefined && last.kind === "REQUESTED" && last.errorCode !== null && OUR_SETUP_CODES.has(last.errorCode);
+}
 
 /**
  * B1 (NETOPIA answers 2026-10-21, Q22): NETOPIA allows at most 3 saved-card (token) tries a day; we send at most 2 per
