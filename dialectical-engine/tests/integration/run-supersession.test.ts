@@ -155,6 +155,18 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
     expect(await resolveRunRef(fixture.database.pool, a)).toBe(b);
   });
 
+  it("an edge never points at a FAILED run (A3 review)", async () => {
+    const w = await waitingRun(), n = await waitingRun();
+    // The new run's setup failed (plan C11's orphan path): it never runs, so the old run must not leave the line for it.
+    await new WorkItemRepository(fixture.database.pool).recordSetupFailure({
+      runId: n, batteryRowId: "Q1", commandKey: `S00:${n}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION"
+    });
+    const edgesBefore = await edges();
+    expect(codeOf(await refusal(supersede(w, n)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(await edges()).toBe(edgesBefore);
+    expect(await waits().isWaiting(fixture.database.pool, w)).toBe(true);
+  });
+
   it("an edge links two runs of the same person only", async () => {
     const mine = await waitingRun(), theirs = await waitingRun(`legacy-run-supersession-${randomUUID()}`);
     const edgesBefore = await edges();
@@ -447,6 +459,22 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
          requested_at, expires_at, readmitted_from_run_id)
        SELECT $1, user_id, owner_ref, identity_session_id, execution_ref, requested_at, expires_at, readmitted_from_run_id
        FROM core.run_key_provision_intent WHERE run_id=$2`, [randomUUID(), second])))).toBe("23505");
+  });
+
+  it("a readmitted run is the new run of the run it re-admits only (A3 review)", async () => {
+    const pool = fixture.database.pool;
+    const old = await waitingEncryptedRun(), other = await waitingEncryptedRun();
+    const fresh = randomUUID();
+    const prepared = (await prepareReadmitted(pool, old, fresh)).rows[0]!;
+    expect(await createDirectly(pool, await encryptedRunDocument(fresh, prepared.execution_ref))).toBe(true);
+    // Same owner, both waiting, but `fresh` re-admits `old`: it cannot become `other`'s new run.
+    const edgesBefore = await edges();
+    expect(codeOf(await refusal(supersede(other, fresh)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(await edges()).toBe(edgesBefore);
+    expect(await waits().isWaiting(pool, other)).toBe(true);
+    // It is `old`'s.
+    await supersede(old, fresh);
+    expect(await resolveRunRef(pool, old)).toBe(fresh);
   });
 
   it("a marked intent takes the re-admission's checks even when its session is live", async () => {

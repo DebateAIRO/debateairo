@@ -473,7 +473,8 @@ GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO deba
 -- core.run_supersession is that record, append-only: old_run_id → new_run_id, reason READMITTED. Its guard refuses an
 -- edge unless the old run still waits (a core.run_wait row and no core.run_wait_start row: a started debate is never
 -- re-admitted, ruling O1, plan A review focus 4) and the new run has no edge of its own, so a cycle cannot form (an edge
--- X → Y needs Y without an outgoing edge). The guard takes ONE advisory lock, so two edges written at once are checked
+-- X → Y needs Y without an outgoing edge). The new run must also be live (no FAILED work item) and, when its execution
+-- binding marks it as a re-admission (readmitted_from_run_id, below), the re-admission of this old run (A3 review). The guard takes ONE advisory lock, so two edges written at once are checked
 -- one after the other, and it locks the old run's wait row FOR UPDATE, which waits for a transaction starting that run
 -- (its run_wait_start insert holds KEY SHARE on the row) and then reads its start. The primary key refuses a second edge
 -- out of a run (23505), UNIQUE new_run_id a second edge into one. Both runs must belong to the same person (A3 review):
@@ -510,7 +511,14 @@ BEGIN
   PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;
   IF NOT FOUND
     OR EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = NEW.old_run_id)
-    OR EXISTS (SELECT 1 FROM core.run_supersession AS onward WHERE onward.old_run_id = NEW.new_run_id) THEN
+    OR EXISTS (SELECT 1 FROM core.run_supersession AS onward WHERE onward.old_run_id = NEW.new_run_id)
+    -- The edge points only at the live re-admission of that same run (A3 review): never at a run recorded FAILED (it
+    -- never runs, so the old run must keep its place), never at a run whose binding marks it as another run's.
+    OR EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = NEW.new_run_id AND work.state = 'FAILED')
+    OR EXISTS (
+      SELECT 1 FROM identity.run_execution_binding AS marked
+      WHERE marked.run_id = NEW.new_run_id AND marked.readmitted_from_run_id IS NOT NULL
+        AND marked.readmitted_from_run_id <> NEW.old_run_id) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';
   END IF;
   -- Each run's person: 'owner:<ref>' from its latest ownership event, else its asker id ('owner:<ref>' or a legacy id).
