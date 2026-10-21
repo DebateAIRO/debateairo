@@ -10,9 +10,12 @@
 //
 //   caddy-slots.mjs transform --in <live Caddyfile> --out <new file>
 //       Reads the live file (root-owned, 0644, in a folder only root can write), writes the changed copy to <out>
-//       (0644, created new: an existing <out> is refused with OUTPUT_EXISTS and kept), and prints one JSON line
+//       (0644, created new: an existing <out> is refused with OUTPUT_EXISTS and kept), reads it back through the same
+//       custody reader and compares every byte, and prints one JSON line
 //       {"event":"PREVIEW_CADDY_TWO_SLOTS","proxiesChanged":<n>,"edgeListener":3090}. It never touches the live file,
 //       never validates with caddy and never restarts anything: the transition runbook does those steps.
+//       A partial or unequal <out> (OUTPUT_WRITE_FAILED, OUTPUT_READBACK_REFUSED) is kept where it is, never unlinked
+//       here: the operator moves it aside before a rerun (until then a rerun refuses OUTPUT_EXISTS).
 //
 // Every refusal is one JSON line {"event":"PREVIEW_CADDY_REFUSED","reason":<code>} on stderr and exit 1. Nothing read
 // from the Caddyfile is printed (its password lines are placeholders, but the file is the server's).
@@ -103,12 +106,14 @@ function transform(liveText) {
     if (index === close) out.push('', ...snippet);
   }
   // The listener is for readiness only (controller ruling, D9): exactly GET /readyz is proxied, always asking the
-  // website for /readyz itself (Caddy's path matcher compares the cleaned path, so /readyz/../api does not match);
-  // every other request answers 404 from Caddy, unproxied and without the edge secret.
+  // website for /readyz itself (Caddy's path matcher compares the cleaned path, so /readyz/../api does not match, and
+  // keeps a trailing slash, so /readyz/ does not either); `rewrite * /readyz?` sets the path and, with its bare `?`,
+  // clears the query string (D9 review; the transition's TA0 confirms the adapted rewrite with `caddy adapt`); every
+  // other request answers 404 from Caddy, unproxied and without the edge secret.
   const [u1, u2, u3] = [unit, unit.repeat(2), unit.repeat(3)];
   out.push('', `:${EDGE_LISTENER.port} {`, `${u1}bind ${EDGE_LISTENER.bind}`,
     `${u1}@readyz {`, `${u2}method GET`, `${u2}path /readyz`, `${u1}}`,
-    `${u1}handle @readyz {`, `${u2}rewrite * /readyz`, `${u2}reverse_proxy ${SLOT_UPSTREAMS} {`, `${u3}import ${SNIPPET_NAME}`,
+    `${u1}handle @readyz {`, `${u2}rewrite * /readyz?`, `${u2}reverse_proxy ${SLOT_UPSTREAMS} {`, `${u3}import ${SNIPPET_NAME}`,
     ...headers.map(header => `${u3}${header}`), `${u2}}`, `${u1}}`,
     `${u1}handle {`, `${u2}respond 404`, `${u1}}`, '}');
   return { text: `${out.join('\n')}\n`, proxiesChanged: proxies.length };
@@ -142,7 +147,20 @@ function parseArguments(argv) {
   return { input: options['--in'], output: options['--out'] };
 }
 
-async function transformCommand({ input, output }, layout) {
+/** Create `path` new (O_EXCL, no symlink followed), 0644, write every byte and fsync. The output is never replaced. */
+async function writeNewFile(path, bytes) {
+  let handle;
+  try {
+    handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644);
+  } catch (error) { refuse(error?.code === 'EEXIST' ? 'OUTPUT_EXISTS' : 'OUTPUT_PATH_REFUSED'); }
+  try {
+    await handle.chmod(0o644);
+    for (let offset = 0; offset < bytes.length;) offset += (await handle.write(bytes, offset)).bytesWritten;
+    await handle.sync();
+  } catch { refuse('OUTPUT_WRITE_FAILED'); } finally { await handle.close().catch(() => undefined); }
+}
+
+async function transformCommand({ input, output }, layout, deps = {}) {
   const owner = layout.ownerUid ?? 0;
   // The output's folder is root's alone, and nothing is at the output yet: checked before the live file is read.
   try { await protectedPath(output, { root: dirname(output), uid: owner }); } catch { refuse('OUTPUT_PATH_REFUSED'); }
@@ -153,27 +171,26 @@ async function transformCommand({ input, output }, layout) {
     liveText = await withPrivateBytes(input, { root: dirname(input), uid: owner, mode: 0o644, maxBytes: MAX_CADDYFILE_BYTES }, raw => new TextDecoder('utf8', { fatal: true }).decode(raw));
   } catch { refuse('INPUT_REFUSED'); }
   const { text, proxiesChanged } = transform(liveText);
-  let handle;
+  const bytes = Buffer.from(text, 'utf8');
+  try { await (deps.write ?? writeNewFile)(output, bytes); } catch (error) { refuse(error instanceof CaddySlotsRefusal ? error.code : 'OUTPUT_WRITE_FAILED'); }
+  // What is on disk is what the runbook validates and installs: read it back (root-owned, 0644, one link, no more bytes
+  // than were written) and compare every byte. A file that differs is kept for the operator (header).
+  let equal = false;
   try {
-    handle = await open(output, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644);
-  } catch (error) { refuse(error?.code === 'EEXIST' ? 'OUTPUT_EXISTS' : 'OUTPUT_PATH_REFUSED'); }
-  try {
-    await handle.chmod(0o644);
-    const bytes = Buffer.from(text, 'utf8');
-    for (let offset = 0; offset < bytes.length;) offset += (await handle.write(bytes, offset)).bytesWritten;
-    await handle.sync();
-  } catch { refuse('OUTPUT_WRITE_FAILED'); } finally { await handle.close().catch(() => undefined); }
+    equal = await withPrivateBytes(output, { root: dirname(output), uid: owner, mode: 0o644, maxBytes: bytes.length }, raw => Buffer.compare(raw, bytes) === 0);
+  } catch { refuse('OUTPUT_READBACK_REFUSED'); }
+  if (!equal) refuse('OUTPUT_READBACK_REFUSED');
   return Object.freeze({ event: 'PREVIEW_CADDY_TWO_SLOTS', proxiesChanged, edgeListener: EDGE_LISTENER.port });
 }
 
 const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-/** One JSON line on stdout and 0, or one refusal line on stderr and 1. */
-export async function main(argv, { actor = {}, layout = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
+/** One JSON line on stdout and 0, or one refusal line on stderr and 1. `deps.write(path, bytes)` replaces the output writer (tests). */
+export async function main(argv, { actor = {}, layout = {}, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
   try {
     const args = parseArguments(argv);
     try { assertActor(actor); } catch { refuse('ACTOR_REFUSED'); }
-    stdout.write(`${JSON.stringify(await transformCommand(args, layout))}\n`);
+    stdout.write(`${JSON.stringify(await transformCommand(args, layout, deps))}\n`);
     return 0;
   } catch (error) {
     stderr.write(`${JSON.stringify({ event: 'PREVIEW_CADDY_REFUSED', reason: error instanceof CaddySlotsRefusal && CODE.test(error.code) ? error.code : 'UNEXPECTED' })}\n`);

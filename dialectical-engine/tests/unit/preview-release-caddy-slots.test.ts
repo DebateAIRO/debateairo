@@ -113,7 +113,7 @@ const LISTENER_LINES = [
   '\t\tpath /readyz',
   '\t}',
   '\thandle @readyz {',
-  '\t\trewrite * /readyz',
+  '\t\trewrite * /readyz?',
   '\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {',
   '\t\t\timport debateai_slots',
   ...PROXY_HEADERS.map(line => `\t\t\t${line}`),
@@ -135,20 +135,37 @@ function blockAt(lines: readonly string[], open: number) {
 }
 /**
  * What the listener does with one request, read from its text by Caddy's documented rules for this shape: `handle`
- * blocks are mutually exclusive and a bare `handle` runs only when no matched one does; the path matcher compares the
- * cleaned path (path.Clean, Caddy #4407), case-insensitively; a request no handle takes gets Caddy's empty 200, which
- * this listener must never need. Returns 'proxy' only when the request reaches a block holding a reverse_proxy.
+ * blocks are mutually exclusive and a bare `handle` runs only when no matched one does; the path matcher sees the path
+ * only (never the query string), cleaned like Caddy's CleanPath (path.Clean with doubled slashes merged, Caddy #4407,
+ * and a trailing slash KEPT: `/readyz/` stays `/readyz/`), compared case-insensitively; a request no handle takes gets
+ * Caddy's empty 200, which this listener must never need. Returns 'proxy' only when the request reaches a block holding
+ * a reverse_proxy. posix.normalize cleans exactly like that CleanPath for these paths (both keep a trailing slash).
  */
-function listenerRoute(out: string, method: string, rawPath: string): 'proxy' | 'refuse' | 'unhandled' {
+function listenerRoute(out: string, method: string, rawUri: string): 'proxy' | 'refuse' | 'unhandled' {
   const lines = out.split('\n'), site = blockAt(lines, lines.indexOf(':3090 {'));
   const matcher = blockAt(site, site.indexOf('\t@readyz {')).slice(1, -1).map(line => line.trim());
   const wantMethod = matcher.find(line => line.startsWith('method '))?.slice(7), wantPath = matcher.find(line => line.startsWith('path '))?.slice(5);
   expect(matcher.every(line => /^(method|path) /.test(line))).toBe(true);
-  const cleaned = posix.normalize(rawPath).replace(/(.)\/$/, '$1');
+  const cleaned = posix.normalize(rawUri.split('?')[0] ?? '');
   const handle = (name: string) => { const at = site.indexOf(name); return at < 0 ? null : blockAt(site, at); };
   const chosen = method === wantMethod && cleaned.toLowerCase() === wantPath?.toLowerCase() ? handle('\thandle @readyz {') : handle('\thandle {');
   if (!chosen) return 'unhandled';
   return chosen.some(line => /^\s*reverse_proxy /.test(line)) ? 'proxy' : chosen.some(line => /^\s*respond 40[34]$/.test(line)) ? 'refuse' : 'unhandled';
+}
+/**
+ * The URI the website is asked for after the readiness handle's `rewrite * <to>`, by Caddy's rewrite rule: only the
+ * parts `<to>` names change; a `<to>` with a `?` sets the query to what follows it, so a bare trailing `?` clears it,
+ * and a `<to>` without one keeps the request's query string.
+ */
+function listenerUpstreamUri(out: string, rawUri: string) {
+  const lines = out.split('\n'), site = blockAt(lines, lines.indexOf(':3090 {'));
+  const rewrites = blockAt(site, site.indexOf('\thandle @readyz {')).filter(line => /^\s*rewrite /.test(line)).map(line => line.trim().split(' '));
+  expect(rewrites).toHaveLength(1);
+  const [, matcher, to = ''] = rewrites[0]!;
+  expect(matcher).toBe('*');
+  const [path, query] = [rawUri.split('?')[0], rawUri.includes('?') ? rawUri.slice(rawUri.indexOf('?') + 1) : ''];
+  const [newPath, newQuery] = to.includes('?') ? [to.slice(0, to.indexOf('?')) || path, to.slice(to.indexOf('?') + 1)] : [to, query];
+  return newQuery === '' ? newPath : `${newPath}?${newQuery}`;
 }
 const once = transformCaddyfile(LIVE_PREVIEW);
 
@@ -193,7 +210,7 @@ describe('transformCaddyfile', () => {
     const out = transformCaddyfile(LIVE_PREVIEW);
     expect(listenerRoute(out, 'GET', '/readyz')).toBe('proxy');
     for (const [method, path] of [['GET', '/'], ['GET', '/api/v1/debates'], ['GET', '/api/v1/staff/alerts'], ['GET', '/login'], ['POST', '/readyz'], ['HEAD', '/readyz'],
-      ['GET', '/readyz/../api'], ['GET', '/readyz/../api/v1/debates'], ['GET', '/readyz/x'], ['GET', '/readyzz'], ['GET', '/livez'], ['DELETE', '/readyz']] as const) {
+      ['GET', '/readyz/../api'], ['GET', '/readyz/../api/v1/debates'], ['GET', '/readyz/x'], ['GET', '/readyz/'], ['GET', '/readyz//'], ['GET', '/readyzz'], ['GET', '/livez'], ['DELETE', '/readyz']] as const) {
       expect([method, path, listenerRoute(out, method, path)]).toEqual([method, path, 'refuse']);
     }
     // The edge secret and the proxy live only inside the readiness handle: the 404 handle adds no header and proxies nothing.
@@ -202,8 +219,12 @@ describe('transformCaddyfile', () => {
     const rest = site.filter(line => !ready.includes(line));
     expect(rest.join('\n')).not.toMatch(/reverse_proxy|X-Debateai-Edge-Secret|header_up/);
     expect(ready.filter(line => /reverse_proxy /.test(line))).toEqual(['\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {']);
-    // Whatever path took the handle, the website is asked for exactly /readyz.
-    expect(ready[1]).toBe('\t\trewrite * /readyz');
+    // Whatever path took the handle, the website is asked for exactly /readyz, with no query string (D9 review).
+    expect(ready[1]).toBe('\t\trewrite * /readyz?');
+    for (const uri of ['/readyz', '/readyz?debug=1', '/READYZ?a=b&c', '/api/../readyz?x', '/readyz/.']) {
+      expect([uri, listenerRoute(out, 'GET', uri)]).toEqual([uri, 'proxy']);
+      expect([uri, listenerUpstreamUri(out, uri)]).toEqual([uri, '/readyz']);
+    }
   });
 
   it('changes nothing else: every other line stays, and the only new lines are the snippet, the imports and the listener', () => {
@@ -268,9 +289,9 @@ describe('caddy-slots.mjs (root CLI)', () => {
     chmodSync(root, 0o755);
     const live = join(root, 'Caddyfile');
     writeFileSync(live, text); chmodSync(live, mode);
-    const run = async (argv: string[], actor: Record<string, unknown> = ROOT_ACTOR) => {
+    const run = async (argv: string[], actor: Record<string, unknown> = ROOT_ACTOR, deps: Record<string, unknown> = {}) => {
       const stdout = sink(), stderr = sink();
-      const code = await main(argv, { actor, layout: { ownerUid: me.uid }, stdout: stdout.stream, stderr: stderr.stream });
+      const code = await main(argv, { actor, layout: { ownerUid: me.uid }, deps, stdout: stdout.stream, stderr: stderr.stream });
       return { code, stdout: stdout.lines.join(''), stderr: stderr.lines.join('') };
     };
     return { root, live, out: join(root, 'Caddyfile.two-slots'), run };
@@ -294,6 +315,21 @@ describe('caddy-slots.mjs (root CLI)', () => {
     expect(readFileSync(out, 'utf8')).toBe('KEEP\n');
     // The live file as its own output is the same case.
     expect(reason(await run(['transform', '--in', live, '--out', live]))).toBe('OUTPUT_EXISTS');
+  });
+
+  it('reads the written file back and refuses one that differs, keeping it for the operator to move aside', async () => {
+    const { live, out, run } = setup();
+    // A write that lost its tail (a full disk, a crash half way): the file is there, but it is not what the transform made.
+    const short = async (path: string, bytes: Buffer) => { writeFileSync(path, bytes.subarray(0, bytes.length - 2), { flag: 'wx', mode: 0o644 }); chmodSync(path, 0o644); };
+    const result = await run(['transform', '--in', live, '--out', out], ROOT_ACTOR, { write: short });
+    expect([result.code, reason(result), result.stdout]).toEqual([1, 'OUTPUT_READBACK_REFUSED', '']);
+    // Kept (never unlinked by the tool); until the operator moves it aside a rerun refuses.
+    expect(existsSync(out)).toBe(true);
+    expect(reason(await run(['transform', '--in', live, '--out', out]))).toBe('OUTPUT_EXISTS');
+    // Equal bytes that the custody reader refuses (not 0644) are refused the same way.
+    const other = setup();
+    const private600 = async (path: string, bytes: Buffer) => { writeFileSync(path, bytes, { flag: 'wx', mode: 0o600 }); chmodSync(path, 0o600); };
+    expect(reason(await other.run(['transform', '--in', other.live, '--out', other.out], ROOT_ACTOR, { write: private600 }))).toBe('OUTPUT_READBACK_REFUSED');
   });
 
   it('refuses a live file of the wrong shape, or already changed, and writes nothing', async () => {
