@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Možen terorizem",
   "archive.category.hateSpeech": "sovražni govor kakršne koli vrste",
   "archive.category.suicideOrHarm": "nagnjenost k samomoru ali škodovanju drugim ljudem",
-  "archive.category.weaponsOrDrugs": "izdelovanje orožja ali drog"
+  "archive.category.weaponsOrDrugs": "izdelovanje orožja ali drog",
+  "archive.publicationReview": "Pregled za objavo",
+  "archive.reviewAsked": "Zahtevano",
+  "archive.reviewApproved": "Odobreno",
+  "archive.reviewRefused": "Zavrnjeno"
 }

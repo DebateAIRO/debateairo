@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Можливий тероризм",
   "archive.category.hateSpeech": "мова ненависті будь-якого виду",
   "archive.category.suicideOrHarm": "схильність до самогубства або заподіяння шкоди іншим людям",
-  "archive.category.weaponsOrDrugs": "виготовлення зброї чи наркотиків"
+  "archive.category.weaponsOrDrugs": "виготовлення зброї чи наркотиків",
+  "archive.publicationReview": "Перевірка перед публікацією",
+  "archive.reviewAsked": "Запитано",
+  "archive.reviewApproved": "Схвалено",
+  "archive.reviewRefused": "Відмовлено"
 }

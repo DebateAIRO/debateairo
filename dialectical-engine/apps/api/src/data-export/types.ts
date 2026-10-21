@@ -6,6 +6,12 @@ export type SynthesisCheckEntry = Readonly<{
   categories: readonly ("TERRORISM" | "HATE_SPEECH" | "SUICIDE_OR_HARM_TO_OTHERS" | "WEAPONS_OR_DRUGS")[];
   checked_at: string;
 }>;
+export type PublicationReviewEntry = Readonly<{
+  asked_at: string;
+  outcome: "APPROVE" | "REFUSE" | null;
+  decided_at: string | null;
+  reason: string | null;
+}>;
 
 /** SPEC-v11 row C7 (V-42): origin/dev's core.run_role_rotation row of a C1 run, every column but run_id. */
 export type RoleRotationRole = Readonly<{ provider_ref: string; model_id: string; maker: string }>;
@@ -39,6 +45,7 @@ export type DebateEntry = Readonly<{
     story: unknown;
     disclosure: unknown;
     synthesis_checks?: readonly SynthesisCheckEntry[];
+    publication_reviews?: readonly PublicationReviewEntry[];
     versions: Readonly<{
       version: number;
       answer: unknown;

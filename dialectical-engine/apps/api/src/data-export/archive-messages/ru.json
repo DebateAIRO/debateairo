@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Возможный терроризм",
   "archive.category.hateSpeech": "ненавистнические высказывания любого рода",
   "archive.category.suicideOrHarm": "склонность к самоубийству или причинению вреда другим людям",
-  "archive.category.weaponsOrDrugs": "изготовление оружия или наркотиков"
+  "archive.category.weaponsOrDrugs": "изготовление оружия или наркотиков",
+  "archive.publicationReview": "Проверка перед публикацией",
+  "archive.reviewAsked": "Запрошено",
+  "archive.reviewApproved": "Одобрено",
+  "archive.reviewRefused": "Отказано"
 }
