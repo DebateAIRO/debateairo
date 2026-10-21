@@ -592,7 +592,7 @@ hosted base" at the end of this guide.
 What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`):
 - publish kit v3 (`publish-register-v3.ts`), chosen by `native-plan --hosted-billing '<JSON>'`;
 - the environment rules for hosted mode (`environment.mjs`): sandbox-only billing values at fixed
-  paths, the moved billing clock refused;
+  paths, the moved billing clock refused, the optional billing notice spool at one fixed folder (H9);
 - the egress proxy (`egress-proxy.mjs`, unit template `debateai-preview-egress.service`): the API keeps
   its Internet denial and reaches only NETOPIA's and Quaderno's sandboxes, by host name;
 - the templated-mail family in `mail-handoff.mjs`: billing and legal emails to the allow-listed
@@ -1144,6 +1144,86 @@ dummy SmartBill and fails harmlessly: do not pay as one here. Renewals need the 
 which stays refused. `mail-recipient.json` allows four addresses (stored as SHA-256 hashes). Two of
 them are verification-forward aliases, and mail to those arrives in the forward target's inbox
 (`verificationForwardTarget`, the one address the file holds in plain text).
+
+### H9. The billing notice spool (optional, from the release that carries PR #192)
+
+NETOPIA sends the saved card only in its first message about a payment; the 5 copies it sends again
+carry none. When the database cannot store that first message, the API can keep it on disk, sealed
+with the records key, and store it later (at its next start and every 10 minutes; one still not
+stored 14 days after it arrived is deleted unread). This is `deploy/vps/README.md` §14.5's spool, in the
+preview's own folder `/var/lib/debateai-v3-preview/api/billing-notice-spool`: owned by the API's
+user, `0700`, so the runner cannot read it, and outside the nightly backup (which copies only the
+database). Without it the API works as before and writes one `billing.notice.spool_off` line at each
+start.
+
+The launcher admits `BILLING_NOTICE_SPOOL_PATH` only in hosted mode, only beside NETOPIA's four
+settings, and only with exactly that folder; anything else stops the start with
+`PREVIEW_API_STARTUP_REFUSED`. The API itself refuses to start when it cannot write the folder.
+
+Do it during a release whose API carries PR #192 (NETOPIA's retry rules). Use that release's root
+shell (step 0's `CAPI`) with H1's second block pasted again (`E`, `AU`, `AGRP`). Step 1 can run any
+time before the release restarts the API (no downtime: `daemon-reload` changes nothing in a running
+service). Step 2 goes just before that restart (with the `REGISTER_VERSION` lines of "Publishing a new
+register version" step 5, when the release publishes one), and the restart switches the spool on.
+
+1. **The folder and the API's write permission.** The API's unit lets it write only the folders it
+   names, so a small drop-in adds this one:
+
+   ```sh
+   SP=/var/lib/debateai-v3-preview/api/billing-notice-spool
+   ( set -euo pipefail
+     [ -n "${AU:-}" ] && [ "$AU" != root ] && [ -n "${AGRP:-}" ] && [ -n "${CAPI:-}" ] || exit 1
+     grep -q BILLING_NOTICE_SPOOL_PATH "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts"   # stops here when this release does not carry PR #192
+     install -d -m 0700 -o "$AU" -g "$AGRP" "$SP"
+     install -o root -g root -m 0644 "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-notice-spool.conf" /etc/systemd/system/debateai-preview-api.service.d/zzzzzzzzzz-billing-notice-spool.conf
+     systemctl daemon-reload
+     echo "spool folder and write permission in place" )
+   stat -c '%a %U %G %n' "$SP"
+   systemctl show -p ReadWritePaths debateai-preview-api
+   ```
+
+   `stat` prints `700 <API user> <API group>`. `systemctl show` must list
+   `-/var/lib/debateai-v3-preview/api/billing-notice-spool` among the API's other folders. If it does
+   not, stop: with step 2's line the API would refuse to start.
+
+2. **The setting**, just before the release's restart:
+
+   ```sh
+   ( set -euo pipefail
+     [ -n "${SP:-}" ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$E/api.env")" = 1 ] && [ "$(grep -c '^NETOPIA_API_BASE_URL=' "$E/api.env")" = 1 ] || exit 1
+     grep -q '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env" || printf '\nBILLING_NOTICE_SPOOL_PATH=%s\n' "$SP" >> "$E/api.env"
+     echo "spool line in api.env" )
+   grep -c '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env"   # must print 1
+   grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d   # must print nothing
+   ```
+
+   The line starts on a new line and is added only once.
+
+3. **A minute after the restart** (the API writes `billing.notice.spool_off` once it listens):
+
+   ```sh
+   systemctl is-active debateai-preview-api   # active
+   journalctl --no-pager -u debateai-preview-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-preview-api)" | grep -cE 'billing\.notice\.spool_(off|failed)|BILLING_NOTICE_SPOOL_REPLAY_FAILED'   # must print 0
+   ```
+
+   No `billing.notice.spool_off` line means the API started with the spool. A
+   `billing.notice.spool_replay` line with `stored`/`kept`/`expired` is normal: it appears only when
+   the folder held messages. `deploy/vps/README.md` §14.8's journal table explains the others.
+
+**The way back** (no release needed): see how many messages wait in the folder, take the line out,
+restart the API. Files left in the folder are stored when the spool is switched on again, if they
+are less than 14 days old (older ones are then deleted unread).
+
+```sh
+E=/etc/debateai-v3-preview/auth-dev-v1; SP=/var/lib/debateai-v3-preview/api/billing-notice-spool
+find "$SP" -type f | wc -l   # 0: nothing waits
+sed -i '/^BILLING_NOTICE_SPOOL_PATH=/d' "$E/api.env"; grep -c '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env"   # 0
+systemctl restart debateai-preview-api
+```
+
+Take the line out first, too, before going back to a release from before PR #192: its launcher
+does not know the setting and refuses to start (`PREVIEW_API_STARTUP_REFUSED`). "Rolling back to
+local mode" below already restores an `api.env` without it. The drop-in and the folder may stay.
 
 ### Rolling back to local mode on register 12
 

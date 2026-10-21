@@ -2699,8 +2699,7 @@ to start with `BILLING_NOTICE_SPOOL_PATH_INVALID`. The `printf` line starts on a
 is already there, so the last `grep` prints `1`. Without the line the API works as before and writes one
 `billing.notice.spool_off` line at each start; with a path that is not a folder the API can write, it refuses to start
 with `BILLING_NOTICE_SPOOL_PATH_INVALID` (create the folder, or remove the line, then restart). The private test site
-(v3-preview) runs from the preview kit, not this unit: switching the spool on there is a separate step for whoever runs
-that site.
+(v3-preview) runs from the preview kit, not this unit: its steps are `deploy/preview-release/v1/README.md` H9.
 
 ### 14.6 Switching a country's payments on
 

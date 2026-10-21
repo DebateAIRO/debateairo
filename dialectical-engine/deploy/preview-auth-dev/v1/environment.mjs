@@ -63,7 +63,10 @@ export const PREVIEW_HOSTED_FIXED_VALUES=Object.freeze({
  QUADERNO_API_KEY_PATH:'/etc/debateai-v3-preview/billing/quaderno-api-key',
  SMARTBILL_CREDENTIALS_PATH:'/etc/debateai-v3-preview/billing/smartbill-credentials',
  OWNER_REPORT_EMAIL_PATH:'/etc/debateai-v3-preview/billing/owner-report-email',
- SMARTBILL_API_BASE_URL:'https://smartbill.invalid'
+ SMARTBILL_API_BASE_URL:'https://smartbill.invalid',
+ // Optional (NETOPIA's answers 2026-10-21, B3a): the API-owned 0700 folder of NETOPIA messages the database could not
+ // store; its unit's write permission is debateai-preview-api-notice-spool.conf (deploy/preview-release/v1/README.md H9).
+ BILLING_NOTICE_SPOOL_PATH:'/var/lib/debateai-v3-preview/api/billing-notice-spool'
 });
 /** NETOPIA's two sandbox bases, exactly (packages/payments-netopia/src/hosts.ts; a unit test pins the two lists equal). */
 export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbox.netopia-payments.com','https://secure.sandbox.netopia-payments.com']);
@@ -71,6 +74,7 @@ export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbo
 export const PREVIEW_QUADERNO_SANDBOX_BASE=/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.sandbox-quadernoapp\.com\/api$/;
 const NETOPIA_KEYS=['NETOPIA_API_BASE_URL','NETOPIA_POS_SIGNATURE','NETOPIA_API_KEY_PATH','NETOPIA_IPN_KEYS_PATH'];
 const INVOICING_KEYS=['QUADERNO_API_KEY_PATH','QUADERNO_API_BASE_URL','SMARTBILL_CREDENTIALS_PATH','SMARTBILL_API_BASE_URL','SMARTBILL_SERIES','OWNER_REPORT_EMAIL_PATH'];
+const SPOOL_KEY='BILLING_NOTICE_SPOOL_PATH';
 /**
  * Owner ruling 2026-10-13: moving the billing clock for renewal tests stays refused on the preview (the owner is still
  * deciding). A host that ever ran with it must never go live (deploy/vps/README.md §14.8).
@@ -80,7 +84,8 @@ const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
  * The hosted API's extra rules: the country files and the Turnstile relay at their fixed values (the API refuses to
  * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
  * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
- * ten: billing on, once the register says so); and every value a sandbox form at its fixed path.
+ * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. The billing notice
+ * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder.
  */
 function assertHostedApiValues(configured) {
  const fixed=PREVIEW_HOSTED_FIXED_VALUES;
@@ -93,9 +98,10 @@ function assertHostedApiValues(configured) {
   ||configured.NETOPIA_API_KEY_PATH!==fixed.NETOPIA_API_KEY_PATH||configured.NETOPIA_IPN_KEYS_PATH!==fixed.NETOPIA_IPN_KEYS_PATH))refuse();
  if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
   ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
+ if(configured[SPOOL_KEY]!==undefined&&(netopia===0||configured[SPOOL_KEY]!==fixed[SPOOL_KEY]))refuse();
 }
 /** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
-const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS];
+const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY];
 /** What the hosted API's fetch does: https through the loopback egress proxy, loopback itself direct. */
 export const PREVIEW_HOSTED_PROXY_ENVIRONMENT=Object.freeze({HTTPS_PROXY:PREVIEW_EGRESS_PROXY_URL,NO_PROXY:'localhost,127.0.0.1,[::1]'});
 /**
