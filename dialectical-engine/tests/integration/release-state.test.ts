@@ -167,7 +167,8 @@ describe("0123 §3: the release table, its state view and its serialized writers
       await expectRefused(() => recordReleaseEvent(database.pool, { releaseKey: B, kind: "RETIRED", recordedBy: BY, reason }),
         "RELEASE_EVENT_INVALID");
     }
-    // The way out: finish the rollback (B current, C draining), then switch back (C current, B draining).
+    // The loud way out: finish the rollback (B current, C draining), then switch back (C current, B draining). The
+    // quiet one, DRAINING again, is the fresh database's "abandon the re-stage" case.
     await recordReleaseSwitch(database.pool, { newReleaseKey: B, expectedCurrent: C, takeTrafficFrom: T7, recordedBy: BY });
     expect(await state(C)).toEqual(live("DRAINING"));
     await stage(C);
@@ -343,7 +344,7 @@ describe("0123 §3: the release table, its state view and its serialized writers
   });
 });
 
-describe("0123 §3: two racing switches on a fresh database", () => {
+describe("0123 §3 on a fresh database: the race, the whole drain path, abandoning a re-stage", () => {
   beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); }, 240_000);
   afterAll(async () => { await database?.stop(); });
 
@@ -394,5 +395,46 @@ describe("0123 §3: two racing switches on a fresh database", () => {
     expect(await state(D)).toEqual({ state: "RETIRED", frontPairStopped: true, retireRequested: true });
     expect((await database.pool.query("SELECT kind FROM core.release_event WHERE release_key=$1 ORDER BY event_seq", [D])).rows.map((row) => row.kind))
       .toEqual(["STAGED", "CURRENT", "DRAINING", "FRONT_PAIR_STOPPED", "RETIRE_REQUESTED", "RETIRED"]);
+  });
+
+  it("abandoning a re-stage: DRAINING again, flags clean, still live until the normal retirement path (B current, A draining, E retired)", async () => {
+    await stage(A);
+    await recordReleaseSwitch(database.pool, { newReleaseKey: A, expectedCurrent: E, takeTrafficFrom: T3, recordedBy: BY });
+    await recordReleaseEvent(database.pool, { releaseKey: E, kind: "FRONT_PAIR_STOPPED", recordedBy: BY });
+    expect(await state(E)).toEqual({ state: "DRAINING", frontPairStopped: true, retireRequested: false });
+    // A rollback stages E again, then is abandoned: E goes back to finishing its own debates, its flags clean.
+    await stage(E);
+    const drainingAgain = await recordReleaseEvent(database.pool, { releaseKey: E, kind: "DRAINING", recordedBy: BY, reason: "RESTAGE_ABANDONED" });
+    expect(Object.isFrozen(drainingAgain)).toBe(true);
+    expect(await state(E)).toEqual(live("DRAINING"));
+    // Still live: no third release while E drains.
+    await stage(B);
+    await expectRefused(() => recordReleaseSwitch(database.pool, { newReleaseKey: B, expectedCurrent: A, takeTrafficFrom: T4, recordedBy: BY }),
+      "RELEASE_SWITCH_CONFLICT");
+    // The normal retirement path, counted from the new DRAINING event.
+    await recordReleaseEvent(database.pool, { releaseKey: E, kind: "FRONT_PAIR_STOPPED", recordedBy: BY });
+    await recordReleaseEvent(database.pool, { releaseKey: E, kind: "RETIRE_REQUESTED", recordedBy: BY });
+    expect(await state(E)).toEqual({ state: "DRAINING", frontPairStopped: true, retireRequested: true });
+    await recordReleaseEvent(database.pool, { releaseKey: E, kind: "RETIRED", recordedBy: BY, reason: "DRAINED" });
+    expect(await state(E)).toEqual({ state: "RETIRED", frontPairStopped: true, retireRequested: true });
+    await recordReleaseSwitch(database.pool, { newReleaseKey: B, expectedCurrent: A, takeTrafficFrom: T4, recordedBy: BY });
+    expect(await readCurrentRelease(database.pool)).toEqual({ releaseKey: B, takeTrafficFrom: T4 });
+    expect(await state(A)).toEqual(live("DRAINING"));
+  });
+
+  it("DRAINING is refused for any release but a STAGED one that still drains (B current, A draining, C staged, D and E retired)", async () => {
+    await stage(C); // never drained
+    const draining = (releaseKey: string) => () =>
+      recordReleaseEvent(database.pool, { releaseKey, kind: "DRAINING", recordedBy: BY });
+    await expectRefused(draining(C), "RELEASE_EVENT_INVALID"); // a STAGED release that never drained
+    await expectRefused(draining(B), "RELEASE_EVENT_INVALID"); // the CURRENT release
+    await expectRefused(draining(E), "RELEASE_EVENT_INVALID"); // a RETIRED release
+    await expectRefused(draining(A), "RELEASE_EVENT_INVALID"); // a release already DRAINING
+    await expectRefused(draining(["r22", "ffffffffffff"].join("-")), "RELEASE_EVENT_INVALID"); // an unknown release
+    // D drained, retired, then staged again: it no longer drains, so DRAINING is refused there too.
+    await stage(D);
+    await expectRefused(draining(D), "RELEASE_EVENT_INVALID");
+    expect(await state(C)).toEqual(live("STAGED"));
+    expect(await state(D)).toEqual(live("STAGED"));
   });
 });

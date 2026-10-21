@@ -12,7 +12,11 @@ import { TypedDomainError } from "@debateai/kernel";
  * inside that transaction. Refusals surface as TypedDomainError with the SQL code as `code`; results are frozen.
  */
 export type ReleaseLifecycleState = "STAGED" | "CURRENT" | "DRAINING" | "RETIRED";
-export type ReleaseEventKind = "STAGED" | "FRONT_PAIR_STOPPED" | "RETIRE_REQUESTED" | "RETIRED";
+/**
+ * DRAINING here is only "abandon the re-stage" (controller ruling 2026-10-21): a draining release staged again for a
+ * rollback that never switched goes back to finishing its own debates. Every other DRAINING comes from the switch.
+ */
+export type ReleaseEventKind = "STAGED" | "DRAINING" | "FRONT_PAIR_STOPPED" | "RETIRE_REQUESTED" | "RETIRED";
 export type ReleaseQueryable = Pick<Pool, "query"> | PoolClient;
 
 /** The codes 0123's writers refuse with (RAISE … MESSAGE = code), and Phase 2's settings hook's (plan S). */
@@ -81,7 +85,10 @@ export async function recordReleaseSwitch(db: ReleaseQueryable, input: Readonly<
   return Object.freeze({ eventSeq: asEventSeq(rows[0]?.event_seq) });
 }
 
-/** STAGED, FRONT_PAIR_STOPPED, RETIRE_REQUESTED or RETIRED for one release; RELEASE_EVENT_INVALID for a disallowed transition. */
+/**
+ * STAGED, DRAINING (abandoning a re-stage only), FRONT_PAIR_STOPPED, RETIRE_REQUESTED or RETIRED for one release;
+ * RELEASE_EVENT_INVALID for a disallowed transition.
+ */
 export async function recordReleaseEvent(db: ReleaseQueryable, input: Readonly<{
   releaseKey: string; kind: ReleaseEventKind; recordedBy: string; reason?: string;
 }>): Promise<Readonly<{ eventSeq: number }>> {

@@ -360,7 +360,7 @@ END;
 $$;
 
 -- Every other event, under the same lock and the same READ COMMITTED rule. RELEASE_EVENT_INVALID (22023) for a
--- malformed key, recorder or reason, any kind outside these four, and a disallowed transition:
+-- malformed key, recorder or reason, any kind outside these five, and a disallowed transition:
 --   STAGED              no state yet, or DRAINING or RETIRED (addendum item 2: a rollback stages an older release
 --                       again);
 --   FRONT_PAIR_STOPPED  a known release that is not the current one;
@@ -368,8 +368,11 @@ $$;
 --   RETIRED             STAGED (addendum item 3: never switched to, 'NOT_SWITCHED') or DRAINING ('DRAINED'); never a
 --                       STAGED release that still drains (a DRAINING event with no later RETIRED event: staged again
 --                       for a rollback that never switched, its drained debates may still run). Such a release retires
---                       only through the drain path: switched to, then drained again, then retired.
--- CURRENT and DRAINING are written by the switch alone.
+--                       only through the drain path: DRAINING again (below), then RETIRE_REQUESTED, then RETIRED;
+--   DRAINING            only a STAGED release that still drains ("abandon the re-stage", controller ruling 2026-10-21):
+--                       it goes back to finishing its own debates; its flags count from this new DRAINING event, so
+--                       root records FRONT_PAIR_STOPPED again and the normal retirement path follows.
+-- CURRENT is written by the switch alone, and so is every other DRAINING (the old current release at a switch).
 CREATE OR REPLACE FUNCTION core.record_release_event(
   p_release_key text,
   p_kind text,
@@ -393,7 +396,7 @@ BEGIN
   END IF;
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('debateai:release-switch', 0));
   IF p_release_key IS NULL OR p_release_key = 'legacy' OR p_release_key !~ '^r[1-9][0-9]*-[0-9a-f]{12}$'
-    OR p_kind IS NULL OR p_kind NOT IN ('STAGED', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED')
+    OR p_kind IS NULL OR p_kind NOT IN ('STAGED', 'DRAINING', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED')
     OR p_recorded_by IS NULL OR length(btrim(p_recorded_by)) NOT BETWEEN 1 AND 128
     OR length(p_reason) > 500 THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'RELEASE_EVENT_INVALID';
@@ -408,6 +411,7 @@ BEGIN
           AND retired.event_seq > drained.event_seq));
   v_allowed := CASE p_kind
     WHEN 'STAGED' THEN v_state IS NULL OR v_state IN ('DRAINING', 'RETIRED')
+    WHEN 'DRAINING' THEN v_state IS NOT DISTINCT FROM 'STAGED' AND v_still_draining
     WHEN 'FRONT_PAIR_STOPPED' THEN v_state IS NOT NULL AND v_state <> 'CURRENT'
     WHEN 'RETIRE_REQUESTED' THEN v_state IS NOT DISTINCT FROM 'DRAINING'
     WHEN 'RETIRED' THEN v_state IS NOT DISTINCT FROM 'DRAINING'
