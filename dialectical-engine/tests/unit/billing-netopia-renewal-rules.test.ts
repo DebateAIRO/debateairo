@@ -104,7 +104,8 @@ describe("N11 M5 when the bank asks the person to confirm a renewal (mail.M5.con
     expect(declined).toContain("Your bank refused the payment.");
     expect(declined).not.toContain("confirm this payment");
     // B2 adds the optional `endDate` (a refusal not retried by itself); tests/unit/mail-templates-render.test.ts pins it.
-    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag", endDate: "date" });
+    // B1 adds `bankAsked` (AUTHENTICATION_REQUIRED not retried by itself); the same file pins it.
+    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag", bankAsked: "flag", endDate: "date" });
   });
 });
 
@@ -142,12 +143,14 @@ describe("the owner's commands in a refused renewal's O3", () => {
       expect(steps, code).not.toContain("every hour");
     }
     expect(OWNER_STEPS.CHARGE_CONFIGURATION_REFUSED).toContain("NETOPIA allows only 3 tries a day on a saved card, so this"
-      + " renewal is not tried again by itself: it waits for you. The person keeps the plan for 72 hours from the renewal date;"
+      + " renewal is not tried again by itself: it waits for you. The person keeps the plan for 72 hours from the renewal date"
+      + " (for a payment retry, until the grace period ends, 8 days after the first failed payment);"
       + " after that the paid features pause until the renewal goes through. Run the check command below as root on the"
       + " server and fix the setting in NETOPIA's admin (or ask NETOPIA about the code).");
     expect(OWNER_STEPS.CHARGE_CREDENTIALS_REFUSED).toContain("NETOPIA refused our API key. Nothing was charged and the"
       + " customer was not emailed. This renewal is not tried again by itself: it waits for you. The person keeps the plan"
-      + " for 72 hours from the renewal date; after that the paid features pause until the renewal goes through. Replace the"
+      + " for 72 hours from the renewal date (for a payment retry, until the grace period ends, 8 days after the first failed"
+      + " payment); after that the paid features pause until the renewal goes through. Replace the"
       + " key with the guided setup (deploy/vps/billing-setup.sh --replace netopia), restart the API and run the check"
       + " command below as root on the server.");
     for (const code of ["RENEWAL_OUTCOME_OPEN", "ORDER_REUSED"] as const) expect(OWNER_STEPS[code], code).not.toMatch(BARE_BILLING_COMMAND);

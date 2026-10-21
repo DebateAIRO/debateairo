@@ -145,14 +145,16 @@ export const OWNER_STEPS: Readonly<Record<
   CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused a renewal because of our own setup (the merchant settings, recurring"
     + " payments not switched on for the account, or a code we do not know). Nothing was charged and the customer was"
     + " not emailed. NETOPIA allows only 3 tries a day on a saved card, so this renewal is not tried again by itself: it"
-    + " waits for you. The person keeps the plan for 72 hours from the renewal date; after that the paid features pause"
+    + " waits for you. The person keeps the plan for 72 hours from the renewal date (for a payment retry, until the grace"
+    + " period ends, 8 days after the first failed payment); after that the paid features pause"
     + " until the renewal goes through. Run the check command below as root on the server and fix the setting in"
     + " NETOPIA's admin (or ask NETOPIA about the code). Then run the second command: it sends every renewal held like"
     + " this once more.\n"
     + `  ${hostCommand("billing:check")}\n  ${hostCommand("billing:renewal-resume")}`,
   CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key. Nothing was charged and the customer was not emailed. This"
     + " renewal is not tried again by itself: it waits for you. The person keeps the plan for 72 hours from the renewal"
-    + " date; after that the paid features pause until the renewal goes through. Replace the key with the guided setup"
+    + " date (for a payment retry, until the grace period ends, 8 days after the first failed payment); after that the"
+    + " paid features pause until the renewal goes through. Replace the key with the guided setup"
     + " (deploy/vps/billing-setup.sh --replace netopia), restart the API and run the check command below as root on the"
     + " server. Then run the second command: it sends every renewal held like this once more.\n"
     + `  ${hostCommand("billing:check")}\n  ${hostCommand("billing:renewal-resume")}`,
@@ -277,6 +279,12 @@ export async function usableSavedCard(
 export class RenewalService {
   /** Subscription periods whose tax refusal this process has already alarmed on (at most one line per period). */
   private readonly taxRefusalsSeen = new Set<string>();
+  /**
+   * C1: the subscription, attempt and UTC hour keys whose `billing.renewal.send_capped` line this process already wrote
+   * (a capped charge is asked again every pass; one line an hour says it). Holds only the current hour's keys.
+   */
+  private readonly sendCapsSeen = new Set<string>();
+  private sendCapsHour = "";
 
   constructor(private readonly deps: RenewalDeps) {}
 
@@ -378,7 +386,8 @@ export class RenewalService {
    * does not name its card; no migration), so only a send between a new token's storage and its adoption is
    * over-counted. No usable card: no NETOPIA call will be made (the CARD_NOT_SAVED path decides), so true. Each caller asks inside the subscription lease it already holds, right
    * before the call's marker is written, so the renewal tick's recovery and the maintenance retry never both see room
-   * for one more send. False writes one content-free line (`attempt`, when the caller names it).
+   * for one more send. False writes one content-free line (`attempt`, when the caller names it), at most once per
+   * subscription, attempt and UTC hour in this process (C1).
    */
   async savedCardSendAllowed(state: SubscriptionState, now: Date, attempt?: number): Promise<boolean> {
     const card = await usableSavedCard(this.deps.repository, state, now);
@@ -392,7 +401,16 @@ export class RenewalService {
       if (charge !== null) charges.push(charge);
     }
     if (savedCardSendLeft(charges, since)) return true;
-    this.deps.audit("billing.renewal.send_capped", attempt === undefined ? {} : { attempt });
+    const hour = now.toISOString().slice(0, 13);
+    if (hour !== this.sendCapsHour) {
+      this.sendCapsSeen.clear();
+      this.sendCapsHour = hour;
+    }
+    const key = `${state.subscriptionId}:${attempt ?? ""}`;
+    if (!this.sendCapsSeen.has(key)) {
+      this.sendCapsSeen.add(key);
+      this.deps.audit("billing.renewal.send_capped", attempt === undefined ? {} : { attempt });
+    }
     return false;
   }
 
@@ -1137,7 +1155,8 @@ export class RenewalService {
    * 3. A call that may have reached NETOPIA: a status read a minute after the unknown, then hourly; a report decides.
    *    After 30 quiet minutes (then hourly), a resend with the same orderID (NETOPIA processes it or answers 56).
    *    At the window's end a fresh read (one made at or after it, then hourly) decides: NO_SUCH_ORDER closes
-   *    FAILED(NO_TRANSACTION) unless NETOPIA confirmed the order exists (PR-27); an unreadable or confirmed order is
+   *    FAILED(NO_TRANSACTION) unless NETOPIA confirmed the order exists (PR-27) or the charge waits for the owner after
+   *    our own setup refused its resend (then nothing: no close, no alert); an unreadable or confirmed order is
    *    never closed (O3 RENEWAL_OUTCOME_OPEN); a report is recorded. Its status reads go on whatever its last call was;
    *    a resend waits for the owner after our own setup's refusal (as in 2), and follows a resume at once.
    * A plan no longer renewable (cancelled, ended, moved on) is never sent again; with nothing ever sent it closes now.
@@ -1196,7 +1215,13 @@ export class RenewalService {
       }
       if (windowOver) {
         const confirmed = blind.some((event) => event.errorCode === ORDER_EXISTS);
-        if (read === "NO_SUCH_ORDER" && !confirmed) return this.closeStuck(charge, "CHARGE_OUTCOME_UNKNOWN", now);
+        if (read === "NO_SUCH_ORDER" && !confirmed) {
+          // Ruling C-8, B1 part 2 (Q22): a charge held for the owner after our own setup refused its resend is never
+          // closed into the dunning (NO_TRANSACTION would email the person and retry); the owner was told at the
+          // refusal, so no new alert either. It waits for the owner's resume, its status reads going on hourly.
+          if (waitsForOwner) return false;
+          return this.closeStuck(charge, "CHARGE_OUTCOME_UNKNOWN", now);
+        }
         await this.outcomeOpen(charge, now);
         return false;
       }
@@ -1213,11 +1238,15 @@ export class RenewalService {
    * which becomes SUBMIT_INTERRUPTED). Without a usable card or payer now: a charge nothing of which reached NETOPIA fails
    * CARD_NOT_SAVED (`..._CLOSES`); one that may hold a payment is only read on (`..._WAITS`). B1 (NETOPIA answers
    * 2026-10-21, Q22): a resend the card's daily allowance holds (`savedCardSendAllowed`) is not made and writes no marker.
+   * C1: the allowance is asked first (it answers true when there is no usable card, so the card paths below still
+   * decide), so a capped resend neither opens the token nor reads the payer each pass; still under the caller's lease.
    */
   private async resend(
     charge: ChargeWithEvents, state: SubscriptionState, now: Date, missingCard: "CARD_NOT_SAVED_CLOSES" | "CARD_NOT_SAVED_WAITS"
   ): Promise<boolean> {
     if (await this.erasureBlocks(state.ownerRef)) return false;
+    // B1 (NETOPIA Q22), under the caller's lease before the marker: no third send in 24 hours; a later pass resends.
+    if (!(await this.savedCardSendAllowed(state, now, charge.attempt))) return false;
     let prepared: SavedCardCharge | "CARD_NOT_SAVED";
     try {
       prepared = await this.preparedCharge(charge, state, now);
@@ -1230,8 +1259,6 @@ export class RenewalService {
       await this.refused(charge, "CARD_NOT_SAVED", null, now, false);
       return true;
     }
-    // B1 (NETOPIA Q22), under the caller's lease right before the marker: no third send in 24 hours; a later pass resends.
-    if (!(await this.savedCardSendAllowed(state, now, charge.attempt))) return false;
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
       chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: RESEND_STARTED })));
     const resumes = charge.events.filter((event) => event.kind === "REQUESTED" && event.errorCode === CHARGE_RESUMED).length;

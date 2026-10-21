@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "Não conseguimos cobrar o pagamento deste mês do seu plano {plan}, e não voltaremos a tentar com este cartão.",
   "mail.M5.bankRefused": "O seu banco recusou o pagamento.",
   "mail.M5.confirmCard": "O seu banco pediu-lhe que confirmasse este pagamento. Confirme o seu cartão nas Definições e tentaremos novamente.",
+  "mail.M5.bankAskedToConfirm": "O seu banco pediu-lhe que confirmasse este pagamento.",
   "mail.M5.retry": "Tentaremos novamente a {retryDate}. Para utilizar outro cartão, abra: {cardPageUrl}",
   "mail.M5.secondTry": "A nossa segunda tentativa também não resultou. Tentaremos novamente a {retryDate}. Para utilizar outro cartão, abra: {cardPageUrl}",
   "mail.M5.lastTry": "Faremos uma última tentativa a {retryDate}. Se falhar, a sua conta passa para o plano Gratuito e os seus debates são mantidos. Para utilizar outro cartão, abra: {cardPageUrl}",

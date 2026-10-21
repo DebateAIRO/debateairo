@@ -388,11 +388,14 @@ export function loadBillingRefundDoneEnvironment() {
 
 /**
  * B1 part 2 (NETOPIA answers 2026-10-21, Q22): `pnpm billing:renewal-resume` reads `NETOPIA_API_BASE_URL` from the API's
- * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required.
+ * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required. C6: it
+ * also reads the OWNER-RUN sandbox's optional `BILLING_STAGE_CLOCK_OFFSET_DAYS`, so its marker is dated on the API's
+ * billing clock (`billingClock`, which refuses it against live).
  */
 export function parseBillingRenewalResumeEnvironment(source: EnvironmentSource) {
   return withProductionFloors(parseEnvironmentSource({
-    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url()
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
+    BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional()
   }, source));
 }
 

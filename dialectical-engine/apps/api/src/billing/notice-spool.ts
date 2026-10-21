@@ -30,7 +30,7 @@ const SpoolFileSchema = z.object({
  * `raw` and `header` sealed under the records key with the file's own spool id in their AAD (records.ts
  * `sealSpooledNotice`), so nothing in it is readable without the key and no seal opens under another file's name.
  * Written atomically: a `.<spoolId>.tmp` created exclusively, written, flushed and closed, renamed, and the folder
- * flushed, so a crash leaves either a whole file or a temporary one, which is never listed.
+ * flushed (best effort, C4), so a crash leaves either a whole file or a temporary one, which is never listed.
  */
 export class NoticeSpool {
   constructor(private readonly deps: Readonly<{ directory: string; recordsKey: Buffer }>) {}
@@ -58,11 +58,17 @@ export class NoticeSpool {
       await unlink(temporary).catch(() => undefined);
       throw error;
     }
-    const folder = await open(this.deps.directory, "r");
+    // C4: the folder flush is best effort. The file is already in place under its final name and will be replayed, so
+    // a folder that cannot be opened or flushed now never turns a kept message into a failure.
     try {
-      await folder.sync();
-    } finally {
-      await folder.close();
+      const folder = await open(this.deps.directory, "r");
+      try {
+        await folder.sync();
+      } finally {
+        await folder.close();
+      }
+    } catch {
+      // Kept: only the folder entry's durability across a power cut is not proved.
     }
     return spoolId;
   }

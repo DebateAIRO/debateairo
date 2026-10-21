@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "Kami tidak dapat menerima pembayaran bulan ini untuk paket {plan} Anda, dan kami tidak akan mencoba lagi dengan kartu ini.",
   "mail.M5.bankRefused": "Bank Anda menolak pembayaran tersebut.",
   "mail.M5.confirmCard": "Bank Anda meminta Anda mengonfirmasi pembayaran ini. Silakan konfirmasi kartu Anda di Pengaturan, dan kami akan mencoba lagi.",
+  "mail.M5.bankAskedToConfirm": "Bank Anda meminta Anda mengonfirmasi pembayaran ini.",
   "mail.M5.retry": "Kami akan mencoba lagi pada {retryDate}. Untuk menggunakan kartu lain, buka: {cardPageUrl}",
   "mail.M5.secondTry": "Percobaan kedua kami juga tidak berhasil. Kami akan mencoba lagi pada {retryDate}. Untuk menggunakan kartu lain, buka: {cardPageUrl}",
   "mail.M5.lastTry": "Kami akan melakukan satu percobaan terakhir pada {retryDate}. Jika gagal, akun Anda pindah ke paket Gratis, dan debat Anda tetap disimpan. Untuk menggunakan kartu lain, buka: {cardPageUrl}",

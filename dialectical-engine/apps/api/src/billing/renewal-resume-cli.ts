@@ -18,6 +18,7 @@ import { loadBillingRenewalResumeEnvironment } from "@debateai/register";
 import { consoleBillingAudit } from "./audit.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { resumeHeldRenewals, type RenewalResumeResult } from "./renewal-resume.js";
+import { billingClock } from "./stage-clock.js";
 
 export type RenewalResumeCliOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;
 export type OpenRenewalResumer = () => Promise<Readonly<{
@@ -31,7 +32,8 @@ const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}$/u;
 export function renderRenewalResumeResult(result: RenewalResumeResult): string {
   const lines = [
     result.resumed > 0
-      ? `Sent again: ${result.resumed} held renewal(s) will each be tried once more within a minute.`
+      ? `Sent again: ${result.resumed} held renewal(s) will each be tried once more within a minute`
+        + " (later if that card was already tried twice in the last 24 hours)."
       : "Nothing to resume: no renewal is waiting for you.",
     ...(result.busy > 0 ? [`Busy: ${result.busy} renewal(s) were being worked on; run the command again in a minute.`] : [])
   ];
@@ -73,6 +75,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     const environment = loadBillingRenewalResumeEnvironment();
     const paymentEnvironment = netopiaEnvironmentOf(environment.NETOPIA_API_BASE_URL.replace(/\/+$/u, ""));
     if (paymentEnvironment === null) throw new TypeError("BILLING_RENEWAL_RESUME_OTHER_PAYMENT_SYSTEM");
+    // C6: the API's own billing clock (main.ts), so CHARGE_RESUMED is dated on the same clock as the charge it releases
+    // (the OWNER-RUN sandbox's BILLING_STAGE_CLOCK_OFFSET_DAYS; refused against live, as the API refuses it).
+    const { clock } = billingClock({ paymentEnvironment, offsetDays: environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null });
     const pool = await openBillingOperatorPool(environment.DATABASE_URL, {
       production: environment.NODE_ENV === "production", readOnly: false, max: 2
     });
@@ -80,7 +85,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     const jobs = new BillingJobQueries(pool);
     return Object.freeze({
       resume: () => resumeHeldRenewals({
-        repository, jobs, paymentEnvironment, clock: () => new Date(), audit: consoleBillingAudit
+        repository, jobs, paymentEnvironment, clock, audit: consoleBillingAudit
       }),
       close: () => pool.end()
     });

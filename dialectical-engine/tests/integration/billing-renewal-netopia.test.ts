@@ -256,14 +256,17 @@ describe("N11 a NETOPIA renewal charges the saved card (spec §2.9.2)", () => {
     expect((await emails(`M5A:${refused.chargeId}`))[0]?.payload).toMatchObject({ "param.bankDeclined": "false" });
   });
 
-  it("turns the bank's request for its security check into AUTHENTICATION_REQUIRED and asks for the card to be confirmed", async () => {
+  it("turns the bank's request for its security check into AUTHENTICATION_REQUIRED and says the bank asked for a confirmation", async () => {
     const run = await due();
     run.payments.answer(run.email, (input) => report(input.orderId, "ACTION_REQUIRED"));
     const charge = await renewNow(run);
     expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED:AUTHENTICATION_REQUIRED"]);
-    expect((await emails(`M5A:${charge.chargeId}`))[0]?.payload).toMatchObject({
-      "param.bankDeclined": "false", "param.confirmCard": "true"
-    });
+    // B1 (final review): NETOPIA named no code 20, so the card is not tried again by itself (B2): the M5 says only
+    // that the bank asked (bankAsked), never confirmCard's "we'll try again".
+    const [m5] = await emails(`M5A:${charge.chargeId}`);
+    expect(m5?.payload).toMatchObject({ "param.bankDeclined": "false", "param.bankAsked": "true" });
+    expect(m5?.payload["param.confirmCard"]).toBeUndefined();
+    expect(m5?.payload["param.endDate"]).toBeDefined();
   });
 
   it("ruling PR-11: a FIRST send that NETOPIA answers 56 (the order was already used) writes the audit line and tells the owner", async () => {
@@ -452,6 +455,52 @@ describe("N11 ruling C-8, B1: a refusal caused by our own setup waits for the ow
     expect(await pendingHolds(run)).toBe(1);
   }, 600_000);
 
+  it("an unknown outcome whose resend our own setup refused stays held at the window's end on NO_SUCH_ORDER: no close, no M5, reads go on; a resume sends it once more", async () => {
+    const run = await due();
+    let fixed = false;
+    let calls = 0;
+    answerAll(run, (input) => {
+      calls += 1;
+      if (calls === 1) return paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout");
+      return fixed ? report(input.orderId, "PENDING") : paymentError("PAYMENT_CONFIGURATION_REFUSED", "99");
+    });
+    // Renewed 5 hours late (still inside its 72 hours), so its refusal's O3 falls in an hour no other test of this
+    // file uses (one O3 per code and hour); the window ends 72 hours past the due instant, 67 hours after `start`.
+    const start = run.seeded.periodEnd.getTime() + 5 * HOUR;
+    const windowEnd = run.seeded.periodEnd.getTime() + 72 * HOUR;
+    await tick(run, start, 0, 66 * HOUR);
+    const charge = await renewalCharge(run);
+    const readsOf = () => run.payments.reads.filter((read) => read.orderId === charge.chargeId).length;
+    expect(sendsOf(run)).toHaveLength(2);
+    expect(await trail(charge.chargeId)).toEqual([
+      "REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN", "REQUESTED:RESEND_STARTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED"
+    ]);
+    const readsBefore = readsOf();
+    // Past the window's end: the fresh reads answer NO_SUCH_ORDER, and the held charge is not closed into the dunning.
+    await tick(run, start, 66 * HOUR + 10 * MINUTE, 69 * HOUR);
+    expect(sendsOf(run)).toHaveLength(2);
+    expect(readsOf()).toBeGreaterThan(readsBefore);
+    const lastRead = await run.repository.lastStatusRead(charge.chargeId);
+    expect(lastRead).toMatchObject({ outcome: "NO_SUCH_ORDER" });
+    expect(lastRead!.at.getTime()).toBeGreaterThanOrEqual(windowEnd);
+    expect((await trail(charge.chargeId)).some((entry) => entry.startsWith("FAILED"))).toBe(false);
+    expect(await kindsOf(run)).not.toContain("PAST_DUE");
+    expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
+    const reference = `charge ${charge.chargeId}`;
+    expect(await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference)).toHaveLength(1);
+    // The owner was told at the refusal: no second O3 at the window's end.
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(0);
+
+    // The owner fixed the setting and resumes (this also releases the renewals the tests above leave held).
+    fixed = true;
+    run.clock.now = new Date(start + 69 * HOUR + 5 * MINUTE);
+    expect((await resume(run)).resumed).toBeGreaterThanOrEqual(1);
+    run.clock.now = new Date(start + 69 * HOUR + 6 * MINUTE);
+    await run.renewal.runOnce();
+    expect(sendsOf(run).map((sent) => sent.orderId)).toEqual([charge.chargeId, charge.chargeId, charge.chargeId]);
+    expect((await trail(charge.chargeId)).slice(-3)).toEqual(["REQUESTED:CHARGE_RESUMED", "REQUESTED:RESEND_STARTED", "SUBMITTED"]);
+  }, 600_000);
+
   it("an outage is unchanged: resent on the 1, 5, 15, 60-minute backoff, then at the window's end NO_TRANSACTION and the dunning", async () => {
     const run = await due();
     const sentAt: number[] = [];
@@ -615,7 +664,9 @@ describe("N11 an unknown outcome is probed on the same orderID (spec §2.9.3)", 
     run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
     await run.renewal.recoverOpenCharge(charge.chargeId);
     expect((await trail(charge.chargeId)).slice(-2)).toEqual(["SUBMITTED", "FAILED:AUTHENTICATION_REQUIRED"]);
-    expect((await emails(`M5A:${charge.chargeId}`))[0]?.payload).toMatchObject({ "param.confirmCard": "true" });
+    const [m5] = await emails(`M5A:${charge.chargeId}`);
+    expect(m5?.payload).toMatchObject({ "param.bankAsked": "true" });
+    expect(m5?.payload["param.confirmCard"]).toBeUndefined();
   });
 });
 
@@ -1014,7 +1065,7 @@ describe("B1 at most 2 saved-card sends per card in 24 hours (NETOPIA Q22)", () 
       expect(inSpan.length, `send ${index} at +${(sent - start) / MINUTE} min`).toBeLessThanOrEqual(2);
     }
     expect(sentAt[2]! - sentAt[0]!).toBeGreaterThan(DAY);
-    // Each capped pass says so with one content-free line.
+    // Each capped charge says so with a content-free line (at most one an hour, C1).
     expect(capped(run).length).toBeGreaterThan(0);
     expect(capped(run)[0]!.fields).toEqual({ attempt: 1 });
     const charge = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
@@ -1050,6 +1101,13 @@ describe("B1 at most 2 saved-card sends per card in 24 hours (NETOPIA Q22)", () 
     expect(sendsOf(run)).toHaveLength(2);
     expect(run.audit.events.filter((entry) => entry.event === "billing.renewal.retry_held"
       && entry.fields.code === "SAVED_CARD_DAILY_LIMIT")).toHaveLength(1);
+    // C1: the capped line is written once per plan, attempt and hour: two more capped asks in this hour write none.
+    const cappedRetry = () => capped(run).filter((entry) => entry.fields.attempt === 2);
+    expect(cappedRetry()).toHaveLength(1);
+    const pastDue = foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId));
+    expect(await run.renewal.savedCardSendAllowed(pastDue, run.clock.now, 2)).toBe(false);
+    expect(await run.renewal.savedCardSendAllowed(pastDue, run.clock.now, 2)).toBe(false);
+    expect(cappedRetry()).toHaveLength(1);
     // A NEW card, stored now: its sends count from its storage, so the retry charges it at once.
     run.clock.now = new Date(unknownAt + 45 * MINUTE);
     const newTokenId = randomUUID();

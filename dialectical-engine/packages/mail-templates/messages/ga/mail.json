@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "Níorbh fhéidir linn íocaíocht na míosa seo as do phlean {plan} a ghlacadh, agus ní dhéanfaimid iarracht arís leis an gcárta seo.",
   "mail.M5.bankRefused": "Dhiúltaigh do bhanc an íocaíocht.",
   "mail.M5.confirmCard": "D’iarr do bhanc ort an íocaíocht seo a dheimhniú. Deimhnigh do chárta i Socruithe, le do thoil, agus déanfaimid iarracht arís.",
+  "mail.M5.bankAskedToConfirm": "D’iarr do bhanc ort an íocaíocht seo a dheimhniú.",
   "mail.M5.retry": "Déanfaimid iarracht arís ar {retryDate}. Chun cárta eile a úsáid, oscail: {cardPageUrl}",
   "mail.M5.secondTry": "Níor éirigh lenár dara hiarracht ach oiread. Déanfaimid iarracht arís ar {retryDate}. Chun cárta eile a úsáid, oscail: {cardPageUrl}",
   "mail.M5.lastTry": "Déanfaimid iarracht dheireanach amháin ar {retryDate}. Má theipeann uirthi, aistreofar do chuntas chuig an bplean Saor in aisce, agus coinneofar do dhíospóireachtaí. Chun cárta eile a úsáid, oscail: {cardPageUrl}",

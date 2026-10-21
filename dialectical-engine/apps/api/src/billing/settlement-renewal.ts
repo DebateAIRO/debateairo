@@ -34,7 +34,8 @@ export type DunningAttempt = Readonly<{
   /**
    * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `NO_TRANSACTION`, `CARD_NOT_SAVED`,
    * `AUTHENTICATION_REQUIRED`, `PAYMENT_FAILED`, `PAYMENT_EXPIRED`); null for a charge-less attempt.
-   * `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence.
+   * `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence (B1: only "your bank
+   * asked you to confirm this payment" when the attempt is not retried by itself).
    */
   chargeErrorCode: string | null;
   /** Whether a bank refused this attempt's charge (W10; on NETOPIA, the report's `bankDeclined`). Only then M5 says so. */
@@ -97,7 +98,10 @@ export async function writeDunningAttempt(
       params: {
         plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card"),
         bankDeclined: String(input.chargeId !== null && input.bankDeclined),
-        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED" ? { confirmCard: "true" } : {}),
+        // N11: the bank asked for its check; B1 (final review): with no automatic retry, only that it asked (bankAsked),
+        // never confirmCard's "we'll try again" after "we won't try this card again".
+        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED"
+          ? autoRetry ? { confirmCard: "true" } : { bankAsked: "true" } : {}),
         ...endDate
       },
       notBefore: now

@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "Platbu za tento měsíc za váš tarif {plan} se nepodařilo strhnout a tuto kartu už znovu zkoušet nebudeme.",
   "mail.M5.bankRefused": "Vaše banka platbu odmítla.",
   "mail.M5.confirmCard": "Vaše banka požádala o potvrzení této platby. Potvrďte prosím svou kartu v Nastavení a my to zkusíme znovu.",
+  "mail.M5.bankAskedToConfirm": "Vaše banka požádala o potvrzení této platby.",
   "mail.M5.retry": "Zkusíme to znovu {retryDate}. Chcete-li použít jinou kartu, otevřete: {cardPageUrl}",
   "mail.M5.secondTry": "Ani náš druhý pokus nevyšel. Zkusíme to znovu {retryDate}. Chcete-li použít jinou kartu, otevřete: {cardPageUrl}",
   "mail.M5.lastTry": "Poslední pokus provedeme {retryDate}. Pokud se nezdaří, váš účet přejde na tarif Zdarma a vaše debaty zůstanou zachovány. Chcete-li použít jinou kartu, otevřete: {cardPageUrl}",

@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "Wir konnten die Zahlung für diesen Monat für Ihren Tarif {plan} nicht einziehen, und wir versuchen es mit dieser Karte nicht noch einmal.",
   "mail.M5.bankRefused": "Ihre Bank hat die Zahlung abgelehnt.",
   "mail.M5.confirmCard": "Ihre Bank hat Sie gebeten, diese Zahlung zu bestätigen. Bitte bestätigen Sie Ihre Karte in den Einstellungen, dann versuchen wir es erneut.",
+  "mail.M5.bankAskedToConfirm": "Ihre Bank hat Sie gebeten, diese Zahlung zu bestätigen.",
   "mail.M5.retry": "Wir versuchen es am {retryDate} erneut. Um eine andere Karte zu verwenden, öffnen Sie: {cardPageUrl}",
   "mail.M5.secondTry": "Auch unser zweiter Versuch war nicht erfolgreich. Wir versuchen es am {retryDate} erneut. Um eine andere Karte zu verwenden, öffnen Sie: {cardPageUrl}",
   "mail.M5.lastTry": "Wir unternehmen am {retryDate} einen letzten Versuch. Schlägt er fehl, wechselt Ihr Konto in den Tarif Kostenlos, und Ihre Debatten bleiben erhalten. Um eine andere Karte zu verwenden, öffnen Sie: {cardPageUrl}",

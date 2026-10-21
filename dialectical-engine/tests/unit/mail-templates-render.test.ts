@@ -53,6 +53,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   otherSystem: "true",
   bankDeclined: "true",
   confirmCard: "true",
+  // B1: off in the shared sample, so every other M5 test reads as before; its own test turns it on.
+  bankAsked: "false",
   paymentAlert: "true",
   cardExpiring: "true",
   endedPlan: "PRO",
@@ -290,7 +292,7 @@ describe("P17 renderMail", () => {
     };
     const catalogues = loadMailCatalogues();
     for (const id of ["M5A", "M5B", "M5C"] as const) {
-      expect(MAIL_TEMPLATES[id].optional, id).toEqual({ confirmCard: "flag", endDate: "date" });
+      expect(MAIL_TEMPLATES[id].optional, id).toEqual({ confirmCard: "flag", bankAsked: "flag", endDate: "date" });
       const { endDate: _endDate, ...today } = paramsFor(id);
       const params = { ...today, bankDeclined: "true", confirmCard: "false" };
       expect(renderMail(id, "en", { ...params, endDate: SAMPLE.endDate! }).text.slice(0, noRetry[id].length), id).toBe(noRetry[id]);
@@ -311,6 +313,42 @@ describe("P17 renderMail", () => {
         }
         expect(withEnd, `${id}/${locale}`).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
       }
+    }
+  });
+
+  it("B1: says only that the bank asked for a confirmation when the card is not tried again (bankAsked), and keeps confirmCard's M5 to the byte", () => {
+    const card = "https://dezbatere.ro/settings/card";
+    const opening = "Hello,\n\nWe couldn't take this month's payment for your Plus plan";
+    const { endDate: _endDate, confirmCard: _confirm, bankAsked: _asked, ...today } = paramsFor("M5A");
+    // AUTHENTICATION_REQUIRED not retried by itself: no "we'll try again" after "we won't try this card again".
+    const asked = renderMail("M5A", "en", { ...today, bankDeclined: "false", bankAsked: "true", endDate: SAMPLE.endDate! }).text;
+    const askedText = `${opening}, and we won't try this card again.\n\nYour bank asked you to confirm this payment.\n\n`
+      + `You keep your plan until November 6, 2026. To keep it after that, add a card, and we'll take the payment from it`
+      + ` straight away: ${card}\n\n`;
+    expect(asked.slice(0, askedText.length)).toBe(askedText);
+    expect(asked).not.toContain("we'll try again");
+    expect(asked).not.toContain("Your bank refused the payment.");
+    // Without endDate and with confirmCard: today's email to the byte (the body up to the signature).
+    const confirmText = `${opening}. You keep your plan while we try again.\n\nYour bank asked you to confirm this payment.`
+      + ` Please confirm your card in Settings, and we'll try again.\n\nWe will try again on October 30, 2026. To use a`
+      + ` different card, open: ${card}\n\n`;
+    const confirm = renderMail("M5A", "en", { ...today, bankDeclined: "false", confirmCard: "true" }).text;
+    expect(confirm.slice(0, confirmText.length)).toBe(confirmText);
+    expect(renderMail("M5A", "en", { ...today, bankDeclined: "false", confirmCard: "true", bankAsked: "false" }).text).toBe(confirm);
+    // In every locale: bankAsked shows the first sentence of confirmCard alone, never its promise to try again, and
+    // wins over the bank's refusal; confirmCard still wins over both.
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const catalogue = catalogues[locale];
+      const sentence = catalogue["mail.M5.bankAskedToConfirm"]!;
+      expect(catalogue["mail.M5.confirmCard"]!.startsWith(sentence), locale).toBe(true);
+      expect(sentence.length, locale).toBeLessThan(catalogue["mail.M5.confirmCard"]!.length);
+      const text = renderMail("M5A", locale, { ...today, bankDeclined: "true", bankAsked: "true", endDate: SAMPLE.endDate! }).text;
+      expect(text, locale).toContain(sentence);
+      expect(text, locale).not.toContain(catalogue["mail.M5.confirmCard"]!);
+      expect(text, locale).not.toContain(catalogue["mail.M5.bankRefused"]!);
+      const both = renderMail("M5A", locale, { ...today, bankDeclined: "false", confirmCard: "true", bankAsked: "true" }).text;
+      expect(both, locale).toContain(catalogue["mail.M5.confirmCard"]!);
     }
   });
 

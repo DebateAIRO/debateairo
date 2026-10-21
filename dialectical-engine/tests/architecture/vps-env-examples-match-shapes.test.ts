@@ -69,7 +69,22 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
     expect(readme).toContain(`install -d -m 0700 -o debateai-api -g debateai-api ${path}`);
     expect(readme).toContain(`| \`${path}\` | \`0700\` | \`debateai-api\``);
     expect(readme).toContain(`stat -c '%a %U %G %n' ${path}`);
-    expect(readme).toContain(`echo 'BILLING_NOTICE_SPOOL_PATH=${path}' >> /etc/debateai/api.env`);
+    // A2 (final review): safe in order. The updated unit is installed and systemd reloaded BEFORE the restart (the old
+    // unit cannot write the folder, so the API would refuse to start), and the line is added on a new line, once.
+    const steps = [
+      `install -d -m 0700 -o debateai-api -g debateai-api ${path}`,
+      "install -m 0644 deploy/vps/systemd/debateai-api.service /etc/systemd/system/",
+      "systemctl daemon-reload",
+      "systemctl show -p ReadWritePaths debateai-api",
+      `grep -q '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env || printf '\\nBILLING_NOTICE_SPOOL_PATH=%s\\n' ${path} >> /etc/debateai/api.env`,
+      "grep -c '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env",
+      "systemctl restart debateai-api"
+    ];
+    const block = readme.slice(readme.indexOf(steps[0]!), readme.indexOf("```", readme.indexOf(steps[0]!)));
+    expect(block.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("stat "))).toEqual(steps);
+    expect(readme).not.toContain(`echo 'BILLING_NOTICE_SPOOL_PATH=`);
+    // The section 5 form the step copies.
+    expect(readme).toContain("install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/");
   });
   it.each(CASES)("$service: every REQUIRED key of the shape is in $example", ({ example, keys }) => {
     const shape = inventory(keys);

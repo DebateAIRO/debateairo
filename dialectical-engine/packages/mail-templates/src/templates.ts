@@ -94,9 +94,12 @@ const define = (template: MailTemplateDefinition): MailTemplateDefinition => Obj
  * B2 (NETOPIA answers 2026-10-21, Q15): the optional `endDate` (the dunning's last retry day) is given when the card
  * will not be tried again by itself (a refusal other than code 20): the first sentence says so, and the last one asks
  * for a card by then in place of the retry date. An M5 queued without it reads as before.
+ * B1 (final review): the optional flag `bankAsked` is "true" for AUTHENTICATION_REQUIRED when the card is NOT tried
+ * again by itself: only the first sentence of `confirmCard` (`mail.M5.bankAskedToConfirm`), never its promise to try
+ * again after "we won't try this card again". `confirmCard` wins over it; it wins over the bank's refusal.
  */
 const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url", bankDeclined: "flag" } as const);
-const retryOptional = Object.freeze({ confirmCard: "flag", endDate: "date" } as const);
+const retryOptional = Object.freeze({ confirmCard: "flag", bankAsked: "flag", endDate: "date" } as const);
 /**
  * W10 (P2-I21): the first M5 sentence is true in every case (B2: without the retry promise when there is none); then
  * the bank's check or its refusal, when there was one.
@@ -105,7 +108,10 @@ const notTaken: ReadonlyArray<MailParagraph> = Object.freeze([
   { ifParam: "endDate", test: "present", then: "mail.M5.notTakenNoRetry", otherwise: "mail.M5.notTaken" },
   {
     ifParam: "confirmCard", test: "true", then: "mail.M5.confirmCard",
-    otherwise: { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+    otherwise: {
+      ifParam: "bankAsked", test: "true", then: "mail.M5.bankAskedToConfirm",
+      otherwise: { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+    }
   }
 ]);
 /** B2: M5's last paragraph, the card request by `endDate` when the card is not tried again, else the retry date. */

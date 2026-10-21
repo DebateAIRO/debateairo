@@ -30,6 +30,7 @@
   "mail.M5.notTakenNoRetry": "{plan} planınızın bu ayki ödemesini alamadık ve bu kartı bir daha denemeyeceğiz.",
   "mail.M5.bankRefused": "Bankanız ödemeyi reddetti.",
   "mail.M5.confirmCard": "Bankanız bu ödemeyi onaylamanızı istedi. Lütfen kartınızı Ayarlar bölümünde onaylayın; ardından yeniden deneyeceğiz.",
+  "mail.M5.bankAskedToConfirm": "Bankanız bu ödemeyi onaylamanızı istedi.",
   "mail.M5.retry": "{retryDate} tarihinde yeniden deneyeceğiz. Başka bir kart kullanmak için şunu açın: {cardPageUrl}",
   "mail.M5.secondTry": "İkinci denememiz de başarılı olmadı. {retryDate} tarihinde yeniden deneyeceğiz. Başka bir kart kullanmak için şunu açın: {cardPageUrl}",
   "mail.M5.lastTry": "{retryDate} tarihinde son bir deneme yapacağız. Başarısız olursa hesabınız Ücretsiz plana geçer ve tartışmalarınız saklanır. Başka bir kart kullanmak için şunu açın: {cardPageUrl}",

@@ -106,6 +106,15 @@ describe("B3a the notice spool's files", () => {
     await rm(directory, { recursive: true, force: true });
     await expect(spool().put({ rawBody: BODY, header: HEADER, receivedAt: AT })).rejects.toThrow();
   });
+
+  it("C4: a folder flush that fails after the rename does not throw: the file is in place and will be replayed", async () => {
+    // Write and search, but no read: the temporary file and the rename work, opening the folder itself does not.
+    await chmod(directory, 0o300);
+    const spoolId = await spool().put({ rawBody: BODY, header: HEADER, receivedAt: AT });
+    await chmod(directory, 0o700);
+    expect(await readdir(directory)).toEqual([`${spoolId}.json`]);
+    expect((await spool().open(spoolId)).rawBody.equals(BODY)).toBe(true);
+  });
 });
 
 describe("B3a the start's check of BILLING_NOTICE_SPOOL_PATH", () => {
