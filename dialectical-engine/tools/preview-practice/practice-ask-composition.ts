@@ -40,7 +40,7 @@ import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, t
 import type { AskRequest } from "@debateai/contract";
 import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
+import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import {
   CostEnvelopeGuard,
@@ -135,10 +135,12 @@ export async function composePracticeAskMoney(input: Readonly<{
   roomDecisionPool?: Pool;
   registerVersion: number;
   deploymentMode: DeploymentMode;
+  /** Side-by-side spec §1, §3: the practice's one release key is read from here, as its runner reads it. */
+  settings: Readonly<{ runner: Pick<PracticeSettings["runner"], "RELEASE_KEY"> }>;
   declaredProviderTargets: Parameters<typeof buildApiProviderPriceMap>[0];
   log?: (line: string) => void;
 }>) {
-  const { pool } = input;
+  const { pool, settings } = input;
   const environment = Object.freeze({ DEPLOYMENT_MODE: input.deploymentMode, REGISTER_VERSION: input.registerVersion });
   if (environment.DEPLOYMENT_MODE !== "hosted") return null;
   assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
@@ -202,8 +204,9 @@ export async function composePracticeAskMoney(input: Readonly<{
       waitingLinePerPerson: band.waitingLinePerPerson,
       // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
       // practice's throwaway database records no release and its runner lives in this process, so it is the only
-      // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with.
-      gate: new PostgresAskAdmissionGate({ releaseKey: developmentReleaseKey(environment.REGISTER_VERSION), hosted: false })
+      // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with
+      // and its runner claims under (settings.runner.RELEASE_KEY, practice-settings.ts practiceReleaseKey).
+      gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false })
     });
     askRoom = room;
   }
@@ -319,7 +322,7 @@ export async function composePracticeAsk(input: Readonly<{
   });
   // Hosted only: the money stages (null in local mode, which builds none of them).
   const money = await composePracticeAskMoney({
-    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, declaredProviderTargets,
+    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, settings, declaredProviderTargets,
     ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool }),
     ...(input.log === undefined ? {} : { log: input.log })
   });
@@ -386,9 +389,10 @@ export async function composePracticeAsk(input: Readonly<{
     previewBudgetGate,
     strangerSampleRate: settings.strangerSampleRate,
     registerVersion: version,
-    // Side-by-side spec §1, as main.ts: every practice run is stamped. The practice's settings carry no RELEASE_KEY (its
-    // runner is composed in this process, not booted under one), so it admits as the development key of its version.
-    releaseKey: developmentReleaseKey(version),
+    // Side-by-side spec §1, §3, as main.ts: every practice run is stamped, with the one key its runner claims under
+    // (practice-runner-composition.ts reads the same settings.runner.RELEASE_KEY); a run stamped with another key would
+    // be NO_WORK for that runner.
+    releaseKey: settings.runner.RELEASE_KEY,
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
     // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.

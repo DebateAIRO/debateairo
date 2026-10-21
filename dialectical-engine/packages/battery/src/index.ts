@@ -737,10 +737,11 @@ export class WorkItemRepository {
 
   /**
    * Spec §4, §9: sets one open work item of `runId` aside — FAILED with `runSetAsideReason(reason)` — only when its run
-   * belongs to this fence's release and it is not settled. `readyOnly` limits it to a job never claimed (plan C's
-   * RELEASE_NOT_SERVED path builds the repository with the run's own release as the fence); otherwise a CLAIMED item
-   * qualifies too, except under another worker's live claim (D2). On the caller's transaction, with the run's waiver
-   * (spec §9) when it wrote the item, so both commit together. True when this call wrote it.
+   * belongs to this fence's release and it is not settled. `readyOnly` limits it to a job never claimed; otherwise a
+   * CLAIMED item qualifies too, except under another worker's live claim (D2). On the caller's transaction, with the
+   * run's waiver (spec §9) when it wrote the item, so both commit together. True when this call wrote it. Plan C's
+   * RELEASE_NOT_SERVED path does not come through here: it closes its never-claimed job through `recordSetupFailure`
+   * with RUN_SETUP_FAILED:RELEASE_NOT_SERVED (shown to the person as "not started") and writes the waiver itself.
    */
   async setAsideWorkItemOn(
     client: PoolClient,
