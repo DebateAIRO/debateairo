@@ -11,16 +11,20 @@ const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).diges
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const digest = 'a'.repeat(64), revision = 'a'.repeat(40), tree = 'b'.repeat(40);
 const publication = { publicationId: '11111111-1111-4111-8111-111111111111', publicationKind: 'GENERAL', baseRegisterVersion: '8', registerVersion: '12', requestSha256: digest, snapshotSha256: digest, rowCount: 68, recordedAt: '2026-10-06T12:00:00.000Z' };
-const root = '/opt/debateai-v3-preview/releases/auth-dev-candidate-v1';
+// Release roots end in their service and each service reads its own release's env file (side-by-side spec §10);
+// `root` is the API's folder, where the native operator lives.
+const rootOf = (service: 'api' | 'ui' | 'runner') => `/opt/debateai-v3-preview/releases/auth-dev-candidate-v1-${service}`;
+const root = rootOf('api');
+const envOf = (service: 'api' | 'ui' | 'runner') => `/etc/debateai-v3-preview/auth-dev-v1/${service}-v1.env`;
 const basePlan = (service: 'api' | 'ui') => ({
-  schema: 'preview-auth-dev-launch-v1', service, artifact: 'candidate', sourceRoot: root, sourceRevision: revision, sourceTree: tree,
+  schema: 'preview-auth-dev-launch-v1', service, artifact: 'candidate', sourceRoot: rootOf(service), sourceRevision: revision, sourceTree: tree,
   serviceUid: service === 'api' ? 1001 : 1002, serviceGid: service === 'api' ? 1001 : 1002,
   sourceManifest: { path: '/opt/debateai-v3-preview/artifacts/v1/source.json', sha256: 'c'.repeat(64) },
   nativeAttestation: { path: '/opt/debateai-v3-preview/artifacts/v1/native.json', sha256: 'd'.repeat(64) },
   uiBuild: service === 'ui' ? { path: '/opt/debateai-v3-preview/artifacts/v1/ui-build.json', sha256: 'e'.repeat(64) } : null,
   publication, operatorManifestSha256: 'f'.repeat(64),
-  environment: { path: `/etc/debateai-v3-preview/auth-dev-v1/${service}.env`, root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: service === 'api' ? 1001 : 1002, mode: 0o640, parentUid: 0 },
-  apiPort: '3101', uiPort: '3100', mailExecutable: `${root}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`, mailFrom: 'noreply@dezbatere.ro'
+  environment: { path: envOf(service), root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: service === 'api' ? 1001 : 1002, mode: 0o640, parentUid: 0 },
+  apiPort: '3101', uiPort: '3100', mailExecutable: `${rootOf(service)}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`, mailFrom: 'noreply@dezbatere.ro'
 });
 const nativePlan = (patch: Record<string, unknown> = {}) => ({
   schema: 'preview-auth-dev-native-plan-v1', operation: 'verify', sourceRoot: root, sourceRevision: revision, sourceTree: tree,
@@ -312,7 +316,7 @@ describe('release drop-in', () => {
       `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/api-launch.json`]);
     expect(prestart.RELEASE_DROPIN_NAME > 'zzzzzzzzz-auth-dev-task12-final.conf').toBe(true);
     const ui = prestart.renderReleaseDropin({ service: 'ui', entry: lock.services.ui, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
-    expect(ui).toContain(`WorkingDirectory=${root}/dialectical-engine/apps/ui\n`);
+    expect(ui).toContain(`WorkingDirectory=${rootOf('ui')}/dialectical-engine/apps/ui\n`);
     expect(ui).toContain('launch-ui.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/ui-launch.json');
     expect(ui).toContain('\n[Service]\nRestart=on-failure\nRestartMode=direct\nRestartSec=30\nTimeoutStartSec=300\n');
   });
@@ -333,9 +337,9 @@ describe('release drop-in', () => {
 
 // GAP-RUNNER (2026-10-09): the runner is pinned and refreshed exactly like the API, starts only in
 // its explicit --start mode, and still stays out of debateai-preview.target (units test).
+const runnerPlan = () => ({ ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, sourceRoot: rootOf('runner'),
+  mailExecutable: `${rootOf('runner')}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`, environment: { ...basePlan('api').environment, path: envOf('runner'), gid: 975 } });
 describe('runner release', () => {
-  const runnerPlan = () => ({ ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975,
-    environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
   it('pins, refreshes and renders the runner with a --start launcher line', async () => {
     const s = server();
     s.write(s.planPath('runner'), runnerPlan());
@@ -353,8 +357,8 @@ describe('runner release', () => {
     expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'runner' });
     const text = prestart.renderReleaseDropin({ service: 'runner', entry: lock.services.runner, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
-    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service runner', 'ExecStart=',
-      `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs --start --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/runner-launch.json`]);
+    expect(lines).toEqual(['[Service]', `WorkingDirectory=${rootOf('runner')}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service runner', 'ExecStart=',
+      `ExecStart=/opt/node/bin/node ${rootOf('runner')}/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs --start --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/runner-launch.json`]);
   });
 
   it('refuses a runner whose release is not the native plan\'s source revision before any database work', async () => {
@@ -392,7 +396,7 @@ describe('runner unit check (before any database work)', () => {
   });
   it('runs before the native plan is read for the runner, and never for api or ui', async () => {
     const s = server();
-    s.write(s.planPath('runner'), { ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
+    s.write(s.planPath('runner'), runnerPlan());
     await pinned(s);
     await prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 });
     let checks = 0;

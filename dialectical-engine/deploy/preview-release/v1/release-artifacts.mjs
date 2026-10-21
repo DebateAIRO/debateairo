@@ -12,7 +12,8 @@
 //       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>
-//   release-artifacts.mjs launch-plan --service api|ui|runner --from <existing plan> --root <release root>
+//   release-artifacts.mjs launch-plan --service api|ui|runner --slot A|B --from <existing plan> --root <release root>
+//       (--slot alone names the ports, --root alone names the env file <service>-<label>.env: side-by-side spec §6, §10)
 //       (--service runner may name the API plan as --from: the runner's identity then comes from its OS account)
 //       --source-manifest <file> [--ui-build <file>] --native-attestation <file> [--publication <publish output>] --out <file>
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
@@ -44,7 +45,7 @@ import { pathToFileURL } from 'node:url';
 import { protectedPath, sha256, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
 import { generateSourceManifest, operatorFiles, operatorManifestSha256, verifySourceManifest } from '../../preview-auth-dev/v1/source-manifest.mjs';
 import { buildUiArtifact, verifyUiBuildManifest } from '../../preview-auth-dev/v1/ui-build.mjs';
-import { parsePublicArtifactBytes, validateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
+import { PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifactBytes, previewEnvironmentPath, validateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
@@ -99,7 +100,7 @@ const COMMANDS = Object.freeze({
   'ui-build': { required: ['--source', '--out'], optional: ['--models'] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
-  'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
+  'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
   'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--hosted-billing'] }
 });
 
@@ -309,7 +310,12 @@ async function launchPlanCommand(options, { layout, deps }) {
   const service = options['--service'], root = options['--root'];
   const validatePlan = deps.validateLaunchPlan ?? validateLaunchPlan;
   if (!ROLES.includes(service)) refuse('ARGUMENTS_REFUSED', ['--service']);
+  // Side-by-side spec §6: the slot alone names the ports (the reviewed table, never --from's).
+  const ports = Object.hasOwn(PREVIEW_SLOTS, options['--slot']) ? PREVIEW_SLOTS[options['--slot']] : refuse('ARGUMENTS_REFUSED', ['--slot']);
   const kind = releasePattern(layout).exec(root)?.[1] ?? refuse('RELEASE_ROOT_REFUSED');
+  // Side-by-side spec §10: the root ends in its service and carries the release label, which names its env file.
+  let label;
+  try { label = labelOfSourceRoot(root, service); } catch { refuse('RELEASE_ROOT_REFUSED'); }
   await assertOutputFree(options['--out'], { layout, name: `${service}-launch.json` });
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validatePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
@@ -334,17 +340,17 @@ async function launchPlanCommand(options, { layout, deps }) {
   try {
     validateNativeAttestation(native.value, { sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree, nativeSourceSha256: source.value.nativeSha256, publication }, Date.parse(native.value?.verifiedAt));
   } catch { refuse('NATIVE_ATTESTATION_MISMATCH'); }
-  let { serviceUid, serviceGid, environment } = from.value;
+  let { serviceUid, serviceGid } = from.value, environment = { ...from.value.environment, path: previewEnvironmentPath(service, label) };
   if (derivedRunner) {
     ({ uid: serviceUid, gid: serviceGid } = await (deps.lookupRunnerAccount ?? lookupRunnerAccount)());
-    environment = { path: `${ENV_ROOT}/runner.env`, root: ENV_ROOT, uid: 0, gid: serviceGid, mode: 0o640, parentUid: 0 };
+    environment = { path: previewEnvironmentPath(service, label), root: ENV_ROOT, uid: 0, gid: serviceGid, mode: 0o640, parentUid: 0 };
   }
   const plan = {
     schema: from.value.schema, service, artifact: kind, sourceRoot: root, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     serviceUid, serviceGid,
     sourceManifest: { path: source.path, sha256: source.sha256 }, nativeAttestation: { path: native.path, sha256: native.sha256 }, uiBuild,
     publication, operatorManifestSha256: operatorManifestSha256(source.value), environment,
-    apiPort: from.value.apiPort, uiPort: from.value.uiPort, mailExecutable: join(root, 'dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs'), mailFrom: from.value.mailFrom
+    apiPort: ports.apiPort, uiPort: ports.uiPort, mailExecutable: join(root, 'dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs'), mailFrom: from.value.mailFrom
   };
   try { validatePlan(plan); } catch { refuse('LAUNCH_PLAN_INVALID'); }
   // Last and slowest: the release folder still matches its manifests byte for byte (as the launcher will check).
