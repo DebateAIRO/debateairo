@@ -26,7 +26,7 @@ describe("minimal scoped staff HTTP boundary", () => {
     const server = api();
     for (const route of staffContractInventory.routes) {
       const [method, path] = route.split(" ");
-      expect(server.hasRoute({ method: method as "GET" | "POST" | "PATCH", url: path!.replace("{staffId}", ":staffId") }), route).toBe(true);
+      expect(server.hasRoute({ method: method as "GET" | "POST" | "PATCH", url: path!.replace(/\{([A-Za-z][A-Za-z0-9]*)\}/g, ":$1") }), route).toBe(true);
     }
     expect(server.hasRoute({ method: "POST", url: "/v1/admin/bootstrap-owner" })).toBe(false);
     expect(server.hasRoute({ method: "POST", url: "/v1/admin/recover-owner" })).toBe(false);

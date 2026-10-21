@@ -117,7 +117,7 @@ describe("Accounts S8 publication architecture", () => {
     expect(databaseSessions).toContain("grantTokenHash");
     expect(api).toContain("PublishDebateRequestSchema");
     expect(api).toContain("step_up_grant");
-    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(2);
+    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(3);
     expect(contract).toContain("warning_acknowledged");
     expect(contract).toContain("z.literal(true)");
   });
