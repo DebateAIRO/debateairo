@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import { migrate } from "@debateai/db";
 import { ServeRepository, buildFactBundle, type ServeGateResult } from "@debateai/serve";
@@ -98,5 +98,29 @@ describe("serve persist synthesis check request", () => {
     const second = await persistAnswer(true, first);
     expect(second.answerVersion).toBe(first.answerVersion + 1);
     expect(await requests(first.answerId)).toEqual([first.answerVersion, second.answerVersion]);
+  });
+
+  it("a request inserted with the answer does not make the same-version persist fail", async () => {
+    await database.pool.query(`CREATE FUNCTION serve.test_early_synthesis_request() RETURNS trigger
+      LANGUAGE plpgsql AS $$ BEGIN
+        INSERT INTO serve.synthesis_check_request(request_id,run_id,answer_id,answer_version)
+        VALUES (gen_random_uuid(),NEW.run_id,NEW.answer_id,NEW.answer_version);
+        RETURN NEW;
+      END $$`);
+    await database.pool.query(`CREATE TRIGGER test_early_synthesis_request AFTER INSERT ON serve.answer
+      FOR EACH ROW EXECUTE FUNCTION serve.test_early_synthesis_request()`);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const answer = await persistAnswer(true);
+      expect(await requests(answer.answerId)).toEqual([answer.answerVersion]);
+      expect((await database.pool.query<{ n: number }>(
+        `SELECT count(*)::integer AS n FROM serve.answer WHERE answer_id=$1`, [answer.answerId]
+      )).rows[0]?.n).toBe(1);
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+      await database.pool.query("DROP TRIGGER test_early_synthesis_request ON serve.answer");
+      await database.pool.query("DROP FUNCTION serve.test_early_synthesis_request()");
+    }
   });
 });

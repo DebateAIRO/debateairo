@@ -136,6 +136,25 @@ function keyStore(owners: Map<string,string>): RunContentKeyStore {
   };
 }
 
+async function namedRowCounts(row: Pick<Fixture,"runId"|"ownerRef"|"userId">): Promise<Map<string,number>> {
+  const columns = (await database.pool.query<{ table_schema: string; table_name: string; column_name: string }>(`
+    SELECT c.table_schema,c.table_name,c.column_name FROM information_schema.columns AS c
+    JOIN information_schema.tables AS t USING (table_schema,table_name)
+    WHERE t.table_type='BASE TABLE' AND c.table_schema IN ('core','serve','identity','ledger','billing')
+      AND c.column_name IN ('run_id','owner_ref','user_id')
+    ORDER BY c.table_schema,c.table_name,c.column_name`)).rows;
+  const counts = new Map<string,number>();
+  for (const column of columns) {
+    const id = column.column_name === "run_id" ? row.runId
+      : column.column_name === "owner_ref" ? row.ownerRef : row.userId;
+    const key = `${column.table_schema}.${column.table_name}.${column.column_name}`;
+    const result = await query(`SELECT count(*)::integer AS n FROM "${column.table_schema}"."${column.table_name}"
+      WHERE "${column.column_name}"=$1`, [id]);
+    counts.set(key, Number(result.rows[0]?.n ?? 0));
+  }
+  return counts;
+}
+
 beforeAll(async () => {
   database=await startTestDatabase();
   await migrate(database.pool);
@@ -154,6 +173,22 @@ afterAll(async () => {
 });
 
 describe("synthesis check system erasure over an isolated PostgreSQL database", () => {
+  it("lists every run and account reference table after system deletion and leaves only declared additions", async () => {
+    const row = await fixture();
+    const before = await namedRowCounts(row);
+    expect(await new SynthesisCheckErasureCoordinator(repository,row.keys).reconcile())
+      .toContainEqual({ runId: row.runId, outcome: "CLEANED" });
+    const after = await namedRowCounts(row);
+    expect([...after.keys()]).toEqual([...before.keys()]);
+    const added = [...after].filter(([key,count]) => count > (before.get(key) ?? 0))
+      .map(([key]) => key).sort();
+    expect(added).toEqual([
+      "identity.synthesis_check_erasure_binding.owner_ref",
+      "identity.synthesis_check_erasure_binding.run_id",
+      "serve.private_run_erasure_tombstone.run_id"
+    ]);
+    expect(await row.keys.exists(row.runId)).toBe(false);
+  });
   it("prepare turns a removal request into the four synthesis_check_erasure_* tombstone rows, the private cleanup intent and the binding, deletes the attestation secret and the request, leaves the one notice insertResult wrote, and every content lease of the run then refuses PRIVATE_CONTENT_ERASED", async () => {
     const row=await fixture();
     const prepared=await repository.prepareRequested(100);

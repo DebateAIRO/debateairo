@@ -4,6 +4,7 @@ import { configureContentEncryption, contentCipherFor, createPool, encryptAttest
   migrate, type Pool } from "@debateai/db";
 import { ServeRepository, SynthesisCheckRepository } from "@debateai/serve";
 import { WorkItemRepository } from "@debateai/battery";
+import { FileRunContentKeyStore } from "@debateai/crypto";
 import type { SynthesisCheckOutcome } from "@debateai/contract";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
@@ -344,8 +345,21 @@ describe("synthesis check repository under debateai_runtime", () => {
   });
 
   it("ownerRefOfRun names the latest recorded owner", async () => {
-    const answer = await fixture();
-    expect(await repository.ownerRefOfRun(answer.runId)).toBe(owner.ownerRef);
+    const runId = randomUUID();
+    await database.pool.query(`INSERT INTO core.run (run_id,question_line,asker_id,session_id,caller_scope,as_of,
+      asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,composition_budget_tier,depth_params,
+      agent_count,discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,created_at_seq)
+      VALUES ($1,'Ownership chronology?','test-asker','test-session','ASKER',clock_timestamp(),'casual','casual',
+        'ASKER','test','low','{}'::jsonb,1,'[{}]'::jsonb,0,'{}'::jsonb,1,'test',ledger.allocate_sequence())`, [runId]);
+    await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, owner.ownerRef]);
+    expect(await repository.ownerRefOfRun(runId)).toBe(owner.ownerRef);
+    const successor = { userId: randomUUID(), ownerRef: randomUUID() };
+    await database.pool.query(`INSERT INTO identity."user"
+      (user_id,email_blind_index,email_ciphertext,password_hash,pseudonym,owner_ref,state,adult_affirmed_at)
+      VALUES ($1,$2,'{}'::jsonb,'fixture-password-hash',$3,$4,'active',clock_timestamp())`,
+      [successor.userId, randomBytes(32), `owner-latest-${successor.userId}`, successor.ownerRef]);
+    await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, successor.ownerRef]);
+    expect(await repository.ownerRefOfRun(runId)).toBe(successor.ownerRef);
   });
 
   it("verdict of record: a final verdict covers a byte-identical synthesis, while a changed synthesis has none", async () => {
@@ -428,6 +442,32 @@ describe("synthesis check repository under debateai_runtime", () => {
       `SELECT * FROM serve.synthesis_check_result WHERE run_id=$1`, [answer.runId]
     )).rows[0]!;
     expect(JSON.stringify({ ...readable, content_ciphertext: null })).not.toMatch(/FLAGGED|SUICIDE_OR_HARM_TO_OTHERS/);
+  });
+
+  it("CLEAR and FLAGGED leave the same readable result and spend columns after both keys are destroyed", async () => {
+    const pair = [await fixture(), await fixture()];
+    const outcomes = [clear, { verdict: "FLAGGED", categories: ["HATE_SPEECH"] } as const];
+    const keys = new FileRunContentKeyStore(owner.secretRoot,
+      {} as ConstructorParameters<typeof FileRunContentKeyStore>[1], async () => owner.userId);
+    for (const [index, answer] of pair.entries()) {
+      const attempt = await publishAttempt(answer!);
+      expect(await repository.insertResult(resultInput(answer!, attempt.attemptId, outcomes[index]!))).toBe("INSERTED");
+      await database.pool.query(`INSERT INTO ledger.model_spend
+        (spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens)
+        VALUES ($1,'SYNTHESIS_CHECK',$2,'anthropic',current_date,25,100,30)`, [randomUUID(), answer!.runId]);
+      expect(await keys.destroy(answer!.runId)).toBe("DESTROYED");
+      await expect(repository.readRecords({ ...answer!, maxVersion: 1 })).rejects.toThrow();
+    }
+    const rows = await Promise.all(pair.map(async (answer) => ({
+      result: (await database.pool.query(`SELECT answer_version,synthesis_origin_version,final,failure_code,
+          policy_version,content,length(content_ciphertext->>'ct') AS ciphertext_length,
+          octet_length(content_attestation) AS attestation_length
+        FROM serve.synthesis_check_result WHERE run_id=$1`, [answer.runId])).rows[0],
+      spend: (await database.pool.query(`SELECT spend_source,provider_ref,charge_micros,input_tokens,output_tokens
+        FROM ledger.model_spend WHERE run_id=$1 AND spend_source='SYNTHESIS_CHECK'`, [answer.runId])).rows[0]
+    })));
+    expect(rows[0]).toEqual(rows[1]);
+    expect(JSON.stringify(rows[0])).not.toMatch(/HATE_SPEECH|FLAGGED|CLEAR/);
   });
 
   it("insertResult answers RUN_ERASED after erasure and stores nothing", async () => {

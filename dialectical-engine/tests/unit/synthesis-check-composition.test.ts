@@ -27,4 +27,13 @@ describe("synthesis check production composition", () => {
     expect(source).toContain("synthesisAnswerAccess,");
     expect(source).toMatch(/try \{ await synthesisCheckErasure\.reconcile\(100\); \} catch \{[^}]*\}\s*await privateErasure\.reconcile/);
   });
+
+  it("wires Publish and the worker to the owner-scoped answer read beneath the public hold", () => {
+    const read = source.slice(source.indexOf("const readSynthesisAnswer ="),
+      source.indexOf("const synthesisCheckWorker ="));
+    expect(read).toContain("application.readAnswer(answerId, ownerSession(ownerRef");
+    expect(read).not.toContain("readOwnerAnswer(");
+    expect(read).toContain("await readSynthesisAnswer(runId, answerId, version, ownerRef)");
+    expect(read).toContain("texts.set(version, synthesisTextOf(answer))");
+  });
 });

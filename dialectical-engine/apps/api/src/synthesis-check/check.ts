@@ -76,6 +76,16 @@ export async function runSynthesisCheck(deps: SynthesisCheckDeps, input: Synthes
 
     const framed = buildFramedPrompt({ contract: synthesisCheckContract(), material: [{ name: "synthesis", content: input.synthesisText }] });
     const expectedCall = judgeCallValue(framed.fence);
+    const estimatedInputTokens = Buffer.byteLength(framed.packet.messages.map(message => message.content).join(""));
+    const recordCallSpend = async (inputTokens: number, outputTokens: number): Promise<void> => {
+      const entry: SpendEntry = {
+        spendSource: "SYNTHESIS_CHECK", runId: input.runId, providerRef: port!.providerRef, chargedOn,
+        inputTokens, outputTokens,
+        chargeMicros: Math.ceil(inputTokens * Number(price.inputUsdPerM) + outputTokens * Number(price.outputUsdPerM))
+      };
+      try { await deps.recordSpend(entry); }
+      catch { log("SYNTHESIS_CHECK_SPEND_UNRECORDED", "UNEXPECTED"); }
+    };
     const remaining = input.deadlineAt.getTime() - deps.clock().getTime();
     const time = Math.max(0, Math.min(deps.deadlineMs, remaining));
     if (time === 0) return unavailable("DEADLINE");
@@ -84,20 +94,16 @@ export async function runSynthesisCheck(deps: SynthesisCheckDeps, input: Synthes
     let reply: Awaited<ReturnType<SynthesisCheckPort["complete"]>>;
     try { reply = await withinDeadline(port, framed.packet, signal); }
     catch (error) {
-      return unavailable(error instanceof SynthesisCheckFailure ? error.code : signal.aborted ? "DEADLINE" : "UNEXPECTED");
+      const code = error instanceof SynthesisCheckFailure ? error.code : signal.aborted ? "DEADLINE" : "UNEXPECTED";
+      if (code === "DEADLINE") await recordCallSpend(estimatedInputTokens, SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS);
+      return unavailable(code);
     }
 
     const parsed = parseSynthesisCheckAnswer(reply.text, expectedCall);
-    const inputTokens = reply.usage?.input_tokens ?? Buffer.byteLength(framed.packet.messages.map(message => message.content).join(""));
+    const inputTokens = reply.usage?.input_tokens ?? estimatedInputTokens;
     const outputTokens = parsed.ok ? SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS
       : Math.max(reply.usage?.output_tokens ?? 0, SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS);
-    const entry: SpendEntry = {
-      spendSource: "SYNTHESIS_CHECK", runId: input.runId, providerRef: port.providerRef, chargedOn,
-      inputTokens, outputTokens,
-      chargeMicros: Math.ceil(inputTokens * Number(price.inputUsdPerM) + outputTokens * Number(price.outputUsdPerM))
-    };
-    try { await deps.recordSpend(entry); }
-    catch { log("SYNTHESIS_CHECK_SPEND_UNRECORDED", "UNEXPECTED"); }
+    await recordCallSpend(inputTokens, outputTokens);
     return parsed.ok
       ? parsed.verdict === "CLEAR" ? result({ verdict: "CLEAR", categories: [] })
         : result({ verdict: "FLAGGED", categories: parsed.categories })

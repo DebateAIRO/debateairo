@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { configureContentEncryption, contentCipherFor, createPool, migrate } from "@debateai/db";
+import { configureContentEncryption, contentCipherFor, createPool, encryptAttestedContentForRun, migrate } from "@debateai/db";
 import { SynthesisCheckRepository } from "@debateai/serve";
 import { PostgresAskApplication } from "../../apps/api/src/index.js";
 import { collectSnapshot, type RawExportRows } from "../../apps/api/src/data-export/snapshot.js";
 import { OwnerViewAdapter } from "../../apps/api/src/data-export/owner-view-adapter.js";
+import { createSynthesisAnswerAccess } from "../../apps/api/src/synthesis-check/hold.js";
 import { renderYourDataHtml } from "../../apps/api/src/data-export/html-page.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import type { SynthesisCheckEntry } from "../../apps/api/src/data-export/types.js";
@@ -75,20 +76,64 @@ describe("synthesis checks in the owner's data export", () => {
           reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null }
       });
       const repository = new SynthesisCheckRepository(runtime);
+      const composedId = randomUUID();
+      const composed = await encryptAttestedContentForRun(db.pool, runId, "serve.composed_text", composedId, {
+        segments: [{ segment_id: randomUUID(), text: "A different synthesis", load_bearing: true, served_number_refs: [] }]
+      });
+      if (composed === null) throw new Error("TEST_COMPOSED_CIPHER_MISSING");
+      const rawArtifactId = randomUUID();
+      const rawArtifact = await encryptAttestedContentForRun(db.pool, runId, "ledger.raw_artifact", rawArtifactId,
+        { rawText: "fixture", metadataJson: {} });
+      if (rawArtifact === null) throw new Error("TEST_RAW_ARTIFACT_CIPHER_MISSING");
+      await db.pool.query(`INSERT INTO ledger.raw_artifact
+        (raw_artifact_id,attempt_id,run_id,provider_ref,provider,model_id,maker,raw_text,metadata_json,
+         parse_status,input_hash,input_hash_version,contract_hash,content_hash,content_hash_version,at_seq,
+         content_ciphertext,content_attestation)
+        VALUES ($1,$2,$3,'test','test','test','test','⟦DEBATEAI:CIPHERTEXT:V1⟧',
+          '{}'::jsonb,'PARSED','test',1,'test','test',1,
+          ledger.allocate_sequence(),$4::jsonb,$5)`,
+        [rawArtifactId, randomUUID(), runId, JSON.stringify(rawArtifact.envelope), rawArtifact.attestation]);
+      await db.pool.query(`INSERT INTO serve.composed_text
+        (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
+        SELECT $2,fact_bundle_id,'[]'::jsonb,$3,1,$4::jsonb,$5 FROM serve.answer
+        WHERE answer_id=$1 AND answer_version=1`,
+        [answerId, composedId, rawArtifactId, JSON.stringify(composed.envelope), composed.attestation]);
+      const second = await encryptAttestedContentForRun(db.pool, runId, "serve.answer", `${answerId}:2`, { answerForm: null });
+      if (second === null) throw new Error("TEST_ANSWER_CIPHER_MISSING");
+      await db.pool.query(`INSERT INTO serve.answer (
+        answer_id,answer_version,run_id,work_item_id,terminal,serve_state,verdict_state,
+        answer_form,condition_marks,fact_bundle_id,composed_text_id,conformance_record_id,
+        sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,
+        verdict_unavailable,memory_disclosure,content_ciphertext,content_attestation
+      ) SELECT answer_id,2,run_id,work_item_id,terminal,'COMPOSED',verdict_state,
+        answer_form,condition_marks,fact_bundle_id,$2,conformance_record_id,
+        ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,
+        builds_on_previous,badges,verdict_unavailable,memory_disclosure,$3::jsonb,$4
+        FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
+        [answerId, composedId, JSON.stringify(second.envelope), second.attestation]);
       const attempt = await repository.startPublishAttempt({ runId, answerId, answerVersion: 1 });
       expect(await repository.insertResult({
         attemptId: attempt.attemptId, runId, answerId, answerVersion: 1, synthesisOriginVersion: 1,
-        outcome: { verdict: "CLEAR", categories: [] }, modelProviderRef: null, modelId: null,
-        policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 0, deadlineMs: 60_000
+        outcome: { verdict: "FLAGGED", categories: ["HATE_SPEECH"] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
+        policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000
+      })).toBe("INSERTED");
+      const secondAttempt = await repository.startPublishAttempt({ runId, answerId, answerVersion: 2 });
+      expect(await repository.insertResult({
+        attemptId: secondAttempt.attemptId, runId, answerId, answerVersion: 2, synthesisOriginVersion: 2,
+        outcome: { verdict: "CLEAR", categories: [] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
+        policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000
       })).toBe("INSERTED");
       const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
         createTestAskAdmissionPoolFacades(runtime));
       const adapter = new OwnerViewAdapter({ application }, { exists: async () => true });
       const real = exportHarness();
-      real.ownerView.readRunAnswer.mockResolvedValue({ answer_id: answerId, answer_version: 1 });
+      real.ownerView.readRunAnswer.mockResolvedValue({ answer_id: answerId, answer_version: 2 });
       real.ownerView.readSynthesisChecks.mockImplementation((ownerRef, id) => adapter.readSynthesisChecks(ownerRef, id));
       const exported = (await real.collect(owner.ownerRef)).debates.debates[0]?.answers?.[0]?.synthesis_checks;
-      expect(exported).toEqual([{ answer_version: 1, verdict: "CLEAR", categories: [], checked_at: expect.any(String) }]);
+      expect(exported).toEqual([
+        { answer_version: 1, verdict: "FLAGGED", categories: ["HATE_SPEECH"], checked_at: expect.any(String) },
+        { answer_version: 2, verdict: "CLEAR", categories: [], checked_at: expect.any(String) }
+      ]);
     } finally {
       await runtime?.end();
       await db.stop();
@@ -142,12 +187,42 @@ describe("synthesis checks in the owner's data export", () => {
   });
 
   it("a held debate is listed with no answer", async () => {
-    const h = exportHarness();
-    h.ownerView.readRunAnswer.mockResolvedValue(null);
-    const entry = (await h.collect()).debates.debates[0];
-    expect(entry).toMatchObject({ content_status: "READABLE", answers: [] });
-    expect(entry?.run_answer).toBeNull();
-    expect(h.ownerView.runRemovedByCheck).toHaveBeenCalledWith("run-1");
-    expect(h.ownerView.readSynthesisChecks).not.toHaveBeenCalled();
-  });
+    const db = await startTestDatabase();
+    let runtime: ReturnType<typeof createPool> | undefined;
+    let owner: Awaited<ReturnType<typeof provisionStoryEncryptedOwner>> | undefined;
+    try {
+      await migrate(db.pool);
+      owner = await provisionStoryEncryptedOwner(db.pool);
+      const url = new URL(db.connectionString);
+      url.searchParams.set("options", "-c role=debateai_runtime");
+      runtime = createPool(url.toString());
+      configureContentEncryption(runtime, contentCipherFor(db.pool)!);
+      const runId = await createEncryptedStoryRun(db.pool, owner, `Held export ${randomUUID()}?`);
+      const { answerId } = await persistTerminalRun({
+        pool: db.pool, runId, fixtureKey: randomUUID(),
+        factBundle: { facts: [], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+          reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null }
+      });
+      const repository = new SynthesisCheckRepository(runtime);
+      await repository.insertRequest({ runId, answerId, answerVersion: 1 });
+      const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
+        createTestAskAdmissionPoolFacades(runtime));
+      const adapter = new OwnerViewAdapter({ application,
+        synthesisAnswerAccess: createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 }) },
+      { exists: async () => true });
+      const heldAnswer = await adapter.readRunAnswer(owner.ownerRef, runId);
+      expect(heldAnswer).toBeNull();
+      const h = exportHarness();
+      h.ownerView.readRunAnswer.mockResolvedValue(heldAnswer as null);
+      const entry = (await h.collect()).debates.debates[0];
+      expect(entry).toMatchObject({ content_status: "READABLE", answers: [] });
+      expect(entry?.run_answer).toBeNull();
+      expect(h.ownerView.runRemovedByCheck).toHaveBeenCalledWith("run-1");
+      expect(h.ownerView.readSynthesisChecks).not.toHaveBeenCalled();
+    } finally {
+      await runtime?.end();
+      await db.stop();
+      if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
+    }
+  }, 180_000);
 });

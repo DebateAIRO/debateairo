@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
-import { migrate } from "@debateai/db";
+import { migrate, withRunContentLease } from "@debateai/db";
 import { ServeRepository, SynthesisCheckRepository, buildFactBundle, type ServeGateResult } from "@debateai/serve";
+import { SynthesisCheckWorker } from "../../apps/api/src/synthesis-check/worker.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner,
@@ -122,6 +123,23 @@ describe("synthesis check request at settlement", () => {
     expect(rows.rows[0]).toEqual({ attempts: "0", results: "0" });
   });
 
+  it("two lost answer versions in one run leave both requests unclaimed", async () => {
+    const first = await persistAnswer("settlement");
+    const second = await persistAnswer("catch-up", first);
+    expect(second.answerVersion).toBe(2);
+    expect(await new WorkItemRepository(database.pool).settle({
+      workItemId: first.workItemId, attemptId: randomUUID(), artifactRef: randomUUID()
+    })).toBe(true);
+    expect(await requestVersions(first.answerId)).toEqual([1, 2]);
+    expect(await claimFor(first.answerId)).toEqual([]);
+    const counts = await database.pool.query<{ attempts: number; results: number }>(
+      `SELECT (SELECT count(*)::integer FROM serve.synthesis_check_attempt WHERE answer_id=$1) AS attempts,
+              (SELECT count(*)::integer FROM serve.synthesis_check_result WHERE answer_id=$1) AS results`,
+      [first.answerId]
+    );
+    expect(counts.rows[0]).toEqual({ attempts: 0, results: 0 });
+  });
+
   it("a refused request insert leaves the result COMPLETED and the answer, label, story and work item unchanged", async () => {
     const failures: string[] = [];
     const logged = vi.spyOn(console, "error").mockImplementation((message: unknown) => {
@@ -149,22 +167,69 @@ describe("synthesis check request at settlement", () => {
     }
   });
 
-  it("a worker that never answers leaves answer settlement returning within D of the same run without one", async () => {
+  it("a timed-out worker check does not delay a same-run later version or another run's settlement", async () => {
+    const first = await persistAnswer("settlement");
+    await settle(first);
+    let sent!: () => void;
+    const packetSent = new Promise<void>((resolve) => { sent = resolve; });
+    const repository = new SynthesisCheckRepository(database.pool);
+    const serve = new ServeRepository(database.pool);
+    const worker = new SynthesisCheckWorker({
+      repository, erasure: { reconcile: async () => [] },
+      withContentLease: <T>(runId: string, use: () => Promise<T>) =>
+        withRunContentLease(database.pool, [runId], use),
+      readAnswer: async (runId, answerId, version, ownerRef) => {
+        if (runId !== first.runId) return null;
+        const stored = await serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, version);
+        return stored === null ? null : { ...stored, serve_state: "COMPOSED" as const,
+          composed_text: [{ segment_id: randomUUID(), text: "A conclusion", load_bearing: true,
+            served_number_refs: [] }] };
+      },
+      check: { port: () => ({ providerRef: "anthropic", modelId: "claude-haiku-5-5",
+        complete: async () => { sent(); return new Promise<{ text: string }>(() => {}); } }),
+        deadlineMs: 1_500, recordSpend: async () => {},
+        priceOf: () => ({ inputUsdPerM: "0.10", outputUsdPerM: "0.50" }),
+        clock: () => new Date(), log: () => {} },
+      deadlineMs: 1_500, log: () => {}
+    });
+    const running = worker.runOnce();
+    await packetSent;
     const started = performance.now();
-    const answer = await persistAnswer("settlement");
-    await settle(answer);
-    expect(performance.now() - started).toBeLessThan(60_000);
-    expect(await requestVersions(answer.answerId)).toEqual([answer.answerVersion]);
-  });
+    const later = await persistAnswer("catch-up", first);
+    const other = await persistAnswer("settlement");
+    await settle(other);
+    expect(performance.now() - started).toBeLessThan(1_500);
+    expect(await requestVersions(first.answerId)).toEqual([1, 2]);
+    expect(await requestVersions(other.answerId)).toEqual([1]);
+    await running;
+    expect((await repository.readRecords({ ...first, maxVersion: 1 }))[0]?.outcome)
+      .toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "DEADLINE" });
+  }, 60_000);
 
-  it("a verdict story that never returns does not hold back the request: the request row exists while the story is still pending", async () => {
+  it("the worker stores a check while a post-settlement story callback remains pending", async () => {
     const answer = await persistAnswer("settlement");
     await settle(answer);
     let storyFinished = false;
-    const story = new Promise<void>(() => {});
-    void story.then(() => { storyFinished = true; });
+    const storyWriter = { writeAfterSettle: async () => {
+      await new Promise<void>(() => {});
+      storyFinished = true;
+    } };
+    void storyWriter.writeAfterSettle();
+    const repository = new SynthesisCheckRepository(database.pool);
+    const serve = new ServeRepository(database.pool);
+    const worker = new SynthesisCheckWorker({
+      repository, erasure: { reconcile: async () => [] },
+      withContentLease: <T>(runId: string, use: () => Promise<T>) =>
+        withRunContentLease(database.pool, [runId], use),
+      readAnswer: (runId, answerId, version, ownerRef) => runId === answer.runId
+        ? serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, version) : Promise.resolve(null),
+      check: { port: () => null, deadlineMs: 60_000, recordSpend: async () => {},
+        priceOf: () => null, clock: () => new Date(), log: () => {} },
+      deadlineMs: 60_000, log: () => {}
+    });
+    await worker.runOnce();
+    expect((await repository.readRecords({ ...answer, maxVersion: 1 }))[0]?.outcome)
+      .toEqual({ verdict: "NO_SYNTHESIS", categories: [] });
     expect(storyFinished).toBe(false);
-    expect(await requestVersions(answer.answerId)).toEqual([answer.answerVersion]);
-    void story;
   });
 });

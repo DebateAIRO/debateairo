@@ -100,6 +100,21 @@ export class SynthesisCheckRepository {
                'synthesis-check-request:' || $1::text,0)) AS acquired`, [candidate.request_id]
           );
           if (!lock.rows[0]?.acquired) continue;
+          await client.query(
+            `SELECT pg_advisory_xact_lock(hashtextextended('synthesis-check-hold:' || $1::text,0))`,
+            [candidate.run_id]
+          );
+          const fresh = async (): Promise<boolean> => {
+            const result = await client.query<{ fresh: boolean }>(
+              `SELECT clock_timestamp() < requested_at
+                 + make_interval(secs => $2::double precision / 1000.0) AS fresh
+               FROM serve.synthesis_check_request WHERE request_id=$1`,
+              [candidate.request_id, deadlineMs]
+            );
+            return result.rows[0]?.fresh === true;
+          };
+          if (!await fresh()) continue;
+          await client.query("SAVEPOINT synthesis_claim_candidate");
           const inserted = await client.query<{
             attempt_id: string; request_id: string; run_id: string; answer_id: string;
             answer_version: number; started_at: Date;
@@ -111,6 +126,12 @@ export class SynthesisCheckRepository {
              RETURNING attempt_id,request_id,run_id,answer_id,answer_version,started_at`,
             [candidate.run_id, candidate.answer_id, candidate.answer_version, candidate.request_id]
           );
+          if (!await fresh()) {
+            await client.query("ROLLBACK TO SAVEPOINT synthesis_claim_candidate");
+            await client.query("RELEASE SAVEPOINT synthesis_claim_candidate");
+            continue;
+          }
+          await client.query("RELEASE SAVEPOINT synthesis_claim_candidate");
           const row = inserted.rows[0];
           if (row !== undefined) claims.push({
             attemptId: row.attempt_id, requestId: row.request_id, runId: row.run_id,
@@ -179,39 +200,18 @@ export class SynthesisCheckRepository {
         const sealed = await encryptAttestedContentForRun(
           this.pool, input.runId, "serve.synthesis_check_result", resultId, payload
         );
-        const inserted = await withWriteTransaction(this.pool, async (client) => {
-          const result = await client.query(
-            `INSERT INTO serve.synthesis_check_result(
-               result_id,attempt_id,run_id,answer_id,answer_version,synthesis_origin_version,
-               final,failure_code,policy_version,content,content_ciphertext,content_attestation
-             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12)
-             ON CONFLICT (answer_id,synthesis_origin_version) WHERE final DO NOTHING
-             RETURNING result_id`,
-            [resultId, input.attemptId, input.runId, input.answerId, input.answerVersion,
-              input.synthesisOriginVersion, outcome.verdict !== "UNAVAILABLE",
-              outcome.verdict === "UNAVAILABLE" ? outcome.failureCode : null,
-              input.policyVersion,
-              JSON.stringify(sealed === null ? payload : CONTENT_JSON_SENTINEL),
-              sealed === null ? null : JSON.stringify(sealed.envelope), sealed?.attestation ?? null]
-          );
-          if (result.rowCount !== 1) return false;
-          if (removesDebate(outcome)) {
-            await client.query(
-              `INSERT INTO serve.synthesis_check_removal_request(request_id,result_id,run_id)
-               VALUES (gen_random_uuid(),$1,$2)`, [resultId, input.runId]
-            );
-            const owner = await client.query<{ owner_ref: string }>(
-              `SELECT owner_ref FROM core.run_ownership_event WHERE run_id=$1
-               ORDER BY at_seq DESC LIMIT 1`, [input.runId]
-            );
-            if (owner.rows[0] === undefined) throw new Error("SYNTHESIS_CHECK_OWNER_MISSING");
-            await client.query(
-              `INSERT INTO serve.synthesis_check_removal_notice(owner_ref) VALUES ($1)`,
-              [owner.rows[0].owner_ref]
-            );
-          }
-          return true;
-        });
+        const stored = await this.pool.query<{ inserted: boolean }>(
+          `SELECT serve.store_synthesis_check_result(
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13
+           ) AS inserted`,
+          [resultId, input.attemptId, input.runId, input.answerId, input.answerVersion,
+            input.synthesisOriginVersion, outcome.verdict !== "UNAVAILABLE",
+            outcome.verdict === "UNAVAILABLE" ? outcome.failureCode : null,
+            input.policyVersion, JSON.stringify(sealed === null ? payload : CONTENT_JSON_SENTINEL),
+            sealed === null ? null : JSON.stringify(sealed.envelope), sealed?.attestation ?? null,
+            removesDebate(outcome)]
+        );
+        const inserted = stored.rows[0]?.inserted === true;
         return inserted ? late ? "LATE" : "INSERTED" : "ALREADY_FINAL";
       });
     } catch (error) {
@@ -225,9 +225,7 @@ export class SynthesisCheckRepository {
     inheritedResultId: string;
   }): Promise<"INSERTED"> {
     await this.pool.query(
-      `INSERT INTO serve.synthesis_check_inheritance(
-         attempt_id,run_id,answer_id,answer_version,inherited_result_id
-       ) VALUES ($1,$2,$3,$4,$5)`,
+      `SELECT serve.record_synthesis_check_inheritance($1,$2,$3,$4,$5)`,
       [input.attemptId, input.runId, input.answerId, input.answerVersion, input.inheritedResultId]
     );
     return "INSERTED";
@@ -280,7 +278,12 @@ export class SynthesisCheckRepository {
   async readAnswerAccess(input: {
     runId: string; answerId?: string; answerVersion?: number; deadlineMs: number;
   }): Promise<SynthesisAnswerAccessState> {
-    const result = await this.pool.query<{ state: SynthesisAnswerAccessState }>(
+    return withWriteTransaction(this.pool, async (client) => {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended('synthesis-check-hold:' || $1::text,0))`,
+        [input.runId]
+      );
+      const result = await client.query<{ state: SynthesisAnswerAccessState }>(
       `WITH target AS (
          SELECT COALESCE($2::uuid,(
            SELECT work.settled_artifact_ref FROM core.work_item AS work
@@ -318,7 +321,8 @@ export class SynthesisCheckRepository {
       [input.runId, input.answerId ?? null, input.answerVersion ?? null, input.deadlineMs,
         SYNTHESIS_CHECK_SEAL_MARGIN_MS]
     );
-    return result.rows[0]!.state;
+      return result.rows[0]!.state;
+    });
   }
 
   async runRemovedByCheck(runId: string): Promise<boolean> {

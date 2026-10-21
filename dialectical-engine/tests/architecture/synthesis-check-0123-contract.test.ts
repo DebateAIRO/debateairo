@@ -22,6 +22,10 @@ const runtimeFunctions = [
   "serve.purge_expired_synthesis_check_removal_notices()",
   "serve.run_removed_by_synthesis_check(uuid)"
 ] as const;
+const writerFunctions = [
+  "serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean)",
+  "serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)"
+] as const;
 
 describe("0123 synthesis check database contract", () => {
   it("0123 is replay-safe in the repository's form", async () => {
@@ -54,13 +58,16 @@ describe("0123 synthesis check database contract", () => {
     expect(sql).toContain("spend_source <> 'SYNTHESIS_CHECK' OR (run_id IS NOT NULL AND spend_phase IS NULL AND attempt_id IS NULL)");
   });
 
-  it("0123 grants SELECT and INSERT on request, attempt, result, inheritance and removal request to debateai_runtime, INSERT only on the notice, nothing on the binding, and no other right to any role", async () => {
+  it("0123 leaves direct runtime INSERT only on request, attempt and result; restricted writes use definer functions", async () => {
     const sql = await source();
     const ordinary = sql.match(/GRANT SELECT, INSERT ON ([^;]+) TO debateai_runtime;/u)?.[1] ?? "";
-    for (const table of [sevenTables[0], sevenTables[1], sevenTables[2], sevenTables[3], sevenTables[4]]) {
+    for (const table of [sevenTables[0], sevenTables[1], sevenTables[2]]) {
       expect(ordinary, table).toContain(table);
     }
-    expect(sql).toContain("GRANT INSERT ON serve.synthesis_check_removal_notice TO debateai_runtime;");
+    for (const table of [sevenTables[3], sevenTables[4], sevenTables[5]]) expect(ordinary).not.toContain(table);
+    expect(sql).toContain("GRANT SELECT ON serve.synthesis_check_inheritance,");
+    expect(sql).toContain("serve.synthesis_check_removal_request TO debateai_runtime;");
+    expect(sql).not.toContain("GRANT INSERT ON serve.synthesis_check_removal_notice TO debateai_runtime;");
     expect(sql).not.toMatch(/GRANT [^;]*SELECT[^;]*synthesis_check_removal_notice/u);
     expect(sql).not.toMatch(/GRANT [^;]*identity\.synthesis_check_erasure_binding/u);
     expect(sql).not.toMatch(/GRANT (?:UPDATE|DELETE|TRUNCATE|ALL) ON (?:serve|identity)\.synthesis_check_/u);
@@ -80,7 +87,8 @@ describe("0123 synthesis check database contract", () => {
       "enforce_content_ciphertext_synthesis_check_result", "enforce_erasure_barrier_synthesis_check_result",
       "enforce_synthesis_check_inheritance", "enforce_synthesis_check_removal_request",
       ...erasureFunctions.map((signature) => signature.split("(")[0]!.split(".")[1]!),
-      ...runtimeFunctions.map((signature) => signature.split("(")[0]!.split(".")[1]!)
+      ...runtimeFunctions.map((signature) => signature.split("(")[0]!.split(".")[1]!),
+      ...writerFunctions.map((signature) => signature.split("(")[0]!.split(".")[1]!)
     ];
     for (const file of await readdir(migrations)) {
       if (!/^\d{4}_.+\.sql$/u.test(file) || file >= "0123_") continue;
@@ -101,6 +109,19 @@ describe("0123 synthesis check database contract", () => {
       expect(definition, name).toContain("SET search_path = pg_catalog");
       expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC;`);
       expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO ${erasureFunctions.includes(signature as typeof erasureFunctions[number]) ? "debateai_erasure_runtime" : "debateai_runtime"};`);
+    }
+  });
+
+  it("the two restricted writers are SECURITY DEFINER and executable by runtime, with no PUBLIC grant", async () => {
+    const sql = await source();
+    for (const signature of writerFunctions) {
+      const name = signature.split("(")[0]!;
+      const start = sql.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const definition = sql.slice(start, sql.indexOf("$$;", start));
+      expect(definition).toContain("SECURITY DEFINER SET search_path = pg_catalog");
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC;`);
+      expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
     }
   });
 

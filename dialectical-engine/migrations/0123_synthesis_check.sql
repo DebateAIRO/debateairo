@@ -117,7 +117,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM serve.synthesis_check_result AS result
     WHERE result.result_id=NEW.inherited_result_id AND result.final
-      AND result.answer_id=NEW.answer_id AND result.answer_version<NEW.answer_version
+      AND result.answer_id=NEW.answer_id AND result.run_id=NEW.run_id
+      AND result.answer_version<=NEW.answer_version
+      AND result.attempt_id<>NEW.attempt_id
   ) THEN
     RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='SYNTHESIS_CHECK_INHERITANCE_INVALID';
   END IF;
@@ -135,6 +137,69 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='SYNTHESIS_CHECK_REMOVAL_RESULT_INVALID';
   END IF;
   RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION serve.store_synthesis_check_result(
+  p_result_id uuid,p_attempt_id uuid,p_run_id uuid,p_answer_id uuid,
+  p_answer_version integer,p_synthesis_origin_version integer,p_final boolean,
+  p_failure_code text,p_policy_version text,p_content jsonb,
+  p_content_ciphertext jsonb,p_content_attestation bytea,p_remove boolean
+)
+RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE
+  v_result_id uuid;
+  v_owner_ref uuid;
+BEGIN
+  IF p_remove AND NOT p_final THEN
+    RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='SYNTHESIS_CHECK_REMOVAL_RESULT_INVALID';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM serve.synthesis_check_attempt AS attempt
+    WHERE attempt.attempt_id=p_attempt_id AND attempt.run_id=p_run_id
+      AND attempt.answer_id=p_answer_id AND attempt.answer_version=p_answer_version
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE='23503', MESSAGE='SYNTHESIS_CHECK_ATTEMPT_MISMATCH';
+  END IF;
+  INSERT INTO serve.synthesis_check_result(
+    result_id,attempt_id,run_id,answer_id,answer_version,synthesis_origin_version,
+    final,failure_code,policy_version,content,content_ciphertext,content_attestation
+  ) VALUES (
+    p_result_id,p_attempt_id,p_run_id,p_answer_id,p_answer_version,p_synthesis_origin_version,
+    p_final,p_failure_code,p_policy_version,p_content,p_content_ciphertext,p_content_attestation
+  ) ON CONFLICT (answer_id,synthesis_origin_version) WHERE final DO NOTHING
+  RETURNING result_id INTO v_result_id;
+  IF v_result_id IS NULL THEN RETURN false; END IF;
+  IF p_remove THEN
+    INSERT INTO serve.synthesis_check_removal_request(request_id,result_id,run_id)
+    VALUES (gen_random_uuid(),p_result_id,p_run_id);
+    SELECT owner_ref INTO v_owner_ref FROM core.run_ownership_event
+    WHERE run_id=p_run_id ORDER BY at_seq DESC LIMIT 1;
+    IF v_owner_ref IS NULL THEN
+      RAISE EXCEPTION USING ERRCODE='23503', MESSAGE='SYNTHESIS_CHECK_OWNER_MISSING';
+    END IF;
+    INSERT INTO serve.synthesis_check_removal_notice(owner_ref) VALUES (v_owner_ref);
+  END IF;
+  RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION serve.record_synthesis_check_inheritance(
+  p_attempt_id uuid,p_run_id uuid,p_answer_id uuid,p_answer_version integer,p_inherited_result_id uuid
+)
+RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM serve.synthesis_check_attempt AS attempt
+    WHERE attempt.attempt_id=p_attempt_id AND attempt.run_id=p_run_id
+      AND attempt.answer_id=p_answer_id AND attempt.answer_version=p_answer_version
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE='23503', MESSAGE='SYNTHESIS_CHECK_ATTEMPT_MISMATCH';
+  END IF;
+  INSERT INTO serve.synthesis_check_inheritance(
+    attempt_id,run_id,answer_id,answer_version,inherited_result_id
+  ) VALUES (p_attempt_id,p_run_id,p_answer_id,p_answer_version,p_inherited_result_id);
+  RETURN true;
 END;
 $$;
 
@@ -269,9 +334,14 @@ REVOKE ALL ON serve.synthesis_check_request, serve.synthesis_check_attempt,
   serve.synthesis_check_removal_request, serve.synthesis_check_removal_notice,
   identity.synthesis_check_erasure_binding FROM PUBLIC, debateai_runtime;
 GRANT SELECT, INSERT ON serve.synthesis_check_request, serve.synthesis_check_attempt,
-  serve.synthesis_check_result, serve.synthesis_check_inheritance,
+  serve.synthesis_check_result TO debateai_runtime;
+GRANT SELECT ON serve.synthesis_check_inheritance,
   serve.synthesis_check_removal_request TO debateai_runtime;
-GRANT INSERT ON serve.synthesis_check_removal_notice TO debateai_runtime;
+
+REVOKE ALL ON FUNCTION serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean) TO debateai_runtime;
+REVOKE ALL ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid) TO debateai_runtime;
 
 REVOKE ALL ON FUNCTION core.enforce_synthesis_check_answer_run() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION core.enforce_synthesis_check_answer_run() TO debateai_runtime;
