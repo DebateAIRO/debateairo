@@ -17,6 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
+import { answerForOutcome, keepFailureCode, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
@@ -1692,6 +1693,7 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 });
 
 export interface ApiOptions {
+  readonly questionCheck?: AskQuestionCheck;
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   /**
    * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
@@ -3555,7 +3557,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
     // help numbers, never a debate. It stays the FIRST thing this route does: before the
     // consent, quota and country rules, and before any other pre-flight check of the question
-    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // (the question check, S04, which runs after the body's validation). A person in crisis must never meet a refusal or a "check
     // unavailable" message instead of help, and their words go to no judge model. Nothing of
     // the question is kept. `country` is the edge's guess, only to pick which helplines the
     // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
@@ -3598,6 +3600,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const ask = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    if (options.questionCheck !== undefined) {
+      const outcome = await options.questionCheck.check(ask.question_line);
+      if (outcome.outcome === "REFUSE" && outcome.kept) {
+        try {
+          await options.questionCheck.keep({
+            questionLine: ask.question_line,
+            accountUserId: request.authenticatedSession?.userId ?? null
+          });
+        } catch (error) {
+          console.error(JSON.stringify({ event: "api.question_check.keep_failed", code: keepFailureCode(error) }));
+          return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+        }
+      }
+      const answer = answerForOutcome(outcome, edgeCountry(request.headers));
+      if (answer !== null) return reply.status(answer.status).send(answer.body);
     }
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,

@@ -20,6 +20,7 @@ import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; exp
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
+export * from "./question-check.js";
 import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
 export * from "./synthesis-check.js";
 import { PublicationReviewSummarySchema } from "./publication-review.js";

@@ -57,6 +57,7 @@ import {
   DebateMapViewSchema,
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
+  QuestionNotStartedSchema,
   QuestionLanguageChoiceNeededSchema,
   type AskSubmitOutcome,
   AskRoomResponseSchema,
@@ -163,6 +164,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
   let waiting: ContractWaitingRefusal | null = null;
+  let questionNotStarted: Readonly<{ kind: import("./question-check.js").QuestionNotStartedKind }> | null = null;
   try {
     const candidate: unknown = await response.json();
     if (response.status === 409) {
@@ -181,6 +183,8 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
           ...(refusal.data.waits_for === undefined ? {} : { waitsFor: refusal.data.waits_for })
         });
       }
+      const questionRefusal = response.status === 422 ? QuestionNotStartedSchema.safeParse(body) : null;
+      if (questionRefusal?.success === true) questionNotStarted = Object.freeze({ kind: questionRefusal.data.kind });
     }
   } catch {
     // A non-JSON failure still retains its transport status below.
@@ -190,7 +194,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
   return new ContractHttpError(
     codeForStatus(response.status), response.status, detail, serverCode, statement, waiting,
-    retryAfterMs(response.headers.get("retry-after"))
+    retryAfterMs(response.headers.get("retry-after")), questionNotStarted
   );
 }
 
