@@ -3,7 +3,7 @@
 // drained path). Every host read goes through `deps`; nothing here touches a server.
 import { afterAll, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,6 +75,7 @@ type Options = Partial<{
   events: Record<string, { kind: string; recordedAt: string; reason: string | null }[]>;
   runner: Record<string, string>;
   journal: string | 'unreadable';
+  jsonJournal: string | 'unreadable';
   alertJournal: string;
   openWork: Record<string, number>;
 }>;
@@ -96,7 +97,7 @@ function host(options: Options = {}) {
     events: {} as Record<string, { kind: string; recordedAt: string; reason: string | null }[]>,
     runner: { Result: 'success', ExecMainStatus: '0', InvocationID: invocation } as Record<string, string>,
     journal: `a line\nDEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: OLD_KEY })}\nPREVIEW_RUNNER_RETIRED\n` as string,
-    alertJournal: '', openWork: {} as Record<string, number>,
+    jsonJournal: '' as string, alertJournal: '', openWork: {} as Record<string, number>,
     ...options
   };
   const log: string[] = [];
@@ -117,7 +118,8 @@ function host(options: Options = {}) {
     if (argv[0] === LAYOUT.journalctl) {
       log.push(`journal ${argv.slice(1).join(' ')}`);
       if (argv[2]!.startsWith('debateai-preview-alert@')) return result(o.alertJournal);
-      return o.journal === 'unreadable' ? result('', 1) : result(o.journal);
+      const text = argv.includes('json') ? o.jsonJournal : o.journal;
+      return text === 'unreadable' ? result('', 1) : result(text);
     }
     throw new Error(`unexpected ${argv.join(' ')}`);
   };
@@ -421,7 +423,7 @@ describe('status, maintenance and the retirement receipt (side-by-side spec §4)
     expect(statSync(out).mode & 0o777).toBe(0o600);
     expect(JSON.parse(bytes.toString('utf8'))).toEqual({
       schema: RECEIPT_SCHEMA, label: OLD, releaseKey: OLD_KEY, switchedAt: SWITCHED_AT, retiredAt: RETIRED_AT, retiredReason: 'RUNNER_RETIRED',
-      runner: { unit: U('runner', OLD), invocationId: invocation, result: 'success', execMainStatus: 0, retiredLines: true },
+      runner: { unit: U('runner', OLD), invocationId: invocation, evidence: 'systemd', result: 'success', execMainStatus: 0, retiredLines: true },
       alertRunsSinceSwitch: 0, writtenAt: '2026-10-22T08:00:00.000Z'
     });
     expect(log).toContain(`journal -u ${U('runner', OLD)} _SYSTEMD_INVOCATION_ID=${invocation} -n 500 -o cat --no-pager`);
@@ -433,7 +435,8 @@ describe('status, maintenance and the retirement receipt (side-by-side spec §4)
     ['a release that never drained (retired before a switch)', { events: { [OLD_KEY]: [{ kind: 'STAGED', recordedAt: SWITCHED_AT, reason: null }, { kind: 'RETIRED', recordedAt: RETIRED_AT, reason: 'NOT_SWITCHED' }] } }, 'RECEIPT_NO_SWITCH'],
     ['a runner that failed', { runner: { Result: 'exit-code', ExecMainStatus: '1', InvocationID: invocation } }, 'RECEIPT_RUNNER_NOT_CLEAN'],
     ['a runner that exited 0 but was stopped by a signal result', { runner: { Result: 'signal', ExecMainStatus: '0', InvocationID: invocation } }, 'RECEIPT_RUNNER_NOT_CLEAN'],
-    ['a runner systemd no longer remembers', { runner: { Result: 'success', ExecMainStatus: '0', InvocationID: '' } }, 'RECEIPT_RUNNER_INVOCATION_UNKNOWN'],
+    ['a runner systemd no longer remembers and the journal has no entry of', { runner: { Result: 'success', ExecMainStatus: '0', InvocationID: '' } }, 'RECEIPT_RUNNER_INVOCATION_UNKNOWN'],
+    ['a runner whose invocation id is not one', { runner: { Result: 'success', ExecMainStatus: '0', InvocationID: 'not-an-id' } }, 'RECEIPT_RUNNER_INVOCATION_UNKNOWN'],
     ['a runner without its retirement lines (the drained path)', { journal: 'a line\n' }, 'RECEIPT_RETIRED_LINES_MISSING'],
     ['a journal that cannot be read', { journal: 'unreadable' }, 'RECEIPT_JOURNAL_UNREADABLE'],
     ['a runner that sent the owner a failure email since the switch', { alertJournal: 'Started debateai-preview-alert@….\n' }, 'RECEIPT_ALERT_SENT']
@@ -442,6 +445,92 @@ describe('status, maintenance and the retirement receipt (side-by-side spec §4)
     const { deps } = retiredHost(options);
     await expect(writeRetirementReceipt({ label: OLD, out, layout: ownLayout, deps })).rejects.toMatchObject({ code });
     expect(() => statSync(out)).toThrow();
+  });
+
+  // systemd unloads a stopped template instance after a clean exit: `systemctl show` then prints defaults with an empty
+  // InvocationID, and the evidence comes from the journal (D11 review). Entries as `journalctl -o json` prints them.
+  const RUNNER = U('runner', OLD);
+  const LAST = 'd'.repeat(32), EARLIER = 'e'.repeat(32), NEXT = 'a'.repeat(32);
+  const SUCCESS_ID = '7ad2d189f7e94e70a38c781354912448', FAILED_ID = 'd9b373ed55a64feb8242e02dbe79a49c', EXIT_ID = '98e322203f7a4ed290d09fe03c09fe15';
+  const STARTED_ID = '39f53479d3a045ac8e11786248231fbf', RESOURCES_ID = 'ae8f7b866b0347b9af31fe1c80b127c0';
+  const entry = (fields: Record<string, unknown>) => JSON.stringify({ __CURSOR: 's=1;i=2', __REALTIME_TIMESTAMP: '1761103212345678', _BOOT_ID: 'f'.repeat(32), ...fields });
+  const out_ = (message: unknown, extra: Record<string, unknown> = {}) => entry({ _SYSTEMD_UNIT: RUNNER, _SYSTEMD_INVOCATION_ID: LAST, _PID: '4242', _UID: '998', MESSAGE: message, ...extra });
+  const pid1 = (messageId: string, message: string, extra: Record<string, unknown> = {}) => entry({ _PID: '1', _UID: '0', _SYSTEMD_UNIT: 'init.scope', UNIT: RUNNER, INVOCATION_ID: LAST, MESSAGE_ID: messageId, MESSAGE: `${RUNNER}: ${message}`, ...extra });
+  const recorded = (fields: Record<string, unknown> = {}) => JSON.stringify({ event: 'PREVIEW_RELEASE_STOP_RECORDED', service: 'runner', label: OLD, releaseKey: OLD_KEY, recorded: 'RETIRED', state: 'DRAINING', ...fields });
+  const RETIRED_LINE = out_(`DEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: OLD_KEY })}`), PREVIEW_LINE = out_('PREVIEW_RUNNER_RETIRED');
+  const STOP_RECORDED = out_(recorded(), { _PID: '4300', _UID: '0' });
+  const SUCCESS = pid1(SUCCESS_ID, 'Deactivated successfully.');
+  const CLEAN_RUN = [
+    pid1(STARTED_ID, 'Started debateai-preview-runner@old-v1.service.'),
+    out_('a line'), out_([104, 105]), out_(null), entry({ _SYSTEMD_UNIT: RUNNER, _SYSTEMD_INVOCATION_ID: LAST }),
+    RETIRED_LINE, PREVIEW_LINE, STOP_RECORDED, SUCCESS, pid1(RESOURCES_ID, 'Consumed 2min 3.456s CPU time.')
+  ];
+  const EARLIER_FAILED_RUN = [out_('an earlier run', { _SYSTEMD_INVOCATION_ID: EARLIER }), pid1(FAILED_ID, 'Failed with result \'exit-code\'.', { INVOCATION_ID: EARLIER })];
+  const without = (...dropped: string[]) => CLEAN_RUN.filter(line => !dropped.includes(line));
+  const forgotten = (entries: string[] | 'unreadable', runner: Record<string, string> = {}): Options => ({
+    runner: { Result: 'success', ExecMainStatus: '0', InvocationID: '', ...runner },
+    jsonJournal: entries === 'unreadable' ? entries : `${entries.join('\n')}\n`
+  });
+
+  it('takes the evidence from the journal when systemd has unloaded the stopped runner', async () => {
+    const out = join(rootOnlyFolder(), 'retirement-receipt.json');
+    const { deps, log } = retiredHost(forgotten([...EARLIER_FAILED_RUN, ...CLEAN_RUN]));
+    await writeRetirementReceipt({ label: OLD, out, layout: ownLayout, deps });
+    expect(JSON.parse(readFileSync(out, 'utf8')).runner).toEqual({ unit: RUNNER, invocationId: LAST, evidence: 'journal', result: 'success', execMainStatus: 0, retiredLines: true });
+    expect(log).toContain(`journal -u ${RUNNER} -n 1000 -o json --output-fields=MESSAGE,MESSAGE_ID,UNIT,INVOCATION_ID,_SYSTEMD_UNIT,_SYSTEMD_INVOCATION_ID,_PID,_UID,EXIT_CODE,EXIT_STATUS -q --no-pager`);
+    expect(log.some(line => line.includes('_SYSTEMD_INVOCATION_ID='))).toBe(false);
+    expect(log).toContain(`journal -u debateai-preview-alert@${RUNNER}.service --since=@${Date.parse(SWITCHED_AT) / 1000} -q -o cat --no-pager`);
+  });
+
+  it.each([
+    ['a journal showing the unit failed', [...without(SUCCESS), pid1(FAILED_ID, 'Failed with result \'exit-code\'.')], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a main process that exited 1', [...without(SUCCESS), pid1(EXIT_ID, 'Main process exited, code=exited, status=1/FAILURE', { EXIT_CODE: 'exited', EXIT_STATUS: '1' }), SUCCESS], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a main process a signal ended (systemd still says success)', [...without(SUCCESS), pid1(EXIT_ID, 'Main process exited, code=killed, status=15/TERM', { EXIT_CODE: 'killed', EXIT_STATUS: '15' }), SUCCESS], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a last run without PID 1\'s success message', without(SUCCESS), 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a success message of an earlier run only', [pid1(SUCCESS_ID, 'Deactivated successfully.', { INVOCATION_ID: EARLIER }), ...without(SUCCESS)], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a success message the runner wrote itself', [...without(SUCCESS), out_('Deactivated successfully.', { UNIT: RUNNER, INVOCATION_ID: LAST, MESSAGE_ID: SUCCESS_ID })], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a last run the stop recorder did not record as RETIRED', without(STOP_RECORDED), 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a RETIRED record the runner printed itself (not root)', [...without(STOP_RECORDED, SUCCESS), out_(recorded()), SUCCESS], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a RETIRED record of another release', [...without(STOP_RECORDED, SUCCESS), out_(recorded({ releaseKey: NEW_KEY }), { _UID: '0' }), SUCCESS], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a last run without its retirement lines', without(RETIRED_LINE, PREVIEW_LINE), 'RECEIPT_RETIRED_LINES_MISSING'],
+    ['retirement lines of an earlier run only', [out_('PREVIEW_RUNNER_RETIRED', { _SYSTEMD_INVOCATION_ID: EARLIER }), out_(`DEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: OLD_KEY })}`, { _SYSTEMD_INVOCATION_ID: EARLIER }), ...without(RETIRED_LINE, PREVIEW_LINE)], 'RECEIPT_RETIRED_LINES_MISSING'],
+    ['a clean run followed by a newer run that has not ended', [...CLEAN_RUN, pid1(STARTED_ID, 'Started debateai-preview-runner@old-v1.service.', { INVOCATION_ID: NEXT }), out_('starting', { _SYSTEMD_INVOCATION_ID: NEXT })], 'RECEIPT_RUNNER_NOT_CLEAN'],
+    ['a newest entry that is no run of the unit (a core dump)', [...CLEAN_RUN, entry({ _PID: '777', _UID: '0', _SYSTEMD_UNIT: 'systemd-coredump@0-777-0.service', COREDUMP_UNIT: RUNNER, MESSAGE_ID: 'fc2e22bc6ee647b6b90729ab34a250b1', MESSAGE: 'Process 4242 (node) dumped core.' })], 'RECEIPT_RUNNER_INVOCATION_UNKNOWN'],
+    ['a newest PID 1 entry without an invocation id', [...CLEAN_RUN, entry({ _PID: '1', UNIT: RUNNER, MESSAGE: 'no id' })], 'RECEIPT_RUNNER_INVOCATION_UNKNOWN'],
+    ['a journal that cannot be read', 'unreadable', 'RECEIPT_JOURNAL_UNREADABLE'],
+    ['a journal line that is not JSON', [...CLEAN_RUN.slice(0, -1), 'not json'], 'RECEIPT_JOURNAL_UNREADABLE'],
+    ['a journal line that is not an entry', [...CLEAN_RUN, '[1,2]'], 'RECEIPT_JOURNAL_UNREADABLE']
+  ] as [string, string[] | 'unreadable', string][])('refuses the receipt from the journal for %s', async (_case, entries, code) => {
+    const out = join(rootOnlyFolder(), 'retirement-receipt.json');
+    const { deps } = retiredHost(forgotten(entries));
+    await expect(writeRetirementReceipt({ label: OLD, out, layout: ownLayout, deps })).rejects.toMatchObject({ code });
+    expect(() => statSync(out)).toThrow();
+  });
+
+  it('names the failure message it found, and still refuses a forgotten unit whose defaults are not clean', async () => {
+    const out = join(rootOnlyFolder(), 'retirement-receipt.json');
+    const failed = retiredHost(forgotten([...without(SUCCESS), pid1(FAILED_ID, 'Failed with result \'exit-code\'.')]));
+    await expect(writeRetirementReceipt({ label: OLD, out, layout: ownLayout, deps: failed.deps })).rejects.toMatchObject({ code: 'RECEIPT_RUNNER_NOT_CLEAN', fields: { source: 'journal', messageId: FAILED_ID } });
+    const notClean = retiredHost(forgotten(CLEAN_RUN, { Result: 'exit-code', ExecMainStatus: '1' }));
+    await expect(writeRetirementReceipt({ label: OLD, out, layout: ownLayout, deps: notClean.deps })).rejects.toMatchObject({ code: 'RECEIPT_RUNNER_NOT_CLEAN', fields: { result: 'exit-code', execMainStatus: '1' } });
+  });
+
+  it('never replaces a file that appears after the folder check (link, not rename)', async () => {
+    const folder = rootOnlyFolder();
+    const out = join(folder, 'retirement-receipt.json');
+    writeFileSync(out, 'kept');
+    const options = { mode: 0o600, uid, gid };
+    await expect(check.writeNewFile(out, Buffer.from('new'), options)).rejects.toMatchObject({ code: 'RECEIPT_OUTPUT_EXISTS' });
+    expect(readFileSync(out, 'utf8')).toBe('kept');
+    const dangling = join(folder, 'dangling.json');
+    symlinkSync(join(folder, 'nowhere.json'), dangling);
+    await expect(check.writeNewFile(dangling, Buffer.from('new'), options)).rejects.toMatchObject({ code: 'RECEIPT_OUTPUT_EXISTS' });
+    expect(lstatSync(dangling).isSymbolicLink() && readlinkSync(dangling)).toBe(join(folder, 'nowhere.json'));
+    const fresh = join(folder, 'fresh.json');
+    await check.writeNewFile(fresh, Buffer.from('new'), options);
+    expect(readFileSync(fresh, 'utf8')).toBe('new');
+    expect(statSync(fresh).mode & 0o777).toBe(0o600);
+    expect(readdirSync(folder).sort()).toEqual(['dangling.json', 'fresh.json', 'retirement-receipt.json']);
   });
 
   it('writes the receipt only as a new file in a folder only its owner can read', async () => {

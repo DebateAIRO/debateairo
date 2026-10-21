@@ -8,7 +8,8 @@
 //                  hatch) or NOT_READY (anything else failed: stop and ask). Each check is named, with a plain detail;
 //   - status       every pinned release: its state in the release table, its three units and its open work;
 //   - receipt      the release retired by itself (spec §4, G4): its RETIRED row, its runner's clean exit and retirement
-//                  lines, and no failure email for that runner since the switch, written as a root-only JSON file;
+//                  lines (from systemd, or from the journal once systemd has unloaded the stopped instance), and no
+//                  failure email for that runner since the switch, written as a NEW root-only JSON file;
 //   - maintenance  infrastructure maintenance (Postgres, Hatchet, Caddy, the gates' software) may be planned only while
 //                  no release drains (spec §4): the operator then creates the maintenance-pending flag by hand.
 //
@@ -21,13 +22,14 @@
 // the current release and of the new one. Read-only: the one file this tool writes is the receipt it is asked for.
 // Exit 0 for SIDE_BY_SIDE and for the other commands; 2 for a DRAINED_PATH or NOT_READY verdict; 1 on a refusal.
 // One JSON line per run: codes, labels, keys, counts, file paths of the source tree and digests only.
-import { lstat, readFile, realpath, statfs } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { constants, link, lstat, open, readFile, realpath, statfs, unlink } from 'node:fs/promises';
 import { connect } from 'node:net';
-import { dirname, isAbsolute, join, normalize } from 'node:path';
+import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
 import { PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifactBytes } from '../../preview-auth-dev/v1/launch-plan.mjs';
-import { LAYOUT, RELEASE_LABEL, atomicWrite, canonicalJson, logLine, runBounded, sha256, unitNameFor } from './common.mjs';
+import { LAYOUT, RELEASE_LABEL, canonicalJson, logLine, runBounded, sha256, unitNameFor } from './common.mjs';
 import { addedMigrations, n1Headers } from './migration-steps.mjs';
 import { readLock } from './prestart.mjs';
 import { GATES, gateState, retiredLinesFound } from './release-retire.mjs';
@@ -66,6 +68,27 @@ const CONNECTIONS_SQL = [
   ''
 ].join('\n');
 const COUNTS_ROW = /^([1-9][0-9]{0,5})\|(0|[1-9][0-9]{0,5})\|(0|[1-9][0-9]{0,5})\n$/;
+/**
+ * The receipt's journal evidence once systemd has unloaded the stopped runner instance (D11 review). The message ids
+ * are systemd's (sd-messages.h; `journalctl --list-catalog <id>` prints each one's catalog entry, a server pre-flight
+ * check). PID 1 writes them with UNIT=<unit> and INVOCATION_ID=<that run of the unit>:
+ *   7ad2d189f7e94e70a38c781354912448  UNIT_SUCCESS            "unit deactivated successfully"
+ *   d9b373ed55a64feb8242e02dbe79a49c  UNIT_FAILURE_RESULT     "unit failed"
+ *   be02cf6855d2428ba40df7e9d022f03d  UNIT_FAILED             a start job failed
+ *   641257651c1b4ec9a8624d7a40a9e1e7  SPAWN_FAILED            a command could not be executed
+ *   fe6faa94e7774663a0da52717891d8ef  UNIT_OUT_OF_MEMORY      the kernel or systemd-oomd killed the unit
+ *   5eb03494b6584870a536b337290809b3  UNIT_RESTART_SCHEDULED  only after a failure (the runner has Restart=no)
+ *   98e322203f7a4ed290d09fe03c09fe15  UNIT_PROCESS_EXIT       EXIT_CODE/EXIT_STATUS of a process; PID 1 writes a
+ *                                     successful exit at debug level only, so it is usually absent, and when present
+ *                                     it must say exited/0.
+ */
+export const UNIT_SUCCESS_MESSAGE_ID = '7ad2d189f7e94e70a38c781354912448';
+export const UNIT_PROCESS_EXIT_MESSAGE_ID = '98e322203f7a4ed290d09fe03c09fe15';
+export const UNIT_FAILURE_MESSAGE_IDS = Object.freeze(['d9b373ed55a64feb8242e02dbe79a49c', 'be02cf6855d2428ba40df7e9d022f03d', '641257651c1b4ec9a8624d7a40a9e1e7', 'fe6faa94e7774663a0da52717891d8ef', '5eb03494b6584870a536b337290809b3']);
+/** The newest 1,000 entries of the unit (its last run ends with the retirement lines, the recorder's line and PID 1's). */
+const JOURNAL_ENTRIES = '1000';
+const JOURNAL_FIELDS = 'MESSAGE,MESSAGE_ID,UNIT,INVOCATION_ID,_SYSTEMD_UNIT,_SYSTEMD_INVOCATION_ID,_PID,_UID,EXIT_CODE,EXIT_STATUS';
+const JOURNAL_JSON_BYTES = 4 * 1024 * 1024;
 
 class CheckRefusal extends Error { constructor(code, fields) { super(code); this.name = 'CheckRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new CheckRefusal(code, fields); };
@@ -134,10 +157,39 @@ function withDefaults(layout, deps) {
       const folder = dirname(path);
       const stat = await lstat(folder).catch(() => refuse('RECEIPT_OUTPUT_REFUSED'));
       if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== uid || (stat.mode & 0o077) !== 0 || await realpath(folder) !== folder) refuse('RECEIPT_OUTPUT_REFUSED');
-      if (await lstat(path).then(() => true, error => error?.code !== 'ENOENT')) refuse('RECEIPT_OUTPUT_EXISTS');
-      await atomicWrite(path, bytes, { mode: 0o600, uid, gid });
+      await writeNewFile(path, bytes, { mode: 0o600, uid, gid });
     })
   };
+}
+
+/**
+ * A NEW file, never a replacement. The steps of common.mjs's atomicWrite (a temporary file beside the target, O_EXCL and
+ * no link followed, owner and mode set, fsync), but it ends with link(temporary, path) instead of rename: link refuses
+ * EEXIST, so a file that appears at `path` after the folder check is kept and the write refuses RECEIPT_OUTPUT_EXISTS
+ * (atomicWrite's rename would replace it; D11 review). Only our own temporary name is removed afterwards.
+ */
+export async function writeNewFile(path, bytes, { mode, uid, gid }) {
+  if (!absolute(path) || !Buffer.isBuffer(bytes) || !Number.isInteger(mode)) refuse('RECEIPT_WRITE_FAILED');
+  const temporary = join(dirname(path), `.${basename(path)}.${randomBytes(8).toString('hex')}.tmp`);
+  let handle, created = false;
+  try {
+    handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+    created = true;
+    await handle.chown(uid, gid);
+    await handle.chmod(mode);
+    for (let offset = 0; offset < bytes.length;) offset += (await handle.write(bytes, offset)).bytesWritten;
+    await handle.sync();
+    await handle.close(); handle = undefined;
+    await link(temporary, path).catch(error => (error?.code === 'EEXIST' ? refuse('RECEIPT_OUTPUT_EXISTS') : Promise.reject(error)));
+    const folder = await open(dirname(path), constants.O_RDONLY);
+    try { await folder.sync(); } catch { /* Some platforms refuse fsync on a directory; the link itself is already atomic. */ } finally { await folder.close(); }
+  } catch (error) {
+    if (error instanceof CheckRefusal) throw error;
+    refuse('RECEIPT_WRITE_FAILED');
+  } finally {
+    await handle?.close().catch(() => undefined);
+    if (created) await unlink(temporary).catch(() => undefined);
+  }
 }
 
 /** `systemctl show <unit> --property=<a,b,…>` as key/value pairs; each asked property exactly once. */
@@ -355,10 +407,59 @@ export async function releaseStatus({ layout = LAYOUT, deps = {} }) {
   return Object.freeze(rows);
 }
 
+/** release-retire.mjs's own line when, at ExecStopPost, it read ExecMainStatus=0 and both lines and recorded RETIRED. */
+function recordedRetired(message, label, releaseKey) {
+  let line;
+  try { line = JSON.parse(message); } catch { return false; }
+  return line !== null && typeof line === 'object' && line.event === 'PREVIEW_RELEASE_STOP_RECORDED' && line.service === 'runner'
+    && line.label === label && line.releaseKey === releaseKey && line.recorded === 'RETIRED';
+}
+
+/**
+ * The runner's last run, from the journal, for a stopped template instance systemd has unloaded (normal after a clean
+ * exit: `systemctl show` then prints defaults with an empty InvocationID). Trusted fields only decide whose line it is:
+ * the unit's own output is `_SYSTEMD_UNIT=<unit>` with `_SYSTEMD_INVOCATION_ID`; PID 1's messages about it are `_PID=1`
+ * with `UNIT=<unit>` and `INVOCATION_ID`. The newest entry names the last run (an entry that is neither refuses); within
+ * that run: no failure message, PID 1's UNIT_SUCCESS, both retirement lines, and the stop recorder's RETIRED line written
+ * as root (`_UID=0`: it read ExecMainStatus=0 from systemd while the unit was still loaded, the exit status 0 PID 1 does
+ * not log). A field that is absent, null (too long) or bytes (not UTF-8) counts as absent; whatever cannot prove a
+ * clean end refuses. Returns that run's invocation id.
+ */
+async function journalEvidence(unit, label, releaseKey, layout, io) {
+  const result = await io.run([layout.journalctl, '-u', unit, '-n', JOURNAL_ENTRIES, '-o', 'json', `--output-fields=${JOURNAL_FIELDS}`, '-q', '--no-pager'],
+    { env: {}, timeoutMs: 10_000, maxOutputBytes: JOURNAL_JSON_BYTES });
+  if (!result || result.error || result.timedOut || result.overflow || result.code !== 0) refuse('RECEIPT_JOURNAL_UNREADABLE');
+  const entries = [];
+  for (const line of String(result.stdout).split('\n')) {
+    if (line === '') continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { refuse('RECEIPT_JOURNAL_UNREADABLE'); }
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) refuse('RECEIPT_JOURNAL_UNREADABLE');
+    entries.push(entry);
+  }
+  const text = (entry, name) => (typeof own(entry, name) === 'string' ? entry[name] : undefined);
+  const fromUnit = entry => text(entry, '_SYSTEMD_UNIT') === unit;
+  const fromPid1 = entry => text(entry, '_PID') === '1' && text(entry, 'UNIT') === unit;
+  const invocationOf = entry => (fromUnit(entry) ? text(entry, '_SYSTEMD_INVOCATION_ID') : fromPid1(entry) ? text(entry, 'INVOCATION_ID') : undefined);
+  const invocationId = entries.length ? invocationOf(entries.at(-1)) : undefined;
+  if (!INVOCATION_ID.test(invocationId ?? '')) refuse('RECEIPT_RUNNER_INVOCATION_UNKNOWN');
+  const run = entries.filter(entry => invocationOf(entry) === invocationId);
+  const output = run.filter(fromUnit), lifecycle = run.filter(fromPid1);
+  const failed = lifecycle.find(entry => UNIT_FAILURE_MESSAGE_IDS.includes(text(entry, 'MESSAGE_ID'))
+    || (text(entry, 'MESSAGE_ID') === UNIT_PROCESS_EXIT_MESSAGE_ID && (text(entry, 'EXIT_CODE') !== 'exited' || text(entry, 'EXIT_STATUS') !== '0')));
+  if (failed) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', messageId: text(failed, 'MESSAGE_ID') });
+  if (!lifecycle.some(entry => text(entry, 'MESSAGE_ID') === UNIT_SUCCESS_MESSAGE_ID)) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', missing: 'UNIT_SUCCESS' });
+  if (!retiredLinesFound(output.map(entry => text(entry, 'MESSAGE')).filter(message => message !== undefined).join('\n'), releaseKey)) refuse('RECEIPT_RETIRED_LINES_MISSING');
+  if (!output.some(entry => text(entry, '_UID') === '0' && recordedRetired(text(entry, 'MESSAGE'), label, releaseKey))) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', missing: 'STOP_RECORDED' });
+  return invocationId;
+}
+
 /**
  * Side-by-side spec §4 and G4: the receipt of a release that retired by itself. Written only when every part holds:
- * the release is RETIRED after a switch made it DRAINING; its runner's last invocation is Result=success with
- * ExecMainStatus=0 and printed both retirement lines; no debateai-preview-alert@ run for that runner since the switch.
+ * the release is RETIRED after a switch made it DRAINING; its runner's last invocation ended cleanly and printed both
+ * retirement lines; no debateai-preview-alert@ run for that runner since the switch. `systemctl show` is the first
+ * source (an InvocationID, Result=success, ExecMainStatus=0, then that invocation's lines); when systemd has unloaded
+ * the instance (an empty InvocationID) the journal is (journalEvidence). The receipt says which (`evidence`).
  */
 export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps = {} }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
@@ -377,12 +478,19 @@ export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps
 
   const unit = unitNameFor(layout, 'runner', label);
   const shown = await showUnit(unit, ['Result', 'ExecMainStatus', 'InvocationID'], layout, io);
-  // A unit systemd has forgotten reads Result=success and ExecMainStatus=0 by default: only a known invocation counts.
-  if (!INVOCATION_ID.test(shown.InvocationID)) refuse('RECEIPT_RUNNER_INVOCATION_UNKNOWN');
+  // A unit systemd has forgotten reads Result=success and ExecMainStatus=0 by default and an empty InvocationID: its
+  // evidence comes from the journal. Any other InvocationID must be a well-formed one.
+  const forgotten = shown.InvocationID === '';
+  if (!forgotten && !INVOCATION_ID.test(shown.InvocationID)) refuse('RECEIPT_RUNNER_INVOCATION_UNKNOWN');
   if (shown.Result !== 'success' || !EXIT_STATUS.test(shown.ExecMainStatus) || shown.ExecMainStatus !== '0') refuse('RECEIPT_RUNNER_NOT_CLEAN', { result: shown.Result, execMainStatus: shown.ExecMainStatus });
-  const journal = await io.run([layout.journalctl, '-u', unit, `_SYSTEMD_INVOCATION_ID=${shown.InvocationID}`, '-n', '500', '-o', 'cat', '--no-pager'], { env: {}, timeoutMs: 10_000, maxOutputBytes: 1024 * 1024 });
-  if (!journal || journal.error || journal.timedOut || journal.overflow || journal.code !== 0) refuse('RECEIPT_JOURNAL_UNREADABLE');
-  if (!retiredLinesFound(String(journal.stdout), releaseKey)) refuse('RECEIPT_RETIRED_LINES_MISSING');
+  let invocationId = shown.InvocationID;
+  if (forgotten) {
+    invocationId = await journalEvidence(unit, label, releaseKey, layout, io);
+  } else {
+    const journal = await io.run([layout.journalctl, '-u', unit, `_SYSTEMD_INVOCATION_ID=${invocationId}`, '-n', '500', '-o', 'cat', '--no-pager'], { env: {}, timeoutMs: 10_000, maxOutputBytes: 1024 * 1024 });
+    if (!journal || journal.error || journal.timedOut || journal.overflow || journal.code !== 0) refuse('RECEIPT_JOURNAL_UNREADABLE');
+    if (!retiredLinesFound(String(journal.stdout), releaseKey)) refuse('RECEIPT_RETIRED_LINES_MISSING');
+  }
   // OnFailure=debateai-preview-alert@%n.service: any journal line of that instance since the switch is a run of it.
   const alertUnit = `${layout.unitPrefix}alert@${unit}.service`;
   const alerts = await io.run([layout.journalctl, '-u', alertUnit, `--since=@${Math.floor(switchedAt / 1000)}`, '-q', '-o', 'cat', '--no-pager'], { env: {}, timeoutMs: 10_000, maxOutputBytes: 64 * 1024 });
@@ -391,7 +499,7 @@ export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps
 
   const receipt = {
     schema: RECEIPT_SCHEMA, label, releaseKey, switchedAt: new Date(switchedAt).toISOString(), retiredAt: retired.recordedAt, retiredReason: retired.reason,
-    runner: { unit, invocationId: shown.InvocationID, result: 'success', execMainStatus: 0, retiredLines: true },
+    runner: { unit, invocationId, evidence: forgotten ? 'journal' : 'systemd', result: 'success', execMainStatus: 0, retiredLines: true },
     alertRunsSinceSwitch: 0, writtenAt: new Date(io.now()).toISOString()
   };
   const text = `${JSON.stringify(receipt)}\n`;

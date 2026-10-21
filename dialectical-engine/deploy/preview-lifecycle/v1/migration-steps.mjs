@@ -49,7 +49,12 @@ export function addedMigrations(olderManifest, newerManifest) {
     .map(([name, sha256]) => Object.freeze({ name, sha256 })));
 }
 
-/** Which of the two exact header lines the migration's leading comment block holds (spec §5). */
+/**
+ * Which of the two exact header lines the migration's leading comment block holds (spec §5). It reports only those two
+ * lines: a step that holds both and also declares `-- n1: drained` (or another malformed header line) reads here as
+ * having both, but plan A's migration loader (packages/db/src/migration-n1.ts) refuses such a step before it is ever
+ * applied (D11 review).
+ */
 export function n1Headers(sqlText) {
   if (typeof sqlText !== 'string') refuse('MIGRATION_TEXT_REFUSED');
   const lines = sqlText.split('\n').map(line => (line.endsWith('\r') ? line.slice(0, -1) : line));
