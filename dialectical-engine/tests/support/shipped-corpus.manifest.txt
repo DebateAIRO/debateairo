@@ -140,6 +140,7 @@ apps/api/src/publication-check/verdict.ts
 apps/api/src/publications.ts
 apps/api/src/question-check/ask-gate.ts
 apps/api/src/question-check/check.ts
+apps/api/src/question-check/compose.ts
 apps/api/src/question-check/contract.ts
 apps/api/src/question-check/instruction.ts
 apps/api/src/question-check/transport.ts
