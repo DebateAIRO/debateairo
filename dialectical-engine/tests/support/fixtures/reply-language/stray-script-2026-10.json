@@ -1,0 +1,46 @@
+{
+ "note": "Real replies from the preview practice runs of 2026-10-14 to 2026-10-21, verbatim: each member holds a few Chinese characters inside a sentence otherwise in the question's language (GLM-5.3-Flash and MiMo-V2.6-Pro). The reply-language check of 2026-10-12 read every one as the expected language, and the R19 story's paragraph was served to readers. path is the member's machine path in its reply; siblings is the whole array when the member is an array element; language is the question's language.",
+ "cases": [
+  {
+   "source": "2026-10-14-shape-s8/language-debate-2#132",
+   "model": "zai-org/GLM-5.3-Flash",
+   "callSiteKey": "MAP:choose",
+   "language": "ro",
+   "question": "Ar trebui România să adopte euro, or should it wait until wages catch up?",
+   "path": "answers.1.statement",
+   "text": "România ar trebui să aștepte până când convergența salarială și competitivitatea fac adoptarea sigură, chiar dacă asta înseamnă după 2030, pentru că pierderea amortizorului valutar lovit毙 salariații."
+  },
+  {
+   "source": "2026-10-16-lg-a/today#273",
+   "model": "zai-org/GLM-5.3-Flash",
+   "callSiteKey": "JUDGE:cross-root:4->0",
+   "language": "en",
+   "question": "Is new nuclear power cheaper than wind and solar with storage for cutting the emissions of a country?",
+   "path": "critic.summary",
+   "text": "Attack on the other makers' position. Their claim sounds like mine but smuggles in two commitments I reject. First, they assert nuclear is 'generally not cheaper ... once you compare complete, comparable systems on a levelised basis' — but levelised metrics are exactly the frame that struggles to price firmness and long-duration storage; if their 'complete system' comparison still runs on levelised arithmetic, it has not actually counted the system costs that drive my qualification, and if it does count them, the 'generally not cheaper' head结论 no longer follows. They cannot have both. Second, they say the ranking is 'close enough, and region-specific enough, that nuclear can be the cheaper option in particular places and grid conditions' — 'close enough' is doing unexamined work: close in what metric, over what discount rate, under which learning-rate assumptions? Storage and renewables have steep projected cost-decline curves while recent nuclear builds have shown cost escalation, so any 'closeness' claimed today is an assumption about the future, not a present fact, and treating it as settled understates how wide the uncertainty band is. Third, restricting nuclear's possible advantage to 'particular places and grid conditions' implies the reversal is an edge case; but every country pursuing net zero faces the same firm-power problem, so if system costs invert the ranking, that inversion is structural, not regional. Their position is therefore less a rival thesis than my position with the load-bearing caveats stripped out and replaced by the vague terms 'generally' and 'close enough'. (This is a reasoned counter I construct from the stated positions, not an attack supplied by the other makers.)"
+  },
+  {
+   "source": "2026-10-16-lg-b/lg-b-debate-failed-1#311",
+   "model": "XiaomiMiMo/MiMo-V2.6-Pro",
+   "callSiteKey": "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro",
+   "language": "en",
+   "question": "Is new nuclear power cheaper than wind and solar with storage for cutting the emissions of a country?",
+   "path": "context.ambiguityFlags.2",
+   "text": "It is unclear whether “cheaper” means levelized cost, total system cost, or cost per tonne of二氧化碳 abated across the whole decarbonization pathway.",
+   "siblings": [
+    "The question names no country, time horizon or emissions target, so cost comparisons depend on unspecified interest rates, resource quality and grid conditions.",
+    "The phrase “with storage” is ambiguous between a few hours of batteries and long-duration or seasonal storage, which the statement treats differently.",
+    "It is unclear whether “cheaper” means levelized cost, total system cost, or cost per tonne of二氧化碳 abated across the whole decarbonization pathway."
+   ]
+  },
+  {
+   "source": "2026-10-21-r19/r19-debate#903",
+   "model": "zai-org/GLM-5.3-Flash",
+   "callSiteKey": "STORY:STORYTELLER:2",
+   "language": "en",
+   "question": "Is new nuclear power cheaper than wind and solar with storage for cutting the emissions of a country?",
+   "path": "long.sections.2.paragraphs.5.text",
+   "text": "Nothing that argued for a different conclusion was thrown out and shown false. The one branch that pushed hardest against our answer — that a renewables-heavy grid's hidden system costs are大于 the renewables camp admits — was explored through the debate and resembles position P2's caveat, which our answer keeps. A few supporting statements were duplicates of positions already stated and added nothing new; what they held was counted where it matched, and where they contradicted the positions they claimed to support, that mismatch is described above."
+  }
+ ]
+}
