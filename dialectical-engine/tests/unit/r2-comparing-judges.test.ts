@@ -384,10 +384,12 @@ describe("the judges recount follows the debate's rule (side-by-side C15)", () =
 
   /**
    * A stand-in pool for one answer read: a run of release OLD with two positions (A by OpenAI, B by Anthropic) and two
-   * judges of other makers who both chose B, whose one condition-mark record names `servedRootRule`. Every other read
-   * finds nothing; the content lease is granted.
+   * judges of other makers who both chose B. The answer row carries `receiptRule`, the rule its propagation receipt
+   * names (the main read's `served_root_rule` column, C15 ruling); `markRule`, when given, is the rule its one
+   * condition-mark record names (no record when absent). Every other read finds nothing; the content lease is granted.
+   * The main read's SQL is kept in `seen`, so a case can prove where the column comes from.
    */
-  function answerReadPool(servedRootRule: string | null): Pool {
+  function answerReadPool(receiptRule: string | null, markRule?: string | null, seen: string[] = []): Pool {
     const at = new Date("2026-10-21T00:00:00.000Z");
     const nodeRow = (nodeId: string, maker: string, strength: number) => ({
       node_id: nodeId, claim_text: `The position ${nodeId}.`, node_content_ciphertext: null, way_of_knowing: "reasoned",
@@ -403,7 +405,8 @@ describe("the judges recount follows the debate's rule (side-by-side C15)", () =
     const vote = (seat: number, maker: string) => ({ judge_seat: seat, maker, chosen_root_node_id: "node-b", chosen_letter: "B",
       conditional: false, same_as: [], question_kind: "general" });
     const answerRow = {
-      answer_id: "answer-1", answer_version: 1, run_id: "run-1", release_key: OLD, question_line: "Which is better?",
+      answer_id: "answer-1", answer_version: 1, run_id: "run-1", release_key: OLD, served_root_rule: receiptRule,
+      question_line: "Which is better?",
       run_content_ciphertext: null, fact_bundle_id: "facts-1", facts: [], facts_content_ciphertext: null,
       composed_text_id: null, composed_content_ciphertext: null, terminal: "SERVED", serve_state: "COMPOSED",
       verdict_state: "SUPPORTED", verdict_unavailable: null, confidence_band: null, band_ceiling: null, answer_form: null,
@@ -416,14 +419,14 @@ describe("the judges recount follows the debate's rule (side-by-side C15)", () =
       root_sites: [{ node_id: "node-a", call_site_key: "JUDGE" }, { node_id: "node-b", call_site_key: "JUDGE:root:secondary" }]
     };
     const markRecord = { mark: "UNSERVED-MAKER-POSITION", scope: "answer", subject_ref: "node-b", reason: "unserved",
-      lift_path: null, served_root_rule: servedRootRule, call_site_key: null, planned_leg_count: null,
+      lift_path: null, served_root_rule: markRule ?? null, call_site_key: null, planned_leg_count: null,
       terminal_transport_outcome: null, review_outcome: null, hidden_strength: null, hidden_score_threshold: null,
       hidden_score_threshold_source_ref: null, excluded_from_served_number: null, judged_basis_count: null,
       affected_node_ids: ["node-a"] };
     const query = async (sql: string, params: readonly unknown[] = []) => {
-      if (sql.includes("AS root_sites")) return { rows: [answerRow] };
+      if (sql.includes("AS root_sites")) { seen.push(sql); return { rows: [answerRow] }; }
       if (sql.includes("AS defeater_refs")) return { rows: [nodeRow("node-a", "OpenAI", 0.6), nodeRow("node-b", "Anthropic", 0.4)] };
-      if (sql.includes("excluded_from_served_number, judged_basis_count")) return { rows: [markRecord] };
+      if (sql.includes("excluded_from_served_number, judged_basis_count")) return { rows: markRule === undefined ? [] : [markRecord] };
       if (sql.includes("pg_try_advisory_lock_shared")) return { rows: [{ acquired: true }] };
       if (sql.includes("pg_advisory_unlock_shared")) return { rows: [{ unlocked: true }] };
       if (sql.includes("run_private_content_is_live")) return { rows: (params[0] as string[]).map((runId) => ({ run_id: runId, live: true })) };
@@ -434,7 +437,7 @@ describe("the judges recount follows the debate's rule (side-by-side C15)", () =
   }
   const ownership = { ownerRef: "00000000-0000-4000-8000-0000000000c1", legacyAskerId: null } as const;
 
-  it("an answer read of another release's debate leaves the section out unless its record names the judges' rule", async () => {
+  it("an answer read of another release's debate leaves the section out unless its receipt names the judges' rule", async () => {
     const elsewhere = await new ServeRepository(answerReadPool(SERVED_ROOT_SELECTION_RULE), { releaseKey: NEW })
       .readAnswerProjection("answer-1", ownership);
     expect(elsewhere).not.toBeNull();
@@ -444,6 +447,26 @@ describe("the judges recount follows the debate's rule (side-by-side C15)", () =
     const judged = await new ServeRepository(answerReadPool(SERVED_ROOT_SELECTION_RULE_JUDGES), { releaseKey: NEW })
       .readAnswerProjection("answer-1", ownership);
     expect(judged!.judges_comparison).toMatchObject({ judges_seated: 2, judges_counted: 2 });
+  });
+
+  it("reads the rule from the propagation receipt, never from a condition-mark record (C15 ruling)", async () => {
+    const seen: string[] = [];
+    // Most answers have no condition-mark record that names a rule: the receipt's judges rule still shows the recount.
+    const noMark = await new ServeRepository(answerReadPool(SERVED_ROOT_SELECTION_RULE_JUDGES, undefined, seen), { releaseKey: NEW })
+      .readAnswerProjection("answer-1", ownership);
+    expect(noMark!.judges_comparison).toMatchObject({ judges_seated: 2, judges_counted: 2 });
+    // The receipt's strength rule hides it, whatever a mark record says; so does a receipt that names no rule.
+    const strength = await new ServeRepository(answerReadPool(SERVED_ROOT_SELECTION_RULE, SERVED_ROOT_SELECTION_RULE_JUDGES), { releaseKey: NEW })
+      .readAnswerProjection("answer-1", ownership);
+    expect(Object.hasOwn(strength!, "judges_comparison")).toBe(false);
+    const markOnly = await new ServeRepository(answerReadPool(null, SERVED_ROOT_SELECTION_RULE_JUDGES), { releaseKey: NEW })
+      .readAnswerProjection("answer-1", ownership);
+    expect(Object.hasOwn(markOnly!, "judges_comparison")).toBe(false);
+    // The column is the run's latest selecting receipt sealed before this answer version (0055: catch-up rows are NULL).
+    const main = seen[0]!.replace(/\s+/gu, " ");
+    expect(main).toContain("(SELECT receipt.served_root_selection ->> 'rule' FROM ledger.propagation_run AS receipt "
+      + "WHERE receipt.run_id = answer.run_id AND receipt.served_root_selection IS NOT NULL "
+      + "AND receipt.at_seq < answer.sealed_at_seq ORDER BY receipt.at_seq DESC LIMIT 1) AS served_root_rule");
   });
 
   it("the same debate read under its own release, or with no release named, shows the recount", async () => {

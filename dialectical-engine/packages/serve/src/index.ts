@@ -2759,6 +2759,12 @@ export class ServeRepository {
       run_id: string;
       /** Side-by-side spec §1 (migration 0123): the release that ran this debate; C15 reads it for the judges recount. */
       release_key: string;
+      /**
+       * Side-by-side spec §5 (plan C15 ruling): the rule that chose this debate's served answer, from its propagation
+       * receipt (`ledger.propagation_run.served_root_selection`, migration 0055): the run's latest selection sealed
+       * before this answer version. A DR-184 catch-up receipt selects nothing (NULL) and is skipped; none reads as null.
+       */
+      served_root_rule: string | null;
       question_line: string;
       run_content_ciphertext: CryptoEnvelope | null;
       fact_bundle_id: string;
@@ -2808,7 +2814,13 @@ export class ServeRepository {
       // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
       root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.release_key, run.question_line,
+      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.release_key,
+              (SELECT receipt.served_root_selection ->> 'rule'
+                 FROM ledger.propagation_run AS receipt
+                WHERE receipt.run_id = answer.run_id AND receipt.served_root_selection IS NOT NULL
+                  AND receipt.at_seq < answer.sealed_at_seq
+                ORDER BY receipt.at_seq DESC LIMIT 1) AS served_root_rule,
+              run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
               facts.fact_bundle_id, facts.facts,
               facts.content_ciphertext AS facts_content_ciphertext,
@@ -3025,11 +3037,11 @@ export class ServeRepository {
     // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
     // vote row). (pre-flight PF-R2b4.5) Side-by-side spec §5 (plan C15): another release's debate is recounted only
     // under the rule its sealed record names, when that is the rule this code implements (`judgesRecountApplies`);
-    // otherwise no section, never numbers that might differ from the served verdict. The rule rides the answer's
-    // condition-mark records (the one that names a served-root rule); none named reads as null.
-    const recordedServedRootRule = conditionMarkRecords.rows.find((record) => record.served_root_rule !== null)?.served_root_rule ?? null;
+    // otherwise no section, never numbers that might differ from the served verdict. The rule is the propagation
+    // receipt's (`served_root_rule` above), never a condition-mark record's: those name a rule only for an
+    // UNSERVED-MAKER-POSITION mark. No receipt or no rule reads as null.
     const judgesComparison = judgesRecountApplies({
-      runReleaseKey: row.release_key, ownReleaseKey: this.#releaseKey, servedRootRule: recordedServedRootRule
+      runReleaseKey: row.release_key, ownReleaseKey: this.#releaseKey, servedRootRule: row.served_root_rule
     })
       ? judgesComparisonOf(
         row.verdict_votes.map((vote) => ({

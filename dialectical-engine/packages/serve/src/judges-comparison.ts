@@ -237,14 +237,16 @@ export function servedPositionOf(nodes: Answer["nodes"], edges: Answer["edges"],
  * debate's stored votes again. It is shown only when this code implements the rule that decided the debate:
  *   - no release is named (`ownReleaseKey` undefined: the runner, the practice report, tests): today's behaviour;
  *   - the debate is this release's own (`runReleaseKey === ownReleaseKey`);
- *   - the debate's sealed record names the comparing judges' rule (`SERVED_ROOT_SELECTION_RULE_JUDGES`).
+ *   - the debate's propagation receipt names the comparing judges' rule (`SERVED_ROOT_SELECTION_RULE_JUDGES`): the
+ *     `rule` of `ledger.propagation_run.served_root_selection` (migration 0055) that chose the served answer.
  * Otherwise the section is left out, the same "no section rather than numbers that differ from the served verdict" rule
  * as `lettersOf`.
  *
- * The rule's NAME is the rule's version: a change to `deriveJudgesVerdict`'s counting must take a new
- * `served_root_rule` name. A new name is a migration of 0121's declared rule history
- * (`condition_mark_served_root_rule_rule_check`), which a reviewer sees, so an older release never shows a recount of a
- * rule it does not implement. Pure.
+ * The rule's NAME is the rule's version: a change to `deriveJudgesVerdict`'s counting must take a new rule name. The
+ * receipt is jsonb with no database CHECK of its own; the guards a reviewer sees are the kernel's `ServedRootRule` type
+ * (what the runner may record) and 0121's declared rule history (`condition_mark_served_root_rule_rule_check`), which
+ * mirrors it, so a new name is a kernel change and a migration, and an older release never shows a recount of a rule
+ * it does not implement. Pure.
  */
 export function judgesRecountApplies(input: Readonly<{
   runReleaseKey: string; ownReleaseKey: string | undefined; servedRootRule: string | null;
