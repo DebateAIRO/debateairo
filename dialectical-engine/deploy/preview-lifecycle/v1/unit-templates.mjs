@@ -9,6 +9,7 @@
 //
 //   unit-templates.mjs render --service api|ui --cat <file> --out <dir>
 //       <file>: `systemctl cat debateai-preview-<service>.service`, saved by root (root-owned, not group/world-writable).
+//       It is split only at the files `systemctl show` reports now (FragmentPath, DropInPaths), and must print exactly those.
 //       <dir>: an empty folder only root can enter; gets debateai-preview-<service>@.service and its .d/ drop-ins.
 //   unit-templates.mjs compare --service api|ui --label <label> --before <file>
 //       <file>: the full `systemctl show debateai-preview-<service>.service` output, saved by root before the change.
@@ -31,6 +32,7 @@ const DROPIN_NAME = /^[A-Za-z0-9._-]+\.conf$/;
 /** systemctl's file header: `# ` and the file's path in one of systemd's unit folders (a body comment rarely looks like that). */
 const HEADER = /^# (\/(?:etc|run|lib|usr\/lib|usr\/local\/lib)\/systemd\/\S+)$/;
 const MAX_INPUT_BYTES = 1024 * 1024;
+const ALERT_HOOK = 'OnFailure=debateai-preview-alert@%n.service';
 /**
  * Side-by-side plan D: the properties whose effective value must be the same for the old fixed unit and a new
  * instance (identity, confinement, environment, limits, stop and restart). systemd reports them in these names.
@@ -40,7 +42,10 @@ export const COMPARED_PROPERTIES = Object.freeze(('User Group SupplementaryGroup
   + 'CapabilityBoundingSet AmbientCapabilities SystemCallFilter SystemCallArchitectures RestrictNamespaces RestrictSUIDSGID LockPersonality '
   + 'MemoryDenyWriteExecute UMask LimitNOFILE LimitCORE TasksMax Environment UnsetEnvironment PassEnvironment KillMode TimeoutStopUSec Restart '
   + 'RestartUSec StartLimitBurst StartLimitIntervalUSec ProtectKernelTunables ProtectKernelModules ProtectKernelLogs ProtectControlGroups '
-  + 'ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory').split(' '));
+  + 'ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory '
+  // D7 review (controller ruling): also the env files, network/user/device isolation, file-system and socket rules.
+  + 'EnvironmentFiles PrivateNetwork PrivateUsers DevicePolicy DeviceAllow RestrictFileSystems NoExecPaths ExecPaths TemporaryFileSystem '
+  + 'SocketBindAllow SocketBindDeny LogsDirectory').split(' '));
 
 class TemplateRefusal extends Error { constructor(code, fields) { super(code); this.name = 'TemplateRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new TemplateRefusal(code, fields); };
@@ -56,18 +61,28 @@ const absolute = path => typeof path === 'string' && isAbsolute(path) && normali
  * `systemctl cat` output -> its files, in the order systemd applies them. Each file starts with a `# <path>`
  * header line; systemctl prints one blank line before every header but the first, which is not part of the
  * file before it. Bodies are returned byte for byte (a file without a final newline stays without one).
+ * With `paths` (the unit's FragmentPath then its DropInPaths, as `systemctl show` reports them), a header is exactly
+ * the next of those paths, so a body comment shaped like a header stays in its file; a header-shaped line naming one
+ * of them out of turn, or a file of the unit's own drop-in folder that systemd does not report, refuses, and every
+ * reported file must be printed.
  */
-export function splitSystemctlCat(text) {
+export function splitSystemctlCat(text, { paths } = {}) {
   if (typeof text !== 'string' || text === '') refuse('TEMPLATE_CAT_REFUSED');
+  if (paths !== undefined && (!Array.isArray(paths) || paths.length === 0 || !paths.every(absolute) || new Set(paths).size !== paths.length)) refuse('TEMPLATE_CAT_REFUSED');
+  const ownFolder = paths ? `${paths[0]}.d/` : null;
   const lines = text.split('\n');
   const starts = [];
   let offset = 0;
   for (const [index, line] of lines.entries()) {
     const match = HEADER.exec(line);
-    if (match) starts.push({ index, offset, path: match[1] });
+    if (paths) {
+      if (line === `# ${paths[starts.length]}`) starts.push({ index, offset, path: paths[starts.length] });
+      else if (index === 0 || (match && (paths.includes(match[1]) || match[1].startsWith(ownFolder)))) refuse('TEMPLATE_CAT_REFUSED');
+    } else if (match) starts.push({ index, offset, path: match[1] });
     else if (index === 0) refuse('TEMPLATE_CAT_REFUSED');
     offset += line.length + 1;
   }
+  if (paths && starts.length !== paths.length) refuse('TEMPLATE_CAT_REFUSED');
   const files = [];
   for (const [n, start] of starts.entries()) {
     const bodyStart = start.offset + lines[start.index].length + 1;
@@ -101,9 +116,10 @@ function installLines(lines) {
  * - every other drop-in of that unit's own folder goes to `debateai-preview-<service>@.service.d/<same name>`;
  * - on every non-comment line, the path token `/etc/debateai-v3-preview/auth-dev-v1/<service>.env` (with or without a
  *   leading `-`) becomes `…/<service>-%i.env`; everything else is copied byte for byte.
- * Any other non-comment mention of `<service>.env`, the port 3100 or 3101 (`:3101`, `PORT=3100`), `lifecycle-current` or a fixed
- * `debateai-preview-(api|ui|runner).service` refuses TEMPLATE_LINE_REFUSED { file, line }: the template would
- * otherwise point every release at one release's file, port, plan or unit (O1).
+ * Any other non-comment mention of `(api|ui|runner).env`, the port 3100 or 3101 (`:3101`, `PORT=3100`),
+ * `lifecycle-current` or a fixed `debateai-preview-(api|ui|runner).service`, and any instance specifier (%i %I %n %N
+ * %j %J) other than in `OnFailure=debateai-preview-alert@%n.service`, refuses TEMPLATE_LINE_REFUSED { file, line }: the
+ * template would otherwise point every release at one release's file, port, plan or unit (O1), or change a name.
  */
 export function renderTemplate({ service, files, layout = LAYOUT }) {
   if (!SERVICES.includes(service) || !Array.isArray(files) || files.length === 0) refuse('ARGUMENTS_REFUSED');
@@ -112,10 +128,14 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
   const template = `${layout.unitPrefix}${service}@.service`;
   const envRoot = layout.nativePlanRoot;
   const envToken = new RegExp(`(^|[\\s=])(-?)${escape(`${envRoot}/${service}.env`)}(?=\\s|$)`, 'g');
-  const forbidden = [`${service}.env`, 'lifecycle-current'];
+  // Any service's fixed env file (D7 review): the own one is rewritten above; another (a website line hiding the API's
+  // api.env, say) would keep naming the old file and silently lose its hardening for every release.
+  const fixedEnv = /(api|ui|runner)\.env/;
   // Slot A's ports as whole numbers (`:3101`, `PORT=3100`); a release's port comes from its slot and its plan.
   const fixedPort = /(?<![0-9])310[01](?![0-9])/;
-  const fixedUnit = /debateai-preview-(api|ui|runner)\.service/;
+  const fixedUnit = new RegExp(`${escape(layout.unitPrefix)}(api|ui|runner)\\.service`);
+  // Instance specifiers mean the old unit's name in its file, but each instance's in a template (`%%` is a literal `%`).
+  const specifier = /(?<!%)(?:%%)*%[iInNjJ]/;
   const out = [];
   const seen = new Set();
   for (const [index, file] of files.entries()) {
@@ -139,8 +159,10 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
     for (const [at, line] of lines.entries()) {
       if (skipped.has(at)) continue;
       if (isComment(line)) { rendered.push(line); continue; }
+      // The one specifier line that means the same in a template: the alert names the failed instance.
+      if (specifier.test(line) && line.trim() !== ALERT_HOOK) refuse('TEMPLATE_LINE_REFUSED', { file: path, line: at + 1 });
       const moved = line.replace(envToken, (_whole, before, dash) => `${before}${dash}${envRoot}/${service}-%i.env`);
-      if (forbidden.some(text => moved.includes(text)) || fixedPort.test(moved) || fixedUnit.test(moved)) refuse('TEMPLATE_LINE_REFUSED', { file: path, line: at + 1 });
+      if (fixedEnv.test(moved) || moved.includes('lifecycle-current') || fixedPort.test(moved) || fixedUnit.test(moved)) refuse('TEMPLATE_LINE_REFUSED', { file: path, line: at + 1 });
       rendered.push(moved);
     }
     out.push(Object.freeze({ name, body: rendered.join('\n') }));
@@ -205,9 +227,22 @@ async function requireEmptyRootOnly(path, layout) {
   } catch { refuse('OUT_DIR_REFUSED'); }
 }
 
+/** The live fixed unit's files as systemd reports them now: its FragmentPath, then its DropInPaths, in order. */
+async function loadedFiles(service, layout, run) {
+  const unit = `${layout.unitPrefix}${service}.service`;
+  const wanted = ['Id', 'FragmentPath', 'DropInPaths'];
+  const result = await run([layout.systemctl, 'show', unit, `--property=${wanted.join(',')}`, '--no-pager'], { env: {}, timeoutMs: 5000, maxOutputBytes: 64 * 1024 });
+  if (!result || result.timedOut || result.overflow || result.error || result.code !== 0) refuse('UNIT_SHOW_UNREADABLE');
+  const shown = parseShow(String(result.stdout), wanted, 'UNIT_SHOW_UNREADABLE');
+  if (shown.Id !== unit || !shown.FragmentPath) refuse('UNIT_SHOW_UNREADABLE');
+  return [shown.FragmentPath, ...(shown.DropInPaths ?? '').split(/\s+/).filter(Boolean)];
+}
+
 /** render: read, render (refusing before anything is written), then write each file root-owned 0644. */
-export async function renderToFolder({ service, catPath, outDir, layout = LAYOUT }) {
-  const rendered = renderTemplate({ service, files: splitSystemctlCat(await readInput(catPath, layout)), layout });
+export async function renderToFolder({ service, catPath, outDir, layout = LAYOUT, run = runBounded }) {
+  const text = await readInput(catPath, layout);
+  const paths = await loadedFiles(service, layout, run);
+  const rendered = renderTemplate({ service, files: splitSystemctlCat(text, { paths }), layout });
   await requireEmptyRootOnly(outDir, layout);
   const { uid, gid } = layoutOwner(layout);
   if (rendered.some(file => file.name.includes('/'))) await ensureDirectory(join(outDir, `${layout.unitPrefix}${service}@.service.d`), { mode: 0o700, uid });
@@ -251,7 +286,7 @@ export async function main(argv, { platform = process.platform, uid = process.ge
     args = parseArguments(argv);
     if (platform !== 'linux' || uid !== 0) refuse('ACTOR_REFUSED');
     const result = args.command === 'render'
-      ? await renderToFolder({ service: args.service, catPath: args.catPath, outDir: args.outDir, layout })
+      ? await renderToFolder({ service: args.service, catPath: args.catPath, outDir: args.outDir, layout, run: deps.run ?? runBounded })
       : await compareWithInstance({ service: args.service, label: args.label, beforePath: args.beforePath, layout, run: deps.run ?? runBounded });
     if (result.differs?.length) { logLine(stderr, result); return 1; }
     logLine(stdout, result);

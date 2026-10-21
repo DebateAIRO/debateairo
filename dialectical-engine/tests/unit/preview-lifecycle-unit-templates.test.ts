@@ -59,6 +59,23 @@ describe('splitSystemctlCat', () => {
     const files = apiFiles();
     expect(splitSystemctlCat(cat(files))).toEqual(files.map(([path, body]) => ({ path, body })));
   });
+  it('with the paths systemd reports, a body comment shaped like a header stays in its file', () => {
+    // A comment naming another unit's file, exactly in systemctl's header shape.
+    const egress = `${EGRESS}# ${DIR}/debateai-preview-egress.service\n`;
+    const files = apiFiles({ '60-hosted-egress.conf': egress });
+    const paths = files.map(([path]) => path);
+    expect(splitSystemctlCat(cat(files), { paths })).toEqual(files.map(([path, body]) => ({ path, body })));
+    // Without them that comment would split the file in two.
+    expect(splitSystemctlCat(cat(files))).toHaveLength(files.length + 1);
+  });
+  it.each([
+    ['a file systemd does not report', (paths: string[]) => paths.slice(0, -1)],
+    ['a file systemd reports that is not printed', (paths: string[]) => [...paths, `${DIR}/debateai-preview-api.service.d/zz-new.conf`]],
+    ['another order', (paths: string[]) => [paths[0]!, ...paths.slice(1).reverse()]]
+  ])('refuses %s', (_name, change) => {
+    const files = apiFiles();
+    expect(() => splitSystemctlCat(cat(files), { paths: change(files.map(([path]) => path)) })).toThrow(expect.objectContaining({ code: 'TEMPLATE_CAT_REFUSED' }));
+  });
   it.each([
     ['empty output', ''],
     ['text before the first header', `[Unit]\n# ${DIR}/debateai-preview-api.service\n`],
@@ -107,6 +124,13 @@ describe('renderTemplate', () => {
     ]);
   });
 
+  it("refuses a website line naming the API's env file (a hidden-file line that would keep naming the old fixed file)", () => {
+    const files = [
+      [`${DIR}/debateai-preview-ui.service`, `[Service]\nUser=debateai-preview-ui\nEnvironmentFile=${ENV}/ui.env\nInaccessiblePaths=-${ENV}/api.env\n`]
+    ] as const;
+    expect(() => render([...files], 'ui')).toThrow(expect.objectContaining({ code: 'TEMPLATE_LINE_REFUSED', fields: { file: `${DIR}/debateai-preview-ui.service`, line: 4 } }));
+  });
+
   it.each([
     'Environment=PORT=3100',
     'ExecStart=/x --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/api-launch.json',
@@ -115,7 +139,15 @@ describe('renderTemplate', () => {
     `ReadOnlyPaths=${ENV}/api.env.old`,
     'ReadWritePaths=/opt/debateai-v3-preview/artifacts/lifecycle-current-old-v1',
     'Wants=debateai-preview-runner.service',
-    'Environment=UPSTREAM=127.0.0.1:3100'
+    'Environment=UPSTREAM=127.0.0.1:3100',
+    `InaccessiblePaths=-${ENV}/runner.env`,
+    `ReadOnlyPaths=${ENV}/ui.env`,
+    'Environment=NAME=%i',
+    'Description=API %I',
+    'Environment=UNIT=%n',
+    'SyslogIdentifier=%N',
+    'Environment=PREFIX=%j %J',
+    'OnFailure=debateai-preview-alert@%n.service other.service'
   ])('refuses %s outside the dropped files', line => {
     const egress = `${EGRESS}${line}\n`;
     expect(() => render(apiFiles({ '60-hosted-egress.conf': egress }))).toThrow(expect.objectContaining({
@@ -125,6 +157,18 @@ describe('renderTemplate', () => {
     expect(() => render(apiFiles({ '50-lifecycle.conf': `${LIFECYCLE}${line}\n` }))).not.toThrow();
     expect(() => render(apiFiles({ 'zzzzzzzzzz-lifecycle-release.conf': `${RELEASE}\n${line}` }))).not.toThrow();
     expect(() => render(apiFiles({ '60-hosted-egress.conf': `${EGRESS}# ${line}\n;${line}\n` }))).not.toThrow();
+  });
+
+  it('keeps the alert hook (its %n names the instance, as intended) and an escaped percent sign', () => {
+    const egress = `${EGRESS}OnFailure=debateai-preview-alert@%n.service\nEnvironment=RATIO=50%%in\n`;
+    expect(bodyOf(render(apiFiles({ '60-hosted-egress.conf': egress })), 'debateai-preview-api@.service.d/60-hosted-egress.conf')).toBe(egress);
+  });
+
+  it('builds the fixed-unit refusal from the layout prefix', () => {
+    const other = { ...common.LAYOUT, unitPrefix: 'acme-' };
+    const files = [[`${DIR}/acme-api.service`, '[Unit]\nAfter=acme-ui.service\n']] as const;
+    expect(() => renderTemplate({ service: 'api', files: splitSystemctlCat(cat([...files])), layout: other })).toThrow(expect.objectContaining({ code: 'TEMPLATE_LINE_REFUSED' }));
+    expect(renderTemplate({ service: 'api', files: splitSystemctlCat(cat([[`${DIR}/acme-api.service`, '[Unit]\nAfter=acme-egress.service\n']])), layout: other })[0].name).toBe('acme-api@.service');
   });
 
   it('keeps a number that only contains an old port', () => {
@@ -164,6 +208,12 @@ describe('compareEffective', () => {
     User: 'debateai-preview-api', Group: 'debateai-preview-api', ProtectSystem: 'strict', ReadOnlyPaths: `${ENV}/api.env -/etc/debateai-v3-preview/api`,
     InaccessiblePaths: '/root', IPAddressDeny: '0.0.0.0/0 ::/0', TimeoutStopUSec: '1min 30s', Restart: 'on-failure', ...overrides
   });
+  it('accepts the moved env file in EnvironmentFiles too, and flags a lost device rule', () => {
+    const before = shown({ EnvironmentFiles: `${ENV}/api.env (ignore_errors=yes)`, DevicePolicy: 'closed' });
+    const after = shown({ ReadOnlyPaths: `${ENV}/api-new-v1.env -/etc/debateai-v3-preview/api`, EnvironmentFiles: `${ENV}/api-new-v1.env (ignore_errors=yes)`, DevicePolicy: 'closed' });
+    expect(compareEffective({ service: 'api', label: 'new-v1', before, after })).toEqual([]);
+    expect(compareEffective({ service: 'api', label: 'new-v1', before, after: { ...after, DevicePolicy: 'auto' } })).toEqual(['DevicePolicy']);
+  });
   it('compareEffective accepts the env substitution and flags a changed user', () => {
     const after = shown({ ReadOnlyPaths: `${ENV}/api-new-v1.env -/etc/debateai-v3-preview/api` });
     expect(compareEffective({ service: 'api', label: 'new-v1', before: shown(), after })).toEqual([]);
@@ -182,7 +232,10 @@ describe('compareEffective', () => {
       + 'IPAddressAllow IPAddressDeny ReadWritePaths ReadOnlyPaths InaccessiblePaths BindPaths BindReadOnlyPaths CapabilityBoundingSet AmbientCapabilities SystemCallFilter '
       + 'SystemCallArchitectures RestrictNamespaces RestrictSUIDSGID LockPersonality MemoryDenyWriteExecute UMask LimitNOFILE LimitCORE TasksMax Environment UnsetEnvironment '
       + 'PassEnvironment KillMode TimeoutStopUSec Restart RestartUSec StartLimitBurst StartLimitIntervalUSec ProtectKernelTunables ProtectKernelModules ProtectKernelLogs '
-      + 'ProtectControlGroups ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory').split(' '));
+      + 'ProtectControlGroups ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory '
+      // Controller ruling (D7 review): also the env files, network/user/device isolation, file-system and socket rules, logs folder.
+      + 'EnvironmentFiles PrivateNetwork PrivateUsers DevicePolicy DeviceAllow RestrictFileSystems NoExecPaths ExecPaths TemporaryFileSystem '
+      + 'SocketBindAllow SocketBindDeny LogsDirectory').split(' '));
     expect(Object.isFrozen(COMPARED_PROPERTIES)).toBe(true);
   });
   it('refuses a label that is not a release label and a service but api or ui', () => {
@@ -200,15 +253,24 @@ describe('unit-templates.mjs CLI', () => {
     const catFile = join(root, 'api.cat'); writeFileSync(catFile, cat(apiFiles()), { mode: 0o600 });
     return { root, out, catFile };
   };
+  function systemd(lines: string[], code = 0) {
+    const calls: { argv: string[]; env: unknown }[] = [];
+    return { calls, run: async (argv: string[], options: { env: unknown }) => { calls.push({ argv, env: options.env }); return { code, signal: null, timedOut: false, overflow: false, stdout: Buffer.from(lines.join('\n') + '\n'), stderr: Buffer.alloc(0) }; } };
+  }
+  const fixedShow = (files = apiFiles()) => ['Id=debateai-preview-api.service', `FragmentPath=${files[0]![0]}`, `DropInPaths=${files.slice(1).map(([path]) => path).join(' ')}`];
+  const renderArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-api.service', '--property=Id,FragmentPath,DropInPaths', '--no-pager'];
   const run = async (argv: string[], options: Record<string, unknown> = {}) => {
     const stdout = sink(), stderr = sink();
-    const code = await main(argv, { platform: 'linux', uid: 0, layout, stdout: stdout.stream, stderr: stderr.stream, ...options });
+    const code = await main(argv, { platform: 'linux', uid: 0, layout, stdout: stdout.stream, stderr: stderr.stream, deps: { run: systemd(fixedShow()).run }, ...options });
     return { code, stdout: stdout.events(), stderr: stderr.events() };
   };
 
   it('render writes the template and its drop-ins into the empty root-only folder', async () => {
     const w = workspace();
-    const result = await run(['render', '--service', 'api', '--cat', w.catFile, '--out', w.out]);
+    const s = systemd(fixedShow());
+    const result = await run(['render', '--service', 'api', '--cat', w.catFile, '--out', w.out], { deps: { run: s.run } });
+    // The saved cat is split only at the files systemd itself reports for the live unit.
+    expect(s.calls).toEqual([{ argv: renderArgv, env: {} }]);
     expect(result).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_RENDERED', service: 'api', files: render().map(file => file.name) }] });
     for (const file of render()) {
       expect(readFileSync(join(w.out, file.name), 'utf8')).toBe(file.body);
@@ -244,6 +306,17 @@ describe('unit-templates.mjs CLI', () => {
     expect(readdirSync(w.out)).toEqual([]);
   });
 
+  it.each([
+    ['systemd does not answer', systemd(fixedShow(), 1), 'UNIT_SHOW_UNREADABLE'],
+    ['systemd answers about another unit', systemd(fixedShow().map(line => line.replace('Id=debateai-preview-api.service', 'Id=debateai-preview-ui.service'))), 'UNIT_SHOW_UNREADABLE'],
+    ['the saved cat is not what systemd loads now', systemd([...fixedShow().slice(0, 2), `DropInPaths=${apiFiles().slice(1, -1).map(([path]) => path).join(' ')}`]), 'TEMPLATE_CAT_REFUSED']
+  ])('render refuses when %s, and writes nothing', async (_name, s, reason) => {
+    const w = workspace();
+    const result = await run(['render', '--service', 'api', '--cat', w.catFile, '--out', w.out], { deps: { run: s.run } });
+    expect(result).toEqual({ code: 1, stdout: [], stderr: [{ event: 'PREVIEW_UNIT_TEMPLATE_REFUSED', service: 'api', reason }] });
+    expect(readdirSync(w.out)).toEqual([]);
+  });
+
   it('render reports a refused line by file and line number only, and writes nothing', async () => {
     const w = workspace();
     writeFileSync(w.catFile, cat(apiFiles({ '60-hosted-egress.conf': `${EGRESS}Environment=PORT=3100\n` })));
@@ -254,10 +327,6 @@ describe('unit-templates.mjs CLI', () => {
 
   const showArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-api@new-v1.service', `--property=Id,LoadState,${COMPARED_PROPERTIES.join(',')}`, '--no-pager'];
   const savedShow = (lines: string[]) => { const w = workspace(); const file = join(w.root, 'api.show'); writeFileSync(file, lines.join('\n') + '\n', { mode: 0o600 }); return file; };
-  const systemd = (lines: string[], code = 0) => {
-    const calls: { argv: string[]; env: unknown }[] = [];
-    return { calls, run: async (argv: string[], options: { env: unknown }) => { calls.push({ argv, env: options.env }); return { code, signal: null, timedOut: false, overflow: false, stdout: Buffer.from(lines.join('\n') + '\n'), stderr: Buffer.alloc(0) }; } };
-  };
   const OLD = ['Id=debateai-preview-api.service', 'Names=debateai-preview-api.service', 'User=debateai-preview-api', `ReadOnlyPaths=${ENV}/api.env`, 'TimeoutStopUSec=1min 30s', 'Description=x=y'];
   const NEW = ['Id=debateai-preview-api@new-v1.service', 'LoadState=loaded', 'User=debateai-preview-api', `ReadOnlyPaths=${ENV}/api-new-v1.env`, 'TimeoutStopUSec=1min 30s'];
 

@@ -4,9 +4,11 @@
 // writes down what root sees on the way, and nothing more:
 //   - when the older release's API stops, the website/API pair is gone (FRONT_PAIR_STOPPED);
 //   - when its runner exits cleanly after printing both retirement lines, the release is RETIRED;
-//   - 7.5 hours after the switch (the backstop timer) it asks the release to retire now and emails the owner;
+//   - 7.5 hours after the switch (the backstop timer) it asks the release to retire now, emails the owner and arms the
+//     25-minute check at an absolute UTC time (a drop-in of debateai-preview-runner-retire-check@<label>.timer);
 //   - 25 minutes after that request, if the runner still runs, it stops that one unit, re-opens a spending gate the
 //     stop halted, and emails the owner. It never stops anything else, and never a runner without a standing request.
+//   - once the release is RETIRED, its backstop and check timers are turned off (disabled; their files stay).
 //
 //   release-retire.mjs stopped --service api|runner --label <label>     ExecStopPost=+ of api@ / runner@ (D7)
 //   release-retire.mjs may-start --service api|ui|runner --label <label> ExecStartPre of the public server units (D16)
@@ -16,8 +18,9 @@
 //
 // Every refusal is one JSON line on stderr and exit 1, so the unit fails and OnFailure= emails the owner: a row that
 // should have been written never goes missing silently. Logs carry codes, labels, keys and counts only.
+import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { LAYOUT, RELEASE_LABEL, logLine, runBounded, unitNameFor } from './common.mjs';
+import { LAYOUT, RELEASE_LABEL, atomicWrite, ensureDirectory, logLine, runBounded, unitNameFor } from './common.mjs';
 import { STARTABLE, readLock, unitIsActive as prestartUnitIsActive } from './prestart.mjs';
 import { countOpenWork, readReleaseEvents, readReleaseState, recordReleaseEvent } from './release-table.mjs';
 
@@ -52,6 +55,11 @@ const SERVICES = Object.freeze(['api', 'ui', 'runner']);
 class RetireRefusal extends Error { constructor(code, fields) { super(code); this.name = 'RetireRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new RetireRefusal(code, fields); };
 const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
+const unitDirOf = layout => layout.systemdUnitDir ?? '/etc/systemd/system';
+const retireTimerOf = (layout, label) => `${layout.unitPrefix}runner-retire@${label}.timer`;
+const checkTimerOf = (layout, label) => `${layout.unitPrefix}runner-retire-check@${label}.timer`;
+/** systemd's calendar form of a UTC instant, rounded UP to the whole second (a timer never fires before it). */
+const utcCalendar = ms => new Date(Math.ceil(ms / 1000) * 1000).toISOString().replace('T', ' ').replace(/\.000Z$/, ' UTC');
 
 /**
  * Both retirement lines, each a whole line of the journal text: the runner's own
@@ -83,6 +91,12 @@ function withDefaults(layout, deps, deadline = null) {
   return {
     now, run,
     sleep: deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
+    // A root-owned unit drop-in (0644) in a root-owned 0755 folder, replaced atomically.
+    writeUnitFile: deps.writeUnitFile ?? (async (path, text) => {
+      const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0;
+      await ensureDirectory(dirname(path), { mode: 0o755, uid });
+      await atomicWrite(path, Buffer.from(text, 'utf8'), { mode: 0o644, uid, gid });
+    }),
     readLock: deps.readLock ?? readLock,
     readReleaseState: guarded(deps.readReleaseState ?? (input => readReleaseState({ ...input, layout, run }))),
     recordReleaseEvent: guarded(deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout, run }))),
@@ -149,6 +163,42 @@ async function systemctl(args, layout, io) {
 }
 
 const noticeUnit = (layout, kind, code) => `${layout.unitPrefix}notice@${kind}-${code}.service`;
+
+/** The time of the latest RETIRE_REQUESTED row (ms since the epoch); none is a state this tool refuses. */
+async function latestRequestAt(releaseKey, io) {
+  const requests = (await io.readReleaseEvents({ releaseKey })).filter(event => event.kind === 'RETIRE_REQUESTED');
+  const requestedAt = requests.length ? Date.parse(requests.at(-1).recordedAt) : Number.NaN;
+  return Number.isFinite(requestedAt) ? requestedAt : refuse('RETIRE_STATE_REFUSED', { state: 'DRAINING' });
+}
+
+/**
+ * Arm the 25-minute check at an absolute UTC time, the latest request + 1,500 s (D7 review): a Persistent, enabled
+ * calendar timer survives a reboot, where a relative one would be lost. The drop-in is replaced on every request, and
+ * restart (not start) re-arms an instance that already fired or is still waiting.
+ */
+async function armCheck(label, requestedAt, layout, io) {
+  const timer = checkTimerOf(layout, label);
+  const text = [
+    '# Written by release-retire.mjs retire-request (side-by-side spec §4); replaced by the next request, never edited by hand.',
+    `# The 25-minute check of release ${label}: 1,500 s after its latest RETIRE_REQUESTED (${new Date(requestedAt).toISOString()}).`,
+    '[Timer]',
+    `OnCalendar=${utcCalendar(requestedAt + RETIRE_CHECK_AFTER_MS)}`,
+    ''
+  ].join('\n');
+  try { await io.writeUnitFile(`${unitDirOf(layout)}/${timer}.d/50-at.conf`, text); } catch { refuse('RETIRE_CHECK_TIMER_FAILED'); }
+  for (const args of [['daemon-reload'], ['enable', timer], ['restart', timer]]) if (!await systemctl(args, layout, io)) refuse('RETIRE_CHECK_TIMER_FAILED');
+}
+
+/**
+ * A RETIRED release needs neither its backstop nor its check: disable and stop both. A timer systemd cannot load (a
+ * check that was never armed has no time) has nothing to stop and is left alone.
+ */
+async function disarmTimers(label, layout, io) {
+  for (const timer of [retireTimerOf(layout, label), checkTimerOf(layout, label)]) {
+    const { LoadState: loadState } = await showUnit(timer, ['LoadState'], layout, io);
+    if (loadState === 'loaded' && !await systemctl(['disable', '--now', timer], layout, io)) refuse('RETIRE_TIMER_STOP_FAILED');
+  }
+}
 
 /**
  * The runner's own end: did THIS invocation exit cleanly after printing both retirement lines? Reads the invocation
@@ -218,13 +268,15 @@ export async function requestRetire({ label, layout = LAYOUT, deps = {} }) {
   const code = noticeCodeOf(label);
   const { state, retireRequested } = await io.readReleaseState({ releaseKey });
   if (state === 'RETIRED') {
-    if (!await systemctl(['disable', '--now', `${layout.unitPrefix}runner-retire@${label}.timer`], layout, io)) refuse('RETIRE_TIMER_STOP_FAILED');
+    await disarmTimers(label, layout, io);
     return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
   }
   if (state !== 'DRAINING') refuse('RETIRE_STATE_REFUSED', { state });
   if (!retireRequested) await recordEvent({ releaseKey, kind: 'RETIRE_REQUESTED', reason: 'BACKSTOP', written: after => after.retireRequested, io });
+  // The check is timed from the row itself (a re-run arms the same time), so it is never earlier than the check allows.
+  const requestedAt = await latestRequestAt(releaseKey, io);
   const noticed = await systemctl(['start', '--no-block', noticeUnit(layout, 'release-retire', code)], layout, io);
-  if (!await systemctl(['start', `${layout.unitPrefix}runner-retire-check@${label}.timer`], layout, io)) refuse('RETIRE_CHECK_TIMER_FAILED');
+  await armCheck(label, requestedAt, layout, io);
   if (!noticed) refuse('NOTICE_START_FAILED');
   return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_REQUESTED', label, releaseKey });
 }
@@ -247,7 +299,7 @@ async function activateGate(gate, io) {
 }
 
 /**
- * 25 minutes after the request. RETIRED: honoured. Anything but a DRAINING release under a standing request is
+ * 25 minutes after the request. RETIRED: honoured (its backstop and check timers are turned off). Anything but a DRAINING release under a standing request is
  * refused untouched (a stale timer after a rollback). Runner already gone without retiring: stranded, owner emailed,
  * nothing stopped. Runner still running: only once 25 minutes have passed since the latest RETIRE_REQUESTED row (a
  * manual or mis-armed run never stops a busy runner early), read both gates, stop that one unit, wait 5 s, read them
@@ -269,12 +321,13 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
       ...(gates ? { gatesReactivationFailed: Object.freeze(gates.failed), gatesUnknown: Object.freeze(gates.unknown) } : {})
     });
   };
-  if (state === 'RETIRED') return finish('PREVIEW_RELEASE_RETIRE_HONOURED', null);
+  if (state === 'RETIRED') {
+    await disarmTimers(label, layout, io);
+    return finish('PREVIEW_RELEASE_RETIRE_HONOURED', null);
+  }
   if (state !== 'DRAINING' || !retireRequested) refuse('RETIRE_STATE_REFUSED', { state });
   if (!await unitIsActive(unit, layout, io)) return finish('PREVIEW_RELEASE_STRANDED', 'release-stranded');
-  const requests = (await io.readReleaseEvents({ releaseKey })).filter(event => event.kind === 'RETIRE_REQUESTED');
-  const requestedAt = requests.length ? Date.parse(requests.at(-1).recordedAt) : Number.NaN;
-  if (!Number.isFinite(requestedAt)) refuse('RETIRE_STATE_REFUSED', { state });
+  const requestedAt = await latestRequestAt(releaseKey, io);
   if (io.now() - requestedAt < RETIRE_CHECK_AFTER_MS) refuse('RETIRE_CHECK_TOO_EARLY');
   const before = [];
   for (const gate of GATES) before.push(await gateState(gate, io));
@@ -306,6 +359,7 @@ export async function markDrainedRetired({ label, layout = LAYOUT, deps = {} }) 
   const openWork = await io.countOpenWork({ releaseKey });
   if (openWork !== 0) refuse('RELEASE_OPEN_WORK', { openWork });
   await recordEvent({ releaseKey, kind: 'RETIRED', reason: 'DRAINED', written: after => after.state === 'RETIRED', io });
+  await disarmTimers(label, layout, io);
   return Object.freeze({ event: 'PREVIEW_RELEASE_DRAINED_RETIRED', label, releaseKey, openWork });
 }
 

@@ -27,12 +27,6 @@ const CLEAN_ENV = '/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin';
 const SUPPORTING = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-capture.service', 'debateai-preview-provider-budget.service', 'debateai-preview-turnstile.service'];
 const RETIRE = `${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/release-retire.mjs`;
 const runnerTemplate = () => readFileSync(resolve(folder, '../../preview-auth-dev/v1/debateai-preview-runner@.service'), 'utf8');
-/** systemd time span ('25min', '1h', '90s', '2min 30s') -> seconds; only the units these templates use. */
-const seconds = (span: string) => span.split(' ').reduce((sum, part) => {
-  const match = /^([0-9]+)(s|min|h)$/.exec(part);
-  if (!match) throw new Error(`unreadable span ${part}`);
-  return sum + Number(match[1]) * { s: 1, min: 60, h: 3600 }[match[2] as 's' | 'min' | 'h'];
-}, 0);
 
 describe('preview lifecycle systemd templates', () => {
   // systemd >= 254 runs OnFailure= on EVERY failed attempt unless RestartMode=direct: without it a
@@ -140,16 +134,17 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(service).some(key => key.startsWith('[Install]'))).toBe(false);
   });
 
-  it('the 25-minute check fires 25 minutes after the request', async () => {
-    const { RETIRE_CHECK_AFTER_MS } = await import('../../deploy/' + 'preview-lifecycle/v1/release-retire.mjs');
+  it('the 25-minute check is an absolute time that survives a reboot and can be armed again', () => {
     const timer = parse(unit('debateai-preview-runner-retire-check@.timer'));
-    // retire-request starts this timer only after RETIRE_REQUESTED is written, so it elapses at least 1,500 s after that row.
-    expect(timer['[Timer]OnActiveSec']).toEqual(['25min']);
-    expect(seconds(timer['[Timer]OnActiveSec']![0]!) * 1000).toBe(RETIRE_CHECK_AFTER_MS);
-    expect(Object.keys(timer).filter(key => /^\[Timer\]On/.test(key))).toEqual(['[Timer]OnActiveSec']);
+    // retire-request writes debateai-preview-runner-retire-check@<label>.timer.d/50-at.conf with OnCalendar = the
+    // latest RETIRE_REQUESTED + 1,500 s in UTC (pinned in preview-lifecycle-release-retire.test.ts), then enables it.
+    expect(Object.keys(timer).filter(key => /^\[Timer\]On/.test(key))).toEqual([]);
     expect(timer['[Timer]Unit']).toEqual(['debateai-preview-runner-retire-check@%i.service']);
-    // Started only by the request, never at boot.
-    expect(Object.keys(timer).some(key => key.startsWith('[Install]'))).toBe(false);
+    expect(timer['[Timer]Persistent']).toEqual(['true']);
+    expect(timer['[Timer]AccuracySec']).toEqual(['1s']);
+    // Once elapsed the timer goes inactive, so a later arm (a second drain after a rollback) starts it again.
+    expect(timer['[Timer]RemainAfterElapse']).toEqual(['false']);
+    expect(timer['[Install]WantedBy']).toEqual(['timers.target']);
     const service = parse(unit('debateai-preview-runner-retire-check@.service'));
     expect(service['[Service]Type']).toEqual(['oneshot']);
     expect(service['[Service]ExecStart']).toEqual([`${CLEAN_ENV} ${NODE} ${RETIRE} retire-check --label %i`]);

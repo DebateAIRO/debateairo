@@ -9,6 +9,10 @@ const OTHER_KEY = ['r20', '0123456789ab'].join('-');
 const INVOCATION = ['5f0c', '9a1e', '77b2', '4c3d', '8e9f', '0a1b', '2c3d', '4e5f'].join('');
 const RUNNER = 'debateai-preview-runner@old-v1.service';
 const API = 'debateai-preview-api@old-v1.service';
+const RETIRE_TIMER = 'debateai-preview-runner-retire@old-v1.timer';
+const CHECK_TIMER = 'debateai-preview-runner-retire-check@old-v1.timer';
+const CHECK_AT = '/etc/systemd/system/debateai-preview-runner-retire-check@old-v1.timer.d/50-at.conf';
+const settings = (text: string) => text.split('\n').filter(line => line !== '' && !line.startsWith('#'));
 const retiredJournal = (key = KEY) => ['{"kind":"DEBATEAI_RUNNER_READY"}', `DEBATEAI_RUNNER_RETIRED {"releaseKey":"${key}"}`, 'PREVIEW_RUNNER_RETIRED'].join('\n') + '\n';
 
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
@@ -16,6 +20,7 @@ type Options = Partial<{
   state: string; frontPairStopped: boolean; retireRequested: boolean; apiActive: boolean; runnerActive: boolean; mainStatus: string;
   journals: string[]; gates: Record<string, [string, string]>; openWork: number; writeFails: 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'REFUSED' | null;
   stopFails: boolean; noticeFails: boolean; activateFails: string[]; requestedAgoMs: number | null; apiShow: string; journalStepMs: number;
+  timerLoad: Record<string, string>; failVerbs: string[]; writeUnitFails: boolean;
 }>;
 const START = Date.parse('2026-10-22T08:00:00.000Z');
 const MINUTE = 60_000;
@@ -24,9 +29,10 @@ function harness(options: Options = {}) {
   const o = { state: 'DRAINING', frontPairStopped: false, retireRequested: false, apiActive: false, runnerActive: true, mainStatus: '0',
     journals: [retiredJournal()], gates: { deepinfra: ['active', 'active'], anthropic: ['active', 'active'] } as Record<string, [string, string]>,
     openWork: 0, writeFails: null, stopFails: false, noticeFails: false, activateFails: [] as string[], requestedAgoMs: 26 * MINUTE as number | null,
-    apiShow: null as string | null, journalStepMs: 0, ...options };
+    apiShow: null as string | null, journalStepMs: 0, timerLoad: {} as Record<string, string>, failVerbs: [] as string[], writeUnitFails: false, ...options };
   const table = { state: o.state, frontPairStopped: o.frontPairStopped, retireRequested: o.retireRequested };
   const events: [string, string | null][] = [], systemctl: string[][] = [], shown: string[][] = [], journal: string[][] = [], gateCalls: string[][] = [], slept: number[] = [];
+  const written: [string, string][] = [];
   let runnerStopped = false, journalReads = 0, clock = START;
   const timeouts: number[] = [];
   const gateOf = (argv: string[]) => GATES.find((gate: any) => argv.includes(gate.privateDir))!;
@@ -42,9 +48,11 @@ function harness(options: Options = {}) {
         if (unit === API && o.apiShow) return result(o.apiShow);
         if (unit === API) return result(o.apiActive ? 'ActiveState=active\nSubState=running\nMainPID=4242\n' : 'ActiveState=deactivating\nSubState=stop-post\nMainPID=0\n');
         if (unit === RUNNER) return result(`ActiveState=${o.runnerActive && !runnerStopped ? 'active' : 'inactive'}\n`);
+        if (unit === RETIRE_TIMER || unit === CHECK_TIMER) return result(`LoadState=${o.timerLoad[unit] ?? 'loaded'}\n`);
         return result('', 1);
       }
       systemctl.push(rest);
+      if (o.failVerbs.includes(rest[0]!)) return result('', 1);
       if (rest[0] === 'stop') { if (o.stopFails) return result('', 1); runnerStopped = true; }
       if (rest[0] === 'start' && rest[1] === '--no-block' && o.noticeFails) return result('', 1);
       return result();
@@ -61,6 +69,7 @@ function harness(options: Options = {}) {
   const fail = (code: string) => Object.assign(new Error(code), { code });
   const deps: Record<string, any> = {
     run, now: () => clock, sleep: async (ms: number) => { slept.push(ms); clock += ms; },
+    writeUnitFile: async (path: string, text: string) => { if (o.writeUnitFails) throw fail('LIFECYCLE_WRITE_REFUSED'); written.push([path, text]); },
     readReleaseEvents: async ({ releaseKey }: { releaseKey: string }) => {
       expect(releaseKey).toBe(KEY);
       const at = (ms: number) => new Date(ms).toISOString();
@@ -81,7 +90,7 @@ function harness(options: Options = {}) {
     },
     countOpenWork: async ({ releaseKey }: { releaseKey: string }) => { expect(releaseKey).toBe(KEY); return o.openWork; }
   };
-  return { deps, events, systemctl, shown, journal, gateCalls, slept, table, timeouts };
+  return { deps, events, systemctl, shown, journal, gateCalls, slept, table, timeouts, written };
 }
 const rejectsWith = async (promise: Promise<unknown>, code: string) => { await expect(promise).rejects.toMatchObject({ code }); };
 
@@ -196,33 +205,64 @@ describe('retirement lines', () => {
 });
 
 describe('the backstop request (side-by-side spec §4)', () => {
-  it('requests retirement once, emails the owner and arms the 25-minute check', async () => {
-    const h = harness({ state: 'DRAINING' });
+  it('requests retirement once, emails the owner and arms the 25-minute check at an absolute time', async () => {
+    const h = harness({ state: 'DRAINING', requestedAgoMs: 0 });
     expect(await requestRetire({ label: 'old-v1', layout, deps: h.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_REQUESTED', label: 'old-v1', releaseKey: KEY });
     expect(h.events).toEqual([['RETIRE_REQUESTED', 'BACKSTOP']]);
-    expect(h.systemctl).toEqual([['start', '--no-block', 'debateai-preview-notice@release-retire-old_v1.service'], ['start', 'debateai-preview-runner-retire-check@old-v1.timer']]);
-    // Run again (a Persistent timer after a reboot): no second row, the check is armed again.
-    const again = harness({ retireRequested: true });
+    // The request was recorded at 08:00:00 UTC: the check is due 1,500 s later, written as one UTC calendar time that a
+    // reboot cannot lose (the timer is Persistent and enabled).
+    expect(h.written.map(([path]) => path)).toEqual([CHECK_AT]);
+    expect(settings(h.written[0]![1])).toEqual(['[Timer]', 'OnCalendar=2026-10-22 08:25:00 UTC']);
+    expect(h.systemctl).toEqual([['start', '--no-block', 'debateai-preview-notice@release-retire-old_v1.service'], ['daemon-reload'], ['enable', CHECK_TIMER], ['restart', CHECK_TIMER]]);
+    // Run again (a Persistent timer after a reboot): no second row, the same time is armed again.
+    const again = harness({ retireRequested: true, requestedAgoMs: 0 });
     await requestRetire({ label: 'old-v1', layout, deps: again.deps });
     expect(again.events).toEqual([]);
     expect(again.systemctl).toEqual(h.systemctl);
+    expect(again.written).toEqual(h.written);
   });
 
-  it('turns its own timer off for a retired release, and refuses any other state', async () => {
+  it('arms the check never earlier than 1,500 s after the latest request (rounded up to the next second)', async () => {
+    for (const [agoMs, at] of [[-400, '08:25:01'], [-1000, '08:25:01'], [10 * MINUTE, '08:15:00']] as const) {
+      const h = harness({ retireRequested: true, requestedAgoMs: agoMs });
+      await requestRetire({ label: 'old-v1', layout, deps: h.deps });
+      const line = settings(h.written[0]![1])[1]!;
+      expect(line).toBe(`OnCalendar=2026-10-22 ${at} UTC`);
+      const due = Date.parse(`${line.slice('OnCalendar='.length, -' UTC'.length).replace(' ', 'T')}Z`);
+      expect(due - (START - agoMs)).toBeGreaterThanOrEqual(retire.RETIRE_CHECK_AFTER_MS);
+      expect(due - (START - agoMs)).toBeLessThan(retire.RETIRE_CHECK_AFTER_MS + 1000);
+    }
+  });
+
+  it('refuses loudly when the check cannot be armed', async () => {
+    for (const options of [{ writeUnitFails: true }, { failVerbs: ['daemon-reload'] }, { failVerbs: ['enable'] }, { failVerbs: ['restart'] }]) {
+      await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: harness(options).deps }), 'RETIRE_CHECK_TIMER_FAILED');
+    }
+    const missing = harness({ retireRequested: true, requestedAgoMs: null });
+    await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: missing.deps }), 'RETIRE_STATE_REFUSED');
+    expect(missing.written).toEqual([]);
+  });
+
+  it('turns both of its timers off for a retired release, and refuses any other state', async () => {
     const retired = harness({ state: 'RETIRED' });
     expect(await requestRetire({ label: 'old-v1', layout, deps: retired.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label: 'old-v1', releaseKey: KEY });
-    expect(retired.systemctl).toEqual([['disable', '--now', 'debateai-preview-runner-retire@old-v1.timer']]);
+    expect(retired.systemctl).toEqual([['disable', '--now', RETIRE_TIMER], ['disable', '--now', CHECK_TIMER]]);
+    // A check that was never armed has no time and does not load: there is nothing to turn off.
+    const unarmed = harness({ state: 'RETIRED', timerLoad: { [CHECK_TIMER]: 'bad-setting' } });
+    await requestRetire({ label: 'old-v1', layout, deps: unarmed.deps });
+    expect(unarmed.systemctl).toEqual([['disable', '--now', RETIRE_TIMER]]);
+    await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: harness({ state: 'RETIRED', failVerbs: ['disable'] }).deps }), 'RETIRE_TIMER_STOP_FAILED');
     for (const state of ['CURRENT', 'STAGED', 'UNKNOWN']) {
       const h = harness({ state });
       await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: h.deps }), 'RETIRE_STATE_REFUSED');
-      expect(h.events).toEqual([]); expect(h.systemctl).toEqual([]);
+      expect(h.events).toEqual([]); expect(h.systemctl).toEqual([]); expect(h.written).toEqual([]);
     }
   });
 
   it('fails loudly when the owner email cannot be queued, after arming the check', async () => {
     const h = harness({ noticeFails: true });
     await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: h.deps }), 'NOTICE_START_FAILED');
-    expect(h.systemctl.at(-1)).toEqual(['start', 'debateai-preview-runner-retire-check@old-v1.timer']);
+    expect(h.systemctl.at(-1)).toEqual(['restart', CHECK_TIMER]);
   });
 });
 
@@ -230,7 +270,9 @@ describe('the 25-minute check (side-by-side spec §4)', () => {
   it('reports a request the runner honoured and stops nothing', async () => {
     const h = harness({ state: 'RETIRED', retireRequested: true, runnerActive: false });
     expect(await checkRetire({ label: 'old-v1', layout, deps: h.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_HONOURED', label: 'old-v1', releaseKey: KEY, openWork: 0, gatesReactivated: [] });
-    expect(h.systemctl).toEqual([]); expect(h.gateCalls).toEqual([]);
+    // The release is retired: its backstop and check timers are turned off (nothing is stopped).
+    expect(h.systemctl).toEqual([['disable', '--now', RETIRE_TIMER], ['disable', '--now', CHECK_TIMER]]); expect(h.gateCalls).toEqual([]);
+    await rejectsWith(checkRetire({ label: 'old-v1', layout, deps: harness({ state: 'RETIRED', retireRequested: true, runnerActive: false, failVerbs: ['disable'] }).deps }), 'RETIRE_TIMER_STOP_FAILED');
   });
 
   it('stops the runner and re-opens only a gate that the stop halted', async () => {
@@ -322,7 +364,11 @@ describe('the drained path', () => {
     const drained = harness({ runnerActive: false });
     expect(await markDrainedRetired({ label: 'old-v1', layout, deps: drained.deps })).toEqual({ event: 'PREVIEW_RELEASE_DRAINED_RETIRED', label: 'old-v1', releaseKey: KEY, openWork: 0 });
     expect(drained.events).toEqual([['RETIRED', 'DRAINED']]);
-    expect(drained.systemctl).toEqual([]);
+    // Retired: the backstop is turned off; the check was never armed (no request), so it does not load and is left alone.
+    const unarmed = harness({ runnerActive: false, timerLoad: { [CHECK_TIMER]: 'bad-setting' } });
+    await markDrainedRetired({ label: 'old-v1', layout, deps: unarmed.deps });
+    expect(unarmed.systemctl).toEqual([['disable', '--now', RETIRE_TIMER]]);
+    expect(drained.systemctl).toEqual([['disable', '--now', RETIRE_TIMER], ['disable', '--now', CHECK_TIMER]]);
     const done = harness({ state: 'RETIRED', runnerActive: false });
     expect(await markDrainedRetired({ label: 'old-v1', layout, deps: done.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label: 'old-v1', releaseKey: KEY });
     expect(done.events).toEqual([]);
