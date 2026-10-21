@@ -317,6 +317,7 @@
   "runFailure.STOPPED": "Ta razprava se je sredi poteka ustavila zaradi težave na naši strani. Prosimo, znova zastavite svoje vprašanje.",
   "runFailure.PLAN_ENDED": "Vaš plačljivi paket se je iztekel ali je bil začasno ustavljen, medtem ko je to vprašanje čakalo, zato se razprava ni začela. Lahko ga zastavite znova.",
   "runFailure.CHOICE_GONE": "Spletno mesto je bilo posodobljeno, medtem ko je vaše vprašanje čakalo, zato ena od izbranih možnosti ni več na voljo. Prosimo, vprašajte znova. S tem ni bilo porabljeno nič od vaše kvote.",
+  "runFailure.SET_ASIDE": "Te razprave ni bilo mogoče dokončati zaradi posodobitve spletnega mesta na naši strani. Ni se štela v vašo kvoto. Prosimo, znova zastavite svoje vprašanje.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ta razprava bi stala več, kot to spletno mesto dovoli za eno razpravo.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator je zahtevo zavrnil: za eno od nalog razprave trenutno ni dosegljiv noben model UI. Poskusite pozneje.",
   "debateChrome.condition.backupModelUsed": "Kjer načrtovanega modela UI ni bilo mogoče uporabiti, ga je nadomestil drug"

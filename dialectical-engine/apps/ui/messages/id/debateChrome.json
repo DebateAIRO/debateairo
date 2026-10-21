@@ -296,6 +296,7 @@
   "runFailure.STOPPED": "Debat ini terhenti di tengah jalan karena masalah di pihak kami. Silakan ajukan pertanyaan Anda lagi.",
   "runFailure.PLAN_ENDED": "Paket berbayar Anda berakhir atau dijeda saat pertanyaan ini menunggu, sehingga debat tidak dimulai. Anda dapat menanyakannya lagi.",
   "runFailure.CHOICE_GONE": "Situs diperbarui saat pertanyaan Anda menunggu, dan salah satu pilihan Anda sudah tidak ditawarkan lagi. Silakan ajukan pertanyaan lagi. Tidak ada jatah Anda yang terpakai.",
+  "runFailure.SET_ASIDE": "Debat ini tidak dapat diselesaikan karena ada pembaruan di pihak kami. Debat ini tidak mengurangi jatah Anda. Silakan ajukan pertanyaan Anda lagi.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Debat ini akan memakan biaya lebih besar daripada yang diizinkan situs ini untuk satu debat.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator menolak permintaan tersebut: salah satu tugas debat tidak memiliki model AI yang dapat dijangkau saat ini. Coba lagi nanti.",
   "debateChrome.condition.backupModelUsed": "Jika model AI yang direncanakan tidak dapat digunakan, model lain menggantikannya"

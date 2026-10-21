@@ -303,6 +303,7 @@
   "runFailure.STOPPED": "Denne debat stoppede halvvejs på grund af et problem hos os. Stil venligst dit spørgsmål igen.",
   "runFailure.PLAN_ENDED": "Din betalte plan udløb eller blev sat på pause, mens dette spørgsmål ventede, så debatten gik ikke i gang. Du kan stille det igen.",
   "runFailure.CHOICE_GONE": "Hjemmesiden blev opdateret, mens dit spørgsmål ventede, og en af de muligheder, du valgte, tilbydes ikke længere. Prøv venligst at stille spørgsmålet igen. Der blev ikke brugt noget af din ramme.",
+  "runFailure.SET_ASIDE": "Vi kunne ikke afslutte denne debat på grund af en opdatering hos os. Denne debat tæller ikke med i din ramme. Stil venligst dit spørgsmål igen.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Denne debat ville koste mere, end dette websted tillader for én debat.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatoren afviste anmodningen: en af debattens opgaver har ingen AI-model, den kan nå lige nu. Prøv igen senere.",
   "debateChrome.condition.backupModelUsed": "Hvor en planlagt AI-model ikke kunne bruges, trådte en anden til"

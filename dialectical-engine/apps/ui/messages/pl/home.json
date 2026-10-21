@@ -27,6 +27,7 @@
   "runFailure.STOPPED": "Ta debata zatrzymała się w połowie z powodu problemu po naszej stronie. Prosimy ponownie zadać swoje pytanie.",
   "runFailure.PLAN_ENDED": "Płatny plan wygasł lub został wstrzymany, gdy to pytanie czekało, więc debata się nie rozpoczęła. Można zadać je ponownie.",
   "runFailure.CHOICE_GONE": "Strona została zaktualizowana, gdy pytanie czekało, i jedna z wybranych opcji nie jest już dostępna. Prosimy zapytać ponownie. Nie zużyto przy tym żadnej części limitu.",
+  "runFailure.SET_ASIDE": "Nie udało nam się dokończyć tej debaty z powodu aktualizacji serwisu po naszej stronie. Nie została ona wliczona do limitu. Prosimy ponownie zadać swoje pytanie.",
   "home.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
   "home.status.waitingOwnDebates": "Twoje pozostałe debaty wykorzystują na razie resztę Twojego limitu. Ta debata rozpocznie się sama, gdy tylko jedna z nich się zakończy.",
   "home.noPublishedDebates": "Nie opublikowano jeszcze żadnej debaty.",

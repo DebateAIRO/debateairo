@@ -317,6 +317,7 @@
   "runFailure.STOPPED": "Tato debata se kvůli problému na naší straně zastavila v polovině. Položte prosím svou otázku znovu.",
   "runFailure.PLAN_ENDED": "Váš placený plán skončil nebo byl pozastaven, zatímco tato otázka čekala, a proto debata nezačala. Můžete ji položit znovu.",
   "runFailure.CHOICE_GONE": "Web byl aktualizován, zatímco vaše otázka čekala, a jedna z možností, které jste zvolili, se už nenabízí. Zeptejte se prosím znovu. Váš limit tím nebyl nijak využit.",
+  "runFailure.SET_ASIDE": "Tuto debatu se nepodařilo dokončit kvůli aktualizaci webu z naší strany. Nepočítá se do vašeho limitu. Položte prosím svou otázku znovu.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Tato debata by stála víc, než tento web povoluje na jednu debatu.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinátor požadavek odmítl: pro jednu z úloh debaty teď není dostupný žádný model AI. Zkuste to znovu později.",
   "debateChrome.condition.backupModelUsed": "Kde plánovaný model AI nešlo použít, zastoupil ho jiný"

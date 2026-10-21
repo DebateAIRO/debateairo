@@ -310,6 +310,7 @@
   "runFailure.STOPPED": "Este debate parou a meio devido a um problema do nosso lado. Por favor, volte a fazer a sua pergunta.",
   "runFailure.PLAN_ENDED": "O seu plano pago terminou ou foi suspenso enquanto esta pergunta aguardava, por isso o debate não começou. Pode fazê-la novamente.",
   "runFailure.CHOICE_GONE": "O site foi atualizado enquanto a sua pergunta esperava na fila, e uma das opções que escolheu já não é oferecida. Faça a pergunta novamente, por favor. Não foi usada nenhuma parte da sua dotação.",
+  "runFailure.SET_ASIDE": "Não foi possível concluir este debate devido a uma atualização do nosso lado. Este debate não foi descontado da sua dotação. Por favor, volte a fazer a sua pergunta.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Este debate custaria mais do que este sítio permite para um debate.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "O coordenador recusou o pedido: uma das tarefas do debate não tem nenhum modelo de IA acessível neste momento. Tente novamente mais tarde.",
   "debateChrome.condition.backupModelUsed": "Onde não foi possível usar um modelo de IA previsto, outro tomou o seu lugar"

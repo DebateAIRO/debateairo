@@ -27,6 +27,7 @@
   "runFailure.STOPPED": "Denne debat stoppede halvvejs på grund af et problem hos os. Stil venligst dit spørgsmål igen.",
   "runFailure.PLAN_ENDED": "Din betalte plan udløb eller blev sat på pause, mens dette spørgsmål ventede, så debatten gik ikke i gang. Du kan stille det igen.",
   "runFailure.CHOICE_GONE": "Hjemmesiden blev opdateret, mens dit spørgsmål ventede, og en af de muligheder, du valgte, tilbydes ikke længere. Prøv venligst at stille spørgsmålet igen. Der blev ikke brugt noget af din ramme.",
+  "runFailure.SET_ASIDE": "Vi kunne ikke afslutte denne debat på grund af en opdatering hos os. Denne debat tæller ikke med i din ramme. Stil venligst dit spørgsmål igen.",
   "home.status.waiting": "Venter på at starte. Din debat starter af sig selv {time}.",
   "home.status.waitingOwnDebates": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",
   "home.noPublishedDebates": "Der er endnu ikke offentliggjort nogen debatter.",

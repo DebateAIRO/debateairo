@@ -27,6 +27,7 @@
   "runFailure.STOPPED": "Diese Debatte ist wegen eines Problems bei uns vorzeitig abgebrochen. Bitte stellen Sie Ihre Frage erneut.",
   "runFailure.PLAN_ENDED": "Ihr kostenpflichtiger Tarif ist abgelaufen oder wurde pausiert, während diese Frage wartete, daher hat die Debatte nicht begonnen. Sie können sie noch einmal stellen.",
   "runFailure.CHOICE_GONE": "Die Website wurde aktualisiert, während Ihre Frage wartete, und eine der gewählten Optionen wird nicht mehr angeboten. Bitte stellen Sie Ihre Frage noch einmal. Dafür wurde Ihr Kontingent nicht belastet.",
+  "runFailure.SET_ASIDE": "Wir konnten diese Debatte wegen einer Aktualisierung bei uns nicht zu Ende führen. Diese Debatte wurde nicht auf Ihr Kontingent angerechnet. Bitte stellen Sie Ihre Frage erneut.",
   "home.status.waiting": "Wartet auf den Start. Ihre Debatte startet von selbst um {time}.",
   "home.status.waitingOwnDebates": "Ihre anderen Debatten nutzen im Moment den Rest Ihres Limits. Diese Debatte startet von selbst, sobald eine davon beendet ist.",
   "home.noPublishedDebates": "Es wurden noch keine Debatten veröffentlicht.",

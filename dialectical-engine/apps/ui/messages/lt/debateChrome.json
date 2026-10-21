@@ -317,6 +317,7 @@
   "runFailure.STOPPED": "Šie debatai sustojo pusiaukelėje dėl problemos mūsų pusėje. Prašome užduoti savo klausimą dar kartą.",
   "runFailure.PLAN_ENDED": "Jūsų mokamas planas baigėsi arba buvo pristabdytas, kol šis klausimas laukė, todėl debatai neprasidėjo. Galite jį užduoti dar kartą.",
   "runFailure.CHOICE_GONE": "Svetainė buvo atnaujinta, kol jūsų klausimas laukė, ir vienas iš pasirinktų variantų nebesiūlomas. Prašome užduoti jį dar kartą. Iš jūsų limito nieko nebuvo panaudota.",
+  "runFailure.SET_ASIDE": "Šių debatų negalėjome užbaigti dėl svetainės atnaujinimo mūsų pusėje. Jie nebuvo įskaityti į jūsų limitą. Prašome užduoti savo klausimą dar kartą.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Šie debatai kainuotų daugiau, nei ši svetainė leidžia vieniems debatams.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatorius atmetė užklausą: vienai iš debatų užduočių šiuo metu nepasiekiamas nė vienas DI modelis. Bandykite vėliau.",
   "debateChrome.condition.backupModelUsed": "Kai suplanuoto DI modelio nepavyko panaudoti, jį pakeitė kitas"

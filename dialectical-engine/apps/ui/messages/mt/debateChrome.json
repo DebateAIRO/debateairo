@@ -324,6 +324,7 @@
   "runFailure.STOPPED": "Dan id-dibattitu waqaf f’nofs it-triq minħabba problema min-naħa tagħna. Jekk jogħġbok, erġa’ agħmel il-mistoqsija tiegħek.",
   "runFailure.PLAN_ENDED": "Il-pjan bi ħlas tiegħek spiċċa jew ġie sospiż waqt li din il-mistoqsija kienet qed tistenna, għalhekk id-dibattitu ma bediex. Tista’ terġa’ tistaqsiha.",
   "runFailure.CHOICE_GONE": "Is-sit ġie aġġornat waqt li l-mistoqsija tiegħek kienet qed tistenna, u waħda mill-għażliet li għażilt m’għadhiex offruta. Jekk jogħġbok erġa’ staqsi. Ma ġie mnaqqas xejn mill-allokazzjoni tiegħek.",
+  "runFailure.SET_ASIDE": "Ma stajniex nlestu dan id-dibattitu minħabba aġġornament min-naħa tagħna. Dan ma naqqasx mill-allokazzjoni tiegħek. Jekk jogħġbok, erġa’ agħmel il-mistoqsija tiegħek.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Dan id-dibattitu jiswa aktar milli jippermetti dan is-sit għal dibattitu wieħed.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Il-koordinatur irrifjuta t-talba: wieħed mill-kompiti tad-dibattitu m’għandu l-ebda mudell tal-IA li jista’ jilħaq bħalissa. Erġa’ pprova aktar tard.",
   "debateChrome.condition.backupModelUsed": "Fejn mudell tal-IA ppjanat ma setax jintuża, daħal ieħor minfloku"

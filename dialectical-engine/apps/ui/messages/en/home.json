@@ -27,6 +27,7 @@
   "runFailure.STOPPED": "This debate stopped partway because of a problem on our side. Please ask your question again.",
   "runFailure.PLAN_ENDED": "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again.",
   "runFailure.CHOICE_GONE": "The site was updated while your question waited, and one of the options you chose is no longer offered. Please ask it again. It did not use any of your allowance.",
+  "runFailure.SET_ASIDE": "We could not finish this debate because of an update on our side. It did not use your allowance. Please ask your question again.",
   "home.status.waiting": "Waiting to start. Your debate will begin by itself at {time}.",
   "home.status.waitingOwnDebates": "Your other debates are using the rest of your limit for now. This one starts by itself as soon as one of them finishes.",
   "home.noPublishedDebates": "No debates have been published yet.",

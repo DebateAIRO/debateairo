@@ -49,6 +49,8 @@ describe("a FAILED run whose reason is the site's day reads as stopped partway (
         // Side-by-side C13: the ask-again sentence for a choice an upload removed (not a limit).
         "runFailure.CHOICE_GONE",
         "runFailure.MODELS_UNAVAILABLE", "runFailure.NOT_STARTED", "runFailure.PLAN_ENDED", "runFailure.RUN_LIMIT_REACHED",
+        // Side-by-side B15: a debate an upload set aside (it used no allowance).
+        "runFailure.SET_ASIDE",
         "runFailure.STOPPED"
       ]);
   });

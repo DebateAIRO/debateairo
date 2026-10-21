@@ -27,6 +27,7 @@
   "runFailure.STOPPED": "Dan id-dibattitu waqaf f’nofs it-triq minħabba problema min-naħa tagħna. Jekk jogħġbok, erġa’ agħmel il-mistoqsija tiegħek.",
   "runFailure.PLAN_ENDED": "Il-pjan bi ħlas tiegħek spiċċa jew ġie sospiż waqt li din il-mistoqsija kienet qed tistenna, għalhekk id-dibattitu ma bediex. Tista’ terġa’ tistaqsiha.",
   "runFailure.CHOICE_GONE": "Is-sit ġie aġġornat waqt li l-mistoqsija tiegħek kienet qed tistenna, u waħda mill-għażliet li għażilt m’għadhiex offruta. Jekk jogħġbok erġa’ staqsi. Ma ġie mnaqqas xejn mill-allokazzjoni tiegħek.",
+  "runFailure.SET_ASIDE": "Ma stajniex nlestu dan id-dibattitu minħabba aġġornament min-naħa tagħna. Dan ma naqqasx mill-allokazzjoni tiegħek. Jekk jogħġbok, erġa’ agħmel il-mistoqsija tiegħek.",
   "home.status.waiting": "Qed jistenna biex jibda. Id-dibattitu tiegħek jibda waħdu fi {time}.",
   "home.status.waitingOwnDebates": "Id-dibattiti l-oħra tiegħek qed jużaw il-bqija tal-limitu tiegħek għalissa. Dan id-dibattitu jibda waħdu hekk kif jispiċċa wieħed minnhom.",
   "home.noPublishedDebates": "Għadu ma ġie ppubblikat l-ebda dibattitu.",

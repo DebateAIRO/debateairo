@@ -317,6 +317,7 @@
   "runFailure.STOPPED": "Ta debata zatrzymała się w połowie z powodu problemu po naszej stronie. Prosimy ponownie zadać swoje pytanie.",
   "runFailure.PLAN_ENDED": "Płatny plan wygasł lub został wstrzymany, gdy to pytanie czekało, więc debata się nie rozpoczęła. Można zadać je ponownie.",
   "runFailure.CHOICE_GONE": "Strona została zaktualizowana, gdy pytanie czekało, i jedna z wybranych opcji nie jest już dostępna. Prosimy zapytać ponownie. Nie zużyto przy tym żadnej części limitu.",
+  "runFailure.SET_ASIDE": "Nie udało nam się dokończyć tej debaty z powodu aktualizacji serwisu po naszej stronie. Nie została ona wliczona do limitu. Prosimy ponownie zadać swoje pytanie.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ta debata kosztowałaby więcej, niż ten serwis pozwala na jedną debatę.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordynator odrzucił żądanie: dla jednego z zadań debaty nie jest teraz osiągalny żaden model AI. Ponów próbę później.",
   "debateChrome.condition.backupModelUsed": "Tam, gdzie nie można było użyć zaplanowanego modelu AI, zastąpił go inny"

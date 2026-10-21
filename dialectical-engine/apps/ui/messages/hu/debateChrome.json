@@ -303,6 +303,7 @@
   "runFailure.STOPPED": "Ez a vita félúton leállt egy nálunk történt hiba miatt. Kérjük, tegye fel újra a kérdését.",
   "runFailure.PLAN_ENDED": "Az Ön fizetős csomagja lejárt vagy szüneteltették, amíg ez a kérdés várakozott, ezért a vita nem kezdődött el. Újra felteheti.",
   "runFailure.CHOICE_GONE": "A weboldal frissült, amíg kérdése várakozott, és az Ön által választott egyik lehetőség már nem érhető el. Kérjük, kérdezzen újra. Nem számított bele az Ön vitakeretébe.",
+  "runFailure.SET_ASIDE": "Ezt a vitát nem tudtuk befejezni a nálunk végzett frissítés miatt. Ez nem vonódott le az Ön vitakeretéből. Kérjük, tegye fel újra a kérdését.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ez a vita többe kerülne, mint amennyit ez az oldal egy vitára enged.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "A koordinátor elutasította a kérést: a vita egyik feladatához jelenleg egyetlen MI-modell sem érhető el. Próbálja újra később.",
   "debateChrome.condition.backupModelUsed": "Ahol egy tervezett MI-modellt nem lehetett használni, egy másik lépett a helyére"
