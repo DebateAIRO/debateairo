@@ -33,6 +33,7 @@ import {
   PreviewGateUnavailable,
   PreviewGateUnsent,
   PreviewModelCooling,
+  PreviewModelNotServed,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   providerCallEndedVendorRefusedUnbilled,
@@ -726,6 +727,32 @@ describe("gate v4: MODEL_COOLING is a busy model, AUTHORITY_HALTED is an unavail
     expect(halted.slept).toEqual([]);
     expect(halted.received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
     expect(halted.ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * Side-by-side spec §9 (decision D6): during an upload two releases share one gate, so the gate's GO can stop serving a
+ * model (its row is gone: MODEL_NOT_ALLOWED) or a price (the release reserved a different amount: RESERVATION_MISMATCH)
+ * that the older release's debates still ask for. Both are refused before anything is reserved or sent. The gate now
+ * names them, and the app reads them as that one model sitting out (the busy model's unbilled refusal), never money.
+ */
+describe("side-by-side §9: a model or price this release's gate no longer serves sits out, never money", () => {
+  it.each(["MODEL_NOT_ALLOWED", "RESERVATION_MISMATCH"])("%s is the busy model's unbilled refusal, not money", async (code) => {
+    const { port, received } = await answeringByPath((_path, response) => {
+      response.writeHead(409, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: code }));
+    });
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(PreviewModelNotServed);
+    expect(refusal).toBeInstanceOf(PreviewVendorRefusedUnbilled);
+    expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
+    expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+    expect(providerCallGateUnavailable(refusal)).toBe(false);
+    // Only STOPPED asks /remaining.
+    expect(received.map((line) => line.split(" ")[1])).toEqual(["/complete"]);
   });
 });
 

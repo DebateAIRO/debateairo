@@ -173,11 +173,14 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
       throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_EXITED");
     }
     const message = outcome.message as Readonly<Record<string, unknown>> | null;
+    // Side-by-side spec §1: the ready line names the release, and it must be the API's own (the key forwarded above).
     if (message === null
       || message.kind !== "DEBATEAI_RUNNER_READY"
       || message.worker !== "debateai-dev-runner"
       || typeof message.registerVersion !== "string"
-      || message.registerVersion !== apiEnvironment.REGISTER_VERSION) {
+      || message.registerVersion !== apiEnvironment.REGISTER_VERSION
+      || typeof message.releaseKey !== "string"
+      || message.releaseKey !== apiEnvironment.RELEASE_KEY) {
       throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_READINESS_INVALID");
     }
     let stopped = false;

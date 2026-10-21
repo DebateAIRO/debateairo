@@ -29,7 +29,7 @@ import {
   type KeyDestroyResult,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
 import {
   readBundledModelScorecard,
   readEngineVersion,
@@ -113,6 +113,18 @@ function acceptanceFailureReason(error: unknown): string {
   return error instanceof TypedDomainError
     ? `ACCEPTANCE_EXECUTION_FAILED:${error.code}`
     : "ACCEPTANCE_EXECUTION_FAILED:UNEXPECTED_ERROR";
+}
+
+/** The acceptance runner's worker id: the runner claims under it, and its failure recorder writes under that claim. */
+export const ACCEPTANCE_WORKER_ID = "acceptance:walking-skeleton";
+
+/**
+ * Side-by-side spec §3 (plan B D2): the acceptance runner's failures are recorded while it still holds its own live
+ * claim, so the recorder's repository is told the runner's worker id. Acceptance runs are `legacy` until admission
+ * stamps a key (B16).
+ */
+export function acceptanceFailureRecorder(pool: Pool): AcceptanceFailureRecorder {
+  return new WorkItemRepository(pool, { releaseKey: LEGACY_RELEASE_KEY, workerId: ACCEPTANCE_WORKER_ID });
 }
 
 export class AcceptanceDispatcher implements Dispatcher {
@@ -459,7 +471,7 @@ export async function createAcceptanceRuntime(input: {
     .max_model_attempts;
   const probes = new ProviderProbeRepository(input.pool);
   const runner = new WalkingSkeletonRunner(input.pool, provider, {
-    workerId: "acceptance:walking-skeleton",
+    workerId: ACCEPTANCE_WORKER_ID,
     claimMs: longestDeadline * maximumRunAttempts
       + policy.runDeathPolicy.cooldownMs * policy.runDeathPolicy.maxCooldownHoldsPerRun,
     claimMarginMs: 0,
@@ -568,7 +580,7 @@ export async function createAcceptanceRuntime(input: {
     // (resolveAcceptanceTerminalActivations) remains the outermost fallback.
     resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(input.pool)
   });
-  const dispatcher = new AcceptanceDispatcher(runner, new WorkItemRepository(input.pool));
+  const dispatcher = new AcceptanceDispatcher(runner, acceptanceFailureRecorder(input.pool));
   for (const { configured, relay } of discoveredProviders) {
     await probes.record({
       probeEvidenceRef: randomUUID(),

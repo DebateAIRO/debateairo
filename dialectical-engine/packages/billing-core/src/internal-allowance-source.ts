@@ -11,12 +11,31 @@ export interface FundingEntitlementPort {
 }
 export interface FundingAllowancePort extends InternalAllowanceReadPort {
   readRunState(runId:string):Promise<InternalRunFundingState>;
-  readPolicy(): Promise<Readonly<{ registerVersion: number; policy: Extract<InternalAllowancePolicy, { enabled: true }> }> | null>;
+  /** The selection (the pointer): read only to know whether funding is switched on for a NEW ask. */
+  readPolicy(): Promise<FundingPolicyAt | null>;
+  /** The sealed funding publication at `registerVersion`, or null when that version is none. */
+  readPolicyAt(registerVersion: number): Promise<FundingPolicyAt | null>;
+}
+type FundingPolicyAt = Readonly<{ registerVersion: number; policy: Extract<InternalAllowancePolicy, { enabled: true }> }>;
+/** Lifetime ceiling of any grant, whatever its version's policy says (31 days). */
+const MAXIMUM_GRANT_LIFETIME_MS = 2678400000;
+/** A policy usable for bounds: the version asked for, finite USD maxima, day ≤ week ≤ grant, lifetime ≤ 31 days. */
+function validPolicyAt(published: FundingPolicyAt | null, registerVersion: number): published is FundingPolicyAt {
+  if (published === null) return false;
+  const p = published.policy;
+  return published.registerVersion === registerVersion && p.enabled === true && p.fundingPolicyVersion === 1 && p.currency === "USD"
+    && p.finishAllowanceBp === 10000 && positive(p.maximumGrantMicros) && positive(p.maximumDayMicros) && positive(p.maximumWeekMicros)
+    && positive(p.maximumLifetimeMs) && p.maximumLifetimeMs <= MAXIMUM_GRANT_LIFETIME_MS
+    && p.maximumDayMicros <= p.maximumWeekMicros && p.maximumWeekMicros <= p.maximumGrantMicros
+    && typeof p.sourceRef === "string" && p.sourceRef.trim() !== "";
 }
 /**
  * Consumption only: no privileged mutation or recovery-login readiness dependency. It holds no register version: a
  * grant stays valid under the version it was issued with, whatever the selection or the process's version is now
- * (side-by-side spec §9, C15).
+ * (side-by-side spec §9, C15): it is checked against the sealed funding publication of its own
+ * `policyRegisterVersion` (`readPolicyAt`), and nothing compares a grant with the current pointer. A run-pinned read
+ * never reads the pointer at all; a new ask reads it only to know whether funding is switched on (null: the
+ * subscription path, as when funding is off).
  */
 export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource {
   private readonly customer: BillingPersonAllowanceSource;
@@ -48,28 +67,27 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
     if (context !== undefined) {
       basis = await this.readFundingForRun(context.runId);
       if (basis.kind === "SUBSCRIPTION") return null;
+    } else if (await this.options.allowances.readPolicy() === null) {
+      // A new ask while funding is switched off: no grant applies; the subscription path answers.
+      return null;
     }
-    const selected = await this.options.allowances.readPolicy();
-    if (selected === null || !positive(selected.registerVersion) || selected.policy.enabled !== true
-      || selected.policy.fundingPolicyVersion !== 1 || selected.policy.currency !== "USD" || selected.policy.finishAllowanceBp !== 10000
-      || !positive(selected.policy.maximumGrantMicros) || !positive(selected.policy.maximumDayMicros) || !positive(selected.policy.maximumWeekMicros)
-      || !positive(selected.policy.maximumLifetimeMs) || selected.policy.maximumLifetimeMs > 2678400000
-      || selected.policy.maximumDayMicros > selected.policy.maximumWeekMicros || selected.policy.maximumWeekMicros > selected.policy.maximumGrantMicros
-      || typeof selected.policy.sourceRef !== "string" || selected.policy.sourceRef.trim() === "") throw unavailable();
     const grant = context === undefined ? await this.options.allowances.current(ownerRef, now) : await this.options.allowances.forRun(context.runId, now);
     if (grant === null) { if (basis !== null) throw unavailable(); return null; }
-    // The selection's maxima bind a grant of the selection's own version only; a grant of another version keeps its
-    // own bounds (day ≤ week ≤ amount, lifetime ≤ 31 days), which its own version's policy admitted at issue.
-    const p = selected.policy, start = grant.startsAt?.getTime(), expiry = grant.expiresAt?.getTime();
-    const sameVersion = grant.policyRegisterVersion === selected.registerVersion;
+    // The grant's own bounds first (ids, day ≤ week ≤ amount, lifetime ≤ 31 days, inside its window, the run's basis).
+    const start = grant.startsAt?.getTime(), expiry = grant.expiresAt?.getTime();
     if (!UUID.test(grant.grantId) || !UUID.test(grant.grantEventId) || grant.ownerRef !== ownerRef || !positive(grant.revision)
       || !positive(grant.policyRegisterVersion) || !positive(grant.amountMicros) || !positive(grant.dayMicros) || !positive(grant.weekMicros)
       || grant.dayMicros > grant.weekMicros || grant.weekMicros > grant.amountMicros
-      || (sameVersion && (grant.amountMicros > p.maximumGrantMicros || grant.dayMicros > p.maximumDayMicros || grant.weekMicros > p.maximumWeekMicros))
-      || !Number.isFinite(start) || !Number.isFinite(expiry) || expiry <= start
-      || expiry - start > (sameVersion ? p.maximumLifetimeMs : 2678400000)
+      || !Number.isFinite(start) || !Number.isFinite(expiry) || expiry <= start || expiry - start > MAXIMUM_GRANT_LIFETIME_MS
       || now.getTime() < start || now.getTime() >= expiry
       || (basis?.kind === "INTERNAL" && (basis.grantId !== grant.grantId || basis.grantEventId !== grant.grantEventId))) throw unavailable();
+    // Then the maxima of the version it was issued with (spec §9), never the selection's: a version that is no sealed
+    // funding publication any more refuses.
+    const issued = await this.options.allowances.readPolicyAt(grant.policyRegisterVersion);
+    if (!validPolicyAt(issued, grant.policyRegisterVersion)) throw unavailable();
+    const p = issued.policy;
+    if (grant.amountMicros > p.maximumGrantMicros || grant.dayMicros > p.maximumDayMicros || grant.weekMicros > p.maximumWeekMicros
+      || expiry - start > p.maximumLifetimeMs) throw unavailable();
     return grant;
   }
   async assertProviderFundingAdmission(runId: string, now: Date): Promise<void> {

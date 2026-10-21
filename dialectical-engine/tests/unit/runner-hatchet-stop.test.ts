@@ -7,6 +7,7 @@ import {
   type WalkingSkeletonRunner
 } from "@debateai/runner";
 import type { RunnerTaskControl } from "../../apps/runner/src/run-keep-alive.js";
+import { createTaskExecutionCounter, type TaskExecutionCounter } from "../../apps/runner/src/runner-retirement.js";
 
 /**
  * L4-F9 repair, the Hatchet side (owner ruling 2026-10-11). The task used to
@@ -34,6 +35,7 @@ function taskOver(input: {
   readonly execute: (workItemId: string, control?: RunnerTaskControl) => Promise<{ kind: string; answerId?: string }>;
   readonly recorded?: { runId: string; workItemId: string; reason: string }[];
   readonly previewExecutionTimeout?: "3600s";
+  readonly executions?: TaskExecutionCounter;
 }) {
   let declared: ((dispatch: unknown, context?: TaskContext) => Promise<unknown>) | null = null;
   declareHatchetWalkingSkeletonTask({
@@ -50,7 +52,8 @@ function taskOver(input: {
     } as unknown as RunnerFailureRecorder,
     workflowName: "walking-skeleton",
     engineRetries: 3,
-    ...(input.previewExecutionTimeout === undefined ? {} : { previewExecutionTimeout: input.previewExecutionTimeout })
+    ...(input.previewExecutionTimeout === undefined ? {} : { previewExecutionTimeout: input.previewExecutionTimeout }),
+    ...(input.executions === undefined ? {} : { executions: input.executions })
   });
   if (declared === null) throw new Error("the task declaration must register a function");
   return declared as (dispatch: unknown, context?: TaskContext) => Promise<unknown>;
@@ -113,6 +116,31 @@ describe("the task's catch tells the two stops apart", () => {
     expect(recorded).toEqual([]);
   });
 
+  it("leaves the work item alone when it belongs to another release", async () => {
+    // Side-by-side spec §3: another release's debate is that release's to finish or fail, never this runner's.
+    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const task = taskOver({
+      recorded,
+      execute: async () => { throw new TypedDomainError("RUNNER_RELEASE_MISMATCH", "the debate belongs to another release"); }
+    });
+    await expect(task({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() }))
+      .rejects.toMatchObject({ code: "RUNNER_RELEASE_MISMATCH" });
+    expect(recorded).toEqual([]);
+  });
+
+  it("leaves the work item alone when its release is retiring", async () => {
+    // Side-by-side spec §4: the retiring release stops; the item is left as is for this release's backstop, which sets
+    // it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
+    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const task = taskOver({
+      recorded,
+      execute: async () => { throw new TypedDomainError("RUNNER_RETIRING", "this release is retiring"); }
+    });
+    await expect(task({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() }))
+      .rejects.toMatchObject({ code: "RUNNER_RETIRING" });
+    expect(recorded).toEqual([]);
+  });
+
   it("records a debate stopped at the limit as failed, under its own code", async () => {
     const recorded: { runId: string; workItemId: string; reason: string }[] = [];
     const task = taskOver({
@@ -129,8 +157,38 @@ describe("the task's catch tells the two stops apart", () => {
   });
 });
 
+describe("side-by-side spec §4: the task counter covers the whole task", () => {
+  it("counts the task while it runs, and after it ends or fails", async () => {
+    const executions = createTaskExecutionCounter();
+    let finish!: (result: { kind: string; answerId?: string }) => void;
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const task = taskOver({
+      executions,
+      execute: () => {
+        started();
+        return new Promise((resolve) => { finish = resolve; });
+      }
+    });
+    const ended = task({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() });
+    await running;
+    expect(executions.count()).toBe(1);
+    finish({ kind: "COMPLETED", answerId: "answer:1" });
+    await expect(ended).resolves.toEqual({ kind: "COMPLETED", answerId: "answer:1" });
+    expect(executions.count()).toBe(0);
+
+    const failing = taskOver({
+      executions,
+      execute: async () => { throw new TypedDomainError("RUNNER_TIME_LIMIT_REACHED", "the debate ran out of time"); }
+    });
+    await expect(failing({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() }))
+      .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+    expect(executions.count()).toBe(0);
+  });
+});
+
 describe("a stop is never mistaken for one unavailable review", () => {
-  it.each(["RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED"])("rethrows %s from the review catch", (code) => {
+  it.each(["RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING"])("rethrows %s from the review catch", (code) => {
     expect(reviewFailureOutcome(new TypedDomainError(code, code))).toEqual({ kind: "RETHROW" });
   });
 });

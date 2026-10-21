@@ -70,7 +70,16 @@ export function verifyRuntimeReadback(event, observed, facts) {
 // The runner has no listener. Its startup evidence is the in-process readiness message the real
 // main announces after its worker is ready and its start-up re-dispatch has finished.
 const RUNNER_BINDING = ['sourceRevision','sourceTree','sourceManifestSha256','operatorManifestSha256','contractSha256','runnerMainSha256'];
-const RUNNER_KEYS = ['schemaVersion','service',...RUNNER_BINDING,'pid','uid','bootId','startTicks','selectedRegisterVersion','nativeRequestSha256','nativeSnapshotSha256','deploymentMode','startupDispatched'];
+const RUNNER_KEYS = ['schemaVersion','service',...RUNNER_BINDING,'pid','uid','bootId','startTicks','selectedRegisterVersion','releaseKey','nativeRequestSha256','nativeSnapshotSha256','deploymentMode','startupDispatched'];
+/** The exact keys of the runner's ready message (apps/runner/src/runner-ready.ts RunnerReadyMessage). */
+const RUNNER_READY_KEYS = ['kind','registerVersion','releaseKey','startupDispatched','worker'];
+/**
+ * Side-by-side uploads spec 2026-10-21 §1: the release a preview runner runs as is
+ * r<selected register version>-<first 12 hex of the plan's source revision>, so its startup event
+ * names exactly the release the plan bound, never another.
+ */
+const runnerReleaseKey = (selectedRegisterVersion, sourceRevision) =>
+  typeof sourceRevision === 'string' ? `r${selectedRegisterVersion}-${sourceRevision.slice(0, 12)}` : null;
 export function validateRunnerRuntimeEvent(event) {
   exactKeys(event, RUNNER_KEYS, 'PREVIEW_RUNTIME_RECEIPT_REFUSED');
   if (event.schemaVersion !== 'preview-auth-dev-runner-startup-v1' || event.service !== 'runner'
@@ -79,6 +88,7 @@ export function validateRunnerRuntimeEvent(event) {
     || !Number.isSafeInteger(event.pid) || event.pid < 1 || !Number.isSafeInteger(event.uid) || event.uid < 1
     || !UUID.test(event.bootId) || !/^[1-9][0-9]{0,19}$/.test(event.startTicks)
     || !VERSION.test(event.selectedRegisterVersion) || !MODES.includes(event.deploymentMode)
+    || event.releaseKey !== runnerReleaseKey(event.selectedRegisterVersion, event.sourceRevision)
     || !HASH.test(event.nativeRequestSha256) || !HASH.test(event.nativeSnapshotSha256)
     || !Number.isSafeInteger(event.startupDispatched) || event.startupDispatched < 0 || event.startupDispatched > 100) refuse('PREVIEW_RUNTIME_RECEIPT_REFUSED');
   return Object.freeze({ ...event });
@@ -93,9 +103,11 @@ export const RUNNER_READY_DEADLINE_MS = 120_000;
 export async function afterRunnerReady({ binding, publication, identity, readSelection, importMain, subscribeReady, emit, readyDeadlineMs = RUNNER_READY_DEADLINE_MS }) {
   validatePublication(publication); exactKeys(binding, RUNNER_BINDING, 'PREVIEW_RUNTIME_BINDING_REFUSED');
   const before = selected(readSelection(), publication);
-  // Every field but the count is checked before main runs, exactly as the API's event is.
+  // Every field but the count is checked before main runs, exactly as the API's event is. The release
+  // key is the plan's own (side-by-side spec §1), built from its source revision and register pin.
   const draft = validateRunnerRuntimeEvent({ schemaVersion:'preview-auth-dev-runner-startup-v1', service:'runner', ...binding, ...identity,
-    ...before, nativeRequestSha256:publication.requestSha256, nativeSnapshotSha256:publication.snapshotSha256, startupDispatched:0 });
+    ...before, releaseKey:runnerReleaseKey(before.selectedRegisterVersion, binding.sourceRevision),
+    nativeRequestSha256:publication.requestSha256, nativeSnapshotSha256:publication.snapshotSha256, startupDispatched:0 });
   let announce;
   const announced = new Promise(resolve => { announce = resolve; });
   const unsubscribe = subscribeReady(message => announce(message));
@@ -112,9 +124,11 @@ export async function afterRunnerReady({ binding, publication, identity, readSel
     if (first === null) refuse('PREVIEW_RUNNER_NOT_READY');
     message = first.value;
   } finally { clearTimeout(deadline); unsubscribe(); }
+  // A ready line without the release key, or naming another release, is not this plan's runner ready (spec §1).
   if (!message || Object.getPrototypeOf(message) !== Object.prototype
-    || Object.keys(message).sort().join('\0') !== ['kind','registerVersion','startupDispatched','worker'].join('\0')
-    || message.kind !== 'DEBATEAI_RUNNER_READY' || message.registerVersion !== before.selectedRegisterVersion) refuse('PREVIEW_RUNNER_NOT_READY');
+    || Object.keys(message).sort().join('\0') !== RUNNER_READY_KEYS.join('\0')
+    || message.kind !== 'DEBATEAI_RUNNER_READY' || message.registerVersion !== before.selectedRegisterVersion
+    || message.releaseKey !== draft.releaseKey) refuse('PREVIEW_RUNNER_NOT_READY');
   const after = selected(readSelection(), publication);
   if (JSON.stringify(before) !== JSON.stringify(after)) refuse('PREVIEW_RUNTIME_SELECTION_REFUSED');
   const event = validateRunnerRuntimeEvent({ ...draft, startupDispatched:message.startupDispatched });
