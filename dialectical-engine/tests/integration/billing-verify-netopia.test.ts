@@ -14,7 +14,9 @@ import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../suppo
 import {
   recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
-import { sealBillingProfile, sealCardToken, sealIpEvidence, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
+import {
+  sealBillingProfile, sealCardToken, sealIpEvidence, sealNoticeAllowed, sealQuoteLocation
+} from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
@@ -153,6 +155,26 @@ async function storeNotice(chargeId: string, status: number, amountText: string,
     noticeId: randomUUID(), paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt, bodySha256: randomBytes(32).toString("hex"),
     orderId: chargeId, providerPaymentId: `ntp-${chargeId.slice(0, 12)}`, providerStatus: status, amountText, currency: "USD",
     cardCountry: "DE", keyFingerprint: "e".repeat(64), jwtIat: null, allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
+  }));
+  return stored.noticeId;
+}
+
+/**
+ * A verified NETOPIA message as N9 stores it, its allow-list really sealed (`sealNoticeAllowed`), so VERIFY_PAYMENT can
+ * read NETOPIA's refusal code from it (B2).
+ */
+async function storeSealedNotice(chargeId: string, status: number, code: string | null): Promise<string> {
+  const noticeId = randomUUID();
+  const providerPaymentId = `ntp-${chargeId.slice(0, 12)}`;
+  const sealed = sealNoticeAllowed(TEST_RECORDS_KEY, noticeId, {
+    orderID: chargeId, ntpID: providerPaymentId, status, amount: "23.80", currency: "USD", code, message: null,
+    cardCountry: "DE", last4: null, expireMonth: null, expireYear: null
+  });
+  const stored = await repository.withTransaction((client) => repository.insertPaymentNotice(client, {
+    noticeId, paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt: new Date(),
+    bodySha256: randomBytes(32).toString("hex"), orderId: chargeId, providerPaymentId, providerStatus: status,
+    amountText: "23.80", currency: "USD", cardCountry: "DE", keyFingerprint: "e".repeat(64), jwtIat: null,
+    allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
   }));
   return stored.noticeId;
 }
@@ -406,6 +428,25 @@ describe("N10 VERIFY_PAYMENT on NETOPIA: a renewal", () => {
       await handlerFor(status, now).verify.handle(job(chargeId, 1, now.at), now.at);
       expect((await repository.charge(chargeId))!.events.find((event) => event.kind === "FAILED")?.errorCode).toBe(code);
       expect((await state(seeded.subscriptionId)).status).toBe("PAST_DUE");
+    }
+  });
+
+  it("B2: a renewal decided from a stored notice keeps NETOPIA's refusal code on its PAST_DUE", async () => {
+    for (const [code, autoRetry] of [["20", true], ["34", false]] as const) {
+      const { seeded, chargeId } = await renewal(`notice-${code}`);
+      const noticeId = await storeSealedNotice(chargeId, 12, code);
+      const status = new ScriptedStatus();
+      const now = { at: new Date() };
+      // The status read stays unavailable until the not-final schedule is spent; the signed notice decides.
+      status.script(chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+      expect(await handlerFor(status, now).verify.handle(job(chargeId, 7, now.at), now.at)).toEqual({ kind: "DONE" });
+      expect(await noticeOutcomes(noticeId)).toContain("DECIDED_BY_NOTICE");
+      expect((await repository.charge(chargeId))!.events.find((event) => event.kind === "FAILED")?.errorCode).toBe("PAYMENT_DECLINED");
+      const pastDue = (await repository.subscriptionEvents(seeded.subscriptionId)).filter((event) => event.kind === "PAST_DUE").at(-1);
+      expect(pastDue?.data, code).toMatchObject({ charge_id: chargeId, decline_code: code, auto_retry: autoRetry });
+      // 20 and 34 are both bank codes (NETOPIA's page names the bank), so M5 says the bank refused.
+      const m5 = (await outbox(chargeId)).find((row) => row.kind === "EMAIL" && row.payload.template === "M5A");
+      expect(m5?.payload, code).toMatchObject({ "param.bankDeclined": "true" });
     }
   });
 

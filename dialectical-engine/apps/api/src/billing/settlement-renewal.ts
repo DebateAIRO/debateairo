@@ -4,7 +4,7 @@ import type { BillingJobQueries, BillingRepository, ChargeRow, EntitlementReposi
 import type { BillingPolicy } from "@debateai/register";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
 import { queuePaymentAlert } from "./payment-alert.js";
-import { addDays, dunningProgress } from "./renewal-rules.js";
+import { addDays, autoRetryAllowed, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 import { APPLIED, type ChargeSettlement, type SettlementResult } from "./settlement.js";
 
@@ -38,6 +38,12 @@ export type DunningAttempt = Readonly<{
   chargeErrorCode: string | null;
   /** Whether a bank refused this attempt's charge (W10; on NETOPIA, the report's `bankDeclined`). Only then M5 says so. */
   bankDeclined: boolean;
+  /**
+   * B2 (NETOPIA answers 2026-10-21, Q15): NETOPIA's own refusal code for this attempt's charge (`"20"`, `"22"`, ...),
+   * kept on the PAST_DUE as `decline_code`; null when NETOPIA named none, and for our own failures and charge-less
+   * attempts. The FAILED charge event keeps its own code (`PAYMENT_DECLINED`, ...) unchanged.
+   */
+  declineCode: string | null;
   periodStart: Date;
   firstFailedAt: Date;
   now: Date;
@@ -49,7 +55,10 @@ export type DunningAttempt = Readonly<{
  * the first failure plus the last retry day plus 1), and M5A/M5B/M5C (whose bank sentence only a charge the bank declined
  * gets, W10, and whose "confirm your card" sentence only an AUTHENTICATION_REQUIRED one, N11); past the last retry day
  * ENDED(DUNNING), Free and M6. A charge-less attempt names its `reason` where a charged one names its `charge_id`, and
- * its M5 is deduplicated on the subscription, the period and the attempt. The settlement's `failed` (a charge) and P11a's
+ * its M5 is deduplicated on the subscription, the period and the attempt. B2 (NETOPIA answers 2026-10-21, Q15): the
+ * PAST_DUE also records whether this attempt may be retried automatically (`auto_retry`, always written,
+ * `autoRetryAllowed`) and NETOPIA's refusal code (`decline_code`, only when it named one); an ENDED row takes neither.
+ * The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
  */
 export async function writeDunningAttempt(
@@ -63,9 +72,11 @@ export async function writeDunningAttempt(
   const retryDay = retryDays[input.attempt - 1];
   if (retryDay !== undefined) {
     const nextRetryAt = addDays(input.firstFailedAt, retryDay);
+    const autoRetry = autoRetryAllowed({ chargeErrorCode: input.chargeErrorCode, declineCode: input.declineCode, reason: input.reason });
     await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "PAST_DUE", now, {
       ...which, attempt: input.attempt, next_retry_at: nextRetryAt.toISOString(),
-      first_failed_at: input.firstFailedAt.toISOString()
+      first_failed_at: input.firstFailedAt.toISOString(), auto_retry: autoRetry,
+      ...(input.declineCode === null ? {} : { decline_code: input.declineCode })
     }));
     if (input.attempt === 1 && subscription.periodAnchorAt !== null) {
       await deps.entitlements.append(client, {
@@ -242,7 +253,8 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       const bankDeclined = context.bankDeclined ?? false;
       await writeDunningAttempt(deps, client, {
         subscription, customerId: context.customerId, attempt: charge.attempt, chargeId: charge.chargeId, reason: null,
-        chargeErrorCode: context.errorCode, bankDeclined, periodStart: charge.periodStart, firstFailedAt, now
+        chargeErrorCode: context.errorCode, bankDeclined, declineCode: context.declineCode ?? null,
+        periodStart: charge.periodStart, firstFailedAt, now
       });
     }
   });

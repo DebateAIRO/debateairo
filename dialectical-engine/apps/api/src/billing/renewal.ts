@@ -665,7 +665,7 @@ export class RenewalService {
       if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
       await writeDunningAttempt(this.deps, client, {
         subscription: fresh, customerId: customer.customerId, attempt, chargeId: null, reason: code, chargeErrorCode: null,
-        bankDeclined: false, periodStart, firstFailedAt, now
+        bankDeclined: false, declineCode: null, periodStart, firstFailedAt, now
       });
       return true;
     });
@@ -687,10 +687,13 @@ export class RenewalService {
    * A final unpaid state of this renewal's charge: FAILED with the code, then the settlement's dunning. F8 (ruling
    * PR-56): a VOIDED report (the money never moved; the owner may have cancelled that month in NETOPIA's admin) starts
    * or continues no dunning: the plan ends as one refunded before the site saw it paid does (`endGivenBackRenewal`),
-   * with no customer email and one O3, as VERIFY_PAYMENT's `netopiaFailed` does for the same report.
+   * with no customer email and one O3, as VERIFY_PAYMENT's `netopiaFailed` does for the same report. `declineCode`
+   * (B2, NETOPIA answers 2026-10-21, Q15): NETOPIA's refusal code from the answer or the read, kept on the PAST_DUE;
+   * the FAILED event keeps `errorCode` unchanged.
    */
   private async refused(
-    charge: ChargeRow, errorCode: RenewalFailureCode, providerPaymentId: string | null, now: Date, bankDeclined?: boolean
+    charge: ChargeRow, errorCode: RenewalFailureCode, providerPaymentId: string | null, now: Date, bankDeclined?: boolean,
+    declineCode?: string | null
   ): Promise<void> {
     const quote = charge.quoteId === null ? null : await this.deps.repository.quote(charge.quoteId, charge.ownerRef);
     const customer = await this.deps.repository.customerByOwner(charge.ownerRef);
@@ -709,7 +712,7 @@ export class RenewalService {
       await this.deps.settlement.failed({
         client, now, charge, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: charge.ownerRef, customerId: customer.customerId, cardCountry: null, errorCode,
-        ...(bankDeclined === undefined ? {} : { bankDeclined })
+        ...(bankDeclined === undefined ? {} : { bankDeclined }), declineCode: declineCode ?? null
       });
       return false;
     });
@@ -1002,7 +1005,9 @@ export class RenewalService {
       this.deps.kick();
       return;
     }
-    await this.refused(charge, failure, answer.providerPaymentId, at, failure === "PAYMENT_DECLINED" && answer.bankDeclined);
+    await this.refused(
+      charge, failure, answer.providerPaymentId, at, failure === "PAYMENT_DECLINED" && answer.bankDeclined, answer.declineCode
+    );
   }
 
   /**
@@ -1212,7 +1217,9 @@ export class RenewalService {
     if (read !== "UNREADABLE") {
       const failure = renewalFailureOf(read.state);
       if (failure !== null) {
-        await this.refused(charge, failure, read.providerPaymentId, now, failure === "PAYMENT_DECLINED" && read.bankDeclined);
+        await this.refused(
+          charge, failure, read.providerPaymentId, now, failure === "PAYMENT_DECLINED" && read.bankDeclined, read.declineCode
+        );
         return true;
       }
       if (read.state === "PAID") {

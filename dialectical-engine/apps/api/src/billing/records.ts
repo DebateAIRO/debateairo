@@ -136,11 +136,26 @@ export function openCardToken(key: Buffer, row: Pick<CardTokenRow, "tokenId" | "
   }
 }
 
+const noticeAllowedAad = (noticeId: string): RecordAad =>
+  ({ table: "billing.payment_notice", column: "allowed_ciphertext", rowId: noticeId });
+const NoticeAllowedSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
+
 /** `billing.payment_notice.allowed_ciphertext`: §2.5.2's allow-list of a verified message (never the token). */
 export function sealNoticeAllowed(
   key: Buffer, noticeId: string, allowed: Readonly<Record<string, string | number | null>>
 ): { ciphertext: Buffer; keyId: string } {
-  return seal(key, { table: "billing.payment_notice", column: "allowed_ciphertext", rowId: noticeId }, allowed);
+  return seal(key, noticeAllowedAad(noticeId), allowed);
+}
+
+/**
+ * The counterpart of `sealNoticeAllowed`: a stored message's allow-list, opened for VERIFY_PAYMENT's decision from the
+ * notice (B2: NETOPIA's refusal `code`). Throws when the ciphertext does not open under this key and row, or does not
+ * hold a flat record of strings, numbers and nulls.
+ */
+export function openNoticeAllowed(
+  key: Buffer, noticeId: string, ciphertext: Buffer
+): Readonly<Record<string, string | number | null>> {
+  return Object.freeze(open(key, noticeAllowedAad(noticeId), ciphertext, NoticeAllowedSchema));
 }
 
 /** `billing.payment_notice_raw.raw_ciphertext`: the verified bytes as received (token included), kept 14 days. */

@@ -299,6 +299,40 @@ describe("N11 a NETOPIA renewal charges the saved card (spec §2.9.2)", () => {
   });
 });
 
+describe("B2 NETOPIA's refusal code travels with the failed attempt", () => {
+  /** The subscription's latest PAST_DUE data (the failed attempt's record). */
+  const pastDueData = async (run: Due) => (await run.repository.subscriptionEvents(run.seeded.subscriptionId))
+    .filter((event) => event.kind === "PAST_DUE").at(-1)?.data;
+
+  it("keeps code 20 (insufficient funds) on the PAST_DUE and marks it retried; the FAILED code stays PAYMENT_DECLINED", async () => {
+    const run = await due();
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
+    const charge = await renewNow(run);
+    expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED:PAYMENT_DECLINED"]);
+    expect(await pastDueData(run)).toMatchObject({ charge_id: charge.chargeId, decline_code: "20", auto_retry: true });
+  });
+
+  it("keeps code 22 on the PAST_DUE and marks it not retried (NETOPIA answers 2026-10-21, Q15)", async () => {
+    const run = await due();
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "22", bankDeclined: true }));
+    const charge = await renewNow(run);
+    expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED:PAYMENT_DECLINED"]);
+    expect(await pastDueData(run)).toMatchObject({ charge_id: charge.chargeId, decline_code: "22", auto_retry: false });
+  });
+
+  it("writes no code for our own CARD_NOT_SAVED (NETOPIA never refused), and retries it", async () => {
+    const run = await due();
+    await run.repository.withTransaction((client) => run.repository.revokeCardToken(client, {
+      tokenId: run.seeded.cardTokenId, at: new Date(run.clock.now.getTime() - HOUR), reason: "OWNER"
+    }));
+    const charge = await renewNow(run);
+    expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "FAILED:CARD_NOT_SAVED"]);
+    const data = await pastDueData(run);
+    expect(data).toMatchObject({ charge_id: charge.chargeId, auto_retry: true });
+    expect(data).not.toHaveProperty("decline_code");
+  });
+});
+
 describe("N11 ruling C-8: a refusal caused by our own setup never starts the failed-payment emails", () => {
   it("holds a configuration refusal, retries it on the not-sent backoff with the same orderID, emails the owner once an hour, and never dunns it", async () => {
     const run = await due();
