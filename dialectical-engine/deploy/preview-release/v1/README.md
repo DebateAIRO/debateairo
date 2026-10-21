@@ -1119,8 +1119,8 @@ Start a short debate as usual: it must finish as it did in local mode.
    journalctl --no-pager -u debateai-preview-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-preview-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
    ```
 
-   Only `billing.notice.unverified` lines with `NOTICE_HEADER_MISSING` (one per check run) are
-   expected; any other line: look it up in `deploy/vps/README.md` §14.8's journal table. Among all of
+   Only `billing.notice.unverified` lines with `NOTICE_HEADER_MISSING` (one per check run, and one
+   every 5 minutes from the notify alarm, H10) are expected; any other line: look it up in `deploy/vps/README.md` §14.8's journal table. Among all of
    that start's billing lines, `billing.card.purged` (the daily card cleanup) and
    `billing.tax_summary.queued` are normal too (both seen on 19 October 2026).
 
@@ -1294,6 +1294,15 @@ Quaderno's path, mail delivery and the purchase come with H8. The unit tests
 `preview-egress-proxy`, `preview-auth-dev-mail`) and the PostgreSQL 18 integration test
 (`tests/integration/preview-register-publish-v3.test.ts`: provider-only then billing on, each version
 passing the hosted API's boot-readiness check) are source evidence only.
+
+### H10. The alarm on NETOPIA's notify address
+
+Every 5 minutes the server knocks on its own notify address (the same unsigned message as the billing
+check) and reports to Healthchecks.io, which emails the owner when the address stops answering or the
+reports stop. The program and its units live outside the release tree (`/usr/local/lib/debateai-notify-alarm`),
+so a release does not touch them and needs no step for them. Setup, the test site's Node drop-in and the
+meaning of each email: `deploy/notify-alarm/README.md`. Each knock writes one harmless
+`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` in the API's journal.
 
 ## A normal release on a hosted base (since R19, 21 October 2026)
 
@@ -2011,7 +2020,8 @@ if [ "$BAD" = 0 ]; then echo B8_DONE; else echo "B8_NOT_DONE: $BAD check(s) BAD"
 
 - The billing check asks NETOPIA's sandbox one status question about a made-up order, so nothing is charged. Its one
   cross is the plans line: this host keeps placeholder EUR and RON prices.
-- In the billing journal only `billing.notice.unverified` lines (one per check run) are expected.
+- In the billing journal only `billing.notice.unverified` lines (one per check run, and one every 5 minutes from the
+  notify alarm, H10) are expected.
 - Then add the release's own checks. R19 added two:
   - the 24 regions in register 17's `countryPolicy`, equal to the approved proposal's value;
   - the region decisions of R19's own code on that live row.

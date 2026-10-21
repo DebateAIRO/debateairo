@@ -769,11 +769,11 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–74 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–75 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
     // Numbered in order with no gap: a void row keeps its number so the later lines keep theirs.
-    expect(rows).toEqual(Array.from({ length: 74 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 75 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -924,7 +924,10 @@ describe("P22 the Billing runbook", () => {
         "SmartBill has none", "The credit note needs a write run (`--allow-writes`)",
         "a draft or reads-only run cannot show it", "made in Quaderno's sandbox on the README §14.9 sandbox server",
         "one quote asked as a Romanian buyer and not paid", "kept or built again for those runs (§14.9 step 8)",
-        "the RON invoice and partial credit note of the SmartBill recording"]]
+        "the RON invoice and partial credit note of the SmartBill recording"]],
+      // B3d: the outside alarm on the notify address, for the live site, with the owner's test email received.
+      [75, ["the alarm on NETOPIA's notify address runs for the live site", "`deploy/notify-alarm/README.md`",
+        "period 5 minutes, grace 5 minutes", "its test email", "`systemctl list-timers debateai-notify-alarm.timer`"]]
     ] as const) {
       const line = row(number);
       for (const needle of [`| ${number} | Before billing is switched on`, "**Decided by:**", "**Proven by:**", ...needles]) {
@@ -1031,11 +1034,13 @@ describe("P22 the Billing runbook", () => {
       "run the journal command from **Before step 1** again; it should print nothing",
       // F6a fix round 1: each check run posts one unsigned message, so both journal reads name that one line as
       // expected; the filters themselves are unchanged, so a NETOPIA message that lost its header still shows.
+      // B3d: the notify alarm's knock is the same unsigned message, one every 5 minutes while the alarm is on.
       "It should print nothing except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run " +
-        "of the check command since that start. That line is the check's own unsigned message (§14.2) and needs nothing",
+        "of the check command since that start, and one every 5 minutes when the notify alarm is on " +
+        "(`deploy/notify-alarm/README.md`). That line is the check's (or the alarm's) own unsigned message (§14.2) and needs nothing",
       "Any other line it prints: look it up in the journal table of §14.8",
       "it should print nothing except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run " +
-        "of the check command since the restart",
+        "of the check command since the restart (and one every 5 minutes when the notify alarm is on)",
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "Start the second only after the first has finished",
       "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",

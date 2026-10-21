@@ -2701,6 +2701,12 @@ is already there, so the last `grep` prints `1`. Without the line the API works 
 with `BILLING_NOTICE_SPOOL_PATH_INVALID` (create the folder, or remove the line, then restart). The private test site
 (v3-preview) runs from the preview kit, not this unit: its steps are `deploy/preview-release/v1/README.md` H9.
 
+**When the whole site is down.** The spool cannot help when the API itself (or the server) is down: then nothing
+answers NETOPIA, and after its 5 copies (about 25 minutes) a first payment's card code is gone. The alarm in
+`deploy/notify-alarm/README.md` knocks on this address every 5 minutes and has an outside service (Healthchecks.io)
+email you when it stops answering, or when the knocks stop reporting. Set it up the day billing goes on (go-live row
+75).
+
 ### 14.6 Switching a country's payments on
 
 A country in the "pay off until the tax registration is done" group opens like this:
@@ -2789,7 +2795,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 74 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 75 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
@@ -3292,7 +3298,7 @@ signals that matter:
 | `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with `--despite-chargeback` after `--confirm`. |
 | `"event":"billing.payment.credentials_refused"`, with `operation` | NETOPIA refused our API key (`operation` says on what: `checkout`, `upgrade`, `card_check`, `verify`, `reconcile`, `charge`, `status` or `refund`). NETOPIA processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose charge is refused this way is kept, as in a NETOPIA outage, for up to 3 days past its due time (a payment retry: 24 hours), and you get O3 at once. New checkouts fail while it lasts. | At once: run the check command (§14.2); it says whether NETOPIA accepts the key. A revoked or replaced key, or a sandbox key beside the live address (or the reverse): run the setup's NETOPIA section with `--replace netopia` and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
-| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2) writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
+| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2), and each knock of the notify alarm (every 5 minutes, `deploy/notify-alarm/README.md`), writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
 | `"event":"billing.notice.recheck"`, with `quarantined`, `verified` and `failed`, or `code` | At its start the API checked the quarantined messages of the last 14 days again with its current keys; `verified` counts those that now pass and were stored as if they had just arrived. A `code` instead means the check itself failed. | `verified` above 0 after a key fix: nothing more; their payments are checked now. `failed` above 0 or a `code`: restart once more; if it repeats, report it. |
 | `"event":"billing.notice.spooled"` (no other field) | A message that passed could not be stored, and was kept on disk instead (§14.5). It is stored at the next replay (within 10 minutes). | One: nothing. Again and again: check the database. |
 | `"event":"billing.notice.spool_failed"` (no other field) | A message that passed could not be stored, and could not be kept on disk either (the spool folder is missing, read-only or full). NETOPIA still sends it again, but its saved card may be lost. | Check the folder with the `stat` line of §14.5 and the free disk space; then check the database. |
@@ -3513,8 +3519,9 @@ is expected on this server unless you publish a price list here too; on the live
 **Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
 below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
 or a status read failed, and billing's bracketed markers. It should print nothing except one
-`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start. That
-line is the check's own unsigned message (§14.2) and needs nothing:
+`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start, and
+one every 5 minutes when the notify alarm is on (`deploy/notify-alarm/README.md`). That line is the check's (or the
+alarm's) own unsigned message (§14.2) and needs nothing:
 
 ```sh
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
@@ -3564,7 +3571,7 @@ dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
    - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
      except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since
-     the restart. (Its second command, which reads every billing line, now shows the renewal's own lines too.)
+     the restart (and one every 5 minutes when the notify alarm is on). (Its second command, which reads every billing line, now shows the renewal's own lines too.)
    - Within two minutes, a payment with the saved card appears in NETOPIA's sandbox admin and a second receipt email
      arrives.
    - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while
