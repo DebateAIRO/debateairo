@@ -154,7 +154,14 @@ describe("0123: the side-by-side releases step", () => {
     // A-x1: the readmitted provision is the content role's alone, and the commit takes its marked intent.
     expect(sql).toContain("ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;");
     expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.prepare_readmitted_run_key_provision(uuid,uuid) TO debateai_content_provision;");
-    expect(sql).toContain(") OR core.lock_readmitted_run_key_provision_for_commit(");
+    // A marked intent commits through the readmit lock ONLY; an unmarked one keeps 0040's lock (one CASE branch).
+    expect(sql).toContain("WHERE marked.run_id=v_run_id AND marked.readmitted_from_run_id IS NOT NULL");
+    expect(sql).toContain(") THEN core.lock_readmitted_run_key_provision_for_commit(");
+    expect(sql).toContain(") ELSE core.lock_run_key_provision_for_commit(");
+    // One live re-admission per old run: the durable marker on the binding and the pending-intent index.
+    expect(sql).toContain("ALTER TABLE identity.run_execution_binding ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;");
+    expect(sql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS run_key_provision_intent_one_readmission_idx");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_READMISSION_TAKEN';");
     expect(sql).toContain("SIDE_BY_SIDE_READMISSION_CONTRACT_INCOMPLETE");
     // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
     const loader = read("packages/db/src/migration-forward0123.ts");

@@ -2,7 +2,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
 import { encrypt, generateDek } from "@debateai/crypto";
-import { RunWaitRepository, recordRunSupersession, resolveRunRef } from "@debateai/db";
+import { WorkItemRepository } from "@debateai/battery";
+import { RunRepository, RunWaitRepository, recordRunSupersession, resolveRunRef } from "@debateai/db";
+import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
 
 /**
@@ -12,7 +14,8 @@ import { startContentRunFixture, type ContentRunFixture } from "../support/conte
  * its own, so a started debate is never re-admitted (plan A review focus 4) and no cycle can form. core.resolve_run_ref
  * follows the chain (at most 16 hops); core.run_waiting_v no longer lists a superseded run. The wait reasons widen with
  * SITE_BUSY and SWITCHING. A superseded run's start is refused RUN_SUPERSEDED. An owner's encrypted waiting run gets
- * its new run's key provision without a live session (A-x1); only the API's role records and resolves supersessions,
+ * its new run's key provision without a live session, once per old run while that re-admission lives (A-x1); an edge
+ * links two runs of one person only; only the API's role records and resolves supersessions,
  * while both runtimes read the stamp and the release state (A-x2). CI skips this directory; run it alone.
  */
 let fixture: ContentRunFixture;
@@ -37,9 +40,36 @@ async function inTransaction<T>(use: (client: PoolClient) => Promise<T>): Promis
   } finally { client.release(!clean); }
 }
 
+/** One legacy asker for the file: an edge links two runs of the same person only (the guard compares them). */
+const ASKER = `legacy-run-supersession-${randomUUID()}`;
+
+/** A legacy run of `askerId` (re-admission copies the old run's asker into the new run, plan C11). */
+function legacyRun(askerId = ASKER): Promise<string> {
+  return new RunRepository(fixture.database.pool).startRun({
+    questionLine: "Should a waiting debate keep its place after an upload?",
+    principal: { kind: "legacy", legacyAskerId: askerId },
+    sessionId: randomUUID(),
+    callerScope: "ASKER",
+    asOf: new Date("2026-10-21T00:00:00.000Z"),
+    askerRiskTier: "casual",
+    effectiveRiskTier: "casual",
+    tierSource: "ASKER",
+    tierProvenanceRef: "asker:run-supersession",
+    compositionBudgetTier: "low",
+    depthParams: { depth: 1 },
+    discoveredPanel: fixtureDiscoveredPanel(2),
+    strangerSampleRate: 0,
+    envelopeBasis: fixtureStructuralCeiling(4),
+    registerVersion: 1,
+    batteryVersion: "run-supersession",
+    askContract: {},
+    batteryRows: []
+  });
+}
+
 /** A legacy run that has taken its place in line (the ask's WAIT), with its SITE reason. */
-async function waitingRun(): Promise<string> {
-  const runId = await fixture.createLegacyRun("Should a waiting debate keep its place after an upload?");
+async function waitingRun(askerId = ASKER): Promise<string> {
+  const runId = await legacyRun(askerId);
   await inTransaction(async (client) => {
     await waits().enterWait(client, runId, new Date());
     await waits().recordReason(client, runId, { waitsFor: "SITE", personRecheckAt: null, at: new Date() });
@@ -61,7 +91,7 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
   it("a superseded run leaves the line and its new run joins it", async () => {
     const w = await waitingRun();
     const before = await waits().countWaiting();
-    const n = await fixture.createLegacyRun("Should a waiting debate keep its place after an upload?");
+    const n = await legacyRun();
     // Re-admission writes the new run's place and the supersession in one transaction (plan C, START).
     await inTransaction(async (client) => {
       await waits().enterWait(client, n, new Date());
@@ -101,7 +131,7 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
   });
 
   it("a run that never waited is never superseded", async () => {
-    const never = await fixture.createLegacyRun("A debate that started at once");
+    const never = await legacyRun();
     const n = await waitingRun();
     expect(codeOf(await refusal(supersede(never, n)))).toBe("RUN_SUPERSESSION_INVALID");
     // The database's own refusal, under the TS layer: check_violation with the code as its message.
@@ -123,6 +153,23 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
     // A run superseded by itself is the CHECK's refusal.
     expect(codeOf(await refusal(supersede(c, c)))).toBe("23514");
     expect(await resolveRunRef(fixture.database.pool, a)).toBe(b);
+  });
+
+  it("an edge links two runs of the same person only", async () => {
+    const mine = await waitingRun(), theirs = await waitingRun(`legacy-run-supersession-${randomUUID()}`);
+    const edgesBefore = await edges();
+    // Another legacy asker's run, either way round.
+    expect(codeOf(await refusal(supersede(mine, theirs)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(codeOf(await refusal(supersede(theirs, mine)))).toBe("RUN_SUPERSESSION_INVALID");
+    // An owner's encrypted run and a legacy run, either way round.
+    const owners = await waitingEncryptedRun();
+    expect(codeOf(await refusal(supersede(owners, mine)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(codeOf(await refusal(supersede(mine, owners)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(await edges()).toBe(edgesBefore);
+    // Two runs of that owner link.
+    const ownersNext = await waitingEncryptedRun();
+    await supersede(owners, ownersNext);
+    expect(await resolveRunRef(fixture.database.pool, owners)).toBe(ownersNext);
   });
 
   it("a chain longer than 16 refuses", async () => {
@@ -229,6 +276,8 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
 
   it("supersession is append-only", async () => {
     const pool = fixture.database.pool;
+    const w = await waitingRun(), n = await waitingRun();
+    await supersede(w, n); // its own edge: the case does not rely on earlier ones
     const before = await edges();
     expect(before).toBeGreaterThan(0);
     for (const statement of [
@@ -369,6 +418,47 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
     await supersede(old, fresh);
     expect(await waits().isWaiting(pool, old)).toBe(false);
     expect(await resolveRunRef(pool, old)).toBe(fresh);
+  });
+
+  it("one live re-admission per old run: a second is refused while the first is pending or alive", async () => {
+    const pool = fixture.database.pool;
+    const old = await waitingEncryptedRun();
+    const first = randomUUID();
+    const prepared = (await prepareReadmitted(pool, old, first)).rows[0]!;
+    // Pending: the first provision is prepared, its run not yet written.
+    const pending = await refusal(prepareReadmitted(pool, old, randomUUID()));
+    expect(codeOf(pending)).toBe("55000");
+    expect((pending as Error).message).toBe("RUN_READMISSION_TAKEN");
+    // Alive: the first run is written (its intent consumed); still refused.
+    expect(await createDirectly(pool, await encryptedRunDocument(first, prepared.execution_ref))).toBe(true);
+    expect((await refusal(prepareReadmitted(pool, old, randomUUID())) as Error).message).toBe("RUN_READMISSION_TAKEN");
+    expect((await pool.query("SELECT readmitted_from_run_id::text AS old FROM identity.run_execution_binding WHERE run_id=$1",
+      [first])).rows).toEqual([{ old }]);
+    // The orphan path (plan C11): START failed after the new run committed, which is recorded FAILED; the old run,
+    // still waiting, may then be re-admitted once more.
+    await new WorkItemRepository(pool).recordSetupFailure({
+      runId: first, batteryRowId: "Q1", commandKey: `S00:${first}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION"
+    });
+    const second = randomUUID();
+    expect((await prepareReadmitted(pool, old, second)).rows).toHaveLength(1);
+    // The pending-intent index is the backstop: a second marked intent for the same old run cannot exist.
+    expect(codeOf(await refusal(pool.query(
+      `INSERT INTO core.run_key_provision_intent (run_id, user_id, owner_ref, identity_session_id, execution_ref,
+         requested_at, expires_at, readmitted_from_run_id)
+       SELECT $1, user_id, owner_ref, identity_session_id, execution_ref, requested_at, expires_at, readmitted_from_run_id
+       FROM core.run_key_provision_intent WHERE run_id=$2`, [randomUUID(), second])))).toBe("23505");
+  });
+
+  it("a marked intent takes the re-admission's checks even when its session is live", async () => {
+    const pool = fixture.database.pool;
+    const old = await waitingEncryptedRun();
+    const fresh = randomUUID();
+    const prepared = (await prepareReadmitted(pool, old, fresh)).rows[0]!;
+    // The old run starts on its own meanwhile: it no longer waits, so its re-admission must not commit, although the
+    // session is live (0040's lock alone would take it).
+    await inTransaction((client) => waits().markStarted(client, old, new Date()));
+    expect(await createDirectly(pool, await encryptedRunDocument(fresh, prepared.execution_ref))).toBe(false);
+    expect((await pool.query("SELECT count(*)::int AS n FROM core.run WHERE run_id=$1", [fresh])).rows[0].n).toBe(0);
   });
 
   it("an ordinary provision still needs a live session at commit", async () => {

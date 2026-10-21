@@ -11,14 +11,15 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * writes it; §3 adds the release table core.release_event, its view core.release_state_v, its two readers and its two
  * serialized writers, owned by the new NOLOGIN role debateai_release_owner (the writers callable by
  * debateai_release_operator); §4 adds the re-admission record core.run_supersession with its guard
- * core.guard_run_supersession(), the start guard core.refuse_starting_superseded_run() (its trigger on core.run_wait_start
- * is checked by the closing block), core.resolve_run_ref(uuid), the readmitted run's key provision and its commit lock (with
- * the intent's marker column core.run_key_provision_intent.readmitted_from_run_id), and redefines core.run_waiting_v; §5
- * widens core.run_wait_reason's waits_for CHECK. The view and that CHECK are checked by the closing block and by tests,
- * not digested, so a later drained step may widen them again (as 0121's CHECKs are handled). It adds no billing relation
- * and no billing function, so the effective verifier in force (0111's) stays in force and is named as its own. Its checks are its postcondition (below), compared on every later
- * migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the
- * lists below.
+ * core.guard_run_supersession(), the start guard core.refuse_starting_superseded_run() (its trigger on
+ * core.run_wait_start is checked by the closing block), core.resolve_run_ref(uuid), the readmitted run's key provision
+ * and its commit lock, the marker columns on core.run_key_provision_intent and identity.run_execution_binding (one live
+ * re-admission per old run), and redefines core.run_waiting_v; §5 widens core.run_wait_reason's waits_for CHECK. The
+ * view, that CHECK and the two indexes on the marker are checked by the closing block and by tests, not digested, so a
+ * later drained step may widen them again (as 0121's CHECKs are handled). It adds no billing relation and no billing
+ * function, so the effective verifier in force (0111's) stays in force and is named as its own. Its checks are its
+ * postcondition (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
+ * Each later section appends its objects to the lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';
@@ -26,7 +27,8 @@ const MANIFEST_PATH='lineage/side-by-side-releases-forward0123.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0123 adds no billing relation or billing function, so it names the verifier in force (0111's, which 0112 to 0123 keep)
 const PREVIOUS='0122_engine_map_check.sql';
 /** §1, §4: the columns 0123 adds, as table.column. */
-const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_from_run_id'] as const;
+const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_from_run_id',
+ 'identity.run_execution_binding.readmitted_from_run_id'] as const;
 /** §1: the CHECKs 0123 adds, as table.constraint. */
 const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
 /**
@@ -34,10 +36,11 @@ const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
  * volatility, definition, ACL).
  */
 const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_run_supersession()',
- 'core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','core.prepare_readmitted_run_key_provision(uuid,uuid)',
- 'core.read_current_release()','core.read_release_state(text)','core.record_release_event(text,text,text,text)',
- 'core.record_release_switch(text,text,timestamptz,text,bigint)','core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)'] as const;
-/** §3, §4: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 digests its own. */
+ 'core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)',
+ 'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.read_current_release()','core.read_release_state(text)',
+ 'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)',
+ 'core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)'] as const;
+/** §3, §4: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 does. */
 const TABLES=['core.release_event','core.run_supersession'] as const;
 /** §3: the view 0123 adds (owner, ACL, definition). */
 const VIEWS=['core.release_state_v'] as const;

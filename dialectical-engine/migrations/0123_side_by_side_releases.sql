@@ -42,9 +42,11 @@ COMMENT ON COLUMN core.run.release_key IS
 
 -- §2. core.create_encrypted_run writes the stamp --------------------------------
 -- 0072's body byte for byte, with three changes: 'releaseKey' joins the closed key list, the INSERT writes
--- release_key = COALESCE(p_run->>'releaseKey','legacy'), and the commit lock also takes a readmitted run's provision
--- (§4, A3: core.lock_readmitted_run_key_provision_for_commit, which needs no live session, only for an intent §4's
--- core.prepare_readmitted_run_key_provision marked). A malformed key fails §1's CHECK inside the function, whose
+-- release_key = COALESCE(p_run->>'releaseKey','legacy'), and an intent §4's core.prepare_readmitted_run_key_provision
+-- marked (readmitted_from_run_id) commits through core.lock_readmitted_run_key_provision_for_commit (no live session,
+-- the re-admission's own checks) and ONLY through it, while every unmarked intent keeps 0040's lock (a live session).
+-- The CASE evaluates one branch, so a marked intent whose session happens to be live still takes the readmit checks
+-- (A3 review). A malformed key fails §1's CHECK inside the function, whose
 -- handler answers false like any other refused document (check_violation), so nothing of the run is written.
 -- startRun's capability probe still finds 'planTier' and 'argumentLanguageTag' in this definition, and it never strips
 -- 'releaseKey': a database without this step refuses a stamped document instead of silently dropping the stamp.
@@ -86,11 +88,14 @@ BEGIN
   IF p_run->>'questionLine'<>'⟦DEBATEAI:CIPHERTEXT:V1⟧'
     OR p_run->>'askerId'<>'owner:'||p_owner_ref::text
     OR p_run->'askContract'<>'{"ciphertext":true,"v":1}'::jsonb
-    OR NOT (core.lock_run_key_provision_for_commit(
-      v_run_id,p_user_id,p_owner_ref,v_execution_ref
-    ) OR core.lock_readmitted_run_key_provision_for_commit(
-      v_run_id,p_user_id,p_owner_ref,v_execution_ref
-    )) THEN
+    OR NOT (CASE WHEN EXISTS (
+        SELECT 1 FROM core.run_key_provision_intent AS marked
+        WHERE marked.run_id=v_run_id AND marked.readmitted_from_run_id IS NOT NULL
+      ) THEN core.lock_readmitted_run_key_provision_for_commit(
+        v_run_id,p_user_id,p_owner_ref,v_execution_ref
+      ) ELSE core.lock_run_key_provision_for_commit(
+        v_run_id,p_user_id,p_owner_ref,v_execution_ref
+      ) END) THEN
     RETURN false;
   END IF;
   IF octet_length(decode(p_run->>'contentAttestationSecret','base64'))<>32
@@ -471,7 +476,11 @@ GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO deba
 -- X → Y needs Y without an outgoing edge). The guard takes ONE advisory lock, so two edges written at once are checked
 -- one after the other, and it locks the old run's wait row FOR UPDATE, which waits for a transaction starting that run
 -- (its run_wait_start insert holds KEY SHARE on the row) and then reads its start. The primary key refuses a second edge
--- out of a run (23505), UNIQUE new_run_id a second edge into one. The API writes the edge inside START, as
+-- out of a run (23505), UNIQUE new_run_id a second edge into one. Both runs must belong to the same person (A3 review):
+-- their principal, read as core.run_waiting_v reads it (the latest ownership event's owner, otherwise the asker id),
+-- must be the same, so an old id can never resolve to another person's run. Both race guards rely on READ COMMITTED,
+-- the isolation every writer of the line uses: after waiting for the lock, the guard's next statement takes a new
+-- snapshot and so reads what the lock's holder committed. The API writes the edge inside START, as
 -- debateai_billing_runtime: the API's own capability role (0093; the API's login holds it, the runner's does not), so
 -- the runner can neither record nor resolve a supersession (least privilege, controller ruling 2026-10-22 on A-x2).
 -- The other direction is guarded too: once a run is superseded, starting it is refused RUN_SUPERSEDED (below).
@@ -493,12 +502,35 @@ VOLATILE
 SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
+DECLARE
+  v_old_principal text;
+  v_new_principal text;
 BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('debateai:run-supersession', 0));
   PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;
   IF NOT FOUND
     OR EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = NEW.old_run_id)
     OR EXISTS (SELECT 1 FROM core.run_supersession AS onward WHERE onward.old_run_id = NEW.new_run_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';
+  END IF;
+  -- Each run's person: 'owner:<ref>' from its latest ownership event, else its asker id ('owner:<ref>' or a legacy id).
+  SELECT CASE WHEN latest.owner_ref IS NOT NULL THEN 'owner:' || latest.owner_ref::text ELSE run.asker_id END
+  INTO v_old_principal
+  FROM core.run AS run
+  LEFT JOIN LATERAL (
+    SELECT event.owner_ref FROM core.run_ownership_event AS event
+    WHERE event.run_id = run.run_id ORDER BY event.at_seq DESC LIMIT 1
+  ) AS latest ON true
+  WHERE run.run_id = NEW.old_run_id;
+  SELECT CASE WHEN latest.owner_ref IS NOT NULL THEN 'owner:' || latest.owner_ref::text ELSE run.asker_id END
+  INTO v_new_principal
+  FROM core.run AS run
+  LEFT JOIN LATERAL (
+    SELECT event.owner_ref FROM core.run_ownership_event AS event
+    WHERE event.run_id = run.run_id ORDER BY event.at_seq DESC LIMIT 1
+  ) AS latest ON true
+  WHERE run.run_id = NEW.new_run_id;
+  IF v_old_principal IS NULL OR v_old_principal IS DISTINCT FROM v_new_principal THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';
   END IF;
   RETURN NEW;
@@ -556,7 +588,8 @@ GRANT SELECT ON core.run_supersession TO debateai_release_owner;
 -- trigger on 0083's core.run_wait_start (a new trigger: no 0083 object is redefined) refuses RUN_SUPERSEDED (23514)
 -- when the run has a supersession row. It first takes KEY SHARE on the run's wait row, which waits for a transaction
 -- writing an edge out of that run (the guard holds the row FOR UPDATE) and then reads its committed edge; the other
--- order is the guard's (it waits for this start's KEY SHARE, then reads the start). A definer, because the row lock and
+-- order is the guard's (it waits for this start's KEY SHARE, then reads the start). Like the guard, this relies on READ
+-- COMMITTED: the read after the lock wait is a new statement, with a new snapshot. A definer, because the row lock and
 -- the read of core.run_supersession need rights the runtime (the waker's role) does not hold; it reads ids only.
 CREATE OR REPLACE FUNCTION core.refuse_starting_superseded_run()
 RETURNS trigger
@@ -637,16 +670,35 @@ GRANT SELECT ON core.run_waiting_v TO debateai_runtime;
 -- marked readmitted_from_run_id. The account must still be active and still map to the old run's owner. The commit
 -- (§2's core.create_encrypted_run) then takes the marked intent through core.lock_readmitted_run_key_provision_for_commit,
 -- which checks everything the ordinary lock checks except the session, and that the old run still waits. An unmarked
--- intent never commits without a live session. The column lives and dies with its intent row (consumed at commit, or
--- cleaned by 0040's sweep like any other), so it adds nothing an erasure has to find.
+-- intent never commits without a live session.
+--
+-- ONE LIVE RE-ADMISSION PER OLD RUN (A3 review): otherwise one waiting run could mint any number of session-free
+-- encrypted runs, since it keeps waiting until START writes its edge on another login. The marker is therefore also
+-- written, durably, on the new run's identity.run_execution_binding (which outlives the intent: it is removed only with
+-- its account, or by 0040's sweep together with an intent that never became a run). Prepare refuses
+-- RUN_READMISSION_TAKEN while any earlier re-admission of the same old run is pending (its binding has no run yet) or
+-- alive (its run exists without a FAILED job). A re-admitted run recorded FAILED (plan C11's orphan path,
+-- RUN_SETUP_FAILED:READMISSION: the START transaction failed after the new run committed) frees the old run for the
+-- next tick, so the debate is never stranded; such a run never ran and never runs. Prepare decides this under the
+-- account's advisory lock (two prepares for one person run one after the other), and a partial UNIQUE index keeps at
+-- most one pending intent per old run regardless.
 ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;
 COMMENT ON COLUMN core.run_key_provision_intent.readmitted_from_run_id IS
   'Side-by-side spec §4 (0123 §4): set only by core.prepare_readmitted_run_key_provision, the waiting run this provision re-admits; the commit then needs no live session. NULL for every ordinary provision.';
+CREATE UNIQUE INDEX IF NOT EXISTS run_key_provision_intent_one_readmission_idx
+  ON core.run_key_provision_intent (readmitted_from_run_id) WHERE readmitted_from_run_id IS NOT NULL;
+ALTER TABLE identity.run_execution_binding ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;
+COMMENT ON COLUMN identity.run_execution_binding.readmitted_from_run_id IS
+  'Side-by-side spec §4 (0123 §4): the waiting run this run re-admits, written by core.prepare_readmitted_run_key_provision; NULL for every ordinary run. An id, never content.';
+CREATE INDEX IF NOT EXISTS run_execution_binding_readmitted_from_idx
+  ON identity.run_execution_binding (readmitted_from_run_id) WHERE readmitted_from_run_id IS NOT NULL;
 
 -- RUN_READMISSION_INVALID (55000): the old run is not an owner's encrypted run, does not wait any more (started, FAILED,
 -- content erased, already superseded: core.run_waiting_v above), or the new run id is taken or equal to it.
 -- RUN_READMISSION_OWNER_GONE (55000): the old run's binding is gone with its account, or the account is no longer
--- active (suspended, held, age-frozen, erased) or no longer maps to the run's owner. Locks in today's order: the
+-- active (suspended, held, age-frozen, erased) or no longer maps to the run's owner.
+-- RUN_READMISSION_TAKEN (55000): an earlier re-admission of the same old run is pending or alive (above), decided after
+-- the account's lock. Locks in today's order: the
 -- security subject, then the account (0085's prepare_run_key_provision). Returns the new run's execution ref and the
 -- user the content key is provisioned for (plan C11: cipher.provisionRun(newRunId, { userId, ownerRef })).
 CREATE OR REPLACE FUNCTION core.prepare_readmitted_run_key_provision(p_old_run_id uuid, p_new_run_id uuid)
@@ -694,6 +746,16 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM core.run_waiting_v AS line WHERE line.run_id = p_old_run_id) THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_READMISSION_INVALID';
   END IF;
+  IF EXISTS (
+    SELECT 1 FROM identity.run_execution_binding AS earlier
+    WHERE earlier.readmitted_from_run_id = p_old_run_id
+      AND NOT EXISTS (
+        SELECT 1 FROM core.work_item AS work WHERE work.run_id = earlier.run_id AND work.state = 'FAILED')
+  ) OR EXISTS (
+    SELECT 1 FROM core.run_key_provision_intent AS pending WHERE pending.readmitted_from_run_id = p_old_run_id
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_READMISSION_TAKEN';
+  END IF;
   LOOP
     v_attempt := v_attempt + 1;
     v_execution_ref := gen_random_uuid();
@@ -701,8 +763,9 @@ BEGIN
     BEGIN
       INSERT INTO core.publication_ref_tombstone(ref, ref_kind, created_at)
       VALUES (v_execution_ref, 'run_execution_ref', v_now);
-      INSERT INTO identity.run_execution_binding(execution_ref, user_id, identity_session_id, run_id, created_at)
-      VALUES (v_execution_ref, v_user_id, v_session_id, p_new_run_id, v_now);
+      INSERT INTO identity.run_execution_binding(
+        execution_ref, user_id, identity_session_id, run_id, created_at, readmitted_from_run_id
+      ) VALUES (v_execution_ref, v_user_id, v_session_id, p_new_run_id, v_now, p_old_run_id);
       INSERT INTO core.run_key_provision_intent(
         run_id, user_id, owner_ref, identity_session_id, execution_ref, requested_at, expires_at, readmitted_from_run_id
       ) VALUES (
@@ -920,6 +983,18 @@ BEGIN
     OR strpos(pg_get_viewdef('core.run_waiting_v'::regclass), 'run_supersession') = 0
     OR NOT has_table_privilege('debateai_runtime', 'core.run_waiting_v', 'SELECT')
     OR NOT has_function_privilege('debateai_content_provision', v_readmit, 'EXECUTE')
+    OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
+             FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
+             WHERE p.oid = v_readmit AND a.grantee <> p.proowner ORDER BY 1)
+       IS DISTINCT FROM ARRAY['debateai_content_provision:EXECUTE']
+    OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
+             FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
+             WHERE p.oid = v_readmit_lock AND a.grantee <> p.proowner ORDER BY 1) <> ARRAY[]::text[]
+    OR to_regclass('core.run_key_provision_intent_one_readmission_idx') IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_attribute
+      WHERE attrelid = 'identity.run_execution_binding'::regclass AND attname = 'readmitted_from_run_id'
+        AND NOT attisdropped AND NOT attnotnull AND format_type(atttypid, atttypmod) = 'uuid')
     OR EXISTS (SELECT 1 FROM unnest(ARRAY['public', 'debateai_runtime', 'debateai_authorization_runtime',
                  'debateai_erasure_runtime', 'debateai_replay', 'debateai_publication_cleanup']) AS r(name)
                WHERE has_function_privilege(r.name, v_readmit, 'EXECUTE')
