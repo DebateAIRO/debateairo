@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { WorkItemRepository, runSetAsideReason, RUN_SET_ASIDE } from "@debateai/battery";
 import { RunRepository, createPool, migrate, withWriteTransaction } from "@debateai/db";
 import { LEGACY_RELEASE_KEY } from "@debateai/kernel";
+import { acceptanceFailureRecorder, ACCEPTANCE_WORKER_ID } from "../../acceptance/main.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -154,7 +155,7 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     await claim(aLive, "worker:a", true);
     await claim(bLapsed, "worker:old", false);
     expect(await fenceA().listLapsedClaimed(10)).toEqual([{ runId: aLapsed.runId, workItemId: aLapsed.workItemId }]);
-    expect((await fenceA().listLapsedClaimed(10)).map((item) => item.workItemId)).not.toContain(aReady.workItemId);
+    expect(await jobRow(aReady.workItemId)).toMatchObject({ state: "READY" });
     await expect(fenceA().listLapsedClaimed(0)).rejects.toBeInstanceOf(TypeError);
   });
 
@@ -175,6 +176,11 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await failure(othersLive, "TEST_LAYER:OTHERS_LIVE")).toBe(false);
     expect(await jobRow(othersLive.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:other" });
 
+    // A repository told no worker id writes over no live claim at all.
+    expect(await new WorkItemRepository(runtime, { releaseKey: KEY_A })
+      .recordTerminalFailure({ ...othersLive, reason: "TEST_LAYER:NO_WORKER" })).toBe(false);
+    expect(await jobRow(othersLive.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:other" });
+
     const mineLive = await runWithJob(KEY_A);
     await claim(mineLive, "worker:a", true);
     expect(await failure(mineLive, "TEST_LAYER:MINE_LIVE")).toBe(true);
@@ -188,6 +194,26 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     // D2: today's re-write of an already FAILED item of its own release is kept.
     expect(await failure(ready, "TEST_LAYER:REWRITTEN")).toBe(true);
     expect(await jobRow(ready.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "TEST_LAYER:REWRITTEN" });
+  });
+
+  it("refuses a malformed fence key; legacy and a well-formed key are accepted", () => {
+    for (const releaseKey of ["r1-0123456789AB", "r01-aaaaaaaaaaaa", "", "LEGACY"]) {
+      expect(() => new WorkItemRepository(runtime, { releaseKey })).toThrow(expect.objectContaining({ code: "RELEASE_KEY_INVALID" }));
+    }
+    expect(() => new WorkItemRepository(runtime, { releaseKey: "r1-aaaaaaaaaaaa", workerId: "" })).toThrow(TypeError);
+    expect(() => new WorkItemRepository(runtime, { releaseKey: LEGACY_RELEASE_KEY })).not.toThrow();
+    expect(() => new WorkItemRepository(runtime, { releaseKey: KEY_B })).not.toThrow();
+  });
+
+  it("the acceptance runner's failure recorder writes under that runner's own live claim (D2)", async () => {
+    const live = await runWithJob(), others = await runWithJob();
+    await claim(live, ACCEPTANCE_WORKER_ID, true);
+    await claim(others, "worker:other", true);
+    const recorder = acceptanceFailureRecorder(runtime);
+    expect(await recorder.recordTerminalFailure({ ...live, reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER" })).toBe(true);
+    expect(await jobRow(live.workItemId)).toEqual({ state: "FAILED", terminal_reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER", claimed_by: null });
+    expect(await recorder.recordTerminalFailure({ ...others, reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER" })).toBe(false);
+    expect(await jobRow(others.workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: "worker:other" });
   });
 
   it("names a set-aside by its waiver reason", () => {

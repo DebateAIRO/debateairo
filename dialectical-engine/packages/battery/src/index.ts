@@ -1,4 +1,4 @@
-import { LEGACY_RELEASE_KEY, type ActivationState } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, parseReleaseKey, type ActivationState } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 
@@ -303,11 +303,13 @@ function assertWorkLimit(limit: number, what: string): void {
 export class WorkItemRepository {
   readonly #fence: Readonly<{ releaseKey: string; workerId: string | null }>;
 
-  /** Without a fence the repository serves the `legacy` release (runs written before 0123 or without a key). */
+  /**
+   * Without a fence the repository serves the `legacy` release (runs written before 0123 or without a key). Any other
+   * key must be well formed (TypedDomainError RELEASE_KEY_INVALID): a mistyped fence would match no run and silently
+   * serve nothing.
+   */
   constructor(private readonly pool: Pool, fence: WorkItemFence = { releaseKey: LEGACY_RELEASE_KEY }) {
-    if (typeof fence?.releaseKey !== "string" || fence.releaseKey.length === 0) {
-      throw new TypeError("WORK_ITEM_FENCE_RELEASE_KEY_REQUIRED");
-    }
+    if (fence?.releaseKey !== LEGACY_RELEASE_KEY) parseReleaseKey(fence?.releaseKey);
     if (fence.workerId !== undefined && (typeof fence.workerId !== "string" || fence.workerId.length === 0)) {
       throw new TypeError("WORK_ITEM_FENCE_WORKER_ID_INVALID");
     }
@@ -711,7 +713,11 @@ export class WorkItemRepository {
     })));
   }
 
-  /** `setAsideOpenWorkOn` in its own write transaction (B11 adds each run's waiver on the same client). */
+  /**
+   * `setAsideOpenWorkOn` in its own write transaction. NOT YET COMPLETE: it writes the FAILED rows without the spend
+   * waiver; B11 MUST add each returned run's waiver on the same client before anything calls it (spec §9: a set-aside
+   * run never uses the person's quota). Until then only tests call it.
+   */
   async setAsideOpenWork(input: Readonly<{ reason: SetAsideReason; limit: number }>): Promise<readonly SetAsideWorkItem[]> {
     return withWriteTransaction(this.pool, (client) => this.setAsideOpenWorkOn(client, input));
   }
@@ -743,7 +749,11 @@ export class WorkItemRepository {
     return result.rowCount === 1;
   }
 
-  /** `setAsideWorkItemOn` in its own write transaction (B11 adds the run's waiver on the same client). */
+  /**
+   * `setAsideWorkItemOn` in its own write transaction. NOT YET COMPLETE: it writes the FAILED row without the spend
+   * waiver; B11 MUST add the run's waiver on the same client before anything calls it (plan C's RELEASE_NOT_SERVED path
+   * included). Until then only tests call it.
+   */
   async setAsideWorkItem(
     input: Readonly<{ runId: string; workItemId: string; reason: SetAsideReason; readyOnly: boolean }>
   ): Promise<boolean> {
