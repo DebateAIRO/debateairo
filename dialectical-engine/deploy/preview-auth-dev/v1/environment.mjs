@@ -115,6 +115,8 @@ export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEn
  if(deploymentMode!=='hosted')refuse('PREVIEW_ENVIRONMENT_REFUSED');
  return setProxy({...PREVIEW_HOSTED_PROXY_ENVIRONMENT});
 }
+/** A release key (side-by-side INTERFACE): `r<site version>-<12 hex of the code revision>`. Root's release-table.mjs keeps the same text; a test pins the two equal. */
+export const RELEASE_KEY_PATTERN=/^r[1-9][0-9]*-[0-9a-f]{12}$/;
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
 export function parseEnvironmentText(text) {
  try{
