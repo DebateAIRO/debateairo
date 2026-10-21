@@ -12,7 +12,7 @@ import { configureContentEncryption, createPool, EntitlementRepository, Postgres
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { TypedDomainError } from "@debateai/kernel";
+import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
@@ -626,10 +626,14 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     wait: (cooldownMs) => new Promise((resolve) => setTimeout(resolve, cooldownMs))
   }
 });
+// Side-by-side spec §2: each release listens, and re-sends its own open work, under its own Hatchet task
+// (`<base>-<release key>`). One shared name would let two live releases take each other's debates and flip each
+// other's retries between two codes; the `legacy` key keeps the bare base name (today's single task).
+const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
   failures: new WorkItemRepository(pool),
-  workflowName: environment.HATCHET_WORKFLOW_NAME, engineRetries: environment.HATCHET_ENGINE_RETRIES });
+  workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
 // re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read.
@@ -650,7 +654,7 @@ const startupReconciliation = await reconcileRunnerStartupWork({
   work: new WorkItemRepository(pool),
   dispatcher: {
     dispatch: async ({ runId, workItemId }) => {
-      await hatchet.runNoWait(environment.HATCHET_WORKFLOW_NAME, { runId, workItemId }, {
+      await hatchet.runNoWait(taskName, { runId, workItemId }, {
         additionalMetadata: {
           v3RunId: runId,
           v3WorkItemId: workItemId,

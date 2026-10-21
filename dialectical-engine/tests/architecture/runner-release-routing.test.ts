@@ -1,0 +1,45 @@
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Side-by-side spec §2: two releases live at once must never share a Hatchet task. With one shared name, either
+ * release's worker could pick up the other's debates and their retries would flip between the two codes. So the runner
+ * registers, and its start-up re-send dispatches, under `releaseTaskName(HATCHET_WORKFLOW_NAME, RELEASE_KEY)`: the base
+ * name plus its own release key (`legacy` keeps the bare base name, today's single task).
+ */
+
+const RUNNER_SOURCE = "apps/runner/src";
+const RUNNER_MAIN = join(RUNNER_SOURCE, "main.ts");
+const TASK_NAME = "const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);";
+
+const occurrences = (source: string, needle: string): number => source.split(needle).length - 1;
+
+describe("the runner registers and re-sends under its release's own task name (side-by-side §2)", () => {
+  it("derives the task name once, from the base name and the release key", async () => {
+    const main = await readFile(RUNNER_MAIN, "utf8");
+    expect(occurrences(main, TASK_NAME)).toBe(1);
+  });
+
+  it("registers the task and re-sends open work under that name", async () => {
+    const main = await readFile(RUNNER_MAIN, "utf8");
+    expect(main).toContain("workflowName: taskName");
+    expect(main).toContain("hatchet.runNoWait(taskName, { runId, workItemId }");
+    expect(main.indexOf(TASK_NAME)).toBeLessThan(main.indexOf("declareHatchetWalkingSkeletonTask("));
+  });
+
+  it("never registers or sends under the bare base name", async () => {
+    const main = await readFile(RUNNER_MAIN, "utf8");
+    expect(main).not.toContain("runNoWait(environment.HATCHET_WORKFLOW_NAME");
+    expect(main).not.toContain("workflowName: environment.HATCHET_WORKFLOW_NAME");
+  });
+
+  it("sends to Hatchet only from main.ts, where the release's task name lives", async () => {
+    const files = (await readdir(RUNNER_SOURCE)).filter((name) => name.endsWith(".ts"));
+    const senders: string[] = [];
+    for (const name of files) {
+      if ((await readFile(join(RUNNER_SOURCE, name), "utf8")).includes("runNoWait(")) senders.push(name);
+    }
+    expect(senders).toEqual(["main.ts"]);
+  });
+});
