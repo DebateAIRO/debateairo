@@ -129,8 +129,8 @@ describe("the task's catch tells the two stops apart", () => {
   });
 
   it("leaves the work item alone when its release is retiring", async () => {
-    // Side-by-side spec §4: the retiring release stops; the item stays CLAIMED until its claim lapses, and the release
-    // that takes over runs it (the backstop). Recording FAILED here would end a debate the next release can finish.
+    // Side-by-side spec §4: the retiring release stops; the item is left as is for this release's backstop, which sets
+    // it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
     const recorded: { runId: string; workItemId: string; reason: string }[] = [];
     const task = taskOver({
       recorded,

@@ -7,8 +7,9 @@
  *    means no call of this release can still be made or awaited;
  *  · the retirement signal: two stops that start off and never go back. `stopClaims` makes `execute` answer NO_WORK
  *    before anything else (RUNNER_RETIRING); `stopCalls` makes the keep-alive refuse every further model call before it
- *    is sent (RUNNER_RETIRING, handled like RUNNER_CLAIM_LOST: the work item is left CLAIMED, and once its claim lapses
- *    the release taking over picks it up — the backstop).
+ *    is sent (RUNNER_RETIRING, handled like RUNNER_CLAIM_LOST). Either way the work item is left as is for this
+ *    release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other
+ *    release off it.
  *
  * Both are plain in-memory state of one process: nothing here reads a clock, a database or the network.
  */

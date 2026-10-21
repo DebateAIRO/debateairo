@@ -332,6 +332,7 @@ describe("side-by-side spec §4 — a retiring release starts no new model call"
     expect(stopCode(keepAlive)).toBe("RUNNER_RETIRING");
     await clock.advance(10 * MINUTE);
     expect(stopCode(keepAlive)).toBe("RUNNER_CLAIM_LOST");
+    keepAlive.stop();
   });
 
   it("names the retirement before the time limit", () => {
