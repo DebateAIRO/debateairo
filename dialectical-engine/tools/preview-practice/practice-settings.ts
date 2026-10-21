@@ -13,7 +13,8 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { PREVIEW_THINKING_LEVELS_INVALID, parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
-import { resolveDeploymentMode } from "@debateai/register";
+import { developmentReleaseKey, parseReleaseKey, TypedDomainError } from "@debateai/kernel";
+import { assertReleaseKeyForRegister, resolveDeploymentMode, type DeploymentMode } from "@debateai/register";
 import { redactKeyShapes } from "./practice-redaction.js";
 import type { PracticeRunnerSettings } from "./practice-runner-composition.js";
 
@@ -60,7 +61,7 @@ export const PRACTICE_SETTINGS_KEYS = Object.freeze([
   "NODE_ENV", "CLAIM_MS", "CLAIM_MARGIN_MS", "MAX_RECOMPOSE", "JUDGEMENT_NUMBER_KIND", "JUDGEMENT_PRODUCER",
   "PROPAGATION_NUMBER_KIND", "PROPAGATION_PRODUCER", "PROVIDER_PROBE_TIMEOUT_MS", "PROVIDER_REF",
   "VLLM_BASE_URL", "VLLM_MODEL", "VLLM_MAKER",
-  "STRANGER_SAMPLE_RATE", "BATTERY_VERSION", "SETTLEMENT_WATCH_HANDLE"
+  "STRANGER_SAMPLE_RATE", "BATTERY_VERSION", "SETTLEMENT_WATCH_HANDLE", "RELEASE_KEY"
 ] as const);
 type SettingsKey = typeof PRACTICE_SETTINGS_KEYS[number];
 /**
@@ -106,12 +107,53 @@ export function settingsValueIsKeyShaped(value: string): boolean {
   return blanked !== unblanked;
 }
 
+/** A full git commit id: what `git rev-parse --verify HEAD` prints. */
+const SOURCE_REVISION_PATTERN = /^[0-9a-f]{40}$/u;
+
+/**
+ * Side-by-side spec §1, §3: the ONE release key of a practice. Its runner is composed in this process (no RELEASE_KEY is
+ * booted), and its ask stamps every run with the same key, so a practice debate is never NO_WORK to its own runner. A
+ * RELEASE_KEY settings line wins (README step S-2 does not copy the live one; an operator may add one by hand); else
+ * the checkout's revision names it (`r<REGISTER_VERSION>-<first 12 hex>`); else, locally only, the development key; a
+ * hosted practice with neither refuses (a hosted release always names its source revision). Every key passes
+ * assertReleaseKeyForRegister.
+ */
+function practiceReleaseKey(line: string | undefined, registerVersion: number, mode: DeploymentMode,
+  sourceRevision: string | null | undefined): string {
+  const key = line ?? (sourceRevision !== undefined && sourceRevision !== null && SOURCE_REVISION_PATTERN.test(sourceRevision)
+    ? `r${String(registerVersion)}-${sourceRevision.slice(0, 12)}`
+    : mode === "hosted" ? undefined : developmentReleaseKey(registerVersion));
+  if (key === undefined) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "RELEASE_KEY");
+  return checkedPracticeReleaseKey(key, registerVersion, mode);
+}
+
+/** assertReleaseKeyForRegister as a practice refusal. Content-free: the check's own code, never the value. */
+function checkedPracticeReleaseKey(key: string, registerVersion: number, mode: DeploymentMode): string {
+  try { return assertReleaseKeyForRegister(key, registerVersion, mode); } catch (error) {
+    throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID",
+      `RELEASE_KEY${error instanceof TypedDomainError ? `: ${error.code}` : ""}`);
+  }
+}
+
+/**
+ * The practice's key at another register version (practice-debate.ts runs on the live version + 1 with --register-next
+ * or its own override version): the same code part, the new number, so the key still names the version both
+ * compositions read (side-by-side spec §1) and the ask and the runner still share it. Checked again against the mode
+ * the practice finally runs in (B6 review): --register-next with a kit v3 composer switches it to hosted, where a local
+ * development key is refused exactly as parsePracticeSettings refuses it.
+ */
+export function practiceReleaseKeyAt(releaseKey: string, registerVersion: number, mode: DeploymentMode): string {
+  return checkedPracticeReleaseKey(
+    parseReleaseKey(`r${String(registerVersion)}-${parseReleaseKey(releaseKey).codeRevision12}`).releaseKey,
+    registerVersion, mode);
+}
+
 /**
  * KEY=value lines, as root writes them with grep from runner.env and api.env (README step S-2). Values are never
  * quoted in those files. A blank line or a # comment is skipped. Anything outside the allow-list refuses, and so does
  * a value that holds anything key-shaped (the long-run rule is not applied: a scope id is long but not a key).
  */
-export function parsePracticeSettings(text: string): PracticeSettings {
+export function parsePracticeSettings(text: string, context?: Readonly<{ sourceRevision?: string | null }>): PracticeSettings {
   const values = new Map<string, string>();
   // Hosted only: each set-aside key and its line number (its value is dropped here, after the key-shape screen). Only
   // a file that says DEBATEAI_DEPLOYMENT_MODE=hosted may carry them; in any other file they are refused at their own
@@ -181,8 +223,10 @@ export function parsePracticeSettings(text: string): PracticeSettings {
   // the preview configuration, which the practice requires above.
   const rate = Number(get("STRANGER_SAMPLE_RATE"));
   if (!(rate >= 0 && rate <= 1)) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "STRANGER_SAMPLE_RATE");
+  const registerVersion = integer("REGISTER_VERSION", 1);
   const runner: PracticeRunnerSettings = Object.freeze({
-    REGISTER_VERSION: integer("REGISTER_VERSION", 1),
+    REGISTER_VERSION: registerVersion,
+    RELEASE_KEY: practiceReleaseKey(values.get("RELEASE_KEY"), registerVersion, mode, context?.sourceRevision),
     PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
     PROVIDER_DISCOVERY_TARGETS_JSON: get("PROVIDER_DISCOVERY_TARGETS_JSON"),
     DEPLOYMENT_MODE: mode,
@@ -206,10 +250,11 @@ export function parsePracticeSettings(text: string): PracticeSettings {
     setAsideKeys: Object.freeze([...setAside.entries()].sort((a, b) => a[1] - b[1]).map(([key]) => key)) });
 }
 
-export function readPracticeSettings(path: string): PracticeSettings {
+/** `sourceRevision`: the checkout's `git rev-parse --verify HEAD`, or null when git cannot answer (practiceReleaseKey). */
+export function readPracticeSettings(path: string, sourceRevision: string | null): PracticeSettings {
   let text: string;
   try { text = readFileSync(path, "utf8"); } catch { throw new PracticeRefusal("PRACTICE_SETTINGS_UNREADABLE"); }
-  return parsePracticeSettings(text);
+  return parsePracticeSettings(text, { sourceRevision });
 }
 
 export type PracticeGateStatus = Readonly<{

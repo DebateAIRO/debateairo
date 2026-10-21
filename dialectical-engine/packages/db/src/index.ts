@@ -18,6 +18,8 @@ export * from "./publication-check.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
+export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
+export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
@@ -245,7 +247,9 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.complete_run_key_provision(uuid,uuid,uuid,uuid)",
   "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)",
   "core.claim_run_key_provision_cleanup(integer)",
-  "core.complete_run_key_provision_cleanup(uuid,uuid)"
+  "core.complete_run_key_provision_cleanup(uuid,uuid)",
+  // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
+  "core.prepare_readmitted_run_key_provision(uuid,uuid)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",

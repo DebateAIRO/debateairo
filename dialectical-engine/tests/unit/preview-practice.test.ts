@@ -59,6 +59,7 @@ import {
   PracticeRefusal,
   parseGateStatus,
   parsePracticeSettings,
+  practiceReleaseKeyAt,
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
@@ -349,6 +350,41 @@ describe("practice start refusals", () => {
     expect(settings.runner).toMatchObject({ REGISTER_VERSION: 11, DEPLOYMENT_MODE: "local", CLAIM_MS: 3_000_000 });
     expect(settings.previewConfig.scope_id).toBe("preview-practice-unit");
   });
+  describe("the practice's release key: one key for its ask and its runner (side-by-side §1, §3)", () => {
+    // Version 1, so the keys below (r1-…) match the settings' REGISTER_VERSION as assertReleaseKeyForRegister requires.
+    const versionOne = (mode: "local" | "hosted") => lines.map((line) => line.startsWith("REGISTER_VERSION=") ? "REGISTER_VERSION=1"
+      : line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? `DEBATEAI_DEPLOYMENT_MODE=${mode}` : line);
+    const head = "d50e33165a1b" + "0".repeat(28);
+    it("a RELEASE_KEY line wins, checked against the register version and the mode", () => {
+      expect(parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-0123456789ab"].join("\n"), { sourceRevision: head })
+        .runner.RELEASE_KEY).toBe("r1-0123456789ab");
+      expect(() => parsePracticeSettings([...versionOne("local"), "RELEASE_KEY=r2-0123456789ab"].join("\n")))
+        .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
+      expect(() => parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-000000000000"].join("\n")))
+        .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
+    });
+    it("without one, the source revision names it; a hosted practice with neither refuses; local falls back to the development key", () => {
+      expect(parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe("r1-d50e33165a1b");
+      expect(parsePracticeSettings(versionOne("local").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe("r1-d50e33165a1b");
+      let refusal: unknown;
+      try { parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: null }); } catch (error) { refusal = error; }
+      expect(refusal).toBeInstanceOf(PracticeRefusal);
+      expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
+      expect(() => parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: "d50e33165a1b" })).toThrow(PracticeRefusal);
+      expect(parsePracticeSettings(versionOne("local").join("\n")).runner.RELEASE_KEY).toBe("r1-000000000000");
+    });
+    it("renumbered for the next version, the key is checked again against the mode the practice finally runs in", () => {
+      expect(practiceReleaseKeyAt("r1-0123456789ab", 2, "hosted")).toBe("r2-0123456789ab");
+      expect(practiceReleaseKeyAt("r1-000000000000", 2, "local")).toBe("r2-000000000000");
+      // A local development key, renumbered when --register-next switches the practice to hosted: refused, as the
+      // settings parser refuses it (B6 review).
+      let refusal: unknown;
+      try { practiceReleaseKeyAt("r1-000000000000", 2, "hosted"); } catch (error) { refusal = error; }
+      expect(refusal).toBeInstanceOf(PracticeRefusal);
+      expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
+      expect((refusal as Error).message).toBe("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY: RELEASE_KEY_INVALID");
+    });
+  });
   it("refuses a key outside the allow-list (a database address, a team list), a key-shaped value, a credential; admits hosted mode", () => {
     expect(() => parsePracticeSettings([...lines, "DATABASE_URL=postgresql://x"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
     expect(() => parsePracticeSettings([...lines, "PREVIEW_TEAM_USER_IDS_JSON=[]"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
@@ -357,8 +393,9 @@ describe("practice start refusals", () => {
     // 2026-10-14 (the hosted preview, owner's ask "make the practice tool available also for the hosted part"): hosted
     // mode is practised now, no longer refused (PRACTICE_REQUIRES_LOCAL_MODE is gone); its own rules are in
     // tests/unit/preview-practice-hosted.test.ts.
-    expect(parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n"))
-      .runner.DEPLOYMENT_MODE).toBe("hosted");
+    // Side-by-side §1 (B6): a hosted practice names its release from the source revision (or a RELEASE_KEY line).
+    expect(parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n"),
+      { sourceRevision: "a".repeat(40) }).runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
       ? 'PROVIDER_DISCOVERY_TARGETS_JSON=[{"authorization_file":"/x"}]' : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID");
     expect(() => parsePracticeSettings(lines.filter((line) => !line.startsWith("CLAIM_MS=")).join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_MISSING");

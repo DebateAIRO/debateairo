@@ -375,8 +375,10 @@ apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-replay.ts
 apps/runner/src/run-seats.ts
 apps/runner/src/run-sit-out.ts
+apps/runner/src/runner-lapsed-resend.ts
 apps/runner/src/runner-preview-team-gate.ts
 apps/runner/src/runner-ready.ts
+apps/runner/src/runner-retirement.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
 apps/runner/src/shape-plan.ts
@@ -948,11 +950,13 @@ packages/db/src/recovery-email.ts
 packages/db/src/recovery.ts
 packages/db/src/release-state.ts
 packages/db/src/run-cost-substitution.ts
+packages/db/src/run-supersession.ts
 packages/db/src/run-wait.ts
 packages/db/src/schema.ts
 packages/db/src/serve-disclosure.ts
 packages/db/src/sessions.ts
 packages/db/src/social-identity.ts
+packages/db/src/spend-waiver.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
 packages/evaluator/src/blind-sample.ts

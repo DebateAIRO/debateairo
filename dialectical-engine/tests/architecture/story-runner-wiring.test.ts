@@ -135,7 +135,8 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(main.match(/createPool\(/gu)).toHaveLength(2);
     expect(main).toContain("const keepAlivePool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive);");
     expect(main.match(/\bkeepAlivePool\b/gu)).toHaveLength(2);
-    expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool),");
+    // Side-by-side spec §3 (B6): the renewals are fenced by this release and worker, like every work repository.
+    expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool, workFence),");
     expect(main).toContain("buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({");
     expect(main).not.toContain(["process", "env"].join("."));
     // Any boot failure to load the pack — a broken rule, an unresolvable

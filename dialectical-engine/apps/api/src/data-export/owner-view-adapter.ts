@@ -42,4 +42,7 @@ export class OwnerViewAdapter implements OwnerViewPort {
   readonly readNode = (ownerRef: string, answerId: string, nodeId: string): Promise<unknown> => {
     const a = this.access(ownerRef); return readOwnerNode(this.deps, answerId, nodeId, a.session, a.ownership);
   };
+  /** Side-by-side C9: the application's resolution, or the id itself when the application has none. */
+  readonly resolveRunRef = async (runId: string): Promise<string> =>
+    this.deps.application.resolveRunRef === undefined ? runId : this.deps.application.resolveRunRef(runId);
 }

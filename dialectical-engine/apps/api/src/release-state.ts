@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
-import { readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import { SITE_CONCURRENT_DEBATES, readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import type { AskAdmissionGate } from "./ask-room.js";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §4, §6 (plan C task C3) — THE API'S RELEASE WATCHER.
@@ -312,5 +313,47 @@ export class ReleaseWatcher {
 
   #line(event: WatchEvent, code?: string): void {
     this.#log(`DEBATEAI_RELEASE_WATCH ${JSON.stringify(code === undefined ? { event } : { event, code })}`);
+  }
+}
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8) — THE ASK ROOM'S GATE, read on the spend decision's own
+ * transaction (inside its day lock), never from the watcher's last poll: an ask admitted the instant a switch moves the
+ * traffic away must see the switch.
+ *
+ * - `ownReleaseIsCurrent` is the watcher's rule (`#lastSaysOwn`) over a fresh `core.read_current_release()`: this
+ *   release is current when the row names it, or when there is no row and the deployment is not hosted (today's
+ *   single-release world); hosted with no row is not current (fail closed).
+ * - `activeDebates` counts the runs with a READY or CLAIMED job across every release (0083's partial index
+ *   work_item_live_run_idx answers it without reading history).
+ *
+ * Both reads are debateai_runtime's (EXECUTE on 0123's reader, SELECT on core.work_item), the room decision pool's login.
+ */
+export class PostgresAskAdmissionGate implements AskAdmissionGate {
+  readonly releaseKey: string;
+  readonly siteConcurrentDebates: number;
+  readonly #hosted: boolean;
+
+  constructor(options: Readonly<{ releaseKey: string; hosted: boolean; siteConcurrentDebates?: number }>) {
+    const cap = options.siteConcurrentDebates ?? SITE_CONCURRENT_DEBATES;
+    if (!Number.isSafeInteger(cap) || cap < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
+    this.releaseKey = options.releaseKey;
+    this.siteConcurrentDebates = cap;
+    this.#hosted = options.hosted;
+  }
+
+  async ownReleaseIsCurrent(tx: Pick<PoolClient, "query">): Promise<boolean> {
+    const current = await readCurrentRelease(tx as Pick<Pool, "query">);
+    return current === null ? !this.#hosted : current.releaseKey === this.releaseKey;
+  }
+
+  async activeDebates(tx: Pick<PoolClient, "query">): Promise<number> {
+    const result = await tx.query<{ active: number }>(
+      `SELECT count(DISTINCT run_id)::integer AS active FROM core.work_item
+       WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL`
+    );
+    const active = result.rows[0]?.active;
+    if (!Number.isSafeInteger(active) || (active as number) < 0) throw new TypeError("ASK_ADMISSION_GATE_COUNT_INVALID");
+    return active as number;
   }
 }

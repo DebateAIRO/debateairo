@@ -1,6 +1,10 @@
 /**
- * The runner's one readiness message, content-free: the worker name, the register version
- * and how many jobs its start-up handed over again.
+ * The runner's one readiness message, content-free: the worker name, the register version, the
+ * release it runs as and how many jobs its start-up handed over again.
+ *
+ * Side-by-side uploads spec 2026-10-21 §1: every ready line announces its release key
+ * (RELEASE_KEY, `r<register>-<12 hex>`). Both listeners check it: the development supervisor
+ * against its API's key, the preview launcher against the plan's register pin and source revision.
  *
  * Two listeners, one message. A development supervisor runs the runner as a child and hears it
  * over IPC (`process.send`, unchanged). The preview launcher
@@ -14,6 +18,7 @@ export type RunnerReadyMessage = Readonly<{
   kind: "DEBATEAI_RUNNER_READY";
   worker: string;
   registerVersion: string;
+  releaseKey: string;
   startupDispatched: number;
 }>;
 

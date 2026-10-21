@@ -115,6 +115,7 @@ import {
   argumentLanguageDirective,
   DEBATE_ROLES,
   debateRoleFromCallSiteKey,
+  LEGACY_RELEASE_KEY,
   TypedDomainError,
   type DebateRole,
   type ServedRootRuleHistory
@@ -1920,9 +1921,10 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
   );
 
   it("renews only the claim it holds, and says when the job is already settled", async () => {
-    const work = new WorkItemRepository(database.pool);
-    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${digitsOnlyId()}`);
     const workerId = "worker:l4f9";
+    // Side-by-side D2: the failure below is written under this worker's own live claim, so the repository knows it.
+    const work = new WorkItemRepository(database.pool, { releaseKey: LEGACY_RELEASE_KEY, workerId });
+    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${digitsOnlyId()}`);
     const claimed = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
     if (claimed === null) throw new Error("TEST_EXPECTED_CLAIM");
 
