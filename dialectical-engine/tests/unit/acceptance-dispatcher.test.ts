@@ -53,10 +53,10 @@ describe("AcceptanceDispatcher", () => {
     }));
   });
 
-  it("records failures through the recorder that knows the acceptance runner's worker id (side-by-side D2)", () => {
+  it("source text: acceptance/main.ts hands the dispatcher acceptanceFailureRecorder (a WorkItemRepository) and names ACCEPTANCE_WORKER_ID (side-by-side D2)", () => {
     // The fence refuses a failure write under a live claim of a worker it was not told about, and the acceptance
-    // runner records its failures while holding its own claim (tests/integration/release-fences.test.ts proves the
-    // write); the dispatcher must be wired to that recorder, not to an unfenced repository.
+    // runner records its failures while holding its own claim. That the recorder writes under the worker id is proven
+    // against a database in tests/integration/release-fences.test.ts; this checks only the wiring in the source.
     expect(acceptanceFailureRecorder({} as Pool)).toBeInstanceOf(WorkItemRepository);
     const source = readFileSync(new URL("../../acceptance/main.ts", import.meta.url), "utf8");
     expect(source).toContain("new AcceptanceDispatcher(runner, acceptanceFailureRecorder(input.pool))");

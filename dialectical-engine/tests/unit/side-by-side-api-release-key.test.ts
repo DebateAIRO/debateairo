@@ -7,8 +7,8 @@ import { validApiEnvironmentFixture } from "../support/apiEnvironmentFixture.js"
 
 /**
  * Side-by-side uploads spec 2026-10-21 §1 (plan C task C1; INTERFACE "RELEASE_KEY", "Journal lines"): the API boots only
- * with the key of the release it is, checked by the one shared check (checkedReleaseKey, plan B2), and once it listens it
- * names that key in its ready line, `DEBATEAI_API_READY {"releaseKey":…,"port":…}`, exactly once.
+ * with the key of the release it is, checked by the one shared check (assertReleaseKeyForRegister, plan B2), and once
+ * it listens it names that key in its ready line, `DEBATEAI_API_READY {"releaseKey":…,"port":…}`, exactly once.
  */
 // The code parts are kept apart from the key name, so no line pairs a *_KEY name with a literal (gitleaks).
 const DEVELOPMENT = "000000000000";

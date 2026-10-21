@@ -71,7 +71,7 @@ function releaseKeyRequired(): TypedDomainError {
  * source revision; then a number that is not this process's REGISTER_VERSION refuses RELEASE_KEY_REGISTER_MISMATCH, so
  * a process never serves debates under another release's name. Returns the key.
  */
-export function checkedReleaseKey(
+export function assertReleaseKeyForRegister(
   raw: string | undefined,
   registerVersion: number,
   deploymentMode: DeploymentMode
@@ -85,15 +85,6 @@ export function checkedReleaseKey(
     throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "RELEASE_KEY's number is not this process's REGISTER_VERSION");
   }
   return parsed.releaseKey;
-}
-
-/** checkedReleaseKey over a key the shape already read (plan B's name for the same check; INTERFACE "RELEASE_KEY"). */
-export function assertReleaseKeyForRegister(
-  releaseKey: string,
-  registerVersion: number,
-  deploymentMode: DeploymentMode
-): string {
-  return checkedReleaseKey(releaseKey, registerVersion, deploymentMode);
 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
