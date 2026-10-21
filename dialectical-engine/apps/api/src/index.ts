@@ -108,6 +108,7 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  RELEASE_LIFECYCLE_STATES,
   RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
@@ -1658,9 +1659,10 @@ export interface AskApplication {
   eventMark?(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null>;
   /**
    * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9): the newest run of a re-admitted debate
-   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route and the
-   * step-up target follow it, so an old link, an open page or a grant asked on the old id names the run
-   * that actually runs. Absent: ids pass through unchanged.
+   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route follows it,
+   * so an old link or an open page names the run that actually runs. A step-up grant does NOT (controller
+   * ruling (h) on the C9 review): it stays bound to the id the page sent, which the debate page takes from
+   * the run projection's own run_ref. Absent: ids pass through unchanged.
    */
   resolveRunRef?(runId: string): Promise<string>;
 }
@@ -1670,20 +1672,6 @@ async function resolvedRunId(options: Pick<ApiOptions, "application">, id: strin
   return options.application.resolveRunRef === undefined ? id : options.application.resolveRunRef(id);
 }
 
-/**
- * Side-by-side C9: a step-up body whose `authorization.target_run_id` is a run id, with that id followed to its newest run
- * BEFORE the service sees it, so the grant it mints and the path it is spent on name the same run. Any other body (no
- * run target, a malformed one) is returned as sent, for the service's own parse to judge.
- */
-async function withResolvedStepUpTarget(options: Pick<ApiOptions, "application">, body: unknown): Promise<unknown> {
-  if (typeof body !== "object" || body === null) return body;
-  const authorization = (body as Record<string, unknown>).authorization;
-  if (typeof authorization !== "object" || authorization === null) return body;
-  const target = ResourceIdSchema.safeParse((authorization as Record<string, unknown>).target_run_id);
-  if (!target.success) return body;
-  const resolved = await resolvedRunId(options, target.data);
-  return resolved === target.data ? body : { ...body, authorization: { ...authorization, target_run_id: resolved } };
-}
 
 export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
@@ -2777,7 +2765,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post<{Params:{provider:string}}>('/v1/account/social/:provider/step-up/begin',credentialRoutePolicy('POST /v1/account/social/{provider}/step-up/begin'),async(request,reply)=>{
     const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
-    const result=await options.socialAuth.beginStepUp(provider.data,await withResolvedStepUpTarget(options,request.body),sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+    const result=await options.socialAuth.beginStepUp(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
   });
   api.post('/v1/account/social/step-up/status',credentialRoutePolicy('POST /v1/account/social/step-up/status'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.status(request.body,request.authenticatedSession!,sourceFor(request)));});
   api.post('/v1/account/social/step-up/passkey-options',credentialRoutePolicy('POST /v1/account/social/step-up/passkey-options'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.beginPasskey(request.body,request.authenticatedSession!,sourceFor(request)));});
@@ -2806,7 +2794,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
     api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
-    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(await withResolvedStepUpTarget(options,request.body),request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
       const result=await security.completePasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request));
       reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS)]);
@@ -2947,14 +2935,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (!passwordWithinRequestBound(body)) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
-      const requested = body.authorization === undefined
+      // Side-by-side C9, controller ruling (h): a run target is NOT followed to its newest run. The grant stays bound to
+      // the id the page sent and is echoed back exactly (no successor disclosed); the page acts on the run projection's
+      // own run_ref, so after a re-admission it sends the newest run here and on the path alike.
+      const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
-      // Side-by-side C9: a run target is followed to its newest run before the grant is minted, so the grant, the
-      // target it echoes and the path it is spent on (which resolves the same way) all name one run.
-      const authorization = requested !== undefined && "target_run_id" in requested
-        ? { ...requested, target_run_id: await resolvedRunId(options, requested.target_run_id) }
-        : requested;
       const rotated = await options.sessions!.stepUp({
         session: authenticated,
         password: typeof body.password === "string" ? body.password : "",
@@ -4123,9 +4109,6 @@ export class ReleaseNotServedError extends TypedDomainError {
 export interface RunReleaseLookup {
   lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null>;
 }
-
-/** The four lifecycle words 0123's state reader answers with (packages/db's readReleaseState checks the same set). */
-const RELEASE_LIFECYCLE_STATES: ReadonlySet<string> = new Set<ReleaseLifecycleState>(["STAGED", "CURRENT", "DRAINING", "RETIRED"]);
 
 /**
  * The lookup over 0123 (A-x2: the API's runtime login reads `core.run.release_key` and executes both definer readers),

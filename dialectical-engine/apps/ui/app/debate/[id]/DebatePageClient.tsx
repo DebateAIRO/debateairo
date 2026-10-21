@@ -722,6 +722,11 @@ export default function DebatePageClient({
   // each reconnect replays the run's history, and history is applied once.
   const liveGateRef = useRef(createLiveEventGate());
   const answerRef = useRef<Answer | null>(initialAnswer);
+  // Side-by-side C9 (controller ruling (h)): the run_ref of the run projection the page last read. After a re-admission
+  // GET /v1/runs/<old id> answers with the NEW run's projection, so a page opened from an old link learns the newest run
+  // here; everything that acts on the debate (the stream, publication, deletion and their step-up target) names it.
+  // Kept with the id it was read for, so a page reused for another debate never acts on the previous one's run.
+  const [projectionRunRef, setProjectionRunRef] = useState<Readonly<{ forId: string; runRef: string }> | null>(null);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
     activeSynthesisDraft(initialDebate)
   );
@@ -780,6 +785,7 @@ export default function DebatePageClient({
         locale
       });
       if (privateDeletionRef.current!==null) return;
+      if (bundle.run !== null) setProjectionRunRef(Object.freeze({ forId: id, runRef: bundle.run.run_ref }));
       setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       if (bundle.kind === "served") {
         // The floor is read with the answer (spec §14.4.4). A read that failed
@@ -848,6 +854,8 @@ export default function DebatePageClient({
   const debateTerminal = debate
     ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
     : false;
+  // Side-by-side C9 (ruling h): the run every action names — the served answer's, else the projection's, else the URL's.
+  const actingRunRef = answer?.run_ref ?? (projectionRunRef?.forId === id ? projectionRunRef.runRef : null) ?? id;
 
   useEffect(() => {
     if (publicMode) return;
@@ -938,7 +946,7 @@ export default function DebatePageClient({
   useEffect(() => {
     if (publicMode) return;
     if (privateDeletionStatus!==null) return;
-    const runRef = answerRef.current?.run_ref ?? id;
+    const runRef = actingRunRef;
 
     const consume = createDebatePageRunEventConsumer({
       runRef,
@@ -1007,7 +1015,7 @@ export default function DebatePageClient({
       },
       gate: liveGateRef.current
     });
-  }, [answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,id,privateDeletionStatus,refresh]);
+  }, [actingRunRef,answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,privateDeletionStatus,refresh]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -2036,7 +2044,7 @@ export default function DebatePageClient({
       ) : null}
 
       {debate && !publicMode ? <PublicationControl
-        runId={answer?.run_ref ?? id}
+        runId={actingRunRef}
         onPrivateDeletion={purgePrivateDebate}
         catalog={publicCatalog}
       /> : null}

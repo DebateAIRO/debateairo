@@ -9,9 +9,10 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
  * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9) — AN OLD RUN ID KEEPS WORKING. A debate re-admitted from the
  * waiting line gets a new run; the person's page, a bookmark, an open stream or a step-up grant may still name the old
  * one. Every run-id route follows `AskApplication.resolveRunRef` right after it parses the id, so the first downstream
- * call already names the newest run; the three step-up routes rewrite `target_run_id` before the service sees it, so the
- * grant and the path name the same run. An application without the method passes the id through unchanged.
- * Embedded-Postgres proof of the database half: tests/integration/side-by-side-run-ref.test.ts.
+ * call already names the newest run. The three step-up routes do NOT (controller ruling (h) on the C9 review): a grant
+ * stays bound to the id the page sent and is echoed back exactly, so no successor is disclosed; the debate page acts on
+ * the run projection's own run_ref (the newest run), so its grant and its path match. An application without the method
+ * passes the id through unchanged. Embedded-Postgres proof of the database half: tests/integration/side-by-side-run-ref.test.ts.
  */
 const OLD = "11111111-1111-4111-8111-111111111111";
 const NEW = "22222222-2222-4222-8222-222222222222";
@@ -48,7 +49,8 @@ function fixtureApplication(seen: string[], resolve: boolean): AskApplication {
 function arrange(input: { resolve?: boolean } = {}) {
   const seen: string[] = [];
   const stepUp = vi.fn<SessionApplication["stepUp"]>(async () => ({
-    sessionToken: OWNER.rawSessionToken, csrfToken: OWNER.rawCsrfToken
+    sessionToken: OWNER.rawSessionToken, csrfToken: OWNER.rawCsrfToken,
+    grantToken: GRANT, grantExpiresAt: new Date("2026-10-22T00:05:00.000Z")
   }));
   const publications: PublicationApplication = {
     reconcileKeyCleanup: async () => 0,
@@ -129,7 +131,7 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
     }
   });
 
-  it("POST /v1/auth/step-up binds the grant to the new run", async () => {
+  it("POST /v1/auth/step-up binds the grant to the id the page sent and echoes exactly that id (OLD stays OLD)", async () => {
     const { api, stepUp } = arrange();
     try {
       const response = await api.inject({
@@ -138,14 +140,17 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
       });
       expect(response.statusCode).toBe(200);
       expect(stepUp).toHaveBeenCalledWith(expect.objectContaining({
-        authorization: { action: "PUBLISH", targetRunId: NEW }
+        authorization: { action: "PUBLISH", targetRunId: OLD }
       }), expect.anything());
+      const grant = (response.json() as { step_up_grant?: Record<string, unknown> }).step_up_grant;
+      expect(grant).toMatchObject({ action: "PUBLISH", target_run_id: OLD, token: GRANT });
+      expect(response.body).not.toContain(NEW);
     } finally {
       await api.close();
     }
   });
 
-  it("the passkey and provider step-up starts hand the service the new run", async () => {
+  it("the passkey and provider step-up starts hand the service the id the page sent", async () => {
     const { api, beginPasskeyStepUp, beginStepUp } = arrange();
     try {
       await api.inject({
@@ -153,14 +158,14 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
         payload: { authorization: { action: "DELETE_PRIVATE_DEBATE", target_run_id: OLD } }
       });
       expect(beginPasskeyStepUp).toHaveBeenCalledOnce();
-      expect(beginPasskeyStepUp.mock.calls[0]?.[0]).toEqual({ authorization: { action: "DELETE_PRIVATE_DEBATE", target_run_id: NEW } });
+      expect(beginPasskeyStepUp.mock.calls[0]?.[0]).toEqual({ authorization: { action: "DELETE_PRIVATE_DEBATE", target_run_id: OLD } });
 
       const social = await api.inject({
         method: "POST", url: "/v1/account/social/google/step-up/begin", headers: write,
         payload: { authorization: { action: "UNPUBLISH", target_run_id: OLD }, next: "/settings/security" }
       });
       expect(social.statusCode).toBe(200);
-      expect(beginStepUp.mock.calls[0]?.[1]).toEqual({ authorization: { action: "UNPUBLISH", target_run_id: NEW }, next: "/settings/security" });
+      expect(beginStepUp.mock.calls[0]?.[1]).toEqual({ authorization: { action: "UNPUBLISH", target_run_id: OLD }, next: "/settings/security" });
     } finally {
       await api.close();
     }

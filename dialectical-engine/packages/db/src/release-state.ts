@@ -21,7 +21,8 @@ export type ReleaseQueryable = Pick<Pool, "query"> | PoolClient;
 
 /** The codes 0123's writers refuse with (RAISE … MESSAGE = code), and Phase 2's settings hook's (plan S). */
 const RELEASE_REFUSALS: ReadonlySet<string> = new Set(["RELEASE_SWITCH_CONFLICT", "RELEASE_EVENT_INVALID", "SETTINGS_ACTIVATION_CONFLICT"]);
-const LIFECYCLE_STATES: ReadonlySet<string> = new Set(["STAGED", "CURRENT", "DRAINING", "RETIRED"]);
+/** The four lifecycle words 0123's state readers answer with; the API's per-send lookup checks the same set (C4 review). */
+export const RELEASE_LIFECYCLE_STATES: ReadonlySet<string> = new Set<ReleaseLifecycleState>(["STAGED", "CURRENT", "DRAINING", "RETIRED"]);
 
 async function query<Row>(db: ReleaseQueryable, text: string, values: readonly unknown[]): Promise<readonly Row[]> {
   try {
@@ -64,7 +65,7 @@ export async function readReleaseState(db: ReleaseQueryable, releaseKey: string)
     "SELECT state, front_pair_stopped, retire_requested FROM core.read_release_state($1)", [releaseKey]);
   const row = rows[0];
   if (row === undefined) return null;
-  if (rows.length > 1 || !LIFECYCLE_STATES.has(row.state)) throw new TypeError("RELEASE_STATE_ROW_INVALID");
+  if (rows.length > 1 || !RELEASE_LIFECYCLE_STATES.has(row.state)) throw new TypeError("RELEASE_STATE_ROW_INVALID");
   return Object.freeze({
     state: row.state as ReleaseLifecycleState, frontPairStopped: row.front_pair_stopped === true, retireRequested: row.retire_requested === true
   });
