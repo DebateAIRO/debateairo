@@ -13,7 +13,9 @@
 --   §5  core.run_wait_reason.waits_for widened with SITE_BUSY and SWITCHING (A3);
 --   §6  the five funding functions that tied a grant to the selection's or the run's version, redefined in place
 --       without that comparison, staff.read_self_allowance_command naming a revoke's grant's own version, and
---       staff.read_internal_funding_policy_at, the funding publication at a version (A4).
+--       staff.read_internal_funding_policy_at, the funding publication at a version (A4);
+--   §7  ledger.model_spend_waiver, the append-only spend waiver of a set-aside debate, and
+--       billing.read_internal_grant_spent redefined in place so a funded person's window leaves waived runs out (A5).
 --
 -- n1 (spec §5, the database rule):
 -- n1: drained
@@ -1128,6 +1130,49 @@ ALTER FUNCTION staff.read_internal_funding_policy_at(bigint) OWNER TO debateai_s
 REVOKE ALL ON FUNCTION staff.read_internal_funding_policy_at(bigint) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint) TO debateai_runtime;
 
+-- §7. The spend waiver (spec §9, C10; INTERFACE "Database") ----------------------------------------------------------
+-- A budget never hard-stops a debate, and a debate set aside because of an upload uses none of the person's quota: the
+-- runner's backstop (BACKSTOP), the owner's stop (OWNER_STOPPED), a settings version its release cannot run
+-- (SETTINGS_VERSION_UNSUPPORTED) and a release that no longer serves it (RELEASE_NOT_SERVED) each close the debate
+-- FAILED and, in the same transaction, name it here. One row per run, the first reason kept (the writer's
+-- ON CONFLICT (run_id) DO NOTHING), append-only like ledger.model_spend (0066:75-86): a waiver is part of the record of
+-- what a person was charged. Every person-window reader leaves a waived run's spend out (readOwnerSpentMicros'
+-- subscription SQL, packages/budget/src/model-spend.ts, and billing.read_internal_grant_spent below for a funded
+-- person); every site-day reader still counts it, since the money was really spent. A code and an id, never content.
+-- In ledger, not billing (0123 adds no billing relation, so 0111's verifier stays in force). Writers: the runner's login
+-- and the API's both hold debateai_runtime (SELECT, INSERT); debateai_staff_security_owner reads it for the funded
+-- reader below (a definer it owns), debateai_replay as it reads ledger.model_spend (0066:93).
+CREATE TABLE IF NOT EXISTS ledger.model_spend_waiver (
+  run_id uuid PRIMARY KEY REFERENCES core.run(run_id),
+  reason text NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CONSTRAINT model_spend_waiver_reason_closed CHECK (
+    reason IN ('BACKSTOP', 'OWNER_STOPPED', 'SETTINGS_VERSION_UNSUPPORTED', 'RELEASE_NOT_SERVED'))
+);
+SELECT core.install_truncate_guard('ledger.model_spend_waiver');
+DROP TRIGGER IF EXISTS reject_mutation ON ledger.model_spend_waiver;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ledger.model_spend_waiver
+  FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+GRANT SELECT, INSERT ON ledger.model_spend_waiver TO debateai_runtime;
+GRANT SELECT ON ledger.model_spend_waiver TO debateai_staff_security_owner;
+GRANT SELECT ON ledger.model_spend_waiver TO debateai_replay;
+
+-- 0093:31-37 plus one clause: a waived run's spend no longer counts against the grant (drained T, spec §9, C10). The
+-- seventh redefinition of 0063's rule, for the reason §6 gives (T is drained, as 0120 did for its reader); same
+-- signature, LANGUAGE sql STABLE, owner, definer, path and grants (0093:52-56). read_internal_grant_commitments is
+-- unchanged: a waived run is closed, so it has no READY or CLAIMED job and holds nothing.
+CREATE OR REPLACE FUNCTION billing.read_internal_grant_spent(p_owner uuid,p_grant uuid,p_event uuid,p_from timestamptz,p_to timestamptz,p_total boolean) RETURNS numeric
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+ SELECT coalesce(sum(s.charge_micros),0) FROM billing.run_charge_scope c JOIN ledger.model_spend s ON s.run_id=c.run_id
+ LEFT JOIN billing.internal_provider_admission a ON a.call_id=s.spend_id
+ WHERE c.owner_ref=p_owner AND c.funding_kind='INTERNAL' AND c.internal_grant_id=p_grant AND c.internal_grant_event_id=p_event
+ AND s.spend_source IN('RUN','STORY') AND (p_total OR (coalesce(a.admitted_at,s.recorded_at)>=p_from AND coalesce(a.admitted_at,s.recorded_at)<p_to))
+ AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver w WHERE w.run_id = s.run_id)
+$$;
+ALTER FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) TO debateai_runtime;
+
 -- THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0122's closing shape). Each section adds its own checks.
 DO $side_by_side_releases_contract$
 DECLARE
@@ -1150,6 +1195,7 @@ DECLARE
     to_regprocedure('staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)'),
     to_regprocedure('staff.read_internal_funding_policy_at(bigint)'),
     to_regprocedure('staff.read_self_allowance_command(jsonb,text,uuid)')];
+  v_spent regprocedure := to_regprocedure('billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)');
 BEGIN
   -- §1: the stamp column, its default, and its validated shape CHECK.
   IF NOT EXISTS (
@@ -1331,6 +1377,41 @@ BEGIN
       WHERE tgrelid = 'billing.run_charge_scope'::regclass AND tgname = 'internal_charge_scope_guard' AND NOT tgisinternal
         AND tgenabled IN ('O', 'A') AND tgfoid = v_funding[4]) THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE';
+  END IF;
+  -- §7: the waiver table with its key, its reference to core.run and its validated closed CHECK; its two guards
+  -- (append-only statement trigger, truncate guard); its ACL exactly SELECT, INSERT for debateai_runtime and SELECT for
+  -- debateai_staff_security_owner and debateai_replay; and the funded spend reader redefined as 0093 left it (owner,
+  -- STABLE definer, pinned path, EXECUTE for the runtime alone) and excluding waived runs, the commitments reader not.
+  IF to_regclass('ledger.model_spend_waiver') IS NULL
+    OR (SELECT count(*) FROM pg_constraint
+        WHERE conrelid = to_regclass('ledger.model_spend_waiver')
+          AND ((contype = 'p' AND conkey = ARRAY[1]::int2[])
+            OR (contype = 'f' AND confrelid = 'core.run'::regclass AND conkey = ARRAY[1]::int2[])
+            OR (conname = 'model_spend_waiver_reason_closed' AND contype = 'c' AND convalidated
+                AND strpos(pg_get_constraintdef(oid), 'RELEASE_NOT_SERVED') > 0))) <> 3
+    OR (SELECT count(*) FROM pg_constraint WHERE conrelid = to_regclass('ledger.model_spend_waiver') AND contype <> 'n') <> 3
+    OR (SELECT count(*) FROM pg_trigger
+        WHERE tgrelid = to_regclass('ledger.model_spend_waiver') AND NOT tgisinternal AND tgenabled IN ('O', 'A')
+          AND ((tgname = 'reject_mutation' AND tgfoid = 'core.reject_mutation()'::regprocedure AND (tgtype & 1) = 0
+                AND (tgtype & 26) = 26)
+            OR (tgname = 'reject_truncate' AND (tgtype & 1) = 0 AND (tgtype & 34) = 34))) <> 2
+    OR ARRAY(SELECT pg_get_userbyid(a.grantee) || ':' || a.privilege_type
+             FROM pg_class AS c, aclexplode(c.relacl) AS a
+             WHERE c.oid = to_regclass('ledger.model_spend_waiver') AND a.grantee <> c.relowner ORDER BY 1)
+       IS DISTINCT FROM ARRAY['debateai_replay:SELECT', 'debateai_runtime:INSERT', 'debateai_runtime:SELECT',
+         'debateai_staff_security_owner:SELECT']
+    OR v_spent IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_proc AS p
+      WHERE p.oid = v_spent AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.provolatile = 's'
+        AND pg_get_userbyid(p.proowner) = 'debateai_staff_security_owner'
+        AND strpos(pg_get_functiondef(p.oid), 'NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver w WHERE w.run_id = s.run_id)') > 0)
+    OR has_function_privilege('public', v_spent, 'EXECUTE')
+    OR has_function_privilege('debateai_staff_recovery', v_spent, 'EXECUTE')
+    OR NOT has_function_privilege('debateai_runtime', v_spent, 'EXECUTE')
+    OR strpos(pg_get_functiondef('billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)'::regprocedure),
+         'model_spend_waiver') > 0 THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_SPEND_WAIVER_CONTRACT_INCOMPLETE';
   END IF;
 END
 $side_by_side_releases_contract$;

@@ -692,8 +692,8 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
   ]
 },
-// Side-by-side spec §9 (migration 0123 §6): the funding functions redefined in place re-assert 0092/0093's runtime
-// grants, and the new funding reader at a version is the one new runtime EXECUTE.
+// Side-by-side spec §9 (migration 0123 §6, §7): the funding functions redefined in place re-assert 0092/0093's runtime
+// grants (§7's funded spend reader among them), and the new funding reader at a version is the one new runtime EXECUTE.
 {
   "roleName": "debateai_runtime",
   "source": "migrations/0123_side_by_side_releases.sql",
@@ -703,7 +703,8 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
     "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
     "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
-    "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)"
+    "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)",
+    "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)"
   ]
 }
 ]);
@@ -975,7 +976,7 @@ it("discloses exactly the reviewed additive funding grants without other princip
   expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
 });
 
-it("discloses exactly 0123's funding grants to the runtime (side-by-side §9: five re-asserted, one new reader)", async () => {
+it("discloses exactly 0123's funding grants to the runtime (side-by-side §9: six re-asserted, one new reader)", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
   const sql = await readFile("migrations/0123_side_by_side_releases.sql", "utf8");
   const actual = [...sql.matchAll(/^GRANT EXECUTE ON FUNCTION (?:billing|staff)\.[^\n]+ TO debateai_runtime;$/gm)]
@@ -983,5 +984,5 @@ it("discloses exactly 0123's funding grants to the runtime (side-by-side §9: fi
   const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0123_side_by_side_releases.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
-  expect(declared).toHaveLength(6);
+  expect(declared).toHaveLength(7);
 });
