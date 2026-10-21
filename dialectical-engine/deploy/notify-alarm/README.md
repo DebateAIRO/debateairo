@@ -122,7 +122,17 @@ systemctl start debateai-notify-alarm.service; journalctl --no-pager -u debateai
 
 Expect `NOTIFY_ALARM_OK`, and the check on Healthchecks.io turns green. `NOTIFY_ALARM_CONFIG_INVALID:site` or
 `:pingUrl`: remove the settings file and write it again. `NOTIFY_ALARM_DOWN …`: the reason table above.
-`NOTIFY_ALARM_REPORT_FAILED`: the server cannot reach `hc-ping.com` (an outbound firewall rule).
+`NOTIFY_ALARM_REPORT_FAILED`: either the link is not the check's ping link (Healthchecks.io answers an unknown link with
+404, and the address of the check's own page on its website is not the ping link: remove the settings file and write
+it again with the right one), or the server cannot reach `hc-ping.com` (an outbound firewall rule).
+
+Switch the timer on **right after** that run: the check is now waiting for the next report, and 10 minutes without one
+send the "DOWN" email.
+
+```sh
+systemctl enable --now debateai-notify-alarm.timer
+systemctl list-timers --no-pager debateai-notify-alarm.timer
+```
 
 A test email, to see the alarm arrive (it knocks nothing and says it is a test):
 
@@ -130,13 +140,8 @@ A test email, to see the alarm arrive (it knocks nothing and says it is a test):
 systemd-run --wait --pipe --property=DynamicUser=yes --property=LoadCredential=notify-alarm:/etc/debateai-notify-alarm/config.json "$N" /usr/local/lib/debateai-notify-alarm/notify-alarm.mjs --test-alarm
 ```
 
-Expect `NOTIFY_ALARM_TEST_SENT` and a "DOWN" email whose reason starts with `TEST:`. Then switch the timer on; within 5
-minutes its first run sends the "UP" email:
-
-```sh
-systemctl enable --now debateai-notify-alarm.timer
-systemctl list-timers --no-pager debateai-notify-alarm.timer
-```
+Expect `NOTIFY_ALARM_TEST_SENT` and a "DOWN" email; the check's page on Healthchecks.io shows the reason, which starts
+with `TEST:`. Within 5 minutes the timer's next run sends the "UP" email.
 
 ## Later
 

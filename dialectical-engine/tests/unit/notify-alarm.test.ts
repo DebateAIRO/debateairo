@@ -94,6 +94,17 @@ describe("notify alarm: the settings file", () => {
     expect(parseAlarmConfig(text({ site: `${SITE}/`, pingUrl: PING }))).toEqual({ site: SITE, pingUrl: PING });
   });
 
+  it("keeps the cleaned-up link, so a space pasted with it cannot break the /fail address", async () => {
+    // Review of ec2a0dcad: URL parsing drops a trailing space, but the raw text went into `${pingUrl}/fail`.
+    for (const pasted of [`${PING} `, `\t${PING}\t`, `${PING}/`]) {
+      const config = parseAlarmConfig(text({ site: SITE, pingUrl: pasted }));
+      const run = io();
+      const net = scripted([received()]);
+      expect(await runAlarm(config, { ...run.deps(net.fetch), testAlarm: true }), JSON.stringify(pasted)).toBe(0);
+      expect(net.calls.map(({ url }) => url)).toEqual([`${PING}/fail`]);
+    }
+  });
+
   it("refuses anything else with a code that names the field and never the ping link", () => {
     const cases: Array<[unknown, string]> = [
       ["not json", "NOTIFY_ALARM_CONFIG_INVALID"],
@@ -228,6 +239,18 @@ describe("notify alarm: one run (knock, maybe knock again, report)", () => {
     }
   });
 
+  it("lets go of every answer's body it does not read, the site's and the alarm service's", async () => {
+    const cancelled: string[] = [];
+    const answer = (name: string, status: number) => new Response(new ReadableStream({
+      pull(controller) { controller.enqueue(new TextEncoder().encode("x")); },
+      cancel() { cancelled.push(name); }
+    }), { status });
+    const run = io();
+    const net = scripted([answer("site 502", 502), answer("site 404", 404), answer("ping 200", 200)]);
+    expect(await runAlarm(CONFIG, run.deps(net.fetch))).toBe(0);
+    expect(cancelled).toEqual(["site 502", "site 404", "ping 200"]);
+  });
+
   it("is content with a report taken on the second try", async () => {
     const run = io();
     const net = scripted([healthy(), new Response("x", { status: 503 }), received()]);
@@ -333,7 +356,9 @@ describe("notify alarm: the systemd files", () => {
       "NoNewPrivileges=true", "ProtectSystem=strict", "ProtectHome=true", "PrivateTmp=true", "PrivateDevices=true",
       "ProtectProc=invisible", "ProcSubset=pid", "ProtectKernelTunables=true", "ProtectKernelModules=true",
       "ProtectControlGroups=true", "RestrictSUIDSGID=true", "LockPersonality=true", "CapabilityBoundingSet=",
-      "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "UMask=0077"
+      "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "UMask=0077",
+      // The repository's other Node units' margins (deploy/social/debateai-social.service).
+      "LimitNOFILE=256", "TasksMax=32"
     ]) expect(unit, line).toMatch(new RegExp(`^${line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
     // No application secret, no fixed user, no email path of its own: the alarm service sends the emails.
     expect(unit).not.toMatch(/^(EnvironmentFile|User|Group|SupplementaryGroups|OnFailure)=/m);

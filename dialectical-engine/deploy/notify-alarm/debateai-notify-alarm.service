@@ -45,4 +45,5 @@ SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @obsolete
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 MemoryMax=256M
-TasksMax=16
+LimitNOFILE=256
+TasksMax=32

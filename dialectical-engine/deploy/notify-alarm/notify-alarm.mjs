@@ -13,7 +13,8 @@
 // Settings: one JSON file {"site": "<the site's https origin>", "pingUrl": "<the alarm service's ping link>"}, handed
 // over by systemd as the credential `notify-alarm` (LoadCredential=), or named with --config for a run by hand. The ping
 // link is a secret (anyone holding it can send a fake "all good"), so it is never written to the log.
-// Exit codes: 0 the report was taken (whatever the site said), 2 wrong argument or settings, 3 the report was not taken.
+// Exit codes: 0 the report was taken (whatever the site said), 1 an unexpected failure (NOTIFY_ALARM_FAILED), 2 wrong
+// argument or settings, 3 the report was not taken.
 // Node built-ins only, so it runs with any Node the host has (the global fetch), outside the release's own tree.
 import { open } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -73,7 +74,9 @@ export function parseAlarmConfig(text) {
   if (site === null || site.pathname !== '/') throw invalid('site');
   const ping = httpsUrl(value.pingUrl);
   if (ping === null || ping.pathname.replace(/\/+$/u, '') === '' || SERVICE_ENDING.test(ping.pathname)) throw invalid('pingUrl');
-  return { site: site.origin, pingUrl: value.pingUrl };
+  // The parsed link, not the raw text: URL parsing drops a space or tab pasted around it, which would otherwise end
+  // up inside the /fail address.
+  return { site: site.origin, pingUrl: ping.href.replace(/\/+$/u, '') };
 }
 
 /** At most BODY_MAX_BYTES of a body as text (null when it is longer); the rest is never read. */
