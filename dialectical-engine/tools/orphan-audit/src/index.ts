@@ -658,7 +658,16 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
 // OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
 // data-export module above. migrate() is unchanged by this.
-const NATIVE_MIGRATE_MODULE_SHA256 = "22de0ff607b2ceabbcb1c851592f7a0be6b103d4d3795defce75f35f4fc48c40";
+// Side-by-side releases A1 (2026-10-21, spec 2026-10-21 §1): the reviewed module after StartRunInput gained releaseKey and
+// startRun stamped core.run.release_key on both insert paths (parseReleaseKey first). migrate() is byte-identical.
+// Side-by-side releases A2 (2026-10-21, spec 2026-10-21 §4, §6): the reviewed module after it re-exported
+// ./release-state.js (the release table's readers and writers). migrate() is byte-identical.
+// Side-by-side releases A3 (2026-10-22, spec 2026-10-21 §4): the reviewed module after it re-exported
+// ./run-supersession.js and CONTENT_PROVISION_SIGNATURES gained core.prepare_readmitted_run_key_provision(uuid,uuid).
+// migrate() is byte-identical.
+// Side-by-side releases A5 (2026-10-22, spec 2026-10-21 §9, C10): the reviewed module after it re-exported
+// ./spend-waiver.js (SPEND_WAIVER_REASONS, recordSpendWaiver, SpendWaiverReason). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "944ddd9e6e966d227068f55c34bbc7d22b13a8d108b79255c0aef603dc595a4b";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -813,7 +822,9 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
       blocking.push(`${where} reads a clock or randomness inside the pure core`);
     }
     blocking.push(...auditProductionFixtureImports(where,source));
-    if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
+    // \b: a switch STATEMENT, not an identifier ending in "switch" (0123's SQL function core.record_release_switch(...),
+    // named in packages/db/src/release-state.ts and the 0123 loader, side-by-side spec 2026-10-21 §6).
+    if (/\bswitch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
     blocking.push(...auditNumericSourceLiteralExports(where, source));

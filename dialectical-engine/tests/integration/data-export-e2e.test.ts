@@ -33,6 +33,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { consumerFixture } from "../support/consumerWebAuthnFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 function entries(zip: Buffer): Record<string, string> {
   const result: Record<string, string> = {};
@@ -398,7 +399,7 @@ describe("data export over a real database and encrypted file store", () => {
     const ownerPool = createPool(db.connectionString), serverAdmission = createPool(db.connectionString), legacyAdmission = createPool(db.connectionString);
     const encryptedPool = createPool(db.connectionString);
     try {
-    const ask = new PostgresAskApplication(ownerPool, {} as never, {} as never, undefined, ownerPool,
+    const ask = new PostgresAskApplication(ownerPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, ownerPool,
       { server: serverAdmission, legacy: legacyAdmission });
     const users = new FileUserDekStore(join(root, randomUUID()), loadKek(generateDek()));
     await users.store(a.userId, generateDek());
@@ -546,7 +547,7 @@ describe("data export over a real database and encrypted file store", () => {
       });
       const cipher = new ContentCipher(keys);
       configureContentEncryption(contentPool, cipher);
-      const ask = new PostgresAskApplication(contentPool, {} as never, {} as never, undefined, contentPool,
+      const ask = new PostgresAskApplication(contentPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, contentPool,
         { server: serverAdmission, legacy: legacyAdmission });
       const question = `encrypted-owner-question-${randomUUID()}`;
       const runId = await new RunRepository(contentPool).startRun({

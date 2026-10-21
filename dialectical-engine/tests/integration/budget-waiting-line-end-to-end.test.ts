@@ -50,6 +50,7 @@ import {
   type StoryEncryptedOwner
 } from "../support/storyEncryptedOwner.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Budget spec 2026-09-28 §2.14, "End to end": one hosted-mode debate under a
@@ -431,6 +432,7 @@ function hostedApplication(input: Readonly<{ billing: boolean; dispatcher: Dispa
   const settings: RunCreationSettings = {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "budget-e2e",
     settlementWatchHandle: "settlement-watch:budget-e2e",
     resolveDiscoveredPanel: async () => PANEL,

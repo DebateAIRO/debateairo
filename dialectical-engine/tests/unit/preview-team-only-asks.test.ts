@@ -21,6 +21,7 @@ import {
   testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import { testReleaseKey } from "../support/releaseKey.js";
 
 const MODEL = "zai-org/GLM-5.3-Flash";
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
@@ -55,7 +56,7 @@ function application(counters: Counters): AskApplication {
     previewProviderTestConfig: PREVIEW,
     // The preview's start-of-debate estimate: an ample pot (tests/unit/preview-budget-estimate.test.ts covers refusals).
     previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:1_000_000_000_000n,remainingCalls:100_000,maxConcurrentCalls:4,largestReservationNanoUsd:72_499_200n,enabledModels:[MODEL]})},roleModels:{answerWriter:MODEL,answerChecker:MODEL,storyteller:null,storyChecker:null},...GATE_SHAPE,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]},
-    strangerSampleRate: 0, registerVersion: 5, batteryVersion: "fixture", settlementWatchHandle: "fixture",
+    strangerSampleRate: 0, releaseKey: testReleaseKey(5), registerVersion: 5, batteryVersion: "fixture", settlementWatchHandle: "fixture",
     resolveDiscoveredPanel: async () => {
       counters.probes += 1;
       return [{ provider_ref: "preview:fixture-a", maker: "Z.AI", model_id: MODEL, probe_evidence_ref: "fixture:probe", probed_at: "2026-10-08T00:00:00Z" }];

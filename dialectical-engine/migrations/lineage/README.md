@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh and the engine's map answer step (0122, below) the twelfth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth and the side-by-side releases (0123, below) the thirteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0122: 0122,
-   `engine-map-check-forward0122.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0122 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0123: 0123,
+   `side-by-side-releases-forward0123.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0123 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -206,6 +206,53 @@ tables are not altered (their digest is 0117's; see 0119's note). No billing rel
 `replayVerifierSql`: its postcondition is the two tables whole. If `origin/dev` takes 0122 first, renumber this step
 (rename every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
 
+## Side-by-side releases (0123)
+
+The thirteenth chain step, after the engine's map answer step 0122 (side-by-side uploads, spec
+`docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §1 and §5): `0123_side_by_side_releases.sql`,
+`side-by-side-releases-forward0123.json`, `packages/db/src/migration-forward0123.ts` (`loadForward0123`, appended last
+to `STEPS`, `MIGRATION_FORWARD0123_*` refusals). The transition release T's one migration, built in numbered sections
+(plan A, tasks A1-A5), each checked by the file's closing contract block and digested by the loader's postcondition: §1
+adds `core.run.release_key` (`text NOT NULL DEFAULT 'legacy'`, CHECK `run_release_key_shape`), the release that runs
+each debate, written once at insert; §2 redefines `core.create_encrypted_run(jsonb,uuid,uuid,jsonb)` in place (0072's
+body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-asserting SECURITY DEFINER, the pinned
+`search_path` and EXECUTE for `debateai_content_provision` only; §3 adds the release table `core.release_event`
+(append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
+`core.read_release_state(text)` (EXECUTE for `debateai_runtime`) and the writers `core.record_release_switch` and
+`core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
+advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`; §4 adds the re-admission
+record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
+`RUN_SUPERSESSION_INVALID` unless the old run still waits, the new run has no edge of its own, no FAILED work item and
+no re-admission marker naming another run, and both are the same person's; SELECT, INSERT for the API's role
+`debateai_billing_runtime` only), the start guard `core.refuse_starting_superseded_run()` (a trigger on
+`core.run_wait_start` refusing `RUN_SUPERSEDED`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`,
+EXECUTE for `debateai_billing_runtime`, at most 16 hops), the readmitted run's key provision
+`core.prepare_readmitted_run_key_provision(uuid,uuid)` (EXECUTE for `debateai_content_provision` only) with its commit
+lock and the marker column `readmitted_from_run_id` on the intent and on the run's execution binding (one live
+re-admission per old run), and redefines `core.run_waiting_v` (0083's view plus "not superseded"); §5 widens
+`core.run_wait_reason`'s `waits_for` CHECK with `SITE_BUSY` and `SWITCHING` (NOT VALID, then validated); §6 redefines in
+place, same signature, owner, definer, path and grants, the five funding functions that tied a grant to the funding
+selection's or the run's version (`billing.reserve_internal_provider_call`, `billing.read_internal_run_state`,
+`billing.read_internal_allowance`, `billing.guard_internal_charge_scope`, `staff.revoke_internal_allowance`), so a grant
+stays valid under the version it was issued with, and `staff.read_self_allowance_command` (a revoke names its grant's
+own version), and adds `staff.read_internal_funding_policy_at(bigint)` (owned by `debateai_staff_security_owner`,
+EXECUTE for `debateai_runtime`), the funding publication at a version; §7 adds the append-only spend waiver
+`ledger.model_spend_waiver` (one row per run, reason `BACKSTOP`, `OWNER_STOPPED`, `SETTINGS_VERSION_UNSUPPORTED` or
+`RELEASE_NOT_SERVED`; SELECT, INSERT for `debateai_runtime`, SELECT for `debateai_staff_security_owner` and
+`debateai_replay`) and redefines `billing.read_internal_grant_spent` in place (same signature, owner, definer, path and
+grants) so a waived run's spend leaves a funded person's window; site-day readers still count it. Its header declares
+`-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier
+functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the three columns (type, NOT NULL, default), the CHECK (name, validation,
+definition), the redefined and added functions whole (§6's six and §7's one redefinitions excepted), the release,
+supersession and waiver tables whole, the release view (owner, ACL, definition) and the two roles' attributes and
+memberships. `core.run_waiting_v`, the `waits_for` CHECK, the marker indexes and the seven funding redefinitions of §6
+and §7 are checked by the closing block and by tests, not digested, so a later drained step may widen or redefine them
+again. While the build is open each task appends its section and recomputes `migration.sha256` with the one-liner at the
+end of this file; once merged, 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename
+every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -214,10 +261,10 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0122: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0123: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
-the reclaim resume, the reply measures, the engine verdict and the engine's map answer step keep) still runs at the end
-of every `migrate()`.
+the reclaim resume, the reply measures, the engine verdict, the engine's map answer step and the side-by-side releases
+keep) still runs at the end of every `migrate()`.
 
 ## Merge order: check the preview first
 

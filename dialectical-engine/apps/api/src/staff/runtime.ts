@@ -153,7 +153,7 @@ export async function createStaffRuntime(input: Readonly<{
     const operator = await loadStaffAlertOperator({ path: input.environment.operatorModulePath, sha256: input.environment.operatorModuleSha256, ...(input.operatorFiles ? { files: input.operatorFiles } : {}) });
     try {
         await readStaffAccessPolicy(input.pool, input.registerVersion, input.environment.internalAllowancePolicy === undefined ? undefined : 1);
-        const allowances = new PostgresInternalAllowanceRepository(input.pool, { registerVersion: input.registerVersion });
+        const allowances = new PostgresInternalAllowanceRepository(input.pool);
         const selectedFunding = await allowances.readPolicy();
         if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);
@@ -184,14 +184,18 @@ export async function createStaffRuntime(input: Readonly<{
             running = dispatcher.drain({ limit: operator.dispatch.batchSize }).catch(() => { input.log?.('TRANSPORT_UNAVAILABLE'); }).finally(() => { running = undefined; });
         };
         return Object.freeze({ readiness, funding, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
-            start() {
+            // Side-by-side spec §4 (plan C7): every dispatch tick and the first drain ask `when` (main.ts: the release
+            // watcher's ownIsCurrent), so a release that is not current claims no alert row.
+            start(options?: Readonly<{ when?: () => boolean }>) {
                 if (closed)
                     throw unavailable();
                 if (timer !== undefined)
                     return;
-                timer = setInterval(trigger, operator.dispatch.intervalMs);
+                const when = options?.when ?? (() => true);
+                const gated = (work: () => void) => (): void => { if (when()) work(); };
+                timer = setInterval(gated(trigger), operator.dispatch.intervalMs);
                 timer.unref();
-                trigger();
+                gated(trigger)();
             },
             async close() {
                 if (closed)

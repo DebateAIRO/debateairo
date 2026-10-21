@@ -9,6 +9,7 @@ import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
 import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * T17 — the cost envelope for the LIVE topology (goal-v4 285-295, F36).
@@ -415,6 +416,7 @@ describe("T17 · an over-bound input still refuses loudly at admission", () => {
     return {
       strangerSampleRate: 0,
       registerVersion: 1,
+      releaseKey: TEST_RELEASE_KEY,
       batteryVersion: "battery:test",
       settlementWatchHandle: "watch:test",
       resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2).map((member, index) => ({

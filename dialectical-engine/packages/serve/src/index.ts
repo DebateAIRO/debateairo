@@ -3141,6 +3141,11 @@ export class ServeRepository {
     });
   }
 
+  /**
+   * The person's debates, newest first. Side-by-side C9 (spec 2026-10-21 §4): a run a re-admission superseded
+   * (`core.run_supersession`, 0123) is left out of both lists and the count, so a question re-admitted from the
+   * waiting line shows once, as its newest run.
+   */
   async readAnswerIndex(ownership: RunOwnershipInput, limit: number, offset: number): Promise<AnswerIndex> {
     const access = normalizeRunOwnership(ownership);
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
@@ -3170,6 +3175,7 @@ export class ServeRepository {
            WHERE core.run_is_owned_by(run.run_id,$1,$2)
              AND (run.content_encryption_version IS DISTINCT FROM 1
                OR core.run_private_content_is_live(run.run_id))
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
            ORDER BY run.run_id, answer.sealed_at_seq DESC
          ), open_run AS (
            SELECT
@@ -3183,6 +3189,7 @@ export class ServeRepository {
              AND (run.content_encryption_version IS DISTINCT FROM 1
                OR core.run_private_content_is_live(run.run_id))
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
@@ -3193,7 +3200,8 @@ export class ServeRepository {
         `SELECT count(*)::text AS count FROM core.run AS run
          WHERE core.run_is_owned_by(run.run_id,$1,$2)
            AND (run.content_encryption_version IS DISTINCT FROM 1
-             OR core.run_private_content_is_live(run.run_id))`,
+             OR core.run_private_content_is_live(run.run_id))
+           AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);

@@ -222,6 +222,26 @@ describe("staff runtime boot without fresh alert readiness", () => {
       expect(mail).toContain(operationId);
     } finally { await runtime.close(); }
   });
+
+  it("side-by-side C7: start({ when }) claims nothing while the release is not current, then delivers once it is", async () => {
+    const f = await fixture();
+    await f.unlock();
+    const runtime = await createStaffRuntime(f.activation);
+    let current = false;
+    try {
+      const operationId = randomUUID();
+      enqueue(f.state, await runtime.intents.mutation({ event: "DISABLE", operationId, keyUserId: targetUser, actorStaffId: null, subjectStaffId: null,
+        reason: { code: "SECURITY_RESPONSE" } }), targetUser);
+      runtime.start({ when: () => current });
+      await new Promise(r => setTimeout(r, 350)); // the gated boot drain plus three gated 100 ms dispatch ticks
+      expect(f.state.claimCalls).toBe(0);
+      expect(f.state.receipts).toEqual([]);
+      current = true;
+      await until(() => f.state.receipts.length > 0);
+      expect(f.state.receipts).toEqual([{ outcome: "DELIVERED", failure: null }]);
+      expect(f.state.attempts).toBe(1);
+    } finally { await runtime.close(); }
+  });
 });
 
 const targetUser = "44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";

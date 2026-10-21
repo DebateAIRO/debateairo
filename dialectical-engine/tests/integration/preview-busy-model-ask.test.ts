@@ -36,6 +36,7 @@ import { computeStructuralCeilingBasis } from "@debateai/register";
 import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import type { PreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { testReleaseKey } from "../support/releaseKey.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -177,7 +178,7 @@ async function askRound(input: Readonly<{ glm: readonly GateStep[]; hosted?: boo
   });
   const settings: RunCreationSettings = {
     ...(input.hosted === true ? {} : { previewProviderTestConfig: config, previewBudgetGate: budgetGate(input.enabled ?? FIVE) }),
-    strangerSampleRate: 0, registerVersion: 11, batteryVersion: "busy-model", settlementWatchHandle: "watch:busy-model",
+    strangerSampleRate: 0, releaseKey: testReleaseKey(11), registerVersion: 11, batteryVersion: "busy-model", settlementWatchHandle: "watch:busy-model",
     resolveDiscoveredPanel,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) =>
       computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned }),

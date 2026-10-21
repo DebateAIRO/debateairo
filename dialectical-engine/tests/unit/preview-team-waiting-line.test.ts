@@ -13,6 +13,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import type { WaitingRun } from "@debateai/db";
 import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import type { AskWaitingLinePort, WaitingStart } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
   deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
@@ -93,7 +94,7 @@ function arrange(input: Readonly<{
   };
   const settings: RunCreationSettings = {
     ...(input.preview ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: input.team ?? [] } : {}),
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "preview-team", settlementWatchHandle: "preview-team",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "preview-team", settlementWatchHandle: "preview-team",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     waitingLine

@@ -446,6 +446,16 @@ export class PreviewModelCooling extends PreviewVendorRefusedUnbilled {
   }
 }
 /**
+ * Side-by-side spec §9 (decision D6): MODEL_NOT_ALLOWED or RESERVATION_MISMATCH. During an upload two releases share
+ * one gate, and the gate's GO may no longer serve a model (its row is gone) or a price (this release reserved another
+ * amount) that this release's debate still asks for. The gate refuses before reserving or sending anything. For the
+ * app this is that one model sitting out the rest of the run, exactly like a busy model: a REFUSED row, the one
+ * 60-second resend, then the sit-out book (apps/runner/src/run-sit-out.ts) drops it. Never a money stop.
+ */
+export class PreviewModelNotServed extends PreviewVendorRefusedUnbilled {
+  constructor() { super("Private preview gate does not serve this model or this price"); }
+}
+/**
  * R-d: a call that ENDED in the vendor's gate-proven unbilled refusal — the gateway's PROVIDER_CALL_FAILED whose last
  * attempt (on the preview, the one 60-second resend) was a `PreviewVendorRefusedUnbilled`. A bare refusal is not a
  * call's end (the gateway records and wraps every one), so it is false; so is a call that ended in the gate's own
@@ -915,7 +925,14 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * unbilled refusal (`PreviewModelCooling`). Review 2026-10-12 adds PROVIDER_ERROR_UNBILLED: the vendor answered with an
  * error that bills nothing but does not say it is busy (Anthropic's 400/404/413/500); the gate counts it toward its
  * five-in-a-row streak, as before gate v4, and the app reads it as the plain `PreviewUnbilledRefusal`, never "busy".
+ * Side-by-side spec §9 (D6) adds PREVIEW_NOT_SERVED_REFUSALS: MODEL_NOT_ALLOWED (the GO no longer carries this model's
+ * row) and RESERVATION_MISMATCH (the GO prices this call differently), both refused before any reservation. During an
+ * upload an older release's debate can meet either while the gate already serves the new release; reading them as the
+ * run's money ceiling (as the opaque STOPPED they were) would stop a debate for a model it can do without, so the app
+ * reads them as that model sitting out (`PreviewModelNotServed`). An older app reads the new codes as unknown, its
+ * money mapping, exactly as it read STOPPED, so the gate change is safe for releases before this one.
  */
+const PREVIEW_NOT_SERVED_REFUSALS: ReadonlySet<string> = new Set(["MODEL_NOT_ALLOWED", "RESERVATION_MISMATCH"]);
 const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED", "MODEL_COOLING"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
@@ -935,6 +952,8 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     if (code === "PROVIDER_NOT_REACHED") return new PreviewGateUnsent();
     return new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight");
   }
+  // Side-by-side §9: this model or this price is not served by this GO (refused before any reservation): it sits out.
+  if (typeof code === "string" && PREVIEW_NOT_SERVED_REFUSALS.has(code)) return new PreviewModelNotServed();
   // Gate v4: the gate says outright that it was already halted when the call arrived, before reserving anything.
   if (code === "AUTHORITY_HALTED") return new PreviewGateUnavailable();
   // Slow answer (2026-10-12): the call was sent and failed or ran out of time at the vendor; the gate booked its whole

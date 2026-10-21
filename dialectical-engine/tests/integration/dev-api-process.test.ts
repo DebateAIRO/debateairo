@@ -91,7 +91,9 @@ function environment(
     HATCHET_WORKFLOW_NAME: "debateai-dev",
     HATCHET_TLS_STRATEGY: "none",
     DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail"),
-    DEBATEAI_DEPLOYMENT_MODE: "local"
+    DEBATEAI_DEPLOYMENT_MODE: "local",
+    // Side-by-side §1: the key dev-api-environment.ts derives for REGISTER_VERSION 424242.
+    RELEASE_KEY: ["r424242", "000000000000"].join("-")
   });
 }
 

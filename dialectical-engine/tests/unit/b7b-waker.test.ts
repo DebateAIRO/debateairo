@@ -12,6 +12,7 @@ import {
   type AskWaitingLinePort,
   type WaitingStart
 } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const NOW = new Date("2026-10-01T00:00:30.000Z");
 const MONTH_RESET = new Date("2026-10-15T00:00:00.000Z");
@@ -83,7 +84,7 @@ function arrange(input: {
     }
   };
   const settings: RunCreationSettings = {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "b7b", settlementWatchHandle: "b7b",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "b7b", settlementWatchHandle: "b7b",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     waitingLine

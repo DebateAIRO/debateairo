@@ -12,11 +12,14 @@ import type {
   CryptoEnvelope,
   PreparedRunContentCipher
 } from "@debateai/crypto";
-import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
+import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
+export * from "./release-state.js";
+export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
+export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
@@ -244,7 +247,9 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.complete_run_key_provision(uuid,uuid,uuid,uuid)",
   "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)",
   "core.claim_run_key_provision_cleanup(integer)",
-  "core.complete_run_key_provision_cleanup(uuid,uuid)"
+  "core.complete_run_key_provision_cleanup(uuid,uuid)",
+  // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
+  "core.prepare_readmitted_run_key_provision(uuid,uuid)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",
@@ -1590,6 +1595,13 @@ export interface StartRunInput {
   readonly batteryVersion: string;
   readonly batteryRows: readonly InitialBatteryRow[];
   readonly askContract?: Readonly<Record<string, unknown>>;
+  /**
+   * The release that runs this debate (side-by-side spec §1, migration 0123): written once into core.run.release_key, in
+   * the same INSERT as registerVersion. When present it must be a well-formed key (`legacy` and malformed keys refuse
+   * with RELEASE_KEY_INVALID before any SQL). When absent the column default `legacy` applies, which no runner serves,
+   * so a forgotten admission path fails loudly downstream.
+   */
+  readonly releaseKey?: string;
 }
 
 export type RunCreationPrincipal =
@@ -2013,6 +2025,8 @@ export class RunRepository {
     input: StartRunInput,
     admissionClient?: PoolClient
   ): Promise<string> {
+    // Side-by-side spec §1: the stamp is checked before anything is written (no intent, no key, no row).
+    const releaseKey = input.releaseKey === undefined ? undefined : parseReleaseKey(input.releaseKey).releaseKey;
     const runId = randomUUID();
     const cipher = contentCipherFor(this.pool);
     let contentKeyProvisioned = false;
@@ -2098,6 +2112,8 @@ export class RunRepository {
         }
         commitAttempted = true;
         const provisionExecutor=admissionClient ?? this.provisionPool;
+        // `releaseKey` is sent only when given, and the capability probe below never strips it (unlike planTier and the
+        // argument language): a database without 0123 refuses a stamped document rather than run it unstamped (O1).
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;
@@ -2152,7 +2168,8 @@ export class RunRepository {
             askContract: storedAskContract,
             contentCiphertext: contentEnvelope,
             contentAttestation: contentAttestation!.toString("base64"),
-            contentAttestationSecret: contentAttestationSecret!.toString("base64")
+            contentAttestationSecret: contentAttestationSecret!.toString("base64"),
+            ...(releaseKey === undefined ? {} : { releaseKey })
           }),input.principal.userId,input.principal.ownerRef,
           JSON.stringify(input.batteryRows.map((row)=>({
             batteryRowId:row.batteryRowId,
@@ -2205,7 +2222,8 @@ export class RunRepository {
         JSON.stringify(input.depthParams),
         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
         JSON.stringify(input.envelopeBasis), input.registerVersion,
-        input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+        input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq,
+        ...(releaseKey === undefined ? [] : [releaseKey])
       ];
       const planTierBindOffset = planTierColumnApplied ? 1 : 0;
       const argumentLanguageBindOffset = argumentLanguageColumnsApplied ? 2 : 0;
@@ -2217,7 +2235,7 @@ export class RunRepository {
           composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""}${argumentLanguageColumnsApplied ? ", argument_language_tag, argument_language_name" : ""},
           depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
-          battery_version, ask_contract, created_at_seq
+          battery_version, ask_contract, created_at_seq${releaseKey === undefined ? "" : ", release_key"}
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
           $11${planTierColumnApplied ? ", $12" : ""}${argumentLanguageColumnsApplied ? `, $${12 + planTierBindOffset}, $${13 + planTierBindOffset}` : ""},
@@ -2225,7 +2243,7 @@ export class RunRepository {
           jsonb_array_length($${13 + bindOffset}::jsonb),
           $${13 + bindOffset}::jsonb, $${14 + bindOffset},
           $${15 + bindOffset}::jsonb, $${16 + bindOffset},
-          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
+          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}${releaseKey === undefined ? "" : `, $${20 + bindOffset}`}
         )`,
         baseRunValues
       );

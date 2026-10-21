@@ -10,6 +10,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ outcome: null as unknown, rotationPicks: 0 }));
 const pinning = vi.hoisted(() => ({
@@ -156,6 +157,7 @@ function settingsWith(input: Readonly<{ rotation: boolean; picker: AskModelPicke
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:rotation",
     settlementWatchHandle: "watch:rotation",
     resolveDiscoveredPanel: async () => PANEL,

@@ -40,7 +40,7 @@ import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, t
 import type { AskRequest } from "@debateai/contract";
 import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import {
   CostEnvelopeGuard,
@@ -104,6 +104,7 @@ import {
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "../../apps/api/src/engine-ask.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
@@ -177,7 +178,7 @@ export async function composePracticeAskMoney(input: Readonly<{
     assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
     const spend = new PostgresModelSpendStore(pool);
     const entitlements = null;
-    const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+    const allowances = new PostgresInternalAllowanceRepository(pool);
     const selectedFunding = await allowances.readPolicy();
     // The preview's api.env names no internal allowance (README H1), so main.ts's `configuredFunding` is undefined there.
     if (selectedFunding !== null) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
@@ -198,7 +199,11 @@ export async function composePracticeAskMoney(input: Readonly<{
       billingPlans,
       dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
       closeBasisPoints: band.closeBasisPoints,
-      waitingLinePerPerson: band.waitingLinePerPerson
+      waitingLinePerPerson: band.waitingLinePerPerson,
+      // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
+      // practice's throwaway database records no release and its runner lives in this process, so it is the only
+      // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with.
+      gate: new PostgresAskAdmissionGate({ releaseKey: developmentReleaseKey(environment.REGISTER_VERSION), hosted: false })
     });
     askRoom = room;
   }
@@ -381,6 +386,9 @@ export async function composePracticeAsk(input: Readonly<{
     previewBudgetGate,
     strangerSampleRate: settings.strangerSampleRate,
     registerVersion: version,
+    // Side-by-side spec §1, as main.ts: every practice run is stamped. The practice's settings carry no RELEASE_KEY (its
+    // runner is composed in this process, not booted under one), so it admits as the development key of its version.
+    releaseKey: developmentReleaseKey(version),
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
     // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.

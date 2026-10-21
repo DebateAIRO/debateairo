@@ -2,6 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
+import type { ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -115,6 +116,7 @@ import {
   isDatabasePoolBusy,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
+  resolveRunRef,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
@@ -200,6 +202,7 @@ import {
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
+  parseReleaseKey,
   TypedDomainError,
   type DeclaredRegion,
   type RiskTier,
@@ -1433,6 +1436,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+  // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
+  // them); neither reads a person's data nor charges an admission budget.
+  { route: "GET /livez", auth: "public", resource: "deployment", action: "liveness" },
+  { route: "GET /readyz", auth: "public", resource: "deployment", action: "readiness" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -1648,6 +1655,33 @@ export interface AskApplication {
    * events route follows the run on one open stream; without it the route answers the snapshot alone.
    */
   eventMark?(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null>;
+  /**
+   * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9): the newest run of a re-admitted debate
+   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route and the
+   * step-up target follow it, so an old link, an open page or a grant asked on the old id names the run
+   * that actually runs. Absent: ids pass through unchanged.
+   */
+  resolveRunRef?(runId: string): Promise<string>;
+}
+
+/** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
+async function resolvedRunId(options: Pick<ApiOptions, "application">, id: string): Promise<string> {
+  return options.application.resolveRunRef === undefined ? id : options.application.resolveRunRef(id);
+}
+
+/**
+ * Side-by-side C9: a step-up body whose `authorization.target_run_id` is a run id, with that id followed to its newest run
+ * BEFORE the service sees it, so the grant it mints and the path it is spent on name the same run. Any other body (no
+ * run target, a malformed one) is returned as sent, for the service's own parse to judge.
+ */
+async function withResolvedStepUpTarget(options: Pick<ApiOptions, "application">, body: unknown): Promise<unknown> {
+  if (typeof body !== "object" || body === null) return body;
+  const authorization = (body as Record<string, unknown>).authorization;
+  if (typeof authorization !== "object" || authorization === null) return body;
+  const target = ResourceIdSchema.safeParse((authorization as Record<string, unknown>).target_run_id);
+  if (!target.success) return body;
+  const resolved = await resolvedRunId(options, target.data);
+  return resolved === target.data ? body : { ...body, authorization: { ...authorization, target_run_id: resolved } };
 }
 
 export type AskPrincipal =
@@ -1758,6 +1792,17 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  /**
+   * Side-by-side spec §6 (plan C5): this process's RELEASE_KEY, sent as `x-debateai-release` on every response (JSON,
+   * refusals, the house 404, the run-event stream's raw head). Always supplied by main; absent, no header is sent.
+   */
+  readonly releaseKey?: string;
+  /**
+   * Side-by-side spec §6 (plan C5): the release watcher's answers behind GET /readyz. Always supplied by main; absent
+   * (test compositions), /readyz answers ready with `releaseKey` (null when that is absent too) and no reasons.
+   * /readyz reads only `readiness()`; `draining()` ends every live run-event stream at its next poll (plan C6).
+   */
+  readonly readiness?: Pick<ReleaseWatcher, "readiness" | "draining">;
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
@@ -2158,6 +2203,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
+  /**
+   * The headers every answer carries: the security set, no-store, and (side-by-side spec §6, plan C5) the release that
+   * wrote it — the browser compares its code part. Set by the onSend hook below and by `frameworkErrors`, whose replies
+   * Fastify builds without onSend.
+   */
+  const setResponseHeaders = (reply: FastifyReply): void => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
+    reply.header("cache-control", "no-store");
+    if (options.releaseKey !== undefined) reply.header("x-debateai-release", options.releaseKey);
+  };
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
@@ -2170,11 +2225,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
      * them itself, and its 414 quotes the offending URL straight back at the
      * caller (L1-F6). They take the same constant typed envelopes here, and an
      * unrecognised one falls back to the constant 400 rather than a framework
-     * body. Nothing here echoes any part of the request.
+     * body. Nothing here echoes any part of the request. These replies skip the onSend hooks (Fastify builds them with
+     * no route context), so they set the common headers themselves (side-by-side C5 fix round 1).
      */
     frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
       const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
         ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      setResponseHeaders(reply);
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
     }
   });
@@ -2299,8 +2356,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
     : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
   api.addHook("onSend", async (request, reply, payload) => {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
-    reply.header("cache-control", "no-store");
+    setResponseHeaders(reply);
     // Reissue the same opaque generation after successful cookie auth so the
     // browser transport observes the ruled sliding 14-day idle lifetime. The
     // conditional database refresh remains the sole authorization decision,
@@ -2720,7 +2776,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post<{Params:{provider:string}}>('/v1/account/social/:provider/step-up/begin',credentialRoutePolicy('POST /v1/account/social/{provider}/step-up/begin'),async(request,reply)=>{
     const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
-    const result=await options.socialAuth.beginStepUp(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+    const result=await options.socialAuth.beginStepUp(provider.data,await withResolvedStepUpTarget(options,request.body),sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
   });
   api.post('/v1/account/social/step-up/status',credentialRoutePolicy('POST /v1/account/social/step-up/status'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.status(request.body,request.authenticatedSession!,sourceFor(request)));});
   api.post('/v1/account/social/step-up/passkey-options',credentialRoutePolicy('POST /v1/account/social/step-up/passkey-options'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.beginPasskey(request.body,request.authenticatedSession!,sourceFor(request)));});
@@ -2749,7 +2805,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
     api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
-    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(await withResolvedStepUpTarget(options,request.body),request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
       const result=await security.completePasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request));
       reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS)]);
@@ -2890,9 +2946,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (!passwordWithinRequestBound(body)) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
-      const authorization = body.authorization === undefined
+      const requested = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
+      // Side-by-side C9: a run target is followed to its newest run before the grant is minted, so the grant, the
+      // target it echoes and the path it is spent on (which resolves the same way) all name one run.
+      const authorization = requested !== undefined && "target_run_id" in requested
+        ? { ...requested, target_run_id: await resolvedRunId(options, requested.target_run_id) }
+        : requested;
       const rotated = await options.sessions!.stepUp({
         session: authenticated,
         password: typeof body.password === "string" ? body.password : "",
@@ -3261,9 +3322,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/debates/:id",
     credentialRoutePolicy("DELETE /v1/debates/{id}"),
     async (request,reply)=>{
-      const runId=ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId=ResourceIdSchema.safeParse(request.params.id);
+      const runId=parsedRunId.success ? await resolvedRunId(options,parsedRunId.data) : null;
       const authenticated=request.authenticatedSession;
-      if (!runId.success || authenticated===undefined) {
+      if (runId===null || authenticated===undefined) {
         return reply.status(404).send({ error:"NOT_FOUND" });
       }
       const input=parseRequest(PrivateDebateErasureRequestSchema,request.body);
@@ -3271,7 +3333,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
       }
       const outcome=await options.accountErasure.deletePrivateDebate({
-        runId:runId.data,authenticated,grantToken:input.step_up_grant,
+        runId,authenticated,grantToken:input.step_up_grant,
         source:sourceFor(request)
       });
       if (outcome==="NOT_FOUND") return reply.status(404).send({ error:"NOT_FOUND" });
@@ -3486,6 +3548,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
+  });
+
+  /**
+   * Side-by-side spec §6 (plan C5): the process probes. Neither needs a session, reads the database or charges an
+   * admission budget: /readyz answers from the release watcher's last read (never a query of its own), so the website's
+   * /readyz and Caddy's health check can poll it every second. `cache-control: no-store` comes from the onSend hook.
+   */
+  api.get("/livez", routePolicy("GET /livez"), async (_request, reply) => reply.send({ live: true }));
+  api.get("/readyz", routePolicy("GET /readyz"), async (_request, reply) => {
+    const readiness = options.readiness?.readiness()
+      ?? Object.freeze({ ready: true, releaseKey: options.releaseKey ?? null, reasons: Object.freeze([]) });
+    return reply.status(readiness.ready ? 200 : 503)
+      .send({ ready: readiness.ready, releaseKey: readiness.releaseKey, reasons: [...readiness.reasons] });
   });
 
   if (options.evaluatorDevMenu !== undefined) {
@@ -3778,23 +3853,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
     if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", sourceFor(request).ip)) return reply;
-    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
     const ownership = ownershipFor(request);
-    if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {
+    // Side-by-side C9: the stream follows the newest run; a stream still open on an old id reads a null mark
+    // (eventMark) and ends with the clean close the page treats as "reconnect", and the reconnect lands here.
+    const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
+    if (runId === null || await options.application.readRun(runId, request.session, ownership) === null) {
       return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     }
     reply.raw.writeHead(200, {
       ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
       "cache-control": "no-store",
+      // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
+      ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
       ...(request.cookieRefresh === undefined
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
     // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
-    // replays the stored events, then follows the run until its terminal event.
+    // replays the stored events, then follows the run until its terminal event — or until this
+    // process drains (side-by-side spec §6, plan C6): a clean close, and the page reconnects and
+    // replays. A replay-only stream (no change mark) ends on its own.
     const application = options.application;
-    const snapshot = (signal: AbortSignal) => options.application.events(runId.data, request.session, ownership, signal);
+    const readiness = options.readiness;
+    const snapshot = (signal: AbortSignal) => options.application.events(runId, request.session, ownership, signal);
     await streamAuthorizedEvents({
       events: signal => application.eventMark === undefined
         ? snapshotRunEventItems(snapshot(signal))
@@ -3802,8 +3885,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           snapshot,
           mark: markSignal => application.eventMark === undefined
             ? Promise.resolve(null)
-            : application.eventMark(runId.data, request.session, ownership, markSignal),
+            : application.eventMark(runId, request.session, ownership, markSignal),
           signal,
+          ...(readiness === undefined ? {} : { draining: () => readiness.draining() }),
           ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
           ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
         }),
@@ -3823,22 +3907,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
-    const runId = ResourceIdSchema.safeParse(request.params.id);
-    if (!runId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    const run = await readOwnerRun(options, runId.data, request.session, ownershipFor(request));
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+    if (!parsedRunId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const runId = await resolvedRunId(options, parsedRunId.data);
+    const run = await readOwnerRun(options, runId, request.session, ownershipFor(request));
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",
     routePolicy("GET /v1/runs/{id}/visibility"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined || options.publications === undefined) {
+      if (runId === null || authenticated === undefined || options.publications === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const visibility = await options.publications.readOwnedVisibility({
-        runId: runId.data,
+        runId,
         authenticated
       });
       return visibility === null
@@ -3847,18 +3933,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   );
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
-    const runId = ResourceIdSchema.safeParse(request.params.id);
-    if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
-    const answer = await readOwnerRunAnswer(options, runId.data, request.session, ownershipFor(request));
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+    if (!parsedRunId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
+    const runId = await resolvedRunId(options, parsedRunId.data);
+    const answer = await readOwnerRunAnswer(options, runId, request.session, ownershipFor(request));
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
     credentialRoutePolicy("POST /v1/runs/{id}/publish"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined) {
+      if (runId === null || authenticated === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const input = parseRequest(PublishDebateRequestSchema, request.body);
@@ -3866,7 +3954,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
       }
       if (!await options.publications.preflightGrant({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         action: "PUBLISH"
@@ -3881,12 +3969,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
       // none, and re-reads the answer under a fresh lease before it commits.
       const contentLease = {
-        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId.data, use),
-        readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
+        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId, use),
+        readAnswer: () => options.application.readRunAnswer(runId, request.session, ownershipFor(request))
       };
       const answer = await contentLease.run(contentLease.readAnswer);
       const published = answer === null ? null : await options.publications.publish({
-        runId: runId.data,
+        runId,
         answer,
         authenticated,
         grantToken: input.step_up_grant,
@@ -3917,9 +4005,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/runs/:id/unpublish",
     credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined) {
+      if (runId === null || authenticated === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const input = parseRequest(UnpublishDebateRequestSchema, request.body);
@@ -3927,7 +4016,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
       }
       if (!await options.publications.preflightGrant({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         action: "UNPUBLISH"
@@ -3939,13 +4028,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const owned = await options.application.readRun(
-        runId.data,
+        runId,
         request.session,
         ownershipFor(request)
       );
       if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       const unpublished = await options.publications.unpublish({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         source: sourceFor(request)
@@ -4050,6 +4139,14 @@ export interface RunCreationSettings {
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
+  /**
+   * Side-by-side spec §1 (INTERFACE "core.run.release_key"): the release this API is (its checked RELEASE_KEY). Every
+   * run it admits — the direct path, a room START and a room WAIT — is stamped with it, so a debate is never served by
+   * another release's runner (ruling O1). Checked at construction: `legacy` or a malformed key refuses
+   * RELEASE_KEY_INVALID, and a key whose number is not `registerVersion` RELEASE_KEY_REGISTER_MISMATCH, before anything
+   * is admitted.
+   */
+  readonly releaseKey: string;
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
@@ -4735,6 +4832,12 @@ export class PostgresAskApplication implements AskApplication {
     runProvisionPool:Pool,
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
+    // Side-by-side spec §1: an API never admits under a key no runner could serve (RELEASE_KEY_INVALID), nor under a
+    // key whose number is not the register version it admits with (RELEASE_KEY_REGISTER_MISMATCH, as checkedReleaseKey
+    // refuses at boot), so no run is stamped with one release while carrying another's settings version.
+    if (parseReleaseKey(settings.releaseKey).siteVersion !== settings.registerVersion) {
+      throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "The release key's number is not this application's register version");
+    }
     validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
     if(settings.previewProviderTestConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard");
     if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
@@ -4894,6 +4997,7 @@ export class PostgresAskApplication implements AskApplication {
           strangerSampleRate: this.settings.strangerSampleRate,
           envelopeBasis,
           registerVersion: this.settings.registerVersion,
+          releaseKey: this.settings.releaseKey,
           batteryVersion: this.settings.batteryVersion,
           askContract: {
             decision_scope: ask.decision_scope,
@@ -5168,6 +5272,7 @@ export class PostgresAskApplication implements AskApplication {
             strangerSampleRate: this.settings.strangerSampleRate,
             envelopeBasis: evaluated.envelopeBasis,
             registerVersion: this.settings.registerVersion,
+            releaseKey: this.settings.releaseKey,
             batteryVersion: this.settings.batteryVersion,
             askContract: {
               decision_scope: runAsk.decision_scope,
@@ -5291,7 +5396,8 @@ export class PostgresAskApplication implements AskApplication {
    * (`RUN_SETUP_FAILED:DISPATCH`, PR #33). A premium question whose owner is now
    * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
    * line. The tick stops at the first run the site's day cannot hold, because
-   * nobody after it fits the day; a run whose own person is full is skipped. A
+   * nobody after it fits the day (side-by-side C8: likewise at a busy site or on
+   * a release that is not current); a run whose own person is full is skipped. A
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
@@ -5348,7 +5454,9 @@ export class PostgresAskApplication implements AskApplication {
           })));
           continue;
         }
-        if (outcome.kind === "SITE_FULL") {
+        // Side-by-side C8: a busy site (its cap of debates) or a release that is not current holds back every run
+        // after this one too, so the pass ends here, as for a full site's day.
+        if (outcome.kind === "SITE_FULL" || outcome.kind === "SITE_BUSY" || outcome.kind === "SWITCHING") {
           stopped = true;
           break;
         }
@@ -5505,6 +5613,16 @@ export class PostgresAskApplication implements AskApplication {
 
   readAnswerIndex(_session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex> {
     return this.#serve.readAnswerIndex(ownership, limit, offset);
+  }
+
+  /**
+   * Side-by-side C9: `core.resolve_run_ref` (0123 §4; EXECUTE for the API's runtime role) on the runtime pool, through
+   * @debateai/db's `resolveRunRef` (`SELECT core.resolve_run_ref($1::uuid)::text`, typed refusals) — the newest run of a
+   * re-admitted debate, the id itself when nothing superseded it. It reads no ownership: every caller hands the result
+   * to an owner-gated read, and a re-admission keeps the debate's owner.
+   */
+  resolveRunRef(runId: string): Promise<string> {
+    return resolveRunRef(this.pool, runId);
   }
 
   readInspection(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null> {
@@ -5683,6 +5801,8 @@ export class PostgresAskApplication implements AskApplication {
    * reads — stored progress events, failed (and unfinished) work items, spawned nodes and their
    * edges, judgement ledger entries, propagation runs. Its mark moves whenever the snapshot could
    * hold a new event; the stream reads the snapshot again only then. No content, no key work.
+   * Side-by-side C9: a superseded run has no mark, so a stream still open on it ends with the clean
+   * close the page treats as "reconnect", and the reconnect follows `resolveRunRef` to the newest run.
    */
   async eventMark(runId: string, _session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null> {
     if (signal?.aborted) return null;
@@ -5702,7 +5822,8 @@ export class PostgresAskApplication implements AskApplication {
          COALESCE((SELECT max(propagation.at_seq) FROM ledger.propagation_run AS propagation
                    WHERE propagation.run_id = run.run_id), 0)::text AS propagated
        FROM core.run AS run
-       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)`,
+       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
+         AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)`,
       [runId, ownership.ownerRef, ownership.legacyAskerId], signal
     );
     const row = result.rows[0];

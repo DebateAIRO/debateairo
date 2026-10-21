@@ -15,6 +15,7 @@ import {
   type RoomDecision,
   type RoomPreview
 } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Budget spec §2.7 (B6b): with a room, `submit` takes the owner's lease FIRST
@@ -136,6 +137,7 @@ function arrange(input: {
   const settings: RunCreationSettings = {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "b6b-unit",
     settlementWatchHandle: "b6b-unit",
     resolveDiscoveredPanel: async () => {

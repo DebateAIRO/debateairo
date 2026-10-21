@@ -31,6 +31,8 @@ export interface OwnerViewPort {
   readStory(ownerRef: string, answerId: string): Promise<unknown>;
   readDisclosure(ownerRef: string, answerId: string): Promise<unknown>;
   readNode(ownerRef: string, answerId: string, nodeId: string): Promise<unknown>;
+  /** Side-by-side C9: the newest run of a re-admitted debate (`core.resolve_run_ref`), the id itself otherwise. */
+  resolveRunRef(runId: string): Promise<string>;
 }
 
 export type UserDekField = "user.email_ciphertext" | "user.recovery_email_ciphertext" | "user.phone_ciphertext";
@@ -206,6 +208,8 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
   const entries: DebateEntry[] = [];
   for (const run of rows(raw.runs)) {
     const reference = string(run.run_id);
+    // Side-by-side C9: a run a re-admission superseded never ran; its newest run is exported in its place.
+    if (await ownerView.resolveRunRef(reference) !== reference) continue;
     const history = visibility.filter((item) => item.run_id === reference).map((item) => ({ state: string(item.state), at: string(item.occurred_at) }));
     const deletedAt = tombstones.get(reference) ?? null;
     const base = {

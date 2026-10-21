@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient, QueryResult } from "pg";
 import { describe, expect, it } from "vitest";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 import {
   AUTH_POLICY_REGISTER_ROWS,
   MFA_POLICY_REGISTER_ROW,
@@ -363,6 +364,7 @@ describe("bigint-safe versions and separate publication hash domains", () => {
       API_PORT: "3000",
       STRANGER_SAMPLE_RATE: "0.1",
       REGISTER_VERSION: "9007199254740991",
+      RELEASE_KEY: fixtureReleaseKey("9007199254740991"),
       BATTERY_VERSION: "test",
       SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "test",
