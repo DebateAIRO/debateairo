@@ -172,17 +172,20 @@ async function latestRequestAt(releaseKey, io) {
 }
 
 /**
- * Arm the 25-minute check at an absolute UTC time, the latest request + 1,500 s (D7 review): a Persistent, enabled
- * calendar timer survives a reboot, where a relative one would be lost. The drop-in is replaced on every request, and
+ * Arm the 25-minute check at an absolute UTC time (D7 review): a Persistent, enabled calendar timer survives a reboot,
+ * where a relative one would be lost. The time is the latest request + 1,500 s, or one second from now when that has
+ * already passed (a manual re-run, a second drain of the same label): systemd never fires a calendar time that was in
+ * the past when it was armed. Rounded up to the second either way. The drop-in is replaced on every request, and
  * restart (not start) re-arms an instance that already fired or is still waiting.
  */
 async function armCheck(label, requestedAt, layout, io) {
   const timer = checkTimerOf(layout, label);
+  const at = Math.max(requestedAt + RETIRE_CHECK_AFTER_MS, io.now() + 1000);
   const text = [
     '# Written by release-retire.mjs retire-request (side-by-side spec §4); replaced by the next request, never edited by hand.',
-    `# The 25-minute check of release ${label}: 1,500 s after its latest RETIRE_REQUESTED (${new Date(requestedAt).toISOString()}).`,
+    `# The 25-minute check of release ${label}: 1,500 s after its latest RETIRE_REQUESTED (${new Date(requestedAt).toISOString()}), never in the past.`,
     '[Timer]',
-    `OnCalendar=${utcCalendar(requestedAt + RETIRE_CHECK_AFTER_MS)}`,
+    `OnCalendar=${utcCalendar(at)}`,
     ''
   ].join('\n');
   try { await io.writeUnitFile(`${unitDirOf(layout)}/${timer}.d/50-at.conf`, text); } catch { refuse('RETIRE_CHECK_TIMER_FAILED'); }
@@ -191,9 +194,10 @@ async function armCheck(label, requestedAt, layout, io) {
 
 /**
  * A RETIRED release needs neither its backstop nor its check: disable and stop both. A timer systemd cannot load (a
- * check that was never armed has no time) has nothing to stop and is left alone.
+ * check that was never armed has no time) has nothing to stop and is left alone. The rollback (D10) uses the exported
+ * disarmTimers for the older label.
  */
-async function disarmTimers(label, layout, io) {
+async function disarmWith(label, layout, io) {
   for (const timer of [retireTimerOf(layout, label), checkTimerOf(layout, label)]) {
     const { LoadState: loadState } = await showUnit(timer, ['LoadState'], layout, io);
     if (loadState === 'loaded' && !await systemctl(['disable', '--now', timer], layout, io)) refuse('RETIRE_TIMER_STOP_FAILED');
@@ -268,7 +272,7 @@ export async function requestRetire({ label, layout = LAYOUT, deps = {} }) {
   const code = noticeCodeOf(label);
   const { state, retireRequested } = await io.readReleaseState({ releaseKey });
   if (state === 'RETIRED') {
-    await disarmTimers(label, layout, io);
+    await disarmWith(label, layout, io);
     return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
   }
   if (state !== 'DRAINING') refuse('RETIRE_STATE_REFUSED', { state });
@@ -279,6 +283,13 @@ export async function requestRetire({ label, layout = LAYOUT, deps = {} }) {
   await armCheck(label, requestedAt, layout, io);
   if (!noticed) refuse('NOTICE_START_FAILED');
   return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_REQUESTED', label, releaseKey });
+}
+
+/** Disable and stop both retirement timers of one release label (the rollback's call, D10); typed refusals as above. */
+export async function disarmTimers({ label, layout = LAYOUT, deps = {} }) {
+  if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
+  await disarmWith(label, layout, withDefaults(layout, deps));
+  return Object.freeze({ event: 'PREVIEW_RELEASE_TIMERS_DISARMED', label });
 }
 
 /** One gate's `state` from its read-only status (initialized, active or halted); anything unreadable is `unknown`. */
@@ -322,7 +333,7 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
     });
   };
   if (state === 'RETIRED') {
-    await disarmTimers(label, layout, io);
+    await disarmWith(label, layout, io);
     return finish('PREVIEW_RELEASE_RETIRE_HONOURED', null);
   }
   if (state !== 'DRAINING' || !retireRequested) refuse('RETIRE_STATE_REFUSED', { state });
@@ -353,13 +364,17 @@ export async function markDrainedRetired({ label, layout = LAYOUT, deps = {} }) 
   const io = withDefaults(layout, deps);
   const releaseKey = await releaseKeyOf(label, layout, io);
   const { state } = await io.readReleaseState({ releaseKey });
-  if (state === 'RETIRED') return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
+  if (state === 'RETIRED') {
+    // Already retired: turn the timers off again, so a disarm that failed on an earlier run is retried.
+    await disarmWith(label, layout, io);
+    return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
+  }
   if (state !== 'DRAINING') refuse('RETIRE_STATE_REFUSED', { state });
   if (await unitIsActive(unitNameFor(layout, 'runner', label), layout, io)) refuse('RELEASE_RUNNER_ACTIVE');
   const openWork = await io.countOpenWork({ releaseKey });
   if (openWork !== 0) refuse('RELEASE_OPEN_WORK', { openWork });
   await recordEvent({ releaseKey, kind: 'RETIRED', reason: 'DRAINED', written: after => after.state === 'RETIRED', io });
-  await disarmTimers(label, layout, io);
+  await disarmWith(label, layout, io);
   return Object.freeze({ event: 'PREVIEW_RELEASE_DRAINED_RETIRED', label, releaseKey, openWork });
 }
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const retire = await import('../../deploy/' + 'preview-lifecycle/v1/release-retire.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { GATES, retiredLinesFound, mayStart, recordStop, requestRetire, checkRetire, markDrainedRetired, main } = retire;
+const { GATES, retiredLinesFound, mayStart, recordStop, requestRetire, checkRetire, markDrainedRetired, disarmTimers, main } = retire;
 const layout = common.LAYOUT;
 const KEY = ['r19', 'd50e33165a1b'].join('-');
 const OTHER_KEY = ['r20', '0123456789ab'].join('-');
@@ -234,6 +237,34 @@ describe('the backstop request (side-by-side spec §4)', () => {
     }
   });
 
+  it('arms a request older than 25 minutes (a manual re-run, a second drain) one second from now, never in the past', async () => {
+    // The default request is 26 minutes old; its due time 07:59:00 has passed, and a past calendar time never fires.
+    const late = harness({ retireRequested: true });
+    await requestRetire({ label: 'old-v1', layout, deps: late.deps });
+    expect(settings(late.written[0]![1])).toEqual(['[Timer]', 'OnCalendar=2026-10-22 08:00:01 UTC']);
+    // Due within the next second: still at least one second ahead (rounded up).
+    const close = harness({ retireRequested: true, requestedAgoMs: 25 * MINUTE - 300 });
+    await requestRetire({ label: 'old-v1', layout, deps: close.deps });
+    expect(settings(close.written[0]![1])[1]).toBe('OnCalendar=2026-10-22 08:00:01 UTC');
+  });
+
+  it('writes the drop-in itself, root-style: 0644 file in a 0755 folder under the unit folder', async () => {
+    const unitDir = realpathSync(mkdtempSync(join(tmpdir(), 'retire-unit-dir-')));
+    const own = { ...layout, systemdUnitDir: unitDir, ownerUid: process.getuid!(), ownerGid: process.getgid!() };
+    const h = harness({ requestedAgoMs: 0 });
+    delete h.deps.writeUnitFile;
+    await requestRetire({ label: 'old-v1', layout: own, deps: h.deps });
+    const folder = join(unitDir, 'debateai-preview-runner-retire-check@old-v1.timer.d');
+    expect(settings(readFileSync(join(folder, '50-at.conf'), 'utf8'))).toEqual(['[Timer]', 'OnCalendar=2026-10-22 08:25:00 UTC']);
+    expect(statSync(join(folder, '50-at.conf')).mode & 0o777).toBe(0o644);
+    expect(statSync(folder).mode & 0o777).toBe(0o755);
+    // A second request replaces it.
+    const again = harness({ retireRequested: true, requestedAgoMs: -2000 });
+    delete again.deps.writeUnitFile;
+    await requestRetire({ label: 'old-v1', layout: own, deps: again.deps });
+    expect(settings(readFileSync(join(folder, '50-at.conf'), 'utf8'))).toEqual(['[Timer]', 'OnCalendar=2026-10-22 08:25:02 UTC']);
+  });
+
   it('refuses loudly when the check cannot be armed', async () => {
     for (const options of [{ writeUnitFails: true }, { failVerbs: ['daemon-reload'] }, { failVerbs: ['enable'] }, { failVerbs: ['restart'] }]) {
       await rejectsWith(requestRetire({ label: 'old-v1', layout, deps: harness(options).deps }), 'RETIRE_CHECK_TIMER_FAILED');
@@ -372,6 +403,22 @@ describe('the drained path', () => {
     const done = harness({ state: 'RETIRED', runnerActive: false });
     expect(await markDrainedRetired({ label: 'old-v1', layout, deps: done.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label: 'old-v1', releaseKey: KEY });
     expect(done.events).toEqual([]);
+    // Already retired: the timers are turned off again, so a disarm that failed last time is retried.
+    expect(done.systemctl).toEqual([['disable', '--now', RETIRE_TIMER], ['disable', '--now', CHECK_TIMER]]);
+    await rejectsWith(markDrainedRetired({ label: 'old-v1', layout, deps: harness({ state: 'RETIRED', runnerActive: false, failVerbs: ['disable'] }).deps }), 'RETIRE_TIMER_STOP_FAILED');
+  });
+});
+
+describe('turning a release\'s timers off (exported for the rollback, D10)', () => {
+  it('disables both timers of that label and leaves one that cannot load alone', async () => {
+    const h = harness();
+    await disarmTimers({ label: 'old-v1', layout, deps: h.deps });
+    expect(h.systemctl).toEqual([['disable', '--now', RETIRE_TIMER], ['disable', '--now', CHECK_TIMER]]);
+    const unarmed = harness({ timerLoad: { [CHECK_TIMER]: 'bad-setting', [RETIRE_TIMER]: 'not-found' } });
+    await disarmTimers({ label: 'old-v1', layout, deps: unarmed.deps });
+    expect(unarmed.systemctl).toEqual([]);
+    await rejectsWith(disarmTimers({ label: 'old-v1', layout, deps: harness({ failVerbs: ['disable'] }).deps }), 'RETIRE_TIMER_STOP_FAILED');
+    await rejectsWith(disarmTimers({ label: '../old', layout, deps: h.deps }), 'ARGUMENTS_REFUSED');
   });
 });
 
