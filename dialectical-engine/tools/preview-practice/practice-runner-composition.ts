@@ -176,13 +176,13 @@ export async function composePracticeRunnerMoney(input: Readonly<{
     (input.log ?? console.warn)(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
   }
   const fundingEntitlements = new EntitlementRepository(pool);
-  const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+  const allowances = new PostgresInternalAllowanceRepository(pool);
   const selectedFunding = await allowances.readPolicy();
   if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== "hosted" || envelopeBand === null || billingPlans === null))
     throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing and finite envelope members");
   const fundingAllowance = selectedFunding === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
     allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-    plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+    plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
   });
   const sharedWallTerms = costEnvelopePolicy === null
     ? null

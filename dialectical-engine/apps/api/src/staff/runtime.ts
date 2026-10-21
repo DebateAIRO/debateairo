@@ -153,7 +153,7 @@ export async function createStaffRuntime(input: Readonly<{
     const operator = await loadStaffAlertOperator({ path: input.environment.operatorModulePath, sha256: input.environment.operatorModuleSha256, ...(input.operatorFiles ? { files: input.operatorFiles } : {}) });
     try {
         await readStaffAccessPolicy(input.pool, input.registerVersion, input.environment.internalAllowancePolicy === undefined ? undefined : 1);
-        const allowances = new PostgresInternalAllowanceRepository(input.pool, { registerVersion: input.registerVersion });
+        const allowances = new PostgresInternalAllowanceRepository(input.pool);
         const selectedFunding = await allowances.readPolicy();
         if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);

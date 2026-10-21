@@ -6,7 +6,11 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 
 /**
  * 0123 (side-by-side uploads spec 2026-10-21 §1, §5; plan A, tasks A1-A5) is ONE chain step built section by section:
- * A1 gives it the release stamp on core.run and the encrypted insert path that writes it. It is the drained transition
+ * A1 gives it the release stamp on core.run and the encrypted insert path that writes it; A2 the release table, its view,
+ * its two readers and its two serialized writers (§3); A3 the re-admission records and the two new wait reasons (§4, §5);
+ * A4 the funding functions redefined so a grant stays valid under the version it was issued with, and the funding
+ * publication reader at a version (§6).
+ * It is the drained transition
  * upload's step (`-- n1: drained`) and adds no billing object, so 0111's effective verifier stays in force
  * (`-- n1: keeps-verifier`, migrations/lineage/README.md step 3).
  */
@@ -76,6 +80,160 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION core\.create_encrypted_run\(jsonb,uuid,uuid,jsonb\) TO debateai_content_provision;/u);
     // The closing contract checks what the file claims, by code.
     expect(sql).toContain("SIDE_BY_SIDE_RELEASE_STAMP_CONTRACT_INCOMPLETE");
+  });
+
+  it("§3 adds the release table, its view, two readers for the runtime and two writers serialized on one lock", () => {
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS core.release_event (");
+    expect(sql).toContain("CONSTRAINT release_event_key_shape CHECK (release_key <> 'legacy' AND release_key ~ '^r[1-9][0-9]*-[0-9a-f]{12}$')");
+    expect(sql).toContain("CREATE INDEX IF NOT EXISTS release_event_key_seq_idx ON core.release_event (release_key, event_seq DESC);");
+    expect(sql).toContain("SELECT core.install_truncate_guard('core.release_event');");
+    expect(sql).toMatch(/CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON core\.release_event\s+FOR EACH STATEMENT EXECUTE FUNCTION core\.reject_mutation\(\);/u);
+    expect(sql).toContain("CREATE OR REPLACE VIEW core.release_state_v AS");
+    for (const role of ["debateai_release_owner", "debateai_release_operator"]) expect(sql).toContain(`CREATE ROLE ${role} NOLOGIN NOINHERIT;`);
+    // Both writers take the one lock the INTERFACE names, first, and need READ COMMITTED.
+    expect(sql.split("PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('debateai:release-switch', 0));")).toHaveLength(3);
+    expect(sql.split("IF pg_catalog.current_setting('transaction_isolation') <> 'read committed' THEN")).toHaveLength(3);
+    // Phase 2's settings hook (plan S, addendum item 5), verbatim, after the compare-and-swap and before the inserts.
+    const hook = [
+      "  IF pg_catalog.to_regprocedure('register.release_switch_settings_hook(text,bigint)') IS NOT NULL THEN",
+      "    PERFORM register.release_switch_settings_hook(p_new, p_expected_active_settings);",
+      "  ELSIF p_expected_active_settings IS NOT NULL THEN",
+      "    RAISE EXCEPTION 'SETTINGS_ACTIVATION_CONFLICT';",
+      "  END IF;"
+    ].join("\n");
+    const hookAt = sql.indexOf(hook);
+    expect(hookAt).toBeGreaterThan(sql.indexOf("MESSAGE = 'RELEASE_SWITCH_CONFLICT'"));
+    expect(hookAt).toBeLessThan(sql.indexOf("VALUES (p_new, 'CURRENT', p_take_traffic_from, p_recorded_by)"));
+    for (const signature of ["core.read_current_release()", "core.read_release_state(text)",
+      "core.record_release_switch(text,text,timestamptz,text,bigint)", "core.record_release_event(text,text,text,text)"]) {
+      expect(sql).toContain(`ALTER FUNCTION ${signature} OWNER TO debateai_release_owner;`);
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC;`);
+    }
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.read_current_release() TO debateai_runtime;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.read_release_state(text) TO debateai_runtime;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.record_release_switch(text,text,timestamptz,text,bigint) TO debateai_release_operator;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO debateai_release_operator;");
+    expect(sql).toContain("SIDE_BY_SIDE_RELEASE_TABLE_CONTRACT_INCOMPLETE");
+    // The loader digests the table whole, the view, the four functions and the two roles.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("const TABLES=['core.release_event',"); // §4 appends core.run_supersession
+    expect(loader).toContain("const VIEWS=['core.release_state_v'] as const;");
+    expect(loader).toContain("const ROLES=['debateai_release_operator','debateai_release_owner'] as const;");
+    expect(loader).toContain("'core.record_release_switch(text,text,timestamptz,text,bigint)'");
+  });
+
+  it("§4 adds the append-only supersession record, its guard, run ref resolution and the line without superseded runs", () => {
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS core.run_supersession (");
+    expect(sql).toContain("old_run_id uuid PRIMARY KEY REFERENCES core.run(run_id),");
+    expect(sql).toContain("new_run_id uuid NOT NULL UNIQUE REFERENCES core.run(run_id),");
+    expect(sql).toContain("CONSTRAINT run_supersession_reason_closed CHECK (reason IN ('READMITTED'))");
+    expect(sql).toContain("CONSTRAINT run_supersession_changes_the_run CHECK (old_run_id <> new_run_id)");
+    expect(sql).toContain("SELECT core.install_truncate_guard('core.run_supersession');");
+    expect(sql).toMatch(/CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON core\.run_supersession\s+FOR EACH STATEMENT EXECUTE FUNCTION core\.reject_mutation\(\);/u);
+    expect(sql).toMatch(/CREATE TRIGGER guard_run_supersession BEFORE INSERT ON core\.run_supersession\s+FOR EACH ROW EXECUTE FUNCTION core\.guard_run_supersession\(\);/u);
+    // The guard: one lock for every edge, the old run's wait row locked against a concurrent start, the refusal code.
+    const guard = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.guard_run_supersession()"));
+    expect(guard.slice(0, guard.indexOf("$$;"))).toContain(
+      "PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';");
+    expect(sql).toContain("ALTER FUNCTION core.resolve_run_ref(uuid) OWNER TO debateai_release_owner;");
+    // The API's role alone records and resolves (controller ruling 2026-10-22): the runner holds debateai_runtime only.
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.resolve_run_ref(uuid) TO debateai_billing_runtime;");
+    expect(sql).toContain("GRANT SELECT, INSERT ON core.run_supersession TO debateai_billing_runtime;");
+    expect(sql).not.toMatch(/GRANT [^;]*ON (FUNCTION core\.resolve_run_ref\(uuid\)|core\.run_supersession) TO debateai_runtime;/u);
+    // A superseded run never starts: a new trigger on 0083's start table, no 0083 object redefined.
+    expect(sql).toMatch(/CREATE TRIGGER refuse_starting_superseded_run BEFORE INSERT ON core\.run_wait_start\s+FOR EACH ROW EXECUTE FUNCTION core\.refuse_starting_superseded_run\(\);/u);
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSEDED';");
+    expect(sql).toContain("GRANT SELECT ON core.run_supersession TO debateai_release_owner;");
+    // The view: 0083's, with one more clause, and 0083's grant re-asserted.
+    const view = sql.slice(sql.indexOf("CREATE OR REPLACE VIEW core.run_waiting_v AS"));
+    const original = read("migrations/0083_budget_holds_waiting_line.sql");
+    const before = original.slice(original.indexOf("CREATE OR REPLACE VIEW core.run_waiting_v AS"));
+    expect(view.slice(0, view.indexOf(";"))).toBe(`${before.slice(0, before.indexOf(";"))}
+  AND NOT EXISTS (SELECT 1 FROM core.run_supersession s WHERE s.old_run_id = wait.run_id)`);
+    expect(view).toContain("GRANT SELECT ON core.run_waiting_v TO debateai_runtime;");
+    // A-x1: the readmitted provision is the content role's alone, and the commit takes its marked intent.
+    expect(sql).toContain("ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.prepare_readmitted_run_key_provision(uuid,uuid) TO debateai_content_provision;");
+    // A marked intent commits through the readmit lock ONLY; an unmarked one keeps 0040's lock (one CASE branch).
+    expect(sql).toContain("WHERE marked.run_id=v_run_id AND marked.readmitted_from_run_id IS NOT NULL");
+    expect(sql).toContain(") THEN core.lock_readmitted_run_key_provision_for_commit(");
+    expect(sql).toContain(") ELSE core.lock_run_key_provision_for_commit(");
+    // One live re-admission per old run: the durable marker on the binding and the pending-intent index.
+    expect(sql).toContain("ALTER TABLE identity.run_execution_binding ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;");
+    expect(sql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS run_key_provision_intent_one_readmission_idx");
+    expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_READMISSION_TAKEN';");
+    expect(sql).toContain("SIDE_BY_SIDE_READMISSION_CONTRACT_INCOMPLETE");
+    // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession'] as const;");
+    for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)", "core.refuse_starting_superseded_run()",
+      "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)"]) {
+      expect(loader).toContain(`'${signature}'`);
+    }
+    expect(loader).toContain("const VIEWS=['core.release_state_v'] as const;");
+    expect(read("packages/db/src/index.ts")).toContain('"core.prepare_readmitted_run_key_provision(uuid,uuid)"');
+  });
+
+  it("§5 widens the wait reasons with SITE_BUSY and SWITCHING, NOT VALID then validated", () => {
+    expect(sql).toContain("AND strpos(pg_catalog.pg_get_constraintdef(check_constraint.oid), 'waits_for') > 0");
+    expect(sql).toContain("AND strpos(pg_catalog.pg_get_constraintdef(check_constraint.oid), 'person_recheck_at') = 0");
+    expect(sql).toContain("ADD CONSTRAINT run_wait_reason_waits_for_check CHECK (waits_for IN ('SITE','PERSON','SITE_BUSY','SWITCHING')) NOT VALID;");
+    expect(sql).toContain("ALTER TABLE core.run_wait_reason VALIDATE CONSTRAINT run_wait_reason_waits_for_check;");
+    expect(sql).toContain("SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE");
+  });
+
+  it("§6 redefines the five funding functions without the version comparisons and the self command naming a revoke's grant version, re-asserting owner and grants, and adds the reader at a version", () => {
+    const body = (signature: string): string => {
+      const start = sql.indexOf(`CREATE OR REPLACE FUNCTION ${signature}`);
+      expect(start, signature).toBeGreaterThan(sql.indexOf("-- §6. Funding grants stay valid"));
+      return sql.slice(start, sql.indexOf("END $$;", start));
+    };
+    expect(sql).toContain("-- Drained T, spec §9, C15:");
+    const reserve = body("billing.reserve_internal_provider_call(");
+    expect(reserve).not.toContain("register_version=(v_grant->>'policyRegisterVersion')");
+    expect(reserve).toContain("IF v_grant IS NULL OR v_now>=(v_grant->>'expiresAt')::timestamptz OR v_now<(v_grant->>'startsAt')::timestamptz THEN");
+    const state = body("billing.read_internal_run_state(");
+    expect(state).toContain("IF NOT EXISTS(SELECT 1 FROM staff.funding_policy_selection f WHERE f.singleton) THEN RETURN 'UNAVAILABLE';END IF;");
+    expect(state).toContain("FROM register.register_version v WHERE v.register_version=v_grant.policy_register_version;");
+    expect(state).not.toContain("FROM core.run");
+    expect(body("billing.read_internal_allowance(")).not.toContain("INTERNAL_FUNDING_POLICY_MISMATCH");
+    expect(body("billing.read_internal_allowance(")).toContain("IF v_policy IS NULL THEN");
+    expect(body("billing.guard_internal_charge_scope(")).not.toContain("policy_register_version");
+    const revoke = body("staff.revoke_internal_allowance(");
+    expect(revoke).not.toContain("(staff.read_internal_funding_policy())->'registerVersion'");
+    expect(revoke).toContain("IF v_grant.policy_register_version IS DISTINCT FROM (p_command->>'policyRegisterVersion')::bigint THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_POLICY_MISMATCH'; END IF;");
+    // configure is not redefined: new grants take the selection's version.
+    expect(sql).not.toContain("FUNCTION staff.configure_internal_allowance(");
+    expect(body("staff.read_internal_funding_policy_at(")).not.toContain("funding_policy_selection");
+    // The staff app's revoke names its grant's own version; a configure (no grant) still names the selection's.
+    const self = body("staff.read_self_allowance_command(");
+    expect(self).toContain("SELECT policy_register_version INTO v_version FROM billing.internal_grant WHERE grant_id=p_grant AND owner_ref=v_owner;");
+    expect(self).toContain("v_version:=(v_policy->>'registerVersion')::bigint;");
+    expect(self).toContain("'policyRegisterVersion',v_version);");
+    for (const signature of ["billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)", "billing.read_internal_run_state(uuid)",
+      "billing.read_internal_allowance(uuid,timestamptz)", "billing.guard_internal_charge_scope()",
+      "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.read_internal_funding_policy_at(bigint)",
+      "staff.read_self_allowance_command(jsonb,text,uuid)"]) {
+      expect(sql).toContain(`ALTER FUNCTION ${signature} OWNER TO debateai_staff_security_owner;`);
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,debateai_runtime,debateai_staff_recovery;`);
+      if (signature !== "billing.guard_internal_charge_scope()") expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
+    }
+    expect(sql).not.toContain("GRANT EXECUTE ON FUNCTION billing.guard_internal_charge_scope()");
+    // No billing function is added: every billing function §6 names already exists in 0092/0093.
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION billing\.(?!reserve_internal_provider_call\(|read_internal_run_state\(|read_internal_allowance\(|guard_internal_charge_scope\()/u);
+    expect(sql).toContain("SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE");
+    // The loader digests the new reader; the six redefinitions are checked by the closing block and the tests.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("'staff.read_internal_funding_policy_at(bigint)'");
+    expect(loader).not.toContain("'billing.read_internal_allowance(uuid,timestamptz)'");
+  });
+
+  it("§2's closing check covers every role 0040's REVOKE names, not only PUBLIC and the runtime", () => {
+    for (const role of ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_replay", "debateai_publication_cleanup"]) {
+      expect(sql).toContain(`OR has_function_privilege('${role}', v_function, 'EXECUTE')`);
+    }
   });
 
   it("is documented as the thirteenth step, keeping 0111's verifier", () => {

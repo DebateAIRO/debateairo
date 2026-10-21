@@ -580,13 +580,13 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
-      const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+      const allowances = new PostgresInternalAllowanceRepository(pool);
       const selectedFunding = await allowances.readPolicy();
       const configuredFunding = environment.STAFF_ACCESS.policyVersion === 2 ? environment.STAFF_ACCESS.internalAllowancePolicy : undefined;
       if ((selectedFunding === null) !== (configuredFunding === undefined)) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
       const fundedAllowance = selectedFunding === null ? undefined : entitlements === null || billingPlans === null
         ? (()=>{throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing");})()
-        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:band.closeBasisPoints});
+        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
         : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
