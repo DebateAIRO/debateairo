@@ -17,6 +17,7 @@ import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationStat
 export * from "./publication-check.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
+export * from "./release-state.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";

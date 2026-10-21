@@ -40,6 +40,9 @@ const PRODUCT_ROLES = [
   "debateai_prod_staff_recovery",
   "debateai_publication_cleanup",
   "debateai_register_publication_owner",
+  // Side-by-side releases (0123 §3): the release table's function owner and its writers' operator group.
+  "debateai_release_operator",
+  "debateai_release_owner",
   "debateai_replay",
   "debateai_runtime",
   "debateai_settlement_watch",

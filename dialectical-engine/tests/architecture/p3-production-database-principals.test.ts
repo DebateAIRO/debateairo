@@ -150,6 +150,12 @@ const externalRecoveryRoles = [
 // not a SCRAM principal of the P3-01 provisioner manifest.
 const peerReadinessRoles = ["debateai_staff_readiness_writer"] as const;
 
+// Side-by-side releases (migration 0123 §3, spec 2026-10-21 §4, §6): the release table's NOLOGIN NOINHERIT function owner
+// and its writers' NOLOGIN NOINHERIT operator group. Phase 1 provisions no login in either (the preview runs the writers
+// as postgres through root), so neither is yet a P3-01 provisioner role; the public server's operator login (Phase 3)
+// brings them into the manifest.
+const sideBySideReleaseRoles = ["debateai_release_operator", "debateai_release_owner"] as const;
+
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
 // principal may hold any predefined pg_* role.
 function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
@@ -766,7 +772,7 @@ describe("P3-01 production database-principal manifest", () => {
         .map(({ roleName }) => roleName)
         .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
-    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles,...peerReadinessRoles].sort());
+    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles,...peerReadinessRoles,...sideBySideReleaseRoles].sort());
     expect(manifest.retiredCapabilityRoles).toEqual([{roleName:"debateai_password_recovery_runtime",login:false,inherit:false,directMemberships:[],status:"RETIRED_BY_0104",reason:expect.any(String)}]);
 
     const sourceDatabaseKeys = [...new Set([

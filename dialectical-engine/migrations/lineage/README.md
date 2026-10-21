@@ -216,11 +216,16 @@ The thirteenth chain step, after the engine's map answer step 0122 (side-by-side
 §1 adds `core.run.release_key` (`text NOT NULL DEFAULT 'legacy'`, CHECK `run_release_key_shape`), the release that runs
 each debate, written once at insert; §2 redefines `core.create_encrypted_run(jsonb,uuid,uuid,jsonb)` in place (0072's
 body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-asserting SECURITY DEFINER, the pinned
-`search_path` and EXECUTE for `debateai_content_provision` only. Its header declares `-- n1: drained` (T is uploaded
+`search_path` and EXECUTE for `debateai_content_provision` only; §3 adds the release table `core.release_event`
+(append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
+`core.read_release_state(text)` (EXECUTE for `debateai_runtime`) and the writers `core.record_release_switch` and
+`core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
+advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`. Its header declares `-- n1: drained` (T is uploaded
 with no debate waiting or running, so it may add a NOT NULL column and redefine earlier functions, each such section
 saying why) and `-- n1: keeps-verifier`: no billing relation or function, so `verify-effective-capabilities-111.sql`
 stays the verifier in force. No supplemental verifier, so no `replayVerifierSql`: its postcondition is the column (type,
-NOT NULL, default), the CHECK (name, validation, definition) and the redefined function whole. While the build is open
+NOT NULL, default), the CHECK (name, validation, definition), the redefined and added functions whole, the release
+table whole, the view (owner, ACL, definition) and the two roles' attributes and memberships. While the build is open
 each task appends its section and recomputes `migration.sha256` with the one-liner at the end of this file; once merged,
 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename every file and constant that
 carries the number, recompute the manifest, re-pin the chain lists).
