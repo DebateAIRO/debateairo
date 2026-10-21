@@ -2,13 +2,22 @@
  * How many Postgres connections each always-on process may hold, pool by pool,
  * and how long a caller waits for one before it is told the database is busy.
  *
- * Pre-launch budget, 2026-10-10. The server allows 200 connections (3 kept for
+ * Pre-launch budget, 2026-10-10. The server allowed 200 connections (3 kept for
  * the superuser) and Hatchet's role may take 50 of them. Owner rulings that day:
  * size for ONE API process — the server runs exactly one — and let the runner
  * run at most 8 debates at once. One API is 79 connections at most and the
- * runner 34 (20 until parallel AI calls, 2026-10-12), which leaves room for
- * Hatchet, the migrator, the operator's commands and 21 spare. A second API process needs PgBouncer or a higher limit
- * first. The plan, the per-pool audit and the arithmetic:
+ * runner 34 (20 until parallel AI calls, 2026-10-12), which left room for
+ * Hatchet, the migrator, the operator's commands and 21 spare. A second API
+ * process needed PgBouncer or a higher limit first.
+ *
+ * Side by side, 2026-10-21 (spec §9): while two releases overlap, the server
+ * allows 320 connections (3 kept for the superuser), and each release runs one
+ * API and one runner. Two of each come to 2 × (79 + 34) = 226; with Hatchet's 50,
+ * the migrator's 3 and the operator's about 10 that is 289, which leaves 28 spare
+ * (317 = 320 less 3). The raise takes effect only at a Postgres restart
+ * (deploy/postgres/postgresql.hardening.conf). The pool sizes below did not change.
+ *
+ * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
  * main.ts and these numbers in step: tests/architecture/database-connection-budget.test.ts.
  *
