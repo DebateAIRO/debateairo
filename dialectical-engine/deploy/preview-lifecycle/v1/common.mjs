@@ -27,6 +27,10 @@ export const LAYOUT = Object.freeze({
   unitPrefix: 'debateai-preview-',
   stateDir: '/var/lib/debateai-v3-preview/lifecycle',
   backupDir: '/var/backups/debateai-v3-preview',
+  // A retired release is moved aside, never deleted (side-by-side spec §10, release-archive.mjs): its folders below
+  // archiveRoot (same disk as the releases), its /etc files and unit drop-ins below configArchiveRoot (same disk as /etc).
+  archiveRoot: '/opt/debateai-v3-preview/archive',
+  configArchiveRoot: '/root/preview-archive',
   postgresCa: '/etc/debateai-v3-preview/postgres-tls/ca.crt',
   peerModule: '/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',
   pgBin: '/usr/lib/postgresql/18/bin',
