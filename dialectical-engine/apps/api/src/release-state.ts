@@ -17,10 +17,13 @@ import { readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from
  * - `readiness()` — the reasons /readyz carries (spec §6), in the fixed order of ReadinessReason. DRAINING is SIGTERM's
  *   alone: a staged release that is not yet current reads exactly ["NOT_CURRENT"] (plan D's switch preconditions).
  * - `onBecameCurrent(listener)` — fired on every false→true of ownIsCurrent() as seen at a poll, the first poll in
- *   start() included.
+ *   start() included; a listener registered while the release already is current fires once at once (controller ruling,
+ *   C3 fix round 1), so work registered after start() — the post-listen one-shots — still runs on a current release.
  *
- * Polls chain with setTimeout (unref'd), so they never overlap and never hold the process open. Every log line is
- * content-free: an event code and at most a driver code, never an error's text, a key or a value.
+ * Polls chain with setTimeout (unref'd), so they never overlap and never hold the process open. A read that has not
+ * answered within `staleMs` counts as a failed read (RELEASE_READ_TIMEOUT: the runtime pool has no statement timeout, and
+ * a hung read must not stop the chain). Every log line is content-free: an event code and at most a driver code, never an
+ * error's text, a key or a value; a read that fails after stop() prints nothing.
  */
 export type { ReleaseLifecycleState };
 export type ReleaseState = Readonly<{ state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean }>;
@@ -129,6 +132,11 @@ export class ReleaseWatcher {
     return this.#drainBegun || (this.#last !== null && !this.#lastSaysOwn());
   }
 
+  /**
+   * BEFORE_TAKE_TRAFFIC_FROM compares the database's instant with this process's clock: it assumes the API and the
+   * database share one host clock (the preview's layout), and spec §6's margin between the switch and the take-traffic-from
+   * instant absorbs the small skew a second host would add.
+   */
   readiness(): ReleaseReadiness {
     const reasons: ReadinessReason[] = [];
     if (!this.#booted) reasons.push("BOOTING");
@@ -142,15 +150,44 @@ export class ReleaseWatcher {
     return Object.freeze({ ready: reasons.length === 0, releaseKey: this.#releaseKey, reasons: Object.freeze(reasons) });
   }
 
-  /** Returns the unsubscribe. A listener that throws is logged by code and never stops the others or the watcher. */
+  /**
+   * Returns the unsubscribe. Registered while the release already is current, the listener fires once at once; then on
+   * every later false→true. A listener that throws is logged by code and never stops the others or the watcher.
+   */
   onBecameCurrent(listener: () => void): () => void {
     const own = (): void => listener();
     this.#listeners.add(own);
+    if (this.#wasCurrent && this.ownIsCurrent()) this.#fire(own);
     return () => { this.#listeners.delete(own); };
   }
 
+  /** A clock stepped back before the last read makes that read stale, never fresh (fail closed). */
   #fresh(): boolean {
-    return this.#last !== null && this.#clock() - this.#last.readAt <= this.#staleMs;
+    if (this.#last === null) return false;
+    const age = this.#clock() - this.#last.readAt;
+    return age >= 0 && age <= this.#staleMs;
+  }
+
+  #fire(listener: () => void): void {
+    try {
+      listener();
+    } catch (error) {
+      this.#line("LISTENER_FAILED", codeOf(error));
+    }
+  }
+
+  /** readCurrent() raced against `staleMs`: a read that never answers is a failed read, so the chain goes on. */
+  async #readWithin(): Promise<Awaited<ReturnType<ReleaseStateReader["readCurrent"]>>> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error("RELEASE_READ_TIMEOUT"), { code: "RELEASE_READ_TIMEOUT" })), this.#staleMs);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([this.#reader.readCurrent(), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   #lastSaysOwn(): boolean {
@@ -170,13 +207,14 @@ export class ReleaseWatcher {
 
   async #poll(): Promise<void> {
     try {
-      const current = await this.#reader.readCurrent();
+      const current = await this.#readWithin();
       this.#last = Object.freeze({
         current: current?.releaseKey ?? null, takeTrafficFrom: current?.takeTrafficFrom ?? null, readAt: this.#clock()
       });
       if (this.#failing) this.#line("READ_RECOVERED");
       this.#failing = false;
     } catch (error) {
+      if (this.#stopped) return; // a normal shutdown ends the pool under a read: no false READ_FAILED
       if (!this.#failing) this.#line("READ_FAILED", codeOf(error));
       this.#failing = true;
     }
@@ -187,13 +225,7 @@ export class ReleaseWatcher {
     this.#wasCurrent = isCurrent;
     if (!became) return;
     this.#line("BECAME_CURRENT");
-    for (const listener of [...this.#listeners]) {
-      try {
-        listener();
-      } catch (error) {
-        this.#line("LISTENER_FAILED", codeOf(error));
-      }
-    }
+    for (const listener of [...this.#listeners]) this.#fire(listener);
   }
 
   #line(event: WatchEvent, code?: string): void {

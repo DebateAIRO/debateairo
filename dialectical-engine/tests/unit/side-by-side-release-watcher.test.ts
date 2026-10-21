@@ -202,6 +202,85 @@ describe("side-by-side C3: the API's release watcher", () => {
     w.stop();
   });
 
+  it("a listener registered after start while current fires once at once, and later polls do not fire it again", async () => {
+    current = { releaseKey: OWN, takeTrafficFrom: new Date(START - 60_000) };
+    const w = watcher(true);
+    await w.start();
+    let fired = 0;
+    w.onBecameCurrent(() => { fired += 1; });
+    expect(fired).toBe(1);
+    await advance(3 * RELEASE_WATCH_POLL_MS);
+    expect(fired).toBe(1);
+    w.stop();
+  });
+
+  it("a listener registered while not current does not fire until the release becomes current", async () => {
+    current = { releaseKey: NEXT, takeTrafficFrom: new Date(START - 60_000) };
+    const w = watcher(true);
+    await w.start();
+    let fired = 0;
+    w.onBecameCurrent(() => { fired += 1; });
+    expect(fired).toBe(0);
+    current = { releaseKey: OWN, takeTrafficFrom: new Date(START) };
+    await advance(RELEASE_WATCH_POLL_MS);
+    expect(fired).toBe(1);
+    w.stop();
+  });
+
+  it("a wall clock stepped back before the last read counts that read as stale (fail closed)", async () => {
+    const w = watcher(false);
+    await w.start();
+    expect(w.ownIsCurrent()).toBe(true);
+    now -= 1;
+    expect(w.ownIsCurrent()).toBe(false);
+    expect(w.readiness().reasons).toContain("DATABASE_UNREACHABLE");
+    w.stop();
+  });
+
+  it("a read that never returns is a failed read after staleMs, and the chain goes on to recover", async () => {
+    let hang = true;
+    let calls = 0;
+    const stuck: ReleaseStateReader = {
+      async readCurrent() {
+        calls += 1;
+        if (hang) return new Promise<never>(() => undefined);
+        return null;
+      },
+      async readState() { return null; }
+    };
+    const w = new ReleaseWatcher({ releaseKey: OWN, hosted: false, reader: stuck, clock: () => now, log: (line) => lines.push(line) });
+    const started = w.start();
+    await advance(RELEASE_WATCH_STALE_MS);
+    await started;
+    expect(w.ownIsCurrent()).toBe(false);
+    expect(lines.filter((line) => line.includes("READ_FAILED"))).toHaveLength(1);
+    expect(lines.some((line) => line.includes("RELEASE_READ_TIMEOUT"))).toBe(true);
+    hang = false;
+    await advance(RELEASE_WATCH_STALE_MS + RELEASE_WATCH_POLL_MS);
+    expect(calls).toBeGreaterThan(1);
+    expect(w.ownIsCurrent()).toBe(true);
+    w.stop();
+  });
+
+  it("a read that fails after stop prints no READ_FAILED", async () => {
+    let reject: ((error: Error) => void) | undefined;
+    const late: ReleaseStateReader = {
+      async readCurrent() {
+        if (reject === undefined) return null;
+        return new Promise<never>((_, fail) => { reject = fail; });
+      },
+      async readState() { return null; }
+    };
+    const w = new ReleaseWatcher({ releaseKey: OWN, hosted: false, reader: late, clock: () => now, log: (line) => lines.push(line) });
+    await w.start();
+    reject = () => undefined;
+    await advance(RELEASE_WATCH_POLL_MS);
+    w.stop();
+    reject(Object.assign(new Error("pool ended"), { code: "ECONNRESET" }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lines.some((line) => line.includes("READ_FAILED"))).toBe(false);
+  });
+
   it("a listener that throws is logged by code and never stops the watcher or the other listeners", async () => {
     const w = watcher(false);
     let other = 0;
