@@ -120,5 +120,18 @@
   "home.crisisSupport.misread": "Om vi har missförstått din fråga kan du formulera om den.",
   "home.crisisSupport.back": "Tillbaka till min fråga",
   "home.crisisSupport.chooseCountry": "Välj ditt land för att se dess stödlinjer.",
-  "home.crisisSupport.emergencyAnywhere": "Om du eller någon annan är i akut fara, ring ditt lokala nödnummer nu."
+  "home.crisisSupport.emergencyAnywhere": "Om du eller någon annan är i akut fara, ring ditt lokala nödnummer nu.",
+  "home.flag.flagged": "Har varningar",
+  "home.removal.title": "Vi tog bort den här debatten",
+  "home.removal.what": "Vi behåller den inte, och den kan inte återställas.",
+  "home.removal.reach": "Endast denna debatt togs bort. Ditt konto och dina andra debatter är orörda.",
+  "home.removal.facts": "Vår automatiska kontroll av dess slutsats fann \"tendenser till självmord eller att skada andra människor\". Ingen rapporterade det till oss, och ingen läste det.",
+  "home.removal.automatic": "Detta beslut fattades av ett automatiserat verktyg, utan någon inblandad person.",
+  "home.removal.ground": "Grund: våra användarvillkor, avsnitt 9 (debatterar våra borttagningar av kontroller).",
+  "home.removal.complain": "För att klaga, skriv till office@dezbatere.ro inom sex månader. Ett klagomål kan inte återuppliva debatten.",
+  "home.removal.close": "Stäng",
+  "home.flag.underReview": "FLAGGAD · UNDER GRANSKNING",
+  "home.flag.approved": "GODKÄNT",
+  "home.flag.refused": "EJ GODKÄND",
+  "home.takeDown.button": "Ta ned"
 }

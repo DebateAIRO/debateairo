@@ -224,7 +224,8 @@ test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstr
       { params: Promise.resolve({ path }) });
     return [...armed];
   };
-  const PUBLISH_CEILING_MS = 85_000;
+  const PUBLISH_CEILING_MS = 145_000;
+  assert.ok(PUBLISH_CEILING_MS >= 2 * 60_000 + 20_000);
   const DEFAULT_CEILING_MS = 30_000;
   const only = (values) => { assert.equal(values.length, 1, "exactly one ceiling is armed"); return values[0]; };
   try {

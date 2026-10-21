@@ -120,5 +120,18 @@
   "home.crisisSupport.misread": "Kui saime teie küsimusest valesti aru, võite selle ümber sõnastada.",
   "home.crisisSupport.back": "Tagasi minu küsimuse juurde",
   "home.crisisSupport.chooseCountry": "Valige oma riik, et näha selle abiliine.",
-  "home.crisisSupport.emergencyAnywhere": "Kui teie või keegi teine on otseses ohus, helistage kohe oma kohalikul hädaabinumbril."
+  "home.crisisSupport.emergencyAnywhere": "Kui teie või keegi teine on otseses ohus, helistage kohe oma kohalikul hädaabinumbril.",
+  "home.flag.flagged": "Lipuga",
+  "home.removal.title": "Kustutasime selle arutelu",
+  "home.removal.what": "Me ei säilita seda ja seda ei saa taastada.",
+  "home.removal.reach": "Kustutati ainult see arutelu. Sinu konto ja muud arutelud on puutumatud.",
+  "home.removal.facts": "Meie selle järelduse automaatne kontroll näitas \"kalduvust enesetapule või teiste inimeste kahjustamisele\". Keegi ei teatanud sellest meile ja keegi ei lugenud seda.",
+  "home.removal.automatic": "See otsus tehti automatiseeritud vahendi abil, ilma et sellega oleks seotud keegi.",
+  "home.removal.ground": "Ground: meie teenusetingimuste 9. jaotis (meie tšeki üle arutlemine kustutatakse).",
+  "home.removal.complain": "Kaebuse esitamiseks kirjutage aadressile office@dezbatere.ro kuue kuu jooksul. Kaebus ei saa arutelu tagasi tuua.",
+  "home.removal.close": "Sule",
+  "home.flag.underReview": "MÄRGITUD · ÜLEVAATAMISEL",
+  "home.flag.approved": "KINNITUD",
+  "home.flag.refused": "EI KINNITUD",
+  "home.takeDown.button": "Eemaldage avalikust vaatest"
 }

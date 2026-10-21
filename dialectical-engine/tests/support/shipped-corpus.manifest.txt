@@ -197,6 +197,13 @@ apps/api/src/support/session.ts
 apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
+apps/api/src/synthesis-check/check.ts
+apps/api/src/synthesis-check/hold.ts
+apps/api/src/synthesis-check/policy.ts
+apps/api/src/synthesis-check/publish-gate.ts
+apps/api/src/synthesis-check/transport.ts
+apps/api/src/synthesis-check/verdict.ts
+apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
 apps/api/src/verification-email.ts
 apps/evaluator-worker/src/index.ts
@@ -457,6 +464,7 @@ apps/ui/components/AuthShell.tsx
 apps/ui/components/BackupEmailVerification.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
+apps/ui/components/CheckRemovalNotice.tsx
 apps/ui/components/CrisisSupport.tsx
 apps/ui/components/DataExportCard.tsx
 apps/ui/components/DateOfBirthField.tsx
@@ -509,6 +517,7 @@ apps/ui/components/StaffInvitationPanel.tsx
 apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisPanel.tsx
+apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
@@ -885,6 +894,7 @@ packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
 packages/contract/src/story.ts
+packages/contract/src/synthesis-check.ts
 packages/contract/src/verdict-state.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
@@ -922,6 +932,7 @@ packages/db/src/migration-forward0119.ts
 packages/db/src/migration-forward0120.ts
 packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
+packages/db/src/migration-forward0123.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -947,6 +958,7 @@ packages/db/src/sessions.ts
 packages/db/src/social-identity.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
+packages/db/src/synthesis-check-erasure.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts
 packages/evaluator/src/consumer.ts
@@ -1113,6 +1125,7 @@ packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
+packages/serve/src/synthesis-check.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/story/src/backup.ts

@@ -64,6 +64,8 @@ export type ModelSpendSource =
   | "RUN"
   | "SUPPORT"
   | "STORY"
+  /** post-settle synthesis inspection: site cost only, never the run's envelope */
+  | "SYNTHESIS_CHECK"
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK";
 
@@ -985,8 +987,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         "A language check's site cost is written only by ledger.record_language_check_spend"
       );
     }
-    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
-      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
+    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK") && entry.runId === null) {
+      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
     }
     // Task M1 (migration 0075): only a RUN charge has a phase. The CHECK
     // `model_spend_phase_is_a_run_charge` says the same one layer lower.
@@ -1012,7 +1014,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   async readRunSpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
-       WHERE run_id = $1 AND spend_source <> 'STORY'`,
+       WHERE run_id = $1 AND spend_source NOT IN ('STORY', 'SYNTHESIS_CHECK')`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);
@@ -1096,11 +1098,20 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
       return this.#total(result.rows[0]?.total);
     }
+    // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
        FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
+         AND NOT EXISTS (
+           SELECT 1 FROM core.run AS run
+           WHERE run.run_id = scope.run_id AND run.plan_tier = 'premium'
+             AND CASE WHEN EXISTS (
+               SELECT 1 FROM serve.synthesis_check_result AS checked
+               WHERE checked.run_id = run.run_id
+             ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
+         )
          AND scope.admitted_at < $3
          AND spend.spend_source IN ('RUN','STORY')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3`,
@@ -1128,6 +1139,14 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
        ) AS spent ON true
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
+         AND NOT EXISTS (
+           SELECT 1 FROM core.run AS run
+           WHERE run.run_id = scope.run_id AND run.plan_tier = 'premium'
+             AND CASE WHEN EXISTS (
+               SELECT 1 FROM serve.synthesis_check_result AS checked
+               WHERE checked.run_id = run.run_id
+             ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
+         )
          AND EXISTS (
            SELECT 1 FROM core.work_item AS work
            WHERE work.run_id = hold.run_id AND work.state IN ('READY','CLAIMED')

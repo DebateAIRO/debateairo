@@ -658,7 +658,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
 // OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
 // data-export module above. migrate() is unchanged by this.
-const NATIVE_MIGRATE_MODULE_SHA256 = "22de0ff607b2ceabbcb1c851592f7a0be6b103d4d3795defce75f35f4fc48c40";
+// synthesis-flag S01 (0123): the reviewed module after it re-exported the synthesis check's erasure module
+// (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "437a1fc0ba019b9dcb6efd4e95551e914e473085f216c89f4febc880a00febab";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

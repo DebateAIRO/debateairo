@@ -19,7 +19,7 @@ afterEach(async () => { await cleanup?.(); cleanup = null; });
 
 it.each(["PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"])("a resumed %s links back with words, never the run id", async (action) => {
   const proof = { status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action, target_run_id: runId, token: "g".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() } };
-  const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
+  const client = { readPublicationReview: vi.fn().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
   const { host, root } = await mount(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={publicCatalog} locale="en" client={client} takeProof={() => proof as never} />);
   cleanup = () => unmount(root, host);
   const link = host.querySelector<HTMLAnchorElement>(`a[href="/debate/${runId}"]`);

@@ -123,5 +123,18 @@
   "home.crisisSupport.misread": "Má bhaineamar míbhrí as do cheist, is féidir leat í a athfhoclú.",
   "home.crisisSupport.back": "Ar ais chuig mo cheist",
   "home.crisisSupport.chooseCountry": "Roghnaigh do thír chun a línte cabhrach a fheiceáil.",
-  "home.crisisSupport.emergencyAnywhere": "Má tá tú féin nó duine eile i mbaol láithreach, glaoigh ar d’uimhir éigeandála áitiúil anois."
+  "home.crisisSupport.emergencyAnywhere": "Má tá tú féin nó duine eile i mbaol láithreach, glaoigh ar d’uimhir éigeandála áitiúil anois.",
+  "home.flag.flagged": "MARCÁILTE",
+  "home.removal.title": "Scriosamar an díospóireacht seo",
+  "home.removal.what": "Ní choinnímid í, agus ní féidir í a athbhunú.",
+  "home.removal.reach": "Níor scriosadh ach an díospóireacht seo. Ní dhearnadh difear do do chuntas ná do do dhíospóireachtaí eile.",
+  "home.removal.facts": "D’aimsigh ár seiceáil uathoibríoch ar a conclúid “claonta i dtreo féinmharaithe nó dochar a dhéanamh do dhaoine eile”. Níor thuairiscigh aon duine dúinn í, agus níor léigh aon duine í.",
+  "home.removal.automatic": "Rinne uirlis uathoibrithe an cinneadh seo, gan aon duine páirteach ann.",
+  "home.removal.ground": "Foras: ár dTéarmaí Seirbhíse, alt 9 (díospóireachtaí a scriosann ár seiceáil).",
+  "home.removal.complain": "Chun gearán a dhéanamh, scríobh chuig office@dezbatere.ro laistigh de shé mhí. Ní féidir leis an ngearán an díospóireacht a thabhairt ar ais.",
+  "home.removal.close": "Dún",
+  "home.flag.underReview": "FLAGGED · FAOI ATHBHREITHNIÚ",
+  "home.flag.approved": "CEADAITHE",
+  "home.flag.refused": "NACH BHFUIL CEADAITHE",
+  "home.takeDown.button": "Bain anuas"
 }

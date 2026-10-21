@@ -20,7 +20,8 @@ const mocks = vi.hoisted(() => ({
   streamEvents: vi.fn(),
   readEvents: vi.fn(),
   readLedgerDigest: vi.fn(),
-  readRunVisibility: vi.fn()
+  readRunVisibility: vi.fn(),
+  readPublicationReview: vi.fn()
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -34,7 +35,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,
       readLedgerDigest: mocks.readLedgerDigest,
-      readRunVisibility: mocks.readRunVisibility
+      readRunVisibility: mocks.readRunVisibility,
+      readPublicationReview: mocks.readPublicationReview
     },
     getDebateBundle: mocks.getDebateBundle
   };
@@ -124,6 +126,7 @@ describe("chrome and views", () => {
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 chrome tests"));
     mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef: string, _emit: (event: RunEvent) => void) => {
       await new Promise<void>(() => {});
     });
@@ -340,6 +343,7 @@ describe("card anatomy", () => {
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 card-anatomy tests"));
     mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
     mocks.streamEvents.mockReset().mockImplementation(async (_runRef: string, _emit: (event: RunEvent) => void) => {
       await new Promise<void>(() => {});
     });

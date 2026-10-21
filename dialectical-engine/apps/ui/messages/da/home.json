@@ -120,5 +120,18 @@
   "home.crisisSupport.misread": "Hvis vi har misforstået dit spørgsmål, kan du omformulere det.",
   "home.crisisSupport.back": "Tilbage til mit spørgsmål",
   "home.crisisSupport.chooseCountry": "Vælg dit land for at se dets hjælpelinjer.",
-  "home.crisisSupport.emergencyAnywhere": "Hvis du eller en anden er i akut fare, så ring til dit lokale alarmnummer nu."
+  "home.crisisSupport.emergencyAnywhere": "Hvis du eller en anden er i akut fare, så ring til dit lokale alarmnummer nu.",
+  "home.flag.flagged": "Anmeld til admin",
+  "home.removal.title": "Vi har slettet denne debat",
+  "home.removal.what": "Vi beholder den ikke, og den kan ikke genoprettes.",
+  "home.removal.reach": "Kun denne debat blev slettet. Din konto og dine andre debatter er uberørte.",
+  "home.removal.facts": "Vores automatiske kontrol af dens konklusion fandt \"tendenser til selvmord eller skade på andre mennesker\". Ingen rapporterede det til os, og ingen læste det.",
+  "home.removal.automatic": "Denne beslutning blev truffet af et automatiseret værktøj uden nogen involveret person.",
+  "home.removal.ground": "Grund: vores Servicevilkår, afsnit 9 (debatterer vores sletning af check).",
+  "home.removal.complain": "Hvis du vil klage, skal du skrive til office@dezbatere.ro inden for seks måneder. En klage kan ikke bringe debatten tilbage.",
+  "home.removal.close": "Luk",
+  "home.flag.underReview": "FLAGET · UNDER ANMELDELSE",
+  "home.flag.approved": "GODKENDT",
+  "home.flag.refused": "IKKE GODKENDT",
+  "home.takeDown.button": "Tag ned"
 }

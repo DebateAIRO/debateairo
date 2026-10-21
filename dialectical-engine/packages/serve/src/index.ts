@@ -26,6 +26,8 @@ import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, ty
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
+import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
+import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
@@ -64,6 +66,8 @@ import {
 // single entry point, so they are re-exported here.
 export * from "./synthesis.js";
 export * from "./engine-verdict.js";
+export * from "./synthesis-check.js";
+export * from "./publication-review.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -1573,6 +1577,7 @@ export interface PersistedSynthesisRound {
 export interface PersistServeInput {
   readonly runId: string;
   readonly workItemId: string;
+  readonly synthesisCheckRequest?: true;
   readonly factBundleVersion: number;
   readonly factBundleContentHash: string;
   readonly factBundle: FactBundle;
@@ -2339,6 +2344,28 @@ export class ServeRepository {
           answerContent?.attestation ?? null
         ]
       );
+      if (input.synthesisCheckRequest === true) {
+        await client.query("SAVEPOINT synthesis_check_request");
+        try {
+          await client.query(
+            `INSERT INTO serve.synthesis_check_request(request_id,run_id,answer_id,answer_version)
+             VALUES (gen_random_uuid(),$1,$2,$3)
+             ON CONFLICT (answer_id,answer_version) DO NOTHING`,
+            [input.runId, answer.rows[0]!.answer_id, answerVersion]
+          );
+          await client.query("RELEASE SAVEPOINT synthesis_check_request");
+        } catch (error) {
+          await client.query("ROLLBACK TO SAVEPOINT synthesis_check_request");
+          await client.query("RELEASE SAVEPOINT synthesis_check_request");
+          console.error(JSON.stringify({
+            event: "synthesis_check_request_failed",
+            answer_id: answer.rows[0]!.answer_id,
+            answer_version: answerVersion,
+            code: error !== null && typeof error === "object" && "code" in error
+              ? String(error.code) : "UNEXPECTED"
+          }));
+        }
+      }
       // T9 / J25 + J29 (+ ADDENDUM) — the loop-round records become DURABLE
       // here, inside the answer's own write transaction.
       //
@@ -3204,10 +3231,46 @@ export class ServeRepository {
       page.rows.map((row) => row.run_ref),
       async () => {
       const answerRows = page.rows.filter((row): row is typeof row & { answer_id: string } => row.kind === "ANSWER" && row.answer_id !== null);
-      const answers = await Promise.all(answerRows.map(async (row) => ({
-        row,
-        answer: await this.readAnswerProjection(row.answer_id, access)
-      })));
+      const checkRepository = new SynthesisCheckRepository(this.pool);
+      const reviewRepository = new PublicationReviewRepository(this.pool);
+      const answers = await Promise.all(answerRows.map(async (row) => {
+        const answer = await this.readAnswerProjection(row.answer_id, access);
+        if (answer === null) return { row, answer, synthesisFlag: null, publicationReview: null };
+        const records = await checkRepository.readRecords({
+          runId: answer.run_ref, answerId: answer.answer_id, maxVersion: answer.answer_version
+        });
+        const origins = [...new Set(records.map((record) => record.synthesisOriginVersion))];
+        const originTexts = new Map(await Promise.all(origins.map(async (origin) => {
+          const projection = origin === answer.answer_version
+            ? answer : await this.readAnswerProjection(answer.answer_id, access, origin);
+          return [origin, projection === null ? null : synthesisTextOf(projection)] as const;
+        })));
+        const listedText = synthesisTextOf(answer);
+        const verdict = verdictOfRecord(records, (origin) =>
+          origin === answer.answer_version || originTexts.get(origin) === listedText
+        );
+        const flagged = verdict?.verdict === "FLAGGED";
+        const publicationReview = flagged ? await (async () => {
+          const reviewRecords = access.ownerRef === null ? [] : await reviewRepository.readStates({
+            ownerRef: access.ownerRef, runId: answer.run_ref, answerId: answer.answer_id
+          });
+          const state = reviewStateOf(reviewRecords, verdict.synthesisOriginVersion);
+          const visibility = await this.pool.query<{ state: string }>(
+            `SELECT state FROM core.run_visibility_event
+             WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1`, [answer.run_ref]
+          );
+          return {
+            review_state: state.state,
+            asks_used: state.asksUsed,
+            visibility: visibility.rows[0]?.state === "PUBLISHED" ? "PUBLISHED" as const : "PRIVATE" as const
+          };
+        })() : null;
+        return {
+          row, answer,
+          synthesisFlag: flagged ? { verdict: "FLAGGED" as const } : null,
+          publicationReview
+        };
+      }));
       const runRepository = new RunRepository(this.pool);
       const openRows = page.rows.filter((row) => row.kind === "OPEN_RUN");
       const openRuns = await Promise.all(openRows.map(async (row) => ({
@@ -3215,7 +3278,7 @@ export class ServeRepository {
         projection: await runRepository.readLoadingProjection(row.run_ref, access)
       })));
       return AnswerIndexSchema.parse({
-        items: answers.flatMap(({ answer, row }) => answer === null ? [] : [{
+        items: answers.flatMap(({ answer, row, synthesisFlag, publicationReview }) => answer === null ? [] : [{
           answer_id: answer.answer_id,
           run_ref: answer.run_ref,
           answer_version: answer.answer_version,
@@ -3225,6 +3288,8 @@ export class ServeRepository {
           serve_state: answer.serve_state,
           staleness_state: answer.staleness_state,
           builds_on_previous: answer.builds_on_previous.value,
+          synthesis_flag: synthesisFlag,
+          publication_review: publicationReview,
           created_at_sequence: Number(row.created_at_sequence),
           // DL3-F2: the row's own model lineage, derived here from the
           // projection this query has already decrypted and read. The library

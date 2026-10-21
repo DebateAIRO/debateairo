@@ -119,5 +119,18 @@
   "home.crisisSupport.misread": "質問を読み違えていた場合は、言い方を変えて入力し直すことができます。",
   "home.crisisSupport.back": "質問に戻る",
   "home.crisisSupport.chooseCountry": "国を選ぶと、その国の相談窓口が表示されます。",
-  "home.crisisSupport.emergencyAnywhere": "あなたや誰かに差し迫った危険がある場合は、今すぐお住まいの地域の緊急通報番号に電話してください。"
+  "home.crisisSupport.emergencyAnywhere": "あなたや誰かに差し迫った危険がある場合は、今すぐお住まいの地域の緊急通報番号に電話してください。",
+  "home.flag.flagged": "フラグ付き",
+  "home.removal.title": "この討論を削除しました",
+  "home.removal.what": "この討論は保存されず、復元できません。",
+  "home.removal.reach": "削除されたのはこの討論だけです。あなたのアカウントと他の討論には影響しません。",
+  "home.removal.facts": "結論の自動チェックで「自殺または他者を傷つける傾向」が見つかりました。誰からも報告されておらず、人が読むこともありませんでした。",
+  "home.removal.automatic": "この決定は人の関与なく、自動化されたツールによって行われました。",
+  "home.removal.ground": "根拠：当サービスの利用規約第9条（チェックによって削除される討論）。",
+  "home.removal.complain": "異議を申し立てるには、6か月以内に office@dezbatere.ro へご連絡ください。申し立てによって討論を復元することはできません。",
+  "home.removal.close": "閉じる",
+  "home.flag.underReview": "フラグが立てられています · 審査中です",
+  "home.flag.approved": "承認されました",
+  "home.flag.refused": "承認されていません",
+  "home.takeDown.button": "取り下げる"
 }

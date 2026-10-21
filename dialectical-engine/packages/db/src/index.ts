@@ -15,6 +15,7 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export * from "./synthesis-check-erasure.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
