@@ -10,16 +10,18 @@
 //
 // The database functions (core.read_current_release, core.read_release_state,
 // core.record_release_switch, core.record_release_event, core.release_event, core.run.release_key)
-// belong to migration 0123 (side-by-side plan A). CURRENT and DRAINING are written only by the
-// switch, in one transaction, never as a plain event.
+// belong to migration 0123 (side-by-side plan A). CURRENT is written only by the switch, and so is the
+// DRAINING of the old current release, in the same transaction. The one plain DRAINING the database
+// accepts is a re-staged release that still drains going back to draining (the abandoned re-stage,
+// release-switch.mjs's before-switch rollback); the database refuses every other one.
 import { LAYOUT, runBounded } from './common.mjs';
 
 /** Same text as `RELEASE_KEY_PATTERN` in deploy/preview-auth-dev/v1/environment.mjs; a test pins the two equal. */
 export const RELEASE_KEY_PATTERN = /^r[1-9][0-9]*-[0-9a-f]{12}$/;
 /** Every row root writes names the root tool that wrote it, e.g. `root:release-switch`. */
 export const RECORDED_BY = /^root:[a-z-]{1,40}$/;
-/** The plain events; CURRENT and DRAINING only via the switch. */
-export const EVENT_KINDS = Object.freeze(['STAGED', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED']);
+/** The plain events; CURRENT only via the switch, DRAINING only where the database allows it (abandoned re-stage). */
+export const EVENT_KINDS = Object.freeze(['STAGED', 'DRAINING', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED']);
 
 const REASON = /^[A-Z_]{1,64}$/;
 const STATES = Object.freeze(['STAGED', 'CURRENT', 'DRAINING', 'RETIRED']);
@@ -29,9 +31,13 @@ const COUNT = /^(?:0|[1-9][0-9]{0,15})$/;
 const EVENT_SEQ = /^[1-9][0-9]{0,18}$/;
 const TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
-// The database gives up before root does (15 s): a statement root has stopped waiting for can
-// never commit afterwards, so a timed-out switch is a switch that did not happen.
-const PRELUDE = "SET statement_timeout = '10s';\n";
+// The database gives up before root does (15 s): once root has stopped waiting, the statement is
+// cancelled by its own 10 s limit, so a timed-out switch is a switch that did not happen. psql gives up
+// connecting after 5 s (PGCONNECT_TIMEOUT, psqlArgv). Error texts are the server's untranslated ones
+// (lc_messages C), so the `ERROR:  <CODE>` match in query() holds whatever the server's language is.
+// A RELEASE_TABLE_UNREADABLE answer to a write can still hide a commit (the reply was lost after it):
+// every caller reads the table again before deciding (D3 review).
+const PRELUDE = "SET statement_timeout = '10s';\nSET lc_messages = 'C';\n";
 const UTC_MS = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
 
 class ReleaseTableRefusal extends Error { constructor(code) { super(code); this.name = 'ReleaseTableRefusal'; this.code = code; } }
@@ -42,14 +48,14 @@ const requireKey = value => { if (!validKey(value)) refuse('RELEASE_KEY_INVALID'
 const requireRecordedBy = value => { if (typeof value !== 'string' || !RECORDED_BY.test(value)) refuse('RELEASE_EVENT_REFUSED'); return value; };
 
 /**
- * runuser -u postgres -- /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC <pgBin>/psql
+ * runuser -u postgres -- /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC PGCONNECT_TIMEOUT=5 <pgBin>/psql
  *   --no-psqlrc --no-align --tuples-only --quiet --field-separator=| -v ON_ERROR_STOP=1
  *   --host=<sock> --port=<port> --dbname=<db> <-v name=value …> -f -
  * `variables` are already checked by the caller; names are fixed identifiers of this file.
  */
 export function psqlArgv(layout, variables = []) {
   return [
-    layout.runuser, '-u', 'postgres', '--', layout.env, '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC',
+    layout.runuser, '-u', 'postgres', '--', layout.env, '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', 'PGCONNECT_TIMEOUT=5',
     `${layout.pgBin}/psql`, '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
     `--host=${layout.pgSocketDir}`, `--port=${layout.pgPort}`, `--dbname=${layout.database}`,
     ...variables.flatMap(([name, value]) => ['-v', `${name}=${value}`]),
@@ -133,7 +139,7 @@ export async function recordReleaseSwitch({ newKey, expectedCurrentKey, takeTraf
   }));
 }
 
-/** One plain event (STAGED, FRONT_PAIR_STOPPED, RETIRE_REQUESTED, RETIRED); `reason` is null or an upper-case code. */
+/** One plain event (STAGED, DRAINING, FRONT_PAIR_STOPPED, RETIRE_REQUESTED, RETIRED); `reason` is null or an upper-case code. */
 export async function recordReleaseEvent({ releaseKey, kind, recordedBy, reason, layout = LAYOUT, run = runBounded }) {
   requireKey(releaseKey);
   if (typeof kind !== 'string' || !EVENT_KINDS.includes(kind)) refuse('RELEASE_EVENT_REFUSED');
