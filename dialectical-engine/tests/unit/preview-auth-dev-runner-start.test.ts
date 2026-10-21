@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
 import { fixtureReleaseKey, validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 import { RUNNER_READY_PROCESS_EVENT, announceRunnerReady } from '../../apps/runner/src/runner-ready.js';
+import { RUNNER_RETIRED_PROCESS_EVENT } from '../../apps/runner/src/runner-retirement.js';
 const execute = promisify(execFile);
 const receipt = await import('../../deploy/' + 'preview-auth-dev/v1/runtime-receipt.mjs');
 const env = await import('../../deploy/' + 'preview-auth-dev/v1/environment.mjs');
@@ -193,6 +194,12 @@ describe('the real readiness seam', () => {
     expect(Object.isFrozen(heard[0])).toBe(true);
   });
 
+  // Side-by-side spec §4: the launcher hears the runner's self-retirement as the same in-process event it emits.
+  it('the launcher listens for exactly the retirement event the runner emits', () => {
+    expect(launcher.RUNNER_RETIRED_PROCESS_EVENT).toBe(RUNNER_RETIRED_PROCESS_EVENT);
+    expect(launcher.RUNNER_RETIRED_PROCESS_EVENT).toBe('debateai:runner-retired');
+  });
+
   it('runner main announces readiness only after the team gate, the worker and the start-up re-dispatch', async () => {
     const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
     const gate = source.indexOf('await refusePreviewOutsiderWork('), worker = source.indexOf('await hatchet.worker('),
@@ -308,17 +315,20 @@ await startRunner([], async () => {
   if (worker.uncaughtWhileStarting) { setTimeout(() => { throw new Error('secret text'); }, 1); return new Promise(() => {}); }
   let end, fail;
   const running = new Promise((resolveRun, rejectRun) => { end = resolveRun; fail = rejectRun; });
-  const finish = () => setTimeout(() => worker.end === 'fails' ? fail(new Error('secret text')) : end(), 5);
+  // 'hangs': like a Hatchet worker.stop() that never settles, main never ends.
+  const finish = () => setTimeout(() => worker.end === 'fails' ? fail(new Error('secret text')) : worker.end === 'hangs' ? undefined : end(), 5);
   if (worker.listensForSignals) { process.on('SIGTERM', finish); process.on('SIGINT', finish); }
   if (worker.endsAlone) finish();
   // Like PREVIEW_RUNNER_STARTED, printed before startRunner listens. With no listener at all the OS
   // ends the process at once, so a worker that does not listen announces after startRunner does.
   if (worker.listensForSignals) process.stdout.write('READY\\n');
   else setImmediate(() => process.stdout.write('READY\\n'));
+  // Like runner-retirement.ts: the retired event first, then the worker stops (main ends after it).
+  if (worker.retires) setTimeout(() => { process.emit('debateai:runner-retired', { releaseKey: 'r1-aaaaaaaaaaaa' }); finish(); }, 1);
   return { event: {}, running };
-});
+}, worker.retiredSettleMs === undefined ? undefined : { retiredSettleMs: worker.retiredSettleMs });
 `;
-type FakeWorker = { listensForSignals?: boolean; endsAlone?: boolean; end?: 'returns' | 'fails'; uncaughtWhileStarting?: boolean };
+type FakeWorker = { listensForSignals?: boolean; endsAlone?: boolean; retires?: boolean; retiredSettleMs?: number; end?: 'returns' | 'fails' | 'hangs'; uncaughtWhileStarting?: boolean };
 function startFakeRunner(worker: FakeWorker, signal: NodeJS.Signals | null) {
   return new Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string }>((resolveRun, rejectRun) => {
     const child = spawn(process.execPath, ['--input-type=module', '-e', CHILD], {
@@ -359,6 +369,28 @@ describe('how a started runner ends (startRunner, real process and signals)', ()
   it('an uncaught error while starting prints only PREVIEW_RUNNER_STOPPED_ON_FAILURE and exits 1', async () => {
     const result = await startFakeRunner({ uncaughtWhileStarting: true }, null);
     expect(result).toEqual({ code: 1, signal: null, stdout: '', stderr: 'PREVIEW_RUNNER_STOPPED_ON_FAILURE\n' });
+  });
+  // Side-by-side spec §4: a release that drained (or was asked to retire) stops its own worker; that is an asked end too.
+  it('a runner that retired by itself prints PREVIEW_RUNNER_RETIRED and exits 0, so OnFailure= sends no email', async () => {
+    const result = await startFakeRunner({ listensForSignals: true, retires: true, end: 'returns' }, null);
+    expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_RETIRED\n', stderr: '' });
+  });
+  it('a runner that retired and whose main then failed is a failure', async () => {
+    const result = await startFakeRunner({ listensForSignals: true, retires: true, end: 'fails' }, null);
+    expect(result).toEqual({ code: 1, signal: null, stdout: 'READY\n', stderr: 'PREVIEW_RUNNER_STOPPED_ON_FAILURE\n' });
+  });
+  // B10 review: the retired event comes before Hatchet's worker.stop(); a stop that never settles must not leave the launcher up.
+  it('a runner that retired and whose main never ends still prints PREVIEW_RUNNER_RETIRED and exits 0, after the settle bound', async () => {
+    const bound = 400, began = Date.now();
+    const result = await startFakeRunner({ listensForSignals: true, retires: true, end: 'hangs', retiredSettleMs: bound }, null);
+    expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_RETIRED\n', stderr: '' });
+    expect(Date.now() - began).toBeGreaterThanOrEqual(bound);
+  });
+  it('production waits RETIRED_SETTLE_MS (30 s) for main to end after retirement; only tests shorten it', async () => {
+    expect(launcher.RETIRED_SETTLE_MS).toBe(30_000);
+    const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
+    expect(code).toContain('{retiredSettleMs=RETIRED_SETTLE_MS}={}');
+    expect(code).toContain('await startRunner(argv.slice(1));');
   });
 });
 
