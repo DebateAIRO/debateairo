@@ -35,7 +35,7 @@ describe('release table door (side-by-side spec §4)', () => {
 
   it('builds exactly the reviewed psql command line, variables before the stdin script', async () => {
     expect(psqlArgv(LAYOUT)).toEqual([
-      '/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC',
+      '/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', 'PGCONNECT_TIMEOUT=3',
       '/usr/lib/postgresql/18/bin/psql', '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
       '--host=/run/debateai-v3-preview/postgresql', '--port=5434', '--dbname=debateai', '-f', '-'
     ]);
@@ -51,6 +51,14 @@ describe('release table door (side-by-side spec §4)', () => {
     const { calls, run } = recorder(ok('41\n'));
     await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', layout: LAYOUT, run });
     expect(sql(calls[0])).toMatch(/^SET statement_timeout = '10s';\n/);
+  });
+
+  it("reads the server's error codes untranslated and gives up connecting after 3 s (connect 3 s + statement 10 s < root's 15 s)", async () => {
+    const { calls, run } = recorder(ok('41\n'));
+    await recordReleaseEvent({ releaseKey: KEY, kind: 'STAGED', recordedBy: 'root:release-switch', reason: null, layout: LAYOUT, run });
+    expect(sql(calls[0])).toMatch(/^SET statement_timeout = '10s';\nSET lc_messages = 'C';\nSELECT core\.record_release_event/);
+    expect(calls[0]!.argv.slice(0, calls[0]!.argv.indexOf(`${LAYOUT.pgBin}/psql`))).toContain('PGCONNECT_TIMEOUT=3');
+    expect(calls[0]!.opts.timeoutMs).toBeGreaterThan(3_000 + 10_000);
   });
 
   it('reads a release with no row as UNKNOWN', async () => {
@@ -131,14 +139,20 @@ describe('release table door (side-by-side spec §4)', () => {
     }
   });
 
-  it('refuses CURRENT and DRAINING as a plain event', async () => {
-    for (const kind of ['CURRENT', 'DRAINING', 'staged', 'STAGED ', '', undefined]) {
+  it('refuses CURRENT as a plain event; DRAINING goes to the database, which takes it only for an abandoned re-stage', async () => {
+    for (const kind of ['CURRENT', 'draining', 'staged', 'STAGED ', '', undefined]) {
       const { calls, run } = recorder(ok('9\n'));
       await expect(recordReleaseEvent({ releaseKey: KEY, kind, recordedBy: 'root:release-switch', reason: null, layout: LAYOUT, run })).rejects.toMatchObject({ code: 'RELEASE_EVENT_REFUSED' });
       expect(calls).toEqual([]);
     }
-    expect(table.EVENT_KINDS).toEqual(['STAGED', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED']);
+    expect(table.EVENT_KINDS).toEqual(['STAGED', 'DRAINING', 'FRONT_PAIR_STOPPED', 'RETIRE_REQUESTED', 'RETIRED']);
     expect(Object.isFrozen(table.EVENT_KINDS)).toBe(true);
+    const accepted = recorder(ok('9\n'));
+    await recordReleaseEvent({ releaseKey: KEY, kind: 'DRAINING', recordedBy: 'root:rollback', reason: 'RESTAGE_ABANDONED', layout: LAYOUT, run: accepted.run });
+    expect(variables(accepted.calls[0])).toEqual([`release_key=${KEY}`, 'kind=DRAINING', 'recorded_by=root:rollback', 'reason=RESTAGE_ABANDONED']);
+    // Any other DRAINING (not a re-staged release that still drains) is the database's RELEASE_EVENT_INVALID.
+    const refused = recorder(result({ code: 3, stderr: 'ERROR:  RELEASE_EVENT_INVALID\n' }));
+    await expect(recordReleaseEvent({ releaseKey: KEY, kind: 'DRAINING', recordedBy: 'root:rollback', reason: null, layout: LAYOUT, run: refused.run })).rejects.toMatchObject({ code: 'RELEASE_EVENT_REFUSED' });
   });
 
   it('refuses a bad recorder, reason or wait before running psql', async () => {

@@ -292,8 +292,11 @@ export async function disarmTimers({ label, layout = LAYOUT, deps = {} }) {
   return Object.freeze({ event: 'PREVIEW_RELEASE_TIMERS_DISARMED', label });
 }
 
-/** One gate's `state` from its read-only status (initialized, active or halted); anything unreadable is `unknown`. */
-async function gateState(gate, io) {
+/**
+ * One gate's `state` from its read-only status (initialized, active or halted); anything unreadable is `unknown`.
+ * `io` needs only `run`; release-switch.mjs (D10) reads both gates through this too.
+ */
+export async function gateState(gate, io) {
   const result = await io.run([PYTHON, '-I', `${gate.folder}/preview_budget_authority.py`, 'status', '--private', gate.privateDir],
     { env: {}, timeoutMs: 30_000, maxOutputBytes: 64 * 1024 });
   if (!result || result.timedOut || result.overflow || result.error || result.code !== 0) return 'unknown';
