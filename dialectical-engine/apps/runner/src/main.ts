@@ -12,7 +12,7 @@ import { configureContentEncryption, createPool, EntitlementRepository, Postgres
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
@@ -632,7 +632,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
 const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
-  failures: new WorkItemRepository(pool),
+  // Side-by-side spec §3 (plan B D2): a failed task records FAILED under this worker's own live claim.
+  failures: new WorkItemRepository(pool, { releaseKey: LEGACY_RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),
   workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up

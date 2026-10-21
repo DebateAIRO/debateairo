@@ -219,6 +219,7 @@ import {
   SERVED_ROOT_SELECTION_RULE_JUDGES,
   TypedDomainError,
   exhaustive,
+  LEGACY_RELEASE_KEY,
   type CompositionBudgetTier,
   type ServedRootRule,
   type WayOfKnowing
@@ -4968,7 +4969,9 @@ export class WalkingSkeletonRunner {
     private readonly settings: WalkingSkeletonSettings
   ) {
     this.#runs = new RunRepository(pool);
-    this.#work = new WorkItemRepository(pool);
+    // Side-by-side spec §3 (plan B D2): the runner's own failure writes land under its own live claim, so its
+    // repository knows its worker id. The release stays `legacy` until the runner is told its key (B6).
+    this.#work = new WorkItemRepository(pool, { releaseKey: LEGACY_RELEASE_KEY, workerId: settings.workerId });
     this.#graph = new GraphRepository(pool);
     // L4-F9 repair: every model call the runner makes goes through the keep-alive
     // of the debate making it, refused once that debate must stop.
