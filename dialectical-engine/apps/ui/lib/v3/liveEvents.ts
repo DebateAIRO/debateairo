@@ -192,6 +192,7 @@ export function startLiveEventStream(input: Readonly<{
       if (input.onFatal(failure)) return;
       // Side-by-side spec §7 (plan C13): an event this page cannot read comes from a newer release, and the same event
       // would fail again on every reconnect. The page shows the reload note and stops: no re-read, no retry.
+      // No further status is sent: the reload note replaces the stream status (it stays at its last value).
       if (failure instanceof ContractHttpError && failure.code === "INVALID_RESPONSE") {
         announceNewerVersion("NEWER_BUILD");
         return;

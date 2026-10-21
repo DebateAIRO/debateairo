@@ -128,6 +128,20 @@ describe("withNewerVersionWatch", () => {
     expect(Object.keys(client).sort()).toEqual(["readRun", "readSession", "version"]);
     expect(watch.newerVersionReason()).toBeNull();
   });
+
+  it("refuses writes, as the frozen client does, instead of letting them seem to succeed", async () => {
+    const watch = await freshWatch();
+    const client = watch.withNewerVersionWatch(Object.freeze(clientRejecting(null))) as Record<string, unknown>;
+    expect(Reflect.set(client, "version", "y")).toBe(false);
+    expect(Reflect.set(client, "added", 1)).toBe(false);
+    expect(Reflect.defineProperty(client, "added", { value: 1 })).toBe(false);
+    expect(Reflect.deleteProperty(client, "version")).toBe(false);
+    expect(Reflect.preventExtensions(client)).toBe(false);
+    expect(() => { client.version = "y"; }).toThrow(TypeError);
+    expect(client.version).toBe("x");
+    expect("added" in client).toBe(false);
+    expect(Object.keys(client).sort()).toEqual(["readRun", "readSession", "version"]);
+  });
 });
 
 describe("the browser's contract client watches every answer", () => {

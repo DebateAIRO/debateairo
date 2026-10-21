@@ -82,7 +82,8 @@ function reasonOf(failure: unknown): NewerVersionReason | null {
  * rethrown unchanged, so every caller keeps its own handling; answers and non-function members pass through untouched.
  * The contract client is frozen, and a Proxy may not hand out another value for a frozen member, so the Proxy stands
  * over an empty target and reads every member from the client; each wrapped method is made once, so it keeps one
- * identity.
+ * identity. Writes are refused (set, defineProperty, deleteProperty and preventExtensions return false), as they are
+ * on the frozen client: without these traps they would land on the mutable empty target and seem to succeed.
  */
 export function withNewerVersionWatch<T extends object>(client: T): T {
   const wrapped = new Map<PropertyKey, unknown>();
@@ -111,6 +112,10 @@ export function withNewerVersionWatch<T extends object>(client: T): T {
       return own === undefined
         ? undefined
         : { value: memberOf(property), writable: false, enumerable: own.enumerable ?? false, configurable: true };
-    }
+    },
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+    preventExtensions: () => false
   });
 }

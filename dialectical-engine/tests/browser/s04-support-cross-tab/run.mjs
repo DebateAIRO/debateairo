@@ -63,7 +63,9 @@ const pidDir = process.env.S04_PID_DIR ? path.resolve(process.env.S04_PID_DIR) :
 function broken(reason) { out(`BROKEN ${reason}`); out("BROKEN"); process.exit(1); }
 if (!argv.includes("--no-build")) broken("--no-build is required: the harness never builds (c4.sh ensure_build does, B3)");
 if (!uiRoot || !fs.existsSync(path.join(uiRoot, "server.mjs"))) broken(`--ui-root must be an apps/ui dir holding server.mjs (got ${uiRoot})`);
-if (!fs.existsSync(path.join(uiRoot, ".next", "BUILD_ID"))) broken(`no build at ${uiRoot}/.next (run through c4.sh, which builds)`);
+// The build folder, as next.config.mjs, server.mjs and release-edge.mjs read it.
+const distDir = process.env.NEXT_DIST_DIR || ".next";
+if (!fs.existsSync(path.join(uiRoot, distDir, "BUILD_ID"))) broken(`no build at ${uiRoot}/${distDir} (run through c4.sh, which builds)`);
 if (!process.env.S04_PID_DIR) broken("S04_PID_DIR is unset (c4.sh sets it to this run's <log>.pids/, N2)");
 fs.mkdirSync(pidDir, { recursive: true });
 
@@ -110,7 +112,7 @@ startChild("fake-api", ["--import", "tsx", path.join(HERE, "fake-api.mjs"), "--p
 // (recorded by `next build` from next.config.mjs `env`), and no page shows a false "newer version" note.
 let bakedCode;
 try {
-  bakedCode = JSON.parse(fs.readFileSync(path.join(uiRoot, ".next", "required-server-files.json"), "utf8"))?.config?.env?.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE;
+  bakedCode = JSON.parse(fs.readFileSync(path.join(uiRoot, distDir, "required-server-files.json"), "utf8"))?.config?.env?.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE;
 } catch { bakedCode = undefined; }
 if (!/^[0-9a-f]{12}$/u.test(String(bakedCode))) broken("BUILD the build records no release code (rebuild with the current next.config.mjs)");
 const releaseKey = ["r17", bakedCode].join("-");

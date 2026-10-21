@@ -265,6 +265,8 @@ describe("live stream loop (one open stream, honest back-off)", () => {
   });
 
   it("an answer this page cannot read shows the reload note instead of retrying the same event forever (side-by-side C13)", async () => {
+    // Page-wide state: nothing before this case may have announced it, or the last assertion would prove nothing.
+    expect(newerVersionReason()).toBeNull();
     vi.useFakeTimers({ now: 0 });
     const run = harness([async () => { throw new ContractHttpError("INVALID_RESPONSE", 200, "x"); }]);
     await vi.advanceTimersByTimeAsync(LIVE_STREAM_RECONNECT.maxGapMs * 3);
