@@ -1109,8 +1109,9 @@ settings, and only with exactly that folder; anything else stops the start with
 
 Do it during a release whose API carries PR #192 (NETOPIA's retry rules). Use that release's root
 shell (step 0's `CAPI`) with H1's second block pasted again (`E`, `AU`, `AGRP`). Step 1 can run any
-time before the release's step 6 (no downtime: `daemon-reload` changes nothing in a running service).
-Step 2 goes with the release's step 5, and step 6's restart switches the spool on.
+time before the release restarts the API (no downtime: `daemon-reload` changes nothing in a running
+service). Step 2 goes just before that restart (with the `REGISTER_VERSION` lines of "Publishing a new
+register version" step 5, when the release publishes one), and the restart switches the spool on.
 
 1. **The folder and the API's write permission.** The API's unit lets it write only the folders it
    names, so a small drop-in adds this one:
@@ -1132,7 +1133,7 @@ Step 2 goes with the release's step 5, and step 6's restart switches the spool o
    `-/var/lib/debateai-v3-preview/api/billing-notice-spool` among the API's other folders. If it does
    not, stop: with step 2's line the API would refuse to start.
 
-2. **The setting**, with the release's step 5 (after the `REGISTER_VERSION` lines):
+2. **The setting**, just before the release's restart:
 
    ```sh
    ( set -euo pipefail
@@ -1145,7 +1146,7 @@ Step 2 goes with the release's step 5, and step 6's restart switches the spool o
 
    The line starts on a new line and is added only once.
 
-3. **After step 6's restart:**
+3. **A minute after the restart** (the API writes `billing.notice.spool_off` once it listens):
 
    ```sh
    systemctl is-active debateai-preview-api   # active
@@ -1161,6 +1162,7 @@ restart the API. Files left in the folder are stored when the spool is switched 
 are less than 14 days old (older ones are then deleted unread).
 
 ```sh
+E=/etc/debateai-v3-preview/auth-dev-v1; SP=/var/lib/debateai-v3-preview/api/billing-notice-spool
 find "$SP" -type f | wc -l   # 0: nothing waits
 sed -i '/^BILLING_NOTICE_SPOOL_PATH=/d' "$E/api.env"; grep -c '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env"   # 0
 systemctl restart debateai-preview-api
