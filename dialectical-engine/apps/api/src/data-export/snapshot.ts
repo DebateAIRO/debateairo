@@ -1,4 +1,4 @@
-import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry } from "./types.js";
+import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 
 export type ExportClaim = Readonly<{
@@ -23,6 +23,8 @@ export interface DataExportSourcePort {
 
 export interface OwnerViewPort {
   runKeyPresent(runId: string): Promise<boolean>;
+  runRemovedByCheck(runId: string): Promise<boolean>;
+  readSynthesisChecks(ownerRef: string, answerId: string): Promise<readonly SynthesisCheckEntry[]>;
   readRun(ownerRef: string, runId: string): Promise<unknown>;
   readRunAnswer(ownerRef: string, runId: string): Promise<unknown | null>;
   readAnswer(ownerRef: string, answerId: string, version: number): Promise<unknown>;
@@ -214,7 +216,7 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       state: null as unknown, visibility_history: history,
       role_rotation: roleRotation(Object.hasOwn(run, "role_rotation") ? run.role_rotation : undefined),
     };
-    if (deletedAt !== null || !await ownerView.runKeyPresent(reference)) {
+    if (deletedAt !== null || await ownerView.runRemovedByCheck(reference) || !await ownerView.runKeyPresent(reference)) {
       entries.push({ ...base, content_status: "UNRECOVERABLE" });
       continue;
     }
@@ -238,6 +240,10 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       }
       answers.push({
         answer_id: id, versions,
+        synthesis_checks: (await ownerView.readSynthesisChecks(ownerRef, id)).map((check) => ({
+          answer_version: check.answer_version, verdict: check.verdict,
+          categories: [...check.categories], checked_at: check.checked_at,
+        })),
         ledger_digest: await ownerView.readLedgerDigest(ownerRef, id),
         story: await ownerView.readStory(ownerRef, id),
         disclosure: await ownerView.readDisclosure(ownerRef, id),
