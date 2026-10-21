@@ -82,7 +82,7 @@ const publicBuildValues = (flag, releaseKey) => Object.freeze({ NODE_ENV: 'produ
  * RELEASE_KEY is the release the build is for (side-by-side spec §1, §7): the website bakes its code part in and
  * refuses to serve under another release's key; the UI launcher demands ui.env's key be the plan's.
  */
-export function uiPublicBuildValues(models = DEFAULT_MODEL_ROSTER, releaseKey) {
+export function uiPublicBuildValues(releaseKey, models = DEFAULT_MODEL_ROSTER) {
   if (typeof models !== 'string' || !UI_MODEL_ROSTERS.includes(models)) refuse('ARGUMENTS_REFUSED', ['--models']);
   if (typeof releaseKey !== 'string' || !RELEASE_KEY_PATTERN.test(releaseKey)) refuse('RELEASE_KEY_REFUSED', ['--release-key']);
   return publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[models], releaseKey);
@@ -98,7 +98,7 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
  * pnpm, next and the route check start `node` from PATH. Put the running Node's own folder first
  * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
  */
-export const buildEnvironment = (execPath = process.execPath, models = DEFAULT_MODEL_ROSTER, releaseKey) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(models, releaseKey), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
+export const buildEnvironment = (releaseKey, execPath = process.execPath, models = DEFAULT_MODEL_ROSTER) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(releaseKey, models), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -244,13 +244,13 @@ async function sourceManifestCommand(options, { layout, deps }) {
 }
 
 /** The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env without printing it. */
-export function buildEnvironmentReport(models = DEFAULT_MODEL_ROSTER, releaseKey) {
-  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(models, releaseKey)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
+export function buildEnvironmentReport(releaseKey, models = DEFAULT_MODEL_ROSTER) {
+  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(releaseKey, models)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
 }
 
 async function uiBuildCommand(options, { layout, deps }) {
   const models = options['--models'] ?? DEFAULT_MODEL_ROSTER, releaseKey = options['--release-key'];
-  uiPublicBuildValues(models, releaseKey);
+  uiPublicBuildValues(releaseKey, models);
   const source = await readSource(options['--source'], { layout, flag: '--source' });
   if (source.value.role !== 'ui') refuse('SOURCE_ROLE_REFUSED');
   // Side-by-side spec §1, §7: the build bakes the key's code part in, so it must be this source's revision.
@@ -262,7 +262,7 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath, models, releaseKey));
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(releaseKey, deps.execPath, models));
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
@@ -609,7 +609,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const context = { layout, deps };
   switch (command) {
     case 'source-manifest': return sourceManifestCommand(options, context);
-    case 'build-env': return buildEnvironmentReport(options['--models'], options['--release-key']);
+    case 'build-env': return buildEnvironmentReport(options['--release-key'], options['--models']);
     case 'ui-build': return uiBuildCommand(options, context);
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);

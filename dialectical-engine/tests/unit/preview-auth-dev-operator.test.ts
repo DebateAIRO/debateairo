@@ -48,6 +48,22 @@ describe('preview operator boundaries',()=>{
   for(const service of ['api','runner'] as const)expect(receipt.PREVIEW_INSTANCE_UNITS[service].source).toBe(`^debateai-preview-${service}@${plans.RELEASE_LABEL.source.slice(1,-1)}\\.service$`);
   expect(readFileSync(resolve('deploy/preview-auth-dev/v1/launch-api.mjs'),'utf8')).toContain('readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE,RELEASE_KEY:process.env.RELEASE_KEY})');
  });
+ // D2 review: the stage website (C12) refuses unless its key's code part is the one stamped into its build, which is the
+ // stage source revision's (ui-build), so the stage's keys come from that revision.
+ it('the stage runtime starts nothing unless its release key is r<publication>-<first 12 hex of the stage revision>, and gives the website that key',async()=>{
+  const stage=await import('../../deploy/'+'preview-auth-dev/v1/stage-runtime.mjs');
+  const stageRevision='d50e33165a1b'+'0'.repeat(28),stagePublication={...publication,registerVersion:'19'};
+  const run=(key:unknown,sourceRevision:unknown)=>stage.exerciseStageRuntime({apiRoot:'/nonexistent-api',uiRoot:'/nonexistent-ui',stateRoot:'/nonexistent-state',publication:stagePublication,uiPort:1,sourceRevision,
+   environment:{NODE_ENV:'production',DEBATEAI_DEPLOYMENT_MODE:'local',REGISTER_VERSION:'19',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',RELEASE_KEY:key}});
+  for(const key of ['r19-0123456789ab','r18-d50e33165a1b','r19-d50e33165a1c',undefined])await expect(run(key,stageRevision),String(key)).rejects.toThrow(/^PREVIEW_STAGE_ENVIRONMENT_REFUSED$/);
+  for(const revision of [undefined,'d50e33165a1b',42])await expect(run('r19-d50e33165a1b',revision),String(revision)).rejects.toThrow(/^PREVIEW_STAGE_ENVIRONMENT_REFUSED$/);
+  // The matching key passes this check and stops only at the next one (no built website in this throwaway root).
+  await expect(run('r19-d50e33165a1b',stageRevision)).rejects.toThrow(/^PREVIEW_UI_MODEL_ROSTER_REFUSED$/);
+  const runtime=readFileSync(resolve('deploy/preview-auth-dev/v1/stage-runtime.mjs'),'utf8');
+  expect(runtime).toContain("const uiEnv={NODE_ENV:'production',RELEASE_KEY:environment.RELEASE_KEY,");
+  expect(readFileSync(resolve('deploy/preview-auth-dev/v1/run-stage.mjs'),'utf8')).toContain('sourceRevision:stage.sourceRevision,environment:fixture.environment');
+  expect(readFileSync(resolve('deploy/preview-auth-dev/v1/stage-fixture.ts'),'utf8')).toContain('RELEASE_KEY:`r${publication.registerVersion}-${input.runtimeObservation.sourceRevision.slice(0,12)}`');
+ });
  it('accepts only exact approved preview credential envelope and zeroes extracted bytes after consumption',async()=>{const input={schema:'dialectical-turnstile-credentials-v1',environment:'preview',hostname:'v3-preview.dezbatere.ro',siteKey:'0x4AAAAAAFNg9KPm2tECytqZ',secretKey:'synthetic-secret-material-for-tests'};let held:Buffer|undefined;await turnstile.withExtractedSecret(Buffer.from(JSON.stringify(input)),(bytes:Buffer)=>{expect(bytes.toString()).toBe(input.secretKey);held=bytes;});expect(held?.every(n=>n===0)).toBe(true);});
  it.each([{environment:'production'},{environment:'PREVIEW'},{schema:'dialectical-turnstile-credentials-v2'},{hostname:'dezbatere.ro'},{siteKey:'test'},{secretKey:'1x'+'0'.repeat(35)},{extra:'unknown'}])('rejects credential domain or schema drift',async patch=>{const input={schema:'dialectical-turnstile-credentials-v1',environment:'preview',hostname:'v3-preview.dezbatere.ro',siteKey:'0x4AAAAAAFNg9KPm2tECytqZ',secretKey:'synthetic-secret-material-for-tests',...patch};await expect(turnstile.withExtractedSecret(Buffer.from(JSON.stringify(input)),()=>true)).rejects.toThrow(/^PREVIEW_TURNSTILE_REFUSED$/);});
 });

@@ -229,18 +229,18 @@ describe('UI build values', () => {
     expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY, RELEASE_KEY: tool.RELEASE_KEY_NOT_GIVEN });
     // The template's RELEASE_KEY is never a key: every build names its own (--release-key), and a build given the template refuses.
     expect(environment.RELEASE_KEY_PATTERN.test(tool.UI_PUBLIC_BUILD_VALUES.RELEASE_KEY)).toBe(false);
-    expect(tool.uiPublicBuildValues('glm-only', NEW_KEY)).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, RELEASE_KEY: NEW_KEY });
+    expect(tool.uiPublicBuildValues(NEW_KEY, 'glm-only')).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, RELEASE_KEY: NEW_KEY });
     expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model', 'all-models']);
     for (const models of tool.UI_MODEL_ROSTERS) {
-      const values = tool.uiPublicBuildValues(models, NEW_KEY), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
+      const values = tool.uiPublicBuildValues(NEW_KEY, models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
       expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models], RELEASE_KEY: NEW_KEY });
       expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, pin, plan)).not.toThrow();
       for (const key of Object.keys(values)) {
         expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, pin, plan)).toThrow();
       }
     }
-    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(models, NEW_KEY)).toThrow(/ARGUMENTS_REFUSED/);
-    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', 'r0-cccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues('glm-only', key), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
+    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(NEW_KEY, models)).toThrow(/ARGUMENTS_REFUSED/);
+    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', 'r0-cccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues(key, 'glm-only'), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
   });
 
   it('the build child gets only the public values plus fixed tool settings, never a secret path or a stray public flag', () => {

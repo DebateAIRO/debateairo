@@ -18,8 +18,14 @@ function ownedChild(command,args,options){
  return {child,exited,output:()=>output,async stop(){if(child.exitCode!==null||child.signalCode!==null)return exited;try{process.kill(-child.pid,'SIGTERM');}catch{}let timer;await Promise.race([exited,new Promise(resolve=>{timer=setTimeout(()=>{try{process.kill(-child.pid,'SIGKILL');}catch{}resolve();},10000);})]);clearTimeout(timer);return exited;}};
 }
 async function eventually(probe,child){const limit=Date.now()+60000;while(Date.now()<limit){if(child.child.exitCode!==null||child.child.signalCode!==null)refuse('PREVIEW_STAGE_PROCESS_EXITED');try{const value=await probe();if(value)return value;}catch{}await new Promise(resolve=>setTimeout(resolve,50));}refuse('PREVIEW_STAGE_LISTEN_TIMEOUT');}
-export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment,publication,uiPort,fullFixture,artifact}) {
- if(environment.NODE_ENV!=='production'||environment.DEBATEAI_DEPLOYMENT_MODE!=='local'||environment.REGISTER_VERSION!==publication.registerVersion||environment.PUBLIC_APP_URL!==PREVIEW_ORIGIN)refuse('PREVIEW_STAGE_ENVIRONMENT_REFUSED');
+/**
+ * `sourceRevision` is the stage's own revision (stage-plan.mjs). Side-by-side spec §1: the stage's release key is
+ * r<publication register version>-<its first 12 hex>, the code part ui-build stamps into the website, which refuses any
+ * other key (apps/ui/release-edge.mjs RELEASE_KEY_BUILD_MISMATCH); the API and the website start with that one key.
+ */
+export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment,publication,uiPort,sourceRevision,fullFixture,artifact}) {
+ if(environment.NODE_ENV!=='production'||environment.DEBATEAI_DEPLOYMENT_MODE!=='local'||environment.REGISTER_VERSION!==publication.registerVersion||environment.PUBLIC_APP_URL!==PREVIEW_ORIGIN
+  ||typeof sourceRevision!=='string'||!/^[0-9a-f]{40}$/.test(sourceRevision)||environment.RELEASE_KEY!==`r${publication.registerVersion}-${sourceRevision.slice(0,12)}`)refuse('PREVIEW_STAGE_ENVIRONMENT_REFUSED');
  // The one place that holds both sides: the website's model list (as built) must offer exactly what the
  // API's preview configuration allows (environment.mjs uiRosterMatchesApiConfig), before anything starts.
  const modelRoster=await builtModelRosterFlag(join(uiRoot,'apps/ui/.next'));
@@ -40,7 +46,7 @@ export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment
   if(event.pid!==api.child.pid||event.platform!==process.platform||event.registerVersion!==publication.registerVersion||event.mainSha256!==mainSha256)refuse('PREVIEW_STAGE_EVENT_REFUSED');
   const apiBase=`http://127.0.0.1:${environment.API_PORT}`;
   const apiProofs={};for(const path of ['/v1/deployment','/v1/auth/password-reset/status','/v1/auth/mfa-recovery/status']){const result=await fetch(apiBase+path,{signal:AbortSignal.timeout(5000)});if(result.status!==401)refuse('PREVIEW_STAGE_API_RESPONSE_REFUSED');apiProofs[path]={status:result.status};await result.body?.cancel();}
-  // The website refuses to start without its release key (side-by-side spec §1); it is the API's, the same release.
+  // The website refuses to start without its release key (side-by-side spec §1): the API's, checked above against the stage revision.
   const uiEnv={NODE_ENV:'production',RELEASE_KEY:environment.RELEASE_KEY,PORT:String(uiPort),DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:apiBase,PUBLIC_APP_URL:PREVIEW_ORIGIN,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:modelRoster,TURNSTILE_SITE_KEY:PREVIEW_SITE_KEY,PATH:'/usr/local/bin:/usr/bin:/bin'};
   ui=ownedChild(process.execPath,[join(uiRoot,'apps/ui/server.mjs')],{cwd:join(uiRoot,'apps/ui'),env:uiEnv});
   const uiBase=`http://127.0.0.1:${uiPort}`;

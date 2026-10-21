@@ -129,20 +129,29 @@ then the same keys from `ui.env` (this prints hashes, never the file):
 Give `build-env` the same `--models` you will give `ui-build` in step 4 (none means `glm-only`). The preview's
 `ui.env` names `all-models`.
 
+`$KEY` is this release's key: `r<register version this release runs with>-<first 12 hex of its source revision>`
+(set `REGV` to that register version; the source revision is read from the UI source manifest of step 2). Give the
+same `--release-key "$KEY"` to `build-env` here and to both `ui-build`s in step 4.
+
 ```sh
-rel build-env
+REGV=17   # change: the register version this release runs with
+KEY="r$REGV-$(jq -r .sourceRevision "$ART/candidate-ui-source.json" | cut -c1-12)"
+rel build-env --release-key "$KEY"
 for K in NODE_ENV PUBLIC_APP_URL NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON TURNSTILE_SITE_KEY; do printf '%s ' "$K"; sed -n "s/^$K=//p" /etc/debateai-v3-preview/auth-dev-v1/ui.env | tr -d '\n' | sha256sum | cut -d' ' -f1; done
 ```
 
 Each hash must equal the `sha256` that `build-env` printed for that key. A hash starting
-`e3b0c442` means the key is missing from `ui.env`: stop and ask.
+`e3b0c442` means the key is missing from `ui.env`: stop and ask. `RELEASE_KEY` is not in this loop: the shared
+`ui.env` holds the live release's key, not the new one. Check instead that `build-env` printed `$KEY` as
+`RELEASE_KEY`'s `value`; the release's own `ui-<label>.env` gets the same key when it is derived
+(`release-env.mjs derive … --release-key "$KEY"`).
 
 **4. Build the website** in the candidate and the fallback UI folders (about 10 minutes each).
 The build log goes to a file; the last line is the result:
 
 ```sh
 for KIND in candidate fallback; do
-  rel ui-build --source "$ART/$KIND-ui-source.json" --out "$ART/$KIND-ui-build.json" > "$ART/$KIND-ui-build.log" 2>&1; echo "$KIND exit $?"; tail -n 1 "$ART/$KIND-ui-build.log"
+  rel ui-build --source "$ART/$KIND-ui-source.json" --release-key "$KEY" --out "$ART/$KIND-ui-build.json" > "$ART/$KIND-ui-build.log" 2>&1; echo "$KIND exit $?"; tail -n 1 "$ART/$KIND-ui-build.log"
 done
 ```
 
@@ -1614,23 +1623,27 @@ echo A3_DONE
 
 These are steps 2 to 5 of "Operator sequence for one release" above, pasted into a root shell after
 `. /root/preview-archive/rNN-names.sh`. Each `--out` goes to `$ART`. One thing differs: **the model list is `all-models`**, so give `--models all-models` to `build-env` and to
-both `ui-build`s. Check the build values against `ui.env` by hash:
+both `ui-build`s. Both also take `--release-key "$KEY"`, where `KEY` is `r<the register version this release will
+publish, one above A1's>-<first 12 hex of REV>`. Check the build values against `ui.env` by hash:
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # A5: the public build values of the all-models list against ui.env, by hash only.
 [ ! -e "$S/build-env-all-models.json" ] || { echo "A5_NOT_DONE: an earlier build-env output exists"; exit 1; }
-rel build-env --models all-models > "$S/build-env-all-models.json"
+KEY="r$(( $(cat "$S/register-before") + 1 ))-${REV:0:12}"
+rel build-env --models all-models --release-key "$KEY" > "$S/build-env-all-models.json"
 for K in NODE_ENV PUBLIC_APP_URL NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON TURNSTILE_SITE_KEY; do
   T=$(jq -r --arg k "$K" '.values[$k].sha256' "$S/build-env-all-models.json"); U=$(sed -n "s/^$K=//p" "$E/ui.env" | tr -d '\n' | sha256sum | cut -d' ' -f1)
   echo "$K tool ${T:0:16} ui.env ${U:0:16}"; [ "$T" = "$U" ] || { echo "A5_NOT_DONE: $K differs from ui.env"; exit 1; }
 done
+# RELEASE_KEY: the new release's key, not the shared ui.env's (that is the live release's); its own ui-<label>.env gets it when derived.
+[ "$(jq -r '.values.RELEASE_KEY.value' "$S/build-env-all-models.json")" = "$KEY" ] || { echo "A5_NOT_DONE: build-env did not print this release's key"; exit 1; }
 echo A5_DONE
 ```
 
-- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --out "$ART/$KIND-ui-build.json"`,
-  for the candidate and the fallback.
+- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --release-key "$KEY" --out "$ART/$KIND-ui-build.json"`,
+  for the candidate and the fallback, after setting `KEY` exactly as A5 does.
 - A7 must print six `PREVIEW_RELEASE_VERIFIED` lines naming `REV`, and the operator digest.
   - The digest changes whenever a file in `deploy/preview-auth-dev/v1` changed.
   - `nativeSha256` changes with new migrations.
