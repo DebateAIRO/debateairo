@@ -11,8 +11,8 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
  * releases run side by side, the older API can be asked for a debate the newer release made, and that debate may carry
  * a value this code does not know. The person sees "open it on the current site": a typed 409
  * `{error:"MADE_BY_NEWER_RELEASE", message:"MADE_BY_NEWER_RELEASE"}`, never a 404 or a 500. Only a debate stamped by
- * ANOTHER release (not this API's own key, not `legacy`) reads that way — a read of this release's own data that fails
- * is a real bug and stays a loud 500. An unreadable live event is skipped (one journal line), never a torn-down stream.
+ * a NEWER release (not this API's own key, not `legacy`, a site version at least this API's own) reads that way — a
+ * read of this release's own data, or of an older release's, that fails is a real bug and stays a loud 500. An unreadable live event is skipped (one journal line), never a torn-down stream.
  * The code is sent on debate reads only (the website's note says "this debate was made by a newer version"). The
  * publication half (readPublicDebate, list): tests/unit/s8-publication.test.ts.
  */
@@ -153,6 +153,78 @@ describe("side-by-side C14: a debate made by a newer release reads as 'open it o
       }
     }
     expect(error.mock.calls.map(([line]) => JSON.parse(String(line)).event)).toContain("api.request.failed");
+  });
+
+  it("newer means a site version at least the API's own: higher → 409, same number with other code → 409, lower → 500", async () => {
+    // Controller ruling on C14's concern 1: an equal number with another code is a code-only upgrade (the other side is
+    // treated as newer); a LOWER site version's data that fails to parse is this code's own bug, and so is a stamp that
+    // is not a release key at all.
+    const SAME_NUMBER_OTHER_CODE = ["r17", "fedcba987654"].join("-");
+    const LOWER_RELEASE = ["r16", "0123456789ab"].join("-");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const [stamp, status] of [[NEWER_RELEASE, 409], [SAME_NUMBER_OTHER_CODE, 409], [LOWER_RELEASE, 500],
+      ["not-a-release-key", 500]] as const) {
+      for (const route of ROUTES) {
+        const app = api(fixtureApplication({ stamps: { [route.stamp]: stamp } }));
+        try {
+          const response = await app.inject({ method: "GET", url: route.url, headers: read });
+          expect(response.statusCode, `${route.url} ${stamp}`).toBe(status);
+          expect(response.json().error, `${route.url} ${stamp}`).toBe(status === 409 ? MADE_BY_NEWER.error : "INTERNAL_ERROR");
+        } finally {
+          await app.close();
+        }
+      }
+    }
+  });
+
+  it("says so in one content-free line (route, id, the debate's key) and keeps the parse failure as the cause", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const ids = { run: RUN_ID, answer: ANSWER_ID } as const;
+    const names = { [`/v1/runs/${RUN_ID}`]: "GET /v1/runs/{id}", [`/v1/runs/${RUN_ID}/answer`]: "GET /v1/runs/{id}/answer",
+      [`/v1/answers/${ANSWER_ID}`]: "GET /v1/answers/{id}" } as Record<string, string>;
+    for (const route of ROUTES) {
+      error.mockClear();
+      const seen: unknown[] = [];
+      const app = api(fixtureApplication({ stamps: { [route.stamp]: NEWER_RELEASE } }));
+      app.addHook("onError", async (_request, _reply, thrown) => { seen.push(thrown); });
+      try {
+        expect((await app.inject({ method: "GET", url: route.url, headers: read })).statusCode, route.url).toBe(409);
+        expect(error.mock.calls.map(([line]) => JSON.parse(String(line))), route.url).toEqual([
+          { event: "api.debate.made_by_newer_release", route: names[route.url], id: ids[route.stamp], releaseKey: NEWER_RELEASE }
+        ]);
+        expect(seen, route.url).toHaveLength(1);
+        expect(seen[0], route.url).toBeInstanceOf(MadeByNewerReleaseError);
+        expect((seen[0] as Error).cause, route.url).toBeInstanceOf(Error);
+        expect(((seen[0] as Error).cause as Error).name, route.url).toBe("ZodError");
+      } finally {
+        await app.close();
+      }
+    }
+  });
+
+  it("a key reader that throws synchronously never replaces the parse failure (the 500 carries the ZodError)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const application = fixtureApplication({ stamps: { run: NEWER_RELEASE } });
+    application.readRunReleaseKey = ((): never => { throw new Error("KEY_READER_THREW"); }) as never;
+    const seen: unknown[] = [];
+    const app = api(application);
+    app.addHook("onError", async (_request, _reply, thrown) => { seen.push(thrown); });
+    try {
+      expect((await app.inject({ method: "GET", url: `/v1/runs/${RUN_ID}`, headers: read })).statusCode).toBe(500);
+      expect(seen.map((thrown) => (thrown as Error).name)).toEqual(["ZodError"]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("an API whose own key is not a release key cannot compare, so another release's failed read stays 500", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const app = api(fixtureApplication({ stamps: { run: NEWER_RELEASE } }), { releaseKey: "legacy" });
+    try {
+      expect((await app.inject({ method: "GET", url: `/v1/runs/${RUN_ID}`, headers: read })).statusCode).toBe(500);
+    } finally {
+      await app.close();
+    }
   });
 
   it("only a ZodError is a newer release's data: any other failure of another release's run stays 500", async () => {
@@ -299,5 +371,9 @@ describe("side-by-side C14: MADE_BY_NEWER_RELEASE is sent on debate reads only",
     }
     expect(count(index, "function withNewerReleaseFallback<")).toBe(1);
     expect(count(index, "withNewerReleaseFallback(")).toBe(3); // the three debate reads, nothing else
+    // The website reads the contract's own constant, never a second copy of the code.
+    const watch = readFileSync(join(import.meta.dirname, "../../apps/ui/lib/v3/releaseWatch.ts"), "utf8");
+    expect(watch).toContain('MADE_BY_NEWER_RELEASE } from "@debateai/contract";');
+    expect(watch).not.toContain('= "MADE_BY_NEWER_RELEASE"');
   });
 });

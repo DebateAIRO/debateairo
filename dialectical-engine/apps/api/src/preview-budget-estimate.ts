@@ -323,8 +323,9 @@ export type PreviewBudgetGateSettings = Readonly<{
   readUnfinishedRuns: () => Promise<readonly PreviewUnfinishedRun[]>;
   /**
    * Side-by-side spec §4 (plan C16): one register version's terms, for an unfinished debate admitted under it. Sealed
-   * versions never change, so each is read once and kept (the API's own is the fields above); a version that cannot be
-   * read refuses (the ask is refused as unavailable), never priced at another version's terms.
+   * versions never change, so each is read once and kept (the API's own is the fields above). A version that cannot be
+   * read rejects, and is not kept; the estimate then prices that one debate at the API's own terms (C16 review,
+   * `versionTermsFallback`), so one unreadable version never refuses every preview ask.
    */
   termsForVersion: (version: number) => Promise<PreviewVersionTerms>;
   /** The app's recorded usage of recent preview calls (see PREVIEW_MEASURED_USAGE_SQL); absent: the defaults. */
@@ -1006,6 +1007,23 @@ export function previewGateRefusalReason(need: PreviewGateNeed, remaining: Previ
   return previewGateRefusal(need, remaining, held)?.reason ?? null;
 }
 
+/** The versions this process has already said it priced at the API's own terms (one line per version per process). */
+const VERSION_TERMS_FALLBACK_SAID = new Set<number>();
+/**
+ * Side-by-side C16 review (controller ruling): an unfinished debate whose register version's terms cannot be read is
+ * priced at the API's own terms, as every debate was before C16, rather than refusing every preview ask while it is
+ * unfinished. Nothing is kept as that version's terms (the next ask reads it again); the operator line is content-free
+ * (the version number only) and printed once per version per process.
+ */
+function versionTermsFallback(gate: PreviewBudgetGateSettings, version: number): PreviewVersionTerms {
+  if (!VERSION_TERMS_FALLBACK_SAID.has(version)) {
+    VERSION_TERMS_FALLBACK_SAID.add(version);
+    console.error(JSON.stringify({ event: "api.preview_estimate.version_terms_fallback", version }));
+  }
+  return Object.freeze({ roleModels: gate.roleModels, roleProviderRefs: gate.roleProviderRefs, storyRounds: gate.storyRounds,
+    callOutputTokens: gate.callOutputTokens, maxCooldownHoldsPerRun: gate.maxCooldownHoldsPerRun });
+}
+
 function logRefusal(kind: "unavailable" | "shortfall", reason: string): void {
   // Operator-only and content-free: a fixed event, the kind and the internal reason (gate state,
   // model ids, counts). Never the question, the asker or a key.
@@ -1166,8 +1184,10 @@ export async function assertPreviewBudgetAdmits(
     held = new Map();
     for (const run of unfinished) {
       // Side-by-side spec §4 (plan C16): an unfinished debate is held at ITS OWN register version's roles, story and
-      // bounds (another release may have admitted it); the new debate above keeps the API's.
-      const terms = await gate!.termsForVersion(run.registerVersion);
+      // bounds (another release may have admitted it); the new debate above keeps the API's. A version whose terms
+      // cannot be read is held at the API's own (C16 review), never a refusal of every ask.
+      const terms = await gate!.termsForVersion(run.registerVersion)
+        .catch(() => versionTermsFallback(gate!, run.registerVersion));
       for (const hold of estimateUnfinishedRunHolds(run, { ...gate!, ...terms },
         pricerFor(run.storyTier, run.basis, terms.callOutputTokens), debateCallCount)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };

@@ -1285,23 +1285,43 @@ describe("each unfinished debate is held at its own register version's terms (si
   const V17: PreviewVersionTerms = Object.freeze({ ...GATE_TERMS, callOutputTokens: Object.freeze({ ...OUTPUT, debate: 16_384 }) });
   const runAt = (registerVersion: number): PreviewUnfinishedRun => Object.freeze({ basis: basis(2), panel: PANEL, phase: "DEBATE", registerVersion });
   const RUNS = Object.freeze([runAt(16), runAt(17)]);
-  /** What the gate says the unfinished debates hold, from its refusal (no calls, or no money, left). */
-  const heldBy = async (gate: PreviewBudgetGateSettings): Promise<{ calls: number; nanoUsd: bigint }> => {
+  /**
+   * What the gate says, from its refusals (no calls, then no money, left): what the unfinished debates hold, what the
+   * new debate needs, and the operator lines printed meanwhile (parsed).
+   */
+  const refusalsOf = async (gate: PreviewBudgetGateSettings): Promise<{
+    held: { calls: number; nanoUsd: bigint }; needs: { calls: number; nanoUsd: bigint }; lines: Record<string, unknown>[];
+  }> => {
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const heldIn = async (remaining: PreviewGateRemaining): Promise<string> => {
+    const refusalIn = async (remaining: PreviewGateRemaining): Promise<{ held: string; needs: string }> => {
       const live = { ...gate, remaining: { deepinfra: async () => remaining } };
       const refusal = await assertPreviewBudgetAdmits(live, { basis: basis(2), panel: PANEL }).then(() => null, (error: unknown) => error);
-      if (!(refusal instanceof PreviewDailyLimitRefusal)) throw new Error("the gate admitted a debate it had no room for");
-      return /, (\d+) held by unfinished debates,/u.exec(refusal.message)![1]!;
+      if (!(refusal instanceof PreviewDailyLimitRefusal)) throw new Error(`expected the daily refusal, got ${String(refusal)}`);
+      const [, held, needs] = /, (\d+) held by unfinished debates, the debate needs (\d+)/u.exec(refusal.message)!;
+      return { held: held!, needs: needs! };
     };
     try {
+      const calls = await refusalIn(remainingWith({ remainingCalls: 0 }));
+      const money = await refusalIn(remainingWith({ remainingNanoUsd: 0n }));
       return {
-        calls: Number(await heldIn(remainingWith({ remainingCalls: 0 }))),
-        nanoUsd: BigInt(await heldIn(remainingWith({ remainingNanoUsd: 0n })))
+        held: { calls: Number(calls.held), nanoUsd: BigInt(money.held) },
+        needs: { calls: Number(calls.needs), nanoUsd: BigInt(money.needs) },
+        lines: quiet.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
       };
     } finally {
       quiet.mockRestore();
     }
+  };
+  /** What the gate says the unfinished debates hold, from its refusal (no calls, or no money, left). */
+  const heldBy = async (gate: PreviewBudgetGateSettings): Promise<{ calls: number; nanoUsd: bigint }> => (await refusalsOf(gate)).held;
+  /** What a new debate needs on the fixture gate when priced at `terms`, as the refusal states it. */
+  const needsAt = (terms: PreviewVersionTerms): { calls: number; nanoUsd: bigint } => {
+    const need = estimatePreviewGateNeeds({ basis: basis(2), panel: PANEL, ...ROLES, ...terms, debateCallCount: previewDebateCallCount() })
+      .find((entry) => entry.gate === "deepinfra")!;
+    return {
+      calls: previewGateEstimateCalls(need, remainingWith({ remainingCalls: 0 })),
+      nanoUsd: previewGateEstimateNanoUsd(need, remainingWith({ remainingNanoUsd: 0n }))
+    };
   };
   const sumOf = (priced: ReadonlyArray<readonly [PreviewUnfinishedRun, PreviewVersionTerms]>) => priced
     .map(([run, terms]) => estimateUnfinishedRunHolds(run, terms)[0]!)
@@ -1313,22 +1333,41 @@ describe("each unfinished debate is held at its own register version's terms (si
       ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS), ...V17,
       termsForVersion: async (version: number) => { asked.push(version); return version === 16 ? V16 : V17; }
     });
-    const held = await heldBy(gate);
+    const { held, needs } = await refusalsOf(gate);
     expect(held).toEqual(sumOf([[RUNS[0]!, V16], [RUNS[1]!, V17]]));
     const allAt17 = sumOf([[RUNS[0]!, V17], [RUNS[1]!, V17]]);
     expect(held.nanoUsd).not.toBe(allAt17.nanoUsd);
     expect(held.calls).not.toBe(allAt17.calls);
     expect(asked).toEqual([16, 17, 16, 17]);
+    // C16 review: the NEW debate is priced at the API's own version (17), never at an unfinished run's (16).
+    expect(needs).toEqual(needsAt(V17));
+    expect(needs.nanoUsd).not.toBe(needsAt(V16).nanoUsd);
   });
 
-  it("a version whose terms cannot be read refuses the ask as unavailable, never prices the debate at the API's terms", async () => {
+  it("a version whose terms cannot be read prices that run at the API's own terms, and says so once (C16 review)", async () => {
+    // Controller ruling: one unreadable version must not refuse every preview ask. Its unfinished run is held exactly as
+    // if it ran under the API's own terms (the behaviour before C16), and one content-free line names the version.
+    const asked: number[] = [];
     const gate: PreviewBudgetGateSettings = Object.freeze({
-      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS),
-      termsForVersion: async (version: number) => { if (version === 16) throw new TypeError("STORY_POLICY_INVALID"); return V17; }
+      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS), ...V17,
+      termsForVersion: async (version: number) => {
+        asked.push(version);
+        if (version === 16) throw new TypeError("STORY_POLICY_INVALID");
+        return V17;
+      }
     });
+    const { held, needs, lines } = await refusalsOf(gate);
+    expect(held).toEqual(sumOf([[RUNS[0]!, V17], [RUNS[1]!, V17]]));
+    expect(needs).toEqual(needsAt(V17));
+    // Not kept as terms: every ask asks for version 16 again (a version that later reads fine is priced at its own).
+    expect(asked).toEqual([16, 17, 16, 17]);
+    expect(lines.filter((line) => line.event === "api.preview_estimate.version_terms_fallback"))
+      .toEqual([{ event: "api.preview_estimate.version_terms_fallback", version: 16 }]);
+    // With room on the gate the ask is admitted, and the line is not printed again.
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL })).rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
+      await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL })).resolves.toBeUndefined();
+      expect(quiet).not.toHaveBeenCalled();
     } finally {
       quiet.mockRestore();
     }

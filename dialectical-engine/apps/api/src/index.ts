@@ -2037,30 +2037,54 @@ export class AskAlreadyWaitingRefusal extends AskRefusal {
  * and `readPublicDebate` — because the website's note names "this debate" for any call refused with it (C13).
  */
 export class MadeByNewerReleaseError extends TypedDomainError {
-  constructor() {
+  /** `cause`: the parse failure that showed it (C14 review), for whoever inspects the error; never sent. */
+  constructor(cause?: unknown) {
     super(MADE_BY_NEWER_RELEASE, MADE_BY_NEWER_RELEASE);
     this.name = "MadeByNewerReleaseError";
+    if (cause !== undefined) this.cause = cause;
   }
 }
 
 /**
  * Side-by-side C14: one debate read whose contract parse failed (a `ZodError`), answered as a newer release's data when
- * the debate is stamped by a release that is neither this API's own nor `legacy`. Anything else is rethrown as it was:
- * this release's own data failing its own parse is a real bug and stays a loud 500, as does any non-parse failure, an
- * API that names no release of its own, a debate with no readable key, or a key read that itself fails.
+ * the debate is stamped by a NEWER release (`madeByNewerRelease`). Anything else is rethrown as it was: this release's
+ * own data, or an older release's, failing this code's parse is a real bug and stays a loud 500, as does any non-parse
+ * failure, an API that names no release of its own, a debate with no readable key, or a key read that itself fails.
  */
 async function withNewerReleaseFallback<T>(
   read: () => Promise<T>,
   releaseKeyOf: () => Promise<string | null>,
-  ownReleaseKey: string | undefined
+  ownReleaseKey: string | undefined,
+  debate: Readonly<{ route: string; id: string }>
 ): Promise<T> {
   try {
     return await read();
   } catch (error) {
     if (!(error instanceof Error) || error.name !== "ZodError" || ownReleaseKey === undefined) throw error;
-    const releaseKey = await releaseKeyOf().catch(() => null);
-    if (releaseKey === null || releaseKey === ownReleaseKey || releaseKey === LEGACY_RELEASE_KEY) throw error;
-    throw new MadeByNewerReleaseError();
+    // C14 review: a key reader that throws synchronously is a failed read like any other; it never replaces the parse
+    // failure.
+    const releaseKey = await Promise.resolve().then(releaseKeyOf).catch(() => null);
+    if (releaseKey === null || !madeByNewerRelease(releaseKey, ownReleaseKey)) throw error;
+    // C14 review: one operator line, content-free (the route, the id asked for, the debate's release key), and the
+    // parse failure kept as the error's cause.
+    console.error(JSON.stringify({ event: "api.debate.made_by_newer_release", route: debate.route, id: debate.id, releaseKey }));
+    throw new MadeByNewerReleaseError(error);
+  }
+}
+
+/**
+ * Side-by-side C14 (controller ruling on its concern 1): a run's release is newer than this API's when its key is not
+ * `legacy`, differs from this API's own, and its site version (`parseReleaseKey(...).siteVersion`) is at least this
+ * API's own. An EQUAL number with another code part is a code-only upgrade: the other side is treated as newer. A lower
+ * site version is older (its data failing this code's parse is our own bug), and a key on either side that does not
+ * parse cannot be compared: both read false, so the caller rethrows the loud 500.
+ */
+function madeByNewerRelease(runReleaseKey: string, ownReleaseKey: string): boolean {
+  if (runReleaseKey === LEGACY_RELEASE_KEY || runReleaseKey === ownReleaseKey) return false;
+  try {
+    return parseReleaseKey(runReleaseKey).siteVersion >= parseReleaseKey(ownReleaseKey).siteVersion;
+  } catch {
+    return false;
   }
 }
 
@@ -3799,7 +3823,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const answer = await withNewerReleaseFallback(
       () => readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request)),
       () => options.application.readAnswerReleaseKey?.(answerId.data) ?? Promise.resolve(null),
-      options.releaseKey
+      options.releaseKey,
+      { route: "GET /v1/answers/{id}", id: answerId.data }
     );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(answer);
   });
@@ -3992,7 +4017,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const run = await withNewerReleaseFallback(
       () => readOwnerRun(options, runId, request.session, ownershipFor(request)),
       () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
-      options.releaseKey
+      options.releaseKey,
+      { route: "GET /v1/runs/{id}", id: runId }
     );
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
   });
@@ -4023,7 +4049,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const answer = await withNewerReleaseFallback(
       () => readOwnerRunAnswer(options, runId, request.session, ownershipFor(request)),
       () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
-      options.releaseKey
+      options.releaseKey,
+      { route: "GET /v1/runs/{id}/answer", id: runId }
     );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
   });

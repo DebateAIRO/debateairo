@@ -711,7 +711,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
         prepared?.close();
       }
       const publicDebate = PublicDebateSchema.safeParse(decrypted);
-      if (!publicDebate.success) throw new MadeByNewerReleaseError();
+      if (!publicDebate.success) throw new MadeByNewerReleaseError(publicDebate.error);
       return publicDebate.data;
     });
   }

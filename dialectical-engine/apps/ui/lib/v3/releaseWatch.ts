@@ -1,4 +1,4 @@
-import { ContractHttpError } from "@debateai/contract";
+import { ContractHttpError, MADE_BY_NEWER_RELEASE } from "@debateai/contract";
 import { DEVELOPMENT_CODE_REVISION, LEGACY_RELEASE_KEY, releaseCodePart } from "@debateai/kernel";
 
 /**
@@ -21,8 +21,8 @@ import { DEVELOPMENT_CODE_REVISION, LEGACY_RELEASE_KEY, releaseCodePart } from "
  */
 export type NewerVersionReason = "NEWER_BUILD" | "MADE_BY_NEWER";
 
-/** The server's code for "a newer release made this" (plan C14). */
-export const MADE_BY_NEWER_RELEASE = "MADE_BY_NEWER_RELEASE";
+/** The server's code for "a newer release made this" (plan C14), the contract's own constant. */
+export { MADE_BY_NEWER_RELEASE };
 
 let reason: NewerVersionReason | null = null;
 const listeners = new Set<(reason: NewerVersionReason) => void>();

@@ -245,8 +245,8 @@ export function servedPositionOf(nodes: Answer["nodes"], edges: Answer["edges"],
  * The rule's NAME is the rule's version: a change to `deriveJudgesVerdict`'s counting must take a new rule name. The
  * receipt is jsonb with no database CHECK of its own; the guards a reviewer sees are the kernel's `ServedRootRule` type
  * (what the runner may record) and 0121's declared rule history (`condition_mark_served_root_rule_rule_check`), which
- * mirrors it, so a new name is a kernel change and a migration, and an older release never shows a recount of a rule
- * it does not implement. Pure.
+ * mirrors it, so a new name is a kernel change (and a 0121 migration when a condition mark carries it), and an older
+ * release never shows a recount of a rule it does not implement. Pure.
  */
 export function judgesRecountApplies(input: Readonly<{
   runReleaseKey: string; ownReleaseKey: string | undefined; servedRootRule: string | null;
