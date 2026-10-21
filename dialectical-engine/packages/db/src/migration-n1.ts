@@ -26,8 +26,11 @@ export type N1Declaration = Readonly<{
   drained: boolean;
   keepsVerifier: boolean;
   outsideTransaction: boolean;
-  /** The index an outside-transaction step builds (the schema of its table), or null for any other step. */
-  concurrentIndex: Readonly<{ schema: string; name: string }> | null;
+  /**
+   * The index an outside-transaction step builds, its table and that table's schema (the index lives there too), or
+   * null for any other step. The step is recorded only over a valid index of that name ON that table.
+   */
+  concurrentIndex: Readonly<{ schema: string; table: string; name: string }> | null;
 }>;
 
 /** A migration refusal of the loader family: the message starts with the code, and `.code` carries it. */
@@ -46,7 +49,7 @@ const DECLARATIONS: ReadonlyMap<string, DeclarationKey> = new Map([
 /** Any line that looks like a declaration, exact or not (a misspelled or misplaced one is refused, never skipped). */
 const DECLARATION_LIKE = /^--\s*n1\s*:/u;
 /** The one statement an outside-transaction body may hold: plain lowercase names, no `;` before its own end. */
-const CONCURRENT_INDEX = /^CREATE INDEX CONCURRENTLY IF NOT EXISTS ([a-z_][a-z0-9_]*) ON ([a-z_][a-z0-9_]*)\.[a-z_][a-z0-9_]*[\s(][^;]*;$/u;
+const CONCURRENT_INDEX = /^CREATE INDEX CONCURRENTLY IF NOT EXISTS ([a-z_][a-z0-9_]*) ON ([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)[\s(][^;]*;$/u;
 const GRANDFATHERED: N1Declaration = Object.freeze({
   expand: false, drained: false, keepsVerifier: false, outsideTransaction: false, concurrentIndex: null
 });
@@ -78,7 +81,7 @@ export function parseN1Header(name: string, sql: string): N1Declaration {
     const body = lines.filter((line) => !line.trim().startsWith("--")).join("\n").trim();
     const statement = CONCURRENT_INDEX.exec(body);
     if (statement === null) return refuse("OUTSIDE_TRANSACTION_BODY");
-    concurrentIndex = Object.freeze({ schema: statement[2]!, name: statement[1]! });
+    concurrentIndex = Object.freeze({ schema: statement[2]!, table: statement[3]!, name: statement[1]! });
   }
   return Object.freeze({ expand, drained: !expand, keepsVerifier: found.has("keepsVerifier"), outsideTransaction, concurrentIndex });
 }

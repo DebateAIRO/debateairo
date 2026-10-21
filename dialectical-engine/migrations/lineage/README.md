@@ -295,7 +295,8 @@ Each step after `0122_engine_map_check.sql` declares its n1 header in its leadin
 whose whole body is one `CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON <schema>.<table> …`. Such a step runs on
 the session first with the same 2 s lock wait and retries (`runOutsideTransactionStep`: an INVALID index of that name
 is dropped concurrently before the build); its step transaction then refuses
-`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID` unless the index is valid, and records the step like any other.
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID` unless an index of that name is valid and on the step's own table (the
+header names it, `parseN1Header`'s `concurrentIndex`), and records the step like any other.
 0122 and earlier declare nothing (all false). The modules `loadMigrationPlan` loads import only node built-ins and
 `./migration-*.js` (standalone probes and the preview's superuser JIT creator load them), so their refusals are plain
 Errors whose message starts with the code and which carry it as `.code`. The reviewed bytes of `migrate()`'s module

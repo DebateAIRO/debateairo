@@ -292,34 +292,38 @@ export async function applyForwardStep(client:PoolClient,plan:MigrationPlan,step
 }
 
 const PLAIN_NAME=/^[a-z_][a-z0-9_]*$/;
-/** The index an outside-transaction step builds; its names are plain, as parseN1Header admits them. */
-const concurrentIndexOf=(step:ChainStep):Readonly<{schema:string;name:string}>=>{
+/** The index an outside-transaction step builds and its table; their names are plain, as parseN1Header admits them. */
+const concurrentIndexOf=(step:ChainStep):Readonly<{schema:string;table:string;name:string}>=>{
  const index=step.n1.concurrentIndex;
- if(!step.n1.outsideTransaction||index===null||!PLAIN_NAME.test(index.schema)||!PLAIN_NAME.test(index.name)){
+ if(!step.n1.outsideTransaction||index===null||!PLAIN_NAME.test(index.schema)||!PLAIN_NAME.test(index.table)||!PLAIN_NAME.test(index.name)){
   throw migrationRefusal('MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED',step.name);
  }
  return index;
 };
 
+/** A valid index of that name ON the step's own table (A6 review: a same-named index elsewhere is not the step's). */
 async function assertConcurrentIndexValid(client:PoolClient,step:ChainStep):Promise<void>{
  const index=concurrentIndexOf(step);
- const row=(await client.query<{valid:boolean}>('SELECT indisvalid valid FROM pg_index WHERE indexrelid=to_regclass($1)',[`${index.schema}.${index.name}`])).rows[0];
+ const row=(await client.query<{valid:boolean}>('SELECT indisvalid valid FROM pg_index WHERE indexrelid=to_regclass($1) AND indrelid=to_regclass($2)',
+  [`${index.schema}.${index.name}`,`${index.schema}.${index.table}`])).rows[0];
  if(row?.valid!==true)throw migrationRefusal('MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID',step.name);
 }
 
 /**
  * The one statement of an outside-transaction step (n1 `outside-transaction`: a concurrent index build, which cannot
- * run inside a transaction), on the migration session with the same 2 s lock wait. An INVALID index of that name, left
- * by a build that was interrupted or timed out, is dropped concurrently first, so the build starts clean (IF NOT EXISTS
- * would keep the invalid one). migrate() then records the step in a normal step transaction, which refuses unless the
- * index is valid. The caller retries a lock wait that ran out (withMigrationLockRetry).
+ * run inside a transaction), on the migration session with the same 2 s lock wait. An INVALID index of that name on
+ * the step's table, left by a build that was interrupted or timed out, is dropped concurrently first, so the build
+ * starts clean (IF NOT EXISTS would keep the invalid one). migrate() then records the step in a normal step
+ * transaction, which refuses unless that index is valid and on that table. The caller retries a lock wait that ran out
+ * (withMigrationLockRetry).
  */
 export async function runOutsideTransactionStep(client:PoolClient,step:ChainStep):Promise<void>{
  const index=concurrentIndexOf(step);
  const qualified=`${index.schema}.${index.name}`;
  await client.query("SET lock_timeout = '2s'");
  try{
-  const invalid=(await client.query<{invalid:boolean}>('SELECT EXISTS(SELECT 1 FROM pg_index WHERE indexrelid=to_regclass($1) AND NOT indisvalid) invalid',[qualified])).rows[0]?.invalid===true;
+  const invalid=(await client.query<{invalid:boolean}>('SELECT EXISTS(SELECT 1 FROM pg_index WHERE indexrelid=to_regclass($1) AND indrelid=to_regclass($2) AND NOT indisvalid) invalid',
+   [qualified,`${index.schema}.${index.table}`])).rows[0]?.invalid===true;
   if(invalid)await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${qualified}`);
   await client.query(step.sql);
  }finally{

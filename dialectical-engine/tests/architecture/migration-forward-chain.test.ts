@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { runOutsideTransactionStep, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
+import { MIGRATION_LOCK_TIMEOUT_MS } from "../../packages/db/src/migration-transaction.js";
 
 /**
  * PR-54 (task N26n), PR-58 (task F10): NETOPIA's migration runs as the forward step 0111, chained after dev's 0110
@@ -683,6 +686,26 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0123_MANIFEST");
       // The same refusal when 0122's own manifest changes under 0123: 0122 stays valid, 0123 alone refuses.
       await refusal("lineage/engine-map-check-forward0122.json", (text) => `${text}\n`, "MIGRATION_FORWARD0123_MANIFEST");
+      // Side-by-side §5 (A6 review): 0123 without its `-- n1: keeps-verifier` line, its manifest re-digested so 0123's own
+      // loader accepts the bytes: the header now says the verifier changes while the manifest names the one before, so
+      // the chain refuses the disagreement (an older release trusts keeps-verifier when it accepts a database ahead).
+      {
+        const sqlPath = join(root, "migrations/0123_side_by_side_releases.sql");
+        const manifestPath = join(root, "migrations/lineage/side-by-side-releases-forward0123.json");
+        const [originalSql, originalManifest] = [await readFile(sqlPath, "utf8"), await readFile(manifestPath, "utf8")];
+        const changed = originalSql.replace("-- n1: keeps-verifier\n", "");
+        expect(changed).not.toBe(originalSql);
+        const manifest = JSON.parse(originalManifest);
+        manifest.migration.sha256 = sha256(changed);
+        try {
+          await writeFile(sqlPath, changed);
+          await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_FORWARD_CHAIN_N1_KEEPS_VERIFIER 0123_side_by_side_releases.sql") });
+        } finally {
+          await writeFile(sqlPath, originalSql);
+          await writeFile(manifestPath, originalManifest);
+        }
+      }
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
@@ -718,5 +741,32 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(seen).toContain("migration-forward-chain.ts");
     expect(seen).toContain("migration-n1.ts");
     expect(seen).not.toContain("migration-transaction.ts");
+  });
+
+  it("refuses an outside-transaction step that names no plain index, before any SQL (A6 review)", async () => {
+    const sent: string[] = [];
+    const client = { query: async (text: string) => { sent.push(text); return { rows: [] }; } } as unknown as PoolClient;
+    const step = (n1: ChainStep["n1"]): ChainStep => ({ name: "0199_probe.sql", n1 } as unknown as ChainStep);
+    const declared = { expand: true, drained: false, keepsVerifier: true, outsideTransaction: true } as const;
+    for (const n1 of [
+      { ...declared, concurrentIndex: null },
+      { ...declared, outsideTransaction: false, concurrentIndex: { schema: "core", table: "run", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core; DROP TABLE core.run", table: "run", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core", table: "run x", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core", table: "run", name: "Probe" } }
+    ]) {
+      await expect(runOutsideTransactionStep(client, step(n1)), JSON.stringify(n1))
+        .rejects.toMatchObject({ code: "MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED", message: "MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED 0199_probe.sql" });
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it("writes every migration lock wait as MIGRATION_LOCK_TIMEOUT_MS (A6 review)", async () => {
+    // The step transaction's SET LOCAL and the outside-transaction build's session SET: each module holds exactly one.
+    const seconds = `${MIGRATION_LOCK_TIMEOUT_MS / 1000}s`;
+    for (const file of ["migration-transaction.ts", "migration-forward-chain.ts"]) {
+      const literals = [...(await readFile(new URL(file, DB_SOURCE), "utf8")).matchAll(/lock_timeout = '([^']*)'/gu)].map((match) => match[1]);
+      expect(literals, file).toEqual([seconds]);
+    }
   });
 });

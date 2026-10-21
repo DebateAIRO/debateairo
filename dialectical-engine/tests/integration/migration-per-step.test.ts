@@ -16,7 +16,7 @@ vi.mock("../../packages/db/src/migration-lineage.js", async (original) => {
 });
 import { migrate } from "../../packages/db/src/index.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
-import type { ChainStep } from "../../packages/db/src/migration-forward-chain.js";
+import { applyForwardStep, replayForwardChain, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
 import { parseN1Header, type N1Declaration } from "../../packages/db/src/migration-n1.js";
 import { seedInstalledAuth106 } from "../support/auth106.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -154,6 +154,52 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).toContain(SIDE_BY_SIDE);
     expect(await receipts()).toContain(SIDE_BY_SIDE);
     expect(retryLines(warn)).toContain(`[MIGRATION_LOCK_RETRY] ${SIDE_BY_SIDE} try 1/5`);
+  }, 120_000);
+
+  it("an outside-transaction step is recorded only over a valid index of its own table (A6 review)", async () => {
+    // applyForwardStep alone, as migrate() runs it after runOutsideTransactionStep: here the build never ran, or left an
+    // invalid index, or an index of that name sits on another table. Each is refused and leaves no ledger row or receipt.
+    const name = "0199_probe_index_check.sql";
+    const sql = "-- probe (side-by-side §5)\n-- n1: expand\n-- n1: keeps-verifier\n-- n1: outside-transaction\n"
+      + "CREATE INDEX CONCURRENTLY IF NOT EXISTS probe_check_idx ON core.run (created_at_seq);\n";
+    const real = await loadMigrationPlan();
+    const step = probe(real.forwardChain.at(-1)!, name, sql, parseN1Header(name, sql));
+    const extended = { ...real, forwardChain: Object.freeze([...real.forwardChain, step]) };
+    const recordAlone = async (): Promise<unknown> => {
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const done = await replayForwardChain(client, extended, new Set(await ledger()));
+        await applyForwardStep(client, extended, step, done);
+        await client.query("COMMIT");
+        return "NOT_REFUSED";
+      } catch (error) {
+        await client.query("ROLLBACK");
+        return error;
+      } finally { client.release(); }
+    };
+    const refused = { code: "MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID", message: `MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID ${name}` };
+    try {
+      expect(await recordAlone()).toMatchObject(refused);
+      await db.pool.query("CREATE INDEX probe_check_idx ON core.run (created_at_seq)");
+      await db.pool.query("UPDATE pg_index SET indisvalid=false WHERE indexrelid='core.probe_check_idx'::regclass");
+      expect(await recordAlone()).toMatchObject(refused);
+      await db.pool.query("DROP INDEX core.probe_check_idx");
+      await db.pool.query("CREATE INDEX probe_check_idx ON core.work_item (run_id)");
+      expect(await recordAlone()).toMatchObject(refused);
+      expect(await ledger()).not.toContain(name);
+      expect(await receipts()).not.toContain(name);
+      // Over a valid index of its own table the same step is recorded.
+      await db.pool.query("DROP INDEX core.probe_check_idx");
+      await db.pool.query("CREATE INDEX probe_check_idx ON core.run (created_at_seq)");
+      expect(await recordAlone()).toBe("NOT_REFUSED");
+      expect(await receipts()).toContain(name);
+    } finally {
+      await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name=$1", [name]);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name=$1", [name]);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name=$1", [name]);
+      await db.pool.query("DROP INDEX IF EXISTS core.probe_check_idx");
+    }
   }, 120_000);
 
   it("an outside-transaction step builds its index concurrently", async () => {

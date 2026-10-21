@@ -9,7 +9,7 @@ import { TypedDomainError } from "@debateai/kernel";
  * waits at most 2 s: readers that queue behind its waiting ALTER wait at most that long too. A lock wait that ran out
  * (SQLSTATE lock_not_available) rolls the try back, pauses 2 s so the queue drains, and tries again, five tries in
  * all; then the step refuses MIGRATION_LOCK_TIMEOUT naming it, and nothing of that step remains. Any other failure
- * is refused at once.
+ * is refused at once. A step holds the locks it takes until its COMMIT: the 2 s bounds each lock wait, not the step.
  *
  * Imported only by migrate() (packages/db/src/index.ts), outside loadMigrationPlan's self-contained closure, so it
  * uses the house TypedDomainError. Its bytes are sealed by tools/orphan-audit (NATIVE_MIGRATE_TRANSACTION_SHA256)

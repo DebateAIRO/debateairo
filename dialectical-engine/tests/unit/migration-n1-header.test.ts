@@ -39,9 +39,9 @@ describe("side-by-side §5: parseN1Header", () => {
     invalid("0123_x.sql", "-- n1: expand \nSELECT 1;");
   });
 
-  it("an outside-transaction step is exactly one concurrent index build, which names the index", () => {
+  it("an outside-transaction step is exactly one concurrent index build, which names the index and its table", () => {
     expect(parseN1Header("0199_probe_concurrent_index.sql", `-- probe\n-- n1: expand\n-- n1: keeps-verifier\n-- n1: outside-transaction\n${CONCURRENT}\n`))
-      .toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true, concurrentIndex: { schema: "core", name: "probe_run_seq_idx" } });
+      .toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true, concurrentIndex: { schema: "core", table: "run", name: "probe_run_seq_idx" } });
     // Not CONCURRENTLY, not IF NOT EXISTS, an unqualified table, a quoted name, or a hidden second statement.
     for (const body of ["CREATE INDEX IF NOT EXISTS probe_run_seq_idx ON core.run (created_at_seq);",
       "CREATE INDEX CONCURRENTLY probe_run_seq_idx ON core.run (created_at_seq);",
