@@ -304,6 +304,46 @@ describe("a preview debate survives a busy model and a halted gate (spec 2026-10
     expect(await disclosureOf(result.answerId)).toMatchObject({ fallback_reason: null, writer_fallback_reason: "ROLE_UNAVAILABLE" });
   });
 
+  it("side-by-side §9: GLM's row is gone from the gate (MODEL_NOT_ALLOWED); GLM sits out after one call and the run is served", async () => {
+    // Side-by-side spec §9 (D6): during an upload the gate's GO may no longer serve a model an older release's debate
+    // still asks for. The gate refuses it MODEL_NOT_ALLOWED before reserving or sending anything, and the app reads that
+    // as the model sitting out (PreviewModelNotServed), never as the run's money ceiling. As in T2, GLM's first call
+    // after claim is its seat on root 0's panel: the POST and its one 60-second resend are refused; then GLM sits out.
+    const debate = await admittedRun("not-served-glm", { panelRefs: FIVE_MAKER_REFS, pin: INCIDENT_PIN });
+    const gates = await startGates({}, { unbilled: [] }, (request) =>
+      request.model === GLM && request.kind !== "PROBE" ? { gateRefuses: "MODEL_NOT_ALLOWED" } : null);
+    const composed = await previewRunner(gates, "resend", { resilience: RUN_RESILIENCE });
+    const result = await completedRun(composed, debate, gates);
+
+    // Exactly one GLM call after claim (two POSTs, both refused by the gate), then none; the gate never halted.
+    expect(gates.requests.filter((request) => request.model === GLM && request.kind !== "PROBE")
+      .map((request) => [request.kind, request.answer])).toEqual([["PANEL", "GATE_REFUSED"], ["PANEL", "GATE_REFUSED"]]);
+    expect(gates.halt.haltedAt).toBeNull();
+    expect(composed.callSleeps).toEqual([UNBILLED_RESEND_MS]);
+    expect(composed.holdWaits).toEqual([]);
+
+    // Served; GLM's sit-out disclosed as a run-time panel revision for a busy model.
+    const { answer, workItem } = await servedAnswer(debate, result.answerId);
+    expect(["COMPOSED", "RECOMPOSED_ONCE"]).toContain(answer!.serve_state);
+    expect(workItem).toEqual({ state: "DONE", terminal_reason: null });
+    const records = answer!.condition_mark_records;
+    const recordsText = JSON.stringify(records.map((record) => [record.mark, record.reason]));
+    const revised = records.find((record) => record.mark === "CRITIQUE-UNAVAILABLE" && record.reason.includes("RUN_PANEL_REVISED:"));
+    expect(revised, `condition mark records: ${recordsText}`).toBeDefined();
+    expect(revised!.reason, `condition mark records: ${recordsText}`).toMatch(GLM_SAT_OUT);
+
+    // Never money: no record, no body stop and no ledger row names the run's money ceiling.
+    expect(recordsText).not.toContain("RUN_COST_ENVELOPE_MONEY_REACHED");
+    expect(await bodyFactsOf(result.answerId)).toMatchObject({ body_stop: null });
+    const moneyRows = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ledger.ledger_entry entry
+        WHERE entry.run_id=$1 AND row_to_json(entry)::text LIKE '%RUN_COST_ENVELOPE_MONEY_REACHED%'`, [debate.runId]);
+    expect(moneyRows.rows[0]!.count).toBe("0");
+    const calls = await modelCalls(debate.runId);
+    expect(calls.filter((call) => PREVIEW_PROVIDER_REF_MODELS[call.actor_ref] === GLM).map((call) => call.outcome))
+      .toEqual(["REFUSED", "REFUSED"]);
+  });
+
   it("gate v4: GLM busy, the gate cools GLM off after its two unbilled refusals; GLM sits out after ONE call and the run is served", async () => {
     // Gate v4 (preview_budget_authority.py note_unbilled_refusal): after two vendor-unbilled refusals in a row for one
     // model, the gate lets that model cool off and refuses its calls MODEL_COOLING without contacting the vendor; the

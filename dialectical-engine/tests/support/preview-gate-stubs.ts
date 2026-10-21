@@ -95,6 +95,11 @@ export type GateOverride = Readonly<{ content: string }> | Readonly<{ unbilled: 
   /** Gate v4's own refusals: this model cooling off (COOLING, with retry_after 60), or the gate halted (HALTED). */
   | Readonly<{ gateRefuses: "MODEL_COOLING" | "AUTHORITY_HALTED" }>
   /**
+   * Side-by-side spec §9: refused before any reservation, this model (its row is gone from the GO) or this price (the
+   * reservation does not match the GO's) is not served by this gate; the app reads either as the model sitting out.
+   */
+  | Readonly<{ gateRefuses: "MODEL_NOT_ALLOWED" | "RESERVATION_MISMATCH" }>
+  /**
    * The gate's STOPPED refusal for this one call while the gate itself stays active (its /remaining says so): the runner
    * reads it as the run's money ceiling, a spend stop (parallel calls, Task 11 fix round 1).
    */
