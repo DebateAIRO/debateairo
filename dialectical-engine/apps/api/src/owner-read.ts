@@ -56,8 +56,10 @@ export async function readOwnerAnswer(
 export async function readOwnerInspection(
   d: OwnerReadDeps, answerId: string, version: number | undefined, session: Session, ownership: RunOwnershipAccess
 ): Promise<Inspection | null> {
-  const answer = await d.application.readAnswer(answerId, session, version, ownership);
-  if (answer === null || !await answerIsShown(d, answer)) return null;
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, version, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const inspection = await d.application.readInspection(answerId, session, version, ownership);
   return inspection === null ? null : InspectionSchema.parse(inspection);
 }
@@ -65,8 +67,10 @@ export async function readOwnerInspection(
 export async function readOwnerLedgerDigest(
   d: OwnerReadDeps, answerId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<ExecutionLedgerDigest | null> {
-  const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
-  if (answer === null || !await answerIsShown(d, answer)) return null;
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const digest = await d.application.readLedgerDigest(answerId, session, ownership);
   return digest === null ? null : ExecutionLedgerDigestSchema.parse(digest);
 }
@@ -154,8 +158,10 @@ export async function readOwnerDisclosure(
 export async function readOwnerNode(
   d: OwnerReadDeps, answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<Node | null> {
-  const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
-  if (answer === null || !await answerIsShown(d, answer)) return null;
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const node = await d.application.readNode(answerId, nodeId, session, ownership);
   return node === null ? null : NodeSchema.parse(node);
 }
