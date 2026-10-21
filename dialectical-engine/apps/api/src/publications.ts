@@ -28,6 +28,7 @@ import {
 import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
+import { MadeByNewerReleaseError } from "./index.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
@@ -677,30 +678,41 @@ export class PostgresPublicationApplication implements PublicationApplication {
     return completed;
   }
 
+  /**
+   * The public debate, or null (404) when it is not published, its key or ciphertext does not open, it names another
+   * publication, or it stopped being public meanwhile. Side-by-side spec §5, §6 (plan C14): a snapshot that passed all
+   * of that but does not parse holds a member this release does not know — a newer release made it — and rejects with
+   * `MadeByNewerReleaseError` (409, "open it on the current site") instead of the 404 it read as before.
+   */
   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
     return this.repository.withContentLease(publicationRef,async () => {
       const snapshot = await this.repository.readPublic(publicationRef);
       if (snapshot === null) return null;
       let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
+      let decrypted: unknown;
       try {
         // Visibility is authorized before external key resolution/decryption.
         prepared = await this.cipher.open(publicationRef, snapshot.runId);
-        const publicDebate = PublicDebateSchema.parse(
-          prepared.decrypt(snapshot.contentCiphertext)
-        );
+        decrypted = prepared.decrypt(snapshot.contentCiphertext);
         prepared.close();
         prepared = undefined;
+        // The row identity is checked on the plaintext as decrypted, before any parse: a snapshot of another
+        // publication, or of an earlier publication of this one, is never this debate whatever its shape.
+        const claimed = typeof decrypted === "object" && decrypted !== null
+          ? decrypted as Readonly<Record<string, unknown>> : {};
+        if (claimed.public_ref !== snapshot.publicationRef
+          || claimed.published_at !== snapshot.createdAt.toISOString()) return null;
         // A concurrent unpublish can commit while decryption runs. Latest-wins
         // visibility is revalidated before any plaintext leaves the service.
-        if (publicDebate.public_ref !== snapshot.publicationRef
-          || publicDebate.published_at !== snapshot.createdAt.toISOString()) return null;
-        return await this.repository.revalidatePublic(snapshot.runId, publicationRef)
-          ? publicDebate : null;
+        if (!await this.repository.revalidatePublic(snapshot.runId, publicationRef)) return null;
       } catch {
         return null;
       } finally {
         prepared?.close();
       }
+      const publicDebate = PublicDebateSchema.safeParse(decrypted);
+      if (!publicDebate.success) throw new MadeByNewerReleaseError();
+      return publicDebate.data;
     });
   }
 
@@ -720,7 +732,11 @@ export class PostgresPublicationApplication implements PublicationApplication {
     const page = await this.repository.listPublicRefs(limit, offset);
     const items = [];
     for (const publicationRef of page.refs) {
-      const debate = await this.readPublicDebate(publicationRef);
+      // Side-by-side C14: a newer release's snapshot is skipped here like an unreadable one; `total` stays the count.
+      const debate = await this.readPublicDebate(publicationRef).catch((error: unknown) => {
+        if (error instanceof MadeByNewerReleaseError) return null;
+        throw error;
+      });
       if (debate === null) continue;
       items.push(Object.freeze({
         public_ref: debate.public_ref,

@@ -20,6 +20,7 @@ import {
   type PublicationKeyStore
 } from "../../packages/crypto/src/index.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { MadeByNewerReleaseError } from "../../apps/api/src/index.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import {
   assertPublicationDatabaseRoleSeparation,
@@ -1213,6 +1214,18 @@ describe("S8 publication crypto and projection", () => {
     expect.soft(read!.answer.tree_included).toBeUndefined();
     expect.soft(read!.answer.nodes).toBeUndefined();
     expect(read!.answer.edges).toBeUndefined();
+  });
+
+  // Side-by-side spec §5, §6 (plan C14): a snapshot that decrypts, still names this publication and is still public, but
+  // carries a member this release does not know, was made by a newer release — "open it on the current site", not a 404.
+  it("rejects a decrypted, revalidated snapshot with an unknown member as made by a newer release; list skips it", async () => {
+    const harness = publicationHarness();
+    const publicationRef = await harness.storeLegacy((ref) => ({ ...publicDebate(ref), future_member: { kind: "next" } }));
+
+    await expect(harness.application.readPublicDebate(publicationRef)).rejects.toBeInstanceOf(MadeByNewerReleaseError);
+    const page = await harness.application.list(10, 0);
+    expect(page.items).toHaveLength(0);
+    expect(page.total).toBe(1);
   });
 
   it("strictly rejects owner/internal fields at the anonymous boundary", () => {

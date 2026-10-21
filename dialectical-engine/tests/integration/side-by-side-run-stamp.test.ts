@@ -124,6 +124,15 @@ describe("side-by-side C2: every new run carries the admitting API's release key
     expect(await stampOf(waiting.run_ref)).toBe(STAMP);
   });
 
+  // Side-by-side C14: the key the newer-release fallback reads after a debate read fails its parse.
+  it("reads a run's stamp back (readRunReleaseKey); an unknown run or answer reads null", async () => {
+    const application = applicationWith(STAMP);
+    const accepted = await submitAs(application);
+    expect(await application.readRunReleaseKey(accepted.run_ref)).toBe(STAMP);
+    expect(await application.readRunReleaseKey(randomUUID())).toBeNull();
+    expect(await application.readAnswerReleaseKey(randomUUID())).toBeNull();
+  });
+
   it("refuses to build an application under a key it could never run as", () => {
     for (const releaseKey of ["legacy", "R1-0123456789AB", ""]) {
       expect(() => applicationWith(releaseKey)).toThrowError(expect.objectContaining({ code: "RELEASE_KEY_INVALID" }));

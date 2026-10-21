@@ -49,6 +49,8 @@ import {
   InvestigationRequestSchema,
   LegacyRunClaimRequestSchema,
   LegacyRunClaimResultSchema,
+  MADE_BY_NEWER_RELEASE,
+  MadeByNewerReleaseSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
@@ -199,6 +201,7 @@ import {
   checkDob,
   dobFromIso,
   isMailAddress,
+  LEGACY_RELEASE_KEY,
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
@@ -1662,6 +1665,15 @@ export interface AskApplication {
    * that actually runs. Absent: ids pass through unchanged.
    */
   resolveRunRef?(runId: string): Promise<string>;
+  /**
+   * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the release a run was admitted by
+   * (`core.run.release_key`), or null when no such run exists. Read only after an owner-gated debate read of that run
+   * failed its contract parse, to tell a newer release's data (409 MADE_BY_NEWER_RELEASE) from this release's own bug
+   * (a loud 500). Absent: every such failure stays a 500.
+   */
+  readRunReleaseKey?(runId: string): Promise<string | null>;
+  /** The same for an answer: the release of the run that answered it (`serve.answer.run_id`), or null. */
+  readAnswerReleaseKey?(answerId: string): Promise<string | null>;
 }
 
 /** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
@@ -2015,6 +2027,51 @@ export class AskAlreadyWaitingRefusal extends AskRefusal {
     this.waitsUntil = refusal.waitsUntil;
     this.waitsFor = refusal.waitsFor;
   }
+}
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the debate asked for was made by a newer release than
+ * this API, and holds a value this code does not know. The error handler answers 409
+ * `{error:"MADE_BY_NEWER_RELEASE", message:"MADE_BY_NEWER_RELEASE"}` (the page says "open it on the current site"),
+ * never a 404 or a 500. Thrown on debate reads only — `withNewerReleaseFallback` around a run, its answer and an answer,
+ * and `readPublicDebate` — because the website's note names "this debate" for any call refused with it (C13).
+ */
+export class MadeByNewerReleaseError extends TypedDomainError {
+  constructor() {
+    super(MADE_BY_NEWER_RELEASE, MADE_BY_NEWER_RELEASE);
+    this.name = "MadeByNewerReleaseError";
+  }
+}
+
+/**
+ * Side-by-side C14: one debate read whose contract parse failed (a `ZodError`), answered as a newer release's data when
+ * the debate is stamped by a release that is neither this API's own nor `legacy`. Anything else is rethrown as it was:
+ * this release's own data failing its own parse is a real bug and stays a loud 500, as does any non-parse failure, an
+ * API that names no release of its own, a debate with no readable key, or a key read that itself fails.
+ */
+async function withNewerReleaseFallback<T>(
+  read: () => Promise<T>,
+  releaseKeyOf: () => Promise<string | null>,
+  ownReleaseKey: string | undefined
+): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "ZodError" || ownReleaseKey === undefined) throw error;
+    const releaseKey = await releaseKeyOf().catch(() => null);
+    if (releaseKey === null || releaseKey === ownReleaseKey || releaseKey === LEGACY_RELEASE_KEY) throw error;
+    throw new MadeByNewerReleaseError();
+  }
+}
+
+/**
+ * Side-by-side C14: the `event_type` of a run event this release could not read, for the journal line — only when it
+ * has the shape of an event name (lowercase words joined by `.` or `_`, at most 64 characters); anything else is null,
+ * so the line stays content-free.
+ */
+function unreadableEventType(event: unknown): string | null {
+  const eventType = typeof event === "object" && event !== null ? (event as Record<string, unknown>).event_type : undefined;
+  return typeof eventType === "string" && /^[a-z][a-z0-9_.]{0,63}$/u.test(eventType) ? eventType : null;
 }
 
 class MalformedRequestError extends Error {
@@ -2667,6 +2724,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         run_ref: knownError.runRef,
         waits_until: knownError.waitsUntil.toISOString(),
         ...(knownError.waitsFor === null ? {} : { waits_for: knownError.waitsFor })
+      }));
+    }
+    // Side-by-side spec §5, §6 (plan C14): a debate a newer release made — "open it on the current site", not a fault.
+    if (knownError instanceof MadeByNewerReleaseError) {
+      return reply.status(409).send(MadeByNewerReleaseSchema.parse({
+        error: MADE_BY_NEWER_RELEASE, message: MADE_BY_NEWER_RELEASE
       }));
     }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
@@ -3732,7 +3795,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    const answer = await readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request));
+    // Side-by-side C14: an answer a newer release made reads as 409 MADE_BY_NEWER_RELEASE, keyed through its run.
+    const answer = await withNewerReleaseFallback(
+      () => readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request)),
+      () => options.application.readAnswerReleaseKey?.(answerId.data) ?? Promise.resolve(null),
+      options.releaseKey
+    );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(answer);
   });
 
@@ -3900,7 +3968,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           reply.raw.write(RUN_EVENT_HEARTBEAT_FRAME);
           return;
         }
-        const event = RunEventSchema.parse(item.event);
+        // Side-by-side spec §6 (plan C14): an event this release cannot read (a newer release's kind or shape) is
+        // skipped with one journal line; the stream goes on. Throwing here ended the stream, the page reconnected,
+        // replayed the same event and ended again, forever. No new event type is ever sent.
+        const parsed = RunEventSchema.safeParse(item.event);
+        if (!parsed.success) {
+          console.error(JSON.stringify(Object.freeze({
+            event: "api.run_event.unreadable", runId, event_type: unreadableEventType(item.event)
+          })));
+          return;
+        }
+        const event = parsed.data;
         reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
       },
       close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
@@ -3910,7 +3988,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
     if (!parsedRunId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     const runId = await resolvedRunId(options, parsedRunId.data);
-    const run = await readOwnerRun(options, runId, request.session, ownershipFor(request));
+    // Side-by-side C14: after C9's resolution, so the key read is the newest run's.
+    const run = await withNewerReleaseFallback(
+      () => readOwnerRun(options, runId, request.session, ownershipFor(request)),
+      () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
+      options.releaseKey
+    );
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
   });
   api.get<{ Params: { id: string } }>(
@@ -3936,7 +4019,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
     if (!parsedRunId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
     const runId = await resolvedRunId(options, parsedRunId.data);
-    const answer = await readOwnerRunAnswer(options, runId, request.session, ownershipFor(request));
+    // Side-by-side C14: after C9's resolution, so the key read is the newest run's.
+    const answer = await withNewerReleaseFallback(
+      () => readOwnerRunAnswer(options, runId, request.session, ownershipFor(request)),
+      () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
+      options.releaseKey
+    );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
   });
   api.post<{ Params: { id: string } }>(
@@ -5624,6 +5712,26 @@ export class PostgresAskApplication implements AskApplication {
    */
   resolveRunRef(runId: string): Promise<string> {
     return resolveRunRef(this.pool, runId);
+  }
+
+  /**
+   * Side-by-side C14: `core.run.release_key` (0123 §1) on the runtime pool. Called only after an owner-gated read of the
+   * same run failed its contract parse; the key names a release, never the debate's content, so it reads no ownership.
+   */
+  async readRunReleaseKey(runId: string): Promise<string | null> {
+    const result = await this.pool.query<{ release_key: string }>(
+      "SELECT release_key FROM core.run WHERE run_id = $1::uuid", [runId]
+    );
+    return result.rows[0]?.release_key ?? null;
+  }
+
+  /** Side-by-side C14: the release of the run that answered (`serve.answer.run_id`), every version alike. */
+  async readAnswerReleaseKey(answerId: string): Promise<string | null> {
+    const result = await this.pool.query<{ release_key: string }>(
+      `SELECT run.release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
+        WHERE answer.answer_id = $1::uuid LIMIT 1`, [answerId]
+    );
+    return result.rows[0]?.release_key ?? null;
   }
 
   readInspection(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null> {
