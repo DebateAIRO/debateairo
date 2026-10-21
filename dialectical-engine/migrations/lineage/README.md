@@ -234,15 +234,16 @@ re-admission per old run), and redefines `core.run_waiting_v` (0083's view plus 
 place, same signature, owner, definer, path and grants, the five funding functions that tied a grant to the funding
 selection's or the run's version (`billing.reserve_internal_provider_call`, `billing.read_internal_run_state`,
 `billing.read_internal_allowance`, `billing.guard_internal_charge_scope`, `staff.revoke_internal_allowance`), so a grant
-stays valid under the version it was issued with, and adds `staff.read_internal_funding_policy_at(bigint)` (owned by
-`debateai_staff_security_owner`, EXECUTE for `debateai_runtime`), the funding publication at a version. Its header
-declares `-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine
-earlier functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
+stays valid under the version it was issued with, and `staff.read_self_allowance_command` (a revoke names its grant's
+own version), and adds `staff.read_internal_funding_policy_at(bigint)` (owned by `debateai_staff_security_owner`,
+EXECUTE for `debateai_runtime`), the funding publication at a version. Its header declares `-- n1: drained` (T is
+uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier functions, each such
+section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
 `replayVerifierSql`: its postcondition is the three columns (type, NOT NULL, default), the CHECK (name, validation,
-definition), the redefined and added functions whole (§6's five redefinitions excepted), the release and supersession
+definition), the redefined and added functions whole (§6's six redefinitions excepted), the release and supersession
 tables whole, the release view (owner, ACL, definition) and the two roles' attributes and memberships.
-`core.run_waiting_v`, the `waits_for` CHECK, the marker indexes and §6's five funding redefinitions are checked by the
+`core.run_waiting_v`, the `waits_for` CHECK, the marker indexes and §6's six funding redefinitions are checked by the
 closing block and by tests, not digested, so a later drained step may widen or redefine them again. While the build is
 open each task appends its section and recomputes `migration.sha256` with the one-liner at the end of this file; once
 merged, 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename every file and constant

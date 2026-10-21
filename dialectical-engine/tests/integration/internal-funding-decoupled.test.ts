@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, EntitlementRepository, PostgresInternalAllowanceRepository, type Pool } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
+import { canonicalInternalAllowanceActionBinding } from "../../apps/api/src/staff/routes.js";
 
 /**
  * Funding grants stay valid under the version they were issued with (side-by-side uploads spec 2026-10-21 §9, C15;
@@ -95,6 +96,25 @@ describe("side-by-side §9: a funding grant stays valid under the version it was
       .toEqual([{ revoked: true }]);
   });
 
+  it("the staff app's revoke of a v2 grant after the move names v2 and completes through the repository", async () => {
+    const { actor, grant } = await v2Grant();
+    await fixture.selectNextFunding();
+    const repository = new PostgresInternalAllowanceRepository(runtime), token = fixture.ordinaryTokenHash(actor);
+    // A configure names the selection's version; a revoke names its grant's own (0123 §6, A4 review).
+    expect(await repository.readSelfCommand(actor.context, token, null)).toMatchObject({ policyRegisterVersion: 3 });
+    const state = await repository.readSelfCommand(actor.context, token, grant.grantId);
+    expect(state).toEqual({ ownerRef: actor.ownerRef, expectedRevision: 1, policyRegisterVersion: 2 });
+    // The route's own binding (apps/api/src/staff/routes.ts) and command, built from that state.
+    const intent = { action: "ALLOWANCE_REVOKE" as const, grant_id: grant.grantId, operation_id: randomUUID(), reason: { code: "FUNDING_APPROVAL" as const } };
+    const binding = canonicalInternalAllowanceActionBinding(intent, state);
+    const proof = await fixture.storeProof(actor, binding);
+    const receipt = await repository.revoke({ ...state, grantId: grant.grantId, actor: actor.context, operationId: intent.operation_id,
+      reason: { code: "FUNDING_APPROVAL" }, proof: { proofId: proof.proofId, binding } as never, alertIntent: proof.alert as never });
+    expect(receipt).toMatchObject({ operationId: intent.operation_id, outcome: "COMPLETED" });
+    expect((await database.pool.query("SELECT revoked_at IS NOT NULL AS revoked FROM billing.internal_grant WHERE grant_id=$1", [grant.grantId])).rows)
+      .toEqual([{ revoked: true }]);
+  });
+
   it("funding switched off still stops funded runs", async () => {
     const { actor, grant } = await v2Grant();
     const runId = await fundedRun(actor.ownerRef, grant, 2);
@@ -129,5 +149,30 @@ describe("side-by-side §9: a funding grant stays valid under the version it was
     await database.pool.query("DELETE FROM staff.funding_policy_selection");
     expect((await repository.readPolicyAt(2))?.registerVersion).toBe(2);
     await expect(repository.readPolicyAt(0)).rejects.toMatchObject({ code: "INTERNAL_ALLOWANCE_UNAVAILABLE" });
+  });
+
+  it("readPolicyAt refuses an unsealed version (the sealed check, not only the shape)", async () => {
+    await fixture.fundedActor();
+    // core's CHECK (sealed) and the publication guard make an unsealed version impossible to write, so this case drops
+    // the CHECK and the triggers inside one transaction, writes v2's rows as an unsealed v4096, reads, and rolls back.
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const check = (await client.query<{ name: string }>(`SELECT conname AS name FROM pg_constraint
+        WHERE conrelid='register.register_version'::regclass AND contype='c' AND strpos(pg_get_constraintdef(oid),'sealed')>0`)).rows[0]!.name;
+      await client.query(`ALTER TABLE register.register_version DROP CONSTRAINT ${JSON.stringify(check)}`);
+      await client.query("SET LOCAL session_replication_role = replica");
+      await client.query("INSERT INTO register.register_version(register_version,row_count,sealed) SELECT 4096,row_count,false FROM register.register_version WHERE register_version=2");
+      await client.query("INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) SELECT 4096,row_key,value_json,source_ref FROM register.register_row WHERE register_version=2");
+      const read = async () => (await client.query("SELECT staff.read_internal_funding_policy_at(4096) AS value")).rows[0].value;
+      expect(await read()).toBeNull();
+      // The same rows, sealed: the publication reads, so the null above was the seal's.
+      await client.query("UPDATE register.register_version SET sealed=true WHERE register_version=4096");
+      expect(await read()).toMatchObject({ registerVersion: 4096, sourceRef: "test:synthetic-funding" });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+    expect(await new PostgresInternalAllowanceRepository(runtime).readPolicyAt(4096)).toBeNull();
   });
 });

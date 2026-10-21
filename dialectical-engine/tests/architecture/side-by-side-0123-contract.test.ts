@@ -184,7 +184,7 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE");
   });
 
-  it("§6 redefines the five funding functions without the version comparisons, re-asserting owner and grants, and adds the reader at a version", () => {
+  it("§6 redefines the five funding functions without the version comparisons and the self command naming a revoke's grant version, re-asserting owner and grants, and adds the reader at a version", () => {
     const body = (signature: string): string => {
       const start = sql.indexOf(`CREATE OR REPLACE FUNCTION ${signature}`);
       expect(start, signature).toBeGreaterThan(sql.indexOf("-- §6. Funding grants stay valid"));
@@ -207,9 +207,15 @@ describe("0123: the side-by-side releases step", () => {
     // configure is not redefined: new grants take the selection's version.
     expect(sql).not.toContain("FUNCTION staff.configure_internal_allowance(");
     expect(body("staff.read_internal_funding_policy_at(")).not.toContain("funding_policy_selection");
+    // The staff app's revoke names its grant's own version; a configure (no grant) still names the selection's.
+    const self = body("staff.read_self_allowance_command(");
+    expect(self).toContain("SELECT policy_register_version INTO v_version FROM billing.internal_grant WHERE grant_id=p_grant AND owner_ref=v_owner;");
+    expect(self).toContain("v_version:=(v_policy->>'registerVersion')::bigint;");
+    expect(self).toContain("'policyRegisterVersion',v_version);");
     for (const signature of ["billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)", "billing.read_internal_run_state(uuid)",
       "billing.read_internal_allowance(uuid,timestamptz)", "billing.guard_internal_charge_scope()",
-      "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.read_internal_funding_policy_at(bigint)"]) {
+      "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.read_internal_funding_policy_at(bigint)",
+      "staff.read_self_allowance_command(jsonb,text,uuid)"]) {
       expect(sql).toContain(`ALTER FUNCTION ${signature} OWNER TO debateai_staff_security_owner;`);
       expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,debateai_runtime,debateai_staff_recovery;`);
       if (signature !== "billing.guard_internal_charge_scope()") expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
@@ -218,7 +224,7 @@ describe("0123: the side-by-side releases step", () => {
     // No billing function is added: every billing function §6 names already exists in 0092/0093.
     expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION billing\.(?!reserve_internal_provider_call\(|read_internal_run_state\(|read_internal_allowance\(|guard_internal_charge_scope\()/u);
     expect(sql).toContain("SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE");
-    // The loader digests the new reader; the five redefinitions are checked by the closing block and the tests.
+    // The loader digests the new reader; the six redefinitions are checked by the closing block and the tests.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("'staff.read_internal_funding_policy_at(bigint)'");
     expect(loader).not.toContain("'billing.read_internal_allowance(uuid,timestamptz)'");

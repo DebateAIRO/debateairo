@@ -12,7 +12,8 @@
 --       so a superseded run no longer waits, the readmitted run's key provision, and the API runtime's reads (A3);
 --   §5  core.run_wait_reason.waits_for widened with SITE_BUSY and SWITCHING (A3);
 --   §6  the five funding functions that tied a grant to the selection's or the run's version, redefined in place
---       without that comparison, and staff.read_internal_funding_policy_at, the funding publication at a version (A4).
+--       without that comparison, staff.read_self_allowance_command naming a revoke's grant's own version, and
+--       staff.read_internal_funding_policy_at, the funding publication at a version (A4).
 --
 -- n1 (spec §5, the database rule):
 -- n1: drained
@@ -877,9 +878,10 @@ ALTER TABLE core.run_wait_reason VALIDATE CONSTRAINT run_wait_reason_waits_for_c
 -- (staff.funding_policy_selection) may name a later or an earlier version than either, so the database may no longer
 -- tie a grant to the selection's version or to the run's. 0092 and 0093 compared the grant's policy_register_version
 -- with both; this section redefines the five functions that did, in place (same signatures, owner, definer, path and
--- grants), each body copied from its migration with only the named comparison removed. 0063's rule ("never CREATE OR
--- REPLACE a function another migration defines") is broken for these five only, because T is drained (no debate waits
--- or runs while it is applied, spec "The transition"), as 0120 did for its reader. What stays:
+-- grants), each body copied from its migration with only the named comparison removed, and a sixth,
+-- staff.read_self_allowance_command, so the staff app's revoke names its grant's own version (A4 review). 0063's rule
+-- ("never CREATE OR REPLACE a function another migration defines") is broken for these six only, because T is drained
+-- (no debate waits or runs while it is applied, spec "The transition"), as 0120 did for its reader. What stays:
 --   * staff.configure_internal_allowance is unchanged: a new grant takes the selection's version (spec §9).
 --   * a revoke names the grant's own version (the command-vs-grant equality stays); the command-vs-selection one goes.
 --   * funding switched off stays off: no selection row → read_internal_allowance refuses INTERNAL_FUNDING_UNAVAILABLE
@@ -1057,6 +1059,37 @@ ALTER FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) OWN
 REVOKE ALL ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
 
+-- 0092:381-396, the sixth redefinition (drained T, spec §9, C15; A4 review, controller ruling): the staff app builds
+-- its proof binding and its revoke command from this reader's policyRegisterVersion (apps/api/src/staff/routes.ts), so
+-- for a revoke (p_grant set) it now names THAT grant's policy_register_version, the one the revoke above compares;
+-- without p_grant (a configure) it still names the selection's. Otherwise a grant issued before the selection moved
+-- could not be revoked through the app. Everything else is 0092's body unchanged, its owner and grants re-asserted.
+CREATE OR REPLACE FUNCTION staff.read_self_allowance_command(p_context jsonb,p_token text,p_grant uuid) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_owner uuid; v_revision bigint; v_policy jsonb; v_version bigint;
+BEGIN
+  PERFORM staff.require_http_authority(p_context,p_token,'ALLOWANCE_WRITE');
+  SELECT owner_ref INTO v_owner FROM identity."user" WHERE user_id=(p_context->>'userId')::uuid;
+  v_policy:=staff.read_internal_funding_policy();
+  IF v_owner IS NULL OR v_policy IS NULL THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_UNAVAILABLE'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('funding:owner:'||v_owner::text,0));
+  IF p_grant IS NOT NULL AND NOT EXISTS(SELECT 1 FROM billing.internal_grant WHERE grant_id=p_grant AND owner_ref=v_owner) THEN
+    RAISE EXCEPTION 'INTERNAL_ALLOWANCE_TARGET_INVALID';
+  END IF;
+  -- Side-by-side spec §9: a revoke names its grant's own version; a configure names the selection's.
+  IF p_grant IS NOT NULL THEN
+    SELECT policy_register_version INTO v_version FROM billing.internal_grant WHERE grant_id=p_grant AND owner_ref=v_owner;
+  ELSE
+    v_version:=(v_policy->>'registerVersion')::bigint;
+  END IF;
+  SELECT COALESCE(max(revision),0) INTO v_revision FROM billing.internal_grant WHERE owner_ref=v_owner;
+  PERFORM staff.require_http_authority(p_context,p_token,'ALLOWANCE_WRITE');
+  RETURN jsonb_build_object('ownerRef',v_owner,'expectedRevision',v_revision,'policyRegisterVersion',v_version);
+END $$;
+ALTER FUNCTION staff.read_self_allowance_command(jsonb,text,uuid) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid) TO debateai_runtime;
+
 -- The funding publication AT a version (addendum from plan B; B14 consumes it as readPolicyAt): the same object
 -- staff.read_internal_funding_policy() returns for the selection ({registerVersion, policy, sourceRef}), for any sealed
 -- version, or NULL when that version is no enabled funding publication. It never reads the selection, so a grant is
@@ -1115,7 +1148,8 @@ DECLARE
     to_regprocedure('billing.read_internal_allowance(uuid,timestamptz)'),
     to_regprocedure('billing.guard_internal_charge_scope()'),
     to_regprocedure('staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)'),
-    to_regprocedure('staff.read_internal_funding_policy_at(bigint)')];
+    to_regprocedure('staff.read_internal_funding_policy_at(bigint)'),
+    to_regprocedure('staff.read_self_allowance_command(jsonb,text,uuid)')];
 BEGIN
   -- §1: the stamp column, its default, and its validated shape CHECK.
   IF NOT EXISTS (
@@ -1263,14 +1297,15 @@ BEGIN
         AND convalidated) THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE';
   END IF;
-  -- §6: the six functions owned by debateai_staff_security_owner as definers with the pinned path; none callable by
+  -- §6: the seven functions owned by debateai_staff_security_owner as definers with the pinned path; none callable by
   -- PUBLIC or the recovery role; all but the charge-scope guard callable by the runtime; no definition comparing a grant
-  -- with the selection's or the run's version any more; configure still taking the selection's version; the guard
-  -- still on run_charge_scope; and the funding reader at a version never reading the selection.
+  -- with the selection's or the run's version any more; configure still taking the selection's version; the self
+  -- command naming a revoke's grant's version; the guard still on run_charge_scope; and the funding reader at a version
+  -- never reading the selection.
   IF array_position(v_funding, NULL) IS NOT NULL
     OR (SELECT count(*) FROM pg_proc AS p
         WHERE p.oid = ANY(v_funding) AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']
-          AND pg_get_userbyid(p.proowner) = 'debateai_staff_security_owner') <> 6
+          AND pg_get_userbyid(p.proowner) = 'debateai_staff_security_owner') <> 7
     OR EXISTS (SELECT 1 FROM unnest(v_funding) AS f(oid)
                WHERE has_function_privilege('public', f.oid, 'EXECUTE')
                  OR has_function_privilege('debateai_staff_recovery', f.oid, 'EXECUTE')
@@ -1286,6 +1321,9 @@ BEGIN
     OR strpos(pg_get_functiondef(v_funding[5]),
          'v_grant.policy_register_version IS DISTINCT FROM (p_command->>''policyRegisterVersion'')::bigint') = 0
     OR strpos(pg_get_functiondef(v_funding[6]), 'funding_policy_selection') > 0
+    OR strpos(pg_get_functiondef(v_funding[7]),
+         'SELECT policy_register_version INTO v_version FROM billing.internal_grant WHERE grant_id=p_grant') = 0
+    OR strpos(pg_get_functiondef(v_funding[7]), '''policyRegisterVersion'',v_version)') = 0
     OR strpos(pg_get_functiondef('staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)'::regprocedure),
          'p_command->''policyRegisterVersion'' IS DISTINCT FROM v_policy->''registerVersion''') = 0
     OR NOT EXISTS (

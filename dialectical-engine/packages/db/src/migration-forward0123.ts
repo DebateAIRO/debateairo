@@ -17,12 +17,13 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * re-admission per old run), and redefines core.run_waiting_v; §5 widens core.run_wait_reason's waits_for CHECK; §6
  * redefines in place the five funding functions that tied a grant to the selection's or the run's version (billing's
  * reserve_internal_provider_call, read_internal_run_state, read_internal_allowance and guard_internal_charge_scope, and
- * staff.revoke_internal_allowance) and adds staff.read_internal_funding_policy_at(bigint). The view, that CHECK, the two
- * indexes on the marker and §6's five redefinitions are checked by the closing block and by tests, not digested, so a
- * later drained step may widen or redefine them again (as 0121's CHECKs are handled). It adds no billing relation and
- * no billing function, so the effective verifier in force (0111's) stays in force and is named as its own. Its checks are its
- * postcondition (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql.
- * Each later section appends its objects to the lists below.
+ * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
+ * and adds staff.read_internal_funding_policy_at(bigint). The view, that CHECK, the two indexes on the marker and §6's
+ * six redefinitions are checked by the closing block and by tests, not digested, so a later drained step may widen or
+ * redefine them again (as 0121's CHECKs are handled). It adds no billing relation and no billing function, so the
+ * effective verifier in force (0111's) stays in force and is named as its own. Its checks are its postcondition
+ * (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later
+ * section appends its objects to the lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';
