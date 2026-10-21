@@ -111,47 +111,65 @@ describe('nightly preview database backup', () => {
 // Side-by-side spec §12 step 7: before the migrations of a side-by-side upload, every database of the preview cluster,
 // the roles, and the key stores the env files name, each checked and summed. A last resort only (spec §11).
 describe('online backup before side-by-side migrations', () => {
-  const KEYS = { USER_DEK_STORE_PATH: '/var/lib/debateai-v3-preview/user-dek-store', KEK_PATH: '/etc/debateai-v3-preview/keys/kek.bin', SUPPORT_KEK_PATH: '/etc/debateai-v3-preview/keys/support-kek.bin' };
+  const owner = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid };
+  /**
+   * A throwaway output folder beside a copy of the preview's two key folders (`keyRoots` points the layout at them): two
+   * key files and one store folder. Every path is a real path (the temp folder is resolved first).
+   */
   const outFolder = (mode = 0o700) => {
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-online-')));
     const out = join(base, 'online'); mkdirSync(out); chmodSync(out, mode);
-    return { base, out };
+    const etc = join(base, 'etc', 'debateai-v3-preview'), lib = join(base, 'var', 'lib', 'debateai-v3-preview');
+    mkdirSync(join(etc, 'keys'), { recursive: true }); mkdirSync(join(lib, 'user-dek-store'), { recursive: true });
+    writeFileSync(join(etc, 'keys', 'kek.bin'), 'KEK-bytes'); writeFileSync(join(etc, 'keys', 'support-kek.bin'), 'SUPPORT-bytes');
+    writeFileSync(join(lib, 'user-dek-store', 'a.json'), '{"dek":"wrapped"}');
+    const keys = { USER_DEK_STORE_PATH: join(lib, 'user-dek-store'), KEK_PATH: join(etc, 'keys', 'kek.bin'), SUPPORT_KEK_PATH: join(etc, 'keys', 'support-kek.bin') };
+    return { base, out, etc, lib, keys, layout: { ...owner, keyRoots: [`${etc}/`, `${lib}/`] } };
   };
+  type Tree = ReturnType<typeof outFolder>;
+  const rel = (path: string) => path.slice(1);
   const envFile = (base: string, name: string, lines: string[]) => { const path = join(base, name); writeFileSync(path, `${lines.join('\n')}\n`); chmodSync(path, 0o640); return path; };
-  const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid };
   const done = (stdout = '', code = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.alloc(0) });
   const PG = '/usr/lib/postgresql/18/bin';
   const AS_POSTGRES = ['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC'];
-  /** The preview's commands behind `run`: psql lists the databases, pg_dump/pg_dumpall/tar write to the file they are handed. */
-  function fakeServer(options: Partial<{ databases: string; restoreList: string; tarList: string; fail: string }> = {}) {
-    const o = { databases: 'debateai\nhatchet\npostgres\n', restoreList: listing, tarList: '', fail: '', ...options };
+  /** A `tar -tvf` listing (GNU form) of the tree's three keys and the store's one file. */
+  const verbose = (t: Tree) => [`-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}`, `-rw------- root/root 13 2026-10-22 01:00 ${rel(t.keys.SUPPORT_KEK_PATH)}`,
+    `drwx------ root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/`, `-rw------- root/root 17 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/a.json`].join('\n') + '\n';
+  /**
+   * The preview's commands behind `run`: psql lists the databases, pg_dump/pg_dumpall/tar write to the file they are
+   * handed. `realTar` hands tar to this machine's real tar instead (the content must really be stored).
+   */
+  function fakeServer(t: Tree, options: Partial<{ databases: string; restoreList: string; tarList: string; fail: string; realTar: boolean }> = {}) {
+    const o = { databases: 'debateai\nhatchet\npostgres\n', restoreList: listing, tarList: '', fail: '', realTar: false, ...options };
     const calls: { argv: string[]; stdin?: string }[] = [];
-    const run = async (argv: string[], opts: { env: Record<string, string>; stdin?: Buffer | number; stdoutFd?: number }) => {
+    const run = async (argv: string[], opts: { env: Record<string, string>; stdin?: Buffer | number; stdoutFd?: number; timeoutMs: number; maxOutputBytes: number }) => {
       expect(opts.env).toEqual({});
+      const program = argv.find(part => part.startsWith('/usr/lib/postgresql/') || part === '/usr/bin/tar') ?? '';
+      if (o.realTar && program === '/usr/bin/tar') { calls.push({ argv }); return common.runBounded(argv, opts); }
       const stdin = Buffer.isBuffer(opts.stdin) ? opts.stdin.toString('utf8') : typeof opts.stdin === 'number' ? readFileSync(opts.stdin, 'utf8') : undefined;
       calls.push({ argv, ...(stdin === undefined ? {} : { stdin }) });
-      const program = argv.find(part => part.startsWith('/usr/lib/postgresql/') || part === '/usr/bin/tar') ?? '';
       if (o.fail && program.endsWith(o.fail)) return done('', 1);
       if (program.endsWith('/psql')) return done(o.databases);
       if (program.endsWith('/pg_dump')) { writeSync(opts.stdoutFd!, `PGDMP-${argv.at(-1)!.slice('--dbname='.length)}`); return done(); }
       if (program.endsWith('/pg_restore')) return done(o.restoreList);
       if (program.endsWith('/pg_dumpall')) { writeSync(opts.stdoutFd!, 'CREATE ROLE debateai_runtime;\n'); return done(); }
       if (program === '/usr/bin/tar' && argv.includes('-cf')) { writeSync(opts.stdoutFd!, 'TAR-synthetic'); return done(); }
-      if (program === '/usr/bin/tar' && argv.includes('-tf')) return done(o.tarList || 'etc/debateai-v3-preview/keys/kek.bin\netc/debateai-v3-preview/keys/support-kek.bin\nvar/lib/debateai-v3-preview/user-dek-store/\nvar/lib/debateai-v3-preview/user-dek-store/a.json\n');
+      if (program === '/usr/bin/tar' && argv.includes('-tvf')) return done(o.tarList || verbose(t));
       throw new Error(`unexpected command ${argv.join(' ')}`);
     };
     return { run, calls };
   }
   const sum = (text: string) => createHash('sha256').update(text).digest('hex');
-  const envs = (base: string) => [
-    envFile(base, 'api-v1.env', ['NODE_ENV=production', `KEK_PATH=${KEYS.KEK_PATH}`, `USER_DEK_STORE_PATH="${KEYS.USER_DEK_STORE_PATH}"`, 'DATABASE_URL=postgresql://x@localhost/debateai']),
-    envFile(base, 'runner-v1.env', [`KEK_PATH=${KEYS.KEK_PATH}`, `SUPPORT_KEK_PATH=${KEYS.SUPPORT_KEK_PATH}`, '# KEK_PATH=/home/old/kek'])
+  const envs = (t: Tree) => [
+    envFile(t.base, 'api-v1.env', ['NODE_ENV=production', `KEK_PATH=${t.keys.KEK_PATH}`, `USER_DEK_STORE_PATH="${t.keys.USER_DEK_STORE_PATH}/"`, 'DATABASE_URL=postgresql://x@localhost/debateai']),
+    envFile(t.base, 'runner-v1.env', [`KEK_PATH=${t.keys.KEK_PATH}`, `SUPPORT_KEK_PATH=${t.keys.SUPPORT_KEK_PATH}`, '# KEK_PATH=/home/old/kek'])
   ];
 
   it('dumps every database, the globals and the key stores, each checked and summed', async () => {
-    const { base, out } = outFolder();
-    const server = fakeServer();
-    const event = await backup.runOnlineBackup({ out, envPaths: envs(base), layout, deps: { run: server.run } });
+    const t = outFolder();
+    const { out } = t;
+    const server = fakeServer(t);
+    const event = await backup.runOnlineBackup({ out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } });
     const argvs = server.calls.map(call => call.argv);
     expect(argvs[0]).toEqual([...AS_POSTGRES, `${PG}/psql`, '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
       '--host=/run/debateai-v3-preview/postgresql', '--port=5434', '--dbname=debateai', '-f', '-']);
@@ -162,8 +180,8 @@ describe('online backup before side-by-side migrations', () => {
         [...AS_POSTGRES, `${PG}/pg_restore`, '--list']
       ]),
       [...AS_POSTGRES, `${PG}/pg_dumpall`, '--globals-only', '--no-password', '--host=/run/debateai-v3-preview/postgresql', '--port=5434'],
-      ['/usr/bin/tar', '-C', '/', '-cf', '-', 'etc/debateai-v3-preview/keys/kek.bin', 'etc/debateai-v3-preview/keys/support-kek.bin', 'var/lib/debateai-v3-preview/user-dek-store'],
-      ['/usr/bin/tar', '-tf', '-']
+      ['/usr/bin/tar', '-C', '/', '-cf', '-', rel(t.keys.KEK_PATH), rel(t.keys.SUPPORT_KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)],
+      ['/usr/bin/tar', '-tvf', '-']
     ]);
     // Each check reads the file just written, from its stdin.
     expect(server.calls.filter(call => call.argv.at(-1) === '--list').map(call => call.stdin)).toEqual(['PGDMP-debateai', 'PGDMP-hatchet', 'PGDMP-postgres']);
@@ -178,66 +196,113 @@ describe('online backup before side-by-side migrations', () => {
     expect(Object.isFrozen(event)).toBe(true);
   });
 
+  it('the server reads its key paths below the two preview folders', async () => {
+    expect(backup.KEY_ROOTS).toEqual(['/etc/debateai-v3-preview/', '/var/lib/debateai-v3-preview/']);
+    expect(Object.keys(common.LAYOUT)).not.toContain('keyRoots');
+  });
+
   it("refuses a key path outside the preview's folders", async () => {
-    for (const value of ['/home/admin/kek.bin', '/etc/debateai-v3-preview/../shadow', 'keys/kek.bin', '/etc/debateai-v3-preview-other/kek.bin', '/var/lib/debateai-v3-preview/']) {
-      const { base, out } = outFolder();
-      const server = fakeServer();
-      const env = envFile(base, 'api-v1.env', [`KEK_PATH=${KEYS.KEK_PATH}`, `CORPUS_KEK_PATH=${value}`]);
-      await expect(backup.runOnlineBackup({ out, envPaths: [env], layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'KEY_PATH_REFUSED' });
+    const t0 = outFolder();
+    for (const value of ['/home/admin/kek.bin', `${t0.etc}/../shadow`, 'keys/kek.bin', `${t0.etc}-other/kek.bin`, `${t0.lib}/`]) {
+      const t = outFolder();
+      const server = fakeServer(t);
+      const env = envFile(t.base, 'api-v1.env', [`KEK_PATH=${t.keys.KEK_PATH}`, `CORPUS_KEK_PATH=${value.replace(t0.base, t.base)}`]);
+      await expect(backup.runOnlineBackup({ out: t.out, envPaths: [env], layout: t.layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'KEY_PATH_REFUSED' });
       expect(server.calls).toEqual([]);
-      expect(readdirSync(out)).toEqual([]);
+      expect(readdirSync(t.out)).toEqual([]);
     }
+  });
+
+  it("D13 ruling: a key link is followed only inside the preview's folders, and the archive stores its content", async () => {
+    // Inside → inside: tar is handed the real file, and the archive holds its bytes, never a link.
+    const t = outFolder();
+    symlinkSync(t.keys.KEK_PATH, join(t.etc, 'keys', 'kek-current'));
+    const inside = envFile(t.base, 'api-v1.env', [`KEK_PATH=${join(t.etc, 'keys', 'kek-current')}`, `USER_DEK_STORE_PATH=${t.keys.USER_DEK_STORE_PATH}`]);
+    const server = fakeServer(t, { realTar: true });
+    const event = await backup.runOnlineBackup({ out: t.out, envPaths: [inside], layout: t.layout, deps: { run: server.run } });
+    expect(server.calls.find(call => call.argv.includes('-cf'))!.argv.slice(5)).toEqual([rel(t.keys.KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)]);
+    const archive = join(t.out, 'online-keys.tar');
+    expect(spawnSync('/usr/bin/tar', ['-xOf', archive, rel(t.keys.KEK_PATH)], { encoding: 'utf8' }).stdout).toBe('KEK-bytes');
+    const listed = spawnSync('/usr/bin/tar', ['-tvf', archive], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
+    expect(listed.filter(line => line[0] === 'l' || line[0] === 'h')).toEqual([]);
+    expect(event.files.find((file: { name: string }) => file.name === 'online-keys.tar')).toBeTruthy();
+    // Inside → outside: refused before anything runs or is written.
+    const u = outFolder();
+    const outside = join(u.base, 'elsewhere.bin');
+    writeFileSync(outside, 'NOT-A-PREVIEW-KEY');
+    symlinkSync(outside, join(u.etc, 'keys', 'kek-escape'));
+    const escape = envFile(u.base, 'api-v1.env', [`KEK_PATH=${join(u.etc, 'keys', 'kek-escape')}`]);
+    const refused = fakeServer(u, { realTar: true });
+    await expect(backup.runOnlineBackup({ out: u.out, envPaths: [escape], layout: u.layout, deps: { run: refused.run } })).rejects.toMatchObject({ code: 'KEY_PATH_REFUSED' });
+    expect(refused.calls).toEqual([]);
+    expect(readdirSync(u.out)).toEqual([]);
+    // A key path that does not resolve is refused the same way, before anything runs.
+    const v = outFolder();
+    const gone = envFile(v.base, 'api-v1.env', [`KEK_PATH=${join(v.etc, 'keys', 'missing.bin')}`]);
+    const missing = fakeServer(v);
+    await expect(backup.runOnlineBackup({ out: v.out, envPaths: [gone], layout: v.layout, deps: { run: missing.run } })).rejects.toMatchObject({ code: 'KEY_PATH_UNREADABLE' });
+    expect(missing.calls).toEqual([]);
+  });
+
+  it('refuses a key archive in which any entry is a link (a link inside a store folder stores no content)', async () => {
+    const t = outFolder();
+    symlinkSync(t.keys.KEK_PATH, join(t.keys.USER_DEK_STORE_PATH, 'b.json'));
+    const server = fakeServer(t, { realTar: true });
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'VERIFY_FAILED' });
+    expect(readdirSync(t.out)).not.toContain('online.sha256');
   });
 
   it('refuses an output folder that is not root-only 0700, or an existing file', async () => {
     const open = outFolder(0o755);
-    await expect(backup.runOnlineBackup({ out: open.out, envPaths: envs(open.base), layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
+    await expect(backup.runOnlineBackup({ out: open.out, envPaths: envs(open), layout: open.layout, deps: { run: fakeServer(open).run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
     const missing = outFolder();
-    await expect(backup.runOnlineBackup({ out: join(missing.base, 'nowhere'), envPaths: envs(missing.base), layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
+    await expect(backup.runOnlineBackup({ out: join(missing.base, 'nowhere'), envPaths: envs(missing), layout: missing.layout, deps: { run: fakeServer(missing).run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
     const linked = outFolder();
     symlinkSync(linked.out, join(linked.base, 'link'));
-    await expect(backup.runOnlineBackup({ out: join(linked.base, 'link'), envPaths: envs(linked.base), layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
-    await expect(backup.runOnlineBackup({ out: open.out, envPaths: envs(open.base), layout: { ...layout, ownerUid: me.uid + 1 }, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
+    await expect(backup.runOnlineBackup({ out: join(linked.base, 'link'), envPaths: envs(linked), layout: linked.layout, deps: { run: fakeServer(linked).run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
+    await expect(backup.runOnlineBackup({ out: open.out, envPaths: envs(open), layout: { ...open.layout, ownerUid: me.uid + 1 }, deps: { run: fakeServer(open).run } })).rejects.toMatchObject({ code: 'DIRECTORY_REFUSED' });
     // An earlier run's file stays as it was and nothing is written beside it.
-    const { base, out } = outFolder();
-    writeFileSync(join(out, 'online-hatchet.dump'), 'earlier'); chmodSync(join(out, 'online-hatchet.dump'), 0o600);
-    const server = fakeServer();
-    await expect(backup.runOnlineBackup({ out, envPaths: envs(base), layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'ALREADY_EXISTS' });
-    expect(readdirSync(out)).toEqual(['online-hatchet.dump']);
-    expect(readFileSync(join(out, 'online-hatchet.dump'), 'utf8')).toBe('earlier');
+    const t = outFolder();
+    writeFileSync(join(t.out, 'online-hatchet.dump'), 'earlier'); chmodSync(join(t.out, 'online-hatchet.dump'), 0o600);
+    const server = fakeServer(t);
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'ALREADY_EXISTS' });
+    expect(readdirSync(t.out)).toEqual(['online-hatchet.dump']);
+    expect(readFileSync(join(t.out, 'online-hatchet.dump'), 'utf8')).toBe('earlier');
     expect(server.calls).toHaveLength(1);
   });
 
   const DUMPS = ['online-debateai.dump', 'online-hatchet.dump', 'online-postgres.dump'];
   it.each([
-    ['a dump that pg_restore cannot list', { restoreList: 'garbage\n' }, 'VERIFY_FAILED', ['online-debateai.dump']],
-    ['a key archive that lacks a key store', { tarList: 'etc/debateai-v3-preview/keys/kek.bin\n' }, 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
-    ['a failing pg_dumpall', { fail: '/pg_dumpall' }, 'DUMP_FAILED', [...DUMPS, 'online-globals.sql']],
-    ['a database name that is not a plain name', { databases: 'debateai\nhost=evil\n' }, 'DATABASE_NAME_REFUSED', []],
-    ['no database at all', { databases: '' }, 'DATABASE_LIST_FAILED', []]
+    ['a dump that pg_restore cannot list', () => ({ restoreList: 'garbage\n' }), 'VERIFY_FAILED', ['online-debateai.dump']],
+    ['a key archive that lacks a key store', (t: Tree) => ({ tarList: `-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}\n` }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
+    ['a key archive whose key file is listed as a link', (t: Tree) => ({ tarList: verbose(t).replace(`-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}`, `lrwxrwxrwx root/root 0 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)} -> x`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
+    ['a key archive that lists the store folder as a file', (t: Tree) => ({ tarList: verbose(t).replace(`drwx------ root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/`, `-rw------- root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
+    ['a failing pg_dumpall', () => ({ fail: '/pg_dumpall' }), 'DUMP_FAILED', [...DUMPS, 'online-globals.sql']],
+    ['a database name that is not a plain name', () => ({ databases: 'debateai\nhost=evil\n' }), 'DATABASE_NAME_REFUSED', []],
+    ['no database at all', () => ({ databases: '' }), 'DATABASE_LIST_FAILED', []]
   ])('refuses %s, deletes nothing it wrote and writes no sums', async (_name, options, code, left) => {
-    const { base, out } = outFolder();
-    const server = fakeServer(options);
-    await expect(backup.runOnlineBackup({ out, envPaths: envs(base), layout, deps: { run: server.run } })).rejects.toMatchObject({ code });
-    expect(readdirSync(out).sort()).toEqual([...left].sort());
+    const t = outFolder();
+    const server = fakeServer(t, options(t));
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } })).rejects.toMatchObject({ code });
+    expect(readdirSync(t.out).sort()).toEqual([...left].sort());
   });
 
   it('refuses env files with no key store, or that others may write', async () => {
-    const { base, out } = outFolder();
-    const none = envFile(base, 'ui-v1.env', ['NODE_ENV=production']);
-    await expect(backup.runOnlineBackup({ out, envPaths: [none], layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'KEY_PATHS_NOT_FOUND' });
-    const loose = envFile(base, 'api-v1.env', [`KEK_PATH=${KEYS.KEK_PATH}`]);
+    const t = outFolder();
+    const none = envFile(t.base, 'ui-v1.env', ['NODE_ENV=production']);
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: [none], layout: t.layout, deps: { run: fakeServer(t).run } })).rejects.toMatchObject({ code: 'KEY_PATHS_NOT_FOUND' });
+    const loose = envFile(t.base, 'api-v1.env', [`KEK_PATH=${t.keys.KEK_PATH}`]);
     chmodSync(loose, 0o666);
-    await expect(backup.runOnlineBackup({ out, envPaths: [loose], layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'ENV_FILE_REFUSED' });
-    await expect(backup.runOnlineBackup({ out, envPaths: [], layout, deps: { run: fakeServer().run } })).rejects.toMatchObject({ code: 'ENV_FILE_REFUSED' });
-    expect(readdirSync(out)).toEqual([]);
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: [loose], layout: t.layout, deps: { run: fakeServer(t).run } })).rejects.toMatchObject({ code: 'ENV_FILE_REFUSED' });
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: [], layout: t.layout, deps: { run: fakeServer(t).run } })).rejects.toMatchObject({ code: 'ENV_FILE_REFUSED' });
+    expect(readdirSync(t.out)).toEqual([]);
   });
 
   it('the event names files and sums, never a path from the env files', async () => {
-    const { base, out } = outFolder();
-    const event = await backup.runOnlineBackup({ out, envPaths: envs(base), layout, deps: { run: fakeServer().run } });
+    const t = outFolder();
+    const event = await backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: fakeServer(t).run } });
     const text = JSON.stringify(event);
-    for (const path of [...Object.values(KEYS), base, out, 'debateai-v3-preview', 'postgresql://']) expect(text).not.toContain(path);
+    for (const path of [...Object.values(t.keys), t.base, t.out, 'debateai-v3-preview', 'postgresql://']) expect(text).not.toContain(path);
     expect(event.files.map((file: { name: string }) => file.name)).toEqual(['online-debateai.dump', 'online-hatchet.dump', 'online-postgres.dump', 'online-globals.sql', 'online-keys.tar']);
   });
 

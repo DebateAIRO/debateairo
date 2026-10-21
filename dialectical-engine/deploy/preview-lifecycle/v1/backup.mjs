@@ -10,9 +10,10 @@
 // The online backup (side-by-side spec §12 step 7), run by hand right before the migrations of a side-by-side upload:
 //   backup.mjs --online <dir> --env <path> [--env <path>]
 // Every database of the preview cluster (pg_dump custom format, each checked with pg_restore --list), the roles
-// (pg_dumpall --globals-only), and the key stores the given env files name (one tar, checked with tar -tf), each file
-// root-only 0600 and new, then their sums in sha256sum format. The services keep running throughout. It is a last
-// resort only (spec §11: going back is a switch, not a restore). It writes only new files and deletes nothing.
+// (pg_dumpall --globals-only), and the key stores the given env files name (their real paths, only inside the
+// preview's folders, in one tar checked with tar -tvf), each file root-only 0600 and new, then their sums in
+// sha256sum format. The services keep running throughout. It is a last resort only (spec §11: going back is a
+// switch, not a restore). It writes only new files and deletes nothing.
 import { constants, createReadStream } from 'node:fs';
 import { lstat, open, readdir, realpath, rename, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -119,7 +120,7 @@ export async function runBackup({ layout = LAYOUT, deps = {}, keep = KEEP }) {
  * exactly the files and folders they name, and only below KEY_ROOTS.
  */
 export const KEY_STORE_KEYS = Object.freeze(['USER_DEK_STORE_PATH', 'PUBLICATION_KEY_STORE_PATH', 'AUDIT_KEY_STORE_PATH', 'KEK_PATH', 'CORPUS_KEK_PATH', 'BLIND_INDEX_KEY_PATH', 'AUDIT_SOURCE_IP_SALT_PATH', 'SUPPORT_KEK_PATH', 'RECORDS_KEY_PATH']);
-/** The preview's own folders; a key path anywhere else (or one of these folders itself) refuses KEY_PATH_REFUSED. */
+/** The preview's own folders; a key path, or its real path, anywhere else (or one of these folders itself) refuses KEY_PATH_REFUSED. */
 export const KEY_ROOTS = Object.freeze(['/etc/debateai-v3-preview/', '/var/lib/debateai-v3-preview/']);
 const TAR = '/usr/bin/tar';
 /** A plain PostgreSQL database name: safe as a file name part and never read as a connection string by pg_dump. */
@@ -157,8 +158,13 @@ async function readEnvFile(path, uid) {
   } catch { return refuse('ENV_FILE_REFUSED'); } finally { await handle?.close().catch(() => undefined); }
 }
 
-/** The KEY_STORE_KEYS values of the env files, each a clean absolute path strictly below one of KEY_ROOTS; sorted, once each. */
-async function keyStorePaths(envPaths, uid) {
+/** True when `path` is a clean absolute path strictly below one of `roots` (a root folder itself never counts). */
+const below = (path, roots) => cleanAbsolute(path) && roots.some(root => path.startsWith(root) && path.length > root.length);
+/** A real key path the verbose tar listing can be read back for: no spaces, quotes or other odd characters. */
+const PLAIN_PATH = /^(?:\/[A-Za-z0-9._@+-]+)+$/;
+
+/** The KEY_STORE_KEYS values of the env files, each a clean absolute path strictly below one of `roots`; sorted, once each. */
+async function keyStorePaths(envPaths, uid, roots) {
   if (!Array.isArray(envPaths) || envPaths.length < 1) refuse('ENV_FILE_REFUSED');
   const paths = new Set();
   for (const envPath of envPaths) {
@@ -169,13 +175,42 @@ async function keyStorePaths(envPaths, uid) {
       if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value.at(-1) === value[0]) value = value.slice(1, -1);
       // A folder may be written with a trailing slash; the root folders themselves never count as a key store.
       if (value.length > 1 && value.endsWith('/')) value = value.slice(0, -1);
-      const below = KEY_ROOTS.some(root => value.startsWith(root) && value.length > root.length);
-      if (!cleanAbsolute(value) || !below) refuse('KEY_PATH_REFUSED');
+      if (!below(value, roots)) refuse('KEY_PATH_REFUSED');
       paths.add(value);
     }
   }
   if (paths.size < 1) refuse('KEY_PATHS_NOT_FOUND');
   return [...paths].sort();
+}
+
+/**
+ * D13 ruling: each key path is resolved to its real path first, and that REAL path must also lie below `roots`, so a
+ * link can never lead this root-run backup out of the preview's folders. The real path must be a regular file or a
+ * folder (a store); tar is handed the real paths, so the archive holds content, never just a link. A path that does
+ * not resolve refuses KEY_PATH_UNREADABLE. Sorted, once each, with what each one is.
+ */
+async function realKeyPaths(paths, roots) {
+  const real = new Map();
+  for (const path of paths) {
+    let resolved, stat;
+    try { resolved = await realpath(path); stat = await lstat(resolved); } catch { refuse('KEY_PATH_UNREADABLE'); }
+    if (!below(resolved, roots) || !PLAIN_PATH.test(resolved) || !(stat.isFile() || stat.isDirectory())) refuse('KEY_PATH_REFUSED');
+    real.set(resolved, stat.isDirectory() ? 'd' : '-');
+  }
+  return [...real.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([path, type]) => ({ path, type }));
+}
+
+/**
+ * `tar -tvf -` lines: the first character is the entry type and, for our plain key paths, the last field is the name
+ * (a folder may end in `/`). Every key must be there with its own type (`-` a regular file, `d` a folder), and no entry
+ * at all may be a link (`l` symbolic, `h` hard): a link inside a store folder would also store no content.
+ */
+function keyListingValid(text, keys) {
+  if (typeof text !== 'string') return false;
+  const lines = text.split('\n').filter(Boolean);
+  if (lines.some(line => line[0] !== '-' && line[0] !== 'd')) return false;
+  const entries = lines.map(line => [line[0], line.split(/\s+/).at(-1).replace(/\/$/, '')]);
+  return keys.every(({ path, type }) => entries.some(([kind, name]) => kind === type && name === path.slice(1)));
 }
 
 /**
@@ -226,8 +261,10 @@ const listingValid = toc => typeof toc === 'string' && /^; Archive created at /m
 export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {} }) {
   const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0;
   const run = deps.run ?? runBounded;
+  // The server layout has no keyRoots, so the server always uses KEY_ROOTS; a test layout points it at a temp copy.
+  const roots = layout.keyRoots ?? KEY_ROOTS;
   await requireRootOnlyFolder(out, uid);
-  const keyPaths = await keyStorePaths(envPaths, uid);
+  const keys = await realKeyPaths(await keyStorePaths(envPaths, uid, roots), roots);
   const listed = await run(psqlArgv(layout), { env: {}, stdin: Buffer.from(LIST_DATABASES, 'utf8'), timeoutMs: 15_000, maxOutputBytes: 64 * 1024 });
   if (!ok(listed)) refuse('DATABASE_LIST_FAILED');
   const databases = String(listed.stdout).split('\n').filter(Boolean);
@@ -250,14 +287,11 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
     check: async () => true
   }));
   // tar runs as root (the key stores are root's) from /, with paths relative to it, so the archive restores in place.
-  const relative = keyPaths.map(path => path.slice(1));
+  const relative = keys.map(({ path }) => path.slice(1));
   files.push(await writeChecked(out, KEYS_FILE, {
     uid, gid, failCode: 'KEYS_FAILED',
     fill: fd => run([TAR, '-C', '/', '-cf', '-', ...relative], { env: {}, stdoutFd: fd, timeoutMs: 10 * 60 * 1000, maxOutputBytes: 65536 }),
-    check: async path => {
-      const names = (await readBack(path, [TAR, '-tf', '-'], run, 10 * 60 * 1000))?.split('\n') ?? [];
-      return relative.every(entry => names.includes(entry) || names.includes(`${entry}/`));
-    }
+    check: async path => keyListingValid(await readBack(path, [TAR, '-tvf', '-'], run, 10 * 60 * 1000), keys)
   }));
   const sums = Buffer.from(files.map(file => `${file.sha256}  ${file.name}\n`).join(''), 'utf8');
   await writeChecked(out, SUMS_FILE, {
