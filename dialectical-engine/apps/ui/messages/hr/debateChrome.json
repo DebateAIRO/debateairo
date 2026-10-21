@@ -309,6 +309,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
   "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
   "runFailure.PLAN_ENDED": "Vaš plaćeni plan je istekao ili je pauziran dok je ovo pitanje čekalo, pa rasprava nije počela. Možete ga ponovno postaviti.",
+  "runFailure.CHOICE_GONE": "Web-stranica je ažurirana dok je vaše pitanje čekalo, pa jedna od opcija koje ste odabrali više nije dostupna. Molimo, ponovno postavite pitanje. Time niste iskoristili nimalo vaše kvote.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ova bi rasprava stajala više nego što ova stranica dopušta za jednu raspravu.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator je odbio zahtjev: za jedan od zadataka rasprave trenutačno nije dostupan nijedan model umjetne inteligencije. Pokušajte ponovno kasnije.",
   "debateChrome.condition.backupModelUsed": "Gdje se planirani model umjetne inteligencije nije mogao upotrijebiti, zamijenio ga je drugi"

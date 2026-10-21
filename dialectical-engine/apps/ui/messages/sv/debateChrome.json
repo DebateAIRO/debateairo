@@ -302,6 +302,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Den här debatten nådde sin gräns innan den hann ge ett svar.",
   "runFailure.STOPPED": "Den här debatten avbröts halvvägs på grund av ett problem hos oss. Ställ gärna din fråga igen.",
   "runFailure.PLAN_ENDED": "Ditt betalabonnemang upphörde eller pausades medan den här frågan väntade, så debatten startade inte. Du kan ställa den igen.",
+  "runFailure.CHOICE_GONE": "Webbplatsen uppdaterades medan din fråga väntade, och ett av alternativen du valde erbjuds inte längre. Ställ gärna frågan igen. Inget av ditt utrymme har använts.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Den här debatten skulle kosta mer än den här webbplatsen tillåter för en debatt.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatorn avvisade begäran: en av debattens uppgifter har ingen AI-modell som kan nås just nu. Försök igen senare.",
   "debateChrome.condition.backupModelUsed": "Där en planerad AI-modell inte kunde användas trädde en annan in"

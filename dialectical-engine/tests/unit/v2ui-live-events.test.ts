@@ -10,6 +10,7 @@ import {
   refreshTriggeredBy,
   startLiveEventStream
 } from "../../apps/ui/lib/v3/liveEvents.js";
+import { newerVersionReason } from "../../apps/ui/lib/v3/releaseWatch.js";
 
 let sequence = 0;
 function event(eventType: RunEvent["event_type"], payload: Record<string, unknown> = {}, subject?: string): RunEvent {
@@ -260,6 +261,17 @@ describe("live stream loop (one open stream, honest back-off)", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(run.opened).toHaveLength(2);
     expect(run.statuses.at(-1)).toEqual({ status: "reconnecting", retryInMs: LIVE_STREAM_RECONNECT.rateLimitedFloorMs });
+    run.stop();
+  });
+
+  it("an answer this page cannot read shows the reload note instead of retrying the same event forever (side-by-side C13)", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([async () => { throw new ContractHttpError("INVALID_RESPONSE", 200, "x"); }]);
+    await vi.advanceTimersByTimeAsync(LIVE_STREAM_RECONNECT.maxGapMs * 3);
+    expect(run.opened).toEqual([0]);
+    expect(run.refreshes).toEqual([]);
+    expect(run.statuses.some((status) => status.status === "reconnecting")).toBe(false);
+    expect(newerVersionReason()).toBe("NEWER_BUILD");
     run.stop();
   });
 

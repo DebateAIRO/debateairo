@@ -309,6 +309,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Această dezbatere și-a atins limita înainte de a putea oferi un răspuns.",
   "runFailure.STOPPED": "Această dezbatere s-a oprit înainte de final din cauza unei probleme din partea noastră. Vă rugăm să puneți din nou întrebarea.",
   "runFailure.PLAN_ENDED": "Abonamentul dvs. plătit s-a încheiat sau a fost suspendat cât timp această întrebare a așteptat, așa că dezbaterea nu a început. O puteți pune din nou.",
+  "runFailure.CHOICE_GONE": "Site-ul a fost actualizat cât timp întrebarea dumneavoastră aștepta, iar una dintre opțiunile pe care le-ați ales nu mai este oferită. Vă rugăm să o puneți din nou. Nu s-a consumat nimic din alocarea dumneavoastră.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Această dezbatere ar costa mai mult decât permite acest site pentru o dezbatere.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Coordonatorul a refuzat-o: pentru una dintre sarcinile dezbaterii nu este accesibil acum niciun model AI. Încercați din nou mai târziu.",
   "debateChrome.condition.backupModelUsed": "Acolo unde un model AI planificat nu a putut fi folosit, a intervenit altul"

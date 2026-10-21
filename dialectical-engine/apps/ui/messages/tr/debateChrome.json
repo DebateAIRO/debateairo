@@ -302,6 +302,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Bu tartışma bir yanıt üretemeden sınırına ulaştı.",
   "runFailure.STOPPED": "Bu tartışma, bizden kaynaklanan bir hata nedeniyle yarıda kaldı. Lütfen sorunuzu yeniden sorun.",
   "runFailure.PLAN_ENDED": "Bu soru beklerken ücretli planınız sona erdi veya duraklatıldı, bu yüzden tartışma başlamadı. Soruyu yeniden sorabilirsiniz.",
+  "runFailure.CHOICE_GONE": "Sorunuz beklerken site güncellendi ve seçtiğiniz seçeneklerden biri artık sunulmuyor. Lütfen soruyu tekrar sorun. Tartışma hakkınızdan hiçbir şey düşülmedi.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Bu tartışma, bu sitenin tek bir tartışma için izin verdiğinden daha fazlasına mal olur.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatör isteği reddetti: Tartışmanın görevlerinden biri için şu anda erişilebilen bir yapay zekâ modeli yok. Daha sonra yeniden deneyin.",
   "debateChrome.condition.backupModelUsed": "Planlanan bir yapay zekâ modelinin kullanılamadığı yerde yerine başka biri geçti"

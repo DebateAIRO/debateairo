@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Forbrugerbeskyttelse"
+  "chrome.footer.consumerProtection": "Forbrugerbeskyttelse",
+  "chrome.release.newerVersion": "Der findes en nyere version af hjemmesiden.",
+  "chrome.release.reload": "Genindlæs",
+  "chrome.release.madeByNewer": "Denne debat er lavet af en nyere version af hjemmesiden. Genindlæs siden eller prøv igen om et par minutter."
 }

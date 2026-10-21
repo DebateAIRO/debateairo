@@ -105,8 +105,15 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { teardown(); pro
 
 startChild("fake-api", ["--import", "tsx", path.join(HERE, "fake-api.mjs"), "--port", String(API_PORT)], lane, childEnv);
 // Side-by-side C12: outside --dev server.mjs needs RELEASE_KEY and serves only a build stamped for it; the harness
-// stamps the build c4.sh made for this test key (built from pieces: no key name beside a literal, gitleaks).
-const releaseKey = ["r17", "0123456789ab"].join("-");
+// stamps the build c4.sh made for a test key (built from pieces: no key name beside a literal, gitleaks). C13: the
+// page compares that key's code part with the code the build baked in, so the key carries the build's own code
+// (recorded by `next build` from next.config.mjs `env`), and no page shows a false "newer version" note.
+let bakedCode;
+try {
+  bakedCode = JSON.parse(fs.readFileSync(path.join(uiRoot, ".next", "required-server-files.json"), "utf8"))?.config?.env?.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE;
+} catch { bakedCode = undefined; }
+if (!/^[0-9a-f]{12}$/u.test(String(bakedCode))) broken("BUILD the build records no release code (rebuild with the current next.config.mjs)");
+const releaseKey = ["r17", bakedCode].join("-");
 const stamped = spawnSync(process.execPath, ["release-edge.mjs", "--stamp"], { cwd: uiRoot, env: { ...childEnv, RELEASE_KEY: releaseKey }, encoding: "utf8" });
 if (stamped.status !== 0) broken(`STAMP release-edge.mjs --stamp failed: ${(stamped.stdout + stamped.stderr).slice(-600)}`);
 startChild("ui-server", ["server.mjs"], uiRoot, { ...childEnv, PORT: String(UI_PORT), DIALECTICAL_API_BASE: `http://127.0.0.1:${API_PORT}`, NODE_ENV: "production", RELEASE_KEY: releaseKey });

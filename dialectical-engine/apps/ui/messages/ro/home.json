@@ -26,6 +26,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Această dezbatere și-a atins limita înainte de a putea oferi un răspuns.",
   "runFailure.STOPPED": "Această dezbatere s-a oprit înainte de final din cauza unei probleme din partea noastră. Vă rugăm să puneți din nou întrebarea.",
   "runFailure.PLAN_ENDED": "Abonamentul dvs. plătit s-a încheiat sau a fost suspendat cât timp această întrebare a așteptat, așa că dezbaterea nu a început. O puteți pune din nou.",
+  "runFailure.CHOICE_GONE": "Site-ul a fost actualizat cât timp întrebarea dumneavoastră aștepta, iar una dintre opțiunile pe care le-ați ales nu mai este oferită. Vă rugăm să o puneți din nou. Nu s-a consumat nimic din alocarea dumneavoastră.",
   "home.status.waiting": "Așteaptă să pornească. Dezbaterea dvs. va porni singură la {time}.",
   "home.status.waitingOwnDebates": "Celelalte dezbateri ale dvs. folosesc deocamdată restul limitei dvs. Această dezbatere va porni singură imediat ce una dintre ele se încheie.",
   "home.noPublishedDebates": "Nu a fost publicată încă nicio dezbatere.",

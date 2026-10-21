@@ -425,6 +425,7 @@ apps/ui/app/privacy/us-health-data/page.tsx
 apps/ui/app/privacy/versions/[sha256]/page.tsx
 apps/ui/app/privacy/versions/page.tsx
 apps/ui/app/providers/page.tsx
+apps/ui/app/public/debate/[id]/MadeByNewerRelease.tsx
 apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
 apps/ui/app/public/debate/[id]/page.tsx
 apps/ui/app/recover-authenticator/page.tsx
@@ -484,6 +485,7 @@ apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
+apps/ui/components/NewVersionNote.tsx
 apps/ui/components/NodeDetailDrawer.tsx
 apps/ui/components/OwnerPossessionPanel.tsx
 apps/ui/components/PasswordResetFlow.tsx
@@ -778,6 +780,7 @@ apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/mapView.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
+apps/ui/lib/v3/releaseWatch.ts
 apps/ui/lib/v3/requestFailure.ts
 apps/ui/lib/v3/runFailure.test.mjs
 apps/ui/lib/v3/runFailure.ts

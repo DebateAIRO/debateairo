@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Cosaint tomhaltóirí"
+  "chrome.footer.consumerProtection": "Cosaint tomhaltóirí",
+  "chrome.release.newerVersion": "Tá leagan níos nuaí den suíomh ar fáil.",
+  "chrome.release.reload": "Athlódáil",
+  "chrome.release.madeByNewer": "Rinne leagan níos nuaí den suíomh an díospóireacht seo. Athlódáil an leathanach, nó bain triail eile as i gceann cúpla nóiméad."
 }

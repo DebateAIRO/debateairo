@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "הגנת הצרכן"
+  "chrome.footer.consumerProtection": "הגנת הצרכן",
+  "chrome.release.newerVersion": "גרסה חדשה יותר של האתר זמינה.",
+  "chrome.release.reload": "טעינה מחדש",
+  "chrome.release.madeByNewer": "הדיון הזה נוצר בגרסה חדשה יותר של האתר. טענו את הדף מחדש, או נסו שוב בעוד כמה דקות."
 }

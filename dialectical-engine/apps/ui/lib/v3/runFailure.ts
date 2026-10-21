@@ -1,7 +1,7 @@
 import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
- * What the asker is told when their debate FAILED: one of five fixed
+ * What the asker is told when their debate FAILED: one of six fixed
  * sentences, chosen from the run's terminal reason code and never containing
  * it. Same shape as `requestFailure.ts` (DL3-F7): a closed alphabet, nothing
  * derived from the stored value beyond which group it belongs to.
@@ -48,7 +48,15 @@ export const RUN_FAILURE_KINDS = Object.freeze([
    * question the day holds back waits in line (sentence C) instead, so a stray
    * one reads as stopped partway.
    */
-  "STOPPED"
+  "STOPPED",
+  /**
+   * Not a fault (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`, side-by-side uploads
+   * spec 2026-10-21 §4, plan C11): a question waited in line across an upload,
+   * and the new release no longer offers one of the choices it was asked with
+   * (a model, a depth, a length). It never started and was never charged (the
+   * waiver); the owner asks again.
+   */
+  "CHOICE_GONE"
 ] as const);
 
 export type RunFailureKind = typeof RUN_FAILURE_KINDS[number];
@@ -92,7 +100,13 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
  */
 export const RUN_FAILURE_FULL_CODES: Readonly<Record<string, RunFailureKind>> = Object.freeze({
   /** Part 4 (part4-scope.md §4.1): the API's waiting-line waker, B7b. */
-  "RUN_SETUP_FAILED:PLAN_CHANGED": "PLAN_ENDED"
+  "RUN_SETUP_FAILED:PLAN_CHANGED": "PLAN_ENDED",
+  /**
+   * Side-by-side uploads (plan C11): the waker's re-admission under a new
+   * release. Its other two steps, RELEASE_NOT_SERVED and READMISSION, keep the
+   * head rule: those debates never began (NOT_STARTED).
+   */
+  "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE": "CHOICE_GONE"
 });
 
 export function runFailureKind(reason: string | null | undefined): RunFailureKind {

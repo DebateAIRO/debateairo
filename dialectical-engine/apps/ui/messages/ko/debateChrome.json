@@ -295,6 +295,7 @@
   "runFailure.RUN_LIMIT_REACHED": "이 토론은 답변을 내기 전에 한도에 도달했습니다.",
   "runFailure.STOPPED": "저희 쪽 문제로 이 토론이 중간에 멈췄습니다. 질문을 다시 해 주세요.",
   "runFailure.PLAN_ENDED": "이 질문이 대기하는 동안 유료 요금제가 종료되었거나 일시 중지되어 토론이 시작되지 않았습니다. 다시 질문하실 수 있습니다.",
+  "runFailure.CHOICE_GONE": "질문이 대기하는 동안 사이트가 업데이트되어, 선택하신 항목 중 하나가 더 이상 제공되지 않습니다. 질문을 다시 해 주세요. 이용 한도는 전혀 사용되지 않았습니다.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "이 토론은 이 사이트가 토론 한 건에 허용하는 비용을 넘게 됩니다.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "조정자가 요청을 거부했습니다. 토론의 작업 중 하나에 지금 연결할 수 있는 AI 모델이 없습니다. 나중에 다시 시도하세요.",
   "debateChrome.condition.backupModelUsed": "계획된 AI 모델을 사용할 수 없었던 곳에서는 다른 모델이 대신했습니다"

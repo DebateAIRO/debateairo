@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "حماية المستهلك"
+  "chrome.footer.consumerProtection": "حماية المستهلك",
+  "chrome.release.newerVersion": "تتوفر نسخة أحدث من الموقع.",
+  "chrome.release.reload": "إعادة تحميل",
+  "chrome.release.madeByNewer": "أُنشئت هذه المناظرة بنسخة أحدث من الموقع. أعد تحميل الصفحة، أو حاول مرة أخرى بعد بضع دقائق."
 }

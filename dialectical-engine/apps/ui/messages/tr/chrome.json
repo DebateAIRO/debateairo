@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Tüketicinin korunması"
+  "chrome.footer.consumerProtection": "Tüketicinin korunması",
+  "chrome.release.newerVersion": "Sitenin daha yeni bir sürümü mevcut.",
+  "chrome.release.reload": "Yeniden yükle",
+  "chrome.release.madeByNewer": "Bu tartışma, sitenin daha yeni bir sürümü tarafından oluşturuldu. Sayfayı yeniden yükleyin veya birkaç dakika sonra tekrar deneyin."
 }

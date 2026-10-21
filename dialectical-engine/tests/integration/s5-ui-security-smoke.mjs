@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -18,15 +18,29 @@ const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none';
 const NONCE_SOURCE = /script-src 'self' 'nonce-([A-Za-z0-9+/=]{22,})' 'strict-dynamic'(?:;|$)/;
 const INJECTED_NONCE = "AAAAAAAAAAAAAAAAAAAAAA==";
 // Side-by-side C12: outside --dev server.mjs needs RELEASE_KEY and serves only a build stamped for it. The smoke
-// stamps the build it was given for this test key (built from pieces: no key name beside a literal, gitleaks).
-const TEST_RELEASE_KEY = ["r17", "0123456789ab"].join("-");
-const OTHER_RELEASE_KEY = ["r17", "aaaaaaaaaaaa"].join("-");
+// stamps the build it was given for a test key (built from pieces: no key name beside a literal, gitleaks). C13: the
+// browser compares that key's code part with the code the build baked in (NEXT_PUBLIC_DEBATEAI_RELEASE_CODE), so the
+// test key carries the build's own code, never a made-up one, and no page ever sees a false "newer version" note.
 
-/** `node release-edge.mjs --stamp` in the UI root, as the build script runs it, for TEST_RELEASE_KEY. */
-function stampBuild(root) {
+/** The release code the build at `root` baked in for the browser (next.config.mjs `env`, recorded by `next build`). */
+function bakedReleaseCode(root) {
+  const recorded = JSON.parse(readFileSync(join(root, process.env.NEXT_DIST_DIR || ".next", "required-server-files.json"), "utf8"));
+  const code = recorded?.config?.env?.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE;
+  assert.match(String(code), /^[0-9a-f]{12}$/u, "the build records its release code (rebuild with the current next.config.mjs)");
+  return code;
+}
+
+/** This build's test key, and another release's key the same build was not made for. */
+function testReleaseKeys(root) {
+  const code = bakedReleaseCode(root);
+  return { own: ["r17", code].join("-"), other: ["r17", code === "a".repeat(12) ? "b".repeat(12) : "a".repeat(12)].join("-") };
+}
+
+/** `node release-edge.mjs --stamp` in the UI root, as the build script runs it, for `releaseKey`. */
+function stampBuild(root, releaseKey) {
   const stamped = spawnSync(process.execPath, ["release-edge.mjs", "--stamp"], {
     cwd: root,
-    env: { ...process.env, RELEASE_KEY: TEST_RELEASE_KEY },
+    env: { ...process.env, RELEASE_KEY: releaseKey },
     encoding: "utf8"
   });
   assert.equal(stamped.status, 0, `the build stamp is written\n${stamped.stderr}`);
@@ -205,7 +219,8 @@ async function smoke(surface) {
   writeFileSync(worldReadablePath, edgeSecret);
   chmodSync(worldReadablePath, 0o644);
   const log = [];
-  stampBuild(root);
+  const { own: TEST_RELEASE_KEY, other: OTHER_RELEASE_KEY } = testReleaseKeys(root);
+  stampBuild(root, TEST_RELEASE_KEY);
   const child = spawn(process.execPath, ["server.mjs"], {
     cwd: root,
     env: {
@@ -277,6 +292,8 @@ async function smoke(surface) {
     assert.equal(session.headers.get("content-security-policy"), API_CONTENT_SECURITY_POLICY, `${surface}: static API CSP`);
     assert.equal(session.headers.get("x-upstream-marker"), null, `${surface}: upstream headers stay behind the allowlist`);
     assertCommonHeaders(session, surface, "/api/v1/session");
+    // C12 review: a proxied answer carries only its API's own release header; this stub sends none.
+    assert.equal(session.headers.get("x-debateai-release"), null, `${surface}: the edge lends no release header to /api`);
     assert.deepEqual(await session.json(), { error: "UNAUTHENTICATED" });
     assert.deepEqual(stubApi.last(), { forwardedFor: "127.0.0.1", edgeSecret: null }, `${surface}: without x-forwarded-for the socket address is the client`);
 

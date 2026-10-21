@@ -46,6 +46,8 @@ describe("a FAILED run whose reason is the site's day reads as stopped partway (
   it("no longer carries the group-4 sentence in the English catalogue", () => {
     expect(Object.keys(homeEnglish).filter((key) => key.startsWith("runFailure.")).sort())
       .toEqual([
+        // Side-by-side C13: the ask-again sentence for a choice an upload removed (not a limit).
+        "runFailure.CHOICE_GONE",
         "runFailure.MODELS_UNAVAILABLE", "runFailure.NOT_STARTED", "runFailure.PLAN_ENDED", "runFailure.RUN_LIMIT_REACHED",
         "runFailure.STOPPED"
       ]);

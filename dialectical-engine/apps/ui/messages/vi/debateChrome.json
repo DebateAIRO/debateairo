@@ -295,6 +295,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Cuộc tranh luận này đã chạm giới hạn trước khi kịp đưa ra câu trả lời.",
   "runFailure.STOPPED": "Cuộc tranh luận này đã dừng giữa chừng do sự cố từ phía chúng tôi. Vui lòng đặt lại câu hỏi của bạn.",
   "runFailure.PLAN_ENDED": "Gói trả phí của bạn đã kết thúc hoặc bị tạm dừng trong lúc câu hỏi này đang chờ, nên cuộc tranh luận chưa bắt đầu. Bạn có thể hỏi lại.",
+  "runFailure.CHOICE_GONE": "Trang web đã được cập nhật trong lúc câu hỏi của bạn đang chờ, và một trong những lựa chọn bạn đã chọn không còn được cung cấp nữa. Vui lòng hỏi lại. Việc này không dùng đến bất kỳ phần hạn mức nào của bạn.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Cuộc tranh luận này sẽ tốn nhiều hơn mức trang này cho phép đối với một cuộc tranh luận.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Bộ điều phối đã từ chối yêu cầu: một trong các việc của cuộc tranh luận hiện không có mô hình AI nào truy cập được. Hãy thử lại sau.",
   "debateChrome.condition.backupModelUsed": "Ở nơi không thể dùng mô hình AI dự kiến, một mô hình khác đã thay thế"

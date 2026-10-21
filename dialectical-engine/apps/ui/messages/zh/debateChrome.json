@@ -295,6 +295,7 @@
   "runFailure.RUN_LIMIT_REACHED": "本场辩论在得出答案之前已达到上限。",
   "runFailure.STOPPED": "由于我们这边出现问题，本场辩论中途停止了。请重新提出您的问题。",
   "runFailure.PLAN_ENDED": "此问题等待期间，您的付费方案已结束或被暂停，因此辩论没有开始。您可以重新提问。",
+  "runFailure.CHOICE_GONE": "您的问题等待期间网站已更新，您所选的一个选项已不再提供。请重新提问。此次未消耗您的任何额度。",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "这场辩论的费用将超过本站对单场辩论允许的额度。",
   "requestFailure.kind.MODEL_UNAVAILABLE": "协调器拒绝了该请求：辩论中的某项任务目前没有可用的 AI 模型。请稍后重试。",
   "debateChrome.condition.backupModelUsed": "计划使用的 AI 模型无法使用时，已由另一个模型接替"

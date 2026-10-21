@@ -34,7 +34,12 @@ const ENGLISH = Object.freeze({
   MODELS_UNAVAILABLE:
     "This debate could not start because the AI models it needs were unavailable. Please try again in a while.",
   RUN_LIMIT_REACHED: "This debate reached its limit before it could produce an answer.",
-  STOPPED: "This debate stopped partway because of a problem on our side. Please ask your question again."
+  STOPPED: "This debate stopped partway because of a problem on our side. Please ask your question again.",
+  // Side-by-side uploads spec 2026-10-21 §4 (plan C13): a waiting question whose chosen option the new release no
+  // longer offers is asked to be asked again, and told it cost nothing.
+  CHOICE_GONE:
+    "The site was updated while your question waited, and one of the options you chose is no longer offered. "
+    + "Please ask it again. It did not use any of your allowance."
 });
 
 test("every code family lands in its group, whether or not the runner wrapped it", () => {
@@ -64,6 +69,12 @@ test("every code family lands in its group, whether or not the runner wrapped it
     // went wrong on our side".
     ["RUN_SETUP_FAILED:PLAN_CHANGED", "PLAN_ENDED"],
     ["  RUN_SETUP_FAILED:PLAN_CHANGED  ", "PLAN_ENDED"],
+    // Side-by-side uploads (plan C11/C13): a waiting question re-admitted under a new release whose chosen option is
+    // no longer offered is told to ask again; the two other new steps never began, the not-started sentence.
+    ["RUN_SETUP_FAILED:CHOICE_UNAVAILABLE", "CHOICE_GONE"],
+    ["RUN_SETUP_FAILED:RELEASE_NOT_SERVED", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:READMISSION", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:CHOICE_UNAVAILABLE:EXTRA", "NOT_STARTED"],
     // The runner's claim-time refusals, first as written, then as the Hatchet
     // catch overwrites them (the role suffix is lost there).
     ["RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "MODELS_UNAVAILABLE"],
@@ -142,7 +153,8 @@ test("says the owner's chosen English sentence in both catalogues, and on the En
     PLAN_ENDED: "RUN_SETUP_FAILED:PLAN_CHANGED",
     MODELS_UNAVAILABLE: "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
     RUN_LIMIT_REACHED: "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL",
-    STOPPED: "CALL_BUDGET_EXHAUSTED"
+    STOPPED: "CALL_BUDGET_EXHAUSTED",
+    CHOICE_GONE: "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE"
   };
   for (const kind of RUN_FAILURE_KINDS) {
     for (const namespace of NAMESPACES) {
@@ -262,7 +274,15 @@ test("maps only codes their writers still produce", () => {
     "RUN_SETUP_FAILED:PLAN_CHANGED": () =>
       api.includes("const reason = `RUN_SETUP_FAILED:${step}`;")
       && api.includes('await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");')
-      && /\| "ROOM_HOLD" \| "PLAN_CHANGED"\n/u.test(api)
+      && /\| "ROOM_HOLD" \| "PLAN_CHANGED"\n/u.test(api),
+    // Side-by-side uploads: the waking re-admission (plan C11, lane C) records the OLD run FAILED with this step when
+    // the new release no longer offers a choice it made. This sentence lands first (C13, lane C2): until C11 is in
+    // the tree the API names no such step at all; once it names it, the write itself must be where this table
+    // expects. The lane merge makes this strict by deleting the first arm (controller ruling owed).
+    "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE": () =>
+      !api.includes('"CHOICE_UNAVAILABLE"')
+      || (api.includes("const reason = `RUN_SETUP_FAILED:${step}`;")
+        && api.includes('await this.#recordRunSetupFailure(run.runId, "CHOICE_UNAVAILABLE");'))
   };
   assert.deepEqual(
     Object.keys(RUN_FAILURE_FULL_CODES).sort(), Object.keys(fullWriters).sort(), "a writer check per whole code"
@@ -322,6 +342,16 @@ test("a waiting question whose paid plan ended is told so, not that something we
   }
 });
 
+test("a waiting question whose chosen option is gone after an update is told to ask again, at no cost (side-by-side C13)", () => {
+  for (const namespace of NAMESPACES) {
+    const message = runFailureMessage("RUN_SETUP_FAILED:CHOICE_UNAVAILABLE", catalogue("en", namespace));
+    assert.equal(message, ENGLISH.CHOICE_GONE, `en/${namespace}`);
+  }
+  // A release that does not serve the debate, and a re-admission that broke after its new run was made, never began.
+  assert.equal(runFailureKind("RUN_SETUP_FAILED:RELEASE_NOT_SERVED"), "NOT_STARTED");
+  assert.equal(runFailureKind("RUN_SETUP_FAILED:READMISSION"), "NOT_STARTED");
+});
+
 test("the operator runbook's table lists every sentence the pages can show", () => {
   // deploy/vps/README.md, "What the asker sees when a debate fails": when an
   // asker quotes a sentence, the operator looks it up there.
@@ -335,6 +365,8 @@ test("the operator runbook's table lists every sentence the pages can show", () 
     const row = rows.find((line) => line.startsWith(`| "${ENGLISH[kind]}" | \`${kind}\` |`));
     assert.ok(row, `the ${kind} row quotes its English sentence`);
   }
+  const choiceRow = rows.find((line) => line.includes("| `CHOICE_GONE` |"));
+  assert.ok(choiceRow.includes("`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`"), "the CHOICE_GONE row names its code");
   const planRow = rows.find((line) => line.includes("| `PLAN_ENDED` |"));
   assert.ok(planRow.includes("`RUN_SETUP_FAILED:PLAN_CHANGED`"), "the PLAN_ENDED row names its code");
   const notStartedRow = rows.find((line) => line.includes("| `NOT_STARTED` |"));

@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Защита на потребителите"
+  "chrome.footer.consumerProtection": "Защита на потребителите",
+  "chrome.release.newerVersion": "Налична е по-нова версия на сайта.",
+  "chrome.release.reload": "Презареди",
+  "chrome.release.madeByNewer": "Този дебат е създаден от по-нова версия на сайта. Презаредете страницата или опитайте отново след няколко минути."
 }

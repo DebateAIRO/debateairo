@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Προστασία καταναλωτών"
+  "chrome.footer.consumerProtection": "Προστασία καταναλωτών",
+  "chrome.release.newerVersion": "Είναι διαθέσιμη μια νεότερη έκδοση του ιστότοπου.",
+  "chrome.release.reload": "Επαναφόρτωση",
+  "chrome.release.madeByNewer": "Αυτή η αντιπαράθεση δημιουργήθηκε από νεότερη έκδοση του ιστότοπου. Φορτώστε ξανά τη σελίδα ή δοκιμάστε ξανά σε λίγα λεπτά."
 }

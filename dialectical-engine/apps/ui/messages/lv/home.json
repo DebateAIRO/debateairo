@@ -26,6 +26,7 @@
   "runFailure.RUN_LIMIT_REACHED": "Šīs debates sasniedza savu ierobežojumu, pirms spēja sniegt atbildi.",
   "runFailure.STOPPED": "Šīs debates apstājās pusceļā mūsu pusē radušās problēmas dēļ. Lūdzu, uzdodiet savu jautājumu vēlreiz.",
   "runFailure.PLAN_ENDED": "Jūsu maksas plāns beidzās vai tika apturēts, kamēr šis jautājums gaidīja, tāpēc debates nesākās. Varat to uzdot vēlreiz.",
+  "runFailure.CHOICE_GONE": "Vietne tika atjaunināta, kamēr jūsu jautājums gaidīja, un viena no izvēlētajām iespējām vairs nav pieejama. Lūdzu, uzdodiet to vēlreiz. No jūsu kvotas nekas netika izmantots.",
   "home.status.waiting": "Gaida sākumu. Jūsu debates sāksies pašas {time}.",
   "home.status.waitingOwnDebates": "Jūsu pārējās debates pagaidām izmanto atlikušo jūsu ierobežojuma daļu. Šīs debates sāksies pašas, tiklīdz kādas no tām beigsies.",
   "home.noPublishedDebates": "Vēl nav publicētas nevienas debates.",

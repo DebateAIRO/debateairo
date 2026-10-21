@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Protección del consumidor"
+  "chrome.footer.consumerProtection": "Protección del consumidor",
+  "chrome.release.newerVersion": "Hay disponible una versión más reciente de este sitio web.",
+  "chrome.release.reload": "Recargar",
+  "chrome.release.madeByNewer": "Este debate fue creado por una versión más reciente de este sitio web. Vuelva a cargar la página o inténtelo de nuevo en unos minutos."
 }

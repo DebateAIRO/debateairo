@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Protecția consumatorilor"
+  "chrome.footer.consumerProtection": "Protecția consumatorilor",
+  "chrome.release.newerVersion": "Este disponibilă o versiune mai nouă a site-ului.",
+  "chrome.release.reload": "Reîncărcați",
+  "chrome.release.madeByNewer": "Această dezbatere a fost creată de o versiune mai nouă a site-ului. Reîncărcați pagina sau încercați din nou peste câteva minute."
 }
