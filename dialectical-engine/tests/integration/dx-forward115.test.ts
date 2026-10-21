@@ -95,7 +95,7 @@ describe("data export forward115", () => {
       "REINDEX TABLE CONCURRENTLY identity.data_export"
     ]) {
       await db.pool.query(statement);
-      await expect(migrate(db.pool), statement).resolves.toBeUndefined();
+      await expect(migrate(db.pool), statement).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     }
   }, 180_000);
 
