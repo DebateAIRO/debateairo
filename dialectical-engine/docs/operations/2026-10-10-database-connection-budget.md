@@ -5,7 +5,7 @@ changed, and plans the next steps: Postgres memory settings at launch, PgBouncer
 
 ## In one paragraph
 
-Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The side-by-side transition raises the limit to 320 at the next Postgres restart (section 8). The job system (Hatchet) may take
+Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The side-by-side transition raises the limit to 320 at the Postgres restart in the drained window (section 8), once the new config is on the server. The job system (Hatchet) may take
 up to 50. Before this change the website program (the API) could open up to about 104 connections. The debate runner had
 only 10, but accepted up to 100 debates at once. Each running debate keeps 2 connections busy, so **the runner would
 jam at about 5 debates at the same moment**: every debate then waits forever for a third connection that never comes,
@@ -251,7 +251,7 @@ one at a time.
 
 ## 8. Side by side (2026-10-21)
 
-The side-by-side transition (spec `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md`, §9) runs two releases
+The side-by-side transition (spec §9 and its section "The transition"; the spec is `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` in the DebateAIRO folder, outside this engine repository) runs two releases
 at once while the new one takes over: the old release keeps its drained debates, and the new one takes new work. Each
 release has its own API and its own runner, so the server holds two of each while they overlap. No pool size changed.
 Only the server's limit did.
@@ -267,10 +267,16 @@ Only the server's limit did.
 | Left free | 28 (317 = 320 less the administrator's 3) |
 
 * **The limit is 320**, in `deploy/postgres/postgresql.hardening.conf` (`max_connections = 320`). It takes effect only at a
-  Postgres restart, made in the drained window of the side-by-side runbook. After that restart, `SHOW max_connections;`
+  Postgres restart, made in the drained window of the side-by-side transition (spec §9, "The transition"). After that restart, `SHOW max_connections;`
   must return 320. Until then the running server still allows 200.
-* **Memory.** A pool opens connections only when it needs them, so the extra allowance costs memory only while both
-  releases hold connections at once. Section 3 covers the memory settings.
+* **Memory.** Pools open connections only when needed, but a higher limit still costs some memory even when idle (section 3).
+* **Query cancellations.** A cancelled query opens a short extra connection outside its pool, and each pool allows at most
+  four of them at once (`packages/db/src/private-stream.ts`). Counted pool by pool, one API and one runner are 14 pools
+  (12 API pools with the dev menu off, plus the runner's 2), so two releases are 28. The 28 free connections cover one
+  cancellation per pool at the same moment, with nothing left for the owner's login. They do not cover four per pool,
+  which would need 112. Section 1 has the same gap for one release (four per pool across 14 pools would need 56, against
+  21). No pool size or constant was changed; whether to raise the spare, lower the cancellation cap, or accept the gap is
+  the controller's decision.
 * **After the transition.** When the old release retires, one release's numbers from section 1 apply again (176 of 197 at
   200). Whether the limit goes back to 200 is the owner's decision, and changing the limit also needs a restart.
 * **The alert in section 5** fires above 240 connections while the limit is 320.

@@ -26,7 +26,8 @@ const API_MAIN = "apps/api/src/main.ts";
 const RUNNER_MAIN = "apps/runner/src/main.ts";
 
 // The server's limit as provisioned by deploy/postgres: 320 for the side-by-side transition (spec §9). The raise takes
-// effect only at a Postgres restart, in the drained window of the side-by-side runbook (area D); it was 200 before.
+// effect only at a Postgres restart, in the drained window of the side-by-side transition (spec §9, "The transition");
+// it was 200 before.
 const POSTGRES_MAX_CONNECTIONS = 320;
 const SUPERUSER_RESERVED = 3; // PostgreSQL's default; backups (pg_dump as postgres) use these
 const HATCHET_ROLE_LIMIT = 50; // deploy/postgres/bootstrap.sql: debateai_prod_hatchet CONNECTION LIMIT 50
@@ -200,8 +201,9 @@ describe("the whole server stays under Postgres's limit", () => {
   });
 
   it("the server config allows the budget", async () => {
-    // The limit the budget is checked against must be the one the server's config file sets.
+    // The limit the budget is checked against must be the one the server's config file sets, and the file sets it once.
     const conf = await readFile("deploy/postgres/postgresql.hardening.conf", "utf8");
-    expect(conf).toMatch(/^max_connections = 320$/mu);
+    expect(conf).toMatch(new RegExp(`^max_connections = ${POSTGRES_MAX_CONNECTIONS}$`, "mu"));
+    expect(conf.match(/^max_connections = /gmu)).toHaveLength(1);
   });
 });

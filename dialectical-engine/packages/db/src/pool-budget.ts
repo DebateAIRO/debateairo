@@ -10,12 +10,13 @@
  * Hatchet, the migrator, the operator's commands and 21 spare. A second API
  * process needed PgBouncer or a higher limit first.
  *
- * Side by side, 2026-10-21 (spec §9): while two releases overlap, the server
- * allows 320 connections (3 kept for the superuser), and each release runs one
- * API and one runner. Two of each come to 2 × (79 + 34) = 226; with Hatchet's 50,
- * the migrator's 3 and the operator's about 10 that is 289, which leaves 28 spare
- * (317 = 320 less 3). The raise takes effect only at a Postgres restart
- * (deploy/postgres/postgresql.hardening.conf). The pool sizes below did not change.
+ * Side by side, 2026-10-21 (spec §9): while two releases overlap (up to about
+ * 7.5 hours, the spec §4 backstop), the server allows 320 connections (3 kept for
+ * the superuser), and each release runs one API and one runner. Two of each come
+ * to 2 × (79 + 34) = 226; with Hatchet's 50, the migrator's 3 and the operator's
+ * about 10 that is 289, which leaves 28 spare (317 = 320 less 3). The raise takes
+ * effect only at a Postgres restart (deploy/postgres/postgresql.hardening.conf).
+ * The pool sizes below did not change.
  *
  * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
