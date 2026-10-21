@@ -4806,7 +4806,8 @@ export class PostgresAskApplication implements AskApplication {
     }
     this.#runs = new RunRepository(pool,runProvisionPool);
     this.#work = new WorkItemRepository(pool);
-    this.#serve = new ServeRepository(pool);
+    // Side-by-side spec §5 (plan C15): the answer read shows another release's judges recount only under its own rule.
+    this.#serve = new ServeRepository(pool, { releaseKey: settings.releaseKey });
     this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
     this.#substitutions = new RunCostSubstitutionRepository(pool);

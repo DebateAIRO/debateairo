@@ -24,12 +24,12 @@ import {
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
-import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
+import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
-  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
-  type RootCallSite
+  judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
+  type JudgesRecount, type JudgesRecountPosition, type RootCallSite
 } from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
@@ -175,13 +175,23 @@ export interface ConformanceJudgement {
  * PF-D2.3): the answer read's `cost_envelope.basis` without the receipt's private members. Least disclosure: `shape`
  * names the asker's plan and the plan's sizes and thresholds, `length` the plan and its word targets, and `engine` engine
  * 2's scoring terms, caps, label thresholds and judge counts; nothing public needs them, and engine internals never
- * reach user-facing output. A copy without them, every other member as stored; a basis with none of them is returned as
- * the same object, so today's answer body is byte for byte what it was.
+ * reach user-facing output.
+ *
+ * Side-by-side spec §5 (plan C15): an ALLOW-list, because two releases read one database and a receipt minted by a newer
+ * release can carry a member this code has never heard of. Only the public members of `costEnvelopeBasisSchema`
+ * (packages/budget) are shown, each as stored and in the stored order; any other member, known private (`shape`,
+ * `length`, `engine`) or unknown, is dropped. A basis whose members are all public is returned as the same object, so
+ * today's answer body is byte for byte what it was.
  */
+export const PUBLIC_COST_ENVELOPE_BASIS_MEMBERS: readonly string[] = Object.freeze([
+  "kind", "max_model_attempts", "panel_size", "depth", "per_site_attempts", "call_sites", "serve_leg",
+  "serve_reserve_attempts", "hold_cap", "final_retry_attempts", "formula_version", "bounds_source_ref"
+]);
+const PUBLIC_BASIS_MEMBER_SET: ReadonlySet<string> = new Set(PUBLIC_COST_ENVELOPE_BASIS_MEMBERS);
+
 export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  if (!Object.hasOwn(basis, "shape") && !Object.hasOwn(basis, "length") && !Object.hasOwn(basis, "engine")) return basis;
-  const { shape: _shape, length: _length, engine: _engine, ...shown } = basis;
-  return shown;
+  if (Object.keys(basis).every((member) => PUBLIC_BASIS_MEMBER_SET.has(member))) return basis;
+  return Object.fromEntries(Object.entries(basis).filter(([member]) => PUBLIC_BASIS_MEMBER_SET.has(member)));
 }
 
 export function deriveConformanceOutcome(
@@ -1993,10 +2003,17 @@ function serveAnswerContentRef(answerId: string, answerVersion: number): string 
 export class ServeRepository {
   readonly #liveness: LivenessRepository;
   readonly #memory: MemoryRepository;
+  /**
+   * Side-by-side spec §5 (plan C15): the release this reader is (the API's checked RELEASE_KEY). The answer read shows
+   * the judges recount of another release's debate only under the rule this code implements (`judgesRecountApplies`).
+   * Absent (the runner, the practice report, tests): every recount is shown, as before.
+   */
+  readonly #releaseKey: string | undefined;
 
-  constructor(private readonly pool: Pool) {
+  constructor(private readonly pool: Pool, options: Readonly<{ releaseKey?: string }> = {}) {
     this.#liveness = new LivenessRepository(pool);
     this.#memory = new MemoryRepository(pool);
+    this.#releaseKey = options.releaseKey;
   }
 
   async recordMemoryQuestion(input: MemoryQuestionRegistration, ownership: RunOwnershipInput): Promise<void> {
@@ -2740,6 +2757,8 @@ export class ServeRepository {
       answer_id: string;
       answer_version: number;
       run_id: string;
+      /** Side-by-side spec §1 (migration 0123): the release that ran this debate; C15 reads it for the judges recount. */
+      release_key: string;
       question_line: string;
       run_content_ciphertext: CryptoEnvelope | null;
       fact_bundle_id: string;
@@ -2789,7 +2808,7 @@ export class ServeRepository {
       // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
       root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
+      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.release_key, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
               facts.fact_bundle_id, facts.facts,
               facts.content_ciphertext AS facts_content_ciphertext,
@@ -2919,18 +2938,6 @@ export class ServeRepository {
     // Follow-up N1: the served answer as recorded (the position the served number's source_ref names), so the panel
     // leads with it even after a review catch-up refreshed the strengths; null for an answer with no served number.
     const servedRootNodeId = servedPositionOf(nodes, edges, numbers.rows.map((number) => number.source_ref));
-    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
-    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
-    // vote row). (pre-flight PF-R2b4.5)
-    const judgesComparison = judgesComparisonOf(
-      row.verdict_votes.map((vote) => ({
-        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
-        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
-      })),
-      nodes, edges,
-      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
-      servedRootNodeId
-    );
     const currentRead = version === undefined;
     const eventStreams = numbers.rows.map((number) => number.events.map((event) => ({
       status: event.status,
@@ -3014,6 +3021,26 @@ export class ServeRepository {
        ORDER BY at_seq`,
       [row.answer_id, row.answer_version]
     );
+    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
+    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
+    // vote row). (pre-flight PF-R2b4.5) Side-by-side spec §5 (plan C15): another release's debate is recounted only
+    // under the rule its sealed record names, when that is the rule this code implements (`judgesRecountApplies`);
+    // otherwise no section, never numbers that might differ from the served verdict. The rule rides the answer's
+    // condition-mark records (the one that names a served-root rule); none named reads as null.
+    const recordedServedRootRule = conditionMarkRecords.rows.find((record) => record.served_root_rule !== null)?.served_root_rule ?? null;
+    const judgesComparison = judgesRecountApplies({
+      runReleaseKey: row.release_key, ownReleaseKey: this.#releaseKey, servedRootRule: recordedServedRootRule
+    })
+      ? judgesComparisonOf(
+        row.verdict_votes.map((vote) => ({
+          judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
+          chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
+        })),
+        nodes, edges,
+        row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
+        servedRootNodeId
+      )
+      : undefined;
     const abstention = await this.pool.query<Answer["abstention"] extends infer T ? Exclude<T, null> : never>(
       `SELECT kind, question_class, risk_tier, price, register_row_key,
               register_version::integer, register_source_ref, unlock_condition, ledger_unknown_ref
