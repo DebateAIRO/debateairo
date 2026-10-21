@@ -25,7 +25,8 @@
 //
 // One command at a time (D10 review): each takes ${lockRoot}/release-switch.lock (created exclusively, holding its pid,
 // removed when it ends); another command meanwhile refuses RELEASE_SWITCH_BUSY. A file left by a process that is gone
-// is still refused (the refusal says holderAlive false): the operator moves it aside, after checking no switch runs.
+// is still refused (the refusal says holderAlive false, and its `next` says how to clear it): the operator moves it
+// aside, after checking no switch runs.
 //
 // Exit 0 with an empty `bad`; 2 when the command finished but a check after the database write failed (`bad` names it);
 // 1 on a refusal (nothing after the refusal happened). One JSON line per run: codes, labels, keys, counts and times only,
@@ -742,13 +743,19 @@ async function lockHolder(path) {
  * Take the switch lock: create `path` exclusively (no symlink followed, 0600) with this process's pid. Resolves to the
  * function that lets go: it removes the file only while it still holds this pid (if the operator moved it aside, the
  * file now there is another command's). RELEASE_SWITCH_BUSY when the file exists; RELEASE_SWITCH_LOCK_FAILED otherwise.
+ * A file whose holder is gone (an ssh drop skips the release, often right when the operator needs `switch --finish`)
+ * is still refused, with `next`: how to clear it (D10 re-review).
  */
 export async function acquireSwitchLock(path) {
   let handle;
   try {
     handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   } catch (error) {
-    if (error?.code === 'EEXIST') refuse('RELEASE_SWITCH_BUSY', await lockHolder(path));
+    if (error?.code === 'EEXIST') {
+      const holder = await lockHolder(path);
+      refuse('RELEASE_SWITCH_BUSY', holder.holderAlive ? holder
+        : { ...holder, next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${path} aside, then re-run` });
+    }
     refuse('RELEASE_SWITCH_LOCK_FAILED');
   }
   const token = `${process.pid}\n`;

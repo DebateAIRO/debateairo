@@ -899,9 +899,13 @@ describe('release-switch.mjs (root CLI)', () => {
       const busy = await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root });
       expect([busy.code, JSON.parse(busy.stderr)]).toEqual([1, { event: 'PREVIEW_RELEASE_STAGE_REFUSED', label: 'new-v1', reason: 'RELEASE_SWITCH_BUSY', fields: { holderPid: process.pid, holderAlive: true } }]);
       expect(readFileSync(lockPath, 'utf8')).toBe(`${process.pid}\n`);
-      // Left by a process that is gone: still refused (the operator moves it aside), and said so.
+      // Left by a process that is gone (an ssh drop skips the release): still refused, and the refusal says how to clear it.
       writeFileSync(lockPath, '2147483646\n');
-      expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({ holderPid: 2147483646, holderAlive: false });
+      expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
+        holderPid: 2147483646, holderAlive: false,
+        next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${lockPath} aside, then re-run`
+      });
+      expect(readFileSync(lockPath, 'utf8')).toBe('2147483646\n');
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
