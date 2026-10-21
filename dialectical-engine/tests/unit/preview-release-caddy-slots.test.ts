@@ -5,7 +5,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 const caddySlots = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
 const plans = await import('../../deploy/' + 'preview-auth-dev/v1/launch-plan.mjs');
 
@@ -104,6 +104,52 @@ function diffLines(before: string, after: string) {
   return { removed, added };
 }
 const diffRemovedLines = (before: string, after: string) => diffLines(before, after).removed;
+/** The loopback listener as the transform writes it (tab file): readiness only, everything else 404 (controller ruling, D9). */
+const LISTENER_LINES = [
+  ':3090 {',
+  '\tbind 127.0.0.1',
+  '\t@readyz {',
+  '\t\tmethod GET',
+  '\t\tpath /readyz',
+  '\t}',
+  '\thandle @readyz {',
+  '\t\trewrite * /readyz',
+  '\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {',
+  '\t\t\timport debateai_slots',
+  ...PROXY_HEADERS.map(line => `\t\t\t${line}`),
+  '\t\t}',
+  '\t}',
+  '\thandle {',
+  '\t\trespond 404',
+  '\t}',
+  '}'
+];
+/** The lines of the block that opens at `lines[open]`, its opening and closing lines included. */
+function blockAt(lines: readonly string[], open: number) {
+  let depth = 0;
+  for (let index = open; index < lines.length; index++) {
+    for (const char of lines[index] ?? '') depth += char === '{' ? 1 : char === '}' ? -1 : 0;
+    if (depth === 0) return lines.slice(open, index + 1);
+  }
+  throw new Error('block never closes');
+}
+/**
+ * What the listener does with one request, read from its text by Caddy's documented rules for this shape: `handle`
+ * blocks are mutually exclusive and a bare `handle` runs only when no matched one does; the path matcher compares the
+ * cleaned path (path.Clean, Caddy #4407), case-insensitively; a request no handle takes gets Caddy's empty 200, which
+ * this listener must never need. Returns 'proxy' only when the request reaches a block holding a reverse_proxy.
+ */
+function listenerRoute(out: string, method: string, rawPath: string): 'proxy' | 'refuse' | 'unhandled' {
+  const lines = out.split('\n'), site = blockAt(lines, lines.indexOf(':3090 {'));
+  const matcher = blockAt(site, site.indexOf('\t@readyz {')).slice(1, -1).map(line => line.trim());
+  const wantMethod = matcher.find(line => line.startsWith('method '))?.slice(7), wantPath = matcher.find(line => line.startsWith('path '))?.slice(5);
+  expect(matcher.every(line => /^(method|path) /.test(line))).toBe(true);
+  const cleaned = posix.normalize(rawPath).replace(/(.)\/$/, '$1');
+  const handle = (name: string) => { const at = site.indexOf(name); return at < 0 ? null : blockAt(site, at); };
+  const chosen = method === wantMethod && cleaned.toLowerCase() === wantPath?.toLowerCase() ? handle('\thandle @readyz {') : handle('\thandle {');
+  if (!chosen) return 'unhandled';
+  return chosen.some(line => /^\s*reverse_proxy /.test(line)) ? 'proxy' : chosen.some(line => /^\s*respond 40[34]$/.test(line)) ? 'refuse' : 'unhandled';
+}
 const once = transformCaddyfile(LIVE_PREVIEW);
 
 describe('transformCaddyfile', () => {
@@ -133,20 +179,31 @@ describe('transformCaddyfile', () => {
     const out = transformCaddyfile(LIVE_PREVIEW);
     expect(out.endsWith([
       'http://v3-preview.dezbatere.ro {', '\tredir https://v3-preview.dezbatere.ro{uri} 308', '}', '',
-      ':3090 {',
-      '\tbind 127.0.0.1',
-      '\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {',
-      '\t\timport debateai_slots',
-      ...PROXY_HEADERS.map(line => `\t\t${line}`),
-      '\t}',
-      '}',
+      ...LISTENER_LINES,
       ''
     ].join('\n'))).toBe(true);
     expect(EDGE_LISTENER).toEqual({ port: 3090, bind: '127.0.0.1' });
     expect(Object.isFrozen(EDGE_LISTENER)).toBe(true);
-    // The listener has no password and no wrong-host check: its proxy carries the main route's own headers instead.
+    // The listener has no password and no wrong-host check: its one proxy carries the main route's own headers instead.
     const site = out.slice(out.indexOf(':3090 {'));
-    expect(site).not.toMatch(/basic_auth|route|respond/);
+    expect(site).not.toMatch(/basic_auth|route /);
+  });
+
+  it('the loopback listener proxies only GET /readyz; every other request gets 404 and is never proxied', () => {
+    const out = transformCaddyfile(LIVE_PREVIEW);
+    expect(listenerRoute(out, 'GET', '/readyz')).toBe('proxy');
+    for (const [method, path] of [['GET', '/'], ['GET', '/api/v1/debates'], ['GET', '/api/v1/staff/alerts'], ['GET', '/login'], ['POST', '/readyz'], ['HEAD', '/readyz'],
+      ['GET', '/readyz/../api'], ['GET', '/readyz/../api/v1/debates'], ['GET', '/readyz/x'], ['GET', '/readyzz'], ['GET', '/livez'], ['DELETE', '/readyz']] as const) {
+      expect([method, path, listenerRoute(out, method, path)]).toEqual([method, path, 'refuse']);
+    }
+    // The edge secret and the proxy live only inside the readiness handle: the 404 handle adds no header and proxies nothing.
+    const lines = out.split('\n'), site = blockAt(lines, lines.indexOf(':3090 {'));
+    const ready = blockAt(site, site.indexOf('\thandle @readyz {'));
+    const rest = site.filter(line => !ready.includes(line));
+    expect(rest.join('\n')).not.toMatch(/reverse_proxy|X-Debateai-Edge-Secret|header_up/);
+    expect(ready.filter(line => /reverse_proxy /.test(line))).toEqual(['\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {']);
+    // Whatever path took the handle, the website is asked for exactly /readyz.
+    expect(ready[1]).toBe('\t\trewrite * /readyz');
   });
 
   it('changes nothing else: every other line stays, and the only new lines are the snippet, the imports and the listener', () => {
@@ -156,7 +213,7 @@ describe('transformCaddyfile', () => {
     const expected = ['', ...SNIPPET_LINES,
       '\t\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {', '\t\t\t\timport debateai_slots',
       '\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {', '\t\t\timport debateai_slots',
-      ':3090 {', '\tbind 127.0.0.1', '\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {', '\t\timport debateai_slots', ...PROXY_HEADERS.map(line => `\t\t${line}`), '\t}', '}', ''];
+      ...LISTENER_LINES, ''];
     expect([...added].sort()).toEqual([...expected].sort());
   });
 
@@ -196,7 +253,7 @@ describe('transformCaddyfile', () => {
   it('the edge secret check reads the last proxy block only (the one the listener copies)', () => {
     // Without the secret in the notify block alone, the main block still has it: the transform goes ahead.
     const notifyWithout = LIVE_PREVIEW.replace(`\t\t\t\t${EDGE_SECRET}\n`, '');
-    expect(transformCaddyfile(notifyWithout)).toContain(`\t\t${EDGE_SECRET}\n\t\theader_up -Authorization\n\t}\n}\n`);
+    expect(transformCaddyfile(notifyWithout)).toContain(`\t\t\t${EDGE_SECRET}\n\t\t\theader_up -Authorization\n\t\t}\n\t}\n\thandle {\n`);
   });
 });
 

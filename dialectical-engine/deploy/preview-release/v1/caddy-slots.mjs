@@ -6,7 +6,7 @@
 // ready slot. A request that arrives while neither slot is ready, during a switch, waits up to 10 s instead of failing.
 // The preview's Caddy runs with `admin off`, so this is a file change and a restart, done once in the transition
 // window (side-by-side plan D15), never a reload. A loopback-only listener (127.0.0.1:3090, no password) lets root
-// poll /readyz through Caddy itself.
+// poll /readyz through Caddy itself: it proxies GET /readyz and nothing else (every other request is a plain 404).
 //
 //   caddy-slots.mjs transform --in <live Caddyfile> --out <new file>
 //       Reads the live file (root-owned, 0644, in a folder only root can write), writes the changed copy to <out>
@@ -24,7 +24,7 @@ import { protectedPath, withPrivateBytes } from '../../preview-auth-dev/v1/custo
 import { PREVIEW_SLOTS } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { assertActor } from './release-artifacts.mjs';
 
-/** Side-by-side spec §6: root polls each slot's readiness through Caddy here, on loopback only, without the password. */
+/** Side-by-side spec §6: root polls readiness through Caddy here, on loopback only, without the password; GET /readyz only. */
 export const EDGE_LISTENER = Object.freeze({ port: 3090, bind: '127.0.0.1' });
 /** Both slots' website ports, slot A first: with `lb_policy first`, A takes traffic whenever both are ready. */
 export const SLOT_UPSTREAMS = Object.keys(PREVIEW_SLOTS).sort().map(slot => `127.0.0.1:${PREVIEW_SLOTS[slot].uiPort}`).join(' ');
@@ -102,15 +102,23 @@ function transform(liveText) {
     else out.push(line);
     if (index === close) out.push('', ...snippet);
   }
-  out.push('', `:${EDGE_LISTENER.port} {`, `${unit}bind ${EDGE_LISTENER.bind}`, `${unit}reverse_proxy ${SLOT_UPSTREAMS} {`, `${unit}${unit}import ${SNIPPET_NAME}`,
-    ...headers.map(header => `${unit}${unit}${header}`), `${unit}}`, '}');
+  // The listener is for readiness only (controller ruling, D9): exactly GET /readyz is proxied, always asking the
+  // website for /readyz itself (Caddy's path matcher compares the cleaned path, so /readyz/../api does not match);
+  // every other request answers 404 from Caddy, unproxied and without the edge secret.
+  const [u1, u2, u3] = [unit, unit.repeat(2), unit.repeat(3)];
+  out.push('', `:${EDGE_LISTENER.port} {`, `${u1}bind ${EDGE_LISTENER.bind}`,
+    `${u1}@readyz {`, `${u2}method GET`, `${u2}path /readyz`, `${u1}}`,
+    `${u1}handle @readyz {`, `${u2}rewrite * /readyz`, `${u2}reverse_proxy ${SLOT_UPSTREAMS} {`, `${u3}import ${SNIPPET_NAME}`,
+    ...headers.map(header => `${u3}${header}`), `${u2}}`, `${u1}}`,
+    `${u1}handle {`, `${u2}respond 404`, `${u1}}`, '}');
   return { text: `${out.join('\n')}\n`, proxiesChanged: proxies.length };
 }
 
 /**
  * Side-by-side spec §6, the one-time change. Inserts the shared rules right after the global options block, turns
- * every `reverse_proxy 127.0.0.1:3100 {` into a two-slot proxy that imports them, and appends the loopback listener
- * (with the main route's header_up lines, so the website sees the same host, forwarding and edge secret). Every other
+ * every `reverse_proxy 127.0.0.1:3100 {` into a two-slot proxy that imports them, and appends the loopback listener:
+ * GET /readyz only, proxied with the main route's header_up lines (so the website sees the same host, forwarding and
+ * edge secret), and 404 for everything else. Every other
  * line stays byte for byte; new lines follow the file's own indentation. Refuses CADDY_ALREADY_TWO_SLOTS (the rules,
  * the listener port or slot B already there) and CADDY_SHAPE_REFUSED (no global block with `admin off`, no slot-A
  * proxy, any other proxy, or a main proxy block without the edge secret).
