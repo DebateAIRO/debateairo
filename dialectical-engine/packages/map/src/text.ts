@@ -1,4 +1,4 @@
-import { replyTextLanguageVerdict, type ReplyLanguageExpectation } from "@debateai/kernel";
+import { replyTextHasStrayScript, replyTextLanguageVerdict, type ReplyLanguageExpectation } from "@debateai/kernel";
 
 /**
  * The primary language subtag ("ro-RO" → "ro"), lower case; "und" stays "und". An empty tag gives "" (which no
@@ -31,9 +31,11 @@ export function mapNormaliseText(text: string): string {
  * REPLY-side check (`replyTextLanguageVerdict`, no model), not the question detector, which is tuned for one-line
  * questions and misread plain Romanian sentences as French. Only "OTHER" refuses: "UNSURE" (a short text, an unknown
  * question script) and an empty text always pass. `expected` is built once per question from its line
- * (`replyLanguageExpectation`).
+ * (`replyLanguageExpectation`). Stray script (2026-10-21): Chinese characters, Japanese kana or Korean Hangul inside a text
+ * whose expected script is another one (GLM's "lovit毙 salariații", practice 2026-10-14) are the wrong language too, by the
+ * same rule the shared reply-language check applies (`replyTextHasStrayScript`).
  */
 export function mapWrongLanguage(text: string, expected: ReplyLanguageExpectation): boolean {
   if (text.trim() === "") return false;
-  return replyTextLanguageVerdict(expected, text) === "OTHER";
+  return replyTextLanguageVerdict(expected, text) === "OTHER" || replyTextHasStrayScript(expected, text);
 }

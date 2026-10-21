@@ -15,6 +15,19 @@ import { detectArgumentLanguage, foreignLatinLetterCount, matrixClause } from ".
  * another language refuses a reply. A refusal is a typed issue at each failing member's machine path, so the step's
  * existing repair (the short follow-up, then the full re-ask) asks the model for the same answer in the question's
  * language. Nothing here translates or edits what a model wrote.
+ *
+ * STRAY LETTERS (2026-10-21). One rule reads letters rather than languages: Chinese characters, Japanese kana or Korean
+ * Hangul inside a member whose expected script is another one (`replyTextHasStrayScript`). The R19 practice debate
+ * served readers an English story whose paragraph said "hidden system costs are大于 the renewables camp admits", and
+ * practice runs from 2026-10-14 on held seven more such slips, in English and Romanian, from four makers: GLM-5.3-Flash,
+ * MiMo-V2.6-Pro, Qwen3.8-Flash and Claude Haiku 5.5 (a map statement, judges' attacks, summaries and flags), so about
+ * eight slips in some 3,200 replies; the language reading above found each one EXPECTED, since a few foreign letters
+ * never outweigh a sentence. Prose in a language written in another script never borrows these four scripts
+ * unchanged, and a name from Chinese, Japanese or Korean is written in the reader's own letters, so one such letter is
+ * enough. A quoted span is not read (a reply may quote a term), and the rule is off when the question line itself holds
+ * such letters (`questionHasStrayScript`). The refusal reuses TEXT_NOT_IN_QUESTION_LANGUAGE, so the existing short
+ * follow-up asks the model for that member again. Every other script keeps the rule above: names, sources and figures
+ * in it are fine.
  */
 export const TEXT_NOT_IN_QUESTION_LANGUAGE = "TEXT_NOT_IN_QUESTION_LANGUAGE" as const;
 
@@ -26,6 +39,11 @@ export interface ReplyLanguageExpectation {
   readonly tag: string;
   /** The question's writing system, or null when the question is too short or too mixed to say. */
   readonly script: ReplyScript | null;
+  /**
+   * Present (2026-10-21) only when the question line holds Chinese, Japanese or Korean letters while its expected script
+   * is another one: the question uses such a term, so a reply may too, and the stray-letter rule is off.
+   */
+  readonly questionHasStrayScript?: true;
 }
 
 /** One natural-language member of a reply, at its machine path (keys and array indices). */
@@ -155,6 +173,36 @@ export function majorityScript(text: string): ReplyScript | null {
 }
 
 /**
+ * The letters the stray-letter rule reads (2026-10-21): Chinese characters, Japanese kana and Korean Hangul. Other
+ * scripts are left to the language reading, where a name or a symbol in them is fine (Газпром, σ).
+ */
+const STRAY_SCRIPT_LETTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+/** The rule reads only members whose expected script is known and is not one of its own. */
+function strayScriptRuleApplies(expected: ReplyLanguageExpectation): boolean {
+  return expected.script !== null && expected.script !== "CJK" && expected.script !== "Hangul";
+}
+
+/**
+ * The expectation for a question line, with `questionHasStrayScript` set (2026-10-21) when the whole line, quotes
+ * included, holds a Chinese, Japanese or Korean letter while the rule applies; `expected` itself otherwise.
+ */
+export function withQuestionStrayScript(expected: ReplyLanguageExpectation, questionLine: string): ReplyLanguageExpectation {
+  if (!strayScriptRuleApplies(expected) || !STRAY_SCRIPT_LETTER.test(questionLine)) return expected;
+  return Object.freeze({ ...expected, questionHasStrayScript: true });
+}
+
+/**
+ * Whether a member holds a Chinese, Japanese or Korean letter outside its quotes while its expected script is another
+ * one (2026-10-21, R19's served story). Off for an unknown script, a CJK or Hangul expectation, and a question that holds
+ * such letters itself.
+ */
+export function replyTextHasStrayScript(expected: ReplyLanguageExpectation, text: string): boolean {
+  if (!strayScriptRuleApplies(expected) || expected.questionHasStrayScript === true) return false;
+  return STRAY_SCRIPT_LETTER.test(matrixClause(text.normalize("NFC")));
+}
+
+/**
  * What a reply to `questionLine` is checked against. The language is the question detector's own
  * (`detectArgumentLanguage`, the same reading that stored the run's language tag); when it could not name one, only the
  * question's writing system is expected.
@@ -162,11 +210,11 @@ export function majorityScript(text: string): ReplyScript | null {
 export function replyLanguageExpectation(questionLine: string): ReplyLanguageExpectation {
   const detected = detectArgumentLanguage(questionLine);
   if (detected.tag !== "und") {
-    return Object.freeze({ tag: detected.tag, script: SCRIPT_OF_TAG[detected.tag] ?? "Latin" });
+    return withQuestionStrayScript(Object.freeze({ tag: detected.tag, script: SCRIPT_OF_TAG[detected.tag] ?? "Latin" }), questionLine);
   }
   const clause = matrixClause(questionLine);
   const text = letterCount(clause) >= 12 ? clause : questionLine;
-  return Object.freeze({ tag: "und", script: letterCount(text) >= 12 ? majorityScript(text) : null });
+  return withQuestionStrayScript(Object.freeze({ tag: "und", script: letterCount(text) >= 12 ? majorityScript(text) : null }), questionLine);
 }
 
 /** The text a verdict reads: quoted spans blanked (a reply may quote another language), unless little is left. */
@@ -246,7 +294,8 @@ export function replyTextLanguageVerdict(expected: ReplyLanguageExpectation, tex
   const body = readableBody(text);
   const letters = letterCount(body);
   if (letters < MIN_SCRIPT_LETTERS || expected.script === null) return "UNSURE";
-  // Names, sources and figures in another script are fine; a text with almost nothing in the question's is not.
+  // Names, sources and figures in another script are fine here; a text with almost nothing in the question's is not.
+  // (Chinese, Japanese and Korean letters inside another script's prose are the stray-letter rule's, not this one's.)
   if (scriptLetterCount(body, expected.script) < EXPECTED_SCRIPT_MIN_SHARE * letters) return "OTHER";
   if (letters < MIN_LETTERS) return "UNSURE";
   const majority = majorityScript(body);
@@ -271,6 +320,8 @@ const pathKey = (path: readonly (string | number)[]): string => path.map(String)
  *  · the whole reply (every field's text together, the strongest evidence): when it is in another language and no
  *    member is clearly in the expected one, every member is refused, short ones included;
  *  · each member alone: a long member clearly in another language is refused even inside an otherwise good reply.
+ * Then (2026-10-21) every member with a stray Chinese, Japanese or Korean letter (`replyTextHasStrayScript`) is refused
+ * too; that rule never feeds the two readings, so a stray member never changes which members they refuse.
  * Every element of a string array refused at once is refused as the array (`context.ambiguityFlags`), so the short
  * follow-up names one member for it.
  */
@@ -285,6 +336,7 @@ export function replyLanguageIssues(
   const whole = verdicts.includes("EXPECTED") ? "MIXED" : replyTextLanguageVerdict(expected, prose.map((field) => field.text).join("\n"));
   let refused = prose.filter((_, index) => whole === "OTHER" ? verdicts[index] !== "EXPECTED" : verdicts[index] === "OTHER");
   if (whole === "OTHER" && refused.length === 0) refused = prose;
+  refused = prose.filter((field) => refused.includes(field) || replyTextHasStrayScript(expected, field.text));
   if (refused.length === 0) return Object.freeze([]);
   const refusedKeys = new Set(refused.map((field) => pathKey(field.path)));
   const paths: (readonly (string | number)[])[] = [];

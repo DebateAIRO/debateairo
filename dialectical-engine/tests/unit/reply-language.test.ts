@@ -14,11 +14,14 @@ import {
   TEXT_NOT_IN_QUESTION_LANGUAGE,
   argumentLanguageDirective,
   detectArgumentLanguage,
+  lockedReplyLanguageExpectation,
   replyLanguageCheck,
   replyLanguageExpectation,
   replyLanguageIssues,
   replyProseFieldsAt,
+  replyTextHasStrayScript,
   replyTextLanguageVerdict,
+  withQuestionStrayScript,
   type ReplyLanguageExpectation
 } from "@debateai/kernel";
 import { decodeModelJson, schemaFailureLocator } from "@debateai/providers";
@@ -45,6 +48,9 @@ interface PracticeReply {
 const PRACTICE = JSON.parse(readFileSync(new URL("../support/fixtures/reply-language/practice-2026-10-12-replies.json", import.meta.url), "utf8")) as {
   readonly question: string;
   readonly replies: readonly PracticeReply[];
+};
+const STRAY = JSON.parse(readFileSync(new URL("../support/fixtures/reply-language/stray-script-2026-10.json", import.meta.url), "utf8")) as {
+  readonly cases: readonly { source: string; model: string; callSiteKey: string; language: string; question: string; path: string; text: string; siblings?: readonly string[] }[];
 };
 const QUESTION = PRACTICE.question;
 const STOP = { finishReason: "stop" } as const;
@@ -208,6 +214,10 @@ describe("language independence, on the translated legal pages of every interfac
     expect(refusedShare(legalParagraphs(locale), EN)).toBeGreaterThanOrEqual(0.9);
   });
 
+  it.each(LOCALES)("%s: no paragraph is refused for a stray letter in its own language", (locale) => {
+    for (const text of legalParagraphs(locale)) expect(replyTextHasStrayScript(expectationOf(locale), text), text).toBe(false);
+  });
+
   it("neighbours that share their small words are told apart (Spanish and French, Czech and Slovak, Danish and Swedish)", () => {
     const share = (from: string, as: string): number => {
       const texts = legalParagraphs(from);
@@ -293,6 +303,80 @@ describe("the check's rules", () => {
       ["a.b", "list.*.text", "tags.*", "missing.path"])).toEqual([
       { path: ["a", "b"], text: "x" }, { path: ["list", 0, "text"], text: "y" }, { path: ["tags", 0], text: "p" }, { path: ["tags", 1], text: "q" }
     ]);
+  });
+});
+
+describe("a few Chinese characters inside a sentence in the question's language (practice 2026-10-14 to R19)", () => {
+  const toPath = (dotted: string) => dotted.split(".").map((segment) => /^\d+$/u.test(segment) ? Number(segment) : segment);
+
+  it("holds the eight real slips: GLM, MiMo, Qwen and Haiku, map, judge, panel and story", () => {
+    expect(STRAY.cases.map((entry) => entry.callSiteKey)).toEqual([
+      "MAP:choose", "JUDGE:cross-root:4->0", "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro", "STORY:STORYTELLER:2",
+      "PANEL:JUDGE:cross-root:1->0:preview:claude-haiku-5-5", "PANEL:JUDGE:cross-root:0->2:preview:qwen-3-8-flash",
+      "PANEL:JUDGE:defender:root3:r1:p3:preview:fixture-a", "PANEL:JUDGE:cross-root:2->3:preview:claude-haiku-5-5"
+    ]);
+  });
+
+  it.each(STRAY.cases.map((entry) => [entry.source, entry] as const))("%s: read as its own language, refused at its own path only", (_source, entry) => {
+    const expected = replyLanguageExpectation(entry.question);
+    expect(expected).toEqual({ tag: entry.language, script: "Latin" });
+    // Why it got through: the language reading is unchanged and still says the expected language.
+    expect(replyTextLanguageVerdict(expected, entry.text)).toBe("EXPECTED");
+    expect(replyTextHasStrayScript(expected, entry.text)).toBe(true);
+    const path = toPath(entry.path);
+    const fields = entry.siblings === undefined
+      ? [{ path, text: entry.text }]
+      : entry.siblings.map((text, index) => ({ path: [...path.slice(0, -1), index], text }));
+    expect(replyLanguageIssues(expected, fields)).toEqual([{ code: TEXT_NOT_IN_QUESTION_LANGUAGE, path, message: TEXT_NOT_IN_QUESTION_LANGUAGE }]);
+  });
+
+  it("the same sentences in the question's own words pass", () => {
+    const r19 = STRAY.cases[3]!;
+    const fixed = r19.text.replace("are大于 the", "are greater than the");
+    expect(replyLanguageIssues(replyLanguageExpectation(r19.question), [{ path: toPath(r19.path), text: fixed }])).toEqual([]);
+  });
+
+  it("kana and Hangul are caught too; one letter is enough", () => {
+    expect(replyTextHasStrayScript(EN, "The ministry's バス plan was dropped after the audit found the costs were understated.")).toBe(true);
+    expect(replyTextHasStrayScript(EN, "The ministry's 원자력 plan was dropped after the audit found the costs were understated.")).toBe(true);
+    expect(replyTextHasStrayScript(EN, "Costs rose毙 sharply.")).toBe(true);
+  });
+
+  it("names and symbols in other writing systems stay fine, as before", () => {
+    expect(replyTextHasStrayScript(EN, "The regulator fined Газпром because its pipeline contracts locked smaller buyers into long terms.")).toBe(false);
+    expect(replyTextHasStrayScript(EN, "A spread of σ = 0.4 around the 5 °C estimate leaves the ranking unchanged.")).toBe(false);
+  });
+
+  it("a quoted term is not read", () => {
+    for (const text of [
+      "The phrase “躺平” (lying flat) describes young workers who refuse to compete for promotions.",
+      "The phrase \"躺平\" (lying flat) describes young workers who refuse to compete for promotions.",
+      "The phrase 「躺平」 (lying flat) describes young workers who refuse to compete for promotions.",
+      "“躺平”"
+    ]) expect(replyTextHasStrayScript(EN, text), text).toBe(false);
+  });
+
+  it("a question that holds such letters turns the rule off", () => {
+    const question = "Is “tang ping” (躺平) a rational answer to overwork for young people?";
+    const expected = replyLanguageExpectation(question);
+    expect(expected.questionHasStrayScript).toBe(true);
+    expect(replyTextHasStrayScript(expected, "Young people who choose 躺平 are answering an overwork culture that stopped paying off.")).toBe(false);
+    expect(lockedReplyLanguageExpectation({ code: "en", name: "English" }, question).questionHasStrayScript).toBe(true);
+    expect(lockedReplyLanguageExpectation({ code: "en", name: "English" }, "Should buses be free?")).toEqual({ tag: "en", script: "Latin" });
+    expect(withQuestionStrayScript(EN, "Should buses be free?")).toBe(EN);
+  });
+
+  it("the rule is off for CJK and Hangul questions and for an unknown script", () => {
+    expect(replyTextHasStrayScript({ tag: "ja", script: "CJK" }, "中心部のバス路線を無料にすると利用者は増える。")).toBe(false);
+    expect(replyTextHasStrayScript({ tag: "zh", script: "CJK" }, "让中心公交线路免费可以增加乘客。")).toBe(false);
+    expect(replyTextHasStrayScript({ tag: "ko", script: "Hangul" }, "정부(政府)는 중앙 버스 노선을 무료로 해야 한다.")).toBe(false);
+    expect(replyTextHasStrayScript({ tag: "und", script: null }, "Costs rose毙 sharply in every region we looked at.")).toBe(false);
+    expect(withQuestionStrayScript({ tag: "ja", script: "CJK" }, "中心部のバス路線を無料にすべきか？")).toEqual({ tag: "ja", script: "CJK" });
+  });
+
+  it("the R19 checker objection, which quoted the slip in ASCII single quotes, is refused (a reader may see it as the reservation)", () => {
+    const objection = "Several fixes are needed, most important first. (1) The final paragraph of 'The alternative answers' contains Chinese characters: 'hidden system costs are大于 the renewables camp admits' — write it in English ('greater than').";
+    expect(replyLanguageIssues(EN, [{ path: ["objection"], text: objection }]).map((issue) => issue.path)).toEqual([["objection"]]);
   });
 });
 

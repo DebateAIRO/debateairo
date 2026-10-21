@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { TypedDomainError } from "@debateai/kernel";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, replyLanguageCheck } from "@debateai/kernel";
 import {
   OpenAICompatibleProviderGateway,
   PREVIEW_STORY_REPAIR_CONTRACT_IDS,
@@ -23,6 +24,7 @@ import {
   STORYTELLER_V4_CONTRACT_ID,
   STORY_CHECKER_CONTRACT_ID,
   STORY_CHECKER_V4_CONTRACT_ID,
+  STORY_BODY_PROSE,
   buildStoryRevisionPrompt,
   classifyStoryContent,
   type StoryMaterialIndex
@@ -67,6 +69,10 @@ function storyRequest(contractId = "story.storyteller.v3"): ProviderCallRequest 
     buildRepairPacket: rejected => buildFramedRepairPrompt(framed, schemaFailureLocator(rejected))
   };
 }
+// Stray script (2026-10-21): the R19 served story's paragraph with two Chinese characters inside an English sentence, verbatim.
+const STRAY = JSON.parse(readFileSync(new URL("../support/fixtures/reply-language/stray-script-2026-10.json", import.meta.url), "utf8")) as {
+  readonly cases: readonly { question: string; text: string }[];
+};
 const RESULT: ProviderCallResult = {
   content: story(), rawArtifactRef: "artifact:fixture", ledgerEntryRef: "ledger:fixture",
   provider: "openai-compatible-http", model: MODEL, maker: "Z.AI", modelVersion: MODEL
@@ -241,6 +247,40 @@ describe("preview storyteller v3 safe repair allowance", () => {
     expect(ledger.map(entry => entry.outcome)).toEqual(["FAILED", "OK"]);
     expect(ledger.map(entry => entry.contractHash)).toEqual(["contract:synthetic-story", "contract:synthetic-story"]);
     expect(ledger[0]?.inputHash).not.toBe(ledger[1]?.inputHash);
+  });
+
+  // Stray script (2026-10-21): R19's served story kept "are大于 the" because no check refused it. The shared reply-language
+  // check now refuses that paragraph at its own path, so the preview asks ONE short follow-up for it and merges the answer.
+  it("R19: the story paragraph with Chinese characters gets ONE short follow-up naming that paragraph, and the English paragraph is merged and accepted", async () => {
+    const r19 = STRAY.cases[3]!; // STORY:STORYTELLER:2, English question
+    const path = "long.sections.2.paragraphs.0.text";
+    const fixed = r19.text.replace("are大于 the", "are greater than the");
+    expect(fixed).not.toBe(r19.text);
+    const firstValue = JSON.parse(story()) as { long: { sections: { paragraphs: { text: string; node_refs: string[] }[] }[] } };
+    firstValue.long.sections[2]!.paragraphs[0] = { text: r19.text, node_refs: ["P1"] };
+    const first = JSON.stringify(firstValue);
+    const expectedValue = JSON.parse(first) as typeof firstValue;
+    expectedValue.long.sections[2]!.paragraphs[0]!.text = fixed;
+    const { gateway, executions } = nativeHarness([first, JSON.stringify({ [path]: fixed })]);
+    const result = await gateway.call({
+      ...storyRequest(),
+      classifyContent: (content, reply) => classifyStoryContent(content, INDEX, reply, replyLanguageCheck(r19.question, STORY_BODY_PROSE)),
+      costEnvelope: { assertCallAllowed: () => undefined, recordCall: () => undefined, assertUsageReported: () => undefined }
+    });
+    expect(executions).toHaveLength(2);
+    expect(result.repairAttempts).toBe(1);
+    const bodies = executions.map(execution => JSON.parse(execution.requestBody));
+    const repaired = readPromptFrame({ messages: bodies[1].messages });
+    expect(repaired.fields.filter((field: { name: string }) => field.name.startsWith("machine_"))).toEqual([
+      { name: "machine_rejection_code", content: TEXT_NOT_IN_QUESTION_LANGUAGE },
+      { name: "machine_rejection_paths", content: path },
+      { name: "machine_reply_form", content: "PATCH" }
+    ]);
+    const sent = bodies[0].messages as unknown[];
+    expect(JSON.stringify(bodies[1].messages.slice(0, sent.length))).toBe(JSON.stringify(sent));
+    expect(bodies[1].messages[sent.length]).toEqual({ role: "assistant", content: first });
+    expect(JSON.parse(result.content)).toEqual(expectedValue);
+    expect(result.content).not.toContain("大于");
   });
 
   it("a story accepted on the first try reports no repair", async () => {
