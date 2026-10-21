@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Yksityinen",
   "archive.unreadable": "Tämän väittelyn sisältöä ei voi enää lukea, koska sen avain on tuhottu.",
   "archive.noDebates": "Sinulla ei ole väittelyjä.",
-  "archive.filesNote": "Tämän ZIP-paketin JSON-tiedostot sisältävät samat tiedot koneellisesti luettavassa muodossa; README.txt sisältää niiden luettelon."
+  "archive.filesNote": "Tämän ZIP-paketin JSON-tiedostot sisältävät samat tiedot koneellisesti luettavassa muodossa; README.txt sisältää niiden luettelon.",
+  "archive.contentCheck": "Sisällön tarkistus",
+  "archive.verdict.flagged": "Merkitty",
+  "archive.verdict.clear": "Ei ongelmia",
+  "archive.verdict.noSynthesis": "Ei synteesiä",
+  "archive.verdict.unavailable": "Ei saatavilla",
+  "archive.category.terrorism": "Mahdollinen terrorismi",
+  "archive.category.hateSpeech": "kaikenlainen vihapuhe",
+  "archive.category.suicideOrHarm": "itsetuhoisuus tai taipumus vahingoittaa muita ihmisiä",
+  "archive.category.weaponsOrDrugs": "aseiden tai huumeiden valmistaminen"
 }

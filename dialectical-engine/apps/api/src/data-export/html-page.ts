@@ -46,6 +46,16 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
   const verdictKey = Object.hasOwn(verdictKeys, verdict) ? verdictKeys[verdict] : undefined;
   const answer = entry.answers?.[0];
   const latest = answer?.versions.at(-1);
+  const latestCheck = answer?.synthesis_checks?.find((check) => check.answer_version === latest?.version);
+  const checkVerdictKey = latestCheck === undefined ? undefined : ({
+    FLAGGED: "archive.verdict.flagged", CLEAR: "archive.verdict.clear",
+    NO_SYNTHESIS: "archive.verdict.noSynthesis", UNAVAILABLE: "archive.verdict.unavailable"
+  } as const)[latestCheck.verdict];
+  const checkCategoryKeys = {
+    TERRORISM: "archive.category.terrorism", HATE_SPEECH: "archive.category.hateSpeech",
+    SUICIDE_OR_HARM_TO_OTHERS: "archive.category.suicideOrHarm", WEAPONS_OR_DRUGS: "archive.category.weaponsOrDrugs"
+  } as const;
+  const checkCategories = latestCheck?.categories.map((category) => catalog[checkCategoryKeys[category]]).join(", ") ?? "";
   const answerData = object(latest?.answer);
   const claims = list(answerData.nodes).map((node) => words(object(node).claim)).filter(Boolean);
   const answerText = list(answerData.composed_text).map((segment) => words(object(segment).text)).filter(Boolean).join("\n\n");
@@ -56,6 +66,7 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
     ${answerText ? `<div class="answer">${escapeHtml(answerText).replace(/\n\n/g, "<br><br>")}</div>` : ""}
     ${story.length ? `<p class="label section-label">${escapeHtml(catalog["archive.story"])}</p>${story.map((text) => `<p class="story-text">${escapeHtml(text)}</p>`).join("")}` : ""}
     ${claims.length ? `<p class="label section-label">${escapeHtml(catalog["archive.arguments"])}</p><ul>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
+    ${latestCheck && checkVerdictKey ? `<p class="label section-label">${escapeHtml(catalog["archive.contentCheck"])}</p><p class="check"><strong${latestCheck.verdict === "FLAGGED" ? ' class="flagged"' : ""}>${escapeHtml(catalog[checkVerdictKey])}</strong> · ${checkCategories ? `${escapeHtml(checkCategories)} · ` : ""}${escapeHtml(formatArchiveTime(new Date(latestCheck.checked_at), locale))}</p>` : ""}
   </article>`;
 }
 
@@ -88,6 +99,7 @@ h3{margin:0;font-size:22px;font-weight:500;line-height:1.3}.meta{margin:8px 0 0;
 .pill{display:inline-block;padding:2px 10px;border:1px solid var(--gold-border);border-radius:999px;color:var(--gold-text);font-size:12px;font-weight:700;line-height:1.5}
 .pill.supported{border-color:var(--agree-text);color:var(--agree-text)}.pill.unsupported{border-color:var(--dispute-border);color:var(--dispute)}
 .answer{margin:10px 0 0;font-size:15px;line-height:1.6}.story-text{margin:0;font-size:15px;line-height:1.6}
+.check{margin:0;font-size:15px;line-height:1.6}.check strong{font-weight:700}.check strong.flagged{color:var(--dispute)}
 ul{margin:0;padding-inline-start:20px;font-size:15px;line-height:1.55}li{margin:0 0 6px}
 .unreadable{margin:8px 0 0;font-size:15px;font-style:italic;color:var(--text-2)}.empty{margin:0;font-size:15px;color:var(--text-2)}
 footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--line-strong);font-size:13px;color:var(--muted)}

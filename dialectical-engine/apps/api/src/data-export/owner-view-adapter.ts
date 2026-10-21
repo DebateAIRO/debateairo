@@ -5,6 +5,8 @@ import {
   type OwnerReadDeps
 } from "../owner-read.js";
 import type { OwnerViewPort } from "./snapshot.js";
+import type { SynthesisCheckEntry } from "./types.js";
+import { OPEN_SYNTHESIS_ANSWER_ACCESS } from "../synthesis-check/hold.js";
 
 export class OwnerViewAdapter implements OwnerViewPort {
   constructor(
@@ -18,6 +20,12 @@ export class OwnerViewAdapter implements OwnerViewPort {
   }
 
   readonly runKeyPresent = (runId: string): Promise<boolean> => this.keys.exists(runId);
+  readonly runRemovedByCheck = async (runId: string): Promise<boolean> =>
+    (await (this.deps.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({ runId })) === "REMOVED";
+  readonly readSynthesisChecks = (ownerRef: string, answerId: string): Promise<readonly SynthesisCheckEntry[]> => {
+    const a = this.access(ownerRef);
+    return this.deps.application.readSynthesisChecks?.(answerId, a.session, a.ownership) ?? Promise.resolve([]);
+  };
   readonly readRun = (ownerRef: string, runId: string): Promise<unknown> => {
     const a = this.access(ownerRef); return readOwnerRun(this.deps, runId, a.session, a.ownership);
   };
