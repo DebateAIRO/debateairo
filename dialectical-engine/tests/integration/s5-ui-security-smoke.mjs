@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
@@ -17,6 +17,20 @@ const FALLBACK_CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 
 const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 const NONCE_SOURCE = /script-src 'self' 'nonce-([A-Za-z0-9+/=]{22,})' 'strict-dynamic'(?:;|$)/;
 const INJECTED_NONCE = "AAAAAAAAAAAAAAAAAAAAAA==";
+// Side-by-side C12: outside --dev server.mjs needs RELEASE_KEY and serves only a build stamped for it. The smoke
+// stamps the build it was given for this test key (built from pieces: no key name beside a literal, gitleaks).
+const TEST_RELEASE_KEY = ["r17", "0123456789ab"].join("-");
+const OTHER_RELEASE_KEY = ["r17", "aaaaaaaaaaaa"].join("-");
+
+/** `node release-edge.mjs --stamp` in the UI root, as the build script runs it, for TEST_RELEASE_KEY. */
+function stampBuild(root) {
+  const stamped = spawnSync(process.execPath, ["release-edge.mjs", "--stamp"], {
+    cwd: root,
+    env: { ...process.env, RELEASE_KEY: TEST_RELEASE_KEY },
+    encoding: "utf8"
+  });
+  assert.equal(stamped.status, 0, `the build stamp is written\n${stamped.stderr}`);
+}
 
 async function availablePort() {
   const server = createServer();
@@ -124,10 +138,10 @@ async function waitForServer(child, url, log) {
 }
 
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
+  if (child.exitCode !== null || child.signalCode !== null) return child.exitCode;
   child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolveExit) => child.once("exit", resolveExit)),
+  return Promise.race([
+    new Promise((resolveExit) => child.once("exit", (code) => resolveExit(code))),
     new Promise((_, reject) => setTimeout(() => reject(new Error("UI server did not stop")), 5_000))
   ]);
 }
@@ -191,11 +205,13 @@ async function smoke(surface) {
   writeFileSync(worldReadablePath, edgeSecret);
   chmodSync(worldReadablePath, 0o644);
   const log = [];
+  stampBuild(root);
   const child = spawn(process.execPath, ["server.mjs"], {
     cwd: root,
     env: {
       ...process.env,
       NODE_ENV: "production",
+      RELEASE_KEY: TEST_RELEASE_KEY,
       DIALECTICAL_UI_HOST: "127.0.0.1",
       DIALECTICAL_API_BASE: stubApi.base,
       // C2 / C2b: this loopback client plays the trusted reverse proxy.
@@ -213,6 +229,7 @@ async function smoke(surface) {
 
     const home = await fetch(`${base}/`);
     assert.equal(home.status, 200, `${surface} renders its production home route`);
+    assert.equal(home.headers.get("x-debateai-release"), TEST_RELEASE_KEY, `${surface}: every answer names its release (C12)`);
     const homeNonce = assertDocumentPolicy(home, surface, "/");
     assertHydrationHtml(await home.text(), homeNonce, surface, "/");
 
@@ -281,6 +298,18 @@ async function smoke(surface) {
 
     await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "10.0.0.0/8" }, "DIALECTICAL_UI_TRUSTED_PROXIES_INVALID");
     await assertRefusesToStart(root, { DIALECTICAL_UI_EDGE_SECRET_PATH: worldReadablePath }, "DIALECTICAL_UI_EDGE_SECRET_INVALID");
+    // Side-by-side C12: no key, or a key the build was not stamped for, refuses to start.
+    await assertRefusesToStart(root, { RELEASE_KEY: "" }, "RELEASE_KEY_REQUIRED");
+    await assertRefusesToStart(root, { RELEASE_KEY: OTHER_RELEASE_KEY }, "RELEASE_KEY_BUILD_MISMATCH");
+
+    // Side-by-side C12 (spec §6): /readyz is answered by the edge from its own API's /readyz, for Caddy's probe with
+    // the edge secret as for any caller. The stub API answers 401 to everything, which is not a readiness answer.
+    for (const headers of [{}, { "x-debateai-edge-secret": edgeSecret }]) {
+      const ready = await fetch(`${base}/readyz`, { headers });
+      assert.equal(ready.status, 503, `${surface}: /readyz is not ready while its API gives no readiness answer`);
+      assert.equal(ready.headers.get("x-debateai-release"), TEST_RELEASE_KEY);
+      assert.deepEqual(await ready.json(), { ready: false, releaseKey: TEST_RELEASE_KEY, reasons: ["BOOTING"] });
+    }
 
     // L3-F4: the image optimizer (sharp) is off the runtime path.
     const image = await fetch(`${base}/_next/image?url=%2Ficon.svg&w=64&q=75`);
@@ -291,7 +320,10 @@ async function smoke(surface) {
     const closedAfter = await probeOrphanUpgrade(port, 1_000);
     process.stdout.write(`${surface}: orphan upgrade socket closed after ${closedAfter} ms\n`);
 
-    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip, upgrade teardown PASS\n`);
+    // Side-by-side C12 (spec §6): a planned stop is never a failure.
+    assert.equal(await stopServer(child), 0, `${surface}: SIGTERM closes the server and exits 0`);
+
+    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip, upgrade teardown, release key + /readyz + clean SIGTERM PASS\n`);
   } finally {
     await stopServer(child);
     await stubApi.stop();

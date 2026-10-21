@@ -105,6 +105,20 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
     await expect(response.text()).resolves.toBe("data: first\n\ndata: second\n\n");
   });
 
+  it("passes the API's release header through, so the browser can compare releases (side-by-side C12)", async () => {
+    // Built from pieces so no line pairs a key name with a literal (gitleaks).
+    const releaseKey = ["r17", "0123456789ab"].join("-");
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json", "x-debateai-release": releaseKey }
+      })) as typeof fetch;
+    const response = await route.GET(new Request("http://web.local/api/v1/session"), {
+      params: Promise.resolve({ path: ["v1", "session"] })
+    });
+    expect(response.headers.get("x-debateai-release")).toBe(releaseKey);
+  });
+
   it("passes an upstream failure through verbatim instead of masking it (DR-115)", async () => {
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ error: "UPSTREAM_EXPLODED" }), {

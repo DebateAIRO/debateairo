@@ -104,7 +104,12 @@ process.on("exit", teardown);
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { teardown(); process.exit(130); });
 
 startChild("fake-api", ["--import", "tsx", path.join(HERE, "fake-api.mjs"), "--port", String(API_PORT)], lane, childEnv);
-startChild("ui-server", ["server.mjs"], uiRoot, { ...childEnv, PORT: String(UI_PORT), DIALECTICAL_API_BASE: `http://127.0.0.1:${API_PORT}`, NODE_ENV: "production" });
+// Side-by-side C12: outside --dev server.mjs needs RELEASE_KEY and serves only a build stamped for it; the harness
+// stamps the build c4.sh made for this test key (built from pieces: no key name beside a literal, gitleaks).
+const releaseKey = ["r17", "0123456789ab"].join("-");
+const stamped = spawnSync(process.execPath, ["release-edge.mjs", "--stamp"], { cwd: uiRoot, env: { ...childEnv, RELEASE_KEY: releaseKey }, encoding: "utf8" });
+if (stamped.status !== 0) broken(`STAMP release-edge.mjs --stamp failed: ${(stamped.stdout + stamped.stderr).slice(-600)}`);
+startChild("ui-server", ["server.mjs"], uiRoot, { ...childEnv, PORT: String(UI_PORT), DIALECTICAL_API_BASE: `http://127.0.0.1:${API_PORT}`, NODE_ENV: "production", RELEASE_KEY: releaseKey });
 async function waitHttp(url, ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) {

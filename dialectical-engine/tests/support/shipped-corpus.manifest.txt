@@ -791,6 +791,8 @@ apps/ui/lib/v3/useStoryLocaleReady.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
+apps/ui/release-edge.d.mts
+apps/ui/release-edge.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
