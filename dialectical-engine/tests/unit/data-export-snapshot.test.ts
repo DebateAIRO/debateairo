@@ -25,6 +25,7 @@ function harness() {
     readStory: vi.fn(async () => ({ text: "story" })),
     readDisclosure: vi.fn(async () => ({ text: "disclosure" })),
     readNode: vi.fn(async (_owner: string, _answer: string, _node: string) => ({ text: "node" })),
+    resolveRunRef: vi.fn(async (run: string) => run),
   };
   const decrypt = {
     openUserField: vi.fn(async (_user: string, field: string) => `PLAIN:${field}`),
@@ -101,6 +102,15 @@ describe("data-export snapshot", () => {
     h.raw.erasure_tombstones = [{ run_id: "run-1", completed_at: "2026-10-04T00:00:00.000Z" }];
     const entry = (await h.collect()).debates.debates[0];
     expect(entry).toEqual({ reference: "run-1", content_status: "UNRECOVERABLE", created_at: "2026-10-03T00:00:00.000Z", deleted_at: "2026-10-04T00:00:00.000Z", tier: "STANDARD", depth: { depth: 2 }, plan_tier: "BASIC", state: null, visibility_history: [{ state: "PRIVATE", at: "2026-10-03T00:00:00.000Z" }], role_rotation: RAW_ROTATION });
+    expect(h.ownerView.readRun).not.toHaveBeenCalled();
+  });
+
+  it("side-by-side C9 skips a run a re-admission superseded: its newest run is exported in its place", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockImplementation(async (run: string) => run === "run-1" ? "run-2" : run);
+    expect((await h.collect()).debates.debates).toEqual([]);
+    expect(h.ownerView.resolveRunRef).toHaveBeenCalledWith("run-1");
+    expect(h.ownerView.runKeyPresent).not.toHaveBeenCalled();
     expect(h.ownerView.readRun).not.toHaveBeenCalled();
   });
 
