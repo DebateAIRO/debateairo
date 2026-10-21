@@ -12,6 +12,7 @@ import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue } from "@d
 import { AskRoom, type AskRoomOptions } from "../../apps/api/src/ask-room.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Budget spec §2.14 "the waiting line: order, one per person, no line-jumping, a
@@ -83,6 +84,7 @@ function applicationWith(
     ...extra,
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "b7b-integration",
     settlementWatchHandle: "b7b-integration",
     resolveDiscoveredPanel: async () => PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({

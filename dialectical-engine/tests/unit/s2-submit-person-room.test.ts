@@ -9,6 +9,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelStrength } from "@debateai/kernel";
 import type { PickerMoneyLimits, PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ outcomes: [] as unknown[], inputs: [] as Array<{ moneyLimits?: unknown; strength?: unknown }> }));
 const pins = vi.hoisted(() => ({ order: [] as string[], pinned: [] as Array<{ strength: string; steppedDown: boolean }> }));
@@ -195,6 +196,7 @@ function arrange(input: Readonly<{
   const settings: RunCreationSettings = {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:s2",
     settlementWatchHandle: "watch:s2",
     resolveDiscoveredPanel: async () => { order.push("panel"); return PANEL; },

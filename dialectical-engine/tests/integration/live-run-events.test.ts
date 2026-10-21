@@ -26,6 +26,7 @@ import {
   type TestHttpIdentity
 } from "../support/httpSession.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const POLL_MS = 25;
 const HEARTBEAT_MS = 150;
@@ -86,7 +87,7 @@ async function appendProgress(runId: string, kind: "node.retrying" | "TERMINAL",
 
 function countingApplication() {
   const application = new PostgresAskApplication(
-    database.pool, {} as never, {} as never, undefined, database.pool,
+    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, undefined, database.pool,
     createTestAskAdmissionPoolFacades(database.pool)
   );
   const calls = { snapshot: 0, mark: 0 };

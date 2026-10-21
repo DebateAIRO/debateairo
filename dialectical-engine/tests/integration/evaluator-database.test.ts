@@ -38,6 +38,7 @@ import {
   publishReplacementRegisterFixture,
   registerFixtureRow
 } from "../support/registerFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 let database: TestDatabase;
 
@@ -1358,6 +1359,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     const settings: RunCreationSettings = {
       strangerSampleRate: 0,
       registerVersion,
+      releaseKey: TEST_RELEASE_KEY,
       batteryVersion: "test",
       settlementWatchHandle: "test",
       resolveDiscoveredPanel: async () => {

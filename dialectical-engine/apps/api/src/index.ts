@@ -200,6 +200,7 @@ import {
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
+  parseReleaseKey,
   TypedDomainError,
   type DeclaredRegion,
   type RiskTier,
@@ -4050,6 +4051,13 @@ export interface RunCreationSettings {
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
+  /**
+   * Side-by-side spec §1 (INTERFACE "core.run.release_key"): the release this API is (its checked RELEASE_KEY). Every
+   * run it admits — the direct path, a room START and a room WAIT — is stamped with it, so a debate is never served by
+   * another release's runner (ruling O1). Checked at construction: `legacy` or a malformed key refuses
+   * RELEASE_KEY_INVALID before anything is admitted.
+   */
+  readonly releaseKey: string;
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
@@ -4735,6 +4743,8 @@ export class PostgresAskApplication implements AskApplication {
     runProvisionPool:Pool,
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
+    // Side-by-side spec §1: an API never admits under a key no runner could serve (RELEASE_KEY_INVALID).
+    parseReleaseKey(settings.releaseKey);
     validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
     if(settings.previewProviderTestConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard");
     if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
@@ -4894,6 +4904,7 @@ export class PostgresAskApplication implements AskApplication {
           strangerSampleRate: this.settings.strangerSampleRate,
           envelopeBasis,
           registerVersion: this.settings.registerVersion,
+          releaseKey: this.settings.releaseKey,
           batteryVersion: this.settings.batteryVersion,
           askContract: {
             decision_scope: ask.decision_scope,
@@ -5168,6 +5179,7 @@ export class PostgresAskApplication implements AskApplication {
             strangerSampleRate: this.settings.strangerSampleRate,
             envelopeBasis: evaluated.envelopeBasis,
             registerVersion: this.settings.registerVersion,
+            releaseKey: this.settings.releaseKey,
             batteryVersion: this.settings.batteryVersion,
             askContract: {
               decision_scope: runAsk.decision_scope,

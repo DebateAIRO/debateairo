@@ -19,6 +19,7 @@ import type { Pool, PoolClient, QueryResult } from "pg";
 import { decideCoarseFit, decideRoomSettings, normaliseAskForPlan, type AskBilling } from "../../apps/api/src/ask-billing.js";
 import type { AskRoomPort, AskRoomReader, RoomDecision, RoomQuestion } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * PAID PLANS (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28). With
@@ -86,6 +87,7 @@ function settingsWith(
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "b8-unit",
     settlementWatchHandle: "b8-unit",
     resolveDiscoveredPanel: async () => panel.map(member),

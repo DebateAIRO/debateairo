@@ -29,7 +29,7 @@ import {
   type KeyDestroyResult,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
 import {
   readBundledModelScorecard,
   readEngineVersion,
@@ -607,6 +607,9 @@ export async function createAcceptanceRuntime(input: {
   const application = new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
+    // Side-by-side spec §1: every run is stamped. The acceptance environment carries no RELEASE_KEY (its runner runs in
+    // this process), so it admits as the development key of the acceptance register's version.
+    releaseKey: developmentReleaseKey(ACCEPTANCE_REGISTER_VERSION),
     batteryVersion: input.environment.BATTERY_VERSION,
     settlementWatchHandle: input.environment.SETTLEMENT_WATCH_HANDLE,
     // A20: the same picker as the local API. The acceptance relays declare no

@@ -8,6 +8,7 @@ import { MemoryRepository } from "../../packages/memory/src/index.js";
 import { parseApiEnvironment } from "../../packages/register/src/index.js";
 import { SettlementRepository } from "../../packages/settlement/src/index.js";
 import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const UNSAFE_VERSION = "9007199254740993" as const;
 
@@ -171,6 +172,7 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       {
         strangerSampleRate: 0,
         registerVersion: Number(UNSAFE_VERSION),
+        releaseKey: TEST_RELEASE_KEY,
         batteryVersion: "test",
         settlementWatchHandle: "test",
         resolveDiscoveredPanel: async () => [],

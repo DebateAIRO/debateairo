@@ -5,6 +5,7 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import { createPool, isDatabasePoolBusy, readRoleRotationCounts } from "../../packages/db/src/index.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /** Spec Part 5: the estimate is told whether the debate is rotated (Task 5 prices it); recorded here, never priced. */
 const estimate = vi.hoisted(() => ({ inputs: [] as unknown[] }));
@@ -33,7 +34,7 @@ const ASK: AskRequest = { question_line: "Should cities price congestion?", risk
 
 function settings(input: Readonly<{ counts?: RoleRotationCounts; rotation?: boolean; panel?: readonly DiscoveredPanelMember[]; order?: string[]; failCounts?: boolean; countsError?: unknown }>): RunCreationSettings {
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:rotation", settlementWatchHandle: "watch:rotation",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "battery:rotation", settlementWatchHandle: "watch:rotation",
     resolveDiscoveredPanel: async () => input.panel ?? PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) => {
       input.order?.push("basis");

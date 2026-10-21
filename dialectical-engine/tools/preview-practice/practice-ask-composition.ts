@@ -40,7 +40,7 @@ import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, t
 import type { AskRequest } from "@debateai/contract";
 import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { TypedDomainError, type RiskTier } from "@debateai/kernel";
+import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import {
   CostEnvelopeGuard,
@@ -381,6 +381,9 @@ export async function composePracticeAsk(input: Readonly<{
     previewBudgetGate,
     strangerSampleRate: settings.strangerSampleRate,
     registerVersion: version,
+    // Side-by-side spec §1, as main.ts: every practice run is stamped. The practice's settings carry no RELEASE_KEY (its
+    // runner is composed in this process, not booted under one), so it admits as the development key of its version.
+    releaseKey: developmentReleaseKey(version),
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
     // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.

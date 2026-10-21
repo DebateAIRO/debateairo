@@ -15,6 +15,7 @@ import type {
   Scorecard,
   SeatCandidate
 } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ calls: [] as unknown[], outcome: null as unknown }));
 
@@ -105,6 +106,7 @@ function settingsWith(input: Readonly<{
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:a20",
     settlementWatchHandle: "watch:a20",
     ...(input.assertDailyCostEnvelope === undefined ? {} : { assertDailyCostEnvelope: input.assertDailyCostEnvelope }),

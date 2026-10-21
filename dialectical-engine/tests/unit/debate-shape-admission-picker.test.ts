@@ -12,6 +12,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PickerInput, PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ calls: [] as unknown[], outcome: null as unknown }));
 
@@ -57,7 +58,7 @@ function settings(input: Readonly<{ policy: boolean; shapes?: unknown[]; dropsBa
     mode: "LOCAL", targetFacts: new Map(), perRunCeilingMicros: null, answerTokenCeilings: SEALED
   };
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:shape", settlementWatchHandle: "watch:shape",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "battery:shape", settlementWatchHandle: "watch:shape",
     resolveDiscoveredPanel: async () => PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape }) => {
       input.shapes?.push(shape);

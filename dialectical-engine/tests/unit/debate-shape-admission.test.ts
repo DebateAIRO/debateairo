@@ -7,6 +7,7 @@ import {
 } from "@debateai/register";
 import { decideSettingsForPlan, normaliseAskForPlan } from "../../apps/api/src/ask-billing.js";
 import { normaliseAskForDebateShape, roomDepthParams } from "../../apps/api/src/debate-shape-ask.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1,
   finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
@@ -23,7 +24,7 @@ const ASK: AskRequest = { question_line: "Should cities price congestion?", risk
 
 function settings(input: Readonly<{ policy?: boolean; panel?: readonly DiscoveredPanelMember[]; seen?: unknown[] }>): RunCreationSettings {
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:shape", settlementWatchHandle: "watch:shape",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "battery:shape", settlementWatchHandle: "watch:shape",
     resolveDiscoveredPanel: async () => input.panel ?? PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape }) => {
       input.seen?.push(shape);

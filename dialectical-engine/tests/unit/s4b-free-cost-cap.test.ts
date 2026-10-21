@@ -50,6 +50,7 @@ import {
   testPrice,
   testScorecard
 } from "../support/scorecardFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /** EXAMPLE caps (micros per call), not production numbers. */
 const EXAMPLE_ECONOMY_CAP_MICROS = 300;
@@ -327,6 +328,7 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
     return {
       strangerSampleRate: 0,
       registerVersion: 1,
+      releaseKey: TEST_RELEASE_KEY,
       batteryVersion: "battery:s4b",
       settlementWatchHandle: "watch:s4b",
       resolveDiscoveredPanel: async () => panel,

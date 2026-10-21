@@ -34,6 +34,7 @@ import {
 import type { DevelopmentProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
 import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
@@ -75,7 +76,7 @@ const PANEL = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium].map((mod
 
 function settingsWith(input: Readonly<{ policy: boolean; length?: boolean; billing?: AskBilling; room?: AskRoomPort; shapes?: unknown[] }>): RunCreationSettings {
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "shape-submit", settlementWatchHandle: "shape-submit",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "shape-submit", settlementWatchHandle: "shape-submit",
     resolveDiscoveredPanel: async () => PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape, length }) => {
       input.shapes?.push(shape);

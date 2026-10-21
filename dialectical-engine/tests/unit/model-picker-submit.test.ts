@@ -7,6 +7,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ outcome: null as unknown }));
 /** `insertRunRoleAssignment` is a module function (P2 A6), so it is recorded through a module mock, not a spy. */
@@ -104,6 +105,7 @@ function settings(modelPicker?: AskModelPickerSettings): RunCreationSettings {
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:a20",
     settlementWatchHandle: "watch:a20",
     resolveDiscoveredPanel: async () => PANEL,

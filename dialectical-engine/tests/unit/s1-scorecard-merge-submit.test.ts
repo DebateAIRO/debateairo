@@ -7,6 +7,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ outcome: null as unknown }));
 const pinning = vi.hoisted(() => ({ order: [] as string[], reject: null as Error | null }));
@@ -128,6 +129,7 @@ const VALID: AskModelPickerSettings = Object.freeze({
 const settings: RunCreationSettings = {
   strangerSampleRate: 0,
   registerVersion: 1,
+  releaseKey: TEST_RELEASE_KEY,
   batteryVersion: "battery:s1a",
   settlementWatchHandle: "watch:s1a",
   resolveDiscoveredPanel: async () => PANEL,

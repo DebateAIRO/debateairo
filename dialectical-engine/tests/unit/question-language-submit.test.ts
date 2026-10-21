@@ -33,6 +33,7 @@ import {
   QuestionLanguageChoiceNeeded, type QuestionLanguageLock, type QuestionLanguagePort
 } from "../../apps/api/src/question-language/decider.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 // stubPool, PANEL, CEILING_TERMS, serverSession, serverPrincipal, fixtureApplication, billingFor: as debate-shape-submit.test.ts.
 const OWNER_REF = "44444444-4444-4444-8444-444444444444";
@@ -146,7 +147,7 @@ function arrangeWith(input: Readonly<{ policy: boolean; port?: QuestionLanguageP
   vi.spyOn(WorkItemRepository.prototype, "recordSetupFailure").mockResolvedValue(true);
   vi.spyOn(RunCostSubstitutionRepository.prototype, "record").mockResolvedValue("substitution:language");
   const settings: RunCreationSettings = {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "language-submit", settlementWatchHandle: "language-submit",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "language-submit", settlementWatchHandle: "language-submit",
     resolveDiscoveredPanel: input.resolveDiscoveredPanel ?? (async () => PANEL),
     ...(input.billing === undefined ? {} : { billing: input.billing }),
     ...(input.room === undefined ? {} : { room: input.room }),

@@ -143,6 +143,7 @@ import {
   publishReplacementRegisterFixture,
   registerFixtureRow
 } from "../support/registerFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -855,6 +856,7 @@ describe("S-LANG argument language persistence", () => {
     const settings: RunCreationSettings = {
       strangerSampleRate: 0,
       registerVersion: 1,
+      releaseKey: TEST_RELEASE_KEY,
       batteryVersion: "slang-test",
       settlementWatchHandle: "slang-test",
       resolveDiscoveredPanel: async () => panel,
@@ -1189,7 +1191,7 @@ describe("LOAD-01 run projection ownership boundary", () => {
     });
 
     const application = new PostgresAskApplication(
-      database.pool,{} as never,{} as never,undefined,database.pool,
+      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY } as never,undefined,database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     );
     const api = buildApi({

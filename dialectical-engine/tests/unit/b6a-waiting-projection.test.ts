@@ -6,6 +6,7 @@ import type { SpendScope, WaitsFor } from "@debateai/budget";
 import { RunRepository } from "@debateai/db";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRoomPort } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const RUN = Object.freeze({
   run_ref: "run:waiting", question_line: "Messi or Ronaldo?", terminal_reason: null, hold_until: null
@@ -97,7 +98,7 @@ describe("B6a readRun answers a waiting run's expected start", () => {
     return { connect: vi.fn(async () => client), query } as unknown as Pool;
   }
   const settings = (room?: AskRoomPort): RunCreationSettings => ({
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "b6a", settlementWatchHandle: "b6a",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "b6a", settlementWatchHandle: "b6a",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     ...(room === undefined ? {} : { room })

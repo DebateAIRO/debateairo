@@ -13,6 +13,7 @@ import {
 } from "@debateai/register";
 import { normaliseAskForDebateShape } from "../../apps/api/src/debate-shape-ask.js";
 import { assertEngineHasLengthPolicy, engineForAsk } from "../../apps/api/src/engine-ask.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1,
   finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
@@ -31,7 +32,7 @@ const ASK: AskRequest = { question_line: "Should cities price congestion?", risk
 
 function settings(input: Readonly<{ engine?: boolean; length?: boolean; shape?: boolean; seen?: (EngineSettings | null)[] }>): RunCreationSettings {
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:engine", settlementWatchHandle: "watch:engine",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "battery:engine", settlementWatchHandle: "watch:engine",
     resolveDiscoveredPanel: async () => PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape, length, engine }) => {
       input.seen?.push(engine);

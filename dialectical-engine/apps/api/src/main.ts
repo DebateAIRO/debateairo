@@ -1080,6 +1080,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
+  // Side-by-side spec §1: every run this API admits carries its own checked release key.
+  releaseKey: environment.RELEASE_KEY,
   batteryVersion: environment.BATTERY_VERSION,
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
   // V-28(2): asked FIRST of every new ask, before the panel is discovered —
