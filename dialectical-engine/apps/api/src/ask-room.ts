@@ -137,11 +137,21 @@ export interface AskRoomEntitlements {
  *   the one `core.read_current_release()` names, or none is named and the deployment is not hosted. An ask the API
  *   admits while a switch moves the traffic away waits in line (SWITCHING) instead of starting on the old release.
  * - `activeDebates` — the runs with a READY or CLAIMED job, across every release; at `siteConcurrentDebates` (8, the
- *   runners' own capacity) the question waits in line (SITE_BUSY). The day lock every decision takes makes the count
- *   and the start one step: two asks never both take the eighth place.
+ *   runners' own capacity) the question waits in line (SITE_BUSY). The day lock does NOT serialize it: two decisions on
+ *   either side of midnight UTC hold different day keys. So the room counts under one constant site-wide transaction
+ *   lock (`SITE_CONCURRENT_DEBATES_LOCK`) on the same transaction, taken after the day and person locks, held to the
+ *   COMMIT: the count and the start are one step, and two asks never both take the eighth place.
  *
  * A room without a gate (every room before C8, and every test that builds none) decides exactly as before.
  */
+/**
+ * Side-by-side C8 review — the one lock that serializes the site's debate count, in every decision and every waker's
+ * start, across days. A leaf: always taken after the day and person locks (`#locked`), and nothing taken after it is
+ * taken before it by any other path (the decision's reads and writes on its own transaction, the first job's sequence
+ * row last). The single-key `bigint` form over `hashtextextended(<text>, 0)`, as tests/architecture/v28-advisory-lock-shape.test.ts explains.
+ */
+const SITE_CONCURRENT_DEBATES_LOCK = "SELECT pg_advisory_xact_lock(hashtextextended('debateai.site_concurrent_debates', 0))";
+
 export interface AskAdmissionGate {
   readonly releaseKey: string;
   readonly siteConcurrentDebates: number;
@@ -609,7 +619,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         const siteFull = rooms.some((entry) => entry.scope === "SITE_DAY" && entry.room === "FULL");
         return Object.freeze({ kind: siteFull ? "SITE_FULL" as const : "PERSON_FULL" as const });
       }
-      if (gate !== undefined && await gate.activeDebates(tx) >= gate.siteConcurrentDebates) {
+      if (gate !== undefined && await this.#siteIsBusy(tx, gate)) {
         if (run.waitsFor !== "SITE_BUSY") {
           await this.#options.line.recordReason(tx, run.runId, Object.freeze({ waitsFor: "SITE_BUSY" as const, personRecheckAt: null, at: now }));
         }
@@ -700,7 +710,13 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const gate = this.#options.gate;
     if (gate === undefined) return null;
     if (!(await gate.ownReleaseIsCurrent(tx))) return "SWITCHING";
-    return await gate.activeDebates(tx) >= gate.siteConcurrentDebates ? "SITE_BUSY" : null;
+    return await this.#siteIsBusy(tx, gate) ? "SITE_BUSY" : null;
+  }
+
+  /** The site's live debates at its cap, counted under `SITE_CONCURRENT_DEBATES_LOCK` on the decision's own transaction. */
+  async #siteIsBusy(tx: PoolClient, gate: AskAdmissionGate): Promise<boolean> {
+    await tx.query(SITE_CONCURRENT_DEBATES_LOCK);
+    return await gate.activeDebates(tx) >= gate.siteConcurrentDebates;
   }
 
   async #evaluate(question: RoomQuestion, now: Date, hold: AdmissionHold | null): Promise<RoomEvaluation> {

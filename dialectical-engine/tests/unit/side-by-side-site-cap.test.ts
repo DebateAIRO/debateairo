@@ -59,7 +59,7 @@ describe("side-by-side C8 decideAdmission's hold", () => {
       .toEqual({ kind: "WAIT", waitsUntil: NEXT_TICK, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" });
   });
 
-  it("hold null (or absent) answers exactly as before, over B1's table of admissions", () => {
+  it("absent and null agree, and carry no cause", () => {
     const table: ReadonlyArray<readonly [readonly ScopeRoom[], Extra]> = [
       [[site("FITS")], {}],
       [[site("CLOSE"), day("FITS")], {}],
@@ -88,6 +88,11 @@ describe("side-by-side C8 decideAdmission's hold", () => {
 });
 
 const NOW = new Date("2026-10-22T10:00:20.000Z");
+/**
+ * C8 review: the day lock does not serialize two decisions on either side of midnight UTC, so the count is taken under
+ * one constant site-wide transaction lock, the statement recorded here as it reached the decision's own client.
+ */
+const SITE_LOCK = "site-lock:SELECT pg_advisory_xact_lock(hashtextextended('debateai.site_concurrent_debates', 0))";
 const OWNER = "44444444-4444-4444-8444-444444444444";
 const CLASS = Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 });
 const MINE = Object.freeze({ access: Object.freeze({ ownerRef: OWNER, legacyAskerId: null }), settingsClass: CLASS });
@@ -104,7 +109,14 @@ function waitingRun(input: Partial<WaitingRun> = {}): WaitingRun {
 
 function arrange(input: { current?: boolean; active?: number; line?: readonly WaitingRun[]; gate?: false } = {}) {
   const asked: string[] = [];
-  const tx = { query: vi.fn(async () => ({ rows: [], rowCount: 0 })), release: vi.fn() };
+  // The site-wide count lock goes through the decision's own client, so it is recorded in order with the gate's reads.
+  const tx = {
+    query: vi.fn(async (sql: string) => {
+      if (typeof sql === "string" && sql.includes("debateai.site_concurrent_debates")) asked.push(`site-lock:${sql}`);
+      return { rows: [], rowCount: 0 };
+    }),
+    release: vi.fn()
+  };
   const gate: AskAdmissionGate = {
     releaseKey: ["r17", "0123456789ab"].join("-"),
     siteConcurrentDebates: 8,
@@ -168,7 +180,7 @@ describe("side-by-side C8 the room asks its gate inside the decision", () => {
     expect(admission).toEqual({
       kind: "WAIT", waitsUntil: new Date("2026-10-22T10:01:00.000Z"), worstScope: "SITE_DAY", cause: "SITE_BUSY"
     });
-    expect(asked).toEqual(["current:tx", "active:tx"]);
+    expect(asked).toEqual(["current:tx", SITE_LOCK, "active:tx"]);
     expect(reasons).toEqual([{ runId: "run:busy", waitsFor: "SITE_BUSY", personRecheckAt: null, at: NOW }]);
   });
 
@@ -183,9 +195,10 @@ describe("side-by-side C8 the room asks its gate inside the decision", () => {
     expect(reasons).toEqual([{ runId: "run:switching", waitsFor: "SWITCHING", personRecheckAt: null, at: NOW }]);
   });
 
-  it("seven live debates: the decision STARTs", async () => {
-    const { room } = arrange({ active: 7 });
+  it("seven live debates: the decision STARTs, counted under the site-wide lock on its own client", async () => {
+    const { room, asked } = arrange({ active: 7 });
     expect(await room.decide(MINE, async ({ admission }) => admission)).toEqual(expect.objectContaining({ kind: "START" }));
+    expect(asked).toEqual(["current:tx", SITE_LOCK, "active:tx"]);
   });
 
   it("the unlocked first look and the room read never ask the gate: a busy site never reads as today's limit", async () => {
@@ -215,8 +228,9 @@ describe("side-by-side C8 the waker's start asks the gate too", () => {
 
   it("a full site holds back a run the room would START, recording SITE_BUSY once", async () => {
     const run = waitingRun();
-    const { room, reasons, holds, started } = arrange({ active: 8, line: [run] });
+    const { room, asked, reasons, holds, started } = arrange({ active: 8, line: [run] });
     expect(await room.startWaiting(run, enqueue)).toEqual({ kind: "SITE_BUSY" });
+    expect(asked).toEqual(["current:tx", "isWaiting", SITE_LOCK, "active:tx"]);
     expect(reasons).toEqual([{ runId: run.runId, waitsFor: "SITE_BUSY", personRecheckAt: null, at: NOW }]);
     expect([holds, started]).toEqual([[], []]);
 
@@ -228,8 +242,9 @@ describe("side-by-side C8 the waker's start asks the gate too", () => {
 
   it("room on the site: the run starts", async () => {
     const run = waitingRun({ waitsFor: "SITE_BUSY" });
-    const { room, holds, started } = arrange({ active: 7, line: [run] });
+    const { room, asked, holds, started } = arrange({ active: 7, line: [run] });
     expect(await room.startWaiting(run, enqueue)).toEqual({ kind: "STARTED", value: "work-item" });
+    expect(asked).toEqual(["current:tx", "isWaiting", SITE_LOCK, "active:tx"]);
     expect([holds, started]).toEqual([[run.runId], [run.runId]]);
   });
 });
