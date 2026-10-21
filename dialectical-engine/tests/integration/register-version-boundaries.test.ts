@@ -166,7 +166,9 @@ describe("unsafe register versions fail inside every legacy-number family", () =
 
     const query = vi.fn(async () => result([]));
     const pool = { query } as unknown as Pool;
-    const application = new PostgresAskApplication(
+    // Side-by-side §1: no release key carries an unsafe number, so an application with an unsafe register version is
+    // refused at construction (RELEASE_KEY_REGISTER_MISMATCH), before readDeployment's own guard could be reached.
+    expect(() => new PostgresAskApplication(
       pool,
       {} as never,
       {
@@ -182,9 +184,7 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       undefined,
       {} as Pool,
       { server: {} as Pool, legacy: {} as Pool }
-    );
-    await expect(application.readDeployment({ session_id: "session:test" } as never))
-      .rejects.toThrow("No sealed V3 deployment register exists");
+    )).toThrowError(expect.objectContaining({ code: "RELEASE_KEY_REGISTER_MISMATCH" }));
     expect(query).not.toHaveBeenCalled();
   });
 });

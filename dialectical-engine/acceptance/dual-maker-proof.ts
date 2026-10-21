@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import type { Pool } from "pg";
 import { RunRepository } from "@debateai/db";
+import { developmentReleaseKey } from "@debateai/kernel";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
@@ -211,6 +212,8 @@ export async function runDualMakerProof(options: DualMakerProofOptions): Promise
       strangerSampleRate:1,
       envelopeBasis:computeAcceptanceStructuralCeiling(policy,2,1),
       registerVersion:1,
+      // Side-by-side spec §1: stamped like an admitted run, with the development key of its own register version.
+      releaseKey:developmentReleaseKey(1),
       batteryVersion:"acceptance:dual-maker-proof",
       batteryRows:[]
     });

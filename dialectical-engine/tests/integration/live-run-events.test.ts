@@ -87,7 +87,7 @@ async function appendProgress(runId: string, kind: "node.retrying" | "TERMINAL",
 
 function countingApplication() {
   const application = new PostgresAskApplication(
-    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, undefined, database.pool,
+    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
     createTestAskAdmissionPoolFacades(database.pool)
   );
   const calls = { snapshot: 0, mark: 0 };

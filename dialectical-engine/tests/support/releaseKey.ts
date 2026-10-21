@@ -7,3 +7,12 @@ import { developmentReleaseKey } from "@debateai/kernel";
  * name with a literal (gitleaks).
  */
 export const TEST_RELEASE_KEY: string = developmentReleaseKey(1);
+
+/**
+ * The development key of register version `v`, `r<v>-000000000000`, for a fixture whose settings use a register version
+ * other than 1: the key's number always equals the fixture's own registerVersion, as a real API's must (the ask
+ * application refuses RELEASE_KEY_REGISTER_MISMATCH otherwise).
+ */
+export function testReleaseKey(v: number): string {
+  return developmentReleaseKey(v);
+}

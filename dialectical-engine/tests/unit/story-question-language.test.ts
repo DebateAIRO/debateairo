@@ -95,13 +95,13 @@ describe("the run read carries the question's language", () => {
     const { pool } = fakePool(true);
     const other = () => ({ query: async () => ({ rows: [] }) }) as unknown as Pool;
     const application = new PostgresAskApplication(
-      pool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
+      pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
     );
     const run = await application.readRun("run:settled", {} as never, LEGACY_OWNER);
     expect(run).toEqual({ ...RUN, argument_language: { tag: "ro", name: "Romanian" } });
     const { pool: legacyPool } = fakePool(false);
     const legacy = new PostgresAskApplication(
-      legacyPool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
+      legacyPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
     );
     expect((await legacy.readRun("run:settled", {} as never, LEGACY_OWNER))?.argument_language).toBeNull();
   });

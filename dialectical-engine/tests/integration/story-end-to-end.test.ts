@@ -409,7 +409,7 @@ async function ownerReads(owner: AuthenticatedSession, answerId: string) {
   const token = "o".repeat(43);
   const api = buildApi({
     application: new PostgresAskApplication(
-      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, undefined, database.pool,
+      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     ),
     sessions: {

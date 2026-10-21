@@ -76,7 +76,7 @@ it('cancels the actual finite PostgreSQL event producer after its pending snapsh
             return { rows: [] };
         } };
     const realPool = { ...pool, connect: async () => ({ ...pool, release: () => { } }) };
-    const app = new PostgresAskApplication(realPool as never, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, { read: async () => { projections++; return []; } }, {} as never, { server: {} as never, legacy: {} as never });
+    const app = new PostgresAskApplication(realPool as never, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => { projections++; return []; } }, {} as never, { server: {} as never, legacy: {} as never });
     const controller = new AbortController(), iterator = app.events('11111111-1111-4111-8111-111111111111', base.session, { ownerRef: base.ownerRef, legacyAskerId: null }, controller.signal)[Symbol.asyncIterator]();
     const pending = iterator.next();
     await waiting;

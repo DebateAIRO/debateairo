@@ -7,7 +7,7 @@ import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,billingPlansFromValue } from "@de
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
-import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { testReleaseKey } from "../support/releaseKey.js";
 let database:TestDatabase,runtime:Pool,fixture:ReturnType<typeof internalFundingFixture>;
 const plans=billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value,"test:task11");
 beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_admission LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
@@ -73,7 +73,7 @@ describe("actual grant-aware room and waiting admission",()=>{
   await fixture.revoke(actor,command.operationId);const nextOwner=await fixture.fundedActor(),next=await fixture.run(nextOwner.ownerRef,"free");
   await r.decide({access:{ownerRef:nextOwner.ownerRef,legacyAskerId:null},settingsClass:{...settingsClass,planTier:"free"}},async({tx,now})=>r.enterWait(tx,next,now));
   const pools=[createPool(database.connectionString),createPool(database.connectionString),createPool(database.connectionString)],dispatched:string[]=[];
-  try{const app=new PostgresAskApplication(runtime,{dispatch:async({runId})=>{dispatched.push(runId);}}, {releaseKey:TEST_RELEASE_KEY,waitingLine:room(funding),registerVersion:2} as never,undefined,pools[0]!,{server:pools[1]!,legacy:pools[2]!});
+  try{const app=new PostgresAskApplication(runtime,{dispatch:async({runId})=>{dispatched.push(runId);}}, {releaseKey:testReleaseKey(2),waitingLine:room(funding),registerVersion:2} as never,undefined,pools[0]!,{server:pools[1]!,legacy:pools[2]!});
    expect(await app.wakeWaitingRuns()).toMatchObject({started:1,failed:1,stopped:false});expect(dispatched).toEqual([next]);expect(await line.readWaiting(ended)).toBeNull();
    expect((await database.pool.query("SELECT state,terminal_reason FROM core.work_item WHERE run_id=$1",[ended])).rows).toEqual([{state:"FAILED",terminal_reason:"RUN_SETUP_FAILED:FUNDING_ENDED"}]);
    expect(await new EntitlementRepository(runtime).readRunFundingBasis(ended)).toEqual(pin);expect((await database.pool.query("SELECT question_line FROM core.run WHERE run_id=$1",[ended])).rows).toEqual(question);
@@ -95,7 +95,7 @@ describe("actual grant-aware room and waiting admission",()=>{
   await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'SUPPORT','fake-provider',current_date,1,1,1)");
   await r.decide({access:{ownerRef:actor.ownerRef,legacyAskerId:null},settingsClass},async({tx,now})=>r.enterWait(tx,runId,now));
   const failure=vi.spyOn(funding,"assertProviderFundingAdmission").mockRejectedValueOnce(new Error("synthetic network read failure")),pools=[createPool(database.connectionString),createPool(database.connectionString),createPool(database.connectionString)];
-  try{const app=new PostgresAskApplication(runtime,{dispatch:async()=>{throw Error("must not dispatch");}}, {releaseKey:TEST_RELEASE_KEY,waitingLine:room(funding),registerVersion:2} as never,undefined,pools[0]!,{server:pools[1]!,legacy:pools[2]!});expect(await app.wakeWaitingRuns()).toMatchObject({started:0,failed:1});expect(await line.readWaiting(runId)).not.toBeNull();expect((await database.pool.query("SELECT count(*)::int AS n FROM core.work_item WHERE run_id=$1",[runId])).rows[0].n).toBe(0);
+  try{const app=new PostgresAskApplication(runtime,{dispatch:async()=>{throw Error("must not dispatch");}}, {releaseKey:testReleaseKey(2),waitingLine:room(funding),registerVersion:2} as never,undefined,pools[0]!,{server:pools[1]!,legacy:pools[2]!});expect(await app.wakeWaitingRuns()).toMatchObject({started:0,failed:1});expect(await line.readWaiting(runId)).not.toBeNull();expect((await database.pool.query("SELECT count(*)::int AS n FROM core.work_item WHERE run_id=$1",[runId])).rows[0].n).toBe(0);
   }finally{failure.mockRestore();await Promise.all(pools.map(p=>p.end()));}
  });
 

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import { developmentReleaseKey } from "../../packages/kernel/src/release-key.js";
 import { parseApiEnvironment } from "../../packages/register/src/runtime-environment.js";
 import { validApiEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
@@ -57,6 +58,18 @@ describe("the API's release key at boot (side-by-side §1, plan C1)", () => {
   it("refuses a development key on the hosted site and accepts a real code part there", () => {
     expect(codeOf(() => apiWith({ ...HOSTED, RELEASE_KEY: `r1-${DEVELOPMENT}` }))).toBe("RELEASE_KEY_INVALID");
     expect(apiWith({ ...HOSTED, RELEASE_KEY: `r1-${CODE}` }).RELEASE_KEY).toBe(`r1-${CODE}`);
+  });
+
+  it("the ask application refuses a key whose number is not its register version (RELEASE_KEY_REGISTER_MISMATCH)", () => {
+    // Four distinct stand-ins: the constructor refuses shared pools before it reads any of them.
+    const build = (releaseKey: string, registerVersion: number) => new PostgresAskApplication(
+      {} as never, {} as never, { releaseKey, registerVersion } as unknown as RunCreationSettings, undefined, {} as never,
+      { server: {} as never, legacy: {} as never }
+    );
+    expect(codeOf(() => build(`r2-${DEVELOPMENT}`, 1))).toBe("RELEASE_KEY_REGISTER_MISMATCH");
+    expect(codeOf(() => build(`r1-${CODE}`, 17))).toBe("RELEASE_KEY_REGISTER_MISMATCH");
+    expect(codeOf(() => build(`r17-${CODE}`, 17))).toBeUndefined();
+    expect(codeOf(() => build("legacy", 17))).toBe("RELEASE_KEY_INVALID");
   });
 
   it("a development launcher runs as r<REGISTER_VERSION>-000000000000", () => {

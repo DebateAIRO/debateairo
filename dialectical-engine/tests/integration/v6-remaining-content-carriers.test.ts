@@ -362,7 +362,7 @@ function memoryKey(runId: string, question: string) {
 
 function askApplication(): PostgresAskApplication {
   return new PostgresAskApplication(
-    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY } as never, undefined, database.pool,
+    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
     createTestAskAdmissionPoolFacades(database.pool)
   );
 }
