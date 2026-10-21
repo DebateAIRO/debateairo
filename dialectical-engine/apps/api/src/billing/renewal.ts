@@ -644,7 +644,9 @@ export class RenewalService {
    * owner lock, on the subscription folded again inside it: still in that status on this period, no cancel pending,
    * and no RENEWAL charge of this attempt or a later one for the period; a pending erasure is asked right before the
    * lock. Written through the settlement's own `writeDunningAttempt`: PAST_DUE with its grace and M5A–C, or past the
-   * last retry day ENDED(DUNNING), Free and M6. One content-free line. Returns whether it wrote.
+   * last retry day ENDED(DUNNING), Free and M6. One content-free line. Returns whether it wrote. `code` is the
+   * attempt's `reason`: TAX_SERVICE_UNAVAILABLE, RETRY_TOTAL_CHANGED, or B2's REFUSAL_NOT_RETRIED (the maintenance pass:
+   * a refusal NETOPIA's answers of 2026-10-21 (Q15) say is not worth retrying, so the attempt sends nothing).
    */
   async failUnpricedAttempt(
     state: SubscriptionState, periodStart: Date, attempt: number, firstFailedAt: Date, now: Date, code: string

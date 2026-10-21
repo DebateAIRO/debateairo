@@ -8,7 +8,7 @@ import { emailJob } from "./email-job.js";
 import { enqueueOnce, isThisPaymentSystem } from "./outbox.js";
 import { paidAndRefundedInFull } from "./refunds.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
-import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
+import { addDays, anniversaryDue, dunningProgress, REFUSAL_NOT_RETRIED } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 import { endDunning } from "./settlement-renewal.js";
 
@@ -159,6 +159,11 @@ export class BillingMaintenance {
    * the stop port names (a pending or finished erasure, or an account the age gate froze) is never retried (R-34,
    * R3-2). P2-I7: the clock is read inside the lease, never taken from the pass, so the retry's charge and its
    * REQUESTED are dated when it really runs (`submit` dates the call's outcome when the call returns).
+   * B2 (NETOPIA answers 2026-10-21, Q15): only refusal code 20 (insufficient funds) is retried by itself. When the latest
+   * attempt may not be (`dunningProgress().autoRetry`, a PAST_DUE written before B2 reads true) and no card change asked
+   * for a retry since, the attempt due on this retry day fails with no charge (`REFUSAL_NOT_RETRIED`): nothing is sent to
+   * NETOPIA and nothing is priced, so M5B, M5C and the end keep their days, and their emails ask for a card. An earlier
+   * attempt that may still hold a payment holds it as a retry would be held.
    */
   private async retry(subscriptionId: string, report: MaintenanceReport): Promise<void> {
     const leased = await this.deps.jobs.withSubscriptionLease(subscriptionId, async (): Promise<"RETRIED" | "ENDED" | false> => {
@@ -181,6 +186,15 @@ export class BillingMaintenance {
         && event.at.getTime() > progress.lastFailedAt.getTime());
       if (!cardChangedSince && now.getTime() < addDays(progress.firstFailedAt, retryDay).getTime()) return false;
       if (await this.deps.renewal.erasureBlocks(state.ownerRef)) return false;
+      if (!progress.autoRetry && !cardChangedSince) {
+        const earlier = await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now);
+        if (earlier !== "NONE") {
+          this.retryHeld(earlier);
+          return false;
+        }
+        return await this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, REFUSAL_NOT_RETRIED)
+          ? "RETRIED" : false;
+      }
       let price: RetryPrice;
       try {
         price = await this.deps.renewal.retryPrice(state, periodStart, next, now);
@@ -205,10 +219,7 @@ export class BillingMaintenance {
       // Spec §2.9.3 step 5: a NETOPIA retry is a NEW orderID, so no earlier attempt of the period may still hold a payment.
       const earlier = await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now);
       if (earlier !== "NONE") {
-        this.deps.audit("billing.renewal.retry_held", {
-          code: earlier === "PAID" ? "EARLIER_ATTEMPT_PAID"
-            : earlier === "PENDING" ? "EARLIER_ATTEMPT_PENDING" : "EARLIER_ATTEMPT_UNREADABLE"
-        });
+        this.retryHeld(earlier);
         return false;
       }
       // Written only if the owner lock's fresh fold still allows it (still PAST_DUE here, no cancel, no erasure).
@@ -219,6 +230,14 @@ export class BillingMaintenance {
     });
     if (leased.kind === "RAN" && leased.value === "RETRIED") report.retried += 1;
     if (leased.kind === "RAN" && leased.value === "ENDED") report.ended += 1;
+  }
+
+  /** Spec §2.9.3 step 5: a retry held because an earlier attempt of the period may still hold a payment. */
+  private retryHeld(earlier: "PAID" | "PENDING" | "UNKNOWN"): void {
+    this.deps.audit("billing.renewal.retry_held", {
+      code: earlier === "PAID" ? "EARLIER_ATTEMPT_PAID"
+        : earlier === "PENDING" ? "EARLIER_ATTEMPT_PENDING" : "EARLIER_ATTEMPT_UNREADABLE"
+    });
   }
 
   /**

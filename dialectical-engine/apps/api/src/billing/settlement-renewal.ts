@@ -26,8 +26,9 @@ export type DunningAttempt = Readonly<{
   /** The charge whose attempt failed; null for a charge-less attempt (Q-1: no charge without a quote; P2-M10). */
   chargeId: string | null;
   /**
-   * Why a charge-less attempt failed: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it) or
-   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total); null with a charge.
+   * Why a charge-less attempt failed: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it),
+   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total) or `REFUSAL_NOT_RETRIED` (B2:
+   * the latest refusal is not retried by itself, so nothing was sent); null with a charge.
    */
   reason: string | null;
   /**
@@ -58,6 +59,8 @@ export type DunningAttempt = Readonly<{
  * its M5 is deduplicated on the subscription, the period and the attempt. B2 (NETOPIA answers 2026-10-21, Q15): the
  * PAST_DUE also records whether this attempt may be retried automatically (`auto_retry`, always written,
  * `autoRetryAllowed`) and NETOPIA's refusal code (`decline_code`, only when it named one); an ENDED row takes neither.
+ * When the attempt is not retried by itself, M5 carries `endDate`, the last retry day (the day the dunning ends unless a
+ * card is added): its wording then promises no retry and asks for a card by that day.
  * The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
  */
@@ -86,13 +89,16 @@ export async function writeDunningAttempt(
       });
     }
     const templates: ReadonlyArray<BillingMailTemplateId> = ["M5A", "M5B", "M5C"];
+    // B2: the same day the last attempt ends the dunning (`first failure + max(dunning_retry_days)`).
+    const endDate = autoRetry ? {} : { endDate: addDays(input.firstFailedAt, Math.max(...retryDays)).toISOString() };
     await enqueueEmail(deps.repository, client, {
       template: templates[Math.min(input.attempt, templates.length) - 1]!, recipient,
       dedupeRef: input.chargeId ?? `${subscription.subscriptionId}:${input.periodStart.toISOString()}:${input.attempt}`,
       params: {
         plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card"),
         bankDeclined: String(input.chargeId !== null && input.bankDeclined),
-        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED" ? { confirmCard: "true" } : {})
+        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED" ? { confirmCard: "true" } : {}),
+        ...endDate
       },
       notBefore: now
     });

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { addBusinessDays, foldSubscription } from "@debateai/billing-core";
+import { renderMail } from "@debateai/mail-templates";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { addYearsClamped } from "../../apps/api/src/billing/renewal-rules.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
@@ -24,11 +25,22 @@ const append = async (subscriptionId: string, kind: Parameters<typeof subscripti
   await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client, subscriptionEvent(state, kind, h.clock.now, data)));
 };
 
-async function firstFailure() {
+/** B2: the queued EMAIL job `jobRef`'s template and params, and its English text as `renderMail` gives it. */
+async function queuedEmail(jobRef: string) {
+  const row = (await h.outboxRows(jobRef)).find((candidate) => candidate.kind === "EMAIL" && candidate.ref === jobRef);
+  if (row === undefined) throw new Error(`no EMAIL job ${jobRef}`);
+  const template = row.payload.template as "M5A" | "M5B" | "M5C";
+  const params = Object.fromEntries(Object.entries(row.payload)
+    .filter(([name]) => name.startsWith("param.")).map(([name, value]) => [name.slice("param.".length), String(value)]));
+  return { template, params, text: renderMail(template, "en", params).text };
+}
+
+/** The renewal fails at NETOPIA as `DECLINED` with refusal code `declineCode` (B2: only "20" is retried by itself). */
+async function firstFailure(declineCode = "20") {
   const paid = await h.activate();
   h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + MINUTE);
   const failedAt = h.clock.now;
-  h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
+  h.payments.failNextCharge(paid.subscriptionId, "DECLINED", declineCode);
   await h.renewal.runOnce();
   return { paid, failedAt };
 }
@@ -439,3 +451,139 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await h.repository.subscriptionEvents(retried.paid.subscriptionId)).some((event) => event.kind === "ENDED")).toBe(false);
   });
 });
+
+describe("B2 only refusal 20 is retried by itself (NETOPIA answers 2026-10-21, Q15)", () => {
+  /** The sentences that promise a retry, which a refusal not retried by itself must never get. */
+  const PROMISES = ["while we try again", "We will try again", "We will make one last try", "Our second try"];
+
+  it("never charges a card refused with code 22 again: charge-less attempts on the retry days, M5A–C say so, then the end", async () => {
+    const { paid, failedAt } = await firstFailure("22");
+    const orderId = paid.subscriptionId;
+    const [first] = await renewals(orderId);
+    // The policy's last retry day (+1/+3/+7): the day the plan ends unless a card is added.
+    const endDate = new Date(failedAt.getTime() + 7 * DAY).toISOString();
+    const m5a = await queuedEmail(`M5A:${first!.chargeId}`);
+    expect(m5a.params).toMatchObject({ endDate, bankDeclined: "true" });
+    expect(m5a.text).toContain("We couldn't take this month's payment for your Plus plan, and we won't try this card again.");
+    expect(m5a.text).toContain("Your bank refused the payment.");
+    expect(m5a.text).toContain("To keep it after that, add a card, and we'll take the payment from it straight away: ");
+    for (const promise of PROMISES) expect(m5a.text).not.toContain(promise);
+    const sent = h.payments.chargesFor(orderId);
+    for (const [day, attempt, template] of [[1, 2, "M5B"], [3, 3, "M5C"]] as const) {
+      h.clock.now = new Date(failedAt.getTime() + day * DAY + MINUTE);
+      await h.maintenance.runOnce();
+      // No saved-card charge is sent, and no charge row is made: the attempt fails with no charge on its retry day.
+      expect(h.payments.chargesFor(orderId), `+${day} days`).toBe(sent);
+      expect(await renewals(orderId)).toHaveLength(1);
+      expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+        kind: "PAST_DUE", data: { attempt, reason: "REFUSAL_NOT_RETRIED", auto_retry: false }
+      });
+      const email = await queuedEmail(`${template}:${orderId}:${first!.periodStart.toISOString()}:${attempt}`);
+      expect(email.template).toBe(template);
+      expect(email.params).toMatchObject({ endDate, bankDeclined: "false" });
+      expect(email.text).toContain("and we won't try this card again.");
+      for (const promise of PROMISES) expect(email.text, template).not.toContain(promise);
+      expect(email.text).toContain(template === "M5C"
+        ? "This is our last reminder. If you don't add a card by "
+        : "To keep it after that, add a card, and we'll take the payment from it straight away: ");
+      // A second pass the same day writes nothing more.
+      const written = (await h.repository.subscriptionEvents(orderId)).length;
+      await h.maintenance.runOnce();
+      expect(await h.repository.subscriptionEvents(orderId)).toHaveLength(written);
+    }
+    h.clock.now = new Date(failedAt.getTime() + 7 * DAY + MINUTE);
+    await h.maintenance.runOnce();
+    expect(h.payments.chargesFor(orderId)).toBe(sent);
+    expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+      kind: "ENDED", data: { cause: "DUNNING", reason: "REFUSAL_NOT_RETRIED" }
+    });
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "ENDED_DUNNING", paidThrough: null });
+    expect((await h.outboxRows(orderId)).map((row) => row.ref)).toContain(`M6:${orderId}`);
+    expect(await renewals(orderId)).toHaveLength(1);
+  });
+
+  it("retries code 20 (insufficient funds) by itself with a NEW orderID at +1 day; its M5A and M5B promise the retry as before", async () => {
+    const { paid, failedAt } = await firstFailure("20");
+    const orderId = paid.subscriptionId;
+    const [first] = await renewals(orderId);
+    const m5a = await queuedEmail(`M5A:${first!.chargeId}`);
+    expect(m5a.params.endDate).toBeUndefined();
+    expect(m5a.params.retryDate).toBe(new Date(failedAt.getTime() + DAY).toISOString());
+    expect(m5a.text).toContain("You keep your plan while we try again.");
+    expect(m5a.text).toContain("We will try again on ");
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    h.payments.failNextCharge(orderId, "DECLINED", "20");
+    await h.maintenance.runOnce();
+    const charges = await renewals(orderId);
+    expect(charges.map((charge) => charge.attempt)).toEqual([1, 2]);
+    expect(charges[1]!.chargeId).not.toBe(first!.chargeId);
+    expect(sentFor(charges[1]!.chargeId)).toHaveLength(1);
+    expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+      kind: "PAST_DUE", data: { attempt: 2, charge_id: charges[1]!.chargeId, decline_code: "20", auto_retry: true }
+    });
+    const m5b = await queuedEmail(`M5B:${charges[1]!.chargeId}`);
+    expect(m5b.params.endDate).toBeUndefined();
+    expect(m5b.text).toContain("Our second try did not work either. We will try again on ");
+  });
+
+  it("charges at once with the new card after a card change, after a refusal not retried by itself and after its charge-less attempt", async () => {
+    // Straight after the refusal: the card change asks for a retry now (R-34), so the new card is charged at once.
+    const changedEarly = await firstFailure("22");
+    h.clock.now = new Date(changedEarly.failedAt.getTime() + 2 * 60 * MINUTE);
+    const earlyCard = await changeCard(changedEarly.paid.subscriptionId, changedEarly.paid.chargeId);
+    await h.maintenance.runOnce();
+    const early = await renewals(changedEarly.paid.subscriptionId);
+    expect(early.map((charge) => charge.attempt)).toEqual([1, 2]);
+    expect(sentFor(early[1]!.chargeId).map((charge) => charge.cardToken.reveal())).toEqual([expect.stringContaining(earlyCard.slice(0, 8))]);
+    expect((await h.repository.subscriptionEvents(changedEarly.paid.subscriptionId)).some((event) =>
+      event.data.reason === "REFUSAL_NOT_RETRIED")).toBe(false);
+
+    // After a charge-less attempt on the first retry day: the card change still retries at once, with the new card.
+    const changedLater = await firstFailure("22");
+    const orderId = changedLater.paid.subscriptionId;
+    h.clock.now = new Date(changedLater.failedAt.getTime() + DAY + MINUTE);
+    await h.maintenance.runOnce();
+    expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+      kind: "PAST_DUE", data: { attempt: 2, reason: "REFUSAL_NOT_RETRIED" }
+    });
+    h.clock.advance(60 * MINUTE);
+    const laterCard = await changeCard(orderId, changedLater.paid.chargeId);
+    await h.maintenance.runOnce();
+    const later = await renewals(orderId);
+    expect(later.map((charge) => charge.attempt)).toEqual([1, 3]);
+    expect(sentFor(later[1]!.chargeId).map((charge) => charge.cardToken.reveal())).toEqual([expect.stringContaining(laterCard.slice(0, 8))]);
+    await h.worker.drain(5);
+    expect((await kinds(orderId)).at(-1)).toBe("RECOVERED");
+  });
+
+  it("keeps retrying a dunning already under way when this shipped: a PAST_DUE with no auto_retry is retried at +1 day", async () => {
+    // Review Focus 4: a PAST_DUE written before B2 names neither auto_retry nor decline_code. The stand-in: the same
+    // attempt written again without the two keys (the latest PAST_DUE decides), over a refusal that would not retry.
+    const { paid, failedAt } = await firstFailure("22");
+    const orderId = paid.subscriptionId;
+    const events = await h.repository.subscriptionEvents(orderId);
+    const { auto_retry: _retry, decline_code: _code, ...before } = events.at(-1)!.data;
+    expect(before).toMatchObject({ attempt: 1, first_failed_at: failedAt.toISOString() });
+    await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client,
+      subscriptionEvent(foldSubscription(events), "PAST_DUE", h.clock.now, before)));
+    expect(Object.hasOwn((await h.repository.subscriptionEvents(orderId)).at(-1)!.data, "auto_retry")).toBe(false);
+    const sent = h.payments.chargesFor(orderId);
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    h.payments.failNextCharge(orderId, "DECLINED", "20");
+    await h.maintenance.runOnce();
+    expect(h.payments.chargesFor(orderId)).toBe(sent + 1);
+    expect((await renewals(orderId)).map((charge) => charge.attempt)).toEqual([1, 2]);
+  });
+});
+
+/** The saved-card charges sent to NETOPIA with this orderID (our charge id); the shared harness charges other plans too. */
+const sentFor = (chargeId: string) => h.payments.charges.filter((charge) => charge.orderId === chargeId);
+
+/** A CARD_CHANGED asking for a retry now (R-34), with a new card stored from `chargeId`'s payment. Returns its id. */
+async function changeCard(subscriptionId: string, chargeId: string): Promise<string> {
+  const state = foldSubscription(await h.repository.subscriptionEvents(subscriptionId));
+  const cardTokenId = await h.storeCardToken(chargeId);
+  await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client,
+    subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { cardTokenId })));
+  return cardTokenId;
+}

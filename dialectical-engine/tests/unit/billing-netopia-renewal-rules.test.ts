@@ -103,7 +103,8 @@ describe("N11 M5 when the bank asks the person to confirm a renewal (mail.M5.con
     const declined = renderMail("M5C", "en", { ...base, bankDeclined: "true" }).text;
     expect(declined).toContain("Your bank refused the payment.");
     expect(declined).not.toContain("confirm this payment");
-    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag" });
+    // B2 adds the optional `endDate` (a refusal not retried by itself); tests/unit/mail-templates-render.test.ts pins it.
+    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag", endDate: "date" });
   });
 });
 

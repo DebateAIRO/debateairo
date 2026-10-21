@@ -546,7 +546,7 @@ describe("N11 a renewal that stays pending (spec §2.9.4)", () => {
 describe("N11 a dunning retry first probes the period's earlier attempts (spec §2.9.3 step 5)", () => {
   it("makes no retry while an earlier attempt reads PAID, and queues its check instead", async () => {
     const run = await due();
-    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
     const first = await renewNow(run);
     expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
     run.payments.scriptStatus(first.chargeId, report(first.chargeId, "PAID"));
@@ -561,7 +561,7 @@ describe("N11 a dunning retry first probes the period's earlier attempts (spec �
 
   it("makes no retry while an earlier attempt cannot be read, and retries with a NEW orderID once it reads unpaid", async () => {
     const run = await due();
-    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
     const first = await renewNow(run);
     run.payments.scriptStatus(first.chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "503"));
     run.clock.now = new Date(run.clock.now.getTime() + DAY + MINUTE);
@@ -685,7 +685,7 @@ describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (mon
 
   it("attempt 2 on a PAST_DUE plan: the plan ends the same way; no attempt 3, and the refunded attempt never holds a retry as paid", async () => {
     const run = await due();
-    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
     await renewNow(run);
     expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
     run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
@@ -840,7 +840,7 @@ describe("F8 a renewal whose first state NETOPIA reports is VOIDED, never seen p
 
   it("a dunning retry (attempt 2 on a PAST_DUE plan) read VOIDED: the dunning does not go on; the plan ends the same way", async () => {
     const run = await due();
-    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
     await renewNow(run);
     expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
     run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
