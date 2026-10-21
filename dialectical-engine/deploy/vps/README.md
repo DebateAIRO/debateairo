@@ -166,6 +166,7 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
 | `/var/lib/debateai/data-exports` | `0700` | `debateai-api` | transient encrypted exports; excluded from backups |
+| `/var/lib/debateai/api/billing-notice-spool` | `0700` | `debateai-api` | optional (§14.5): NETOPIA messages the database could not store, sealed, kept at most 14 days; not in the backups |
 | `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
@@ -785,7 +786,8 @@ recipient address on the sendmail argv is not readable by other local uids — a
 `SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`.
 `MemoryDenyWriteExecute` is deliberately **not** set: it breaks the V8 JIT.
 
-`ReadWritePaths` is exactly what each service writes — the API's four custody stores, nothing for
+`ReadWritePaths` is exactly what each service writes — the API's four custody stores and the
+optional billing notice spool (§14.5; its leading `-` lets the API start while that folder does not exist), nothing for
 the UI, and `ReadOnlyPaths` on the DEK store for the runner (it only ever *loads* run content keys;
 `ContentCipher.provisionRun` runs on the API's content-provision path).
 
@@ -2671,6 +2673,23 @@ emails you at once (O4, at most one an hour) with the reason, the time and the c
 check command. The owner summary (`pnpm billing:tax-summary`, **The tax summary** in §14.8) counts the kept messages by
 the day they arrived, and every message that does not pass writes the journal line `billing.notice.unverified` (§14.8).
 
+**When the database cannot store a message that passed.** NETOPIA sends the saved card only in its first message about
+a payment; the copies it sends again (5 of them, 5 minutes apart) carry no card. So the API can keep such a message on
+disk, sealed with the records key, and store it later: at its next start and every 10 minutes, it checks each kept
+message again with its current keys, stores it, and deletes the file; a file it cannot read or check is deleted after
+14 days. NETOPIA is still answered `503`, so its copies keep coming as before. To switch this on (once, on the server):
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/api/billing-notice-spool
+stat -c '%a %U %G %n' /var/lib/debateai/api/billing-notice-spool
+echo 'BILLING_NOTICE_SPOOL_PATH=/var/lib/debateai/api/billing-notice-spool' >> /etc/debateai/api.env
+systemctl restart debateai-api
+```
+
+`stat` prints `700 debateai-api debateai-api`. Without the line the API works as before and writes one
+`billing.notice.spool_off` line at each start; with a path that is not a folder the API can write, it refuses to start
+with `BILLING_NOTICE_SPOOL_PATH_INVALID` (create the folder, or remove the line, then restart).
+
 ### 14.6 Switching a country's payments on
 
 A country in the "pay off until the tax registration is done" group opens like this:
@@ -3257,6 +3276,10 @@ signals that matter:
 | `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
 | `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2) writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
 | `"event":"billing.notice.recheck"`, with `quarantined`, `verified` and `failed`, or `code` | At its start the API checked the quarantined messages of the last 14 days again with its current keys; `verified` counts those that now pass and were stored as if they had just arrived. A `code` instead means the check itself failed. | `verified` above 0 after a key fix: nothing more; their payments are checked now. `failed` above 0 or a `code`: restart once more; if it repeats, report it. |
+| `"event":"billing.notice.spooled"` (no other field) | A message that passed could not be stored, and was kept on disk instead (§14.5). It is stored at the next replay (within 10 minutes). | One: nothing. Again and again: check the database. |
+| `"event":"billing.notice.spool_failed"` (no other field) | A message that passed could not be stored, and could not be kept on disk either (the spool folder is missing, read-only or full). NETOPIA still sends it again, but its saved card may be lost. | Check the folder with the `stat` line of §14.5 and the free disk space; then check the database. |
+| `"event":"billing.notice.spool_replay"`, with `stored`, `kept` and `expired`, or `code` | The API checked the kept messages again (at its start, then every 10 minutes): `stored` were stored and deleted, `kept` could not be read, checked or stored yet and wait for the next try, `expired` were older than 14 days and deleted unread. A `code` instead means the folder itself could not be read. | `stored` only: nothing. `kept` above 0 on several lines in a row: check the database, then run the check command (§14.2); a key fix plus a restart stores them. `expired` above 0 or a `code`: report it. |
+| `"event":"billing.notice.spool_off"` (no other field) | At its start the API serves NETOPIA's messages but `BILLING_NOTICE_SPOOL_PATH` is not set, so a message the database cannot store is not kept (§14.5). | Switch it on with the four lines of §14.5. |
 | `"event":"billing.notice.store_failed"` (no other field) | A message that passed could not be stored, almost always because the database did not answer. It was answered `503`, so NETOPIA sends it again. | One: nothing. Again and again: check the database. |
 | `"event":"billing.notice.parse_failed"` (no other field) | A message that passed could not be read: it is stored as it came, and you get O3. Its payment is still found by the status reads. | Report it at once: NETOPIA's message may have changed shape. |
 | `"event":"billing.notice.unknown_order"` (no other field) | A message that passed names an order the site does not know (neither a charge nor a test order). It is stored with no effect. | A single line: nothing. Several: report them; NETOPIA may be sending another shop's messages to this address. |

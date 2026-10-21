@@ -207,6 +207,20 @@ export type BillingAuditEvent =
   /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
   | "billing.notice.recheck"
   /**
+   * B3a (NETOPIA answers 2026-10-21: the saved card comes only in the first message): a verified message the database
+   * could not take was kept in the spool (BILLING_NOTICE_SPOOL_PATH) for the replay. No field.
+   */
+  | "billing.notice.spooled"
+  /** B3a: such a message could not be kept either (the spool's folder missing, read-only or full). No field. */
+  | "billing.notice.spool_failed"
+  /**
+   * B3a: one replay of the spool (at the start and every 10 minutes) that found anything: the counts `stored`, `kept`
+   * and `expired` only, or the replay's failure code (BILLING_NOTICE_SPOOL_REPLAY_FAILED).
+   */
+  | "billing.notice.spool_replay"
+  /** B3a: NETOPIA's message is served but BILLING_NOTICE_SPOOL_PATH is not set; written once at the start. No field. */
+  | "billing.notice.spool_off"
+  /**
    * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
    * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
    */

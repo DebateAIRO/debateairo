@@ -2,7 +2,10 @@
 // N9 (spec 2026-10-05 §2.7.3-2.7.4, §2.20.2 "the intake"): NETOPIA's message stored before the answer, the saved card
 // kept, the quarantine and the restart re-check, the provider-only mode, admission after verification.
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PoolClient } from "pg";
 import { buildApi } from "@debateai/api";
 import { openRecord } from "@debateai/crypto";
@@ -12,6 +15,7 @@ import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { writeCardSaved } from "../../apps/api/src/billing/card-adoption.js";
 import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
 import { NetopiaNoticeIntake, type NetopiaIntakeMode, type NoticeArrival } from "../../apps/api/src/billing/netopia-intake.js";
+import { NoticeSpool } from "../../apps/api/src/billing/notice-spool.js";
 import { openCardToken, sealCardToken } from "../../apps/api/src/billing/records.js";
 import { chargeEvent, newChargeId } from "../../apps/api/src/billing/rows.js";
 import { TimeShiftedCardPayments } from "../../apps/api/src/billing/time-shifted-payments.js";
@@ -59,16 +63,28 @@ const arrival = (signed: Readonly<{ rawBody: Buffer; header: string }>, now: Dat
 
 function intakeFor(options: Partial<{
   mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true; paymentEnvironment: "sandbox" | "live"; clockOffsetMs: number;
+  /** B3a: the first `insertPaymentNotice` throws (the database refused one write), every later one goes through. */
+  insertFailsOnce: true; spool: NoticeSpool;
 }> = {}) {
   const audit = recordingAudit();
   const kick = vi.fn();
-  const store = options.storeDown === undefined ? repository : Object.assign(Object.create(repository) as BillingRepository, {
+  let insertFailures = options.insertFailsOnce === undefined ? 0 : 1;
+  const store = options.storeDown !== undefined ? Object.assign(Object.create(repository) as BillingRepository, {
     withTransaction: async () => { throw new Error("the database is unreachable"); }
+  }) : insertFailures === 0 ? repository : Object.assign(Object.create(repository) as BillingRepository, {
+    insertPaymentNotice: async (...args: Parameters<BillingRepository["insertPaymentNotice"]>) => {
+      if (insertFailures > 0) {
+        insertFailures -= 1;
+        throw new Error("the database refused the write");
+      }
+      return repository.insertPaymentNotice(...args);
+    }
   });
   const intake = new NetopiaNoticeIntake({
     repository: store, jobs, trust: (options.keys ?? KEYS).trust(POS), recordsKey: TEST_RECORDS_KEY,
     paymentEnvironment: options.paymentEnvironment ?? "sandbox", mode: options.mode ?? "ON", audit, kick,
-    ...(options.clockOffsetMs === undefined ? {} : { clockOffsetMs: options.clockOffsetMs })
+    ...(options.clockOffsetMs === undefined ? {} : { clockOffsetMs: options.clockOffsetMs }),
+    ...(options.spool === undefined ? {} : { spool: options.spool })
   });
   return { intake, audit, kick };
 }
@@ -245,6 +261,116 @@ describe("N9 NETOPIA's verified message", () => {
     expect(kick).not.toHaveBeenCalled();
     expect(audit.events).toEqual([{ event: "billing.notice.store_failed", fields: {} }]);
     expect(await noticesFor(chargeId)).toEqual([]);
+  });
+});
+
+describe("B3a a verified message the database could not take is kept on disk and replayed", () => {
+  const RETRY = "{\"errorType\":1,\"errorCode\":1,\"errorMessage\":\"retry\"}";
+  const folders: string[] = [];
+  const folder = async (): Promise<string> => {
+    const made = await mkdtemp(join(tmpdir(), "spool-"));
+    folders.push(made);
+    return made;
+  };
+  afterEach(async () => {
+    for (const made of folders.splice(0)) await rm(made, { recursive: true, force: true });
+  });
+  const spooled = async (directory: string): Promise<string[]> =>
+    (await readdir(directory)).filter((name) => name.endsWith(".json"));
+  /** Each case has its own day, after every other case's messages (the last of them is 2026-10-09). */
+  const day = (offset: number, minutes = 0): Date => new Date(Date.UTC(2026, 9, 10 + offset, 10, minutes));
+
+  it("keeps the first message (the only one with the card), answers 503, and the replay stores the card", async () => {
+    const { chargeId, customerId } = await openCharge();
+    const directory = await folder();
+    const spool = new NoticeSpool({ directory, recordsKey: TEST_RECORDS_KEY });
+    const { intake, audit, kick } = intakeFor({ insertFailsOnce: true, spool });
+    // NETOPIA answers 2026-10-21: only the FIRST message carries the saved card.
+    const first = sign(body(chargeId));
+    expect(await intake.receive(arrival(first, day(0)))).toEqual({ status: 503, body: RETRY });
+    expect(await spooled(directory)).toHaveLength(1);
+    expect(audit.events).toEqual([
+      { event: "billing.notice.store_failed", fields: {} }, { event: "billing.notice.spooled", fields: {} }
+    ]);
+    expect(kick).not.toHaveBeenCalled();
+    // Five minutes later NETOPIA's resend arrives, without the card; the database takes it.
+    const resend = sign(body(chargeId, { binding: undefined }));
+    expect(await intake.receive(arrival(resend, day(0, 5)))).toEqual({ status: 200, body: OK });
+    expect(await tokensFor("source_charge_id", chargeId)).toEqual([]);
+    // The replay (the start's, or the 10-minute tick's) verifies the kept message again and stores it.
+    expect(await intake.replaySpool(day(0, 10))).toBe(1);
+    const notices = await noticesFor(chargeId);
+    expect(notices).toHaveLength(2);
+    const tokens = await tokensFor("source_charge_id", chargeId);
+    expect(tokens).toMatchObject([{ customer_id: customerId, last4: "5098" }]);
+    const [received] = await query<{ received_at: Date }>(
+      "SELECT received_at FROM billing.payment_notice WHERE notice_id = $1", [tokens[0]!.source_notice_id]);
+    // Stored at its real arrival, so NETOPIA's order of messages survives the replay.
+    expect(received!.received_at).toEqual(day(0));
+    expect(await outcomesOf(tokens[0]!.source_notice_id)).toEqual(["APPLIED"]);
+    expect(openCardToken(TEST_RECORDS_KEY, { tokenId: tokens[0]!.token_id, tokenCiphertext: tokens[0]!.token_ciphertext }).reveal()).toBe(TOKEN);
+    expect(await spooled(directory)).toEqual([]);
+    const verify = await jobsFor(chargeId);
+    expect(verify.map((job) => job.kind)).toEqual(["VERIFY_PAYMENT"]);
+    expect(verify[0]!.not_before.getTime()).toBeLessThanOrEqual(day(0, 10).getTime());
+    expect(audit.events.at(-1)).toEqual({ event: "billing.notice.spool_replay", fields: { stored: 1, kept: 0, expired: 0 } });
+    expect(kick).toHaveBeenCalledTimes(2);
+    // A second replay finds nothing: no store, no line, no kick.
+    const lines = audit.events.length;
+    expect(await intake.replaySpool(day(0, 20))).toBe(0);
+    expect(audit.events).toHaveLength(lines);
+    expect(kick).toHaveBeenCalledTimes(2);
+    expect(await tokensFor("source_charge_id", chargeId)).toHaveLength(1);
+  });
+
+  it("still answers 503 quickly, and throws nothing, when the spool itself cannot write (Review Focus 2)", async () => {
+    const { chargeId } = await openCharge();
+    const directory = await folder();
+    const spool = new NoticeSpool({ directory, recordsKey: TEST_RECORDS_KEY });
+    await rm(directory, { recursive: true, force: true });
+    const { intake, audit, kick } = intakeFor({ storeDown: true, spool });
+    expect(await intake.receive(arrival(sign(body(chargeId)), day(1)))).toEqual({ status: 503, body: RETRY });
+    expect(audit.events).toEqual([
+      { event: "billing.notice.store_failed", fields: {} }, { event: "billing.notice.spool_failed", fields: {} }
+    ]);
+    expect(kick).not.toHaveBeenCalled();
+    expect(await noticesFor(chargeId)).toEqual([]);
+  });
+
+  it("keeps a corrupt file and one sealed under another records key, stores the good one, and drops the bad ones after 14 days (Review Focus 3)", async () => {
+    const { chargeId } = await openCharge();
+    const directory = await folder();
+    const spool = new NoticeSpool({ directory, recordsKey: TEST_RECORDS_KEY });
+    const good = sign(body(chargeId));
+    await spool.put({ rawBody: good.rawBody, header: good.header, receivedAt: day(2) });
+    const other = sign(body(newChargeId()));
+    await new NoticeSpool({ directory, recordsKey: Buffer.alloc(32, 9) })
+      .put({ rawBody: other.rawBody, header: other.header, receivedAt: day(2) });
+    const corrupt = join(directory, `${randomUUID()}.json`);
+    await writeFile(corrupt, "{\"v\":1,\"raw\":", { mode: 0o600 });
+    await utimes(corrupt, day(2), day(2));
+    const { intake, audit } = intakeFor({ spool });
+    expect(await intake.replaySpool(day(2, 1))).toBe(1);
+    expect(await tokensFor("source_charge_id", chargeId)).toHaveLength(1);
+    expect(await spooled(directory)).toHaveLength(2);
+    expect(audit.events.at(-1)).toEqual({ event: "billing.notice.spool_replay", fields: { stored: 1, kept: 2, expired: 0 } });
+    // Kept, and tried again on every tick, until they are 14 days old.
+    expect(await intake.replaySpool(day(9))).toBe(0);
+    expect(await spooled(directory)).toHaveLength(2);
+    expect(await intake.replaySpool(day(17))).toBe(0);
+    expect(await spooled(directory)).toEqual([]);
+    expect(audit.events.at(-1)).toEqual({ event: "billing.notice.spool_replay", fields: { stored: 0, kept: 0, expired: 2 } });
+  });
+
+  it("keeps today's behaviour exactly with no spool: 503, nothing on disk, nothing to replay", async () => {
+    const { chargeId } = await openCharge();
+    const directory = await folder();
+    const { intake, audit } = intakeFor({ storeDown: true });
+    expect(await intake.receive(arrival(sign(body(chargeId)), day(3)))).toEqual({ status: 503, body: RETRY });
+    expect(audit.events).toEqual([{ event: "billing.notice.store_failed", fields: {} }]);
+    expect(await readdir(directory)).toEqual([]);
+    expect(await intake.replaySpool(day(3, 10))).toBe(0);
+    expect(audit.events).toHaveLength(1);
   });
 });
 

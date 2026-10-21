@@ -36,7 +36,8 @@ UMask=0077
 # The custody trees the API creates directories in at runtime (L2 out-of-scope: the DEK
 # store and the publication key store are written by @debateai/crypto). Everything else on the
 # box — including /opt and /etc/debateai — stays read-only under ProtectSystem=strict.
-ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys /var/lib/debateai/data-exports
+# The billing notice spool (README §14.5) is optional: its leading "-" lets the unit start while the folder does not exist.
+ReadWritePaths=/var/lib/debateai/api/user-deks /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys /var/lib/debateai/data-exports -/var/lib/debateai/api/billing-notice-spool
 
 # --- process and kernel ---
 NoNewPrivileges=true

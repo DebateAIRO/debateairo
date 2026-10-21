@@ -57,6 +57,20 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
     expect(readme).toContain(`| \`${path}\` | \`0700\` | \`debateai-api\``);
     expect(readme).toContain(`stat -c '%a %U %G %n' ${path}`);
   });
+  it("B3a: the optional billing notice spool is commented in the example, writable under the unit, and provisioned 0700", () => {
+    const example = readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8");
+    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api.service"), "utf8");
+    const readme = readFileSync(resolve(engineRoot, "deploy/vps/README.md"), "utf8");
+    expect(inventory("API_ENVIRONMENT_KEYS").optional).toContain("BILLING_NOTICE_SPOOL_PATH");
+    expect(exampleKeys("deploy/vps/env/api.env.example").has("BILLING_NOTICE_SPOOL_PATH")).toBe(false);
+    const path = /^# BILLING_NOTICE_SPOOL_PATH=(.+)$/m.exec(example)?.[1];
+    expect(path).toBe("/var/lib/debateai/api/billing-notice-spool");
+    expect(unit.match(/^ReadWritePaths=(.+)$/m)?.[1]?.split(/\s+/)).toContain(`-${path}`);
+    expect(readme).toContain(`install -d -m 0700 -o debateai-api -g debateai-api ${path}`);
+    expect(readme).toContain(`| \`${path}\` | \`0700\` | \`debateai-api\``);
+    expect(readme).toContain(`stat -c '%a %U %G %n' ${path}`);
+    expect(readme).toContain(`echo 'BILLING_NOTICE_SPOOL_PATH=${path}' >> /etc/debateai/api.env`);
+  });
   it.each(CASES)("$service: every REQUIRED key of the shape is in $example", ({ example, keys }) => {
     const shape = inventory(keys);
     expect(shape.required.length).toBeGreaterThan(0);

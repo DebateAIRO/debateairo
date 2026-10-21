@@ -513,6 +513,12 @@ const apiEnvironmentShape = {
     NETOPIA_API_KEY_PATH: z.string().min(1).optional(),
     NETOPIA_IPN_KEYS_PATH: z.string().min(1).optional(),
     /**
+     * B3a (NETOPIA answers 2026-10-21): the folder where a verified NETOPIA message the database could not take is kept,
+     * sealed, until it is stored (NETOPIA sends the saved card only in its first message). Optional: absent, nothing is
+     * kept (one boot line says so); set, it must be an existing folder the API can write, or the API refuses to start.
+     */
+    BILLING_NOTICE_SPOOL_PATH: z.string().min(1).optional(),
+    /**
      * OWNER-RUN sandbox only (spec 2026-10-05 §2.3, README §14.9): whole days added to the billing jobs' clock.
      * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is one of NETOPIA's
      * sandbox bases.

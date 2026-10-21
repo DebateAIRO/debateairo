@@ -142,6 +142,7 @@ import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
 import { NetopiaNoticeIntake } from "./billing/netopia-intake.js";
+import { assertNoticeSpoolDirectory, NoticeSpool } from "./billing/notice-spool.js";
 import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
@@ -841,6 +842,18 @@ if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
   if (missing !== null) console.error(JSON.stringify({ event: "billing.provider_only.incomplete", missing }));
 }
 /**
+ * B3a (NETOPIA answers 2026-10-21): NETOPIA sends the saved card only in its first message about a payment, so a
+ * verified message the database could not take is kept, sealed under the records key, in BILLING_NOTICE_SPOOL_PATH's
+ * folder and replayed at the start and every 10 minutes. Optional (absent: one `billing.notice.spool_off` line once
+ * the API listens, and such a message is only answered 503, as before); set, it must be an existing folder this
+ * process can write, or the API refuses to start (BILLING_NOTICE_SPOOL_PATH_INVALID).
+ */
+const billingNoticeSpool = environment.BILLING_NOTICE_SPOOL_PATH === undefined
+  ? undefined
+  : boot.runSync("billing-notice-spool", () => new NoticeSpool({
+      directory: assertNoticeSpoolDirectory(environment.BILLING_NOTICE_SPOOL_PATH!), recordsKey
+    }));
+/**
  * N9 (spec 2026-10-05 §2.7.3, ruling C-9): in the provider-only mode NETOPIA's message is the one billing route served.
  * The intake keeps the owner's test-tool orders' cards; every other verified message is stored as BILLING_OFF, with no
  * card, no job and no email. Nothing drains an outbox here, so the kick does nothing.
@@ -848,7 +861,8 @@ if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
 const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({
   repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool), trust: providerOnlyConnectors.noticeTrust,
   recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
-  mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined
+  mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined,
+  ...(billingNoticeSpool === undefined ? {} : { spool: billingNoticeSpool })
 });
 /**
  * F7 (final review data-1): the intake above keeps the owner's test-tool cards and every message's raw bytes, so the
@@ -858,7 +872,9 @@ const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new Net
 const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createProviderOnlyJobs({
   pool, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
   publicAppUrl: providerOnlyConnectors.publicAppUrl, audit: consoleBillingAudit, clock: () => new Date(),
-  reportPending: (code) => console.error(`[${code}]`)
+  reportPending: (code) => console.error(`[${code}]`),
+  // B3a: the spool's replay every 10 minutes, as the billing runtime's.
+  ...(billingNoticeSpool === undefined || providerOnlyIntake === undefined ? {} : { notices: providerOnlyIntake })
 });
 // A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
 // open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
@@ -1516,7 +1532,9 @@ const billingRuntime = billingConnectors === null
       // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
       taxAuthorities,
       audit: consoleBillingAudit, clock: stageClock.clock, clockOffsetMs: stageClock.offsetMs,
-      reportPending: (code) => console.error(`[${code}]`)
+      reportPending: (code) => console.error(`[${code}]`),
+      // B3a: the spool of verified NETOPIA messages the database could not take (BILLING_NOTICE_SPOOL_PATH).
+      ...(billingNoticeSpool === undefined ? {} : { noticeSpool: billingNoticeSpool })
     });
   });
 /**
@@ -1788,6 +1806,14 @@ if (netopiaIntake !== undefined) {
   void netopiaIntake.recheckQuarantine(new Date()).catch(() => {
     consoleBillingAudit("billing.notice.recheck", { code: "BILLING_NOTICE_RECHECK_FAILED" });
   });
+  // B3a: the spool's kept messages are verified again and stored the same way; the 10-minute tick replays them after.
+  if (billingNoticeSpool === undefined) {
+    consoleBillingAudit("billing.notice.spool_off", {});
+  } else {
+    void netopiaIntake.replaySpool(new Date()).catch(() => {
+      consoleBillingAudit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" });
+    });
+  }
 }
 if (askRoom !== undefined) {
   triggerAskWake();

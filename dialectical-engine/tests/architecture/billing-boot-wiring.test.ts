@@ -100,6 +100,28 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(runtime).toMatch(/netopiaNotices,\s*\n\s*subscription\s*\n\s*\}\);/u);
   });
 
+  it("B3a: builds the optional notice spool once, gives it to both intakes, and replays it at the start and every 10 minutes", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const spool = main.indexOf("const billingNoticeSpool = environment.BILLING_NOTICE_SPOOL_PATH === undefined");
+    expect(spool).toBeGreaterThan(main.indexOf("const recordsKey = boot.runSync"));
+    expect(main.slice(spool, spool + 400)).toContain("assertNoticeSpoolDirectory(environment.BILLING_NOTICE_SPOOL_PATH!)");
+    const providerOnly = main.indexOf("const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({");
+    expect(providerOnly).toBeGreaterThan(spool);
+    expect(main.slice(providerOnly, providerOnly + 600)).toContain("{ spool: billingNoticeSpool }");
+    expect(main).toContain("{ notices: providerOnlyIntake }");
+    expect(main).toContain("{ noticeSpool: billingNoticeSpool }");
+    const listen = main.indexOf('await startup.run("listen"');
+    const replay = main.indexOf("netopiaIntake.replaySpool(new Date())");
+    expect(replay).toBeGreaterThan(listen);
+    expect(main.indexOf('consoleBillingAudit("billing.notice.spool_off", {})')).toBeGreaterThan(listen);
+    const runtime = await readFile("apps/api/src/billing/runtime.ts", "utf8");
+    expect(runtime).toContain("() => netopiaNotices.replaySpool(deps.clock())");
+    expect(runtime).toContain("setInterval(replaySpool, 600_000)");
+    const jobs = await readFile("apps/api/src/billing/provider-only-jobs.ts", "utf8");
+    expect(jobs).toContain("() => notices.replaySpool(deps.clock())");
+    expect(jobs).toContain("setInterval(replaySpool, 600_000)");
+  });
+
   it("F7 (data-1): the provider-only mode runs the daily card job alone, started with the API like the billing runtime", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     const jobs = main.indexOf("const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createProviderOnlyJobs({");
