@@ -27,6 +27,24 @@ below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116
 5. One loader entry: append it LAST to `STEPS` in `packages/db/src/migration-forward-chain.ts`.
 6. On the preview the step is applied only by the native operator's `apply-and-plan` (with the owner's yes); its `verify`,
    `publish` and every start refuse while the step, or dev's 0110, is pending (`deploy/preview-auth-dev/v1/README.md`).
+7. The SQL file's leading comment block carries its n1 header lines (side-by-side spec §5, "The N-1 rule"; below):
+   `-- n1: expand` for every step after 0123 (only a drained upload, like 0123, may say `-- n1: drained`), and
+   `-- n1: keeps-verifier` exactly when step 3 made no new verifier. CI's N-1 audit (`tools/orphan-audit`
+   `auditMigrationN1Compatibility`, run by `auditSourceRules` on every `migrations/*.sql`) refuses a missing or wrong
+   header, a `keeps-verifier` line the manifest contradicts, and, in an expand step, anything the release before
+   cannot run beside: a `DROP`, `RENAME`, column type change, `SET NOT NULL`, `ADD COLUMN … NOT NULL` without
+   `DEFAULT`, a `REVOKE` or `CREATE OR REPLACE` of what earlier steps made (a new function or view supersedes it;
+   a new view is written `CREATE VIEW`), a new trigger on an existing table, and every strong lock on one: `CREATE
+   INDEX` without `CONCURRENTLY`, `ADD CONSTRAINT` without `NOT VALID` (and any `UNIQUE`, `PRIMARY KEY` or `EXCLUDE`),
+   `VALIDATE CONSTRAINT` in the step that adds it, `UPDATE` / `DELETE` / `INSERT … SELECT`, `LOCK TABLE`, `CLUSTER`,
+   `VACUUM FULL` and `REINDEX` without `CONCURRENTLY`. Function bodies are not read (they run when called). Tables the
+   step creates itself are free. Three exceptions pass with a `-- n1: reviewed <reason>` line directly above them,
+   the reason saying why the older release is unaffected: `DROP TRIGGER IF EXISTS t ON x` followed by
+   `CREATE TRIGGER t … ON x`; `ALTER TABLE x DROP CONSTRAINT IF EXISTS c` followed by
+   `ALTER TABLE x ADD CONSTRAINT c … NOT VALID` (same name, same table; on a table the step creates neither pair needs
+   the line); and a `DO` block that runs `EXECUTE`. A reviewed line without a reason is refused like a misspelled
+   declaration. Files up to `0122_engine_map_check.sql` predate the rule and are not audited; their count is pinned
+   (`N1_GRANDFATHERED_COUNT`), so a file slipped in before the cut-off is refused too.
 
 `migrate()` then runs the base recipe, 0108, the sealed verifier and 0110 as before, then each pending step in order:
 its SQL, its verifier, its ledger row and its receipt in `public.debateai_schema_migration_step`. A database at 0108

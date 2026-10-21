@@ -3,6 +3,11 @@ import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EVENT_CONSUMERS } from "@debateai/contract";
 import { loadMigrationPlan, sha256, type MigrationPlan } from "../../../packages/db/src/migration-lineage.js";
+import { lineAt, maskSqlComments, maskSqlQuotedLiterals, sqlDoBlocks, type SqlDoBlock } from "./sql-text.js";
+import { auditMigrationN1Compatibility, auditN1GrandfatheredCount, definedFunctionNames, readLineageKeepsVerifier } from "./migration-n1.js";
+
+// Side-by-side spec 2026-10-21 §5 (plan A, task A8): the N-1 audit, run below by auditSourceRules.
+export * from "./migration-n1.js";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 type Row = readonly [name: string, directory: string, allowed: readonly string[]];
@@ -495,118 +500,6 @@ export async function auditSurfaceReachability(): Promise<{
   };
 }
 
-function lineAt(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length;
-}
-
-function maskSqlComments(source: string): string {
-  return source
-    .replace(/--[^\n]*/g, (comment) => " ".repeat(comment.length))
-    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
-}
-
-type SqlDoBlock = {
-  readonly start: number;
-  readonly end: number;
-  readonly bodyStart: number;
-  readonly bodyEnd: number;
-};
-
-function dollarTagAt(source: string, index: number): string | null {
-  return /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/u.exec(source.slice(index))?.[0] ?? null;
-}
-
-function quotedSqlEnd(source: string, index: number, quote: "'" | "\""): number {
-  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
-    if (source[cursor] === quote && source[cursor + 1] === quote) {
-      cursor += 1;
-      continue;
-    }
-    if (source[cursor] === quote) return cursor + 1;
-  }
-  return source.length;
-}
-
-function sqlDoBlocks(source: string): readonly SqlDoBlock[] {
-  const blocks: SqlDoBlock[] = [];
-  for (let index = 0; index < source.length;) {
-    const char = source[index];
-    if (char === "'" || char === "\"") {
-      index = quotedSqlEnd(source, index, char);
-      continue;
-    }
-    const before = source[index - 1] ?? "";
-    const after = source[index + 2] ?? "";
-    if ((source.slice(index, index + 2).toUpperCase() === "DO")
-      && !/[A-Za-z0-9_$]/u.test(before)
-      && !/[A-Za-z0-9_$]/u.test(after)) {
-      let open = index + 2;
-      while (/\s/u.test(source[open] ?? "")) open += 1;
-      const tag = dollarTagAt(source, open);
-      if (tag !== null) {
-        const bodyStart = open + tag.length;
-        const bodyEnd = source.indexOf(tag, bodyStart);
-        if (bodyEnd < 0) break;
-        let semicolon = bodyEnd + tag.length;
-        while (/\s/u.test(source[semicolon] ?? "")) semicolon += 1;
-        if (source[semicolon] === ";") {
-          blocks.push(Object.freeze({
-            start: index,
-            end: semicolon + 1,
-            bodyStart,
-            bodyEnd
-          }));
-          index = semicolon + 1;
-          continue;
-        }
-        index = bodyEnd + tag.length;
-        continue;
-      }
-    }
-    if (char === "$") {
-      const tag = dollarTagAt(source, index);
-      if (tag !== null) {
-        const close = source.indexOf(tag, index + tag.length);
-        if (close < 0) break;
-        index = close + tag.length;
-        continue;
-      }
-    }
-    index += 1;
-  }
-  return blocks;
-}
-
-function maskSqlQuotedLiterals(source: string): string {
-  const output = [...source];
-  for (let index = 0; index < source.length;) {
-    const char = source[index];
-    if (char === "'" || char === "\"") {
-      const end = quotedSqlEnd(source, index, char);
-      for (let cursor = index; cursor < end; cursor += 1) {
-        if (output[cursor] !== "\n") output[cursor] = " ";
-      }
-      index = end;
-      continue;
-    }
-    if (char === "$") {
-      const tag = dollarTagAt(source, index);
-      if (tag !== null) {
-        const close = source.indexOf(tag, index + tag.length);
-        if (close < 0) return output.join("");
-        const end = close + tag.length;
-        for (let cursor = index; cursor < end; cursor += 1) {
-          if (output[cursor] !== "\n") output[cursor] = " ";
-        }
-        index = end;
-        continue;
-      }
-    }
-    index += 1;
-  }
-  return output.join("");
-}
-
 function blockHasConstraintGuard(source: string, block: SqlDoBlock, index: number, name: string): boolean {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const body = source.slice(block.bodyStart, block.bodyEnd);
@@ -805,7 +698,10 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
  * the law, and the law is unchanged everywhere else.
  */
 const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map([
-  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
+  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]],
+  // Side-by-side spec 2026-10-21 §5 (plan A, task A8, owner-approved plan): the count of grandfathered migrations is a
+  // frozen fact of the tree the N-1 audit pins, not a policy value; by name, in its one file, like the two above.
+  ["tools/orphan-audit/src/migration-n1.ts", ["N1_GRANDFATHERED_COUNT"]]
 ]);
 
 /**
@@ -879,10 +775,18 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
   const nativePlan = await loadMigrationPlan();
   const migrateSource = await readFile(join(root, "packages/db/src/index.ts"), "utf8");
   const transactionSource = await readFile(join(root, "packages/db/src/migration-transaction.ts"), "utf8");
-  for (const name of (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort()) {
+  const migrationNames = (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort();
+  // Side-by-side §5 (A8): each file's N-1 audit knows the functions of the files sorted before it and whether its
+  // lineage manifest keeps the verifier in force.
+  const keepsVerifier = await readLineageKeepsVerifier(join(migrationsDirectory, "lineage"));
+  const earlierFunctions = new Set<string>();
+  for (const name of migrationNames) {
     const source = await readFile(join(migrationsDirectory, name), "utf8");
     blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource, transactionSource }));
+    blocking.push(...auditMigrationN1Compatibility(`migrations/${name}`, source, { earlierFunctions, keepsVerifier: keepsVerifier.get(name) ?? null }));
+    for (const defined of definedFunctionNames(source)) earlierFunctions.add(defined);
   }
+  blocking.push(...auditN1GrandfatheredCount(migrationNames));
   await auditOrphans();
   if (gatewayDeclarations !== 1) blocking.push(`ProviderGateway declaration count is ${gatewayDeclarations}, expected 1`);
   return { blocking };
