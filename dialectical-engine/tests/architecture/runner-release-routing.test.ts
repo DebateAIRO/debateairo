@@ -60,6 +60,17 @@ describe("the runner registers and re-sends under its release's own task name (s
     expect(main).toContain("store: postgresRunnerRetirementStore(pool, workFence),");
   });
 
+  it("main.ts never refuses boot over funding: no pointer read, the funding source built whenever plans are (spec §9)", async () => {
+    // Side-by-side spec §9: a grant is checked against the policy of the version it was issued with, so the runner
+    // needs no funding selection at boot, and a selection made after boot works without a restart.
+    const main = await readFile(RUNNER_MAIN, "utf8");
+    expect(main).not.toContain("allowances.readPolicy()");
+    expect(main).not.toContain('"INTERNAL_FUNDING_UNAVAILABLE"');
+    expect(main).toContain(
+      "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({"
+    );
+  });
+
   it("sends to Hatchet only from main.ts, where the release's task name lives", async () => {
     const files = (await readdir(RUNNER_SOURCE)).filter((name) => name.endsWith(".ts"));
     const senders: string[] = [];

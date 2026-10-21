@@ -177,10 +177,9 @@ export async function composePracticeRunnerMoney(input: Readonly<{
   }
   const fundingEntitlements = new EntitlementRepository(pool);
   const allowances = new PostgresInternalAllowanceRepository(pool);
-  const selectedFunding = await allowances.readPolicy();
-  if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== "hosted" || envelopeBand === null || billingPlans === null))
-    throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing and finite envelope members");
-  const fundingAllowance = selectedFunding === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
+  // Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
+  // version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
+  const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
     allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
     plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
   });
