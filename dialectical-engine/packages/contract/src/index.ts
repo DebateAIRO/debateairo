@@ -1718,6 +1718,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
+    "POST /v1/runs/{id}/publication-review",
+    "GET /v1/runs/{id}/publication-review",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",

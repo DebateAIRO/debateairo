@@ -27,6 +27,7 @@ export function createSynthesisPublishGate(input: Readonly<{
   repository: SynthesisCheckRepository;
   readAnswerVersions(runId: string, answerId: string, maxVersion: number, ownerRef: string): Promise<ReadonlyMap<number, string | null>>;
   check: SynthesisCheckDeps;
+  approvalCovers?(input: Readonly<{ runId: string; answerId: string; originVersion: number }>): Promise<boolean>;
   deadlineMs: number;
   clock(): Date;
   sleep(ms: number): Promise<void>;
@@ -45,7 +46,11 @@ export function createSynthesisPublishGate(input: Readonly<{
             runId: target.runId, answerId: target.answer.answer_id, maxVersion: target.answer.answer_version
           }), (origin) => origin === synthesisOriginVersion);
           if (verdict?.verdict === "FLAGGED") {
-            return verdict.categories.includes("SUICIDE_OR_HARM_TO_OTHERS") ? "REMOVED" : "APPROVAL_REQUIRED";
+            if (verdict.categories.includes("SUICIDE_OR_HARM_TO_OTHERS")) return "REMOVED";
+            return await input.approvalCovers?.({
+              runId: target.runId, answerId: target.answer.answer_id,
+              originVersion: verdict.synthesisOriginVersion
+            }) ? "PROCEED" : "APPROVAL_REQUIRED";
           }
           if (verdict?.verdict === "CLEAR" || verdict?.verdict === "NO_SYNTHESIS") return "PROCEED";
           return null;

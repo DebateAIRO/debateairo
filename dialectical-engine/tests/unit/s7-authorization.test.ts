@@ -136,6 +136,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
+  { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -334,7 +336,7 @@ describe("S7 deny-by-default authorization", () => {
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map.
     // The synthesis check adds the once-only removal notice route.
-    expect(contractInventory.routes).toHaveLength(168);
+    expect(contractInventory.routes).toHaveLength(170);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
