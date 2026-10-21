@@ -839,8 +839,10 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished FROM core.wo
 ```
 
 An instance whose start the release tool refuses, or that fails 20 times within 10 minutes, stays
-failed (`systemctl --failed` lists it) until it is started again by hand (`systemctl start`); the
-unit's start limit keeps a refused start from retrying every 5 seconds for ever.
+failed (`systemctl --failed` lists it); the unit's start limit keeps a refused start from retrying
+every 5 seconds for ever. Once that limit is hit, systemd refuses even a start by hand until the
+10 minutes have passed, so clear the count first, then start it:
+`systemctl reset-failed debateai-<service>@<label>`, then `systemctl start debateai-<service>@<label>`.
 
 **A new register version is a new release.** `REGISTER_VERSION` and `RELEASE_KEY` are per release: each release's overlays (`/etc/debateai/releases/<label>/api.env` and `runner.env`) are read after the base files and win, and the release key carries the register version (`r<version>-…`), so a running release never changes version. Writing a new `REGISTER_VERSION` into the base files and restarting `@$label` therefore changes nothing, and a release's overlays are written once and never edited. So wherever this runbook says to pin a new version ("copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`", "pin it in both `EnvironmentFile`s") and then restart the API and the runner, do a side-by-side upgrade instead (below): a new label and a new key on the same commit, the key's number being the version to pin. Its steps 3 and 9 to 12 are that pin and that restart (the overlays name the version; stage, start, switch); when the version is already published, skip step 8, and step 7 has nothing to apply.
 
@@ -1012,7 +1014,7 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --
 ```
 
 The printed `REGISTER_VERSION=` must be the number in the new release key; the overlays already
-carry it, so nothing is pinned in the base files. If it is another number, stop: start nothing,
+carry it, so nothing is pinned in the base files before the switch (step 12). If it is another number, stop: start nothing,
 and name the release again (a new label and key, step 1). Then close the window (§4 step 5).
 Running processes ignore the new version: each reads its own at start.
 
@@ -1041,7 +1043,8 @@ once and the new pair a few seconds later. It waits until Caddy sends traffic to
 (asked through `127.0.0.1:3090`, §6), stops the older API and website and records that, enables
 the new release's three instances and disables the older API and website (the older runner stays
 enabled until it retires), and arms the older release's backstop for 7.5 hours later. Then run
-the "current release" line above again: `$label` is now the new release.
+the "current release" line above again: `$label` is now the new release, then set
+`REGISTER_VERSION` in both base files to the new version (§5 "A new register version is a new release").
 
 **13. Retirement and the receipt.** The older runner finishes its debates and retires by itself:
 it exits 0, root records the release `RETIRED` and disables its runner, and the backstop timer is

@@ -446,6 +446,8 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     // A refused start (ExecStartPre=) does not retry every 5 s for ever: the start limit ends it.
     expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitIntervalSec=600$[\s\S]*^\[Service\]/m);
     expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitBurst=20$[\s\S]*^\[Service\]/m);
+    // Once the limit is hit systemd refuses even a start by hand until the interval passes: the runbook clears it first.
+    expect(read("deploy/vps/README.md")).toContain("`systemctl reset-failed debateai-<service>@<label>`, then `systemctl start debateai-<service>@<label>`");
     expect(unit).toMatch(/^\[Install\]\nWantedBy=multi-user\.target$/m);
   });
 
@@ -1204,6 +1206,10 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     for (const needle of ["`REGISTER_VERSION`", "`RELEASE_KEY`", "win", "a new label and a new key on the same commit", "steps 3 and 9 to 12"]) {
       expect(rule, needle).toContain(needle);
     }
+    // The base files follow the switch: nothing is pinned in them before it, and step 12 sets them after it.
+    const order = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    expect(order).toContain("nothing is pinned in the base files before the switch (step 12)");
+    expect(order).toMatch(/`\$label` is now the new release, then set\s+`REGISTER_VERSION` in both base files to the new version/u);
     const pins = /REGISTER_VERSION=` line into|[Pp]in (?:it|that version|the version|the newest version|the gated version)[^.]*\b(?:both|REGISTER_VERSION)\b|`REGISTER_VERSION` in both|REGISTER_VERSION` to that version/u;
     const sections = readme.split(/^(?=#{2,4} )/mu);
     const unpointed = sections.filter((section) => pins.test(section))
