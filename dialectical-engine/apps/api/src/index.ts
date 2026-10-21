@@ -3805,10 +3805,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
     const gapRef = parseRequest(InvestigationGapRefSchema, request.params.gapRef);
     const input = parseRequest(InvestigationRequestSchema, request.body);
-    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownershipFor(request));
-    if (answer === null || await (options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({
-      runId: answer.run_ref, answerId: answer.answer_id, answerVersion: answer.answer_version
-    }) !== "SHOW") return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    if (options.synthesisAnswerAccess !== undefined) {
+      const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownershipFor(request));
+      if (answer === null || await options.synthesisAnswerAccess.stateOf({
+        runId: answer.run_ref, answerId: answer.answer_id, answerVersion: answer.answer_version
+      }) !== "SHOW") return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    }
     const accepted = await options.application.recordInvestigation(
       answerId.data, gapRef, input.user_input, request.session, ownershipFor(request)
     );
