@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -48,7 +49,7 @@ function apiSource(): Record<string, string> {
     ACCOUNT_ERASURE_GRACE_MS: "604800000", MAIL_SENDMAIL_PATH: "/usr/sbin/sendmail",
     MAIL_FROM: "noreply@example.test", PUBLIC_APP_URL: "https://example.test",
     API_HOST: "127.0.0.1", API_PORT: "8790", STRANGER_SAMPLE_RATE: "0",
-    REGISTER_VERSION: "1", BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
+    REGISTER_VERSION: "1", RELEASE_KEY: fixtureReleaseKey("1"), BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
     HATCHET_CLIENT_TOKEN: "test", HATCHET_HOST_PORT: "127.0.0.1:7077",
     HATCHET_API_URL: "http://127.0.0.1:8888", HATCHET_TENANT_ID: "test",
     HATCHET_WORKFLOW_NAME: "test", HATCHET_TLS_STRATEGY: "none", NODE_ENV: "test"

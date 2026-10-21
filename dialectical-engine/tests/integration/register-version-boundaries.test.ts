@@ -7,6 +7,7 @@ import { readTerminalRecordedFacts } from "../../packages/battery/src/terminal.j
 import { MemoryRepository } from "../../packages/memory/src/index.js";
 import { parseApiEnvironment } from "../../packages/register/src/index.js";
 import { SettlementRepository } from "../../packages/settlement/src/index.js";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 
 const UNSAFE_VERSION = "9007199254740993" as const;
 
@@ -148,6 +149,8 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       API_PORT: "3000",
       STRANGER_SAMPLE_RATE: "0.1",
       REGISTER_VERSION: UNSAFE_VERSION,
+      // Side-by-side §1: the key that matches this version; the version itself is refused first.
+      RELEASE_KEY: fixtureReleaseKey(UNSAFE_VERSION),
       BATTERY_VERSION: "test",
       SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "test",

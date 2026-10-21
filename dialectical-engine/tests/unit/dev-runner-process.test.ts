@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  DevelopmentRunnerProcessError,
   startDevelopmentRunnerProcess,
   type DevelopmentRunnerChild,
   type DevelopmentRunnerProcessOperations
@@ -23,6 +24,8 @@ function apiEnvironment(): Readonly<Record<string, string>> {
     // The dev API's own value (dev-api-environment.ts): the CLI call timeout.
     PROVIDER_PROBE_TIMEOUT_MS: String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS),
     REGISTER_VERSION: "424242",
+    // Side-by-side §1: the dev API's own release key (dev-api-environment.ts derives r<REGISTER_VERSION>-000000000000).
+    RELEASE_KEY: ["r424242", "000000000000"].join("-"),
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
     REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
     KEK_PATH: "/private/dev/kek.bin",
@@ -142,7 +145,28 @@ describe("development runner process lifecycle", () => {
     const runtime = operations({ apiEnvironment: withoutReceipt });
     await expect(startDevelopmentRunnerProcess({
       repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
-    })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
+    })).rejects.toThrow("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
+    expect(runtime.environment).toEqual([]);
+  });
+
+  // Side-by-side uploads spec 2026-10-21 §1: the dev runner runs as the dev API's own release, never as a key it made up.
+  it("forwards the API's RELEASE_KEY to the runner", async () => {
+    const runtime = operations({ apiEnvironment: { ...apiEnvironment(), RELEASE_KEY: ["r4", "000000000000"].join("-") } });
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    });
+    expect(runtime.environment[0]?.RELEASE_KEY).toBe("r4-000000000000");
+    await runner.stop();
+  });
+
+  it("refuses an API environment without RELEASE_KEY", async () => {
+    const { RELEASE_KEY: _dropped, ...withoutKey } = apiEnvironment();
+    const runtime = operations({ apiEnvironment: withoutKey });
+    const refusal = startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    });
+    await expect(refusal).rejects.toBeInstanceOf(DevelopmentRunnerProcessError);
+    await expect(refusal).rejects.toThrow("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
     expect(runtime.environment).toEqual([]);
   });
   /**
@@ -191,7 +215,7 @@ describe("development runner process lifecycle", () => {
     const forwarded = runtime.environment[0]!;
     const api = apiEnvironment();
     for (const key of [
-      "KEK_PATH", "DATABASE_URL", "REGISTER_VERSION", "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+      "KEK_PATH", "DATABASE_URL", "REGISTER_VERSION", "RELEASE_KEY", "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
       "REGISTER_DEPLOYMENT_RECEIPT_FILE", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH",
       "PROVIDER_DISCOVERY_TARGETS_JSON", "PROVIDER_PROBE_TIMEOUT_MS",
       "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT", "HATCHET_API_URL", "HATCHET_TENANT_ID",

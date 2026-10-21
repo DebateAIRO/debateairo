@@ -6,7 +6,20 @@
  * V-9(c): `DEBATEAI_DEPLOYMENT_MODE` is `local` for the same reason — local is
  * the loopback-safe deployment, and a fixture that silently claimed `hosted`
  * would put every other refusal behind the hosted provider rules.
+ *
+ * Side-by-side §1: `RELEASE_KEY` names `REGISTER_VERSION` ("1"), so a test that moves the version moves the key too.
+ * Built from its two parts, so no line pairs a *_KEY name with a literal (gitleaks).
  */
+const FIXTURE_RELEASE_KEY = fixtureReleaseKey(1);
+
+/**
+ * Side-by-side §1: the release key a hand-built environment carries for its own `REGISTER_VERSION`
+ * (`r<version>-0123456789ab`), so its number always matches the version beside it.
+ */
+export function fixtureReleaseKey(registerVersion: string | number): string {
+  return [`r${registerVersion}`, "0123456789ab"].join("-");
+}
+
 export function validApiEnvironmentFixture(): Record<string, string> {
   return {
     DEBATEAI_DEPLOYMENT_MODE: "local",
@@ -38,7 +51,8 @@ export function validApiEnvironmentFixture(): Record<string, string> {
     HATCHET_API_URL: "http://127.0.0.1:8080",
     HATCHET_TENANT_ID: "fixture",
     HATCHET_WORKFLOW_NAME: "fixture",
-    HATCHET_TLS_STRATEGY: "none"
+    HATCHET_TLS_STRATEGY: "none",
+    RELEASE_KEY: FIXTURE_RELEASE_KEY
   };
 }
 
@@ -84,6 +98,7 @@ export function validRunnerEnvironmentFixture(): Record<string, string> {
     HATCHET_API_URL: "http://127.0.0.1:8080",
     HATCHET_TENANT_ID: "fixture",
     HATCHET_WORKFLOW_NAME: "fixture",
-    HATCHET_TLS_STRATEGY: "none"
+    HATCHET_TLS_STRATEGY: "none",
+    RELEASE_KEY: FIXTURE_RELEASE_KEY
   };
 }

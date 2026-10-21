@@ -3,6 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 import {
   appendAuditEvent,
   createEmailBlindIndex,
@@ -190,6 +191,7 @@ describe("S2 email confidentiality and lookup", () => {
       API_PORT: "3000",
       STRANGER_SAMPLE_RATE: "0.1",
       REGISTER_VERSION: "1",
+      RELEASE_KEY: fixtureReleaseKey("1"),
       BATTERY_VERSION: "test",
       SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "test",

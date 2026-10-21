@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
-import { validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
+import { fixtureReleaseKey, validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 import { RUNNER_READY_PROCESS_EVENT, announceRunnerReady } from '../../apps/runner/src/runner-ready.js';
 const execute = promisify(execFile);
 const receipt = await import('../../deploy/' + 'preview-auth-dev/v1/runtime-receipt.mjs');
@@ -310,7 +310,7 @@ describe('runner environment narrowing', () => {
   const preview = JSON.stringify({ deployment: 'v3-preview', free_model_ids: ['zai-org/GLM-5.3-Flash'], requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' });
   const configured = (): Record<string, string> => {
     const { VLLM_BASE_URL: _a, VLLM_MODEL: _b, VLLM_MAKER: _c, ...rest } = validRunnerEnvironmentFixture();
-    return { ...rest, NODE_ENV: 'production', REGISTER_VERSION: '12', DEBATEAI_DEPLOYMENT_MODE: 'local', PREVIEW_PROVIDER_TEST_CONFIG_JSON: preview, PREVIEW_TEAM_USER_IDS_JSON: '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]' };
+    return { ...rest, NODE_ENV: 'production', REGISTER_VERSION: '12', RELEASE_KEY: fixtureReleaseKey('12'), DEBATEAI_DEPLOYMENT_MODE: 'local', PREVIEW_PROVIDER_TEST_CONFIG_JSON: preview, PREVIEW_TEAM_USER_IDS_JSON: '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]' };
   };
   it('keeps the team list and only source runner keys, with the fixed PATH', () => {
     const result = env.narrowEnvironment('runner', configured(), runtime, { registerVersion: '12' }, approved);
@@ -319,7 +319,7 @@ describe('runner environment narrowing', () => {
     expect(result.selectedRegisterVersion).toBe('12');
     expect(Object.keys(result.environment).sort()).toEqual([...Object.keys(configured()), 'PATH'].sort());
   });
-  it.each([{ NODE_EXTRA_CA_CERTS: '/etc/ca.crt' }, { NODE_OPTIONS: '--require x' }, { REGISTER_VERSION: '11' }, { DEBATEAI_DEPLOYMENT_MODE: 'staging' }, { NODE_ENV: 'development' }, { PREVIEW_TEAM_USER_IDS_JSON: '["not-a-uuid"]' }, { TURNSTILE_SOCKET_PATH: '/run/x.sock' }, { HTTPS_PROXY: 'http://127.0.0.1:3180' }])('refuses %j without emitting values', patch => {
+  it.each([{ NODE_EXTRA_CA_CERTS: '/etc/ca.crt' }, { NODE_OPTIONS: '--require x' }, { REGISTER_VERSION: '11', RELEASE_KEY: fixtureReleaseKey('11') }, { DEBATEAI_DEPLOYMENT_MODE: 'staging' }, { NODE_ENV: 'development' }, { PREVIEW_TEAM_USER_IDS_JSON: '["not-a-uuid"]' }, { TURNSTILE_SOCKET_PATH: '/run/x.sock' }, { HTTPS_PROXY: 'http://127.0.0.1:3180' }])('refuses %j without emitting values', patch => {
     expect(() => env.narrowEnvironment('runner', { ...configured(), ...patch }, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   });
   // Owner rulings 2026-10-13: the runner runs hosted beside a hosted API, only on the preview's own configuration.

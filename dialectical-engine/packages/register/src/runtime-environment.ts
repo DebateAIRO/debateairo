@@ -1,7 +1,12 @@
 import { parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
-import type { StaffAccessEnvironment } from "@debateai/kernel";
+import {
+  TypedDomainError,
+  isDevelopmentReleaseKey,
+  parseReleaseKey,
+  type StaffAccessEnvironment
+} from "@debateai/kernel";
 import { z } from "zod";
 import {
   parseRegisterVersionText,
@@ -40,6 +45,56 @@ const kekPath = z.preprocess((value) => {
   }
   return value;
 }, z.string().min(1));
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §1 (INTERFACE "RELEASE_KEY"): the release this process is, required by the API
+ * and the runner alike (`hatchetShape`). Absent or empty refuses RELEASE_KEY_REQUIRED; a malformed value (upper case,
+ * `legacy`, a leading zero) refuses RELEASE_KEY_INVALID through parseReleaseKey. Thrown from the preprocess, like
+ * `kekPath`, so the key inventory reads it as required. The register-version and hosted checks need the other keys,
+ * so they run after the shape: assertReleaseKeyForRegister.
+ */
+const releaseKeyValue = z.preprocess((value) => {
+  if (typeof value !== "string" || value.length === 0) throw releaseKeyRequired();
+  return parseReleaseKey(value).releaseKey;
+}, z.string().min(1));
+
+/** Content-free, like every refusal here: names the setting, never a value. */
+function releaseKeyRequired(): TypedDomainError {
+  return new TypedDomainError("RELEASE_KEY_REQUIRED", "RELEASE_KEY is required: r<REGISTER_VERSION>-<12 lowercase hex>");
+}
+
+/**
+ * Side-by-side spec §1; INTERFACE environment values. The one check of a configured release key, for every loader that
+ * reads one (the API and runner shapes here; plan C's and plan D's callers reuse it): absent or empty refuses
+ * RELEASE_KEY_REQUIRED; then the key is parsed (RELEASE_KEY_INVALID); then a development key
+ * (`r<v>-000000000000`, isDevelopmentReleaseKey) refuses RELEASE_KEY_INVALID on the hosted site, which always knows its
+ * source revision; then a number that is not this process's REGISTER_VERSION refuses RELEASE_KEY_REGISTER_MISMATCH, so
+ * a process never serves debates under another release's name. Returns the key.
+ */
+export function checkedReleaseKey(
+  raw: string | undefined,
+  registerVersion: number,
+  deploymentMode: DeploymentMode
+): string {
+  if (raw === undefined || raw.length === 0) throw releaseKeyRequired();
+  const parsed = parseReleaseKey(raw);
+  if (deploymentMode === "hosted" && isDevelopmentReleaseKey(parsed.releaseKey)) {
+    throw new TypedDomainError("RELEASE_KEY_INVALID", "A hosted release key names its source revision, never 000000000000");
+  }
+  if (parsed.siteVersion !== registerVersion) {
+    throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "RELEASE_KEY's number is not this process's REGISTER_VERSION");
+  }
+  return parsed.releaseKey;
+}
+
+/** checkedReleaseKey over a key the shape already read (plan B's name for the same check; INTERFACE "RELEASE_KEY"). */
+export function assertReleaseKeyForRegister(
+  releaseKey: string,
+  registerVersion: number,
+  deploymentMode: DeploymentMode
+): string {
+  return checkedReleaseKey(releaseKey, registerVersion, deploymentMode);
+}
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
 const nodeEnvironment = z.enum(["development", "test", "production"]).optional();
@@ -407,7 +462,9 @@ export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
   HATCHET_API_URL: z.string().url(), HATCHET_TENANT_ID: z.string().min(1),
-  HATCHET_WORKFLOW_NAME: z.string().min(1), HATCHET_TLS_STRATEGY: z.enum(["tls", "mtls", "none"])
+  HATCHET_WORKFLOW_NAME: z.string().min(1), HATCHET_TLS_STRATEGY: z.enum(["tls", "mtls", "none"]),
+  /** Side-by-side §1-§2: the release this process is; its Hatchet task is named after it (releaseTaskName). */
+  RELEASE_KEY: releaseKeyValue
 } as const;
 
 const apiEnvironmentShape = {
@@ -711,7 +768,9 @@ function validateApiEnvironment(
   if ((deploymentMode === "hosted" || turnstileBeyondSignup) && environment.TURNSTILE_SOCKET_PATH === undefined) {
     throw new TypeError("TURNSTILE_SOCKET_PATH_REQUIRED");
   }
-  return { ...environment, DEPLOYMENT_MODE: deploymentMode };
+  // Side-by-side §1: the key names this API's own register version (and a real source revision when hosted).
+  const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
+  return { ...environment, RELEASE_KEY: releaseKey, DEPLOYMENT_MODE: deploymentMode };
 }
 
 export function parseApiEnvironment(
@@ -1016,13 +1075,16 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   }
   assertProductionFloors(environment);
   const previewConfig = parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  const previewTeamUserIds = parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined);
+  const deploymentMode = resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV);
+  // Side-by-side §1: the same check as the API's, so a runner never serves under another release's name.
+  const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
   return {
     ...environment,
+    RELEASE_KEY: releaseKey,
     PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
-    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined),
-    DEPLOYMENT_MODE: resolveDeploymentMode(
-      environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
-    )
+    PREVIEW_TEAM_USER_IDS: previewTeamUserIds,
+    DEPLOYMENT_MODE: deploymentMode
   };
 }
 

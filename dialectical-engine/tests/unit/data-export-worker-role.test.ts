@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 import { assertProductionFloors, parseApiEnvironment } from "../../packages/register/src/runtime-environment.js";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
@@ -18,7 +19,7 @@ function apiSource(): Record<string, string> {
     ACCOUNT_ERASURE_GRACE_MS: "604800000", MAIL_SENDMAIL_PATH: "/usr/sbin/sendmail",
     MAIL_FROM: "noreply@example.test", PUBLIC_APP_URL: "https://example.test",
     API_HOST: "127.0.0.1", API_PORT: "8790", STRANGER_SAMPLE_RATE: "0",
-    REGISTER_VERSION: "1", BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
+    REGISTER_VERSION: "1", RELEASE_KEY: fixtureReleaseKey("1"), BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
     HATCHET_CLIENT_TOKEN: "test", HATCHET_HOST_PORT: "127.0.0.1:7077",
     HATCHET_API_URL: "http://127.0.0.1:8888", HATCHET_TENANT_ID: "test",
     HATCHET_WORKFLOW_NAME: "test", HATCHET_TLS_STRATEGY: "none", NODE_ENV: "test"
