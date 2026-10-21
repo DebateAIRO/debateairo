@@ -27,9 +27,10 @@ the model list, `NODE_ENV=production`). They are the same constants the reviewed
 check demands from `ui.env`, so the build and the running site cannot disagree. `build-env`
 prints them with their sha256 so you can compare `ui.env` by hash, without printing it.
 
-The model list is one of two reviewed lists, picked by name with `--models` (on `build-env` and
-`ui-build`): `glm-only` (the default: GLM only, the list the preview has used so far) or
-`multi-model` (Free: GLM and DeepSeek; Premium: GLM, DeepSeek, MiMo and Qwen). The list is baked into
+The model list is one of three reviewed lists, picked by name with `--models` (on `build-env` and
+`ui-build`): `glm-only` (the default: GLM only), `multi-model` (Free: GLM and DeepSeek; Premium: GLM,
+DeepSeek, MiMo and Qwen) or `all-models` (Free and Premium: GLM, DeepSeek, MiMo, Qwen and Haiku; the list
+the preview runs, R18 and R19 were built with it). The list is baked into
 the website when it is built, so changing it means a new build. The build writes the list it used
 into `.next/preview-model-roster.json` (covered by the build manifest), and the UI start-up check
 refuses unless `ui.env` names the same list. Which list belongs at which moment is in
@@ -64,8 +65,8 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | Command | What it does |
 |---|---|
 | `source-manifest --repository <clean git clone> --root <release root> --role api\|ui\|runner --out <file>` | runs `generateSourceManifest` with uid 0 and writes it; prints `{path,sha256,bytes}` |
-| `build-env [--models glm-only\|multi-model]` | prints the fixed public UI build values (for that model list; default `glm-only`) and their sha256; reads no file |
-| `ui-build --source <ui source manifest> [--models glm-only\|multi-model] --out <file>` | checks the UI root against its manifest, builds with the fixed values and that model list (default `glm-only`), records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
+| `build-env [--models glm-only\|multi-model\|all-models]` | prints the fixed public UI build values (for that model list; default `glm-only`) and their sha256; reads no file |
+| `ui-build --source <ui source manifest> [--models glm-only\|multi-model\|all-models] --out <file>` | checks the UI root against its manifest, builds with the fixed values and that model list (default `glm-only`), records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
 | `verify --source <file> [--ui-build <file>]` | re-runs `verifySourceManifest` (and `verifyUiBuildManifest`) against the exact file bytes |
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
@@ -79,6 +80,10 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 
 This follows the release runbook: steps 1-3 (package, build, fingerprints) need no downtime;
 the native-plan steps belong to its steps 5b and 7 (downtime, owner yes).
+
+**On the hosted preview (since 19 October 2026)** a whole release follows "A normal release on a hosted base" at the
+end of this guide. It runs steps 2 to 5 below as they are, and replaces steps 6 and 7 and the publish sequence with
+its hosted form.
 
 **0. Names for this release.** Open one root shell first (`sudo -i`) and keep it for every
 step below. `LABEL` below is the example of the release built from dev 23402d10e: change it for
@@ -97,7 +102,8 @@ rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-t
 **1. Package** (runbook step 1, unchanged): the clean reference clone at `$ART/source-reference`,
 six root-owned release folders `$R/auth-dev-{candidate,fallback}-$LABEL-{api,ui,runner}` exported
 with `git archive`, dependencies installed offline with `pnpm install --frozen-lockfile`, and the
-contract generated in each. The tool starts after that.
+contract generated in each. The tool starts after that. When `pnpm-lock.yaml` changed since the live release, the
+offline install first needs a store copy holding the new packages ("A normal release on a hosted base", A3).
 
 **2. Source manifests** for all six folders (about 2 minutes each):
 
@@ -112,7 +118,8 @@ Expect six lines `{"path":…,"sha256":…,"bytes":…}`.
 **3. Check the public build values against `ui.env`, by hash only.** First the tool's values,
 then the same keys from `ui.env` (this prints hashes, never the file):
 
-Give `build-env` the same `--models` you will give `ui-build` in step 4 (none means `glm-only`).
+Give `build-env` the same `--models` you will give `ui-build` in step 4 (none means `glm-only`). The preview's
+`ui.env` names `all-models`.
 
 ```sh
 rel build-env
@@ -238,10 +245,13 @@ those debates would wait with nobody to run them.
 `conformanceContractHash` `108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6` (was `660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f`)
 and `mapContractHash` `d46c0c12d8164c9b01db78ff64ab58515e8a2f98887d5a433c090b40dcd39b71` (was `25b4c106a9b5e444d19aee0a31b7fea95f377ee91fb1f9eef64c623938e59392`); the
 composer seal is unchanged. It needs them whether or not it carries the `lengthGuidancePolicy` row (`--length-guidance`).
-Rolling the CODE back to R18 (the release before these seals) also needs `REGISTER_VERSION` re-pinned in both
-`api.env` and `runner.env` to the version published before them (on the preview: 14), and both restarted: an R18
-runner refuses a version with the new seals (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, the other way). Never roll the
-code back while a debate admitted with the length row runs: the older code refuses a receipt that carries `length`.
+On the preview these seals arrived with R19 (register 17, 21 October 2026). Rolling the CODE back to R18 (the release
+before them) needs the version published before them (on the preview: 16) in both `api.env` and `runner.env`: an R18
+runner refuses a version with the new seals (`REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`, the other way). On the preview
+a re-pin is not enough. R19 also applied migrations 0121 and 0122, and R18 refuses that database: its native verify
+knows only its own migration list. The way back is the cold copy taken just before them ("A normal release on a hosted
+base", rbB), and it brings back register 16 with it. Never roll the code back while a debate admitted with the length
+row runs: the older code refuses a receipt that carries `length`.
 
 **R2a moves the engine seal.** A register version for this code carries `engineContractHash` `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` (was
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`, R1d's seal over no contract). Nothing reads it
@@ -256,7 +266,12 @@ comparing judges' prompt contract. Nothing reads it without an `engineVersionPol
 There is no `debateShapePolicy` row: leave out `--debate-shape`, so the shape stays off. Any other added or
 changed row: stop and ask.
 
-**The order.**
+**The order.** It was written for the local-mode preview. On the hosted preview (since 19 October 2026) follow "A
+normal release on a hosted base" at the end of this guide instead. It is the same order, with three changes:
+- the plan and the practice carry `--hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes`
+  (step 3's plan without `--hosted-billing` is refused there: `HOSTED_BILLING_REQUIRED`);
+- a cold copy of the database comes before the migrations;
+- the runner is started by hand.
 
 1. **Practice first, with `--register-next`** (`tools/preview-practice/README.md`). Without it the practice
    debate stops at `REGISTER_PROMPT_CONTRACT_HASH_MISMATCH`. Its progress line must name exactly the rows above.
@@ -274,7 +289,9 @@ changed row: stop and ask.
    it, never before. Never restart the API alone on version 12: it does not check the fingerprints, so it
    would accept debates the runner cannot start.
 
-Rollback: the new version stays sealed and unused; the old release goes back on version 12 in both env files.
+Rollback: before step 2's migrations nothing has changed, and the old release starts again as it was. Once they are
+applied, the old code refuses the database, so the only way back is the cold copy taken just before them (R17's way;
+on the hosted preview, rbB in "A normal release on a hosted base"). A version published after them goes with it.
 Switching the shape on later is a separate publication (`--debate-shape`), after these steps.
 
 ## Publishing a new register version on the preview (publish kit v2)
@@ -311,6 +328,9 @@ put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && 
 cp -a "$NP" "$S/native-plan.before.json"
 ```
 
+`nat` prints `exit N` and itself always returns 0. So an `&&` after it never stops on a refusal: read the
+printed line. In a script, test it: `OUT=$(nat …); [ "$OUT" = "exit 0" ] || { …; exit 1; }`.
+
 1. **Plan** (read-only; the services can stay up). The base is the live publication:
 
    ```sh
@@ -319,6 +339,18 @@ cp -a "$NP" "$S/native-plan.before.json"
    put "$S/native-plan.before.json"   # at once: a restart's prestart accepts only a verify plan
    jq '{baseRegisterVersion,addedKeys,changedKeys,deltaSha256}' "$ART/register-proposal.json"
    ```
+
+   **On the hosted preview** (since 19 October 2026) that `plan` line is refused (`HOSTED_BILLING_REQUIRED`). The
+   plan must carry the owner's hosted inputs with billing on and the live checker. H6's billing-off JSON would switch
+   billing off:
+
+   ```sh
+   HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB_ON" --out "$ART/native-plan-plan.json"
+   ```
+
+   `publish`, `verify` and `apply-and-plan` carry the hosted inputs over from their `--from`, and refuse
+   `--hosted-billing`. A whole release on the hosted preview is in "A normal release on a hosted base".
 
 2. **The owner reviews the delta.** Read every entry, old value against new:
 
@@ -428,13 +460,28 @@ cp -a "$NP" "$S/native-plan.before.json"
    the next lines first count the debates the runner is working on right now (`CLAIMED`), and
    restart the runner only when that count is 0. If they print a number above 0, nothing is
    restarted: wait a few minutes and paste the same lines again. If the number stays above 0 for
-   more than 30 minutes, stop and ask. The runner is never restarted automatically;
-   `try-restart` restarts it only if it is running, so a runner stopped on purpose stays stopped
-   and its next start by hand uses the new version.
+   more than 30 minutes, stop and ask. The runner is never restarted automatically.
+
+   The release runbook's downtime, which step 3 follows, stops the runner too, so here it is usually not running. A runner from
+   before #177 even shows `failed` after that planned stop. These lines therefore restart a running runner, and
+   start a stopped (`inactive` or `failed`) one. They used `try-restart` until 21 October 2026, and that left a
+   stopped runner down. If the runner was stopped on purpose before this release, for another reason, do not
+   paste them: its next start by hand uses the new version.
 
    ```sh
-   RUNNING=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT count(*) FROM core.work_item WHERE state = 'CLAIMED'"); echo "debates running now: $RUNNING"
-   [ "${PINNED:-}" = yes ] && [ "$RUNNING" = 0 ] && systemctl try-restart debateai-preview-runner && echo "runner restarted (if it was running)"
+   ( set -euo pipefail
+     [ "${PINNED:-}" = yes ] || { echo "RUNNER_NOT_DONE: the pin block above did not finish (PINNED is not yes)"; exit 1; }
+     RUNNING=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT count(*) FROM core.work_item WHERE state = 'CLAIMED'"); echo "debates running now: $RUNNING"
+     [ "$RUNNING" = 0 ] || { echo "RUNNER_NOT_DONE: a debate is running; wait and paste these lines again"; exit 1; }
+     RS=$(systemctl is-active debateai-preview-runner || true); echo "runner before: $RS"
+     case "$RS" in
+       active) systemctl restart debateai-preview-runner ;;
+       inactive|failed) systemctl start debateai-preview-runner ;;
+       *) echo "RUNNER_NOT_DONE: the runner is $RS: look first"; exit 1 ;;
+     esac
+     sleep 20
+     [ "$(systemctl is-active debateai-preview-runner || true)" = active ] || { echo "RUNNER_NOT_DONE: the runner is not active after its start: read its journal"; exit 1; }
+     echo "runner started on the new version" )
    ```
 
 **Publishing the call-concurrency row.** The register row `callConcurrencyPolicy` says how many AI
@@ -490,8 +537,13 @@ A plan without the option keeps the current value: once a version holds the row,
 unchanged from the version the plan is based on, and the delta does not list it. So a publication
 made for another reason never needs the option, and never changes the setting.
 
-**Rolling back.** Re-install the archived `$S/native-plan.before.json`, set `REGISTER_VERSION` back
-to the old version, and re-pin the old launch plans. The new version stays sealed, unused. Later
+**Rolling back.** This holds only for a release that applied no migration. Once a release's
+`apply-and-plan` ran, the old code refuses the database, and the way back is the cold copy taken
+before it ("A normal release on a hosted base", rbB). Without a migration: re-install the archived
+`$S/native-plan.before.json`, set `REGISTER_VERSION` back to the old version, and re-pin the old
+launch plans (re-pinning rewrites `pinnedAt`, so compare the lock with its copy without those
+times). On the hosted base use rbB instead: after this lighter way back a published version sits above the live
+one, so the next release's A0 refuses until the owner decides how to go on. The new version stays sealed, unused. Later
 publications must then be based on that newest version, not on the one running after the
 rollback, because `plan` and `publish` refuse a base with a newer version above it. So run the next
 `plan` with `--from` set to the kept `$ART/native-plan-verify.json` of step 4, which names it. The
@@ -534,7 +586,8 @@ steps below where the server differed from what they said:
 - one guard that did not stop its block (H6);
 - the database login of H0.
 
-A later switch can follow the steps as they now stand.
+A later switch can follow the steps as they now stand. A release after the switch follows "A normal release on a
+hosted base" at the end of this guide.
 
 What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`):
 - publish kit v3 (`publish-register-v3.ts`), chosen by `native-plan --hosted-billing '<JSON>'`;
@@ -948,9 +1001,9 @@ these four rows (`deltaSha256` `91b9bf14…a397`), and version 15 was published.
 runbook's downtime also stops the runner. A runner built before #177 (R18 and older) exits 1 on that
 planned stop, so `systemctl is-active debateai-preview-runner` prints `failed`, not `inactive`. The
 owner then gets a "debateai-preview-runner failed" email from the alert unit. Both are harmless. Accept
-`inactive` or `failed` as "stopped". Step 6's `try-restart` restarts only a running unit, so a runner
-left `failed` stays down: start it with `systemctl start debateai-preview-runner` once `PINNED` is
-`yes` and no debate runs.
+`inactive` or `failed` as "stopped". Step 6's runner lines start a runner that is `inactive` or
+`failed`, once `PINNED` is `yes` and no debate runs. (Until 21 October 2026 they used `try-restart`,
+which restarts only a running unit, so a runner left `failed` stayed down.)
 
 **Step 5 also switches the mode and adds the hosted settings.** In place of step 5's lines, with `V`
 from step 3 (the POS signature is not a secret: NETOPIA prints it in its admin):
@@ -1097,6 +1150,15 @@ them are verification-forward aliases, and mail to those arrives in the forward 
 The heading keeps its old name. The register this returns to is the one the preview ran before H6:
 14 on 19 October 2026, not 12.
 
+**This undoes the hosted switch only, and only from the release that made it** (R18), on a database no later release
+has changed. It is not the way back from a release on the hosted base: that is the release's own rbB ("A normal
+release on a hosted base"). Since R19 (21 October 2026) it cannot run as written. R19 applied migrations 0121 and
+0122, and the pre-hosted release R18 refuses that database. R19's runner, in turn, refuses register 14 (its prompt
+seals). To go back to local mode while R19 is the live release, first run R19's rbB (only with the owner's yes that
+everything written since R19's cold copy is lost). It restores that copy, taken before 0121 and 0122, and with it R18
+on register 16, hosted. Then run this section. Once a later release is live, R19's names file and copy are stale: ask
+the owner first.
+
 Restores the files kept in H1 and the release pinned before H6, then restarts. The hosted versions
 stay sealed and unused; the billing rows written in the sandbox stay in the database (local mode reads
 none of them).
@@ -1121,9 +1183,8 @@ put "$S/native-plan.before-hosted.json" \
 ```
 
 If `R0` prints `null`, the lock had no runner before: leave the runner pin and drop-in lines out.
-Then restart the runner exactly as step 6's runner lines say (only when `PINNED` is `yes` and no
-debate is running). If it is not running (`failed` after a planned stop, H6's step 3 note), start it
-with `systemctl start debateai-preview-runner` instead. Then check that
+Then run step 6's runner lines (only when `PINNED` is `yes` and no debate is running): they restart a
+running runner, and start one left `inactive` or `failed` (H6's step 3 note). Then check that
 `grep -c '^DEBATEAI_DEPLOYMENT_MODE=local$' "$E/api.env" "$E/runner.env"` prints 1 for each file.
 
 The egress proxy, the Caddy exemption and Postfix's limit may stay: in local mode the API makes no
@@ -1153,3 +1214,840 @@ Quaderno's path, mail delivery and the purchase come with H8. The unit tests
 `preview-egress-proxy`, `preview-auth-dev-mail`) and the PostgreSQL 18 integration test
 (`tests/integration/preview-register-publish-v3.test.ts`: provider-only then billing on, each version
 passing the hosted API's boot-readiness check) are source evidence only.
+
+## A normal release on a hosted base (since R19, 21 October 2026)
+
+**In plain words.** Since 19 October 2026 the preview runs in hosted mode with NETOPIA sandbox billing on
+(register 16, "Hosted preview with NETOPIA sandbox billing" above). So every release from then on is a release on a
+hosted base. The sequences earlier in this guide were written while the preview ran in local mode, and on this host
+three of their habits now go wrong:
+- a register plan without the owner's hosted inputs is refused (`HOSTED_BILLING_REQUIRED`), and one with the
+  billing-OFF inputs of H6 would switch billing off;
+- a release that brings database steps (migrations) has no way back unless a cold copy of the database is taken just
+  before them;
+- `try-restart` leaves a stopped runner down.
+
+R19 was the first release on the hosted base: dev `d50e33165`, migrations 0121 and 0122, register 17. It ran the order
+below with one script per step. Every script worked the first time, and the site was down 11 minutes 38 seconds. This
+section is that recipe, written so that any later release can follow it.
+
+**How each step runs.**
+- Each step below is one script. It starts with `set -euo pipefail` and reads the release's names file (step A1).
+  Run each one on its own, as root, with `bash -s` (R19 sent each file over `ssh … 'sudo -n bash -s' < step.sh` and
+  kept its output next to it). Replace `rNN` with the release's number (`r20`, `r21`, …) and fill in the few
+  `<…>` values; everything else is derived.
+- The last line says `<STEP>_DONE`, or `<STEP>_NOT_DONE: <why>`: then the script has exited 1 at the first surprise.
+  After a `_NOT_DONE`, run nothing further: read "The way back" below and decide with the owner.
+- Every guard is written `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`. A bare test inside an `a && b` list does
+  not stop a script under `set -e` (R17's `cmp … && echo X` lines did not stop either).
+- The scripts print no env value other than `REGISTER_VERSION`, `DEBATEAI_DEPLOYMENT_MODE` and `MAIL_SENDMAIL_PATH`.
+- Long steps (A3, A4, A6, A7) may run in the background, as R19 did: save the script in `$S/jobs` (made once with
+  `install -d -o root -g root -m 0700 "$S/jobs"`), start it with `nohup bash "$S/jobs/<step>.sh" > "$S/jobs/<step>.log"
+  2>&1 < /dev/null &`, and read the log with `tail`.
+
+**The plan's inputs on this host never change** (the owner's, 14 and 19 October 2026). The hosted kit rebuilds
+billing, the ceilings and the answer checker from the plan every time, never from the base:
+
+```sh
+HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+```
+
+- Every plan carries `--hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes`.
+- Never H6's billing-OFF JSON: the delta would show `billingPolicy` switching billing off.
+- Never without the checker flags: the delta would show the answer checker going back to GLM (`evaluatorRoleRef`,
+  `storyCheckerRoleRef`).
+- Leave out `--role-rotation` (rotation stays on), `--call-concurrency` (the row is carried from the base) and
+  `--debate-shape`. Add `--length-guidance` only when the owner chose it for this release (R19 had none).
+
+**The traps** (each one stopped, or nearly stopped, an earlier release):
+- **`nat` always exits 0.** It prints `exit N` and returns 0 itself, so `put … && nat …` never stops on a refusal.
+  Take its line and test it: `OUT=$(nat "$F"); [ "$OUT" = "exit 0" ] || { …; exit 1; }`.
+- **A pin writes `pinnedAt`.** After a re-pin the lock is never byte-equal to its copy. Compare it without the pin
+  times: `diff <(jq -S 'del(.services[].pinnedAt)' "$S/release-lock.before.json") <(jq -S 'del(.services[].pinnedAt)' "$LOCK")`.
+- **The build roster is `all-models`**, the list in `ui.env` (Free and Premium list all five AIs, Haiku
+  included). It is not `multi-model`, which hashes to `f6b1851e…`: the UI start-up check would refuse that build.
+- **Skip the runner's prepare-only check** (`launch-runner.mjs --plan` without `--start`). It refuses a database
+  proof older than 180 seconds, and the launch plans take longer than that to make. The real start makes a fresh
+  proof.
+- **With a migration pending, `verify`, `publish` and every start refuse.** So B3 comes before B4 and before any
+  start. `plan` (A8) is not affected: it composes from the code and the sealed base (R19 planned with 0121 and 0122
+  pending).
+- **0122 must be in before the first start of R3+ code.** Every map read of R3+ code (R19 and later) joins
+  `core.map_item_rests_on`, which 0122 makes: without it every debate page fails. In general, a release's
+  migrations go in before its first start.
+- Also: a runner from before #177 (R18 and older) reports `failed` after a planned stop and sends one false "runner
+  failed" email. R19 and later exit 0 on a planned stop, so they show `inactive`. Accept both as "stopped".
+- Also: the API writes `PREVIEW_API_STARTED` only after its launcher has re-hashed the release, a minute or more after
+  `systemctl start`. Wait for it (B6 waits up to 4 minutes); do not read the journal at once.
+
+**The order, and the way back from each point.**
+
+| Step | What | The site | The way back from here |
+|---|---|---|---|
+| A0 | preflight (read-only) | up | nothing to undo |
+| A1 | names file, archive `$S`, the copies the way back needs | up | nothing to undo |
+| A2 | package: bundle, reference clone, six folders | up | nothing to undo |
+| A3 | dependencies: a store copy with the new lockfile packages, then `downloaded 0` in all six | up | nothing to undo |
+| A4-A7 | manifests, build values, two UI builds, verify and digest | up | nothing to undo |
+| A8 | register plan and proposal (read-only) | up | the live verify plan is put back at once |
+| A9 | the owner reads the delta; their yes names its `deltaSha256` | up | – |
+| A10 | gate files: hash check | up | – |
+| Practice | on the Mac, `--register-next` with the plan's flags | up | none (a throwaway database) |
+| B0 | preflight again, right before the downtime | up | – |
+| B1 | stop the runner, the backup timer, the website, the API | **down** | rbA: start the old release as it was |
+| B2 | cold copy of the database cluster | down | rbA |
+| B3 | migrations (`apply-and-plan`) | down | **only the cold copy: rbB** |
+| B4 | publish with the owner's yes; verify plan, first proof, three launch plans | down | rbB |
+| B5 | the two env edits | down | rbB |
+| B6 | pin three; start the API, then the website (the downtime ends), then the backup timer | up | rbB |
+| B7 | start the runner by hand | up | rbB |
+| B8 | checks (read-only) | up | rbB |
+
+- **Phase B needs the owner's yes, fresh in the live chat right before B1.** It names:
+  - the downtime;
+  - the cold copy;
+  - the migrations by number;
+  - the publish with the delta hash;
+  - the switch to the new commit.
+
+  R19's was: "Yes, upload R19 to the test site now: stop the services, take the cold copy of the database, apply
+  migrations 0121 and 0122, publish register 17 with delta cde2b04a…, switch to d50e33165 and start everything again."
+- **A release that adds no migration** skips B3 only (B3 then prints `B3_SKIPPED` and changes nothing). Keep B2: it
+  takes seconds, and it keeps rbB possible after the publish.
+
+### A0. Preflight (read-only)
+
+```sh
+set -euo pipefail
+# A0: preflight. Reads only; runs before the names file exists.
+E=/etc/debateai-v3-preview/auth-dev-v1; NP=$E/native-plan.json; LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+gs() { /usr/bin/python3 -I "$1/preview_budget_authority.py" status --private "$2"; }
+date -u
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "A0_NOT_DONE: a debate is queued or running"; exit 1; }
+echo "ledger $(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")"
+V0=$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1") || { echo "A0_NOT_DONE: the database is unreadable"; exit 1; }; echo "register $V0"
+for F in api.env runner.env; do [ "$(grep -c "^REGISTER_VERSION=$V0\$" "$E/$F")" = 1 ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$E/$F")" = 1 ] || { echo "A0_NOT_DONE: $F is not hosted on register $V0"; exit 1; }; done
+[ "$(jq -r .operation "$NP")" = verify ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$NP")" = on ] || { echo "A0_NOT_DONE: native-plan.json is not a billing-on verify plan"; exit 1; }
+jq -r '.services | to_entries[] | "\(.key) \(.value.sourceRevision) v\(.value.publication.registerVersion) \(.value.basePlan.path)"' "$LOCK"
+[ "$(jq -r '[.services[].publication.registerVersion] | unique | join(" ")' "$LOCK")" = "$V0" ] || { echo "A0_NOT_DONE: the lock's three plans are not all on register $V0"; exit 1; }
+[ "$(psqlq "SELECT pg_has_role('debateai_prod_api_runtime','debateai_billing_runtime','MEMBER')")" = t ] || { echo "A0_NOT_DONE: the API's login is not a billing member (H0)"; exit 1; }
+for P in /opt/debateai-v3-preview/operator/deepinfra-budget-v3:/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 /opt/debateai-v3-preview/operator/anthropic-budget-v1:/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; do
+  J=$(gs "${P%%:*}" "${P#*:}") || { echo "A0_NOT_DONE: a gate's status is unreadable"; exit 1; }; echo "$(basename "${P%%:*}") $(jq -c '{state,in_flight,today_spend_usd}' <<<"$J")"
+  [ "$(jq -r .state <<<"$J")" = active ] && [ "$(jq -r .in_flight <<<"$J")" = 0 ] || { echo "A0_NOT_DONE: a gate is not active, or has a call in flight"; exit 1; }
+done
+for U in api ui runner provider-budget anthropic-budget postgresql hatchet hatchet-gateway turnstile egress; do systemctl show -p Id -p ActiveState -p NRestarts debateai-preview-$U | tr '\n' ' '; echo; done
+AV=$(df --output=avail -BG / | tail -1 | tr -dc 0-9); echo "disk free ${AV} GB"
+[ "$AV" -ge 15 ] || { echo "A0_NOT_DONE: less than 15 GB free (R19 used about 4 GB)"; exit 1; }
+echo A0_DONE
+```
+
+R19 (21 October 2026): unfinished 0, ledger `139|0120_reply_measures.sql`, register 16, the lock's three
+`…-billing-on` plans of R18, both gates active with nothing in flight, 35 GB free.
+
+### A1. Names, the archive `$S` and the copies the way back needs
+
+The old release is the one the lock names now: its folders, commit and plans are read from the lock, never typed.
+`OSTORE` is the pnpm store the live release installed from. R19 made its own copy,
+`/opt/debateai-v3-preview/artifacts/auth-dev-d50e33165-r19-v1/pnpm-store`. A release that made no copy installed
+from the one before it.
+
+```sh
+set -euo pipefail
+# A1: this release's names file, its archive folder S, and the copies the way back needs. Nothing live changes.
+NN=rNN                                                    # this release's number, e.g. r20
+REV='<the full 40-character dev commit>'                  # on the Mac: git fetch origin dev && git rev-parse refs/remotes/origin/dev
+OSTORE='<the pnpm store the live release installed from>'
+LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json; E=/etc/debateai-v3-preview/auth-dev-v1; NP=$E/native-plan.json
+NAMES=/root/preview-archive/$NN-names.sh; SP=/root/preview-archive/$NN-S.txt
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+[ ! -e "$NAMES" ] && [ ! -e "$SP" ] || { echo "A1_NOT_DONE: $NAMES or $SP exists (look first)"; exit 1; }
+printf '%s\n' "$NN" | grep -qxE 'r[0-9]+' && printf '%s\n' "$REV" | grep -qxE '[0-9a-f]{40}' || { echo "A1_NOT_DONE: NN or REV is not filled in"; exit 1; }
+[ -d "$OSTORE/v11" ] || { echo "A1_NOT_DONE: OSTORE is not a pnpm store"; exit 1; }
+OCAPI=$(jq -r .services.api.sourceRoot "$LOCK"); OCUI=$(jq -r .services.ui.sourceRoot "$LOCK"); OCRUN=$(jq -r .services.runner.sourceRoot "$LOCK")
+OREV=$(jq -r .services.api.sourceRevision "$LOCK"); OLABEL=${OCAPI#/opt/debateai-v3-preview/releases/auth-dev-candidate-}; OLABEL=${OLABEL%-api}
+OPLANS=$(dirname "$(jq -r .services.api.basePlan.path "$LOCK")")
+[ "$OCUI" = "/opt/debateai-v3-preview/releases/auth-dev-candidate-$OLABEL-ui" ] && [ "$OCRUN" = "/opt/debateai-v3-preview/releases/auth-dev-candidate-$OLABEL-runner" ] && [ "$(jq -r '[.services[].sourceRevision] | unique | length' "$LOCK")" = 1 ] || { echo "A1_NOT_DONE: the lock's three services are not one release"; exit 1; }
+for F in api ui runner; do [ "$(jq -r ".services.$F.basePlan.path" "$LOCK")" = "$OPLANS/$F-launch.json" ] || { echo "A1_NOT_DONE: the lock's $F plan is not in $OPLANS"; exit 1; }; done
+[ "$(jq -r .operation "$NP")" = verify ] && [ "$(jq -r .sourceRevision "$NP")" = "$OREV" ] && [ "$REV" != "$OREV" ] || { echo "A1_NOT_DONE: native-plan.json is not the live release's verify plan, or REV is the live release"; exit 1; }
+LABEL=${REV:0:9}-$NN-v1
+[ ! -e "/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL" ] && [ ! -e "/opt/debateai-v3-preview/releases/auth-dev-candidate-$LABEL-api" ] || { echo "A1_NOT_DONE: this release's artifacts folder or folders exist"; exit 1; }
+[ -d "/opt/debateai-v3-preview/artifacts/auth-dev-$OLABEL/source-reference" ] || { echo "A1_NOT_DONE: the old release's reference clone is missing"; exit 1; }
+S=/root/preview-archive/$NN-$(date -u +%Y%m%dT%H%M%SZ)
+install -d -o root -g root -m 0700 "$S"
+umask 077
+printf '%s\n' "$S" > "$SP"
+{ printf 'REV=%s\nLABEL=%s\nOREV=%s\nOLABEL=%s\nOCAPI=%s\nOCUI=%s\nOCRUN=%s\nOPLANS=%s\nOSTORE=%s\nS=$(cat %s)\n' "$REV" "$LABEL" "$OREV" "$OLABEL" "$OCAPI" "$OCUI" "$OCRUN" "$OPLANS" "$OSTORE" "$SP"
+  cat <<'EOF'
+umask 022
+RELS=/opt/debateai-v3-preview/releases
+R=$RELS
+ART=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL
+OART=/opt/debateai-v3-preview/artifacts/auth-dev-$OLABEL
+CAPI=$RELS/auth-dev-candidate-$LABEL-api
+CUI=$RELS/auth-dev-candidate-$LABEL-ui
+CRUN=$RELS/auth-dev-candidate-$LABEL-runner
+STORE=$ART/pnpm-store
+N=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+E=/etc/debateai-v3-preview/auth-dev-v1
+NP=$E/native-plan.json
+LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
+AU=$(systemctl show -p User --value debateai-preview-api); AGRP=$(id -gn "$AU")
+HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
+PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
+GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
+PAN=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1
+rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs" "$@"; }
+nat() { ( cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "$p" 5<&- | "$@" 3<&0 0<&5 5<&-' sh '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}' /usr/sbin/runuser -u postgres -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs" --credential-fd 3 < /dev/null > "$1" ); echo "exit $?"; }
+put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && cmp "$1" "$NP"; }
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+pre() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/prestart.mjs" "$@"; }
+gs() { /usr/bin/python3 -I "$1/preview_budget_authority.py" status --private "$2"; }
+EOF
+} > "$NAMES"
+chmod 0600 "$NAMES" "$SP"
+. "$NAMES"
+umask 077
+cp -p "$E/api.env" "$S/api.env.before"; cp -p "$E/runner.env" "$S/runner.env.before"; cp -p "$E/ui.env" "$S/ui.env.before"
+chmod 0600 "$S/api.env.before" "$S/runner.env.before" "$S/ui.env.before"
+cp -p "$LOCK" "$S/release-lock.before.json"
+cp -a "$NP" "$S/native-plan.before.json"
+jq -r '.services.api.basePlan.path, .services.ui.basePlan.path, .services.runner.basePlan.path' "$LOCK" > "$S/old-plans.txt"
+( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* )
+psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$S/ledger-before"
+psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" > "$S/register-before"
+umask 022
+cmp -s "$S/native-plan.before.json" "$NP" && cmp -s "$S/release-lock.before.json" "$LOCK" && cmp -s "$S/api.env.before" "$E/api.env" && cmp -s "$S/runner.env.before" "$E/runner.env" && cmp -s "$S/ui.env.before" "$E/ui.env" || { echo "A1_NOT_DONE: a copy differs from the live file"; exit 1; }
+echo "S=$S ART=$ART old release $OLABEL, its plans in $OPLANS; ledger $(cat "$S/ledger-before"), register $(cat "$S/register-before")"
+echo A1_DONE
+```
+
+Every later step starts with these two lines:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+```
+
+### A2. Package
+
+On the Mac (changes no checkout): a bundle of dev since the live release, and its sha256. `OREV` is the commit A0
+printed for the lock's three plans.
+
+```sh
+OREV='<the commit A0 printed for the lock>'
+git fetch origin dev && git bundle create "$TMPDIR/rNN.bundle" refs/remotes/origin/dev "^$OREV" && git bundle verify "$TMPDIR/rNN.bundle" && shasum -a 256 "$TMPDIR/rNN.bundle"
+```
+
+Copy it to the server (R19: `/home/ubuntu/r19-d50e33165.bundle`), then:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A2: the bundle checked, the reference clone at REV, the new migrations listed, six release folders by git archive.
+BUN='<the path of the bundle on the server>'; BSHA='<the sha256 the Mac printed>'
+[ "$(sha256sum "$BUN" | cut -d' ' -f1)" = "$BSHA" ] || { echo "A2_NOT_DONE: the bundle is not the Mac's"; exit 1; }
+[ ! -e "$ART" ] || { echo "A2_NOT_DONE: $ART exists"; exit 1; }
+install -d -o root -g root -m 0755 "$ART"
+git clone -q --no-checkout "$OART/source-reference" "$ART/source-reference"
+git -C "$ART/source-reference" fetch -q "$BUN" refs/remotes/origin/dev
+git -C "$ART/source-reference" checkout -q --detach "$REV"
+[ "$(git -C "$ART/source-reference" rev-parse HEAD)" = "$REV" ] && [ -z "$(git -C "$ART/source-reference" status --porcelain --untracked-files=no)" ] || { echo "A2_NOT_DONE: the reference clone is not clean at REV"; exit 1; }
+git -C "$ART/source-reference" merge-base --is-ancestor "$OREV" HEAD || { echo "A2_NOT_DONE: REV is not built on the live release"; exit 1; }
+git -C "$ART/source-reference" diff --name-only --no-renames --diff-filter=A "$OREV" "$REV" -- 'dialectical-engine/migrations/[0-9]*.sql' | sed 's#.*/##' > "$S/new-migrations.txt"
+echo "new migrations: $(tr '\n' ' ' < "$S/new-migrations.txt")"
+echo "package files changed:"; git -C "$ART/source-reference" diff --name-only "$OREV" "$REV" -- '*package.json' dialectical-engine/pnpm-workspace.yaml dialectical-engine/pnpm-lock.yaml
+echo "gate and lifecycle files changed (A10):"; git -C "$ART/source-reference" diff --name-only "$OREV" "$REV" -- dialectical-engine/deploy/preview-gate dialectical-engine/deploy/preview-lifecycle dialectical-engine/packages/providers/ops
+for KIND in candidate fallback; do for ROLE in api ui runner; do
+  D=$RELS/auth-dev-$KIND-$LABEL-$ROLE
+  [ ! -e "$D" ] || { echo "A2_NOT_DONE: $D exists"; exit 1; }
+  install -d -o root -g root -m 0755 "$D"
+  git -C "$ART/source-reference" archive --format=tar "$REV" | tar -x -C "$D" --no-same-owner
+  chown -R root:root "$D"; find "$D" -type d -exec chmod go-w {} +; find "$D" -type f -exec chmod go-w {} +
+done; done
+echo A2_DONE
+```
+
+`$S/new-migrations.txt` decides B3: R19's held `0121_engine_verdict.sql` and `0122_engine_map_check.sql`. An empty
+file means no B3.
+
+### A3. Dependencies: a store copy, then offline
+
+When `pnpm-lock.yaml` changed since the live release (A2 lists it), the store the live release installed from lacks
+the new packages, and the offline install fails. R17 (for `eld`) and R19 (five packages, `follow-redirects` 1.16.1
+among them) solved it the same way:
+1. copy that store, and never touch the original;
+2. run ONE online install against the copy, in a separate fill folder (pnpm checks every new download against the
+   lockfile's sha512);
+3. install all six folders offline from the copy.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A3: store copy, one online fill against the copy, then the six folders offline (downloaded 0), then generate:contract.
+[ "$(df --output=avail -BG / | tail -1 | tr -dc 0-9)" -ge 15 ] || { echo "A3_NOT_DONE: less than 15 GB free"; exit 1; }
+[ ! -e "$STORE" ] && [ ! -e "$ART/store-fill" ] || { echo "A3_NOT_DONE: this release's store or fill folder exists"; exit 1; }
+O0=$(find "$OSTORE" -type f | wc -l)
+cp -a "$OSTORE" "$STORE"
+install -d -o root -g root -m 0755 "$ART/store-fill"
+git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine | tar -x -C "$ART/store-fill" --no-same-owner
+( cd "$ART/store-fill/dialectical-engine" && umask 022 && /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin CI=true NEXT_TELEMETRY_DISABLED=1 TZ=UTC PNPM_CONFIG_STORE_DIR="$STORE" /usr/local/bin/node tools/source-map-hotfix.mjs install ) > "$ART/store-fill-install.log" 2>&1 || { echo "A3_NOT_DONE: the online fill failed (see $ART/store-fill-install.log)"; exit 1; }
+echo "fill: $(grep -oE 'resolved [0-9]+, reused [0-9]+, downloaded [0-9]+, added [0-9]+, done' "$ART/store-fill-install.log" | tail -n 1)"
+[ "$(find "$OSTORE" -type f | wc -l)" = "$O0" ] || { echo "A3_NOT_DONE: the old store changed"; exit 1; }
+for D in "$RELS"/auth-dev-*-"$LABEL"-*; do
+  G="$ART/$(basename "$D")"
+  ( cd "$D/dialectical-engine" && umask 022 && /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin CI=true NEXT_TELEMETRY_DISABLED=1 TZ=UTC PNPM_CONFIG_OFFLINE=true PNPM_CONFIG_STORE_DIR="$STORE" /usr/local/bin/node tools/source-map-hotfix.mjs install ) > "$G-install.log" 2>&1 || { echo "A3_NOT_DONE: the offline install failed in $D"; exit 1; }
+  [ "$(grep -oE 'downloaded [0-9]+, added [0-9]+, done' "$G-install.log" | tail -n 1 | cut -d, -f1)" = "downloaded 0" ] || { echo "A3_NOT_DONE: $D did not install with downloaded 0"; exit 1; }
+  ( cd "$D/dialectical-engine" && umask 022 && /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin CI=true TZ=UTC /usr/local/bin/node tools/source-map-hotfix.mjs generate ) > "$G-generate.log" 2>&1 || { echo "A3_NOT_DONE: generate:contract failed in $D"; exit 1; }
+  echo "$(basename "$D"): $(grep -oE 'resolved [0-9]+, reused [0-9]+, downloaded [0-9]+, added [0-9]+, done' "$G-install.log" | tail -n 1)"
+done
+[ "$(sha256sum "$RELS"/auth-dev-*-"$LABEL"-*/dialectical-engine/packages/contract/generated/openapi.json | cut -d' ' -f1 | sort -u | wc -l)" = 1 ] || { echo "A3_NOT_DONE: the six openapi.json differ"; exit 1; }
+echo A3_DONE
+```
+
+- R19's fill printed `resolved 446, reused 441, downloaded 5`, and then all six printed `downloaded 0`.
+- pnpm 11 keeps its index in one file, `v11/index.db`, and the server has no `sqlite3`. So name the new packages from
+  the lockfile diff on the Mac.
+- When the lockfile did not change, skip the copy and the fill. Install from `$OSTORE` directly: put `$OSTORE` for
+  `$STORE` in the offline line, as R18 did.
+
+### A4-A7. Manifests, build values, UI builds, verify
+
+These are steps 2 to 5 of "Operator sequence for one release" above, pasted into a root shell after
+`. /root/preview-archive/rNN-names.sh`. Each `--out` goes to `$ART`. One thing differs: **the model list is `all-models`**, so give `--models all-models` to `build-env` and to
+both `ui-build`s. Check the build values against `ui.env` by hash:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A5: the public build values of the all-models list against ui.env, by hash only.
+[ ! -e "$S/build-env-all-models.json" ] || { echo "A5_NOT_DONE: an earlier build-env output exists"; exit 1; }
+rel build-env --models all-models > "$S/build-env-all-models.json"
+for K in NODE_ENV PUBLIC_APP_URL NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON TURNSTILE_SITE_KEY; do
+  T=$(jq -r --arg k "$K" '.values[$k].sha256' "$S/build-env-all-models.json"); U=$(sed -n "s/^$K=//p" "$E/ui.env" | tr -d '\n' | sha256sum | cut -d' ' -f1)
+  echo "$K tool ${T:0:16} ui.env ${U:0:16}"; [ "$T" = "$U" ] || { echo "A5_NOT_DONE: $K differs from ui.env"; exit 1; }
+done
+echo A5_DONE
+```
+
+- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --out "$ART/$KIND-ui-build.json"`,
+  for the candidate and the fallback.
+- A7 must print six `PREVIEW_RELEASE_VERIFIED` lines naming `REV`, and the operator digest.
+  - The digest changes whenever a file in `deploy/preview-auth-dev/v1` changed.
+  - `nativeSha256` changes with new migrations.
+- On 21 October 2026 the live list hashed to `cd299616…1c27`.
+
+### A8. The register plan and its proposal (read-only; the site stays up)
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# A8: the plan (billing-on inputs, the live checker), the native operator's proposal, the live verify plan put back at once.
+[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "A8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" || { echo "A8_NOT_DONE: native-plan.json moved since A1"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "A8_NOT_DONE: a debate is queued or running"; exit 1; }
+[ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "A8_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
+rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB_ON" --out "$ART/native-plan-plan.json" || { echo "A8_NOT_DONE: the release tool refused the plan"; exit 1; }
+[ "$(jq -r .operation "$ART/native-plan-plan.json")" = plan ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-plan.json")" = on ] || { echo "A8_NOT_DONE: the plan is not a billing-on plan"; exit 1; }
+restore() { put "$S/native-plan.before.json" && echo VERIFY_PLAN_RESTORED; }
+trap 'restore || echo "VERIFY_PLAN_NOT_RESTORED: put $S/native-plan.before.json back by hand"' EXIT
+put "$ART/native-plan-plan.json" || { echo "A8_NOT_DONE: put of the plan failed"; exit 1; }
+OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
+trap - EXIT
+restore || { echo "A8_NOT_DONE: put $S/native-plan.before.json back by hand"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "A8_NOT_DONE: the native operator refused the plan"; exit 1; }
+sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"
+jq -c '{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256}' "$ART/register-proposal.json"
+echo A8_DONE
+```
+
+`native-plan.json` holds the plan only while `nat` runs (R19: 53 seconds), and the trap puts the live verify plan back
+on any exit. A restart's prestart accepts only a verify plan, which is why A8 refuses while a debate is queued or
+running.
+
+### A9. The owner reads the delta
+
+Print every entry, old value against new, as step 2 of the publish sequence above does. Then check the rows the
+hosted kit must leave alone:
+
+```sh
+jq -r '.delta[] | "\(.change) \(.rowKey) (\(.reason))\n  old: \(.oldValueJsonText)\n  new: \(.newValueJsonText)"' "$ART/register-proposal.json"
+jq -r '["billingPolicy","costEnvelopePolicy","admissionPolicy","storyCostEnvelopePolicy","evaluatorRoleRef","storyCheckerRoleRef","answerRoleRotationPolicy","callConcurrencyPolicy","debateShapePolicy","lengthGuidancePolicy","engineVersionPolicy"] as $w | [.delta[].rowKey | select(. as $k | $w | index($k))] | if length == 0 then "WATCH_LIST_ABSENT" else "STOP: " + join(" ") end' "$ART/register-proposal.json"
+```
+
+- Expect exactly the rows this release's code moves, as the release's own notes list them, plus
+  `nodeRuntimeVersion` (its source reference only).
+- The second line must print `WATCH_LIST_ABSENT`. A row on that list is there only by an owner decision for this
+  release (for example `lengthGuidancePolicy` with `--length-guidance`). Anything else: stop.
+- R19's delta, on base 16:
+  - added `engineContractHash`;
+  - changed the judge, conformance, map and serve contract hashes;
+  - changed `countryPolicy` (it gained the 24 closed payment regions);
+  - changed `nodeRuntimeVersion`;
+  - 73 rows; `deltaSha256` `cde2b04ad226cf25d2efb490d427dfb8c27ad9d443b6d7cee67f4367e2548a17`.
+- The owner's yes names the printed `deltaSha256`. Re-running `plan` stamps a new time, so it makes a new hash and
+  needs a new yes.
+
+### A10. Gate files
+
+Run the check of "Publishing the call-concurrency row", Step 0 above (the `same` lines). Both gates must print
+`match this release`, and both `state` lines `active`. If A2 listed a changed gate file, stop: that gate is
+redeployed first, as `deploy/preview-gate/v3/README.md` says, with the owner's yes. In R19 nothing had changed, so
+there was nothing to install.
+
+### The practice (on the Mac; owner rule: before every upload)
+
+Follow `tools/preview-practice/README.md`, "Practising the hosted preview" and its steps S-0 to S-7. Practise on
+exactly `REV`, with the live register exported from the server (S-1), and with the plan's own flags (`$D` and `$P`
+as in S-5 and S-6):
+
+```sh
+HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
+```
+
+- Add `--length-policy` if, and only if, the plan carries `--length-guidance`. Then run `formats` as S-6 says.
+- **Pass bar** (the owner's):
+  - a FAIL is a step that failed for good, or a debate left unfinished;
+  - repaired slips, a story served with reservation, slow AIs and one unbilled "too busy" are warnings.
+- **The match.** The changed rows the practice prints (and `register.codeNext` in `report.json`) must equal A8's
+  `addedKeys` and `changedKeys`, except `nodeRuntimeVersion`: the server measures its source reference again.
+- R19's practice: PASS_WITH_WARNINGS, 33 minutes, $0.24 DeepInfra and $0.06 Anthropic, and the rows matched.
+
+### B0. Preflight again, right before the downtime
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B0: read-only. Nothing moved since phase A, everything staged is in place, nothing of phase B exists yet, and the
+# way back is ready (old plans, old folders, drop-ins, the mail line, Hatchet allowed at the gateway).
+REG0=$(cat "$S/register-before")
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "B0_NOT_DONE: a debate is queued or running"; exit 1; }
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$(cat "$S/ledger-before")" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$(cat "$S/register-before")" ] || { echo "B0_NOT_DONE: the ledger or the register moved since A1"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" && cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "B0_NOT_DONE: native-plan.json or the lock moved since A1"; exit 1; }
+for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "B0_NOT_DONE: $F moved since A1"; exit 1; }; done
+sha256sum -c --quiet "$S/plan-proposal.sha256" || { echo "B0_NOT_DONE: the plan or the proposal changed since A8"; exit 1; }
+for KIND in candidate fallback; do for ROLE in api ui runner; do [ -s "$ART/$KIND-$ROLE-source.json" ] && [ -d "$RELS/auth-dev-$KIND-$LABEL-$ROLE/dialectical-engine" ] || { echo "B0_NOT_DONE: $KIND $ROLE is not staged"; exit 1; }; done; [ -s "$ART/$KIND-ui-build.json" ] || { echo "B0_NOT_DONE: the $KIND UI build is missing"; exit 1; }; done
+for F in native-plan-apply-and-plan.json native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "B0_NOT_DONE: $F already exists (look first)"; exit 1; }; done
+[ ! -e "$S/pg18-cold.sha256" ] || { echo "B0_NOT_DONE: a cold copy already exists in S (look first)"; exit 1; }
+[ "$(sed -n 1p "$S/old-plans.txt")" = "$(jq -r .services.api.basePlan.path "$LOCK")" ] && [ "$(sed -n 2p "$S/old-plans.txt")" = "$(jq -r .services.ui.basePlan.path "$LOCK")" ] && [ "$(sed -n 3p "$S/old-plans.txt")" = "$(jq -r .services.runner.basePlan.path "$LOCK")" ] || { echo "B0_NOT_DONE: old-plans.txt is not the lock's three plans"; exit 1; }
+for F in $(cat "$S/old-plans.txt"); do [ -s "$F" ] && [ "$(jq -r .publication.registerVersion "$F")" = "$REG0" ] || { echo "B0_NOT_DONE: the old plan $F is missing or not on $REG0"; exit 1; }; done
+for D in "$OCAPI" "$OCUI" "$OCRUN"; do [ -d "$D/dialectical-engine" ] || { echo "B0_NOT_DONE: the old release's folder $D is missing"; exit 1; }; done
+for U in api ui runner; do [ "$(grep -cF "$OLABEL" /etc/systemd/system/debateai-preview-$U.service.d/zzzzzzzzzz-lifecycle-release.conf || true)" -ge 1 ] || { echo "B0_NOT_DONE: the $U drop-in does not name the old release"; exit 1; }; done
+[ "$(grep -c "^MAIL_SENDMAIL_PATH=$OCAPI/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs\$" "$E/api.env")" = 1 ] || { echo "B0_NOT_DONE: api.env's mail line does not name the old release once"; exit 1; }
+CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
+IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
+ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gateway.service)
+[ -n "$CID" ] && [ -n "$IP" ] && echo " $ALLOW " | grep -qF -e " $IP/32 " -e " $IP " || { echo "B0_NOT_DONE: Hatchet's address is unread or not in the gateway's IPAddressAllow (B2 could not start the gateway again)"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] && [ "$(gs "$GD" "$PD" | jq -r .in_flight)" = 0 ] && [ "$(gs "$GAN" "$PAN" | jq -r .in_flight)" = 0 ] || { echo "B0_NOT_DONE: a gate is not active, or has a call in flight"; exit 1; }
+echo "new migrations: $(tr '\n' ' ' < "$S/new-migrations.txt"); disk free $(df --output=avail -BG / | tail -1 | tr -dc 0-9) GB"
+echo B0_DONE
+```
+
+### B1. The downtime starts: stop the runner, the backup timer, the website, the API
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B1: DOWNTIME START. Guards first (nothing is stopped if one fails), then the four stops.
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "B1_NOT_DONE: a debate is queued or running (nothing was stopped)"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" && cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "B1_NOT_DONE: native-plan.json or the lock moved (nothing was stopped)"; exit 1; }
+for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "B1_NOT_DONE: $F moved (nothing was stopped)"; exit 1; }; done
+[ "$(gs "$GD" "$PD" | jq -r .in_flight)" = 0 ] && [ "$(gs "$GAN" "$PAN" | jq -r .in_flight)" = 0 ] || { echo "B1_NOT_DONE: a gate has a call in flight (nothing was stopped)"; exit 1; }
+date -u +%s >> "$S/downtime-start-epoch"; echo "DOWNTIME START $(date -u)"
+for U in debateai-preview-runner debateai-preview-backup.timer debateai-preview-ui debateai-preview-api; do systemctl stop "$U" || { echo "B1_NOT_DONE: systemctl stop $U failed"; exit 1; }; done
+RS=$(systemctl is-active debateai-preview-runner || true); echo "runner $RS"
+case "$RS" in inactive|failed) ;; *) echo "B1_NOT_DONE: the runner is still $RS"; exit 1;; esac
+for U in debateai-preview-ui debateai-preview-api debateai-preview-backup.timer; do [ "$(systemctl is-active "$U" || true)" = inactive ] || { echo "B1_NOT_DONE: $U is not inactive"; exit 1; }; done
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "B1_NOT_DONE: a debate was admitted during the stop (it would land in the cold copy): ask"; exit 1; }
+C=x; for i in $(seq 1 15); do C=$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE datname='debateai' AND backend_type='client backend' AND pid<>pg_backend_pid()"); [ "$C" = 0 ] && break; sleep 2; done
+[ "$C" = 0 ] || { echo "B1_NOT_DONE: $C database client(s) still connected"; exit 1; }
+echo B1_DONE
+```
+
+The runner of R18 and older prints `failed` here and sends one false "runner failed" email. That is the planned
+stop.
+
+### B2. The cold copy of the database cluster
+
+This is R17's method (W2-02). After B3 this copy is the only way back.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B2: stop the gateway, Hatchet, PostgreSQL; tar the data folder and its config into S; check; start them again.
+PGP=/var/lib/postgresql/18; SOCK=/run/debateai-v3-preview/postgresql
+LEDGER0=$(cat "$S/ledger-before"); REG0=$(cat "$S/register-before")
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "B2_NOT_DONE: $U is running (B1 first)"; exit 1;; esac; done
+[ "$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE datname='debateai' AND backend_type='client backend' AND pid<>pg_backend_pid()")" = 0 ] || { echo "B2_NOT_DONE: database clients connected"; exit 1; }
+[ ! -e "$S/pg18-v3-preview-cold.tgz" ] && [ ! -e "$S/pg18-v3-preview-config.tgz" ] && [ ! -e "$S/pg18-cold.sha256" ] || { echo "B2_NOT_DONE: an earlier cold copy exists in S (look first)"; exit 1; }
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "B2_NOT_DONE: the ledger or the register moved since A1"; exit 1; }
+SIZE=$(du -sm "$PGP/v3-preview" | cut -f1); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || { echo "B2_NOT_DONE: not enough free space for the copy"; exit 1; }
+CID0=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
+IP0=$(docker inspect "$CID0" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
+[ -n "$CID0" ] && [ -n "$IP0" ] || { echo "B2_NOT_DONE: the Hatchet container or its address is unread"; exit 1; }
+systemctl stop debateai-preview-hatchet-gateway debateai-preview-hatchet debateai-preview-postgresql || { echo "B2_NOT_DONE: a stop failed (look at the three units first)"; exit 1; }
+for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = inactive ] || { echo "B2_NOT_DONE: $U is not inactive (nothing copied)"; exit 1; }; done
+umask 077
+tar -C "$PGP" -czf "$S/pg18-v3-preview-cold.tgz" v3-preview || { echo "B2_NOT_DONE: the data tar failed; the database is STOPPED"; exit 1; }
+tar -C /etc/debateai-v3-preview -czf "$S/pg18-v3-preview-config.tgz" postgresql || { echo "B2_NOT_DONE: the config tar failed; the database is STOPPED"; exit 1; }
+sha256sum "$S/pg18-v3-preview-cold.tgz" "$S/pg18-v3-preview-config.tgz" > "$S/pg18-cold.sha256"
+umask 022
+sha256sum -c --quiet "$S/pg18-cold.sha256" || { echo "B2_NOT_DONE: the copy does not match its own sha256; the database is STOPPED"; exit 1; }
+cat "$S/pg18-cold.sha256"
+systemctl start debateai-preview-postgresql || { echo "B2_NOT_DONE: PostgreSQL did not start"; exit 1; }
+for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
+/usr/lib/postgresql/18/bin/pg_isready -h "$SOCK" -p 5434 || { echo "B2_NOT_DONE: PostgreSQL is not ready"; exit 1; }
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] || { echo "B2_NOT_DONE: the ledger changed across the copy"; exit 1; }
+systemctl start debateai-preview-hatchet || { echo "B2_NOT_DONE: Hatchet did not start"; exit 1; }
+CID=; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
+IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' || true)
+[ "$CID" = "$CID0" ] && [ "$IP" = "$IP0" ] || { echo "B2_NOT_DONE: the Hatchet container or address changed; the gateway is NOT started: stop and ask"; exit 1; }
+ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gateway.service)
+echo " $ALLOW " | grep -qF -e " $IP/32 " -e " $IP " || { echo "B2_NOT_DONE: Hatchet's address is not in the gateway's IPAddressAllow; the gateway is NOT started"; exit 1; }
+W=$(/usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin /usr/local/bin/node /opt/debateai-v3-preview/operator/gateway/gateway-route-witness.mjs check 2>&1) || { echo "$W" | cut -c1-400; echo "B2_NOT_DONE: the gateway witness check refused; the gateway is NOT started"; exit 1; }
+echo "$W" | grep -q PASS || { echo "B2_NOT_DONE: the gateway witness did not say PASS; the gateway is NOT started"; exit 1; }
+systemctl start debateai-preview-hatchet-gateway.service || { echo "B2_NOT_DONE: the gateway did not start"; exit 1; }
+for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = active ] || { echo "B2_NOT_DONE: $U is not active"; exit 1; }; done
+echo B2_DONE
+```
+
+The witness runs `check` only, never `write`. R19's copy was 18 MB and took 8 seconds.
+
+### B3. The migrations
+
+`apply-and-plan` takes `hostedBilling` from `--from`, the live verify plan, and it refuses `--hosted-billing`
+(`ARGUMENTS_REFUSED`). Its own proposal is discarded: B4 publishes A8's plan, which the owner approved.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B3: apply this release's migrations (forward-only). From the native operator's start on, the way back is rbB.
+LEDGER0=$(cat "$S/ledger-before"); REG0=$(cat "$S/register-before")
+[ -s "$S/new-migrations.txt" ] || { echo "B3_SKIPPED: this release adds no migration"; exit 0; }
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "B3_NOT_DONE: $U is running"; exit 1;; esac; done
+for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = active ] || { echo "B3_NOT_DONE: $U is not active (B2 not finished)"; exit 1; }; done
+sha256sum -c --quiet "$S/pg18-cold.sha256" || { echo "B3_NOT_DONE: no checked cold copy in S (B2 first)"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" || { echo "B3_NOT_DONE: native-plan.json is not the live verify plan"; exit 1; }
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "B3_NOT_DONE: the ledger or the register moved"; exit 1; }
+[ ! -e "$ART/native-plan-apply-and-plan.json" ] && [ ! -e "$ART/native-apply-and-plan.json" ] || { echo "B3_NOT_DONE: earlier apply-and-plan files exist (look first)"; exit 1; }
+rel native-plan --operation apply-and-plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-apply-and-plan.json" || { echo "B3_NOT_DONE: the release tool refused the plan (nothing applied)"; exit 1; }
+[ "$(jq -r .operation "$ART/native-plan-apply-and-plan.json")" = apply-and-plan ] && [ "$(jq -r .sourceRevision "$ART/native-plan-apply-and-plan.json")" = "$REV" ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-apply-and-plan.json")" = on ] || { echo "B3_NOT_DONE: the plan is not this release's billing-on apply-and-plan (nothing applied)"; exit 1; }
+restore() { put "$S/native-plan.before.json" && echo VERIFY_PLAN_RESTORED; }
+trap 'restore || echo "VERIFY_PLAN_NOT_RESTORED: put $S/native-plan.before.json back by hand"' EXIT
+put "$ART/native-plan-apply-and-plan.json" || { echo "B3_NOT_DONE: put failed (nothing applied)"; exit 1; }
+OUT=$(nat "$ART/native-apply-and-plan.json"); echo "nat: $OUT"
+trap - EXIT
+restore || { echo "B3_NOT_DONE: put $S/native-plan.before.json back by hand"; exit 1; }
+LEDGER=$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration"); echo "ledger $LEDGER"
+[ "$OUT" = "exit 0" ] || { head -c 1200 "$ART/native-apply-and-plan.json"; echo; echo "B3_NOT_DONE: the native operator refused (from here the way back is rbB)"; exit 1; }
+for M in $(cat "$S/new-migrations.txt"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || { echo "B3_NOT_DONE: $M is not in the ledger"; exit 1; }; done
+[ "$LEDGER" = "$(( ${LEDGER0%%|*} + $(grep -c . "$S/new-migrations.txt") ))|$(LC_ALL=C sort "$S/new-migrations.txt" | tail -n 1)" ] || { echo "B3_NOT_DONE: the ledger is not the old one plus exactly this release's migrations"; exit 1; }
+[ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "B3_NOT_DONE: the newest register moved"; exit 1; }
+echo B3_DONE
+```
+
+R19: about 1.5 minutes. The ledger went from `139|0120_reply_measures.sql` to `141|0122_engine_map_check.sql`, and
+four new tables appeared: `ledger.point_investigation`, `ledger.verdict_vote`, `core.map_item_rests_on` and
+`core.map_answer_check`. A release can add a check of its own tables here.
+
+### B4. Publish, the verify plan, the first proof, the three launch plans
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B4: publish A8's plan with the owner's yes; then the verify plan for the new version, the first proof and the three
+# launch plans from the lock's plans with --publication. No runner prepare-only check (its proof is valid 180 s).
+YES='<the deltaSha256 the owner approved, in full>'
+REG0=$(cat "$S/register-before"); VNEXT=$((REG0 + 1))
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "B4_NOT_DONE: $U is running"; exit 1;; esac; done
+cmp -s "$S/native-plan.before.json" "$NP" || { echo "B4_NOT_DONE: native-plan.json is not the live verify plan"; exit 1; }
+[ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "B4_NOT_DONE: the newest register is not $REG0"; exit 1; }
+for M in $(cat "$S/new-migrations.txt"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || { echo "B4_NOT_DONE: $M is not applied (B3 first)"; exit 1; }; done
+sha256sum -c --quiet "$S/plan-proposal.sha256" || { echo "B4_NOT_DONE: the plan or the proposal changed since A8"; exit 1; }
+[ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] && [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$REG0" ] || { echo "B4_NOT_DONE: the proposal is not the approved one"; exit 1; }
+for F in native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "B4_NOT_DONE: $F exists (look first)"; exit 1; }; done
+OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR=$(sed -n 3p "$S/old-plans.txt")
+[ "$OLDA" = "$(jq -r .services.api.basePlan.path "$LOCK")" ] && [ "$OLDU" = "$(jq -r .services.ui.basePlan.path "$LOCK")" ] && [ "$OLDR" = "$(jq -r .services.runner.basePlan.path "$LOCK")" ] || { echo "B4_NOT_DONE: old-plans.txt is not the lock's three plans"; exit 1; }
+DONE=no
+cleanup() { [ "$DONE" = yes ] || { put "$S/native-plan.before.json" && echo "the old verify plan is back"; } || echo "the old verify plan is NOT back: put it by hand"; }
+trap cleanup EXIT
+rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json" || { echo "B4_NOT_DONE: the release tool refused the publish plan (nothing published)"; exit 1; }
+put "$ART/native-plan-publish.json" || { echo "B4_NOT_DONE: put of the publish plan failed (nothing published)"; exit 1; }
+OUT=$(nat "$ART/register-published.json"); echo "nat: $OUT"
+[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "B4_NOT_DONE: the publish was refused (PREVIEW_REGISTER_BASE_NOT_CURRENT needs a new plan and a new yes)"; exit 1; }
+V=$(jq -r .publication.registerVersion "$ART/register-published.json"); echo "new REGISTER_VERSION=$V"
+[ "$V" = "$VNEXT" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$V" ] || { echo "B4_NOT_DONE: the published version is not $VNEXT"; exit 1; }
+printf '%s\n' "$V" > "$S/new-register-version"
+echo "PUBLISHED_$V"
+rel native-plan --operation verify --from "$ART/native-plan-publish.json" --publication "$ART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-verify.json" || { echo "B4_NOT_DONE: the release tool refused the verify plan (version $V IS published)"; exit 1; }
+put "$ART/native-plan-verify.json" || { echo "B4_NOT_DONE: put of the verify plan failed (version $V IS published)"; exit 1; }
+OUT=$(nat "$ART/native-first-verify.json"); echo "nat: $OUT"
+[ "$OUT" = "exit 0" ] && [ "$(jq -r .publication.registerVersion "$ART/native-first-verify.json")" = "$V" ] || { echo "B4_NOT_DONE: the first proof was refused or does not name $V (version $V IS published)"; exit 1; }
+rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/api-launch.json" || { echo "B4_NOT_DONE: the API launch plan was refused"; exit 1; }
+rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/ui-launch.json" || { echo "B4_NOT_DONE: the website launch plan was refused"; exit 1; }
+rel launch-plan --service runner --from "$OLDR" --root "$CRUN" --source-manifest "$ART/candidate-runner-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/runner-launch.json" || { echo "B4_NOT_DONE: the runner launch plan was refused"; exit 1; }
+for F in api ui runner; do [ "$(jq -r .publication.registerVersion "$ART/$F-launch.json")" = "$V" ] || { echo "B4_NOT_DONE: the $F launch plan does not carry $V"; exit 1; }; done
+MX=$(jq -r '.. | objects | select(has("mailExecutable")) | .mailExecutable' "$ART/api-launch.json" | head -n 1); echo "mailExecutable $MX"
+[ "$MX" = "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs" ] && [ -f "$MX" ] || { echo "B4_NOT_DONE: the API plan's mail program is not this release's"; exit 1; }
+cmp -s "$ART/native-plan-verify.json" "$NP" || { echo "B4_NOT_DONE: native-plan.json is not version $V's verify plan"; exit 1; }
+DONE=yes; trap - EXIT
+echo B4_DONE
+```
+
+- **If B4 stops after `PUBLISHED_<V>`**, the new version stays published, and the trap has put the old verify plan
+  back. There are two ways on:
+  - forward, by hand, in a root shell after `. /root/preview-archive/rNN-names.sh`. Never publish a second time: a
+    fresh `publicationId` meets the version already written and is refused.
+    1. Set `V=$(cat "$S/new-register-version")`, and `OLDA`, `OLDU`, `OLDR` from `$S/old-plans.txt` (lines 1 to 3).
+    2. Continue from the first B4 line whose output file is missing. The tool never overwrites a file, so a line
+       whose `--out` exists refuses with `OUTPUT_EXISTS`.
+    3. If `native-plan-verify.json` exists, start with `put "$ART/native-plan-verify.json"`. If
+       `native-first-verify.json` is missing, run `nat` for it and check its `exit 0`.
+    4. Finish with `cmp "$ART/native-plan-verify.json" "$NP"`: B5 and B6 need the new verify plan in place.
+  - back: rbB.
+- R19 published register 17 (publication `f783ddf7-…`) in about 6 minutes.
+
+### B5. The two env edits
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B5: REGISTER_VERSION in api.env and runner.env; MAIL_SENDMAIL_PATH (api.env) to this release's mail program. Nothing else.
+REG0=$(cat "$S/register-before"); V=$(cat "$S/new-register-version")
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "B5_NOT_DONE: $U is running"; exit 1;; esac; done
+cmp -s "$ART/native-plan-verify.json" "$NP" || { echo "B5_NOT_DONE: native-plan.json is not version $V's verify plan (B4 first)"; exit 1; }
+for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "B5_NOT_DONE: $F differs from its copy before the edit"; exit 1; }; done
+for F in api.env runner.env; do [ "$(grep -c "^REGISTER_VERSION=$REG0\$" "$E/$F")" = 1 ] && [ "$(grep -c '^REGISTER_VERSION=' "$E/$F")" = 1 ] || { echo "B5_NOT_DONE: REGISTER_VERSION is not $REG0 exactly once in $F"; exit 1; }; done
+MX=$(jq -r '.. | objects | select(has("mailExecutable")) | .mailExecutable' "$ART/api-launch.json" | head -n 1)
+[ "$MX" = "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs" ] && [ "$(grep -c "^MAIL_SENDMAIL_PATH=$OCAPI/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs\$" "$E/api.env")" = 1 ] && [ "$(grep -c '^MAIL_SENDMAIL_PATH=' "$E/api.env")" = 1 ] || { echo "B5_NOT_DONE: the mail line is not the old release's, once"; exit 1; }
+[ "$(grep -F "$OLABEL" "$E/api.env" | grep -vc '^MAIL_SENDMAIL_PATH=' || true)" = 0 ] && [ "$(grep -cF "$OLABEL" "$E/runner.env" || true)" = 0 ] || { echo "B5_NOT_DONE: another env line names the old release"; exit 1; }
+MA=$(stat -c '%a %U:%G' "$E/api.env"); MR=$(stat -c '%a %U:%G' "$E/runner.env")
+sed -i "s/^REGISTER_VERSION=$REG0\$/REGISTER_VERSION=$V/" "$E/api.env" "$E/runner.env"
+sed -i "s#^MAIL_SENDMAIL_PATH=$OCAPI/#MAIL_SENDMAIL_PATH=$CAPI/#" "$E/api.env"
+for F in api.env runner.env; do [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/$F")" = 1 ] && [ "$(grep -c '^REGISTER_VERSION=' "$E/$F")" = 1 ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$E/$F")" = 1 ] || { echo "B5_NOT_DONE: $F is not version $V, hosted (way back: rbB)"; exit 1; }; done
+[ "$(grep -c "^MAIL_SENDMAIL_PATH=$MX\$" "$E/api.env")" = 1 ] || { echo "B5_NOT_DONE: the mail line is not this release's (way back: rbB)"; exit 1; }
+grep -E '^(REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|MAIL_SENDMAIL_PATH)=' "$E/api.env" "$E/runner.env"
+diff <(grep -vE '^(REGISTER_VERSION|MAIL_SENDMAIL_PATH)=' "$S/api.env.before") <(grep -vE '^(REGISTER_VERSION|MAIL_SENDMAIL_PATH)=' "$E/api.env") >/dev/null && diff <(grep -vE '^REGISTER_VERSION=' "$S/runner.env.before") <(grep -vE '^REGISTER_VERSION=' "$E/runner.env") >/dev/null && cmp -s "$S/ui.env.before" "$E/ui.env" || { echo "B5_NOT_DONE: another line changed (way back: rbB)"; exit 1; }
+[ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/api.env" | sort | uniq -d)" ] && [ -z "$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$E/runner.env" | sort | uniq -d)" ] || { echo "B5_NOT_DONE: a duplicate key"; exit 1; }
+[ "$(stat -c '%a %U:%G' "$E/api.env")" = "$MA" ] && [ "$(stat -c '%a %U:%G' "$E/runner.env")" = "$MR" ] || { echo "B5_NOT_DONE: a mode or an owner changed"; exit 1; }
+diff <(grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PREVIEW_TEAM_USER_IDS_JSON)=' "$E/api.env") <(grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PREVIEW_TEAM_USER_IDS_JSON)=' "$E/runner.env") >/dev/null && diff <(grep -E '^(DEBATEAI_DEPLOYMENT_MODE|REGISTER_VERSION)=' "$E/api.env" | sort) <(grep -E '^(DEBATEAI_DEPLOYMENT_MODE|REGISTER_VERSION)=' "$E/runner.env" | sort) >/dev/null || { echo "B5_NOT_DONE: a SAME check differs (config and team; mode and version)"; exit 1; }
+echo B5_DONE
+```
+
+The hosted keys, the NETOPIA, Quaderno and SmartBill paths, the B-1 thinking table and Haiku's `slip_fix` line all
+stay byte for byte: the `diff` lines prove it. The last two lines are the two SAME checks of
+`deploy/preview-auth-dev/v1/README.md` "Operator checks before the first start".
+
+### B6. Pin, then start the API, then the website (the downtime ends)
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B6: pin the three plans, regenerate the three drop-ins, daemon-reload; start the API (wait for its start line naming
+# REV), then the website (/login 200: the downtime ends), then the backup timer. Not the runner (B7).
+V=$(cat "$S/new-register-version")
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "B6_NOT_DONE: $U is running"; exit 1;; esac; done
+cmp -s "$ART/native-plan-verify.json" "$NP" && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$V" ] || { echo "B6_NOT_DONE: B4 is not done"; exit 1; }
+[ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/api.env")" = 1 ] && [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/runner.env")" = 1 ] && [ "$(grep -c "^MAIL_SENDMAIL_PATH=$CAPI/" "$E/api.env")" = 1 ] || { echo "B6_NOT_DONE: B5 is not done"; exit 1; }
+pin1() { local out; out=$(pre pin --from "$1") || { echo "$out"; return 1; }; echo "$out"; echo "$out" | grep -q '"event":"PREVIEW_LIFECYCLE_RELEASE_PINNED"' && echo "$out" | grep -q "\"sourceRevision\":\"$REV\"" && echo "$out" | grep -q "\"registerVersion\":\"$V\""; }
+drop1() { local Dp=/etc/systemd/system/debateai-preview-$1.service.d/zzzzzzzzzz-lifecycle-release.conf; pre dropin --service "$1" > "$Dp.new" && chmod 0644 "$Dp.new" && mv "$Dp.new" "$Dp" && [ "$(grep -cF "$LABEL" "$Dp")" -ge 1 ] && [ "$(grep -cF "$OLABEL" "$Dp" || true)" = 0 ]; }
+PINNED=no
+pin1 "$ART/api-launch.json" && pin1 "$ART/ui-launch.json" && pin1 "$ART/runner-launch.json" && drop1 api && drop1 ui && drop1 runner && systemctl daemon-reload && PINNED=yes
+[ "$PINNED" = yes ] || { echo "B6_NOT_DONE: a pin, a drop-in or daemon-reload did not finish; nothing was started (way back: rbB)"; exit 1; }
+[ "$(jq -r --arg r "$REV" --arg v "$V" '[.services[] | select(.sourceRevision == $r and .publication.registerVersion == $v)] | length' "$LOCK")" = 3 ] || { echo "B6_NOT_DONE: the lock does not name this release on $V three times"; exit 1; }
+T0=$(date +%s)
+systemctl start debateai-preview-api || echo "systemctl start api returned non-zero"
+for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; [ "$(systemctl is-active debateai-preview-api || true)" = failed ] && break; sleep 3; done
+journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_(READY|REFUSED)|PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED' | cut -c1-300 || true
+[ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] || { echo "B6_NOT_DONE: the API refused to start; the website and the runner are left stopped"; exit 1; }
+[ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep 'PREVIEW_API_STARTED' | grep -c "\"sourceRevision\":\"$REV\"" || true)" -ge 1 ] && [ "$(systemctl is-active debateai-preview-api || true)" = active ] || { echo "B6_NOT_DONE: the API did not start on this release; the website and the runner are left stopped"; exit 1; }
+systemctl start debateai-preview-ui || echo "systemctl start ui returned non-zero"
+c=000; for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/login || true); [ "$c" = 200 ] && break; sleep 3; done
+[ "$c" = 200 ] || { echo "B6_NOT_DONE: the website does not answer /login with 200; the runner is left stopped"; exit 1; }
+echo "DOWNTIME END $(date -u) ($(( $(date +%s) - $(tail -n 1 "$S/downtime-start-epoch") )) s)"
+systemctl start debateai-preview-backup.timer && [ "$(systemctl is-active debateai-preview-backup.timer || true)" = active ] || { echo "B6_NOT_DONE: the backup timer did not start (the API and the website are up)"; exit 1; }
+echo B6_DONE
+```
+
+### B7. The runner, by hand
+
+B1 stopped the runner, so it is started with `systemctl start`, never `try-restart` (which restarts only a running
+unit and would leave it down). It starts only when nothing is claimable and both gates are active.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B7: start this release's runner by hand. Refuses on any start-up, register, engine, capacity or login refusal line.
+V=$(cat "$S/new-register-version")
+case "$(systemctl is-active debateai-preview-runner || true)" in inactive|failed) ;; *) echo "B7_NOT_DONE: the runner is already running"; exit 1;; esac
+[ "$(systemctl is-active debateai-preview-api || true)" = active ] && [ "$(systemctl is-active debateai-preview-ui || true)" = active ] || { echo "B7_NOT_DONE: the API or the website is not active (B6 first)"; exit 1; }
+[ "$(jq -r .services.runner.sourceRevision "$LOCK")" = "$REV" ] && [ "$(jq -r .services.runner.publication.registerVersion "$LOCK")" = "$V" ] && [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/runner.env")" = 1 ] || { echo "B7_NOT_DONE: the runner's pin or runner.env is not this release on $V"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE run_id IS NOT NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))")" = 0 ] || { echo "B7_NOT_DONE: something is claimable; the runner is not started (ask)"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "B7_NOT_DONE: a spending gate is not active; the runner is not started"; exit 1; }
+T0=$(date +%s)
+systemctl start debateai-preview-runner || echo "systemctl start runner returned non-zero"
+for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-runner --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+[ "$(journalctl -u debateai-preview-runner --since "@$T0" -o cat --no-pager | grep 'PREVIEW_RUNNER_STARTED' | grep -c "\"sourceRevision\":\"$REV\"" || true)" -ge 1 ] || { echo "B7_NOT_DONE: no PREVIEW_RUNNER_STARTED naming REV"; exit 1; }
+sleep 20
+BADL=$(journalctl -u debateai-preview-runner --since "@$T0" -o cat --no-pager | grep -E 'GATE_CAPACITY_UNREAD|UNAUTHENTICATED|STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE|_MISMATCH|_UNSEALED|ENGINE_REQUIRES|ENGINE_[A-Z_]*REFUSED|REGISTER_[A-Z_]*REFUSED' || true)
+[ -z "$BADL" ] || { echo "$BADL" | cut -c1-300; echo "B7_NOT_DONE: a refusal, capacity or login line in the runner's journal (above)"; exit 1; }
+[ "$(systemctl is-active debateai-preview-runner || true)" = active ] && [ "$(systemctl show -p NRestarts --value debateai-preview-runner)" = 0 ] || { echo "B7_NOT_DONE: the runner is not active with NRestarts 0 after 20 s"; exit 1; }
+echo B7_DONE
+```
+
+R19's runner was back 2 minutes after the website. Debates cannot start until it runs, though the site is up.
+
+### B8. The checks (read-only)
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# B8: read-only. Every check prints OK or BAD; the last line is the verdict.
+V=$(cat "$S/new-register-version"); BAD=0
+ok() { echo "OK   $1"; }; bad() { echo "BAD  $1"; BAD=$((BAD + 1)); }
+for U in api runner; do M=$(journalctl --no-pager -o cat -u debateai-preview-$U _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value debateai-preview-$U)" | grep -o '"deploymentMode":"[a-z]*"' | sort -u || true); if [ "$M" = '"deploymentMode":"hosted"' ]; then ok "HOSTED_$U"; else bad "HOSTED_$U"; fi; done
+for U in api ui runner provider-budget anthropic-budget postgresql hatchet hatchet-gateway turnstile egress; do if [ "$(systemctl is-active debateai-preview-$U || true)" = active ] && [ "$(systemctl show -p NRestarts --value debateai-preview-$U)" = 0 ]; then ok "ACTIVE_$U"; else bad "ACTIVE_$U"; fi; done
+if [ "$(systemctl --failed --no-legend --plain | grep -c debateai || true)" = 0 ]; then ok NO_FAILED_DEBATEAI_UNIT; else bad NO_FAILED_DEBATEAI_UNIT; fi
+if [ "$(systemctl is-active debateai-preview-backup.timer || true)" = active ]; then ok BACKUP_TIMER_ACTIVE; else bad BACKUP_TIMER_ACTIVE; fi
+for F in api.env runner.env; do if [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/$F")" = 1 ] && [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$E/$F")" = 1 ]; then ok "ENV_${V}_HOSTED_$F"; else bad "ENV_${V}_HOSTED_$F"; fi; done
+for U in api runner; do if [ "$(ps -o args= -p "$(systemctl show -p MainPID --value debateai-preview-$U)" | grep -c "auth-dev-candidate-$LABEL-$U/" || true)" = 1 ]; then ok "RUNS_THIS_RELEASE_$U"; else bad "RUNS_THIS_RELEASE_$U"; fi; done
+echo "ledger $(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")"
+if [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$V" ]; then ok "REGISTER_$V"; else bad "REGISTER_$V"; fi
+if [ "$(jq -r --arg r "$REV" --arg v "$V" '[.services[] | select(.sourceRevision == $r and .publication.registerVersion == $v)] | length' "$LOCK")" = 3 ]; then ok LOCK_THREE_TIMES; else bad LOCK_THREE_TIMES; fi
+if cmp -s "$ART/native-plan-verify.json" "$NP"; then ok NP_IS_THE_NEW_VERIFY_PLAN; else bad NP_IS_THE_NEW_VERIFY_PLAN; fi
+if [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ]; then ok BOTH_GATES_ACTIVE; else bad BOTH_GATES_ACTIVE; fi
+NC=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify || true)
+if [ "$NC" = 503 ]; then ok NOTIFY_503; else bad "NOTIFY_503 (got $NC)"; fi
+BC=$(systemd-run --quiet --pipe --wait --collect --uid="$AU" --gid="$AGRP" --property=EnvironmentFile="$E/api.env" --setenv=NODE_USE_ENV_PROXY=1 --setenv=HTTPS_PROXY=http://127.0.0.1:3180 '--setenv=NO_PROXY=localhost,127.0.0.1,[::1],v3-preview.dezbatere.ro' --working-directory="$CAPI/dialectical-engine" "$N" --import tsx apps/api/src/billing/check-cli.ts 2>&1 || true)
+echo "$BC" | grep -vE 'DeprecationWarning|trace-deprecation' || true
+if echo "$BC" | grep -q '^1 of 16 checks need attention\.$' && [ "$(echo "$BC" | grep -c '^✗' || true)" = 1 ] && echo "$BC" | grep '^✗' | grep -q placeholders; then ok BILLING_CHECK_15_OF_16; else bad BILLING_CHECK_15_OF_16; fi
+journalctl --no-pager -u debateai-preview-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-preview-api)" | grep -oE 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING' | sort | uniq -c || echo "(no billing line)"
+if [ "$BAD" = 0 ]; then echo B8_DONE; else echo "B8_NOT_DONE: $BAD check(s) BAD"; exit 1; fi
+```
+
+- The billing check asks NETOPIA's sandbox one status question about a made-up order, so nothing is charged. Its one
+  cross is the plans line: this host keeps placeholder EUR and RON prices.
+- In the billing journal only `billing.notice.unverified` lines (one per check run) are expected.
+- Then add the release's own checks. R19 added two:
+  - the 24 regions in register 17's `countryPolicy`, equal to the approved proposal's value;
+  - the region decisions of R19's own code on that live row.
+- Finally, the owner starts one short real debate on the site, and it must finish.
+
+### The way back
+
+**rbA: before B3 (no migration ran, nothing published, nothing pinned, no env edit).** It starts the old release
+exactly as it was. Give it one word, `yes` or `no`, for the runner (`bash -s -- yes`). If B2 stopped half way, it
+refuses: finish B2's restart part by hand first (PostgreSQL, Hatchet, the witness `check` must say `PASS`, then the
+gateway).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# rbA: start the old release as it was. Only before B3.
+RUNNER=${1:-}
+[ "$RUNNER" = yes ] || [ "$RUNNER" = no ] || { echo "RBA_NOT_DONE: say yes or no for the runner (bash -s -- yes)"; exit 1; }
+for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = active ] || { echo "RBA_NOT_DONE: $U is not active (bring the database side back first)"; exit 1; }; done
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$(cat "$S/ledger-before")" ] || { echo "RBA_NOT_DONE: a migration ran: use rbB"; exit 1; }
+[ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$(cat "$S/register-before")" ] || { echo "RBA_NOT_DONE: a version was published: use rbB"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" && cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "RBA_NOT_DONE: native-plan.json or the lock moved: use rbB"; exit 1; }
+for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "RBA_NOT_DONE: $F moved: use rbB"; exit 1; }; done
+for U in api ui runner; do [ "$(grep -cF "$OLABEL" /etc/systemd/system/debateai-preview-$U.service.d/zzzzzzzzzz-lifecycle-release.conf || true)" -ge 1 ] || { echo "RBA_NOT_DONE: the $U drop-in does not name the old release: use rbB"; exit 1; }; done
+T0=$(date +%s)
+systemctl start debateai-preview-api || echo "systemctl start api returned non-zero"
+for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+[ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep 'PREVIEW_API_STARTED' | grep -c "\"sourceRevision\":\"$OREV\"" || true)" -ge 1 ] || { echo "RBA_NOT_DONE: no PREVIEW_API_STARTED naming the old release"; exit 1; }
+systemctl start debateai-preview-ui || echo "systemctl start ui returned non-zero"
+c=000; for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/login || true); [ "$c" = 200 ] && break; sleep 3; done
+[ "$c" = 200 ] || { echo "RBA_NOT_DONE: the website does not answer /login with 200"; exit 1; }
+echo "DOWNTIME END (rbA) $(date -u)"
+systemctl start debateai-preview-backup.timer || { echo "RBA_NOT_DONE: the backup timer did not start (the API and the website are up)"; exit 1; }
+if [ "$RUNNER" = yes ]; then
+  [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE run_id IS NOT NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))")" = 0 ] && [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "RBA_NOT_DONE: something is claimable or a gate is not active; the runner is left stopped"; exit 1; }
+  T1=$(date +%s); systemctl start debateai-preview-runner || echo "systemctl start runner returned non-zero"
+  for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+  [ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep 'PREVIEW_RUNNER_STARTED' | grep -c "\"sourceRevision\":\"$OREV\"" || true)" -ge 1 ] && [ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep -cE 'GATE_CAPACITY_UNREAD|UNAUTHENTICATED' || true)" = 0 ] || { echo "RBA_NOT_DONE: the old runner did not start cleanly"; exit 1; }
+fi
+echo RBA_DONE
+```
+
+**rbB: from B3 on, at any later point (also after B4 to B8).** Once a migration ran, the old code refuses the
+database: its native verify knows only its own migration list. So a re-pin alone cannot work, and the way back is
+the cold copy. rbB does the following, in order:
+1. it stops everything;
+2. it restores B2's cold copy (the current data folder is moved aside, never deleted: it holds secrets, and deleting
+   it is the owner's call);
+3. it puts back the old verify plan and the three env files from `$S`;
+4. it re-pins the old release's three plans, which rebuilds the lock;
+5. it writes the drop-ins, then starts the API, the website and the runner.
+
+**Everything written to the database after B2 is lost with it**: the new version, the new tables, and anything
+people did on the site since then.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# rbB: restore the cold copy and the old release. From B3 on.
+TS=$(date -u +%Y%m%dT%H%M%SZ); PGP=/var/lib/postgresql/18; SOCK=/run/debateai-v3-preview/postgresql
+LEDGER0=$(cat "$S/ledger-before"); REG0=$(cat "$S/register-before")
+sha256sum -c --quiet "$S/pg18-cold.sha256" || { echo "RBB_NOT_DONE: the cold copy is missing or does not match its sha256 (nothing stopped)"; exit 1; }
+for F in native-plan.before.json api.env.before runner.env.before ui.env.before release-lock.before.json old-plans.txt; do [ -s "$S/$F" ] || { echo "RBB_NOT_DONE: $S/$F is missing (nothing stopped)"; exit 1; }; done
+OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR=$(sed -n 3p "$S/old-plans.txt")
+[ -s "$OLDA" ] && [ -s "$OLDU" ] && [ -s "$OLDR" ] && [ -d "$OCAPI/dialectical-engine" ] && [ -d "$OCUI/dialectical-engine" ] && [ -d "$OCRUN/dialectical-engine" ] || { echo "RBB_NOT_DONE: the old release's plans or folders are missing (nothing stopped)"; exit 1; }
+CC="$S/rbB-config-check-$TS"; install -d -o root -g root -m 0700 "$CC"; tar -C "$CC" -xzf "$S/pg18-v3-preview-config.tgz"
+diff -r "$CC/postgresql" /etc/debateai-v3-preview/postgresql >/dev/null || { echo "RBB_NOT_DONE: the live PostgreSQL config differs from the copy's (nothing stopped; look first)"; exit 1; }
+MODE0=$(stat -c '%a %U:%G' "$PGP/v3-preview")
+for U in debateai-preview-runner debateai-preview-backup.timer debateai-preview-ui debateai-preview-api; do systemctl stop "$U" || true; done
+for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "RBB_NOT_DONE: $U is still running"; exit 1;; esac; done
+CID0=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
+systemctl stop debateai-preview-hatchet-gateway debateai-preview-hatchet debateai-preview-postgresql || { echo "RBB_NOT_DONE: a stop failed (look first)"; exit 1; }
+for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = inactive ] || { echo "RBB_NOT_DONE: $U is not inactive (nothing restored)"; exit 1; }; done
+[ ! -e "$PGP/v3-preview.after-$TS" ] || { echo "RBB_NOT_DONE: $PGP/v3-preview.after-$TS exists"; exit 1; }
+mv "$PGP/v3-preview" "$PGP/v3-preview.after-$TS" || { echo "RBB_NOT_DONE: the data folder could not be moved aside; the database is STOPPED"; exit 1; }
+tar -C "$PGP" -xzf "$S/pg18-v3-preview-cold.tgz" || { echo "RBB_NOT_DONE: the restore failed; the old folder is $PGP/v3-preview.after-$TS; the database is STOPPED"; exit 1; }
+[ "$(stat -c '%a %U:%G' "$PGP/v3-preview")" = "$MODE0" ] || { echo "RBB_NOT_DONE: the restored folder's mode or owner differs; the database is STOPPED"; exit 1; }
+systemctl start debateai-preview-postgresql || { echo "RBB_NOT_DONE: PostgreSQL did not start on the restored folder"; exit 1; }
+for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
+[ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "RBB_NOT_DONE: the restored database is not ledger $LEDGER0, register $REG0"; exit 1; }
+systemctl start debateai-preview-hatchet || { echo "RBB_NOT_DONE: Hatchet did not start"; exit 1; }
+CID=; for i in $(seq 1 30); do CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true); [ -n "$CID" ] && break; sleep 2; done
+IP=$(docker inspect "$CID" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' || true)
+[ -n "$CID" ] && { [ -z "$CID0" ] || [ "$CID" = "$CID0" ]; } || { echo "RBB_NOT_DONE: the Hatchet container is missing or changed; the gateway is NOT started: stop and ask"; exit 1; }
+ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gateway.service)
+echo " $ALLOW " | grep -qF -e " $IP/32 " -e " $IP " || { echo "RBB_NOT_DONE: Hatchet's address is not in the gateway's IPAddressAllow; the gateway is NOT started"; exit 1; }
+W=$(/usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin /usr/local/bin/node /opt/debateai-v3-preview/operator/gateway/gateway-route-witness.mjs check 2>&1) && echo "$W" | grep -q PASS || { echo "$W" | cut -c1-400; echo "RBB_NOT_DONE: the gateway witness did not say PASS; the gateway is NOT started"; exit 1; }
+systemctl start debateai-preview-hatchet-gateway.service || { echo "RBB_NOT_DONE: the gateway did not start"; exit 1; }
+put "$S/native-plan.before.json" || { echo "RBB_NOT_DONE: the old verify plan could not be put back"; exit 1; }
+for F in api.env runner.env ui.env; do M0=$(stat -c '%a %U:%G' "$E/$F"); cat "$S/$F.before" > "$E/$F"; cmp -s "$S/$F.before" "$E/$F" && [ "$(stat -c '%a %U:%G' "$E/$F")" = "$M0" ] || { echo "RBB_NOT_DONE: $F was not restored with its mode"; exit 1; }; done
+pin1() { local out; out=$(pre pin --from "$1") || { echo "$out"; return 1; }; echo "$out"; echo "$out" | grep -q '"event":"PREVIEW_LIFECYCLE_RELEASE_PINNED"' && echo "$out" | grep -q "\"sourceRevision\":\"$OREV\"" && echo "$out" | grep -q "\"registerVersion\":\"$REG0\""; }
+drop1() { local Dp=/etc/systemd/system/debateai-preview-$1.service.d/zzzzzzzzzz-lifecycle-release.conf; pre dropin --service "$1" > "$Dp.new" && chmod 0644 "$Dp.new" && mv "$Dp.new" "$Dp" && [ "$(grep -cF "$OLABEL" "$Dp")" -ge 1 ] && [ "$(grep -cF "$LABEL" "$Dp" || true)" = 0 ]; }
+PINNED=no
+pin1 "$OLDA" && pin1 "$OLDU" && pin1 "$OLDR" && drop1 api && drop1 ui && drop1 runner && systemctl daemon-reload && PINNED=yes
+[ "$PINNED" = yes ] || { echo "RBB_NOT_DONE: the re-pin, a drop-in or daemon-reload did not finish; the app services are stopped"; exit 1; }
+diff <(jq -S 'del(.services[].pinnedAt)' "$S/release-lock.before.json") <(jq -S 'del(.services[].pinnedAt)' "$LOCK") >/dev/null || { echo "RBB_NOT_DONE: the rebuilt lock differs from its copy beyond the pin times; the app services are stopped"; exit 1; }
+T0=$(date +%s)
+systemctl start debateai-preview-api || echo "systemctl start api returned non-zero"
+for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+[ "$(journalctl -u debateai-preview-api --since "@$T0" -o cat --no-pager | grep 'PREVIEW_API_STARTED' | grep -c "\"sourceRevision\":\"$OREV\"" || true)" -ge 1 ] || { echo "RBB_NOT_DONE: no PREVIEW_API_STARTED naming the old release"; exit 1; }
+systemctl start debateai-preview-ui || echo "systemctl start ui returned non-zero"
+c=000; for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/login || true); [ "$c" = 200 ] && break; sleep 3; done
+[ "$c" = 200 ] || { echo "RBB_NOT_DONE: the website does not answer /login with 200; the runner is left stopped"; exit 1; }
+echo "DOWNTIME END (rbB) $(date -u)"
+systemctl start debateai-preview-backup.timer || { echo "RBB_NOT_DONE: the backup timer did not start; the runner is left stopped"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM core.work_item WHERE run_id IS NOT NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))")" = 0 ] && [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "RBB_NOT_DONE: something is claimable or a gate is not active; the runner is left stopped (ask)"; exit 1; }
+T1=$(date +%s); systemctl start debateai-preview-runner || echo "systemctl start runner returned non-zero"
+for i in $(seq 1 80); do [ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+[ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep 'PREVIEW_RUNNER_STARTED' | grep -c "\"sourceRevision\":\"$OREV\"" || true)" -ge 1 ] && [ "$(journalctl -u debateai-preview-runner --since "@$T1" -o cat --no-pager | grep -cE 'GATE_CAPACITY_UNREAD|UNAUTHENTICATED' || true)" = 0 ] || { echo "RBB_NOT_DONE: the old runner did not start cleanly"; exit 1; }
+echo "kept for the owner: $PGP/v3-preview.after-$TS (the database as the new release left it; it holds secrets)"
+echo RBB_DONE
+```
+
+- **After rbB, the next plan** is made from the restored verify plan (`$S/native-plan.before.json`): its base is the
+  version the cold copy brought back.
+- **The new release's folders and `$ART`** stay where they are, unused. Keep the old release's folders and plans
+  until the next release is live: rbB needs them.
+- **Afterwards** (not part of the upload, with the owner's yes): move the practice's server copies (S-7) into `$S`.
+  R19 also left `$ART/store-fill`; it is harmless and unused.
