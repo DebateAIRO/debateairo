@@ -10,7 +10,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildApi,
   evaluateAskAdmission,
@@ -62,9 +62,12 @@ import {
   type PreviewCallShares,
   type PreviewMeasuredCallUsage,
   previewCallOutputTokens,
+  previewUnfinishedRunFrom,
+  readPreviewBudgetGateSettings,
   PreviewGateUnavailableRefusal,
   PREVIEW_UNFINISHED_RUNS_SQL,
   type PreviewUnfinishedRun,
+  type PreviewVersionTerms,
   nextBucharestMidnight,
   PreviewDailyLimitRefusal,
   type PreviewBudgetGateSettings
@@ -185,6 +188,11 @@ function remainingWith(patch: Partial<PreviewGateRemaining> = {}): PreviewGateRe
 
 type Counters = { probes: number; remaining: number };
 
+/** The fixture gate's own register version's terms (side-by-side C16). */
+const GATE_TERMS: PreviewVersionTerms = Object.freeze({ roleModels: ROLE_MODELS,
+  roleProviderRefs: Object.freeze(["preview:fixture-a", "preview:fixture-b"]), storyRounds: 2, callOutputTokens: OUTPUT,
+  maxCooldownHoldsPerRun: 2 });
+
 function gateWith(counters: Counters, answer: () => Promise<PreviewGateRemaining>,
   unfinished: readonly PreviewUnfinishedRun[] = [], measured?: () => Promise<PreviewMeasuredCallUsage>): PreviewBudgetGateSettings {
   return Object.freeze({
@@ -196,6 +204,8 @@ function gateWith(counters: Counters, answer: () => Promise<PreviewGateRemaining
     askProbeModelIds: ASK_PROBE_MODELS,
     maxCooldownHoldsPerRun: 2,
     readUnfinishedRuns: async () => unfinished,
+    // Every unfinished debate here was admitted under the API's own version (C16 cases build their own gate).
+    termsForVersion: async () => GATE_TERMS,
     ...(measured === undefined ? {} : { readMeasuredCallUsage: measured })
   });
 }
@@ -415,32 +425,32 @@ describe("the start-of-debate estimate is a realistic worst case, per gate (pure
   });
 
   it("an unfinished debate holds its whole estimate but its ask's probes; an older model off the rows is priced at the dearest row", () => {
-    const [hold] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES);
+    const [hold] = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: PANEL }, ROLES);
     // Without this ask's five health checks (2 x GLM, DeepSeek, MiMo, Qwen: 26,567,680): 1,101,517,200 x 1.15.
     const askChecks = 2n * REAL.PROBE_GLM + REAL.PROBE_DEEPSEEK + REAL.PROBE_MIMO + REAL.PROBE_QWEN;
     expect(askChecks).toBe(26_567_680n);
     expect(hold).toEqual({ gate: "deepinfra", modelIds: [GLM, DEEPSEEK], expectedCalls: EXPECTED_CALLS - 5, callsWithMargin: 96,
       callsNanoUsd: 1_266_744_780n });
     expect(margin(CALLS_BASE - askChecks)).toBe(1_266_744_780n);
-    const old = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
-    const asMimo = estimateUnfinishedRunHolds({ basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: MIMO }] }, ROLES);
+    const old = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: "old/model" }] }, ROLES);
+    const asMimo = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: [{ provider_ref: "preview:other", model_id: MIMO }] }, ROLES);
     expect(old[0]!.callsNanoUsd).toBe(asMimo[0]!.callsNanoUsd);
     // The same pricing as the new debate: a measured average applies to the held debate too.
     const measuredPricer = calibratedEstimatePricer([sample(DEEPSEEK, "DEBATE", 20, 10_000, 3_000)]);
-    expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL }, ROLES, measuredPricer, "BASIS_CEILING")[0]!.callsNanoUsd)
+    expect(estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: PANEL }, ROLES, measuredPricer, "BASIS_CEILING")[0]!.callsNanoUsd)
       .toBe((193_680_000n + 64n * (3_800_000n - 1_520_000n)) * 115n / 100n);
   });
 
   it("a debate only writing its story holds the story's calls: 4 per round, the storyteller's and the checker's repair included", () => {
-    const [story] = estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES);
+    const [story] = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES);
     // 2 rounds x (storyteller 19,200,050 at GLM's 16,384 story allowance, its repair 27,392,050, the check 77,772,850,
     // its repair 77,772,850 (both at GLM's own 131,072)) on GLM at the largest story size (the run row carries none here)
     // = 404,275,600; x 1.15, rounded up.
     expect(story).toMatchObject({ gate: "deepinfra", expectedCalls: 8, callsWithMargin: 10, callsNanoUsd: 464_916_940n });
     // A run whose ask chose the low story size is held at that size.
-    expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES, realisticWorstCasePricer(OUTPUT, "low"))[0])
+    expect(estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: PANEL, phase: "STORY" }, ROLES, realisticWorstCasePricer(OUTPUT, "low"))[0])
       .toMatchObject({ callsNanoUsd: 409_569_970n });
-    expect(estimateUnfinishedRunHolds({ basis: basis(2), panel: PANEL, phase: "STORY" }, { ...ROLES, storyRounds: 0 })[0])
+    expect(estimateUnfinishedRunHolds({ registerVersion: 5, basis: basis(2), panel: PANEL, phase: "STORY" }, { ...ROLES, storyRounds: 0 })[0])
       .toMatchObject({ expectedCalls: 0, callsNanoUsd: 0n });
   });
 
@@ -516,7 +526,7 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
     const counters = { probes: 0, remaining: 0 };
     // A running debate holds its estimate without its own ask's health checks: 1,266,744,780 and 96 calls.
     const pot = remainingWith({ remainingNanoUsd: ESTIMATE + 1_266_744_780n - 1n });
-    const running = [{ basis: basis(2), panel: PANEL }];
+    const running = [{ basis: basis(2), panel: PANEL, registerVersion: 5 }];
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot) }), ASK)).resolves.toBeDefined();
     await expect(evaluateAskAdmission(settings(counters, { previewBudgetGate: gateWith(counters, async () => pot, running) }), ASK))
       .rejects.toMatchObject({ name: "AskRefusal", code: "DAILY_COST_ENVELOPE_REACHED" });
@@ -759,7 +769,7 @@ describe("one ask at a time is estimated and started on the preview (review find
         await evaluateAskAdmission(settings(counters, { previewBudgetGate: live }), ASK, null, lock);
         // What submit does next while holding the lock: the run row, then its READY job.
         await new Promise((resolve) => setTimeout(resolve, 5));
-        started.push({ basis: basis(2), panel: PANEL });
+        started.push({ basis: basis(2), panel: PANEL, registerVersion: 5 });
         events.push(`${name}:queued`);
         return "admitted";
       } catch (error) {
@@ -1251,8 +1261,8 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
 
   it("an unfinished rotated debate is held with the rotated pricing, not the boot roles", () => {
     const settings = { roleModels, roleProviderRefs, storyRounds: 2, callOutputTokens: sent, maxCooldownHoldsPerRun: 2 };
-    const rotated = estimateUnfinishedRunHolds({ basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE", rotated: true }, settings);
-    const fixed = estimateUnfinishedRunHolds({ basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE" }, settings);
+    const rotated = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE", rotated: true }, settings);
+    const fixed = estimateUnfinishedRunHolds({ registerVersion: 5, basis: basisFor(4, 2), panel: PREMIUM, phase: "DEBATE" }, settings);
     // Roles on MiMo (dearer than the boot roles' GLM and DeepSeek), and no health checks of the off-panel fixture-b.
     expect(rotated[0]!.callsNanoUsd).toBeGreaterThan(fixed[0]!.callsNanoUsd);
     expect(rotated[0]!.callsWithMargin).toBeLessThan(fixed[0]!.callsWithMargin);
@@ -1261,5 +1271,152 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
   it("the unfinished-runs query reports whether each run is rotated", () => {
     expect(PREVIEW_UNFINISHED_RUNS_SQL).toContain("core.run_role_rotation");
     expect(PREVIEW_UNFINISHED_RUNS_SQL).toMatch(/AS rotated/u);
+  });
+});
+
+describe("each unfinished debate is held at its own register version's terms (side-by-side C16)", () => {
+  // Version 16 (an older release's): no story, debate calls at 4,096. Version 17 (the API's): 2 story rounds, debate
+  // calls at 16,384.
+  const V16: PreviewVersionTerms = Object.freeze({
+    roleModels: Object.freeze({ answerWriter: GLM, answerChecker: GLM, storyteller: null, storyChecker: null }),
+    roleProviderRefs: Object.freeze(["preview:fixture-a", "preview:fixture-b"]), storyRounds: 0,
+    callOutputTokens: Object.freeze({ debate: 4096, storyteller: 0, storytellerRetry: 0, storyChecker: 0 }), maxCooldownHoldsPerRun: 2
+  });
+  const V17: PreviewVersionTerms = Object.freeze({ ...GATE_TERMS, callOutputTokens: Object.freeze({ ...OUTPUT, debate: 16_384 }) });
+  const runAt = (registerVersion: number): PreviewUnfinishedRun => Object.freeze({ basis: basis(2), panel: PANEL, phase: "DEBATE", registerVersion });
+  const RUNS = Object.freeze([runAt(16), runAt(17)]);
+  /** What the gate says the unfinished debates hold, from its refusal (no calls, or no money, left). */
+  const heldBy = async (gate: PreviewBudgetGateSettings): Promise<{ calls: number; nanoUsd: bigint }> => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const heldIn = async (remaining: PreviewGateRemaining): Promise<string> => {
+      const live = { ...gate, remaining: { deepinfra: async () => remaining } };
+      const refusal = await assertPreviewBudgetAdmits(live, { basis: basis(2), panel: PANEL }).then(() => null, (error: unknown) => error);
+      if (!(refusal instanceof PreviewDailyLimitRefusal)) throw new Error("the gate admitted a debate it had no room for");
+      return /, (\d+) held by unfinished debates,/u.exec(refusal.message)![1]!;
+    };
+    try {
+      return {
+        calls: Number(await heldIn(remainingWith({ remainingCalls: 0 }))),
+        nanoUsd: BigInt(await heldIn(remainingWith({ remainingNanoUsd: 0n })))
+      };
+    } finally {
+      quiet.mockRestore();
+    }
+  };
+  const sumOf = (priced: ReadonlyArray<readonly [PreviewUnfinishedRun, PreviewVersionTerms]>) => priced
+    .map(([run, terms]) => estimateUnfinishedRunHolds(run, terms)[0]!)
+    .reduce((sum, hold) => ({ calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd }), { calls: 0, nanoUsd: 0n });
+
+  it("two debates at versions 16 and 17 hold the sum of each priced alone at its own terms, not both at 17", async () => {
+    const asked: number[] = [];
+    const gate: PreviewBudgetGateSettings = Object.freeze({
+      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS), ...V17,
+      termsForVersion: async (version: number) => { asked.push(version); return version === 16 ? V16 : V17; }
+    });
+    const held = await heldBy(gate);
+    expect(held).toEqual(sumOf([[RUNS[0]!, V16], [RUNS[1]!, V17]]));
+    const allAt17 = sumOf([[RUNS[0]!, V17], [RUNS[1]!, V17]]);
+    expect(held.nanoUsd).not.toBe(allAt17.nanoUsd);
+    expect(held.calls).not.toBe(allAt17.calls);
+    expect(asked).toEqual([16, 17, 16, 17]);
+  });
+
+  it("a version whose terms cannot be read refuses the ask as unavailable, never prices the debate at the API's terms", async () => {
+    const gate: PreviewBudgetGateSettings = Object.freeze({
+      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS),
+      termsForVersion: async (version: number) => { if (version === 16) throw new TypeError("STORY_POLICY_INVALID"); return V17; }
+    });
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL })).rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
+    } finally {
+      quiet.mockRestore();
+    }
+  });
+
+  /**
+   * A stand-in register: each version's rows by key; counts the register_row reads per version. The unfinished-debates
+   * read returns `unfinishedRows` and keeps its parameters.
+   */
+  const registerPool = (versions: Readonly<Record<number, Readonly<Record<string, unknown>>>>, unfinishedRows: readonly unknown[] = []) => {
+    const reads = new Map<number, number>();
+    const unfinishedParams: unknown[][] = [];
+    const query = vi.fn(async (sql: string, params: readonly unknown[] = []) => {
+      if (sql === PREVIEW_UNFINISHED_RUNS_SQL) { unfinishedParams.push([...params]); return { rows: unfinishedRows }; }
+      if (!sql.includes("register.register_row")) throw new Error(`unexpected query: ${sql}`);
+      const version = Number(params[0]);
+      reads.set(version, (reads.get(version) ?? 0) + 1);
+      const keys = Array.isArray(params[1]) ? params[1] as string[] : [params[1] as string];
+      const rows = versions[version] ?? {};
+      return { rows: keys.filter((key) => Object.hasOwn(rows, key))
+        .map((key) => ({ row_key: key, value_json: rows[key], source_ref: `fixture:v${String(version)}:${key}` })) };
+    });
+    return { pool: { query } as never, readsOf: (version: number) => reads.get(version) ?? 0, unfinishedParams };
+  };
+  const registerRows = (writerCeiling: number) => Object.freeze({
+    synthesizerRoleRef: { kind: "SYNTHESIZER_ROLE_REF", providerRef: "preview:fixture-a", provisional: false },
+    evaluatorRoleRef: { kind: "EVALUATOR_ROLE_REF", providerRef: "preview:fixture-b", provisional: false },
+    evaluatorLoopMaxRounds: { kind: "EVALUATOR_LOOP_MAX_ROUNDS", maxRounds: 3 },
+    synthesizerCallBound: { kind: "SYNTHESIZER_CALL_BOUND", maxAttempts: 3, tokenCeiling: writerCeiling, deadlineMs: 240_000 },
+    evaluatorCallBound: { kind: "EVALUATOR_CALL_BOUND", maxAttempts: 3, tokenCeiling: 1024, deadlineMs: 240_000 },
+    acceptanceOrganCostBounds: { kind: "ACCEPTANCE_ORGAN_COST_BOUNDS", organs: {
+      JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 },
+      COMPOSER: { maxAttempts: 3, tokenCeiling: 512, deadlineMs: 60_000 },
+      CONFORMANCE: { maxAttempts: 3, tokenCeiling: 512, deadlineMs: 60_000 }
+    } },
+    runDeathPolicy: { kind: "RUN_DEATH_POLICY", final_retry_attempts: 1, max_cooldown_holds_per_run: 2 }
+  });
+
+  it("termsForVersion reads a version's register once (a sealed version never changes), and the API's own not at all", async () => {
+    const { pool, readsOf } = registerPool({ 16: registerRows(4096), 17: registerRows(16_384) });
+    const settings = await readPreviewBudgetGateSettings(pool, 17, PREVIEW, []);
+    const bootReads = readsOf(17);
+    expect(bootReads).toBeGreaterThan(0);
+    expect(readsOf(16)).toBe(0);
+    const first = await settings.termsForVersion(16);
+    const reads = readsOf(16);
+    expect(reads).toBeGreaterThan(0);
+    expect(await settings.termsForVersion(16)).toBe(first);
+    expect(readsOf(16)).toBe(reads);
+    await settings.termsForVersion(17);
+    expect(readsOf(17)).toBe(bootReads);
+    // Version 16's own terms: its writer's ceiling, no story.
+    expect(first).toEqual({
+      roleModels: { answerWriter: GLM, answerChecker: GLM, storyteller: null, storyChecker: null },
+      roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyRounds: 0,
+      callOutputTokens: previewCallOutputTokens(PREVIEW, { debate: [2048, 512, 512, 4096, 1024], story: null }), maxCooldownHoldsPerRun: 2
+    });
+    expect((await settings.termsForVersion(17)).callOutputTokens)
+      .toEqual(previewCallOutputTokens(PREVIEW, { debate: [2048, 512, 512, 16_384, 1024], story: null }));
+    expect(first.callOutputTokens.debate).not.toBe(settings.callOutputTokens.debate);
+  });
+
+  it("a version that cannot be read is not kept, and a version that is not a positive whole number is refused", async () => {
+    const versions: Record<number, Readonly<Record<string, unknown>>> = { 17: registerRows(16_384) };
+    const { pool, readsOf } = registerPool(versions);
+    const settings = await readPreviewBudgetGateSettings(pool, 17, PREVIEW, []);
+    await expect(settings.termsForVersion(15)).rejects.toThrow();
+    versions[15] = registerRows(2048);
+    await expect(settings.termsForVersion(15)).resolves.toMatchObject({ storyRounds: 0 });
+    expect(readsOf(15)).toBeGreaterThan(1);
+    for (const bad of [0, -1, 1.5, Number.NaN]) {
+      await expect(settings.termsForVersion(bad)).rejects.toThrow("PREVIEW_REGISTER_VERSION_INVALID");
+    }
+  });
+
+  it("the unfinished-debates read names each debate's register version, and asks for every story phase", async () => {
+    expect(PREVIEW_UNFINISHED_RUNS_SQL).toContain("run.register_version::integer AS register_version");
+    const row = { envelope_basis: basis(2), discovered_panel: PANEL, phase: "DEBATE", composition_budget_tier: "low", rotated: false };
+    expect(previewUnfinishedRunFrom({ ...row, register_version: 16 })).toMatchObject({ registerVersion: 16, phase: "DEBATE" });
+    // The API's version 17 has no story, yet a debate of a version with one is still held while it writes its story:
+    // the story filter is on ($1 true), and each debate's own version's story rounds decide what it holds.
+    const { pool, unfinishedParams } = registerPool({ 17: registerRows(16_384) }, [{ ...row, phase: "STORY", register_version: 16 }]);
+    const settings = await readPreviewBudgetGateSettings(pool, 17, PREVIEW, []);
+    expect(settings.storyRounds).toBe(0);
+    expect(await settings.readUnfinishedRuns()).toMatchObject([{ registerVersion: 16, phase: "STORY" }]);
+    expect(unfinishedParams).toEqual([[true, 3600]]);
+    for (const bad of [null, "16", 0, 1.5]) {
+      expect(() => previewUnfinishedRunFrom({ ...row, register_version: bad })).toThrow("PREVIEW_UNFINISHED_RUN_UNREADABLE");
+    }
   });
 });

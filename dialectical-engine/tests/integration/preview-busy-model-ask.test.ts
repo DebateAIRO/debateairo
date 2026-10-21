@@ -143,7 +143,8 @@ function budgetGate(enabled: readonly string[]): PreviewBudgetGateSettings {
     callOutputTokens: { debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 },
     askProbeModelIds: [GLM, GLM, DEEPSEEK, MIMO, QWEN, HAIKU],
     maxCooldownHoldsPerRun: 2,
-    readUnfinishedRuns: async () => []
+    readUnfinishedRuns: async () => [],
+    termsForVersion: async () => { throw new Error("FIXTURE_HAS_NO_UNFINISHED_DEBATES"); }
   }) as PreviewBudgetGateSettings;
 }
 

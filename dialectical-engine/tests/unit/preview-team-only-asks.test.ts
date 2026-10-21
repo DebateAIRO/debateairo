@@ -55,7 +55,7 @@ function application(counters: Counters): AskApplication {
   const settings: RunCreationSettings = {
     previewProviderTestConfig: PREVIEW,
     // The preview's start-of-debate estimate: an ample pot (tests/unit/preview-budget-estimate.test.ts covers refusals).
-    previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:1_000_000_000_000n,remainingCalls:100_000,maxConcurrentCalls:4,largestReservationNanoUsd:72_499_200n,enabledModels:[MODEL]})},roleModels:{answerWriter:MODEL,answerChecker:MODEL,storyteller:null,storyChecker:null},...GATE_SHAPE,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[]},
+    previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:1_000_000_000_000n,remainingCalls:100_000,maxConcurrentCalls:4,largestReservationNanoUsd:72_499_200n,enabledModels:[MODEL]})},roleModels:{answerWriter:MODEL,answerChecker:MODEL,storyteller:null,storyChecker:null},...GATE_SHAPE,roleProviderRefs:[],maxCooldownHoldsPerRun:0,readUnfinishedRuns:async()=>[],termsForVersion:async()=>{throw new Error("FIXTURE_HAS_NO_UNFINISHED_DEBATES");}},
     strangerSampleRate: 0, releaseKey: testReleaseKey(5), registerVersion: 5, batteryVersion: "fixture", settlementWatchHandle: "fixture",
     resolveDiscoveredPanel: async () => {
       counters.probes += 1;

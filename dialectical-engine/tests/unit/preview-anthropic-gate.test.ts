@@ -401,7 +401,9 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
   const deepinfra = async () => answer([GLM, DEEPSEEK, MIMO, QWEN], { remainingNanoUsd: 10_000_000_000n, remainingCalls: 2000,
     maxConcurrentCalls: 10, largestReservationNanoUsd: 142_110_720n });
   const settings = (remaining: PreviewBudgetGateSettings["remaining"], change: Partial<PreviewBudgetGateSettings> = {}): PreviewBudgetGateSettings =>
-    Object.freeze({ ...estimateSettings, askProbeModelIds: [], remaining, readUnfinishedRuns: async () => [], ...change });
+    Object.freeze({ ...estimateSettings, askProbeModelIds: [], remaining, readUnfinishedRuns: async () => [],
+      // Every unfinished debate here was admitted under the API's own version (side-by-side C16).
+      termsForVersion: async () => estimateSettings, ...change });
   const needsOf = (panel: readonly { provider_ref: string; model_id: string }[], depth = 1) =>
     estimatePreviewGateNeeds({ basis: basisFor(panel.length, depth), panel, ...estimateSettings });
   it("maps Haiku to the Anthropic gate and splits a three-maker panel over both gates", () => {
@@ -450,7 +452,7 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
     expect(asked).toBe(0);
   });
   it("an unfinished Haiku debate is held on the Anthropic gate, not on DeepInfra's", async () => {
-    const run = { basis: basisFor(3, 1), panel: PANEL };
+    const run = { basis: basisFor(3, 1), panel: PANEL, registerVersion: 11 };
     const held = estimateUnfinishedRunHolds(run, estimateSettings);
     expect(held.map(hold => hold.gate)).toEqual(["deepinfra", "anthropic"]);
     const share = held[1]!.callsNanoUsd;
@@ -463,9 +465,9 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: pot - 1n }) },
       { readUnfinishedRuns: async () => [run] }), panel)).rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     // An unfinished DeepInfra-only debate holds nothing on the Anthropic gate.
-    expect(estimateUnfinishedRunHolds({ basis: basisFor(2, 1), panel: DEEPINFRA_PANEL }, estimateSettings).map(hold => hold.gate)).toEqual(["deepinfra"]);
+    expect(estimateUnfinishedRunHolds({ registerVersion: 11, basis: basisFor(2, 1), panel: DEEPINFRA_PANEL }, estimateSettings).map(hold => hold.gate)).toEqual(["deepinfra"]);
     // An older run naming a model off the reviewed rows is held on DeepInfra, never on Anthropic.
-    const older = estimateUnfinishedRunHolds({ basis: basisFor(1, 1), panel: [member("preview:old", "retired/model")] }, estimateSettings);
+    const older = estimateUnfinishedRunHolds({ registerVersion: 11, basis: basisFor(1, 1), panel: [member("preview:old", "retired/model")] }, estimateSettings);
     expect(older.map(hold => hold.gate)).toEqual(["deepinfra"]);
   });
 });
