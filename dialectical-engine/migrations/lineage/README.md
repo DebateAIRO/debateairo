@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0123, below) the thirteenth and the publication review (0124, below) the fourteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0123, below) the thirteenth, the publication review (0124, below) the fourteenth and the threat reports (0125, below) the fifteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0124: 0124,
-   `publication-review-forward0124.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0124 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0125: 0125,
+   `threat-reports-forward0125.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0125 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -228,6 +228,14 @@ The Ask consumes a PUBLISH grant; no identity step-up object changes.
 Its manifest is `publication-review-forward0124.json`, and its loader is `packages/db/src/migration-forward0124.ts`.
 It keeps the previous effective verifier because it adds no billing relation or function.
 A hosted deploy applies it with `pnpm db:migrate`.
+
+## The threat reports (0125)
+
+The fifteenth chain step, after the publication review's 0124 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0125_threat_reports.sql`, `threat-reports-forward0125.json`, `packages/db/src/migration-forward0125.ts` (`loadForward0125`, appended last to `STEPS`, `MIGRATION_FORWARD0125_` refusals).
+It creates `staff.threat_report`, `staff.threat_report_event`, `staff.threat_report_alert`, eleven staff and export functions, and two ledger functions for the question-check spend writer and its invoker trigger.
+The eight shared objects it changes are `model_spend_spend_source_check`, `subject_capabilities_check`, `staff.valid_capabilities`, `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn`, `staff.commit_owner_command` and `staff.read_audit_page`; it pins none of them (W-0117).
+`verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
+If an earlier pending step takes 0125 first, renumber this step, recompute its manifest and re-pin the chain lists before merge.
 
 ## Replay: every applied step keeps its own checks
 

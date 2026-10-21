@@ -67,7 +67,9 @@ export type ModelSpendSource =
   /** post-settle synthesis inspection: site cost only, never the run's envelope */
   | "SYNTHESIS_CHECK"
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
-  | "LANGUAGE_CHECK";
+  | "LANGUAGE_CHECK"
+  /** the pre-start question check: a run-less site cost (0125), written only by ledger.record_question_check_spend */
+  | "QUESTION_CHECK";
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
@@ -75,6 +77,7 @@ export type ModelSpendSource =
  * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
  */
 export const LANGUAGE_CHECK_SPEND_WRITER = "ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
+export const QUESTION_CHECK_SPEND_WRITER = "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
 
 /** One fast language check's site cost, as the writer takes it: no run, no phase, no attempt. */
 export type LanguageCheckSpendEntry = Readonly<{
@@ -104,6 +107,22 @@ export async function languageCheckSpendWriterPresent(pool: Pick<Pool, "query">)
 /** One language check's site cost, through the one writer (0118). The database's CHECKs refuse a negative count. */
 export async function recordLanguageCheckSpend(pool: Pick<Pool, "query">, entry: LanguageCheckSpendEntry): Promise<void> {
   await pool.query("SELECT ledger.record_language_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
+    [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** The question check carries the same site-cost fields, with a distinct database writer. */
+export type QuestionCheckSpendEntry = LanguageCheckSpendEntry;
+
+export async function questionCheckSpendWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'ledger', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [QUESTION_CHECK_SPEND_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+export async function recordQuestionCheckSpend(pool: Pick<Pool, "query">, entry: QuestionCheckSpendEntry): Promise<void> {
+  await pool.query("SELECT ledger.record_question_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
     [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
@@ -986,6 +1005,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         "MODEL_SPEND_LANGUAGE_CHECK_FUNCTION_ONLY",
         "A language check's site cost is written only by ledger.record_language_check_spend"
       );
+    }
+    if (entry.spendSource === "QUESTION_CHECK") {
+      throw new TypedDomainError("MODEL_SPEND_QUESTION_CHECK_FUNCTION_ONLY", "A question check's site cost is written only by ledger.record_question_check_spend");
     }
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK") && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
