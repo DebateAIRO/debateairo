@@ -1,0 +1,13 @@
+# Install as /etc/systemd/system/debateai-notify-alarm.timer (README.md beside this file).
+# Every 5 minutes on the clock: the period set on the alarm service's check (5 minutes, grace 5 minutes).
+# Not Persistent: a missed tick is not worth a catch-up run; the next one comes within 5 minutes.
+[Unit]
+Description=DebateAI: knock on NETOPIA's notify address every 5 minutes
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=10s
+Unit=debateai-notify-alarm.service
+
+[Install]
+WantedBy=timers.target
