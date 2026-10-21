@@ -646,7 +646,8 @@ const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
 await refusePreviewOutsiderWork({
   previewConfigured: previewConfig !== undefined,
   teamUserIds: environment.PREVIEW_TEAM_USER_IDS,
-  ...postgresRunnerPreviewTeamGateStore(pool),
+  // Side-by-side spec §3: this release's jobs only (its live-outsider refusal and its 100 cap included).
+  ...postgresRunnerPreviewTeamGateStore(pool, environment.RELEASE_KEY),
   log: (line) => console.warn(JSON.stringify(line))
 });
 // Connection budget (2026-10-10, owner ruling): at most 8 debates at once, each
