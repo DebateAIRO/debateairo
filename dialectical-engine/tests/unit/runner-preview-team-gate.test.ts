@@ -98,7 +98,7 @@ describe('the store applies the API rule on the runner pool', () => {
     expect(queries[0]!.text).toMatch(/state IN \('READY', 'CLAIMED'\)/);
     expect(queries[0]!.text).toMatch(/run_id IS NOT NULL/);
     // Side-by-side spec §3: only this release's runs.
-    expect(queries[0]!.text.replace(/\s+/g, ' ')).toContain('JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2');
+    expect(queries[0]!.text.replace(/\s+/g, ' ')).toContain('FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2');
     expect(queries[0]!.values).toEqual([101, 'r1-aaaaaaaaaaaa']);
     expect([...await store.teamRuns([run(1), run(2)], [ALICE])]).toEqual([run(1)]);
     expect(queries[1]).toEqual({ text: PREVIEW_TEAM_RUNS_SQL, values: [[run(1), run(2)], [ALICE]] });

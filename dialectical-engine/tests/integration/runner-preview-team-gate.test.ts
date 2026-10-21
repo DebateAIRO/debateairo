@@ -179,5 +179,9 @@ describe("the runner's start-up team gate, as the runner principal", () => {
     const store = postgresRunnerPreviewTeamGateStore(runner, "r1-aaaaaaaaaaaa");
     expect(await store.work.failClaimable({ runId: other.runId, workItemId: other.workItemId, reason: "X" })).toBe(false);
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "READY", terminal_reason: null });
+    // Not vacuous: that release's own store fails the same job.
+    const own = postgresRunnerPreviewTeamGateStore(runner, "r2-bbbbbbbbbbbb");
+    expect(await own.work.failClaimable({ runId: other.runId, workItemId: other.workItemId, reason: "X" })).toBe(true);
+    expect(await jobRow(other.workItemId)).toMatchObject({ state: "FAILED" });
   });
 });

@@ -201,6 +201,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(cli).toContain("if (nextInputs?.kit === \"v2\" && settings.runner.DEPLOYMENT_MODE === \"hosted\") {");
     const debate = read("tools/preview-practice/practice-debate.ts");
     expect(debate).toContain("...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: \"hosted\" as const })");
+    expect(debate).toContain("nextReleaseKey(receipt.codeNext.composer === undefined ? input.settings.runner.DEPLOYMENT_MODE : \"hosted\")");
   });
 });
 
