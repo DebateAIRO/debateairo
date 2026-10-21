@@ -1730,7 +1730,10 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
-api.addHook("onClose",async () => endBecameCurrent?.());
+// Side-by-side spec §4 (plan C7 review): the release listener unsubscribes FIRST on close. Fastify runs onClose hooks
+// last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
+// one-shot pass can start a runtime the hooks below have already stopped.
+api.addHook("preClose",async () => endBecameCurrent?.());
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }

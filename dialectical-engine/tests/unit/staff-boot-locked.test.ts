@@ -244,7 +244,7 @@ describe("staff runtime boot without fresh alert readiness", () => {
   });
 });
 
-const targetUser ="44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";
+const targetUser = "44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";
 async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
   const f = await fixture();
   const runtime = await createStaffRuntime(options.funded ? fundedActivation(f, "hosted") : f.activation);

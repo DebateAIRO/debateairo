@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 /**
  * Side-by-side uploads spec 2026-10-21 §4 (plan C task C7): every API background loop runs only while this process's
  * release is current, and the work a request owns is deliberately left ungated. Source pins over apps/api/src: a new
- * timer anywhere in the API must take a side (gated, or named here as request-owned), never slip in unnoticed.
+ * setInterval anywhere in the API, and a new whole-minute tick in main.ts, must take a side (gated, or named here as
+ * request-owned), never slip in unnoticed.
  */
 const api = fileURLToPath(new URL("../../apps/api/src/", import.meta.url));
 const read = (path: string): string => readFileSync(join(api, path), "utf8");
@@ -80,6 +81,20 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       expect(enclosingCalls(mainCode, at), `setInterval( at line ${main.slice(0, at).split("\n").length}`)
         .toContain("gatedInterval");
     }
+  });
+
+  it("in main.ts, every everyWholeMinute( takes a gatedTrigger( as its tick", () => {
+    const ticks = callsOf(main, "everyWholeMinute");
+    expect(ticks.length).toBeGreaterThan(0);
+    for (const at of ticks) {
+      expect(mainCode.slice(at + "everyWholeMinute(".length).trimStart().startsWith("gatedTrigger("),
+        `everyWholeMinute( at line ${main.slice(0, at).split("\n").length}`).toBe(true);
+    }
+  });
+
+  it("unsubscribes the release listener before every onClose stop (preClose)", () => {
+    expect(main).toContain('api.addHook("preClose",async () => endBecameCurrent?.());');
+    expect(main).not.toMatch(/addHook\("onClose",[^\n]*endBecameCurrent/u);
   });
 
   it("gates every timer main.ts starts, on the watcher", () => {
