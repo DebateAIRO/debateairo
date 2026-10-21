@@ -22,6 +22,8 @@ const T3 = new Date("2026-10-21T12:00:00.000Z");
 const T4 = new Date("2026-10-21T13:00:00.000Z");
 const T5 = new Date("2026-10-21T14:00:00.000Z");
 const T6 = new Date("2026-10-21T15:00:00.000Z");
+const T7 = new Date("2026-10-21T16:00:00.000Z");
+const T8 = new Date("2026-10-21T17:00:00.000Z");
 const BY = "test:release-state";
 
 const codeOf = (error: unknown): string | undefined =>
@@ -154,6 +156,26 @@ describe("0123 §3: the release table, its state view and its serialized writers
     expect(reason).toEqual([{ reason: "NOT_SWITCHED" }]);
   });
 
+  it("a draining release staged again without a switch still drains: no third live release, no NOT_SWITCHED retirement (C current, B draining)", async () => {
+    // A rollback that stages B again but never switches leaves B's drained debates running: B is still live.
+    await stage(B);
+    expect(await state(B)).toEqual(live("STAGED"));
+    await expectRefused(() => recordReleaseSwitch(database.pool, { newReleaseKey: D, expectedCurrent: C, takeTrafficFrom: T7, recordedBy: BY }),
+      "RELEASE_SWITCH_CONFLICT");
+    // Only the drain path may retire it, whatever the reason given.
+    for (const reason of ["NOT_SWITCHED", "DRAINED"]) {
+      await expectRefused(() => recordReleaseEvent(database.pool, { releaseKey: B, kind: "RETIRED", recordedBy: BY, reason }),
+        "RELEASE_EVENT_INVALID");
+    }
+    // The way out: finish the rollback (B current, C draining), then switch back (C current, B draining).
+    await recordReleaseSwitch(database.pool, { newReleaseKey: B, expectedCurrent: C, takeTrafficFrom: T7, recordedBy: BY });
+    expect(await state(C)).toEqual(live("DRAINING"));
+    await stage(C);
+    await recordReleaseSwitch(database.pool, { newReleaseKey: C, expectedCurrent: B, takeTrafficFrom: T8, recordedBy: BY });
+    expect(await readCurrentRelease(database.pool)).toEqual({ releaseKey: C, takeTrafficFrom: T8 });
+    expect(await state(B)).toEqual(live("DRAINING"));
+  });
+
   it("refused transitions (C current, B draining, A retired, D staged)", async () => {
     const event = (releaseKey: string, kind: string, extra: Partial<{ recordedBy: string; reason: string }> = {}) =>
       () => recordReleaseEvent(database.pool, { releaseKey, kind: kind as "STAGED", recordedBy: BY, ...extra });
@@ -188,6 +210,7 @@ describe("0123 §3: the release table, its state view and its serialized writers
       "INSERT INTO core.release_event(release_key,kind,recorded_by,take_traffic_from) VALUES ($1,'STAGED',$2,now())", [E, BY]), "23514");
     // Both writers need READ COMMITTED: a snapshot older than the lock would read a stale current release.
     const client = await database.pool.connect();
+    let clean = false;
     try {
       for (const call of [
         () => client.query("SELECT core.record_release_event($1,'STAGED',$2)", [E, BY]),
@@ -198,7 +221,8 @@ describe("0123 §3: the release table, its state view and its serialized writers
         await client.query("ROLLBACK");
         expect(messageOf(error)).toBe("RELEASE_EVENT_INVALID");
       }
-    } finally { client.release(); }
+      clean = true;
+    } finally { client.release(!clean); } // a client left mid-transaction is destroyed, never pooled
     expect(await state(C)).toEqual(live("CURRENT"));
     expect(await state(E)).toBeNull();
   });
@@ -213,6 +237,7 @@ describe("0123 §3: the release table, its state view and its serialized writers
     expect(await eventCount()).toBe(before);
     // When 0124's hook exists, the switch calls it with its own arguments after the compare-and-swap (rolled back here).
     const client = await database.pool.connect();
+    let clean = false;
     try {
       await client.query("BEGIN");
       await client.query(`CREATE FUNCTION register.release_switch_settings_hook(p_new text, p_expected bigint) RETURNS void
@@ -227,7 +252,8 @@ describe("0123 §3: the release table, its state view and its serialized writers
       const stale = await refusal(client.query("SELECT core.record_release_switch($1,$2,$3,$4,7)", [D, B, T6, BY]));
       expect(messageOf(stale)).toBe("RELEASE_SWITCH_CONFLICT");
       await client.query("ROLLBACK");
-    } finally { client.release(); }
+      clean = true;
+    } finally { client.release(!clean); }
     expect(await database.pool.query("SELECT to_regprocedure('register.release_switch_settings_hook(text,bigint)') AS hook"))
       .toMatchObject({ rows: [{ hook: null }] });
     const nulled = (await database.pool.query<{ seq: string }>("SELECT core.record_release_switch($1,$2,$3,$4,NULL)::text AS seq", [D, C, T6, BY])).rows[0]!;
@@ -251,6 +277,7 @@ describe("0123 §3: the release table, its state view and its serialized writers
 
   it("runtime reads, never writes; the operator writes, never reads the table", async () => {
     const client: PoolClient = await database.pool.connect();
+    let clean = false;
     try {
       await client.query("SET ROLE debateai_runtime");
       expect(await readCurrentRelease(client)).toEqual({ releaseKey: D, takeTrafficFrom: T6 });
@@ -271,11 +298,8 @@ describe("0123 §3: the release table, its state view and its serialized writers
       await client.query("SET LOCAL ROLE debateai_release_operator");
       expect(codeOf(await refusal(readCurrentRelease(client)))).toBe("42501");
       await client.query("ROLLBACK");
-    } finally {
-      await client.query("ROLLBACK").catch(() => undefined);
-      await client.query("RESET ROLE").catch(() => undefined);
-      client.release();
-    }
+      clean = true;
+    } finally { client.release(!clean); } // a client left mid-transaction or under SET ROLE is destroyed, never pooled
     expect(await state(E)).toBeNull();
   });
 
@@ -328,6 +352,7 @@ describe("0123 §3: two racing switches on a fresh database", () => {
     await stage(E);
     const first = await database.pool.connect();
     const second = await database.pool.connect();
+    let clean = false;
     try {
       // The first switch holds the lock in an open transaction; the second must wait for it, then see D current.
       await first.query("BEGIN");
@@ -349,13 +374,25 @@ describe("0123 §3: two racing switches on a fresh database", () => {
       const rejected = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
       expect(rejected).toHaveLength(1);
       expect(codeOf(rejected[0]!.reason)).toBe("RELEASE_SWITCH_CONFLICT");
+      clean = true;
     } finally {
-      await first.query("ROLLBACK").catch(() => undefined);
-      first.release();
-      second.release();
+      first.release(!clean);
+      second.release(!clean);
     }
     expect(await readCurrentRelease(database.pool)).toEqual({ releaseKey: D, takeTrafficFrom: T1 });
     expect(await state(E)).toEqual(live("STAGED"));
     expect((await database.pool.query("SELECT count(*)::int n FROM core.release_event WHERE kind='CURRENT'")).rows[0].n).toBe(1);
+  });
+
+  it("the whole drain path: stage, current, draining, front pair stopped, retire requested, retired keeps both flags (E current, D retired)", async () => {
+    await recordReleaseSwitch(database.pool, { newReleaseKey: E, expectedCurrent: D, takeTrafficFrom: T2, recordedBy: BY });
+    expect(await state(D)).toEqual(live("DRAINING"));
+    await recordReleaseEvent(database.pool, { releaseKey: D, kind: "FRONT_PAIR_STOPPED", recordedBy: BY });
+    await recordReleaseEvent(database.pool, { releaseKey: D, kind: "RETIRE_REQUESTED", recordedBy: BY });
+    expect(await state(D)).toEqual({ state: "DRAINING", frontPairStopped: true, retireRequested: true });
+    await recordReleaseEvent(database.pool, { releaseKey: D, kind: "RETIRED", recordedBy: BY, reason: "DRAINED" });
+    expect(await state(D)).toEqual({ state: "RETIRED", frontPairStopped: true, retireRequested: true });
+    expect((await database.pool.query("SELECT kind FROM core.release_event WHERE release_key=$1 ORDER BY event_seq", [D])).rows.map((row) => row.kind))
+      .toEqual(["STAGED", "CURRENT", "DRAINING", "FRONT_PAIR_STOPPED", "RETIRE_REQUESTED", "RETIRED"]);
   });
 });

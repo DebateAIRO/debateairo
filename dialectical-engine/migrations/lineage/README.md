@@ -210,25 +210,26 @@ tables are not altered (their digest is 0117's; see 0119's note). No billing rel
 
 The thirteenth chain step, after the engine's map answer step 0122 (side-by-side uploads, spec
 `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §1 and §5): `0123_side_by_side_releases.sql`,
-`side-by-side-releases-forward0123.json`, `packages/db/src/migration-forward0123.ts` (`loadForward0123`, appended last to
-`STEPS`, `MIGRATION_FORWARD0123_*` refusals). The transition release T's one migration, built in numbered sections
-(plan A, tasks A1-A5), each checked by the file's closing contract block and digested by the loader's postcondition:
-§1 adds `core.run.release_key` (`text NOT NULL DEFAULT 'legacy'`, CHECK `run_release_key_shape`), the release that runs
+`side-by-side-releases-forward0123.json`, `packages/db/src/migration-forward0123.ts` (`loadForward0123`, appended last
+to `STEPS`, `MIGRATION_FORWARD0123_*` refusals). The transition release T's one migration, built in numbered sections
+(plan A, tasks A1-A5), each checked by the file's closing contract block and digested by the loader's postcondition: §1
+adds `core.run.release_key` (`text NOT NULL DEFAULT 'legacy'`, CHECK `run_release_key_shape`), the release that runs
 each debate, written once at insert; §2 redefines `core.create_encrypted_run(jsonb,uuid,uuid,jsonb)` in place (0072's
 body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-asserting SECURITY DEFINER, the pinned
 `search_path` and EXECUTE for `debateai_content_provision` only; §3 adds the release table `core.release_event`
 (append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
 `core.read_release_state(text)` (EXECUTE for `debateai_runtime`) and the writers `core.record_release_switch` and
 `core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
-advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`. Its header declares `-- n1: drained` (T is uploaded
-with no debate waiting or running, so it may add a NOT NULL column and redefine earlier functions, each such section
-saying why) and `-- n1: keeps-verifier`: no billing relation or function, so `verify-effective-capabilities-111.sql`
-stays the verifier in force. No supplemental verifier, so no `replayVerifierSql`: its postcondition is the column (type,
-NOT NULL, default), the CHECK (name, validation, definition), the redefined and added functions whole, the release
-table whole, the view (owner, ACL, definition) and the two roles' attributes and memberships. While the build is open
-each task appends its section and recomputes `migration.sha256` with the one-liner at the end of this file; once merged,
-0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename every file and constant that
-carries the number, recompute the manifest, re-pin the chain lists).
+advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`. Its header declares
+`-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier
+functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the column (type, NOT NULL, default), the CHECK (name, validation,
+definition), the redefined and added functions whole, the release table whole, the view (owner, ACL, definition) and the
+two roles' attributes and memberships. While the build is open each task appends its section and recomputes
+`migration.sha256` with the one-liner at the end of this file; once merged, 0123 is never edited again. If `origin/dev`
+takes 0123 first, renumber this step (rename every file and constant that carries the number, recompute the manifest,
+re-pin the chain lists).
 
 ## Replay: every applied step keeps its own checks
 

@@ -4,15 +4,16 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * Side-by-side releases (spec 2026-10-21 §1, §5; plan A, tasks A1-A5) as the chain step after engine 2's map answer step
- * 0122 (migrations/lineage/README.md): the transition release T's one migration, built section by section. §1 stamps
- * every run with its release (core.run.release_key and its CHECK run_release_key_shape); §2 redefines
+ * Side-by-side releases (spec 2026-10-21 §1, §5; plan A, tasks A1-A5) as the chain step after engine 2's map answer
+ * step 0122 (migrations/lineage/README.md): the transition release T's one migration, built section by section. §1
+ * stamps every run with its release (core.run.release_key and its CHECK run_release_key_shape); §2 redefines
  * core.create_encrypted_run(jsonb,uuid,uuid,jsonb) in place (0072's body plus the stamp) so the encrypted insert path
  * writes it; §3 adds the release table core.release_event, its view core.release_state_v, its two readers and its two
  * serialized writers, owned by the new NOLOGIN role debateai_release_owner (the writers callable by
- * debateai_release_operator). It adds no billing relation and no billing function, so the effective verifier in force (0111's) stays in
- * force and is named as its own. Its checks are its postcondition (below), compared on every later migrate(); it has no
- * supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the lists below.
+ * debateai_release_operator). It adds no billing relation and no billing function, so the effective verifier in force
+ * (0111's) stays in force and is named as its own. Its checks are its postcondition (below), compared on every later
+ * migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the
+ * lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';

@@ -162,7 +162,9 @@ GRANT EXECUTE ON FUNCTION core.create_encrypted_run(jsonb,uuid,uuid,jsonb) TO de
 -- append-only list of what happened to each release (STAGED, CURRENT, DRAINING, FRONT_PAIR_STOPPED, RETIRE_REQUESTED,
 -- RETIRED), core.release_state_v reads one row per release from it, and every writer first takes ONE advisory lock, so
 -- two switches can never both win (the second reads the first's CURRENT row and refuses RELEASE_SWITCH_CONFLICT).
--- At most two releases are ever live (spec non-goal): a switch refuses while a third release still drains.
+-- At most two releases are ever live (spec non-goal): a switch refuses while a third release still drains. A release
+-- still drains from its DRAINING event until a later RETIRED event, whatever it was marked since: a draining release
+-- STAGED again for a rollback that never switched keeps its drained debates running, so it stays live.
 --
 -- Two NOLOGIN NOINHERIT roles, created and asserted as 0055 creates its own (0055:7-58):
 --   debateai_release_owner     owns the four functions below and holds SELECT, INSERT on the table (USAGE on its
@@ -286,7 +288,8 @@ $$;
 -- The switch: the lock first, then every read under it, then the two inserts. READ COMMITTED is required (as 0055:1625
 -- requires it): each statement after the lock then reads what the lock's previous holder committed, while an older
 -- snapshot would read a stale current release. RELEASE_SWITCH_CONFLICT (40001): the current release is not
--- p_expected_current (NULL = none yet), or a release other than p_new and the current one still drains.
+-- p_expected_current (NULL = none yet), or a release other than p_new and the current one still drains (a DRAINING
+-- event with no later RETIRED event, even if it was STAGED again since).
 -- RELEASE_EVENT_INVALID (22023): a malformed key or recorder, no p_take_traffic_from, p_new already current, or p_new's
 -- latest state is not STAGED (addendum item 4: a draining or retired release is STAGED again first, as plan D's
 -- rollback does). Then Phase 2's settings hook (addendum item 5, plan S): PL/pgSQL resolves a function at the
@@ -332,8 +335,12 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'RELEASE_EVENT_INVALID';
   END IF;
   IF EXISTS (
-    SELECT 1 FROM core.release_state_v AS state
-    WHERE state.state = 'DRAINING' AND state.release_key <> p_new AND state.release_key IS DISTINCT FROM v_current
+    SELECT 1 FROM core.release_event AS drained
+    WHERE drained.kind = 'DRAINING' AND drained.release_key <> p_new AND drained.release_key IS DISTINCT FROM v_current
+      AND NOT EXISTS (
+        SELECT 1 FROM core.release_event AS retired
+        WHERE retired.release_key = drained.release_key AND retired.kind = 'RETIRED'
+          AND retired.event_seq > drained.event_seq)
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'RELEASE_SWITCH_CONFLICT';
   END IF;
@@ -352,12 +359,16 @@ BEGIN
 END;
 $$;
 
--- Every other event, under the same lock and the same READ COMMITTED rule. RELEASE_EVENT_INVALID (22023) for a malformed
--- key, recorder or reason, any kind outside these four, and a disallowed transition:
---   STAGED              no state yet, or DRAINING or RETIRED (addendum item 2: a rollback stages an older release again);
+-- Every other event, under the same lock and the same READ COMMITTED rule. RELEASE_EVENT_INVALID (22023) for a
+-- malformed key, recorder or reason, any kind outside these four, and a disallowed transition:
+--   STAGED              no state yet, or DRAINING or RETIRED (addendum item 2: a rollback stages an older release
+--                       again);
 --   FRONT_PAIR_STOPPED  a known release that is not the current one;
 --   RETIRE_REQUESTED    DRAINING only;
---   RETIRED             STAGED (addendum item 3: never switched to, 'NOT_SWITCHED') or DRAINING ('DRAINED').
+--   RETIRED             STAGED (addendum item 3: never switched to, 'NOT_SWITCHED') or DRAINING ('DRAINED'); never a
+--                       STAGED release that still drains (a DRAINING event with no later RETIRED event: staged again
+--                       for a rollback that never switched, its drained debates may still run). Such a release retires
+--                       only through the drain path: switched to, then drained again, then retired.
 -- CURRENT and DRAINING are written by the switch alone.
 CREATE OR REPLACE FUNCTION core.record_release_event(
   p_release_key text,
@@ -373,6 +384,7 @@ SET search_path = pg_catalog
 AS $$
 DECLARE
   v_state text;
+  v_still_draining boolean;
   v_allowed boolean;
   v_event_seq bigint;
 BEGIN
@@ -387,11 +399,19 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'RELEASE_EVENT_INVALID';
   END IF;
   SELECT state.state INTO v_state FROM core.release_state_v AS state WHERE state.release_key = p_release_key;
+  v_still_draining := EXISTS (
+    SELECT 1 FROM core.release_event AS drained
+    WHERE drained.release_key = p_release_key AND drained.kind = 'DRAINING'
+      AND NOT EXISTS (
+        SELECT 1 FROM core.release_event AS retired
+        WHERE retired.release_key = drained.release_key AND retired.kind = 'RETIRED'
+          AND retired.event_seq > drained.event_seq));
   v_allowed := CASE p_kind
     WHEN 'STAGED' THEN v_state IS NULL OR v_state IN ('DRAINING', 'RETIRED')
     WHEN 'FRONT_PAIR_STOPPED' THEN v_state IS NOT NULL AND v_state <> 'CURRENT'
     WHEN 'RETIRE_REQUESTED' THEN v_state IS NOT DISTINCT FROM 'DRAINING'
-    WHEN 'RETIRED' THEN v_state IS NOT NULL AND v_state IN ('STAGED', 'DRAINING')
+    WHEN 'RETIRED' THEN v_state IS NOT DISTINCT FROM 'DRAINING'
+      OR (v_state IS NOT DISTINCT FROM 'STAGED' AND NOT v_still_draining)
     ELSE false
   END;
   IF NOT v_allowed THEN
