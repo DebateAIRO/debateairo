@@ -473,6 +473,43 @@ describe("N11 ruling C-8, B1: a refusal caused by our own setup waits for the ow
     expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
     expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(1);
   }, 600_000);
+
+  // Last in this describe: its resume also releases the renewals the tests above leave held.
+  it("a refusal after the owner's resume gets its own O3 even in the same hour; before any resume, one O3 per code and hour", async () => {
+    const first = await due();
+    const second = await due();
+    // Five minutes into the next whole hour, so everything below happens inside one hour.
+    const hour = Math.ceil(first.clock.now.getTime() / HOUR) * HOUR;
+    first.clock.now = new Date(hour + 5 * MINUTE);
+    answerAll(first, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "99"));
+    const charge = await renewNow(first);
+    const reference = `charge ${charge.chargeId}`;
+    expect(await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference)).toHaveLength(1);
+    // A second plan refused in the same hour, before any resume: no second email (one per code and hour).
+    second.clock.now = new Date(hour + 10 * MINUTE);
+    answerAll(second, () => paymentError("PAYMENT_CONFIGURATION_REFUSED", "99"));
+    const other = await renewNow(second);
+    expect(await trail(other.chargeId)).toEqual(["REQUESTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED"]);
+    expect(await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", `charge ${other.chargeId}`)).toHaveLength(0);
+    // The owner resumes; NETOPIA refuses the resend again in the same hour: a second O3 says it waits again.
+    first.clock.now = new Date(hour + 20 * MINUTE);
+    expect((await resume(first)).resumed).toBeGreaterThanOrEqual(1);
+    first.clock.now = new Date(hour + 21 * MINUTE);
+    expect(await first.renewal.recoverOpenCharge(charge.chargeId)).toBe(true);
+    expect((await trail(charge.chargeId)).slice(-3)).toEqual([
+      "REQUESTED:CHARGE_RESUMED", "REQUESTED:RESEND_STARTED", "REQUESTED:CHARGE_CONFIGURATION_REFUSED"
+    ]);
+    const alerts = await ownerAlerts("CHARGE_CONFIGURATION_REFUSED", reference);
+    expect(alerts).toHaveLength(2);
+    expect(alerts.map((row) => row.ref)).toEqual([
+      `O3:CHARGE_CONFIGURATION_REFUSED:${new Date(hour).toISOString().slice(0, 13)}`,
+      `O3:CHARGE_CONFIGURATION_REFUSED:${new Date(hour).toISOString().slice(0, 13)}:r1`
+    ]);
+    // Every O3 of this code and hour: those two, and no third for the second plan.
+    expect(await outboxRows("kind = 'EMAIL' AND ref LIKE $1", [
+      `O3:CHARGE_CONFIGURATION_REFUSED:${new Date(hour).toISOString().slice(0, 13)}%`
+    ])).toHaveLength(2);
+  });
 });
 
 describe("N11 an unknown outcome is probed on the same orderID (spec §2.9.3)", () => {

@@ -959,9 +959,12 @@ export class RenewalService {
    * One saved-card call (the first, or a resend: always the charge's own orderID) and its answer (spec §2.9.2 step 4).
    * Every row is dated by the clock read when the call returned (P2-I7). Ruling PR-11: a FIRST send answered from a `56`
    * (`answeredOrderReused`) is an anomaly: one content-free audit line and O3 ORDER_REUSED, then the answer is recorded
-   * as this order's report; a resend is expected to meet a 56 and writes nothing more.
+   * as this order's report; a resend is expected to meet a 56 and writes nothing more. `resumes`: the owner's resume
+   * markers the charge already holds (`resend` counts them; a first send has none), for the refusal's O3 (`notSent`).
    */
-  private async sendNetopia(charge: ChargeRow, state: SubscriptionState, request: SavedCardCharge, resend: boolean): Promise<void> {
+  private async sendNetopia(
+    charge: ChargeRow, state: SubscriptionState, request: SavedCardCharge, resend: boolean, resumes = 0
+  ): Promise<void> {
     let answer: PaymentReport;
     try {
       answer = await this.netopiaDeps().payments.chargeSavedCard(request);
@@ -976,7 +979,7 @@ export class RenewalService {
         return;
       }
       if (code === "PAYMENT_PROVIDER_UNAVAILABLE" || code === "PAYMENT_CREDENTIALS_REFUSED" || code === "PAYMENT_CONFIGURATION_REFUSED") {
-        await this.notSent(charge, state, NETOPIA_NOT_SENT[code], now);
+        await this.notSent(charge, state, NETOPIA_NOT_SENT[code], now, resumes);
         return;
       }
       // PAYMENT_OUTCOME_UNKNOWN, an answer of an unexpected shape, anything else: it may have reached NETOPIA (§2.9.3).
@@ -1004,16 +1007,20 @@ export class RenewalService {
    * Ruling C-8 / D5 5i: nothing was charged. The request stands (a REQUESTED with why), the renewal itself is held (Q-1),
    * no email reaches the person; a refused key or a refusal of our own settings emails the owner at once (O3, once per
    * code and hour) and a refused key raises the operator alarm. B1 part 2 (NETOPIA answers 2026-10-21, Q22): such a
-   * refusal is then never sent again by itself (`recoverNetopiaCharge`); the O3 names the owner's resume command.
+   * refusal is then never sent again by itself (`recoverNetopiaCharge`); the O3 names the owner's resume command. A
+   * refusal that follows the owner's resume (`resumes` > 0: the charge's `CHARGE_RESUMED` markers) gets its own O3
+   * (`:r<resumes>` on the dedupe ref), so the owner hears that the renewal waits again even within the same hour;
+   * before any resume, several refusals in one hour still give one email.
    */
-  private async notSent(charge: ChargeRow, state: SubscriptionState, code: string, now: Date): Promise<void> {
+  private async notSent(charge: ChargeRow, state: SubscriptionState, code: string, now: Date, resumes = 0): Promise<void> {
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
       chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: code })));
     this.deps.audit("billing.renewal.unknown", { attempt: charge.attempt, code });
     if (code === "CHARGE_CREDENTIALS_REFUSED") this.deps.audit("billing.payment.credentials_refused", { operation: "charge" });
     if (code === "CHARGE_CREDENTIALS_REFUSED" || code === "CHARGE_CONFIGURATION_REFUSED") {
       await queuePaymentAlert(this.deps, {
-        code, reference: `charge ${charge.chargeId}`, nextSteps: OWNER_STEPS[code], dedupeRef: `${code}:${hourOf(now)}`, now
+        code, reference: `charge ${charge.chargeId}`, nextSteps: OWNER_STEPS[code],
+        dedupeRef: resumes > 0 ? `${code}:${hourOf(now)}:r${resumes}` : `${code}:${hourOf(now)}`, now
       });
     }
     if (charge.attempt === 1) await this.holdPending(state, charge.periodStart, now, code);
@@ -1238,7 +1245,8 @@ export class RenewalService {
     if (!(await this.savedCardSendAllowed(state, now, charge.attempt))) return false;
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
       chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: RESEND_STARTED })));
-    await this.sendNetopia(charge, state, prepared, true);
+    const resumes = charge.events.filter((event) => event.kind === "REQUESTED" && event.errorCode === CHARGE_RESUMED).length;
+    await this.sendNetopia(charge, state, prepared, true, resumes);
     return true;
   }
 
