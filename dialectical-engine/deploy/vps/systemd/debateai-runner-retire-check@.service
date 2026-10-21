@@ -1,0 +1,21 @@
+# deploy/vps/systemd/debateai-runner-retire-check@.service -> /etc/systemd/system/ (started by its .timer)
+# 25 minutes after release %i was asked to retire (side-by-side spec §4): a retired release is left as it is; a
+# runner already gone without retiring is reported as stranded (nothing is stopped); a runner still running is the
+# ONE unit this stops (debateai-runner@%i.service). This is the only planned stop of a runner that may still have
+# work: never `systemctl stop` a busy runner by hand (README §5 "Side-by-side upgrades"). A refusal fails the unit:
+# `systemctl --failed` shows it (this host has no failure mail, README §9).
+[Unit]
+Description=DebateAI: stop release %i's runner if it still runs 25 minutes after the request
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=postgresql.service
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only, as the request does.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs retire-check --label %i
+# The runner stop (systemctl waits up to 90 s: its TimeoutStopSec=30 plus its stop recorder) and the reads around it.
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

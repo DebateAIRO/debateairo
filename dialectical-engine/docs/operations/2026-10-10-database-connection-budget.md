@@ -5,7 +5,7 @@ changed, and plans the next steps: Postgres memory settings at launch, PgBouncer
 
 ## In one paragraph
 
-Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The job system (Hatchet) may take
+Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The side-by-side transition raises the limit to 320 at the Postgres restart in the drained window (section 8), once the new config is on the server. The job system (Hatchet) may take
 up to 50. Before this change the website program (the API) could open up to about 104 connections. The debate runner had
 only 10, but accepted up to 100 debates at once. Each running debate keeps 2 connections busy, so **the runner would
 jam at about 5 debates at the same moment**: every debate then waits forever for a third connection that never comes,
@@ -72,9 +72,9 @@ guard that keeps the code and the numbers in step is
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit: 176 + 79 is more than 197. Before running two (for example to restart without a
-gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings
-(section 3).
+A second API process does **not** fit at 200: 176 + 79 is more than 197. Two releases, each with its own API, do fit at
+the transition's 320 (section 8). Before running a further API process (for example to restart without a gap, or to
+grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings (section 3).
 
 ## 2. What happens when a pool runs dry
 
@@ -130,7 +130,7 @@ log_temp_files = 10MB             # log any query that spills more than 10 MB to
 * **Why not more `work_mem`:** it is per step, per query. 176 connections × 8 MB × a few steps could, in theory, exceed
   the RAM. In practice only about as many queries run at once as there are cores, so 8 MB is safe. Raise it only when
   `log_temp_files` shows spills.
-* **Keep `max_connections = 200`.** Each extra allowed connection costs memory even when unused, and 6 cores cannot run
+* **Keep `max_connections` at 200, or at 320 while the side-by-side transition lasts (section 8).** Each extra allowed connection costs memory even when unused, and 6 cores cannot run
   more than about 12–24 queries truly at the same time anyway. More connections do not mean more speed.
 * **When to apply:** in the launch window, because `shared_buffers` needs a restart. Put the file in the repo
   (`deploy/postgres/postgresql.memory.conf`) and the step in the runbook in the same pull request.
@@ -183,7 +183,7 @@ cursors or temporary tables were found):
 
 Fire when either is true:
 
-* **Connections in use above 150** (three quarters of 200), for two minutes in a row:
+* **Connections in use above 240** (three quarters of 320, the limit during the side-by-side transition; 150 at 200), for two minutes in a row:
 
 ```sql
 SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'client backend';
@@ -245,5 +245,38 @@ a freeze), but each still deserves its own fix:
 
 ## 7. What was not changed
 
-No server, deploy or Postgres setting changed. The one-shot commands (migrator, billing, support and owner CLIs,
-scheduler jobs) keep their own pool sizes; they run by hand, one at a time.
+In the 2026-10-10 change no server, deploy or Postgres setting changed (the 2026-10-21 raise to 320 is in section 8). The
+one-shot commands (migrator, billing, support and owner CLIs, scheduler jobs) keep their own pool sizes; they run by hand,
+one at a time.
+
+## 8. Side by side (2026-10-21)
+
+The side-by-side transition (spec §9 and its section "The transition"; the spec is `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` in the DebateAIRO folder, outside this engine repository) runs two releases
+at once while the new one takes over: the old release keeps its drained debates, and the new one takes new work. Each
+release has its own API and its own runner, so the server holds two of each while they overlap. No pool size changed.
+Only the server's limit did.
+
+| Who | Connections at most |
+|---|---|
+| Website program (API), two releases at 79 each | 158 |
+| Debate runner, two releases at 34 each | 68 |
+| Hatchet (its role's limit) | 50 |
+| Migrator (its role's limit) | 3 |
+| Owner's commands | about 10 |
+| **Sum of ceilings** | **289** |
+| Left free | 28 (317 = 320 less the administrator's 3) |
+
+* **The limit is 320**, in `deploy/postgres/postgresql.hardening.conf` (`max_connections = 320`). It takes effect only at a
+  Postgres restart, made in the drained window of the side-by-side transition (spec §9, "The transition"). After that restart, `SHOW max_connections;`
+  must return 320. Until then the running server still allows 200.
+* **Memory.** Pools open connections only when needed, but a higher limit still costs some memory even when idle (section 3).
+* **Query cancellations.** A cancelled query opens a short extra connection outside its pool, and each pool allows at most
+  four of them at once (`packages/db/src/private-stream.ts`). Counted pool by pool, one API and one runner are 14 pools
+  (12 API pools with the dev menu off, plus the runner's 2), so two releases are 28. The 28 free connections cover one
+  cancellation per pool at the same moment, with nothing left for the owner's login. They do not cover four per pool,
+  which would need 112. Section 1 has the same gap for one release (four per pool across 14 pools would need 56, against
+  21). No pool size or constant was changed; whether to raise the spare, lower the cancellation cap, or accept the gap is
+  the controller's decision.
+* **After the transition.** When the old release retires, one release's numbers from section 1 apply again (176 of 197 at
+  200). Whether the limit goes back to 200 is the owner's decision, and changing the limit also needs a restart.
+* **The alert in section 5** fires above 240 connections while the limit is 320.

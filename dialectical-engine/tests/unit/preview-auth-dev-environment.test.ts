@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
-import { fixtureReleaseKey, validApiEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
+import { fixtureReleaseKey, validApiEnvironmentFixture, validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 const env=await import('../../deploy/'+'preview-auth-dev/v1/environment.mjs');
 const native={registerVersion:'12'};
-const approved={apiPort:'3101',uiPort:'3100',mailExecutable:'/opt/release/mail-handoff.mjs',mailFrom:'noreply@dezbatere.ro'};
+// Side-by-side spec §1: the plan's source revision starts with the fixture key's 12 hex, so fixtureReleaseKey('12') is this plan's key.
+const approved={apiPort:'3101',uiPort:'3100',mailExecutable:'/opt/release/mail-handoff.mjs',mailFrom:'noreply@dezbatere.ro',sourceRevision:'0123456789ab'.padEnd(40,'c')};
 function configured():Record<string,string>{return{...validApiEnvironmentFixture(),NODE_ENV:'production',REGISTER_VERSION:'12',RELEASE_KEY:fixtureReleaseKey('12'),PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',API_PORT:'3101',API_HOST:'127.0.0.1',MAIL_SENDMAIL_PATH:approved.mailExecutable,MAIL_FROM:'noreply@dezbatere.ro'};}
 describe('source-derived strict preview environment',()=>{
  it('retains opaque values only for current source keys and privately normalizes exact local register selection',()=>{const input=configured();const result=env.narrowEnvironment('api',input,runtime,native,approved);expect(result.environment.DATABASE_URL).toBe(input.DATABASE_URL);expect(result.selectedRegisterVersion).toBe('12');expect(result.deploymentMode).toBe('local');expect(result.environment.PATH).toBe('/usr/local/bin:/usr/bin:/bin');});
@@ -13,6 +14,48 @@ describe('source-derived strict preview environment',()=>{
  it('admits only the exact optional public Turnstile mapping',()=>expect(env.narrowEnvironment('api',{...configured(),TURNSTILE_SOCKET_PATH:'/run/debateai-preview-turnstile/siteverify.sock'},runtime,native,approved).environment.TURNSTILE_SOCKET_PATH).toBe('/run/debateai-preview-turnstile/siteverify.sock'));
  it.each(['A=one\nA=two\n','A=$(command)\n','export A=one\n','A=one\r\n','BAD-NAME=one\n'])('refuses ambiguous executable environment syntax',text=>expect(()=>env.parseEnvironmentText(text)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
  it('parses exact bare values including embedded equals without expansion',()=>expect(env.parseEnvironmentText('A=one=two\nB={"fixed":true}\n')).toEqual({A:'one=two',B:'{"fixed":true}'}));
+});
+
+// Side-by-side spec §1: every preview process starts only with its own release key, r<plan register pin>-<first 12 hex of the plan's source revision>.
+describe('the release key in the narrowed environment',()=>{
+ const KEY='r17-d50e33165a1b';
+ const plan={...approved,sourceRevision:'d50e33165a1b'+'0'.repeat(28)},pin={...native,registerVersion:'17'};
+ const api=(key:string|undefined):Record<string,string>=>{const value:Record<string,string>={...configured(),REGISTER_VERSION:'17'};if(key!==undefined)value.RELEASE_KEY=key;else delete value.RELEASE_KEY;return value;};
+ it('admits each service only with the release key of its plan\'s revision and register version',()=>{
+  expect(env.expectedReleaseKey(pin,plan.sourceRevision)).toBe(KEY);
+  expect(env.narrowEnvironment('api',api(KEY),runtime,pin,plan).environment.RELEASE_KEY).toBe(KEY);
+  for(const bad of ['r18-d50e33165a1b','r17-d50e33165a1c','R17-d50e33165a1b','r17-000000000000','legacy',undefined])
+   expect(()=>env.narrowEnvironment('api',api(bad),runtime,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ const PREVIEW=JSON.stringify({deployment:'v3-preview',free_model_ids:['zai-org/GLM-5.3-Flash'],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/team-budget-v2.sock',scope_id:'preview-team-v2-20261009'});
+ const runner=(patch:Record<string,string>={}):Record<string,string>=>{
+  const {VLLM_BASE_URL:_a,VLLM_MODEL:_b,VLLM_MAKER:_c,...rest}=validRunnerEnvironmentFixture();
+  return {...rest,NODE_ENV:'production',REGISTER_VERSION:'17',RELEASE_KEY:KEY,DEBATEAI_DEPLOYMENT_MODE:'local',PREVIEW_PROVIDER_TEST_CONFIG_JSON:PREVIEW,
+   RUNNER_WORKER_ID:`debateai-preview-runner-${KEY}`,HATCHET_WORKER_NAME:`debateai-preview-runner-${KEY}`,...patch};
+ };
+ it('refuses a runner whose worker id or worker name is not this release\'s',()=>{
+  const result=env.narrowEnvironment('runner',runner(),runtime,pin,plan);
+  expect(result.environment.RUNNER_WORKER_ID).toBe('debateai-preview-runner-r17-d50e33165a1b');
+  expect(result.environment.HATCHET_WORKER_NAME).toBe('debateai-preview-runner-r17-d50e33165a1b');
+  for(const key of ['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'])
+   for(const other of ['debateai-preview-runner-r16-d50e33165a1b','debateai-preview-runner',`debateai-preview-runner-${KEY}-x`,`${KEY}-debateai-preview-runner`])
+    expect(()=>env.narrowEnvironment('runner',runner({[key]:other}),runtime,pin,plan),`${key}=${other}`).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('runner',runner({RELEASE_KEY:'r17-d50e33165a1c',RUNNER_WORKER_ID:'debateai-preview-runner-r17-d50e33165a1c',HATCHET_WORKER_NAME:'debateai-preview-runner-r17-d50e33165a1c'}),runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('admits the website only with its plan\'s release key, which reaches the website\'s environment',()=>{
+  const ui=(key:string|undefined)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,...(key===undefined?{}:{RELEASE_KEY:key})});
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',ui(KEY),built,pin,plan).environment.RELEASE_KEY).toBe(KEY);
+  for(const bad of ['r18-d50e33165a1b','r17-d50e33165a1c','legacy',undefined])
+   expect(()=>env.narrowEnvironment('ui',ui(bad),built,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('ui',ui(KEY),built,null,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('RELEASE_KEY_PATTERN agrees with the kernel\'s parser',async()=>{
+  const { parseReleaseKey, RELEASE_KEY_PATTERN } = await import('../../packages/kernel/src/release-key.js');
+  expect(env.RELEASE_KEY_PATTERN.source).toBe(RELEASE_KEY_PATTERN.source);
+  for(const key of ['r1-000000000000','r17-d50e33165a1b','r0-000000000000','r17-D50E33165A1B','legacy','r17-d50e33165a1','r017-d50e33165a1b'])
+   expect(env.RELEASE_KEY_PATTERN.test(key),key).toBe((()=>{try{parseReleaseKey(key);return true;}catch{return false;}})());
+ });
 });
 
 const LEGACY_FLAG='["zai-org/GLM-5.3-Flash"]';
@@ -31,14 +74,14 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   for(const value of [JSON.stringify({free:ALL_FIVE.slice(0,4),premium:ALL_FIVE.slice(0,4)}),JSON.stringify({free:[...ALL_FIVE].reverse(),premium:ALL_FIVE})])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
   for(const value of [undefined,'',' '+LEGACY_FLAG,'["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"]',MULTI_FLAG.replace(',"Qwen/Qwen3.8-Flash"',''),MULTI_FLAG.replace(',"XiaomiMiMo/MiMo-V2.6-Pro"',''),JSON.stringify(JSON.parse(MULTI_FLAG),null,1)])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
  });
- const ui=(flag:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:flag});
+ const ui=(flag:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:flag,RELEASE_KEY:fixtureReleaseKey('12')});
  it('ui.env must name the list the website was built with',()=>{
-  for(const flag of [LEGACY_FLAG,MULTI_FLAG,ALL_FLAG])expect(env.narrowEnvironment('ui',ui(flag),{builtModelRosterFlag:flag},null,approved).environment.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toBe(flag);
-  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{builtModelRosterFlag:MULTI_FLAG},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
-  expect(()=>env.narrowEnvironment('ui',ui(MULTI_FLAG),{builtModelRosterFlag:LEGACY_FLAG},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
-  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  for(const flag of [LEGACY_FLAG,MULTI_FLAG,ALL_FLAG])expect(env.narrowEnvironment('ui',ui(flag),{builtModelRosterFlag:flag},native,approved).environment.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toBe(flag);
+  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{builtModelRosterFlag:MULTI_FLAG},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(MULTI_FLAG),{builtModelRosterFlag:LEGACY_FLAG},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
   const other='["deepseek-ai/DeepSeek-V4.1-Flash"]';
-  expect(()=>env.narrowEnvironment('ui',ui(other),{builtModelRosterFlag:other},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(other),{builtModelRosterFlag:other},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
  });
  it.each([
   ['the legacy array with the legacy five-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM]}),true],

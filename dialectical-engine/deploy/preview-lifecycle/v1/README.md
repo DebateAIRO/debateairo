@@ -172,7 +172,7 @@ launchers still re-check every byte exactly as before.
 ## Files
 
 ```text
-prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs
+prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs  release-table.mjs
 unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs  readiness-writer-actor.mjs
 systemd/debateai-preview.target
 systemd/debateai-preview-{api,ui,postgresql}.service.d/50-lifecycle.conf

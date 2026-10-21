@@ -1,0 +1,21 @@
+# Install as /etc/systemd/system/debateai-preview-runner-retire@.service (started by its .timer).
+# Root asks release %i to retire now (side-by-side spec §4): a DRAINING release gets RETIRE_REQUESTED
+# (reason BACKSTOP) once, the owner gets one email, and debateai-preview-runner-retire-check@%i.timer is
+# armed only after that row is written, at the absolute UTC time 1,500 s after it (its 50-at.conf drop-in).
+# An already RETIRED release only turns its backstop and check timers off. Anything else refuses, the unit
+# fails and OnFailure= emails the owner. It never stops a service.
+[Unit]
+Description=DebateAI preview: ask release %i to retire now (backstop)
+After=debateai-preview-postgresql.service
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only (like the prestart and the alert): nothing from the
+# service manager's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-retire.mjs retire-request --label %i
+TimeoutStartSec=120
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

@@ -20,8 +20,10 @@ export const RETIRED_SETTLE_MS=30_000;
 /**
  * Side-by-side uploads spec 2026-10-21 §1: the preview launcher checks runner.env's RELEASE_KEY
  * against the plan, so a runner never starts (or is prepared) as another release. The only key it
- * admits is r<plan register pin>-<first 12 hex of the plan's source revision>; anything else
- * refuses PREVIEW_RUNNER_RELEASE_KEY_MISMATCH, naming no value.
+ * admits is r<plan register pin>-<first 12 hex of the plan's source revision>. The narrowed
+ * environment (environment.mjs narrowEnvironment) refuses any other key first, with
+ * PREVIEW_ENVIRONMENT_REFUSED; this is a second check of the same rule, which refuses
+ * PREVIEW_RUNNER_RELEASE_KEY_MISMATCH, naming no value.
  */
 export function assertRunnerReleaseKey(configured,plan,source) {
  if(configured.RELEASE_KEY!==`r${plan.publication.registerVersion}-${source.sourceRevision.slice(0,12)}`)refuse('PREVIEW_RUNNER_RELEASE_KEY_MISMATCH');
@@ -61,7 +63,7 @@ export async function launchRunner(argv) {
  assertRunnerReleaseKey(configured,plan,source);
  process.chdir(engine);installNarrowEnvironment(selected.environment);
  return afterRunnerReady({binding:{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,sourceManifestSha256:plan.sourceManifest.sha256,operatorManifestSha256:plan.operatorManifestSha256,contractSha256:source.contractSha256,runnerMainSha256:main.sha256},publication:plan.publication,identity:await linuxProcessIdentity(),
-  readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE}),
+  readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE,RELEASE_KEY:process.env.RELEASE_KEY}),
   subscribeReady:listener=>{process.once(RUNNER_READY_PROCESS_EVENT,listener);return ()=>process.removeListener(RUNNER_READY_PROCESS_EVENT,listener);},
   importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_RUNNER_STARTED ${JSON.stringify(event)}\n`)});
 }

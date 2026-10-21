@@ -1,0 +1,85 @@
+# deploy/vps/systemd/debateai-ui@.service
+# One website instance per release (side-by-side spec §6, §10): debateai-ui@<label>.service, %i = the release label.
+# It runs from the release's own root-owned folder, talks only to its own release's API (the overlay's
+# DIALECTICAL_API_BASE) and listens on its slot's port (the overlay's PORT): slot A 3001, slot B 3002, the two
+# upstreams of the Caddyfile. Only the current release's instance is enabled at boot.
+#
+# The UI holds no key material and no database credential at all: it proxies to the API over
+# loopback. Its only secrets-adjacent input is the edge secret file, which it reads once at boot.
+[Unit]
+Description=DebateAI UI (Next front door), release %i
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target debateai-api@%i.service
+Wants=network-online.target
+# Bound to its own release's API (spec §6 "Unit coupling"): when that API stops, this website stops with it.
+BindsTo=debateai-api@%i.service
+# A start the release tool refuses (a draining or retired release) fails in ExecStartPre=, and Restart=on-failure
+# would retry it every 5 s for ever. RestartPreventExitStatus= cannot stop that (systemd reads it from the main
+# process only, never from ExecStartPre=), so the start limit does: 20 tries in 10 minutes (about 100 s of retries,
+# enough for a PostgreSQL restart or a boot-order race), then the instance stays failed and shows in
+# `systemctl --failed` until it is started again by hand (README §5 "The current release").
+StartLimitIntervalSec=600
+StartLimitBurst=20
+
+[Service]
+Type=simple
+User=debateai-ui
+Group=debateai-ui
+WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine/apps/ui
+# The shared base file, then the release's own overlay (env/releases/ui.env.example: release key, the slot's PORT
+# and its own API's DIALECTICAL_API_BASE); the later file wins. No "-": a release without its own file does not start.
+EnvironmentFile=/etc/debateai/ui.env
+EnvironmentFile=/etc/debateai/releases/%i/ui.env
+Environment=NODE_ENV=production
+Environment=DIALECTICAL_UI_HOST=127.0.0.1
+# R2 / C2: only these exact peer addresses may name a client through x-forwarded-for. CIDRs and
+# hostnames are refused by parseTrustedProxies (apps/ui/trusted-client-ip.mjs).
+Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1
+# C2b: and only when they also present the shared edge secret, so that another local process
+# reaching 127.0.0.1:3001 or :3002 cannot forge a client address. File is 0400 debateai-ui, 0640 root:caddy
+# on the Caddy side (README §4).
+Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret
+# Root's start check (side-by-side plan D16b): a draining or retired release's website is refused.
+ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service ui --label %i
+ExecStart=/usr/bin/node /opt/debateai/releases/%i/dialectical-engine/apps/ui/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+# No ReadWritePaths: the UI owns no custody tree. Scratch space, if the Next server ever needs
+# any, is the state directory below and nothing else on the box is writable.
+StateDirectory=debateai-ui
+StateDirectoryMode=0700
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
