@@ -1,10 +1,11 @@
 import { PostgresAskApplication } from "@debateai/api";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { createPool, migrate, EntitlementRepository, PostgresInternalAllowanceRepository, RunWaitRepository, type Pool } from "@debateai/db";
+import { createPool, migrate, EntitlementRepository, PostgresInternalAllowanceRepository, RunWaitRepository, recordSpendWaiver, type Pool } from "@debateai/db";
 import { PostgresModelSpendStore } from "@debateai/budget";
 import * as billing from "@debateai/billing-core";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,billingPlansFromValue } from "@debateai/register";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
 import { testReleaseKey } from "../support/releaseKey.js";
@@ -127,6 +128,33 @@ describe("actual grant-aware room and waiting admission",()=>{
   try{await lock.query("BEGIN");await lock.query("SELECT singleton FROM staff.funding_policy_selection FOR UPDATE");read=new PostgresInternalAllowanceRepository(runtime).readRunState(runId);
    expect(await Promise.race([read.then(()=>"READ"),new Promise(resolve=>setTimeout(()=>resolve("BLOCKED"),750))])).toBe("READ");
   }finally{await lock.query("ROLLBACK");lock.release();await read;}
+ });
+ it("side-by-side C17: the API's usage read leaves a waived run out (300 000 waived, 200 000 counted)",async()=>{
+  // Spec §9, C10: a debate set aside because of an upload uses none of the person's quota. Plan A's readOwnerSpentMicros
+  // leaves a waived run out of every person window, so the usage bars (apps/api/src/billing/usage.ts, composed as
+  // main.ts composes it) show 200 000 micros used. PLUS: day 1 000 000, week 2 500 000, month 5 000 000 micros.
+  const actor=await fixture.fundedActor(),entitlements=new EntitlementRepository(runtime),anchor=new Date(),plusTx=await runtime.connect();
+  try{await entitlements.append(plusTx,{ownerRef:actor.ownerRef,planId:"PLUS",effectiveAt:anchor,periodAnchorAt:anchor,cause:"SUBSCRIBED",subscriptionId:null,paidThrough:new Date(anchor.getTime()+86400000)});}finally{plusTx.release();}
+  const current=await entitlements.current(actor.ownerRef,new Date()),waived=await fixture.run(actor.ownerRef),counted=await fixture.run(actor.ownerRef);
+  for(const [runId,micros] of [[waived,300000],[counted,200000]] as const){
+   const tx=await runtime.connect();
+   try{await entitlements.recordRunChargeScope(tx,{runId,ownerRef:actor.ownerRef,planId:current.planId,entitlementEventId:current.eventId,admittedAt:new Date()});}finally{tx.release();}
+   await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'RUN',$1,'fake-provider',(clock_timestamp() AT TIME ZONE 'UTC')::date,$2,1,1)",[runId,micros]);
+  }
+  const store=new PostgresModelSpendStore(runtime),spent:number[]=[];
+  const spend={readOwnerSpentMicros:async(...args:Parameters<PostgresModelSpendStore["readOwnerSpentMicros"]>)=>{const value=await store.readOwnerSpentMicros(...args);spent.push(value);return value;}};
+  const funding=source(),reader=new PersonUsageReader({entitlements,allowance:funding,funding,spend});
+  // Control: before the waiver both runs count, 500 000 micros in every window.
+  expect((await reader.read(actor.ownerRef,new Date())).windows.map(w=>[w.scope,w.percent])).toEqual([["PERSON_DAY",50],["PERSON_WEEK",20],["PERSON_MONTH",10]]);
+  expect(spent).toEqual([500000,500000,500000]);
+  spent.length=0;
+  expect(await recordSpendWaiver(runtime,waived,"BACKSTOP")).toEqual({written:true});
+  const usage=await reader.read(actor.ownerRef,new Date());
+  expect(usage).toMatchObject({planId:"PLUS"});
+  expect(usage.windows.map(w=>[w.scope,w.percent])).toEqual([["PERSON_DAY",20],["PERSON_WEEK",8],["PERSON_MONTH",4]]);
+  expect(spent).toEqual([200000,200000,200000]);
+  // The site's day still counts the real spend of both.
+  expect(await store.readDaySpentMicros(new Date().toISOString().slice(0,10))).toBeGreaterThanOrEqual(500000);
  });
 
 });

@@ -32,13 +32,20 @@ type DatabaseState = { installation: unknown; published: boolean; authorized: st
   /** Fake alert outbox: every claim spends one attempt, as staff.claim_alert_delivery does. */
   outbox: Array<Record<string, unknown>>; keyUsers: Map<string, string>; claimCalls: number; attempts: number; receipts: Array<{ outcome: unknown; failure: unknown }>;
   /** Replaces the readiness read: a thrown database fault or an unexpected answer. */
-  readinessFault?: () => unknown[] };
+  readinessFault?: () => unknown[];
+  /** Side-by-side C17: the shared funding selection when another release moved it (undefined: follows `funded`). */
+  selection?: unknown;
+  /** Every funding policy read, in order: the pointer's or the one at a version, with its parameters. */
+  fundingReads: Array<{ at: boolean; params: readonly unknown[] }> };
 /** Enumerated SQL answers only; any unknown statement returns no row and fails closed. */
 function database(state: DatabaseState): Pool {
   const answer = (sql: string, params: readonly unknown[]): unknown[] => {
     if (sql.includes("register.register_row")) return params[0] === 2 ? [{ row_key: "staffAccessPolicy", value_json: state.funded ? fundedStaffValue : STAFF_ACCESS_POLICY_REGISTER_ROW.value,
       source_ref: STAFF_ACCESS_POLICY_REGISTER_ROW.sourceRef, sealed: true, declared_row_count: 1, actual_row_count: "1" }] : [];
-    if (sql.includes("staff.read_internal_funding_policy")) return [{ value: state.funded ? { registerVersion: 2, policy: fundingValue, sourceRef: fundingPolicy.sourceRef } : null }];
+    if (sql.includes("staff.read_internal_funding_policy")) {
+      state.fundingReads.push({ at: sql.includes("staff.read_internal_funding_policy_at("), params });
+      return [{ value: state.selection !== undefined ? state.selection : state.funded ? { registerVersion: 2, policy: fundingValue, sourceRef: fundingPolicy.sourceRef } : null }];
+    }
     if (sql.includes("staff.read_owner_recovery_installation")) return [{ value: state.installation }];
     if (sql.includes("staff.read_independent_alert_readiness")) return state.readinessFault?.() ?? [{ value: state.published ? "READY" : "UNAVAILABLE" }];
     if (sql.includes("staff.authorize_alert_operation")) { if (state.published) state.authorized.push(String(params[0])); return [{ value: state.published }]; }
@@ -91,7 +98,7 @@ async function fixture() {
   const operatorSource = `import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';export function createStaffAlertOperatorAdapters(){return {schema:'staff-alert-operator-v1',acknowledgements:new Map([['capture',{evidence:async config=>{if(await readFile(${JSON.stringify(ackState)},'utf8')!=='FRESH')return null;return {configSha256:createHash('sha256').update(await readFile(${JSON.stringify(configPath)})).digest('hex'),generation:config.generation,rehearsalId:${JSON.stringify(randomUUID())},expiresAt:new Date(Date.now()+60000)};},acknowledge:async()=> 'ACK'}]]),invitationDelivery:{send:async()=> 'ACK'},dispatch:{batchSize:1,intervalMs:100}};}`;
   await writeFile(operatorPath, operatorSource, { mode: 0o600 });
   const state: DatabaseState = { installation: { operationId: randomUUID(), outcome: "COMPLETED", recordedAt: new Date().toISOString() }, published: false, authorized: [], funded: false,
-    outbox: [], keyUsers: new Map(), claimCalls: 0, attempts: 0, receipts: [] };
+    fundingReads: [], outbox: [], keyUsers: new Map(), claimCalls: 0, attempts: 0, receipts: [] };
   const deks = new Map<string, Buffer>();
   const keys = { load: async (userId: string) => { const key = deks.get(userId) ?? Buffer.alloc(32, 9); deks.set(userId, key); return Buffer.from(key); },
     store: async () => undefined, exists: async () => true, destroy: async () => "ALREADY_ABSENT" } as unknown as ReadableUserDekStore;
@@ -198,6 +205,55 @@ describe("staff runtime boot without fresh alert readiness", () => {
     const local = await fixture();
     await expect(createStaffRuntime(funded(local, "local"))).rejects.toThrow("STAFF_UNAVAILABLE");
     expect(local.lines).toEqual([]);
+  });
+
+  it("side-by-side C17: a selection another release moved (other content, other version) never refuses boot; one line says so", async () => {
+    // Spec §9: neither process refuses boot over funding. The newer release selected version 3 with another day cap.
+    const differs = await fixture();
+    differs.state.selection = { registerVersion: 3, policy: { ...fundingValue, maximum_day_micros: 90000 }, sourceRef: fundingPolicy.sourceRef };
+    const runtime = await createStaffRuntime(fundedActivation(differs, "hosted"));
+    try {
+      expect(differs.lines).toEqual([JSON.stringify({ event: "api.funding.selection_differs", reason: "DIFFERENT" }), lockedLine("ACK_EVIDENCE_STALE")]);
+      await differs.unlock();
+      differs.state.fundingReads.length = 0;
+      // A staff action reads the selection, then the policy at the selection's own version (3), never this API's (2).
+      await expect(runtime.funding!.requireReady()).resolves.toBeUndefined();
+      expect(differs.state.fundingReads).toEqual([{ at: false, params: [] }, { at: true, params: [3] }]);
+    } finally { await runtime.close(); }
+  });
+
+  it("side-by-side C17: funding switched on or off by another release, or unreadable, boots with one content-free line", async () => {
+    const policy3 = { registerVersion: 3, policy: fundingValue, sourceRef: fundingPolicy.sourceRef };
+    // This API's settings name no funding, the selection names version 3: no team funding tools here, and boot goes on.
+    const unconfigured = await fixture();
+    unconfigured.state.selection = policy3;
+    const plain = await createStaffRuntime(unconfigured.activation);
+    try {
+      expect(unconfigured.lines).toEqual([JSON.stringify({ event: "api.funding.selection_differs", reason: "NOT_CONFIGURED" }), lockedLine("ACK_EVIDENCE_STALE")]);
+      expect(plain.funding).toBeUndefined();
+    } finally { await plain.close(); }
+    // This API's settings name funding, the selection is gone (switched off): boot goes on, each funded action refuses.
+    const absent = await fixture();
+    absent.state.selection = null;
+    const off = await createStaffRuntime(fundedActivation(absent, "hosted"));
+    try {
+      expect(absent.lines).toEqual([JSON.stringify({ event: "api.funding.selection_differs", reason: "ABSENT" }), lockedLine("ACK_EVIDENCE_STALE")]);
+      await absent.unlock();
+      await expect(off.funding!.requireReady()).rejects.toThrow("STAFF_UNAVAILABLE");
+    } finally { await off.close(); }
+    // A selection this release cannot read (a newer shape): boot goes on, each funded action refuses.
+    const unreadable = await fixture();
+    unreadable.state.selection = { registerVersion: 3, policy: { ...fundingValue, funding_policy_version: 2 }, sourceRef: fundingPolicy.sourceRef };
+    const odd = await createStaffRuntime(fundedActivation(unreadable, "hosted"));
+    try {
+      expect(unreadable.lines).toEqual([JSON.stringify({ event: "api.funding.selection_differs", reason: "UNREADABLE" }), lockedLine("ACK_EVIDENCE_STALE")]);
+      await unreadable.unlock();
+      await expect(odd.funding!.requireReady()).rejects.toMatchObject({ code: "INTERNAL_ALLOWANCE_UNAVAILABLE" });
+    } finally { await odd.close(); }
+    // Both off: nothing differs, no line.
+    const neither = await fixture();
+    const quiet = await createStaffRuntime(neither.activation);
+    try { expect(neither.lines).toEqual([lockedLine("ACK_EVIDENCE_STALE")]); } finally { await quiet.close(); }
   });
 
   it("start() while locked claims nothing, so a queued alert keeps all three attempts and goes out after unlock", async () => {

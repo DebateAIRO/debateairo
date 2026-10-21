@@ -591,13 +591,13 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
-      const allowances = new PostgresInternalAllowanceRepository(pool);
-      const selectedFunding = await allowances.readPolicy();
-      const configuredFunding = environment.STAFF_ACCESS.policyVersion === 2 ? environment.STAFF_ACCESS.internalAllowancePolicy : undefined;
-      if ((selectedFunding === null) !== (configuredFunding === undefined)) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
-      const fundedAllowance = selectedFunding === null ? undefined : entitlements === null || billingPlans === null
-        ? (()=>{throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing");})()
-        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
+      // Side-by-side spec §9 (C17), the runner's rule (B14): no funding read and no funding refusal at boot. The selection
+      // is shared by every live release and moved by the newest; a grant is checked against the policy of the version it
+      // was issued with, never the pointer, and a new ask reads the pointer only to know whether funding is switched on.
+      // So a selection made by another release (another version or content, switched on or off) needs no restart here.
+      // The team's funding tools are the staff runtime's (createStaffRuntime: one api.funding.selection_differs line).
+      const fundedAllowance = entitlements === null || billingPlans === null ? undefined
+        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
         : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });

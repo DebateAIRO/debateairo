@@ -32,13 +32,13 @@
  *  - All pools are the throwaway database's (its superuser): a missing grant on the live roles would not show here.
  *  - Hosted: billing kept off (above); the room's money ledger and waiting line are the throwaway database's, so the
  *    site's day holds only this practice's spend; no waker is started (a practice ask that would WAIT is reported as
- *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, so an internal-funding selection refuses
- *    (INTERNAL_FUNDING_UNAVAILABLE), as on the preview, whose api.env must name none (README H1).
+ *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, and with billing off no funding source is
+ *    built, so an internal-funding selection is neither read nor refused (side-by-side spec §9, C17, as main.ts).
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
-import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
+import { ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError, developmentReleaseKey, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
@@ -178,10 +178,8 @@ export async function composePracticeAskMoney(input: Readonly<{
     assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
     const spend = new PostgresModelSpendStore(pool);
     const entitlements = null;
-    const allowances = new PostgresInternalAllowanceRepository(pool);
-    const selectedFunding = await allowances.readPolicy();
-    // The preview's api.env names no internal allowance (README H1), so main.ts's `configuredFunding` is undefined there.
-    if (selectedFunding !== null) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
+    // Side-by-side spec §9 (C17), as main.ts: no funding read and no funding refusal at boot. main.ts builds the funding
+    // source only with billing on; billing is kept off here, so there is none (the room gets no `funding`).
     const personAllowance = NO_PERSON_ALLOWANCE;
     const estimator = new RecentRunsCostEstimator({
       source: new PostgresRecentRunUsageSource(pool),

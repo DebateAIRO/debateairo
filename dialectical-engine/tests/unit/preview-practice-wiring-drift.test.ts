@@ -246,6 +246,15 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
     }
+    // Side-by-side spec §9 (C17): neither ask composition reads the funding selection at boot or refuses boot over it.
+    // main.ts builds the funding source whenever billing is on; the practice keeps billing off, so it builds none.
+    for (const gone of ["allowances.readPolicy()", "The configured funding selection is mismatched", "Internal funding requires hosted billing"]) {
+      expect(shipped, gone).not.toContain(gone);
+      expect(practice, gone).not.toContain(gone);
+    }
+    expect(shipped).toContain("const fundedAllowance = entitlements === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});");
+    expect(practice).not.toContain("PostgresInternalAllowanceRepository");
+    expect(practice).not.toContain("FundingAwarePersonAllowanceSource");
     const shippedRoom = objectAfter(API_MAIN, "const room = new AskRoom({");
     const practiceRoom = objectAfter(PRACTICE_ASK, "const room = new AskRoom({");
     expect(shippedRoom.has("funding")).toBe(true);

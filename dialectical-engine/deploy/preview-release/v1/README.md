@@ -722,9 +722,9 @@ systemctl show -p IPAddressAllow -p IPAddressDeny -p RestrictAddressFamilies -p 
 postconf -h message_size_limit   # 0 (no limit) or at least 12582912
 ```
 
-The first must be 0: a hosted API refuses to start when the staff settings name an internal
-allowance the database does not select (`INTERNAL_FUNDING_UNAVAILABLE`), and team funding is not
-built. The last line must show the API's Internet denial with loopback allowed (`IPAddressDeny`
+The first must be 0: team funding is not built on the preview. (Since side-by-side §9 an API whose
+staff settings differ from the database's funding selection still starts, with one
+`api.funding.selection_differs` line in its journal.) The last line must show the API's Internet denial with loopback allowed (`IPAddressDeny`
 `0.0.0.0/0 ::/0`, `IPAddressAllow` loopback), `AF_INET` among the families, and no
 `InaccessiblePaths` entry covering `/var/lib/debateai-geoip` or `/etc/debateai-v3-preview/billing`.
 The Postfix limit matters because a billing email may carry the Terms PDF: the hand-off admits up to
