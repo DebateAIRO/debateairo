@@ -141,7 +141,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
   it("the step goes through once the lock is released", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const holder = await holdCoreRun();
-    let attempt: Promise<void> | undefined;
+    let attempt: Promise<unknown> | undefined;
     try {
       attempt = migrate(db.pool);
       await alterWaiting();
@@ -168,9 +168,11 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(built?.valid).toBe(true);
     expect(await receipts()).toContain(name);
     expect(await ledger()).toContain(name);
-    // A build interrupted after its catalog row (an INVALID index left behind) and never recorded: the next run drops
+    // A build interrupted after its catalog row (an INVALID index left behind) and never recorded (no receipt, no
+    // ledger row, no declaration row: side-by-side §5 writes all three in the step's transaction): the next run drops
     // the invalid index concurrently, builds it again and records the step.
     await db.pool.query("UPDATE pg_index SET indisvalid=false WHERE indexrelid='core.probe_run_seq_idx'::regclass");
+    await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name=$1", [name]);
     await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name=$1", [name]);
     await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name=$1", [name]);
     await migrate(db.pool);

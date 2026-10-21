@@ -1,6 +1,6 @@
 import { loadForward108, type Forward108Plan } from "./migration-forward108.js";
 import { loadForward110, type Forward110Plan } from "./migration-forward110.js";
-import { appliedForwardSteps, loadForwardChain, type ChainStep } from "./migration-forward-chain.js";
+import { appliedForwardSteps, FORWARD_STEP_NAME, loadForwardChain, type ChainStep } from "./migration-forward-chain.js";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import type { PoolClient } from "pg";
@@ -112,6 +112,29 @@ export function compatibilityPreconditionDigest(plan: MigrationPlan, cohort: "au
   const applied = [...new Set([...(plan.manifest.cohorts[cohort] ?? []), ...preceding])].sort();
   return sha256(JSON.stringify({ lineage: cohort, applied, source: plan.sources.get(name)!.sha256 }));
 }
+/** This code's last forward step: the chain's last, or 0110 (the chain's anchor, loadMigrationPlan) while it is empty. */
+export function lastForwardStep(plan: Pick<MigrationPlan, "manifest" | "forward110" | "forwardChain">):
+  Readonly<{ name: string; manifestSha256: string; verifierSha256: string }> {
+  return plan.forwardChain.at(-1) ?? Object.freeze({ name: plan.forward110.name, manifestSha256: plan.forward110.manifestSha256,
+    verifierSha256: plan.manifest.effectiveCapabilityVerifier.executableSha256 });
+}
+export type LedgerSplit = Readonly<{ known: readonly string[]; extra: readonly string[] }>;
+/**
+ * Side-by-side spec 2026-10-21 §5 ("database ahead", migration-ahead.ts): the ledger's `extra` names are the ones this
+ * code does not know, shaped like a forward step and sorting after this code's last step, in ascending order: steps a
+ * newer release applied, which migrate() accepts or refuses. `known` is everything else, in ledger order, and is what
+ * identifyLineage is given; an unknown name that is not extra (before this code's last step, or not shaped like a step)
+ * stays in it, so it still refuses UNKNOWN_APPLIED_NAME.
+ */
+export function splitLedger(plan: MigrationPlan, ledger: readonly string[]): LedgerSplit {
+  const last = lastForwardStep(plan).name;
+  const isKnown = (name: string): boolean => plan.sources.has(name) || name === plan.forward108.name
+    || name === plan.forward110.name || plan.forwardChain.some((step) => step.name === name);
+  const isExtra = (name: string): boolean => !isKnown(name) && FORWARD_STEP_NAME.test(name) && name > last;
+  return Object.freeze({ known: Object.freeze(ledger.filter((name) => !isExtra(name))),
+    extra: Object.freeze(ledger.filter(isExtra).sort()) });
+}
+/** `ledger` is the known part of the ledger (splitLedger): migrate() identifies the lineage without a newer release's steps. */
 export function identifyLineage(plan: MigrationPlan, ledger: readonly string[], resolutionNames: readonly string[]): Lineage {
   // PR-54, PR-58: the forward steps are an applied prefix of the chain on top of dev's 0110 applied (which dev admits
   // only beside a complete 108 lineage); the base lineage is identified without them.
@@ -178,6 +201,12 @@ export async function transactionBodyPostconditionEvidence(client: PoolClient, n
   return fail("TRANSACTION_BODY_DECLARATION");
 }
 
+/**
+ * The 0093 compatibility receipt's postcondition digest. A newer release's step may re-seal that receipt while an older
+ * release keeps running on the same database (side-by-side §5, "database ahead"), and the older release compares it
+ * with its own copy of this function, so this SQL is frozen for as long as an older release can start
+ * (migrations/lineage/README.md).
+ */
 export async function lineageEvidence(client: PoolClient): Promise<string> {
   const result = await client.query<{ evidence: unknown }>(`
     SELECT jsonb_build_object(

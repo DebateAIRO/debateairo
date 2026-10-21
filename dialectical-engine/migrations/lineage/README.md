@@ -302,13 +302,63 @@ Errors whose message starts with the code and which carry it as `.code`. The rev
 and of `migration-transaction.ts` are sealed in `tools/orphan-audit` (`NATIVE_MIGRATE_MODULE_SHA256`,
 `NATIVE_MIGRATE_TRANSACTION_SHA256`) with their ordered controls.
 
+## Database ahead (side-by-side §5)
+
+During a side-by-side upload (spec `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §5, "The N-1
+rule"; plan A, task A7) the newer release migrates the shared database while the older release keeps running, and the
+older release may restart. Its `migrate()` then meets ledger names it does not know. `splitLedger`
+(`packages/db/src/migration-lineage.ts`) sets apart the **extra** ones: not known to this code, shaped like a step
+name, and sorting after this code's last step. `identifyLineage` sees only the rest, so any other unknown name
+(before this code's last step, or not shaped like a step) still refuses `MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`.
+
+Each step after `0122_engine_map_check.sql` records its n1 header in the migrator-private declaration table
+`public.debateai_schema_migration_step_n1` (`source_name` primary key with the step-name CHECK `fwdstep_source_check`,
+`n1_expand`, `keeps_verifier`, `outside_transaction`, `chain_head_manifest_sha256` with a 64-hex CHECK, and
+`recorded_at`; all NOT NULL). `applyForwardStep` writes the row in the step's own transaction, and its
+`chain_head_manifest_sha256` is the manifest SHA-256 of the LAST step of the applying code's own chain, so one newer
+release means one head. Steps up to 0122 have no row; 0123 has the first. `replayForwardChain` creates the table on first
+use and checks its ACL like the receipt table's: owned by the installer, no grant, no column grant, no `debateai_` role
+able to act as its owner, exact columns, three keys (`MIGRATION_FORWARD_CHAIN_DECLARATION_ACL_DRIFT`). It binds only the
+receipts of this code's steps; the extra steps' receipts are left to the acceptance check.
+
+Right after the replay, in the prologue transaction, `assertDatabaseAheadAccepted` (`packages/db/src/migration-ahead.ts`)
+accepts the extra steps only when every rule holds, and otherwise refuses
+`DATABASE_AHEAD_NOT_ACCEPTED <DETAIL> <name>` (the prologue rolls back):
+
+1. every step of this code's chain is applied (`PENDING_KNOWN_STEP`);
+2. every extra step has a receipt (`RECEIPT_MISSING`);
+3. the receipts chain from this code's last manifest, one after the other, on the same base recipe (`CHAIN_BROKEN`);
+4. every extra receipt names this code's last verifier, so the verifier this code runs is the one in force
+   (`VERIFIER_CHANGED`);
+5. every extra step has a declaration row (`NOT_DECLARED`) with `n1_expand` (`NOT_EXPAND`) and `keeps_verifier`
+   (`NOT_KEEPS_VERIFIER`);
+6. all extra steps carry one `chain_head_manifest_sha256`, so they come from at most one newer release
+   (`MORE_THAN_ONE_RELEASE`);
+7. with `migrate(pool, { newerChain })` (the newer release's `describeForwardSteps()`, from its root-owned plan): this
+   code's chain is a prefix of it by name, manifest, source and verifier, and the extra steps are a prefix of the rest
+   with the receipts' manifests and sources, each declared expand and keeps-verifier (`NEWER_CHAIN_MISMATCH`).
+
+Accepted, `migrate()` has replayed every one of its own steps (receipts, own checks, postconditions, and its own last
+verifier, which rule 4 shows is the one in force), applies nothing and returns
+`{ appliedSteps: [], extraSteps: [<the extra names>] }`; on a database it is current with, `extraSteps` is empty and
+`appliedSteps` lists the steps the run applied. Read-only helpers, for the release tooling: `verifyDatabaseAhead(pool,
+options)` makes the same split, lineage and acceptance check in a `BEGIN READ ONLY` transaction and returns
+`{ mode: "CURRENT" | "AHEAD", knownSteps, extraSteps }`; `readPendingForwardSteps(pool)` lists this code's steps the
+database has not applied, with their n1 header (the release check refuses a side-by-side upload when one is not expand);
+`describeForwardSteps()` describes this code's whole chain.
+
+For as long as an older release can start on the database, two things are **frozen**: the declaration table's shape
+(the older release checks its exact columns and keys before it trusts a row) and the SQL of `lineageEvidence()` in
+`packages/db/src/migration-lineage.ts` (a newer step may re-seal the 0093 compatibility receipt with it, and the older
+release compares that receipt with its own copy of the function). Changing either needs a drained upload, like 0123.
+
 ## Merge order: check the preview first
 
 Before merging any branch with a forward step, read the live preview's applied steps (read-only):
 `SELECT name FROM public.debateai_schema_migration ORDER BY name` and
 `SELECT source_name FROM public.debateai_schema_migration_step`. **Whatever is applied there merges first** and keeps
 its number: an applied step can never be renumbered (`migrate()` refuses an unknown applied name,
-`MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`). Otherwise whichever branch merges first keeps its number and the
+`MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`, unless it is a newer release's accepted step, above). Otherwise whichever branch merges first keeps its number and the
 other renumbers just before its own merge (new file name, manifest `previous` and `migration`, the loader's two
 constants, then every exact-chain test). The preview's native verify never applies a pending step (it refuses); only
 the native operator's `apply-and-plan` applies one, with the owner's yes.

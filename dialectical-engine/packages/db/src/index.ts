@@ -2,9 +2,10 @@ import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { applyForward110 } from "./migration-forward110.js";
 import { applyForwardStep, effectiveForwardVerifierSql, pendingForwardSteps, replayForwardChain, runOutsideTransactionStep } from "./migration-forward-chain.js";
 import { withMigrationLockRetry, withMigrationStepTransaction } from "./migration-transaction.js";
+import { assertDatabaseAheadAccepted, type MigrateOptions, type MigrateReport } from "./migration-ahead.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
+import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, splitLedger, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import type {
@@ -21,6 +22,17 @@ export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
 export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
+export {
+  DATABASE_AHEAD_NOT_ACCEPTED,
+  describeChain,
+  describeForwardSteps,
+  readPendingForwardSteps,
+  verifyDatabaseAhead,
+  type DatabaseAheadReport,
+  type ForwardStepDeclaration,
+  type MigrateOptions,
+  type MigrateReport
+} from "./migration-ahead.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
@@ -1039,7 +1051,13 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
   return pool;
 }
 
-export async function migrate(pool: Pool): Promise<void> {
+/**
+ * Applies this code's pending migrations and replays the applied ones (migrations/lineage/README.md). Side-by-side spec
+ * 2026-10-21 §5 ("database ahead", migration-ahead.ts): on a database a newer release moved forward by expand steps it
+ * declared, it replays its own steps, applies nothing and reports those steps as `extraSteps`; `options.newerChain` (the
+ * newer release's describeForwardSteps()) binds them to that release's own list.
+ */
+export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {
   const plan = await loadMigrationPlan();
   const compat = plan.manifest.compatibility;
   const client = await pool.connect();
@@ -1049,8 +1067,8 @@ export async function migrate(pool: Pool): Promise<void> {
     await client.query("SELECT pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))");
     // The prologue: the ledger tables, the lineage and its receipts, the base recipe, 0108, 0110 and the replay of
     // every applied chain step, in one transaction with the 2 s lock wait (migration-transaction.ts). It returns the
-    // applied prefix of the chain.
-    let done = await withMigrationStepTransaction(client, "PROLOGUE", async () => {
+    // applied prefix of the chain and the steps a newer release added (accepted in it, or refused).
+    const prologue = await withMigrationStepTransaction(client, "PROLOGUE", async () => {
       await client.query(`
         CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
           name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
@@ -1080,7 +1098,11 @@ export async function migrate(pool: Pool): Promise<void> {
         FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
       `);
       if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
-      const applied = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+      const ledger = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+      // Side-by-side §5 ("database ahead"): the steps a newer release added after this code's last one are split off and
+      // judged after the replay below; the lineage is identified from the rest, where any other unknown name still
+      // refuses UNKNOWN_APPLIED_NAME.
+      const { known: applied, extra } = splitLedger(plan, ledger);
       const resolutions = (await client.query<{
         logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
         executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
@@ -1181,8 +1203,15 @@ export async function migrate(pool: Pool): Promise<void> {
       else await client.query(forwardVerifierSql);
       await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
       await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-      return await replayForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
+      const replayed = await replayForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]),extra);
+      // Accepted only when every rule of migration-ahead.ts holds (one newer release, expand and keeps-verifier steps
+      // chained from this code's last one, this code's verifier still in force), else DATABASE_AHEAD_NOT_ACCEPTED and
+      // the prologue rolls back. Accepted, every step of this code is applied, so nothing below is pending.
+      await assertDatabaseAheadAccepted(client,plan,appliedSet,extra,options);
+      return { done: replayed, extra };
     });
+    let done = prologue.done;
+    const appliedSteps: string[] = [];
     // Each pending step in its own transaction: a step's locks end with it, a step that fails (or a kill) leaves every
     // earlier step committed, and the next run continues at the next step. A lock wait that ran out is tried again,
     // five tries, then MIGRATION_LOCK_TIMEOUT names the step.
@@ -1207,7 +1236,9 @@ export async function migrate(pool: Pool): Promise<void> {
         }
       });
       done = [...before, step];
+      appliedSteps.push(step.name);
     }
+    return Object.freeze({ appliedSteps: Object.freeze(appliedSteps), extraSteps: prologue.extra });
   } finally {
     // A session lock must never outlive the run: when the unlock cannot be sent, the connection is destroyed, which
     // ends the session and its lock, and the run's own outcome (its refusal, or success) stands.

@@ -911,6 +911,7 @@ packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
 packages/db/src/mail-locale.ts
+packages/db/src/migration-ahead.ts
 packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts
 packages/db/src/migration-forward0113.ts

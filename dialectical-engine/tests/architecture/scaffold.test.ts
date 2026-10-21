@@ -54,6 +54,12 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
         "await replayForwardChain(client,plan,", "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]",
         "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release()"].map((fragment) =>
         ({ plan, migrateSource: without(migrateSource, fragment, migrateSource.indexOf("export async function migrate(")), transactionSource })),
+      // Side-by-side §5 (A7, "database ahead"): the ledger split before the lineage and the acceptance after the replay,
+      // each removed in turn, and a migrate() with A6's signature (the begin marker no longer found).
+      ...["const { known: applied, extra } = splitLedger(plan, ledger);", "await assertDatabaseAheadAccepted(client,plan,"].map((fragment) =>
+        ({ plan, migrateSource: without(migrateSource, fragment, migrateSource.indexOf("export async function migrate(")), transactionSource })),
+      { plan, migrateSource: without(migrateSource, "export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {", 0)
+        .replace("REMOVED_NATIVE_CONTROL", "export async function migrate(pool: Pool): Promise<void> {"), transactionSource },
       // ... and the transaction module's: its bytes changed at all, then each of its ordered controls removed.
       { plan, migrateSource, transactionSource: `${transactionSource} ` },
       ...['await client.query("BEGIN");', "await client.query(\"SET LOCAL lock_timeout = '2s'\");", 'await client.query("COMMIT");',

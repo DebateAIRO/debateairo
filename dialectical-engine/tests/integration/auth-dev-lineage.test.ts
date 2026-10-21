@@ -2,7 +2,8 @@ import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createPool,migrate } from '@debateai/db';
+import { createPool,migrate,type MigrateReport } from '@debateai/db';
+import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import type {PoolClient} from 'pg';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 
@@ -25,6 +26,11 @@ async function seedInstalled106(target:TestDatabase):Promise<void>{
   await target.pool.query(bytes.toString('utf8'));
   await target.pool.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[name]);
  }
+}
+/** Two migrators serialized on the session lock: one applies every forward step, the other replays them (side-by-side §5's report). */
+async function expectOneAppliesOneReplays(reports:readonly MigrateReport[]):Promise<void>{
+ const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);
+ expect([...reports].sort((a,b)=>a.appliedSteps.length-b.appliedSteps.length)).toEqual([{appliedSteps:[],extraSteps:[]},{appliedSteps:chain,extraSteps:[]}]);
 }
 async function seedIntegratedOriginal(target:TestDatabase):Promise<void>{
  const manifest=JSON.parse(await readFile(new URL('../../migrations/lineage/auth-dev-20261006.json',import.meta.url),'utf8')) as {
@@ -110,7 +116,7 @@ describe('native auth106 to Dev integration lineage',()=>{
  it('serializes concurrent fresh migrators with exactly two declared wrapper resolutions',async()=>{
   const target=await startTestDatabase(),second=createPool(target.connectionString,{max:1});
   try{
-   await expect(Promise.all([migrate(target.pool),migrate(second)])).resolves.toEqual([undefined,undefined]);
+   await expectOneAppliesOneReplays(await Promise.all([migrate(target.pool),migrate(second)]));
    expect((await target.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual([
     {logical_name:'0025_evaluator_domain_refusal_receipts.sql'},
     {logical_name:'0029_evaluator_dev_menu_grants.sql'}
@@ -504,7 +510,7 @@ describe('native auth106 to Dev integration lineage',()=>{
   }finally{await prior.stop();}
 
   const after=await startTestDatabase();
-  let migration:Promise<void>|undefined,insert:Promise<unknown>|undefined;
+  let migration:Promise<unknown>|undefined,insert:Promise<unknown>|undefined;
   const barrier=await after.pool.connect(),writer=await after.pool.connect();
   let barrierOpen=false;
   try{
@@ -548,7 +554,7 @@ describe('native auth106 to Dev integration lineage',()=>{
   const second=createPool(target.connectionString,{max:1});
   try{
    await seedInstalled106(target);
-   await expect(Promise.all([migrate(target.pool),migrate(second)])).resolves.toEqual([undefined,undefined]);
+   await expectOneAppliesOneReplays(await Promise.all([migrate(target.pool),migrate(second)]));
    expect((await target.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution')).rows).toEqual([{logical_name:'0093_billing_runtime_role.sql'}]);
    expect((await target.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0107_auth_dev_integration.sql'")).rows[0].n).toBe(1);
   }finally{await second.end();await target.stop();}

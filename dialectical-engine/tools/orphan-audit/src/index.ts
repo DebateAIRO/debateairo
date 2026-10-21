@@ -676,7 +676,12 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // replayForwardChain), then each pending forward step in its own transaction (withMigrationStepTransaction: 2 s lock
 // wait, five tries) through applyForwardStep, re-sealing the compatibility row inside each step; an outside-transaction
 // step builds its index first (runOutsideTransactionStep). The controls below follow that shape.
-const NATIVE_MIGRATE_MODULE_SHA256 = "d91addfcccb7c7c77f327e62b68fee4b5fc246a630ca26d4581b7a594a9c44b7";
+// Side-by-side releases A7 (2026-10-22, spec 2026-10-21 §5, "database ahead"): migrate() CHANGED. It takes options and
+// returns its report (migrate(pool, options): MigrateReport), splits the ledger (splitLedger: the steps a newer release
+// added are kept out of identifyLineage), and right after replayForwardChain accepts or refuses them
+// (assertDatabaseAheadAccepted, migration-ahead.ts); it re-exports the database-ahead readers. Two controls bind the split
+// and the acceptance.
+const NATIVE_MIGRATE_MODULE_SHA256 = "bc1c3b969c6f329efbfe8a97d8d57627aa559127fa5f360e8c78b6b3452354f9";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK, then the one retried SQLSTATE).
 const NATIVE_MIGRATE_TRANSACTION_SHA256 = "fedcd67a3dd1a754d6e07bf76e8e7acb81b3a2b7bb090f26708ec59623408567";
@@ -702,21 +707,24 @@ function assertNativeReplayBinding(name: string, source: string, { plan, migrate
     || !plan.manifest.order.includes(bareName) || declared?.sql !== source
     || declared.sha256 !== sha256(source)
     || plan.manifest.sources.find((entry) => entry.name === bareName)?.sha256 !== declared.sha256) refused();
-  const begin = migrateSource.indexOf("export async function migrate(pool: Pool): Promise<void> {");
+  const begin = migrateSource.indexOf("export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {");
   const end = migrateSource.indexOf("\nexport ", begin + 1);
   if (begin < 0 || end < 0) refused();
   const native = migrateSource.slice(begin, end);
   // Side-by-side §5 (A6): the session lock, the prologue transaction, one transaction per pending step with its
-  // compatibility re-seal, the unlock and the release.
+  // compatibility re-seal, the unlock and the release. (A7): the ledger split before the lineage, and the database-ahead
+  // acceptance right after the replay.
   const controls = [
     "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
     "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+    "const { known: applied, extra } = splitLedger(plan, ledger);",
     "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
     "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
     "if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "await client.query(plan.sources.get(name)!.sql);",
     "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
     "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
-    "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "for (const step of pending)",
+    "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "await assertDatabaseAheadAccepted(client,plan,",
+    "for (const step of pending)",
     "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]",
     "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release();"
   ];
