@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
 
 /**
@@ -21,32 +21,17 @@ import { readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from
  *   C3 fix round 1), so work registered after start() — the post-listen one-shots — still runs on a current release.
  *
  * Polls chain with setTimeout (unref'd), so they never overlap and never hold the process open. A read that has not
- * answered within `staleMs` counts as a failed read (RELEASE_READ_TIMEOUT: the runtime pool has no statement timeout, and
- * a hung read must not stop the chain). Every log line is content-free: an event code and at most a driver code, never an
- * error's text, a key or a value; a read that fails after stop() prints nothing.
+ * answered within `staleMs` counts as a failed read (RELEASE_READ_TIMEOUT) and is aborted: the Postgres reader then
+ * gives its own client back DESTROYED (release with an error), so a read hung on a lock or a dead socket never keeps a
+ * slot of the 20-connection runtime pool, and the database stops the statement itself (a transaction-local
+ * statement_timeout of the same bound). Every log line is content-free: an event code and at most a driver code, never
+ * an error's text, a key or a value; a read that fails after stop() prints nothing. A wall clock stepped back
+ * invalidates the last read (fail closed until a new read).
  */
 export type { ReleaseLifecycleState };
 export type ReleaseState = Readonly<{ state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean }>;
 export type ReadinessReason = "BOOTING" | "DATABASE_UNREACHABLE" | "DRAINING" | "NOT_CURRENT" | "BEFORE_TAKE_TRAFFIC_FROM";
 export type ReleaseReadiness = Readonly<{ ready: boolean; releaseKey: string; reasons: readonly ReadinessReason[] }>;
-
-export interface ReleaseStateReader {
-  readCurrent(): Promise<Readonly<{ releaseKey: string; takeTrafficFrom: Date | null }> | null>;
-  readState(releaseKey: string): Promise<ReleaseState | null>;
-}
-
-/** The reader over 0123's two definer functions (EXECUTE for debateai_runtime), one statement per call. */
-export class PostgresReleaseStateReader implements ReleaseStateReader {
-  constructor(private readonly pool: Pick<Pool, "query">) {}
-
-  readCurrent(): Promise<Readonly<{ releaseKey: string; takeTrafficFrom: Date | null }> | null> {
-    return readCurrentRelease(this.pool);
-  }
-
-  readState(releaseKey: string): Promise<ReleaseState | null> {
-    return readReleaseState(this.pool, releaseKey);
-  }
-}
 
 /**
  * The watcher's two timings (spec §6: read every second, a read older than five seconds is "unreachable"), carried as one
@@ -55,6 +40,67 @@ export class PostgresReleaseStateReader implements ReleaseStateReader {
 export const RELEASE_WATCH_TIMING: Readonly<{ pollMs: number; staleMs: number }> = Object.freeze({ pollMs: 1_000, staleMs: 5_000 });
 export const RELEASE_WATCH_POLL_MS: number = RELEASE_WATCH_TIMING.pollMs;
 export const RELEASE_WATCH_STALE_MS: number = RELEASE_WATCH_TIMING.staleMs;
+
+/** `signal` aborts a read the caller gave up on: the reader then frees whatever the read holds. */
+export interface ReleaseStateReader {
+  readCurrent(signal?: AbortSignal): Promise<Readonly<{ releaseKey: string; takeTrafficFrom: Date | null }> | null>;
+  readState(releaseKey: string, signal?: AbortSignal): Promise<ReleaseState | null>;
+}
+
+const readTimeout = (): Error => Object.assign(new Error("RELEASE_READ_TIMEOUT"), { code: "RELEASE_READ_TIMEOUT" });
+
+/**
+ * The reader over 0123's two definer functions (EXECUTE for debateai_runtime). Each read checks out its own client and
+ * runs in a short transaction whose statement_timeout is `statementTimeoutMs` (SET LOCAL semantics via set_config, so the
+ * pooled client keeps no setting). Success gives the client back; a failure or an abort gives it back with the error, so
+ * pg destroys it and the slot is free at once — the hung query is never waited for or reused.
+ */
+export class PostgresReleaseStateReader implements ReleaseStateReader {
+  readonly #statementTimeoutMs: number;
+
+  constructor(private readonly pool: Pick<Pool, "connect">, options: Readonly<{ statementTimeoutMs?: number }> = {}) {
+    const bound = options.statementTimeoutMs ?? RELEASE_WATCH_STALE_MS;
+    if (!Number.isSafeInteger(bound) || bound < 1 || bound > 600_000) throw new TypeError("RELEASE_READ_TIMEOUT_INVALID");
+    this.#statementTimeoutMs = bound;
+  }
+
+  readCurrent(signal?: AbortSignal): Promise<Readonly<{ releaseKey: string; takeTrafficFrom: Date | null }> | null> {
+    return this.#withClient(signal, (client) => readCurrentRelease(client));
+  }
+
+  readState(releaseKey: string, signal?: AbortSignal): Promise<ReleaseState | null> {
+    return this.#withClient(signal, (client) => readReleaseState(client, releaseKey));
+  }
+
+  async #withClient<T>(signal: AbortSignal | undefined, read: (client: PoolClient) => Promise<T>): Promise<T> {
+    // A function, not a narrowed property: the abort can land while connect() is awaited.
+    const aborted = (): boolean => signal?.aborted === true;
+    if (aborted()) throw readTimeout();
+    const client = await this.pool.connect();
+    let released = false;
+    const release = (error?: Error): void => {
+      if (released) return;
+      released = true;
+      client.release(error);
+    };
+    const onAbort = (): void => release(readTimeout());
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      if (aborted()) throw readTimeout();
+      await client.query("BEGIN");
+      await client.query("SELECT set_config('statement_timeout', $1, true)", [String(this.#statementTimeoutMs)]);
+      const result = await read(client);
+      await client.query("COMMIT");
+      release();
+      return result;
+    } catch (error) {
+      release(error instanceof Error ? error : readTimeout());
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+}
 
 /** The one journal line the watcher prints: `DEBATEAI_RELEASE_WATCH {"event":…[,"code":…]}`. */
 type WatchEvent = "READ_FAILED" | "READ_RECOVERED" | "BECAME_CURRENT" | "STOPPED_BEING_CURRENT" | "LISTENER_FAILED";
@@ -76,8 +122,11 @@ export class ReleaseWatcher {
   readonly #pollMs: number;
   readonly #staleMs: number;
   readonly #log: (line: string) => void;
-  readonly #listeners = new Set<() => void>();
+  /** Each listener and whether it already fired in the current period (reset when a poll sees not current). */
+  readonly #listeners = new Map<() => void, { fired: boolean }>();
   #last: LastRead | null = null;
+  /** The latest clock reading: a reading below it is a backward step, which invalidates the last read. */
+  #clockHigh = Number.NEGATIVE_INFINITY;
   #failing = false;
   #wasCurrent = false;
   #booted = false;
@@ -144,27 +193,40 @@ export class ReleaseWatcher {
     if (this.#drainBegun) reasons.push("DRAINING");
     if (this.#last !== null && !this.#lastSaysOwn()) reasons.push("NOT_CURRENT");
     const takeTrafficFrom = this.#last?.takeTrafficFrom ?? null;
-    if (this.#last !== null && this.#lastSaysOwn() && takeTrafficFrom !== null && this.#clock() < takeTrafficFrom.getTime()) {
+    if (this.#last !== null && this.#lastSaysOwn() && takeTrafficFrom !== null && this.#now() < takeTrafficFrom.getTime()) {
       reasons.push("BEFORE_TAKE_TRAFFIC_FROM");
     }
     return Object.freeze({ ready: reasons.length === 0, releaseKey: this.#releaseKey, reasons: Object.freeze(reasons) });
   }
 
   /**
-   * Returns the unsubscribe. Registered while the release already is current, the listener fires once at once; then on
-   * every later false→true. A listener that throws is logged by code and never stops the others or the watcher.
+   * Returns the unsubscribe. Each listener fires once per current period: at once when registered while the release is
+   * current (never after stop()), otherwise at the first poll that sees it current — including a fresh read after a
+   * stale one in the same period. A listener that throws is logged by code and never stops the others or the watcher.
    */
   onBecameCurrent(listener: () => void): () => void {
     const own = (): void => listener();
-    this.#listeners.add(own);
-    if (this.#wasCurrent && this.ownIsCurrent()) this.#fire(own);
+    const entry = { fired: false };
+    this.#listeners.set(own, entry);
+    if (!this.#stopped && this.#wasCurrent && this.ownIsCurrent()) {
+      entry.fired = true;
+      this.#fire(own);
+    }
     return () => { this.#listeners.delete(own); };
   }
 
-  /** A clock stepped back before the last read makes that read stale, never fresh (fail closed). */
+  /** The clock, checked: a backward step drops the last read (stale until a new one) and becomes the new baseline. */
+  #now(): number {
+    const now = this.#clock();
+    if (now < this.#clockHigh) this.#last = null;
+    this.#clockHigh = now;
+    return now;
+  }
+
   #fresh(): boolean {
+    const now = this.#now();
     if (this.#last === null) return false;
-    const age = this.#clock() - this.#last.readAt;
+    const age = now - this.#last.readAt;
     return age >= 0 && age <= this.#staleMs;
   }
 
@@ -176,15 +238,23 @@ export class ReleaseWatcher {
     }
   }
 
-  /** readCurrent() raced against `staleMs`: a read that never answers is a failed read, so the chain goes on. */
+  /**
+   * readCurrent() raced against `staleMs`: a read that never answers is a failed read, so the chain goes on. The read is
+   * aborted first, so the reader frees its client before the next poll can start another read; the pending promise is
+   * never reused (a dead socket would stall it forever).
+   */
   async #readWithin(): Promise<Awaited<ReturnType<ReleaseStateReader["readCurrent"]>>> {
+    const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(Object.assign(new Error("RELEASE_READ_TIMEOUT"), { code: "RELEASE_READ_TIMEOUT" })), this.#staleMs);
+      timer = setTimeout(() => {
+        abort.abort();
+        reject(readTimeout());
+      }, this.#staleMs);
       timer.unref?.();
     });
     try {
-      return await Promise.race([this.#reader.readCurrent(), timeout]);
+      return await Promise.race([this.#reader.readCurrent(abort.signal), timeout]);
     } finally {
       clearTimeout(timer);
     }
@@ -209,7 +279,7 @@ export class ReleaseWatcher {
     try {
       const current = await this.#readWithin();
       this.#last = Object.freeze({
-        current: current?.releaseKey ?? null, takeTrafficFrom: current?.takeTrafficFrom ?? null, readAt: this.#clock()
+        current: current?.releaseKey ?? null, takeTrafficFrom: current?.takeTrafficFrom ?? null, readAt: this.#now()
       });
       if (this.#failing) this.#line("READ_RECOVERED");
       this.#failing = false;
@@ -223,9 +293,15 @@ export class ReleaseWatcher {
     const became = isCurrent && !this.#wasCurrent;
     if (!isCurrent && this.#wasCurrent) this.#line("STOPPED_BEING_CURRENT");
     this.#wasCurrent = isCurrent;
-    if (!became) return;
-    this.#line("BECAME_CURRENT");
-    for (const listener of [...this.#listeners]) this.#fire(listener);
+    if (became) this.#line("BECAME_CURRENT");
+    for (const [listener, entry] of [...this.#listeners]) {
+      if (!isCurrent) {
+        entry.fired = false;
+      } else if (!entry.fired) {
+        entry.fired = true;
+        this.#fire(listener);
+      }
+    }
   }
 
   #line(event: WatchEvent, code?: string): void {

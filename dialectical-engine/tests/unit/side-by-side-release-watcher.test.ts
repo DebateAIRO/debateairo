@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  PostgresReleaseStateReader,
   RELEASE_WATCH_POLL_MS,
   RELEASE_WATCH_STALE_MS,
   ReleaseWatcher,
@@ -279,6 +280,103 @@ describe("side-by-side C3: the API's release watcher", () => {
     reject(Object.assign(new Error("pool ended"), { code: "ECONNRESET" }));
     await vi.advanceTimersByTimeAsync(0);
     expect(lines.some((line) => line.includes("READ_FAILED"))).toBe(false);
+  });
+
+  it("a timed-out read gives its client back destroyed, so hung reads never hold more than one connection", async () => {
+    let out = 0;
+    let most = 0;
+    let destroyed = 0;
+    let hang = true;
+    const bounds: unknown[] = [];
+    const pool = {
+      async connect() {
+        out += 1;
+        most = Math.max(most, out);
+        let released = false;
+        const pending: ((error: Error) => void)[] = [];
+        return {
+          async query(text: string, values?: unknown[]) {
+            if (released) throw new Error("client released");
+            if (text.includes("set_config('statement_timeout'")) bounds.push(values?.[0]);
+            if (text.includes("read_current_release") && hang) return new Promise<never>((_, reject) => { pending.push(reject); });
+            return { rows: [] };
+          },
+          release(error?: Error) {
+            if (released) return;
+            released = true;
+            out -= 1;
+            if (error !== undefined) {
+              destroyed += 1;
+              for (const reject of pending) reject(error);
+            }
+          }
+        };
+      }
+    };
+    const w = new ReleaseWatcher({
+      releaseKey: OWN, hosted: false, reader: new PostgresReleaseStateReader(pool as never), clock: () => now, log: (line) => lines.push(line)
+    });
+    const started = w.start();
+    await advance(RELEASE_WATCH_STALE_MS);
+    await started;
+    await advance(3 * (RELEASE_WATCH_STALE_MS + RELEASE_WATCH_POLL_MS));
+    expect(destroyed).toBeGreaterThanOrEqual(3);
+    expect(most).toBe(1);
+    expect(w.ownIsCurrent()).toBe(false);
+    expect(bounds.length).toBeGreaterThanOrEqual(3);
+    expect(bounds.every((bound) => bound === String(RELEASE_WATCH_STALE_MS))).toBe(true);
+    hang = false;
+    await advance(RELEASE_WATCH_STALE_MS + RELEASE_WATCH_POLL_MS);
+    expect(w.ownIsCurrent()).toBe(true);
+    expect(out).toBe(0);
+    expect(most).toBe(1);
+    w.stop();
+  });
+
+  it("a listener registered after stop never fires", async () => {
+    const w = watcher(false);
+    await w.start();
+    w.stop();
+    let fired = 0;
+    w.onBecameCurrent(() => { fired += 1; });
+    expect(fired).toBe(0);
+  });
+
+  it("a listener registered while the last read is stale fires on the next fresh current read", async () => {
+    current = { releaseKey: OWN, takeTrafficFrom: new Date(START - 60_000) };
+    const w = watcher(true);
+    let early = 0;
+    w.onBecameCurrent(() => { early += 1; });
+    await w.start();
+    failing = true;
+    await advance(RELEASE_WATCH_STALE_MS + 1);
+    let late = 0;
+    w.onBecameCurrent(() => { late += 1; });
+    expect(late).toBe(0);
+    failing = false;
+    await advance(RELEASE_WATCH_POLL_MS);
+    expect(w.ownIsCurrent()).toBe(true);
+    expect(late).toBe(1);
+    expect(early).toBe(1);
+    await advance(3 * RELEASE_WATCH_POLL_MS);
+    expect(late).toBe(1);
+    w.stop();
+  });
+
+  it("a stale read stepped back under staleMs by the clock stays stale until a new read", async () => {
+    current = { releaseKey: OWN, takeTrafficFrom: new Date(START - 60_000) };
+    const w = watcher(true);
+    await w.start();
+    failing = true;
+    await advance(RELEASE_WATCH_STALE_MS + RELEASE_WATCH_POLL_MS);
+    expect(w.ownIsCurrent()).toBe(false);
+    now -= RELEASE_WATCH_STALE_MS; // the read's age drops back under staleMs
+    expect(w.ownIsCurrent()).toBe(false);
+    expect(w.readiness().reasons).toContain("DATABASE_UNREACHABLE");
+    failing = false;
+    await advance(RELEASE_WATCH_POLL_MS);
+    expect(w.ownIsCurrent()).toBe(true);
+    w.stop();
   });
 
   it("a listener that throws is logged by code and never stops the watcher or the other listeners", async () => {
