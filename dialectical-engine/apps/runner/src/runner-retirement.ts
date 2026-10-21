@@ -78,7 +78,8 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *  · a release with no row (`legacy`, dev, tests) is never retired;
  *  · a retire request on a release that is not DRAINING is ignored (plan B D5) and said once.
  *
- * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, a SQLSTATE.
+ * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, how it retired, a SQLSTATE. A
+ * failure on the way out (RETIREMENT_ANNOUNCE_FAILED, RETIREMENT_STOP_FAILED) is logged and rejects `retired`.
  */
 export const RUNNER_RETIRED_PROCESS_EVENT = "debateai:runner-retired" as const;
 export const RUNNER_RETIREMENT_TIMING = Object.freeze({
@@ -129,7 +130,8 @@ export function postgresRunnerRetirementStore(pool: Pool, fence: WorkItemFence):
           openWork: open.rows[0]?.open_work ?? 0
         });
       } catch (error) {
-        await client.query("ROLLBACK");
+        // A failing ROLLBACK never replaces the read's own failure (and its SQLSTATE).
+        await client.query("ROLLBACK").catch(() => undefined);
         throw error;
       } finally {
         client.release();
@@ -188,11 +190,19 @@ export function startRunnerRetirement(input: Readonly<{
     retiring = true;
     input.log(Object.freeze({ kind: KIND, event: "RETIRING", how }));
     input.signal.stopClaims();
-    input.announce(`DEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: input.releaseKey })}\n`);
-    input.emit(Object.freeze({ releaseKey: input.releaseKey }));
+    try {
+      input.announce(`DEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: input.releaseKey })}\n`);
+      input.emit(Object.freeze({ releaseKey: input.releaseKey }));
+    } catch (error) {
+      // The launcher may not know: stopping the worker now would read as a failure. Loud, and the worker is left as is.
+      input.log(Object.freeze({ kind: KIND, event: "RETIREMENT_ANNOUNCE_FAILED" }));
+      refuse(error);
+      return;
+    }
     try {
       await input.stopWorker();
     } catch (error) {
+      input.log(Object.freeze({ kind: KIND, event: "RETIREMENT_STOP_FAILED" }));
       refuse(error);
       return;
     }

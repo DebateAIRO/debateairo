@@ -209,6 +209,26 @@ describe("lapsed claims are re-sent by their own release every five minutes (sid
     expect(listCalls.map((call) => call.at)).toEqual([300_000, 900_000]);
   });
 
+  it("stop() or a pause during a pass sends no further item of it", async () => {
+    let paused = false;
+    let resend: Readonly<{ stop(): void }> | undefined;
+    const stopped = harness({
+      list: async () => [item(1), item(2), item(3)],
+      dispatch: async (entry) => { if (entry.workItemId === "work-1") resend?.stop(); }
+    });
+    resend = stopped.resend;
+    await stopped.time.advance(300_000);
+    expect(stopped.dispatched).toEqual(["work-1"]);
+
+    const pausing = harness({
+      list: async () => [item(1), item(2), item(3)],
+      dispatch: async (entry) => { if (entry.workItemId === "work-2") paused = true; },
+      paused: () => paused
+    });
+    await pausing.time.advance(300_000);
+    expect(pausing.dispatched).toEqual(["work-1", "work-2"]);
+  });
+
   it("stop() ends the re-send: no further list", async () => {
     const { time, resend, listCalls } = harness();
     await time.advance(300_000);

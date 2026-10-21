@@ -192,13 +192,14 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     const order: string[] = [];
     const reads: number[] = [];
     const failure = new Error("worker stop failed");
+    const lines: Array<Readonly<Record<string, string | number>>> = [];
     const retirement = startRunnerRetirement({
       releaseKey: KEY,
       store: { readFacts: async () => { reads.push(time.now()); return drained(); } },
       executions: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => { order.push("stopWorker"); throw failure; },
-      log: () => undefined,
+      log: (line) => { lines.push(line); },
       announce: () => { order.push("announce"); },
       emit: () => { order.push("emit"); },
       clock: time.clock
@@ -206,8 +207,37 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     await time.advance(60_000);
     await expect(retirement.retired).rejects.toBe(failure);
     expect(order).toEqual(["announce", "emit", "stopWorker"]);
+    expect(lines).toEqual([
+      { kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIRING", how: "DRAINED" },
+      { kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIREMENT_STOP_FAILED" }
+    ]);
     await time.advance(300_000);
     expect(reads).toEqual([60_000]);
+  });
+
+  it("an announcement that throws is logged, rejects retired with that failure, and stops no worker", async () => {
+    const time = fakeClock();
+    const order: string[] = [];
+    const lines: Array<Readonly<Record<string, string | number>>> = [];
+    const failure = new Error("stdout closed");
+    const retirement = startRunnerRetirement({
+      releaseKey: KEY,
+      store: { readFacts: async () => drained() },
+      executions: { count: () => 0 },
+      signal: createRunnerRetirementSignal(),
+      stopWorker: async () => { order.push("stopWorker"); },
+      log: (line) => { lines.push(line); },
+      announce: () => { order.push("announce"); throw failure; },
+      emit: () => { order.push("emit"); },
+      clock: time.clock
+    });
+    await time.advance(60_000);
+    await expect(retirement.retired).rejects.toBe(failure);
+    expect(order).toEqual(["announce"]);
+    expect(lines).toEqual([
+      { kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIRING", how: "DRAINED" },
+      { kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIREMENT_ANNOUNCE_FAILED" }
+    ]);
   });
 
   it("a release with no row (dev, tests) is never retired and writes no line", async () => {

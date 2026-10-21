@@ -19,7 +19,8 @@ import type { DispatchableWorkItem } from "@debateai/battery";
  *  · a re-send still unsettled after `everyMs` is given up the same way (LAPSED_RESEND_FAILED): one hung Hatchet call
  *    never stalls the chain, so later passes still run (the item is lapsed again and listed by a later pass);
  *  · while this release retires (claims stopped, spec §4) a pass lists nothing: its runner would answer NO_WORK, and
- *    the backstop sets those debates aside.
+ *    the backstop sets those debates aside. A pass under way when it starts to retire, or when `stop()` is called,
+ *    sends no further item.
  *
  * Lines are content-free (`kind: "DEBATEAI_RUNNER_RESEND"`): an event, counts, a work item id we mint, a SQLSTATE.
  */
@@ -81,6 +82,8 @@ export function startLapsedClaimResend(input: Readonly<{
     }
     let count = 0;
     for (const item of listed.slice(0, LAPSED_RESEND.limit)) {
+      // stop() or this release starting to retire takes effect mid-pass: no further item of it is sent.
+      if (stopped || input.paused()) break;
       let sent = false;
       try {
         sent = await sentWithin(input.dispatch(item), clock, LAPSED_RESEND.everyMs) === "SENT";
