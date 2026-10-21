@@ -60,9 +60,10 @@ export interface ChargeSettlement {
   /**
    * `bankDeclined` (N10/N11): NETOPIA's own "the bank refused" (spec §2.4.5), passed by the renewal's synchronous refusal and
    * by VERIFY_PAYMENT's NETOPIA path. Absent: a charge whose caller did not say is never read as the bank's refusal
-   * (`settlement-renewal.ts`).
+   * (`settlement-renewal.ts`). `declineCode` (B2, NETOPIA answers 2026-10-21, Q15): NETOPIA's own refusal code
+   * (`"20"`, `"22"`, ...) when its report named one; absent or null: none (our own failure, or a report without one).
    */
-  failed(context: SettlementContext & Readonly<{ errorCode: string; bankDeclined?: boolean }>): Promise<void>;
+  failed(context: SettlementContext & Readonly<{ errorCode: string; bankDeclined?: boolean; declineCode?: string | null }>): Promise<void>;
   /** A card check's authorization is voided on purpose (A12); P12e supplies this for CARD_CHECK. */
   voided?(context: SettlementContext): Promise<void>;
 }

@@ -3,6 +3,7 @@ import type { PaymentEnvironment } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { BillingAudit } from "./audit.js";
 import { CardCustody } from "./card-custody.js";
+import type { NetopiaNoticeIntake } from "./netopia-intake.js";
 import { ProviderOnlyOwnerJobs } from "./owner-jobs.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 
@@ -15,6 +16,11 @@ export type ProviderOnlyJobsDeps = Readonly<{
   audit: BillingAudit;
   clock: () => Date;
   reportPending: (code: string) => void;
+  /**
+   * B3a (NETOPIA answers 2026-10-21): the provider-only intake, when it has a spool (BILLING_NOTICE_SPOOL_PATH): its
+   * kept messages are replayed every 10 minutes, as the billing runtime's are (main.ts replays them once at the start).
+   */
+  notices?: Pick<NetopiaNoticeIntake, "replaySpool">;
 }>;
 
 export type ProviderOnlyJobs = Readonly<{
@@ -39,7 +45,13 @@ export function createProviderOnlyJobs(deps: ProviderOnlyJobsDeps): ProviderOnly
   const schedule = createCoalescingSingleFlight(
     () => owner.schedule(), () => deps.reportPending("BILLING_OWNER_JOBS_PENDING")
   );
+  const { notices } = deps;
+  const replaySpool = notices === undefined ? undefined : createCoalescingSingleFlight(
+    () => notices.replaySpool(deps.clock()),
+    () => deps.audit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" })
+  );
   let timer: ReturnType<typeof setInterval> | undefined;
+  let spoolTimer: ReturnType<typeof setInterval> | undefined;
   return Object.freeze({
     schedule: () => owner.schedule(),
     start() {
@@ -47,10 +59,16 @@ export function createProviderOnlyJobs(deps: ProviderOnlyJobsDeps): ProviderOnly
       timer = setInterval(schedule, 86_400_000);
       timer.unref();
       schedule();
+      if (replaySpool !== undefined) {
+        spoolTimer = setInterval(replaySpool, 600_000);
+        spoolTimer.unref();
+      }
     },
     stop() {
       if (timer !== undefined) clearInterval(timer);
+      if (spoolTimer !== undefined) clearInterval(spoolTimer);
       timer = undefined;
+      spoolTimer = undefined;
     }
   });
 }

@@ -35,6 +35,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   requested: "2026-10-08T10:00:00.000Z",
   expires: "2026-10-09T10:02:00.000Z",
   retryDate: "2026-10-30",
+  endDate: "2026-11-06T10:00:00.000Z",
   accessEndDate: "2026-10-29",
   cancelPageUrl: "https://dezbatere.ro/cancel",
   termsUrl: "https://dezbatere.ro/terms",
@@ -52,6 +53,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   otherSystem: "true",
   bankDeclined: "true",
   confirmCard: "true",
+  // B1: off in the shared sample, so every other M5 test reads as before; its own test turns it on.
+  bankAsked: "false",
   paymentAlert: "true",
   cardExpiring: "true",
   endedPlan: "PRO",
@@ -108,6 +111,14 @@ function codeOf(run: () => unknown): string {
 /** A catalogue sentence's longest stretch without a placeholder: what a rendered email must (or must not) contain. */
 const longestFixedPart = (sentence: string): string =>
   sentence.split(/\{[A-Za-z][A-Za-z0-9_]*\}/u).map((part) => part.trim()).sort((a, b) => b.length - a.length)[0]!;
+
+/** The longest placeholder-free stretch of `sentence` that `other` does not contain (two sentences opening alike). */
+const distinctPart = (sentence: string, other: string): string => {
+  const part = sentence.split(/\{[A-Za-z][A-Za-z0-9_]*\}/u).map((piece) => piece.trim()).filter((piece) => !other.includes(piece))
+    .sort((a, b) => b.length - a.length)[0];
+  if (part === undefined || part === "") throw new Error(`no part of "${sentence}" is its own`);
+  return part;
+};
 
 const NOTHING: ReadonlySet<MailAttachmentFact> = new Set();
 const EVERYTHING: ReadonlySet<MailAttachmentFact> = new Set(MAIL_ATTACHMENT_FACTS);
@@ -231,15 +242,17 @@ describe("P17 renderMail", () => {
   it("opens M5A–C with a sentence true in every case, and names the bank only when the bank declined (W10, P2-I21)", () => {
     const first = "We couldn't take this month's payment for your Plus plan. You keep your plan while we try again.";
     for (const id of ["M5A", "M5B", "M5C"] as const) {
+      // B2's optional `endDate` (a refusal not retried by itself) changes the first sentence; its own test is below.
+      const { endDate: _endDate, ...retried } = paramsFor(id);
       // An outage past Q-1's 72 hours, our own refused key, an unknown outcome or a tax service that stayed down: no
       // bank was asked, so no sentence blames one.
       // N11: `confirmCard` (AUTHENTICATION_REQUIRED) is left "false" here; its own sentence is pinned in
       // tests/unit/billing-netopia-renewal-rules.test.ts.
-      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false", confirmCard: "false" }).text;
+      const ours = renderMail(id, "en", { ...retried, bankDeclined: "false", confirmCard: "false" }).text;
       expect(ours, id).toContain(`Hello,\n\n${first}\n\n`);
       expect(ours, id).not.toMatch(/bank/iu);
       // PAYMENT_DECLINED: the same first sentence, then the bank's refusal.
-      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true", confirmCard: "false" }).text;
+      const declined = renderMail(id, "en", { ...retried, bankDeclined: "true", confirmCard: "false" }).text;
       expect(declined, id).toContain(`Hello,\n\n${first}\n\nYour bank refused the payment.\n\n`);
       expect(MAIL_TEMPLATES[id].params.bankDeclined, id).toBe("flag");
       const { bankDeclined: _flag, ...withoutFlag } = paramsFor(id);
@@ -252,6 +265,90 @@ describe("P17 renderMail", () => {
       expect(catalogue["mail.M5.refused"], locale).toBeUndefined();
       expect(catalogue["mail.M5.notTaken"], locale).toBeDefined();
       expect(catalogue["mail.M5.notTaken"], locale).not.toContain(catalogue["mail.M5.bankRefused"]!);
+    }
+  });
+
+  it("says in M5A–C that a refused card is not tried again when endDate is given, and reads as before without it (B2)", () => {
+    const card = "https://dezbatere.ro/settings/card";
+    const opening = "Hello,\n\nWe couldn't take this month's payment for your Plus plan";
+    const bank = "\n\nYour bank refused the payment.\n\n";
+    // NETOPIA answers 2026-10-21 (Q15): a refusal other than code 20 is never retried by itself, so no sentence promises it.
+    const noRetry: Readonly<Record<"M5A" | "M5B" | "M5C", string>> = {
+      M5A: `${opening}, and we won't try this card again.${bank}You keep your plan until November 6, 2026. To keep it after`
+        + ` that, add a card, and we'll take the payment from it straight away: ${card}\n\n`,
+      M5B: `${opening}, and we won't try this card again.${bank}You keep your plan until November 6, 2026. To keep it after`
+        + ` that, add a card, and we'll take the payment from it straight away: ${card}\n\n`,
+      M5C: `${opening}, and we won't try this card again.${bank}This is our last reminder. If you don't add a card by`
+        + ` November 6, 2026, your account moves to the Free plan, and your debates are kept. To add a card, open: ${card}\n\n`
+    };
+    // Without endDate, today's email to the byte (the body up to the signature).
+    const retried: Readonly<Record<"M5A" | "M5B" | "M5C", string>> = {
+      M5A: `${opening}. You keep your plan while we try again.${bank}We will try again on October 30, 2026. To use a`
+        + ` different card, open: ${card}\n\n`,
+      M5B: `${opening}. You keep your plan while we try again.${bank}Our second try did not work either. We will try again`
+        + ` on October 30, 2026. To use a different card, open: ${card}\n\n`,
+      M5C: `${opening}. You keep your plan while we try again.${bank}We will make one last try on October 30, 2026. If it`
+        + ` fails, your account moves to the Free plan, and your debates are kept. To use a different card, open: ${card}\n\n`
+    };
+    const catalogues = loadMailCatalogues();
+    for (const id of ["M5A", "M5B", "M5C"] as const) {
+      expect(MAIL_TEMPLATES[id].optional, id).toEqual({ confirmCard: "flag", bankAsked: "flag", endDate: "date" });
+      const { endDate: _endDate, ...today } = paramsFor(id);
+      const params = { ...today, bankDeclined: "true", confirmCard: "false" };
+      expect(renderMail(id, "en", { ...params, endDate: SAMPLE.endDate! }).text.slice(0, noRetry[id].length), id).toBe(noRetry[id]);
+      expect(renderMail(id, "en", params).text.slice(0, retried[id].length), id).toBe(retried[id]);
+      // In every locale: the no-retry sentences with endDate, today's without, never both.
+      const later = id === "M5C" ? "mail.M5.addCardLast" : "mail.M5.addCard";
+      const old = id === "M5A" ? "mail.M5.retry" : id === "M5B" ? "mail.M5.secondTry" : "mail.M5.lastTry";
+      for (const locale of MAIL_LOCALES) {
+        const catalogue = catalogues[locale];
+        const without = renderMail(id, locale, params).text;
+        const withEnd = renderMail(id, locale, { ...params, endDate: SAMPLE.endDate! }).text;
+        // Each pair shares words (the first sentences open alike), so each side is told by a part the other lacks.
+        for (const [shown, hidden] of [["mail.M5.notTakenNoRetry", "mail.M5.notTaken"], [later, old]] as const) {
+          expect(withEnd, `${id}/${locale} ${shown}`).toContain(distinctPart(catalogue[shown]!, catalogue[hidden]!));
+          expect(withEnd, `${id}/${locale} ${hidden}`).not.toContain(distinctPart(catalogue[hidden]!, catalogue[shown]!));
+          expect(without, `${id}/${locale} ${hidden}`).toContain(distinctPart(catalogue[hidden]!, catalogue[shown]!));
+          expect(without, `${id}/${locale} ${shown}`).not.toContain(distinctPart(catalogue[shown]!, catalogue[hidden]!));
+        }
+        expect(withEnd, `${id}/${locale}`).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
+      }
+    }
+  });
+
+  it("B1: says only that the bank asked for a confirmation when the card is not tried again (bankAsked), and keeps confirmCard's M5 to the byte", () => {
+    const card = "https://dezbatere.ro/settings/card";
+    const opening = "Hello,\n\nWe couldn't take this month's payment for your Plus plan";
+    const { endDate: _endDate, confirmCard: _confirm, bankAsked: _asked, ...today } = paramsFor("M5A");
+    // AUTHENTICATION_REQUIRED not retried by itself: no "we'll try again" after "we won't try this card again".
+    const asked = renderMail("M5A", "en", { ...today, bankDeclined: "false", bankAsked: "true", endDate: SAMPLE.endDate! }).text;
+    const askedText = `${opening}, and we won't try this card again.\n\nYour bank asked you to confirm this payment.\n\n`
+      + `You keep your plan until November 6, 2026. To keep it after that, add a card, and we'll take the payment from it`
+      + ` straight away: ${card}\n\n`;
+    expect(asked.slice(0, askedText.length)).toBe(askedText);
+    expect(asked).not.toContain("we'll try again");
+    expect(asked).not.toContain("Your bank refused the payment.");
+    // Without endDate and with confirmCard: today's email to the byte (the body up to the signature).
+    const confirmText = `${opening}. You keep your plan while we try again.\n\nYour bank asked you to confirm this payment.`
+      + ` Please confirm your card in Settings, and we'll try again.\n\nWe will try again on October 30, 2026. To use a`
+      + ` different card, open: ${card}\n\n`;
+    const confirm = renderMail("M5A", "en", { ...today, bankDeclined: "false", confirmCard: "true" }).text;
+    expect(confirm.slice(0, confirmText.length)).toBe(confirmText);
+    expect(renderMail("M5A", "en", { ...today, bankDeclined: "false", confirmCard: "true", bankAsked: "false" }).text).toBe(confirm);
+    // In every locale: bankAsked shows the first sentence of confirmCard alone, never its promise to try again, and
+    // wins over the bank's refusal; confirmCard still wins over both.
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const catalogue = catalogues[locale];
+      const sentence = catalogue["mail.M5.bankAskedToConfirm"]!;
+      expect(catalogue["mail.M5.confirmCard"]!.startsWith(sentence), locale).toBe(true);
+      expect(sentence.length, locale).toBeLessThan(catalogue["mail.M5.confirmCard"]!.length);
+      const text = renderMail("M5A", locale, { ...today, bankDeclined: "true", bankAsked: "true", endDate: SAMPLE.endDate! }).text;
+      expect(text, locale).toContain(sentence);
+      expect(text, locale).not.toContain(catalogue["mail.M5.confirmCard"]!);
+      expect(text, locale).not.toContain(catalogue["mail.M5.bankRefused"]!);
+      const both = renderMail("M5A", locale, { ...today, bankDeclined: "false", confirmCard: "true", bankAsked: "true" }).text;
+      expect(both, locale).toContain(catalogue["mail.M5.confirmCard"]!);
     }
   });
 

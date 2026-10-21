@@ -9,6 +9,7 @@ import {
 } from "@debateai/payments-netopia";
 import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
+import type { NoticeSpool, SpoolEntry } from "./notice-spool.js";
 import { enqueueOnce } from "./outbox.js";
 import { openQuarantined, sealCardToken, sealNoticeAllowed, sealNoticeRaw, sealQuarantined } from "./records.js";
 
@@ -51,6 +52,11 @@ export type NetopiaNoticeIntakeDeps = Readonly<{
    * TimeShiftedCardPayments moves its answers', so card adoption compares every token's payment time on one clock.
    */
   clockOffsetMs?: number;
+  /**
+   * B3a (NETOPIA answers 2026-10-21): where a verified message the database could not take is kept (main.ts builds it
+   * from BILLING_NOTICE_SPOOL_PATH). Absent: such a message is answered 503 and nothing is kept, as before.
+   */
+  spool?: NoticeSpool;
 }>;
 
 const CHARGE_ORDER = /^[0-9a-f]{32}$/u;
@@ -60,6 +66,10 @@ const QUARANTINE_DAYS = 14;
 /** Ruling PR-30: the re-check reads the quarantine in keyset pages of at most this many rows, until a short page. */
 const RECHECK_PAGE_ROWS = 500;
 const DAY_MS = 86_400_000;
+/** B3a: a kept message is dropped 14 days after it arrived, like the quarantine (§2.5.2). */
+const SPOOL_DAYS = 14;
+/** B3a: one replay reads at most this many kept messages, oldest first; the next tick reads on. */
+const SPOOL_REPLAY_FILES = 500;
 /** The house admission envelope (apps/api/src/index.ts `admitOrRefuse`), for a caller with no reply to send it on. */
 const OVER_BUDGET: NoticeAnswer = Object.freeze({
   status: 429, body: JSON.stringify({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" })
@@ -88,8 +98,16 @@ type CardSource = Readonly<{
  * and, when worth keeping, sealed into the quarantine for the next start's re-check.
  */
 export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
+  /** B3a: the replay under way, so the start's replay and a tick's never read the same files at once. */
+  private replaying: Promise<number> | undefined;
+
   constructor(private readonly deps: NetopiaNoticeIntakeDeps) {}
 
+  /**
+   * B3a (NETOPIA answers 2026-10-21): a verified message the database could not take is kept in the spool, when there is
+   * one, because only NETOPIA's first message carries the saved card. The answer stays 503 STORE_FAILED all the same:
+   * NETOPIA's resends cost nothing (a body stored twice is one notice, by its SHA-256) and stay a second source.
+   */
   async receive(input: NoticeArrival): Promise<NoticeAnswer> {
     const verdict = verifyNetopiaNotice(input.rawBody, input.header, this.deps.trust);
     if (!verdict.ok) return this.rejected(input, verdict.reason);
@@ -97,10 +115,88 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
       await this.store(input.rawBody, verdict, { arrival: "DELIVERED", receivedAt: input.now }, input.now);
     } catch {
       this.deps.audit("billing.notice.store_failed", {});
+      await this.keep(input);
       return netopiaNoticeAnswer("STORE_FAILED");
     }
     this.deps.kick();
     return netopiaNoticeAnswer("OK");
+  }
+
+  /** B3a (Review Focus 2): a spool that cannot write (gone, read-only, full) is one line, never a throw. */
+  private async keep(input: NoticeArrival): Promise<void> {
+    const { spool } = this.deps;
+    if (spool === undefined) return;
+    try {
+      await spool.put({ rawBody: input.rawBody, header: input.header, receivedAt: input.now });
+      this.deps.audit("billing.notice.spooled", {});
+    } catch {
+      this.deps.audit("billing.notice.spool_failed", {});
+    }
+  }
+
+  /**
+   * B3a: the spool's kept messages, at most 500 a call, oldest first, verified again with the keys read at this start
+   * and stored as the quarantine's re-check stores them (`RECHECKED`, at their real arrival). A stored one (DUPLICATE
+   * included: NETOPIA's resend got there first) is removed; one that does not open or verify, or whose store throws, is
+   * kept for the next call; one older than 14 days is removed unread (Review Focus 3). One line when anything was found,
+   * a kick when anything was stored; the number stored is returned. One bad file never stops the others.
+   */
+  async replaySpool(now: Date): Promise<number> {
+    const { spool } = this.deps;
+    if (spool === undefined) return 0;
+    if (this.replaying !== undefined) return this.replaying;
+    const run = this.replayOnce(spool, now).finally(() => {
+      this.replaying = undefined;
+    });
+    this.replaying = run;
+    return run;
+  }
+
+  private async replayOnce(spool: NoticeSpool, now: Date): Promise<number> {
+    const entries = await spool.entries(SPOOL_REPLAY_FILES);
+    let stored = 0;
+    let kept = 0;
+    let expired = 0;
+    for (const entry of entries) {
+      const result = await this.replayOne(spool, entry, now);
+      if (result === "STORED") stored += 1;
+      else if (result === "EXPIRED") expired += 1;
+      else kept += 1;
+    }
+    if (entries.length > 0) this.deps.audit("billing.notice.spool_replay", { stored, kept, expired });
+    if (stored > 0) this.deps.kick();
+    return stored;
+  }
+
+  private async replayOne(
+    spool: NoticeSpool, entry: SpoolEntry, now: Date
+  ): Promise<"STORED" | "EXPIRED" | "UNREADABLE" | "UNVERIFIED" | "FAILED"> {
+    try {
+      if (now.getTime() - entry.receivedAt.getTime() > SPOOL_DAYS * DAY_MS) {
+        await spool.remove(entry.spoolId);
+        return "EXPIRED";
+      }
+    } catch {
+      return "FAILED";
+    }
+    let opened: Readonly<{ rawBody: Buffer; header: string | undefined; receivedAt: Date }>;
+    try {
+      opened = await spool.open(entry.spoolId);
+    } catch {
+      return "UNREADABLE";
+    }
+    try {
+      const verdict = verifyNetopiaNotice(opened.rawBody, opened.header, this.deps.trust);
+      if (!verdict.ok) return "UNVERIFIED";
+      await this.store(opened.rawBody, verdict, { arrival: "RECHECKED", receivedAt: opened.receivedAt }, now);
+    } catch {
+      return "FAILED";
+    } finally {
+      opened.rawBody.fill(0);
+    }
+    // Stored: a file that cannot be removed now is a DUPLICATE next time, removed then.
+    await spool.remove(entry.spoolId).catch(() => undefined);
+    return "STORED";
   }
 
   /**

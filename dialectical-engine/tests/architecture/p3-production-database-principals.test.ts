@@ -480,6 +480,10 @@ describe("P3-01 production database-principal manifest", () => {
         // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
         // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
         { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
+        // B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner's resume command (`pnpm billing:renewal-resume`) runs as
+        // the API under systemd-run and appends only billing.charge_event rows (REQUESTED CHARGE_RESUMED), which that
+        // principal already writes; no privilege is added.
+        { component: "apps/api:billing-renewal-resume-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_RENEWAL_RESUME_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:renewal-resume" },
         // NETOPIA spec 2026-10-05 §2.20.3 (N22): the owner's NETOPIA recording (`pnpm billing:netopia-sandbox`) runs as the
         // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
         // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to

@@ -23,6 +23,7 @@ import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoic
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { BillingMaintenance } from "./maintenance.js";
 import { NetopiaNoticeIntake } from "./netopia-intake.js";
+import type { NoticeSpool } from "./notice-spool.js";
 import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
@@ -75,6 +76,11 @@ export type BillingRuntimeDeps = Readonly<{
   identities?: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
   /** P16a/P16c (R-35): where and when each tax is paid (the O1 text). Billing does not start without it. */
   taxAuthorities?: TaxAuthorities;
+  /**
+   * B3a (NETOPIA answers 2026-10-21): BILLING_NOTICE_SPOOL_PATH's spool, where the intake keeps a verified message the
+   * database could not take; replayed on the 10-minute tick (main.ts replays it once at the start). Absent: none.
+   */
+  noticeSpool?: NoticeSpool;
 }>;
 
 export type BillingRuntime = Readonly<{
@@ -281,7 +287,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const netopiaNotices = new NetopiaNoticeIntake({
     repository, jobs, trust: deps.connectors.noticeTrust, recordsKey: deps.connectors.recordsKey,
     paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain(),
-    clockOffsetMs: deps.clockOffsetMs ?? 0
+    clockOffsetMs: deps.clockOffsetMs ?? 0, ...(deps.noticeSpool === undefined ? {} : { spool: deps.noticeSpool })
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
@@ -320,6 +326,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const scheduleOwnerJobs = createCoalescingSingleFlight(
     () => ownerJobs.schedule(), () => deps.reportPending("BILLING_OWNER_JOBS_PENDING")
   );
+  // B3a: the spool's replay on the reconcile's 10-minute tick, single-flight; a failed replay is one line, tried again.
+  const replaySpool = createCoalescingSingleFlight(
+    () => netopiaNotices.replaySpool(deps.clock()),
+    () => deps.audit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" })
+  );
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
     outbox,
@@ -347,6 +358,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       reconcileTimer.unref();
       timers.push(reconcileTimer);
       reconcile();
+      if (deps.noticeSpool !== undefined) {
+        const spoolTimer = setInterval(replaySpool, 600_000);
+        spoolTimer.unref();
+        timers.push(spoolTimer);
+      }
       // P16c: the quarter's tax summary is queued once; checking daily is enough.
       const ownerTimer = setInterval(scheduleOwnerJobs, 86_400_000);
       ownerTimer.unref();
