@@ -42,7 +42,7 @@ const ENTRY_KEYS = ['basePlan', 'nativePlanSha256', 'sourceRoot', 'sourceRevisio
  * Side-by-side spec §4: a website or API starts only for a release that is (or is about to be) served;
  * a runner also for a DRAINING one (it still owns that release's open debates, database-ahead restart).
  */
-const STARTABLE = Object.freeze({ api: ['STAGED', 'CURRENT'], ui: ['STAGED', 'CURRENT'], runner: ['STAGED', 'CURRENT', 'DRAINING'] });
+export const STARTABLE = Object.freeze({ api: ['STAGED', 'CURRENT'], ui: ['STAGED', 'CURRENT'], runner: ['STAGED', 'CURRENT', 'DRAINING'] });
 /** Side-by-side plan D: MemoryMax runner 3G (systemd shows bytes). */
 export const RUNNER_MEMORY_MAX = '3221225472';
 /** A fresh proof must still be young when the launcher reads it after its source re-hash. */

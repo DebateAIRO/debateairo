@@ -30,6 +30,10 @@
 // 2026-10-15; owner answer M3), and the gate booked the call's full reservation as its charge and kept working. The
 // email names the gate, the day's count and the day, says nothing was halted, and gives the read-only
 // `status` command. Google has none.
+// Release notices (side-by-side spec §4), queued by root's release-retire.mjs: "release-retire-<code>" (the
+// backstop asked a draining release to retire), "release-forced-<code>" (its runner was still running 25 minutes
+// later and was stopped) and "release-stranded-<code>" (its runner had stopped without retiring). <code> is the
+// release label with each dash written as an underscore. Each names the release and one command; no amounts.
 import { constants } from 'node:fs';
 import { link, lstat, open, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -118,7 +122,7 @@ const NOTICES = Object.freeze({
 });
 /** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled or booked kind needs a valid count and day). */
 export function parseNotice(text) {
-  const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text)) : null;
+  const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
   if (match && (match[1].endsWith('-unbilled') || match[1].endsWith('-booked')) && unbilledCode(match[2]) === null) return null;
   return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
 }
@@ -145,6 +149,44 @@ const ANTHROPIC_NOTICES = Object.freeze({
     command: `/usr/bin/python3 -I ${ANTHROPIC_FOLDER}/anthropic_addresses.py check`,
     lookAt: ANTHROPIC_ADDRESS_UNIT, journal: ANTHROPIC_ADDRESS_UNIT
   })
+});
+
+// Root's retirement notices (side-by-side spec §4, deploy/preview-lifecycle/v1/release-retire.mjs). The code is the
+// release label with `-` written as `_` (labels hold only a-z, 0-9 and dashes, so this reads back exactly).
+const RELEASE_NOTICE = /^(release-retire|release-forced|release-stranded)-([a-z0-9_]{1,64})$/;
+const releaseOf = code => code.replace(/_/g, '-');
+const runnerUnitOf = label => `debateai-preview-runner@${label}`;
+/** Forced and stranded share the one fixing command: start the release's runner again, it finishes the job itself. */
+const restartRunner = (label, why) => ({
+  lead: `${why} Its unfinished debates are still open. Start its runner again with the one command below: it closes its unfinished debates with a plain sentence and no quota use, and then stops by itself. Nothing else needs doing.`,
+  command: `systemctl start ${runnerUnitOf(label)}`,
+  lookAt: `${runnerUnitOf(label)}.service`, journal: null
+});
+const RELEASE_NOTICES = Object.freeze({
+  'release-retire': code => {
+    const label = releaseOf(code);
+    return {
+      subject: `Preview: release ${label} was asked to retire`,
+      lead: `Release ${label} was still finishing debates 7.5 hours after the switch to the newer release, so it was asked to retire now. Its runner takes no new work, lets the model calls already sent finish (at most 20 minutes), closes what is left with a plain sentence and no quota use, and stops. Nothing needs doing: if its runner is still running 25 minutes from now, a check stops it and emails you again.`,
+      commandIntro: 'To watch it (read-only, as root on the server):',
+      command: `journalctl -u ${runnerUnitOf(label)} -n 50 --no-pager`,
+      lookAt: `${runnerUnitOf(label)}.service`, journal: null
+    };
+  },
+  'release-forced': code => {
+    const label = releaseOf(code);
+    return {
+      subject: `Preview: release ${label}'s runner was stopped 25 minutes after the retire request`,
+      ...restartRunner(label, `Release ${label}'s runner was still running 25 minutes after it was asked to retire, so it was stopped. If the stop cut off a model call and that halted a spending gate, the gate was re-opened.`)
+    };
+  },
+  'release-stranded': code => {
+    const label = releaseOf(code);
+    return {
+      subject: `Preview: release ${label}'s runner stopped before it retired`,
+      ...restartRunner(label, `Release ${label} was asked to retire, but 25 minutes later its runner was no longer running and had not reported that it retired (for example after a crash or a server restart).`)
+    };
+  }
 });
 
 class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
@@ -401,7 +443,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false,
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
     if (notice !== null && (parseNotice(`${notice.kind}-${notice.code}`)?.unit !== unit)) refuse('NOTICE_REFUSED');
-    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind])(notice.code) }
+    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind] ?? RELEASE_NOTICES[notice.kind])(notice.code) }
       : test ? { kind: 'test', send: true, restarts: null }
       : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null));
     if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });
