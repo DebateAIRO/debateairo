@@ -574,6 +574,51 @@ describe("B2 only refusal 20 is retried by itself (NETOPIA answers 2026-10-21, Q
     expect(h.payments.chargesFor(orderId)).toBe(sent + 1);
     expect((await renewals(orderId)).map((charge) => charge.attempt)).toEqual([1, 2]);
   });
+
+  it("skips an M5B whose retry day passed before its refusal was decided; an M5C whose day is still ahead goes out", async () => {
+    // Owner ruling 2026-10-21: a reminder naming a day already gone is not sent; the next step follows on the next pass.
+    const { paid, failedAt } = await firstFailure("20");
+    const orderId = paid.subscriptionId;
+    // The +1-day retry is decided only after +3 days (the retry day M5B would name).
+    h.clock.now = new Date(failedAt.getTime() + 3 * DAY + MINUTE);
+    h.payments.failNextCharge(orderId, "DECLINED", "20");
+    await h.maintenance.runOnce();
+    const second = (await renewals(orderId))[1]!;
+    expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+      kind: "PAST_DUE", data: { attempt: 2, charge_id: second.chargeId, auto_retry: true }
+    });
+    expect((await h.outboxRows(second.chargeId)).map((row) => row.ref)).not.toContain(`M5B:${second.chargeId}`);
+    // The next pass makes the +3-day retry at once; its M5C names +7 days, still ahead, so it is sent.
+    h.clock.advance(10 * MINUTE);
+    h.payments.failNextCharge(orderId, "DECLINED", "20");
+    await h.maintenance.runOnce();
+    const third = (await renewals(orderId))[2]!;
+    expect(third.attempt).toBe(3);
+    const m5c = await queuedEmail(`M5C:${third.chargeId}`);
+    expect(m5c.params.retryDate).toBe(new Date(failedAt.getTime() + 7 * DAY).toISOString());
+  });
+
+  it("skips M5B and M5C whose 'add a card by' day passed before the pass reached them, and ends the plan with M6", async () => {
+    const { paid, failedAt } = await firstFailure("22");
+    const orderId = paid.subscriptionId;
+    const [first] = await renewals(orderId);
+    const refOf = (attempt: number) => `${attempt === 2 ? "M5B" : "M5C"}:${orderId}:${first!.periodStart.toISOString()}:${attempt}`;
+    // No pass ran until after the last retry day (+7): each overdue attempt fails with no charge, one per pass.
+    h.clock.now = new Date(failedAt.getTime() + 8 * DAY);
+    for (const attempt of [2, 3]) {
+      await h.maintenance.runOnce();
+      expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+        kind: "PAST_DUE", data: { attempt, reason: "REFUSAL_NOT_RETRIED", auto_retry: false }
+      });
+      expect((await h.outboxRows(orderId)).map((row) => row.ref)).not.toContain(refOf(attempt));
+      h.clock.advance(10 * MINUTE);
+    }
+    await h.maintenance.runOnce();
+    expect((await h.repository.subscriptionEvents(orderId)).at(-1)).toMatchObject({
+      kind: "ENDED", data: { cause: "DUNNING", reason: "REFUSAL_NOT_RETRIED" }
+    });
+    expect((await h.outboxRows(orderId)).map((row) => row.ref)).toContain(`M6:${orderId}`);
+  });
 });
 
 /** The saved-card charges sent to NETOPIA with this orderID (our charge id); the shared harness charges other plans too. */

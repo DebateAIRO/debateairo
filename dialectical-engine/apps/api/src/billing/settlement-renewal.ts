@@ -61,7 +61,10 @@ export type DunningAttempt = Readonly<{
  * PAST_DUE also records whether this attempt may be retried automatically (`auto_retry`, always written,
  * `autoRetryAllowed`) and NETOPIA's refusal code (`decline_code`, only when it named one); an ENDED row takes neither.
  * When the attempt is not retried by itself, M5 carries `endDate`, the last retry day (the day the dunning ends unless a
- * card is added): its wording then promises no retry and asks for a card by that day.
+ * card is added): its wording then promises no retry and asks for a card by that day. Owner ruling 2026-10-21: an M5B
+ * or M5C whose day (`retryDate` when retried by itself, else `endDate`) has already passed when the attempt is decided
+ * is not sent (a refusal decided late, after a hold for the owner, or a pass that ran late); the next step follows on
+ * the next maintenance pass and its own email says what happened. M5A's day is never past (a first failure is dated now).
  * The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
  */
@@ -89,9 +92,12 @@ export async function writeDunningAttempt(
         paidThrough: addDays(input.firstFailedAt, Math.max(...retryDays) + 1), monthCreditOverrideMicros: null
       });
     }
-    const templates: ReadonlyArray<BillingMailTemplateId> = ["M5A", "M5B", "M5C"];
     // B2: the same day the last attempt ends the dunning (`first failure + max(dunning_retry_days)`).
-    const endDate = autoRetry ? {} : { endDate: addDays(input.firstFailedAt, Math.max(...retryDays)).toISOString() };
+    const lastDay = addDays(input.firstFailedAt, Math.max(...retryDays));
+    // Owner ruling 2026-10-21: a reminder naming a day already gone is not sent.
+    if (input.attempt > 1 && (autoRetry ? nextRetryAt : lastDay).getTime() <= now.getTime()) return "PAST_DUE";
+    const templates: ReadonlyArray<BillingMailTemplateId> = ["M5A", "M5B", "M5C"];
+    const endDate = autoRetry ? {} : { endDate: lastDay.toISOString() };
     await enqueueEmail(deps.repository, client, {
       template: templates[Math.min(input.attempt, templates.length) - 1]!, recipient,
       dedupeRef: input.chargeId ?? `${subscription.subscriptionId}:${input.periodStart.toISOString()}:${input.attempt}`,
