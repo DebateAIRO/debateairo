@@ -9,6 +9,7 @@ import {
   waitingUntil,
   withSpendDecisionLock,
   type Admission,
+  type AdmissionHold,
   type CostEstimator,
   type PersonAllowanceSource,
   type PersonWindow,
@@ -128,6 +129,26 @@ export interface AskRoomEntitlements {
     (Readonly<{planId: PlanId; entitlementEventId: string}> | Readonly<{basis: FundingBasis}>)): Promise<void>;
 }
 
+/**
+ * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8) — WHAT HOLDS EVERY NEW DEBATE BACK, read inside the
+ * spend-decision lock on the decision's own transaction (`PostgresAskAdmissionGate`, ./release-state.ts):
+ *
+ * - `ownReleaseIsCurrent` — the release watcher's rule, read now and not from the watcher's last poll: this release is
+ *   the one `core.read_current_release()` names, or none is named and the deployment is not hosted. An ask the API
+ *   admits while a switch moves the traffic away waits in line (SWITCHING) instead of starting on the old release.
+ * - `activeDebates` — the runs with a READY or CLAIMED job, across every release; at `siteConcurrentDebates` (8, the
+ *   runners' own capacity) the question waits in line (SITE_BUSY). The day lock every decision takes makes the count
+ *   and the start one step: two asks never both take the eighth place.
+ *
+ * A room without a gate (every room before C8, and every test that builds none) decides exactly as before.
+ */
+export interface AskAdmissionGate {
+  readonly releaseKey: string;
+  readonly siteConcurrentDebates: number;
+  ownReleaseIsCurrent(tx: Pick<PoolClient, "query">): Promise<boolean>;
+  activeDebates(tx: Pick<PoolClient, "query">): Promise<number>;
+}
+
 export type AskRoomOptions = Readonly<{
   /** A pool of its own: see `withSpendDecisionLock`. */
   lockPool: Pool;
@@ -153,6 +174,8 @@ export type AskRoomOptions = Readonly<{
   closeBasisPoints: number;
   waitingLinePerPerson: number;
   clock?: () => Date;
+  /** Side-by-side C8: the site's cap and the release re-check, asked by `decide` and `startWaiting` only. */
+  gate?: AskAdmissionGate;
 }>;
 
 /** What `PostgresAskApplication` asks of the room (B6a/B6b). */
@@ -192,10 +215,14 @@ export interface AskRoomReader {
   readRoom(question: RoomQuestion): Promise<AskRoomAnswer>;
 }
 
-/** B7b: what trying to start one waiting run came to. */
+/**
+ * B7b: what trying to start one waiting run came to. Side-by-side C8: SITE_BUSY, the site runs its cap of debates;
+ * SWITCHING, this release is not the current one. Either ends the waker's pass, as SITE_FULL does.
+ */
 export type WaitingStart<T> =
   | Readonly<{ kind: "STARTED"; value: T }>
-  | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "FUNDING_FAILED" | "ACCOUNT_HELD" }>;
+  | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "FUNDING_FAILED" | "ACCOUNT_HELD" }>
+  | Readonly<{ kind: "SITE_BUSY" | "SWITCHING" }>;
 
 /** What the waker asks of the room (B7b). */
 export interface AskWaitingLinePort {
@@ -343,6 +370,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     for (const value of [options.dailyCeilingMicros, options.closeBasisPoints, options.waitingLinePerPerson]) {
       if (!Number.isSafeInteger(value) || value < 1) throw new TypeError("ASK_ROOM_OPTIONS_INVALID");
     }
+    const cap = options.gate?.siteConcurrentDebates;
+    if (cap !== undefined && (!Number.isSafeInteger(cap) || cap < 1)) throw new TypeError("ASK_ROOM_OPTIONS_INVALID");
     this.#options = options;
     this.#clock = options.clock ?? (() => new Date());
   }
@@ -354,7 +383,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    */
   async precheck(question: RoomQuestion): Promise<RoomPreview> {
     const now = this.#clock();
-    const evaluation = await this.#evaluate(question, now);
+    const evaluation = await this.#evaluate(question, now, null);
     const admission = evaluation.admission;
     if (admission.kind === "REFUSE_ALREADY_WAITING") throw alreadyWaiting(evaluation);
     return Object.freeze({
@@ -368,10 +397,14 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
 
   async decide<T>(question: RoomQuestion, apply: (context: RoomDecisionContext) => Promise<T>): Promise<T> {
     return this.#locked(question.access.ownerRef, async (tx, now) => {
-      const evaluation = await this.#evaluate(question, now);
+      // Side-by-side C8: the site's cap and the release re-check, in the lock, on the decision's own transaction.
+      const evaluation = await this.#evaluate(question, now, await this.#holdOf(tx));
       const admission = evaluation.admission;
       if (admission.kind === "REFUSE_ALREADY_WAITING") throw alreadyWaiting(evaluation);
-      this.#waitReasons.set(tx, evaluation.waitReason);
+      // A wait the hold alone decides is recorded as the hold (SITE_BUSY or SWITCHING); any other as measured.
+      this.#waitReasons.set(tx, admission.kind === "WAIT" && admission.cause !== undefined
+        ? Object.freeze({ waitsFor: admission.cause, personRecheckAt: null })
+        : evaluation.waitReason);
       const ownerRef = question.access.ownerRef;
       if (ownerRef !== null && this.#options.entitlements !== null) {
         const basis = this.#options.funding === undefined ? this.#subscriptionBasis(await this.#options.entitlements.current(ownerRef, now))
@@ -468,7 +501,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   /** GET /v1/asks/room: the admission's shape, deciding nothing and writing nothing. */
   async readRoom(question: RoomQuestion): Promise<AskRoomAnswer> {
     const now = this.#clock();
-    const evaluation = await this.#evaluate(question, now);
+    // Side-by-side C8: no hold here, so a busy site or a switch never reads as a full room ("today's limit").
+    const evaluation = await this.#evaluate(question, now, null);
     const ownerRef = question.access.ownerRef;
     const grant = this.#options.funding === undefined || ownerRef === null ? null : await this.#options.funding.readGrant(ownerRef,now);
     const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
@@ -527,10 +561,15 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * charge scope and its start mark, then queues its first job on the same
    * transaction, LAST (see `withSpendDecisionLock`): all of it commits, or none.
    * A run that does not fit gets a fresh reason when it changed or is a person's.
+   * Side-by-side C8 (with a gate): a release that is not current starts nothing and writes nothing (SWITCHING), asked
+   * before anything else; a run the room would START while the site runs its cap of debates is held back (SITE_BUSY,
+   * its reason appended only when it was not already SITE_BUSY).
    */
   async startWaiting<T>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>> {
     const access = accessOfWaitingRun(run);
+    const gate = this.#options.gate;
     return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
+      if (gate !== undefined && !(await gate.ownReleaseIsCurrent(tx))) return Object.freeze({ kind: "SWITCHING" as const });
       if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
       const basis = await this.#options.entitlements?.readRunFundingBasis?.(run.runId) ?? null;
       if (basis?.kind === "INTERNAL") {
@@ -569,6 +608,12 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         }
         const siteFull = rooms.some((entry) => entry.scope === "SITE_DAY" && entry.room === "FULL");
         return Object.freeze({ kind: siteFull ? "SITE_FULL" as const : "PERSON_FULL" as const });
+      }
+      if (gate !== undefined && await gate.activeDebates(tx) >= gate.siteConcurrentDebates) {
+        if (run.waitsFor !== "SITE_BUSY") {
+          await this.#options.line.recordReason(tx, run.runId, Object.freeze({ waitsFor: "SITE_BUSY" as const, personRecheckAt: null, at: now }));
+        }
+        return Object.freeze({ kind: "SITE_BUSY" as const });
       }
       await this.#openStartWith(tx, { runId: run.runId, access, heldMicros: estimateMicros, now }, entitlement, basis);
       await this.#options.line.markStarted(tx, run.runId, now);
@@ -646,7 +691,19 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     await this.#options.entitlements.recordRunChargeScope(tx,{runId,ownerRef,basis,admittedAt});
   }
 
-  async #evaluate(question: RoomQuestion, now: Date): Promise<RoomEvaluation> {
+  /**
+   * Side-by-side C8: what holds every new question back right now, read on the decision's transaction: SWITCHING when
+   * this release is not current (the count is then not needed), SITE_BUSY at the site's cap, null otherwise or with no
+   * gate.
+   */
+  async #holdOf(tx: PoolClient): Promise<AdmissionHold | null> {
+    const gate = this.#options.gate;
+    if (gate === undefined) return null;
+    if (!(await gate.ownReleaseIsCurrent(tx))) return "SWITCHING";
+    return await gate.activeDebates(tx) >= gate.siteConcurrentDebates ? "SITE_BUSY" : null;
+  }
+
+  async #evaluate(question: RoomQuestion, now: Date, hold: AdmissionHold | null): Promise<RoomEvaluation> {
     const estimateMicros = await this.#options.estimator.estimateMicros(question.settingsClass);
     const { rooms, personUses, waitReason } = await this.#measure(question.access, estimateMicros, now);
     const waiting = await this.#waitingOf(question.access);
@@ -661,7 +718,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       siteLineBlocking,
       personWaitingCount: waiting.length,
       waitingLinePerPerson: this.#options.waitingLinePerPerson,
-      nextTickAt
+      nextTickAt,
+      hold
     });
     return Object.freeze({
       admission, rooms, personUses, waitReason, estimateMicros, waiting, expected: waitingUntil({ rooms, nextTickAt })

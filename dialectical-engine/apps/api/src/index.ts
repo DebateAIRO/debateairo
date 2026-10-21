@@ -5354,7 +5354,8 @@ export class PostgresAskApplication implements AskApplication {
    * (`RUN_SETUP_FAILED:DISPATCH`, PR #33). A premium question whose owner is now
    * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
    * line. The tick stops at the first run the site's day cannot hold, because
-   * nobody after it fits the day; a run whose own person is full is skipped. A
+   * nobody after it fits the day (side-by-side C8: likewise at a busy site or on
+   * a release that is not current); a run whose own person is full is skipped. A
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
@@ -5411,7 +5412,9 @@ export class PostgresAskApplication implements AskApplication {
           })));
           continue;
         }
-        if (outcome.kind === "SITE_FULL") {
+        // Side-by-side C8: a busy site (its cap of debates) or a release that is not current holds back every run
+        // after this one too, so the pass ends here, as for a full site's day.
+        if (outcome.kind === "SITE_FULL" || outcome.kind === "SITE_BUSY" || outcome.kind === "SWITCHING") {
           stopped = true;
           break;
         }

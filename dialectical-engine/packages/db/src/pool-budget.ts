@@ -77,6 +77,14 @@ export const SUPPORT_CONTROL_PLANE_POOL = budget("support:control", 2, 200);
  */
 export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
 
+/**
+ * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8): the debates the whole site runs at once, across every
+ * release side by side. The API starts a debate only while fewer runs than this have a READY or CLAIMED job (counted in
+ * the spend-decision lock, `AskAdmissionGate.activeDebates`); otherwise the question waits in line (SITE_BUSY). It is
+ * the runners' own capacity, so two releases' runners together never take more debates than one runner was sized for.
+ */
+export const SITE_CONCURRENT_DEBATES: number = RUNNER_CAPACITY.concurrentRuns;
+
 export const RUNNER_DATABASE_POOLS = Object.freeze({
   runtime: budget("runner:runtime", RUNNER_CAPACITY.concurrentRuns * 3 + 8, 5_000),
   // Only the running debates' claim renewals (apps/runner/src/run-keep-alive.ts).

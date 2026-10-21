@@ -182,7 +182,7 @@ import {
 } from "./account-erasure.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
-import { PostgresReleaseStateReader, ReleaseWatcher } from "./release-state.js";
+import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
@@ -617,7 +617,10 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         ...(fundedAllowance === undefined ? {} : {funding:fundedAllowance}),
         dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
         closeBasisPoints: band.closeBasisPoints,
-        waitingLinePerPerson: band.waitingLinePerPerson
+        waitingLinePerPerson: band.waitingLinePerPerson,
+        // Side-by-side spec §9, §13 (plan C8): at most SITE_CONCURRENT_DEBATES debates across releases, and an ask
+        // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
+        gate: new PostgresAskAdmissionGate({ releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted" })
       });
       // B7a (the usage read) and B8 (the server-decided ask and its coarse fit)
       // reuse these same instances and this one readiness answer.
