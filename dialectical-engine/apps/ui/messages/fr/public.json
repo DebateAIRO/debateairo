@@ -209,6 +209,6 @@
   "public.publication.contentCheck.stillPrivate": "Votre débat reste privé et inchangé. Vous seul pouvez le voir.",
   "public.publication.contentCheck.appeal": "Pour demander à une personne de réexaminer cette décision, écrivez à office@dezbatere.ro dans un délai de six mois.",
   "public.publication.contentCheck.unavailable": "La vérification du contenu est momentanément indisponible. Rien n’a donc été publié. Votre débat reste privé. Réessayez dans quelques minutes.",
-  "public.publication.approvalRequired": "Ce débat a besoin de notre approbation avant de pouvoir être publié.",
-  "public.publication.checkingDebate": "Vérification du débat..."
+  "public.publication.approvalRequired": "Ce débat nécessite notre approbation avant de pouvoir être publié.",
+  "public.publication.checkingDebate": "Vérification du débat…"
 }

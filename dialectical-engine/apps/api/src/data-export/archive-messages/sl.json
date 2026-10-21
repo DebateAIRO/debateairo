@@ -23,8 +23,8 @@
   "archive.verdict.clear": "Brez težav",
   "archive.verdict.noSynthesis": "Brez sinteze",
   "archive.verdict.unavailable": "Ni na voljo",
-  "archive.category.terrorism": "Možen terorizem",
-  "archive.category.hateSpeech": "sovražni govor kakršne koli vrste",
-  "archive.category.suicideOrHarm": "nagnjenost k samomoru ali škodovanju drugim ljudem",
-  "archive.category.weaponsOrDrugs": "izdelovanje orožja ali drog"
+  "archive.category.terrorism": "Morebitni terorizem",
+  "archive.category.hateSpeech": "sovražni govor katere koli vrste",
+  "archive.category.suicideOrHarm": "nagnjenja k samomoru ali škodovanju drugim ljudem",
+  "archive.category.weaponsOrDrugs": "izdelava orožja ali drog"
 }

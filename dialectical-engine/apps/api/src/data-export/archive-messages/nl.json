@@ -25,6 +25,6 @@
   "archive.verdict.unavailable": "Niet beschikbaar",
   "archive.category.terrorism": "Mogelijk terrorisme",
   "archive.category.hateSpeech": "haatzaaiende uitlatingen van welke aard dan ook",
-  "archive.category.suicideOrHarm": "neigingen tot zelfdoding of het schaden van anderen",
-  "archive.category.weaponsOrDrugs": "wapens of drugs maken"
+  "archive.category.suicideOrHarm": "neigingen tot zelfdoding of het schaden van andere mensen",
+  "archive.category.weaponsOrDrugs": "het maken van wapens of drugs"
 }

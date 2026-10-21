@@ -24,7 +24,7 @@
   "archive.verdict.noSynthesis": "Немає синтезу",
   "archive.verdict.unavailable": "Недоступно",
   "archive.category.terrorism": "Можливий тероризм",
-  "archive.category.hateSpeech": "мова ненависті будь-якого виду",
-  "archive.category.suicideOrHarm": "схильність до самогубства або заподіяння шкоди іншим людям",
-  "archive.category.weaponsOrDrugs": "виготовлення зброї чи наркотиків"
+  "archive.category.hateSpeech": "мова ворожнечі будь-якого виду",
+  "archive.category.suicideOrHarm": "схильності до самогубства або до заподіяння шкоди іншим людям",
+  "archive.category.weaponsOrDrugs": "виготовлення зброї або наркотиків"
 }

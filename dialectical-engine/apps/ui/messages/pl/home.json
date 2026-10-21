@@ -123,13 +123,13 @@
   "home.crisisSupport.back": "Wróć do mojego pytania",
   "home.crisisSupport.chooseCountry": "Wybierz swój kraj, aby zobaczyć dostępne telefony zaufania.",
   "home.crisisSupport.emergencyAnywhere": "Jeśli Tobie lub komuś innemu grozi bezpośrednie niebezpieczeństwo, zadzwoń teraz pod lokalny numer alarmowy.",
-  "home.flag.flagged": "Oznaczone flagą",
+  "home.flag.flagged": "OZNACZONA",
   "home.removal.title": "Usunęliśmy tę debatę",
-  "home.removal.what": "Nie przechowujemy go i nie można go przywrócić.",
+  "home.removal.what": "Nie przechowujemy jej i nie można jej przywrócić.",
   "home.removal.reach": "Tylko ta debata została usunięta. Twoje konto i inne debaty są nietknięte.",
-  "home.removal.facts": "Nasza automatyczna kontrola wniosków wykazała „skłonność do samobójstw lub krzywdzenia innych ludzi”. Nikt nam tego nie zgłosił i nikt tego nie przeczytał.",
-  "home.removal.automatic": "Decyzja ta została podjęta przez zautomatyzowane narzędzie, bez udziału żadnej osoby.",
-  "home.removal.ground": "Podstawa: nasze Warunki Świadczenia Usług, sekcja 9 (debaty, które usuwa nasz czek).",
-  "home.removal.complain": "Aby złożyć skargę, napisz na adres office@dezbatere.ro w ciągu sześciu miesięcy. Skarga nie może przywrócić debaty.",
-  "home.removal.close": "Zamknięty"
+  "home.removal.facts": "Nasza automatyczna kontrola jej konkluzji wykazała „skłonności do samobójstwa lub krzywdzenia innych osób”. Nikt nam jej nie zgłosił i żaden człowiek jej nie przeczytał.",
+  "home.removal.automatic": "Decyzję podjęło narzędzie automatyczne, bez udziału człowieka.",
+  "home.removal.ground": "Podstawa: nasze Warunki świadczenia usług, punkt 9 (debaty, które usuwa nasza kontrola).",
+  "home.removal.complain": "Aby złożyć skargę, napisz na office@dezbatere.ro w ciągu sześciu miesięcy. Skarga nie może przywrócić debaty.",
+  "home.removal.close": "Zamknij"
 }

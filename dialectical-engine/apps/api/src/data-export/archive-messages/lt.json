@@ -24,7 +24,7 @@
   "archive.verdict.noSynthesis": "Nėra apibendrinimo",
   "archive.verdict.unavailable": "Nepasiekiama",
   "archive.category.terrorism": "Galimas terorizmas",
-  "archive.category.hateSpeech": "bet kokia neapykantos kalba",
-  "archive.category.suicideOrHarm": "polinkis į savižudybę ar kitų žmonių žalojimą",
-  "archive.category.weaponsOrDrugs": "ginklų ar narkotikų gamyba"
+  "archive.category.hateSpeech": "bet kokios rūšies neapykantos kalba",
+  "archive.category.suicideOrHarm": "polinkiai į savižudybę arba kenkimą kitiems žmonėms",
+  "archive.category.weaponsOrDrugs": "ginklų ar narkotikų gaminimas"
 }

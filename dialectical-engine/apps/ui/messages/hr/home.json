@@ -122,13 +122,13 @@
   "home.crisisSupport.back": "Natrag na moje pitanje",
   "home.crisisSupport.chooseCountry": "Odaberite svoju državu kako biste vidjeli njezine linije za pomoć.",
   "home.crisisSupport.emergencyAnywhere": "Ako ste vi ili netko drugi u neposrednoj opasnosti, odmah nazovite lokalni broj za hitne slučajeve.",
-  "home.flag.flagged": "Obilježeno zastavicom",
+  "home.flag.flagged": "OZNAČENO",
   "home.removal.title": "Izbrisali smo ovu raspravu",
-  "home.removal.what": "Ne čuvamo ga i ne može se vratiti.",
-  "home.removal.reach": "Izbrisana je samo ova rasprava. Tvoj račun i ostale rasprave su netaknute.",
-  "home.removal.facts": "Naša automatska provjera njegovog zaključka otkrila je \"sklonost samoubojstvu ili nanošenju štete drugim ljudima\". Nitko nam to nije prijavio i nitko to nije pročitao.",
-  "home.removal.automatic": "Ova je odluka donesena automatiziranim alatom, bez uključene osobe.",
-  "home.removal.ground": "Utemeljitev: naši Uvjeti korištenja, odjeljak 9. (raspravlja o brisanju naših čekova).",
-  "home.removal.complain": "Da biste se žalili, pišite na office@dezbatere.ro u roku od šest mjeseci. Pritužba ne može vratiti raspravu.",
-  "home.removal.close": "Zatvori"
+  "home.removal.what": "Ne čuvamo je i ne može se vratiti.",
+  "home.removal.reach": "Izbrisana je samo ova rasprava. Vaš račun i vaše ostale rasprave su netaknuti.",
+  "home.removal.facts": "Naša automatska provjera njezina zaključka utvrdila je „sklonosti samoubojstvu ili nanošenju štete drugim ljudima”. Nitko nam je nije prijavio i nijedna je osoba nije pročitala.",
+  "home.removal.automatic": "Ovu je odluku donio automatizirani alat, bez sudjelovanja osobe.",
+  "home.removal.ground": "Osnova: naši Uvjeti korištenja, odjeljak 9 (rasprave koje naša provjera briše).",
+  "home.removal.complain": "Da biste uložili pritužbu, pišite na office@dezbatere.ro u roku od šest mjeseci. Pritužba ne može vratiti raspravu.",
+  "home.removal.close": "Zatvorite"
 }

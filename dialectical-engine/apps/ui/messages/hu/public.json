@@ -208,6 +208,6 @@
   "public.publication.contentCheck.stillPrivate": "A vitája privát és változatlan marad. Csak Ön láthatja.",
   "public.publication.contentCheck.appeal": "Ha szeretné, hogy egy ember felülvizsgálja ezt a döntést, hat hónapon belül írjon az office@dezbatere.ro címre.",
   "public.publication.contentCheck.unavailable": "A tartalomellenőrzés jelenleg nem érhető el, ezért semmit sem tettünk közzé. A vitája privát marad. Próbálja újra néhány perc múlva.",
-  "public.publication.approvalRequired": "Ezt a vitát a közzététel előtt jóvá kell hagynunk.",
+  "public.publication.approvalRequired": "Ehhez a vitához szükséges a jóváhagyásunk, mielőtt közzé lehetne tenni.",
   "public.publication.checkingDebate": "A vita ellenőrzése…"
 }

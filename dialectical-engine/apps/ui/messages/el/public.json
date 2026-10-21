@@ -208,6 +208,6 @@
   "public.publication.contentCheck.stillPrivate": "Η συζήτησή σας παραμένει ιδιωτική και αμετάβλητη. Μόνο εσείς μπορείτε να τη δείτε.",
   "public.publication.contentCheck.appeal": "Για να ζητήσετε από έναν άνθρωπο να επανεξετάσει αυτή την απόφαση, γράψτε στο office@dezbatere.ro εντός έξι μηνών.",
   "public.publication.contentCheck.unavailable": "Ο έλεγχος περιεχομένου δεν είναι διαθέσιμος αυτή τη στιγμή, οπότε δεν δημοσιεύτηκε τίποτα. Η συζήτησή σας παραμένει ιδιωτική. Δοκιμάστε ξανά σε λίγα λεπτά.",
-  "public.publication.approvalRequired": "Αυτή η συζήτηση χρειάζεται την έγκρισή μας πριν δημοσιευτεί.",
-  "public.publication.checkingDebate": "Έλεγχος της συζήτησης..."
+  "public.publication.approvalRequired": "Αυτή η αντιπαράθεση χρειάζεται την έγκρισή μας πριν μπορέσει να δημοσιευθεί.",
+  "public.publication.checkingDebate": "Έλεγχος της αντιπαράθεσης…"
 }

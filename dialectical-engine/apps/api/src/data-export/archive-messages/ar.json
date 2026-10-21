@@ -18,13 +18,13 @@
   "archive.unreadable": "تعذّرت قراءة محتوى هذه المناظرة لأن مفتاحها أُتلف.",
   "archive.noDebates": "ليس لديك مناظرات.",
   "archive.filesNote": "تحتوي ملفات JSON في أرشيف ZIP هذا على البيانات نفسها بصيغة قابلة للمعالجة آليًا؛ ويسردها ملف README.txt.",
-  "archive.contentCheck": "فحص المحتوى",
+  "archive.contentCheck": "مراجعة المحتوى",
   "archive.verdict.flagged": "مُعلَّم",
-  "archive.verdict.clear": "واضح",
-  "archive.verdict.noSynthesis": "لا توجد خلاصة",
+  "archive.verdict.clear": "لا توجد مشكلات",
+  "archive.verdict.noSynthesis": "لا يوجد تركيب",
   "archive.verdict.unavailable": "غير متاح",
-  "archive.category.terrorism": "إرهاب محتمل",
-  "archive.category.hateSpeech": "خطاب كراهية من أي نوع",
-  "archive.category.suicideOrHarm": "ميول إلى الانتحار أو إيذاء أشخاص آخرين",
-  "archive.category.weaponsOrDrugs": "صنع أسلحة أو مخدرات"
+  "archive.category.terrorism": "الإرهاب المحتمل",
+  "archive.category.hateSpeech": "خطاب الكراهية بأي شكل كان",
+  "archive.category.suicideOrHarm": "النزعات إلى الانتحار أو إيذاء الآخرين",
+  "archive.category.weaponsOrDrugs": "صنع الأسلحة أو المخدرات"
 }

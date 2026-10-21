@@ -19,12 +19,12 @@
   "archive.noDebates": "Nincsenek vitái.",
   "archive.filesNote": "A ZIP-archívumban lévő JSON-fájlok ugyanazokat az adatokat géppel olvasható formában tartalmazzák; a README.txt felsorolja őket.",
   "archive.contentCheck": "Tartalomellenőrzés",
-  "archive.verdict.flagged": "Megjelölve",
+  "archive.verdict.flagged": "Megjelölt",
   "archive.verdict.clear": "Rendben",
   "archive.verdict.noSynthesis": "Nincs szintézis",
   "archive.verdict.unavailable": "Nem érhető el",
   "archive.category.terrorism": "Lehetséges terrorizmus",
-  "archive.category.hateSpeech": "bármilyen gyűlöletbeszéd",
-  "archive.category.suicideOrHarm": "öngyilkosságra vagy mások bántalmazására való hajlam",
-  "archive.category.weaponsOrDrugs": "fegyverek vagy kábítószerek készítése"
+  "archive.category.hateSpeech": "bármilyen jellegű gyűlöletbeszéd",
+  "archive.category.suicideOrHarm": "öngyilkosságra vagy mások bántására irányuló hajlamok",
+  "archive.category.weaponsOrDrugs": "fegyverek vagy drogok készítése"
 }

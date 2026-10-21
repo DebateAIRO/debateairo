@@ -123,13 +123,13 @@
   "home.crisisSupport.back": "Grįžti prie mano klausimo",
   "home.crisisSupport.chooseCountry": "Pasirinkite savo šalį, kad pamatytumėte jos pagalbos linijas.",
   "home.crisisSupport.emergencyAnywhere": "Jei jums ar kam nors kitam gresia tiesioginis pavojus, nedelsdami skambinkite vietiniu skubios pagalbos numeriu.",
-  "home.flag.flagged": "Pažymėta",
-  "home.removal.title": "Ištrynėme šią diskusiją",
-  "home.removal.what": "Mes jos nelaikome ir jos negalima atkurti.",
-  "home.removal.reach": "Ištrinta tik ši diskusija. Jūsų paskyra ir kitos diskusijos nebus paveiktos.",
-  "home.removal.facts": "Automatiškai tikrindami jo išvadą nustatėme „polinkį į savižudybę ar kitų žmonių žalojimą“. Niekas mums apie tai nepranešė ir niekas neperskaitė.",
-  "home.removal.automatic": "Šis sprendimas buvo priimtas automatizuotu įrankiu, nedalyvaujant jokiam asmeniui.",
-  "home.removal.ground": "Pagrindas: mūsų paslaugų teikimo sąlygų 9 skyrius (diskusijos dėl mūsų čekio ištrynimo).",
-  "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius rašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti diskusijos.",
-  "home.removal.close": "Užverti"
+  "home.flag.flagged": "PAŽYMĖTA",
+  "home.removal.title": "Ištrynėme šiuos debatus",
+  "home.removal.what": "Mes jų nesaugome, ir jų atkurti negalima.",
+  "home.removal.reach": "Ištrinti tik šie debatai. Jūsų paskyra ir kiti jūsų debatai lieka nepaveikti.",
+  "home.removal.facts": "Mūsų automatinė jų baigiamosios išvados patikra nustatė: „polinkiai į savižudybę arba kenkimą kitiems žmonėms“. Niekas mums apie juos nepranešė, ir joks žmogus jų neskaitė.",
+  "home.removal.automatic": "Šį sprendimą priėmė automatinė priemonė, nedalyvaujant jokiam žmogui.",
+  "home.removal.ground": "Pagrindas: mūsų Paslaugų teikimo sąlygos, 9 skyrius (debatai, kuriuos ištrina mūsų patikra).",
+  "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius parašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti debatų.",
+  "home.removal.close": "Uždaryti"
 }
