@@ -9,15 +9,15 @@ import { createNetopiaPayments, createSecretToken } from "@debateai/payments-net
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { AdjustableTaxEngine, testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
-  recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY, type RecordingAudit
+  recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY, testCardToken, type RecordingAudit
 } from "../support/billingSubscriptionFixtures.js";
 import { startFakeNetopia } from "../support/fake-netopia.js";
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
-import { sealBillingProfile, type BillingProfile } from "../../apps/api/src/billing/records.js";
+import { sealBillingProfile, sealCardToken, sealQuoteLocation, type BillingProfile } from "../../apps/api/src/billing/records.js";
 import { RenewalService } from "../../apps/api/src/billing/renewal.js";
-import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
+import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 
 let database: TestDatabase;
@@ -857,5 +857,182 @@ describe("F8 a renewal whose first state NETOPIA reports is VOIDED, never seen p
     const { verify, audit } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
     expect(await verify.handle(verifyJob(retry.chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
     await endsWithoutDunning(run, retry.chargeId, emailsBefore, audit, 2);
+  });
+});
+
+// Kept last: its 72-hour tick runs `runOnce` over every plan of this file's database, through this test's own port.
+describe("B1 at most 2 saved-card sends per card in 24 hours (NETOPIA Q22)", () => {
+  /** This payer's saved-card calls, in the order they were made (the port also serves the file's other plans). */
+  const sendsOf = (run: Due) => run.payments.charges.filter((sent) => sent.payer.email === run.email);
+  const capped = (run: Due) => run.audit.events.filter((entry) => entry.event === "billing.renewal.send_capped");
+
+  it("an unknown outcome: never more than 2 sends in any 24 hours, and a third only once the first is more than a day old", async () => {
+    const run = await due();
+    const sentAt: number[] = [];
+    for (let call = 0; call < 100; call += 1) {
+      run.payments.answer(run.email, () => {
+        sentAt.push(run.clock.now.getTime());
+        return paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout");
+      });
+    }
+    // The 60-second tick, sampled every 10 minutes for 72 hours: the renewal, its probes and its resends.
+    const start = run.clock.now.getTime();
+    for (let elapsed = 0; elapsed <= 72 * HOUR; elapsed += 10 * MINUTE) {
+      run.clock.now = new Date(start + elapsed);
+      await run.renewal.runOnce();
+    }
+    expect(sendsOf(run)).toHaveLength(sentAt.length);
+    // Not vacuous: the renewal went out, was resent, and was resent again a day later.
+    expect(sentAt.length).toBeGreaterThanOrEqual(3);
+    for (const [index, sent] of sentAt.entries()) {
+      // Every 24-hour span ending at a send (both ends included, as `since` is) holds at most 2 sends.
+      const inSpan = sentAt.filter((other) => other <= sent && sent - other <= DAY);
+      expect(inSpan.length, `send ${index} at +${(sent - start) / MINUTE} min`).toBeLessThanOrEqual(2);
+    }
+    expect(sentAt[2]! - sentAt[0]!).toBeGreaterThan(DAY);
+    // Each capped pass says so with one content-free line.
+    expect(capped(run).length).toBeGreaterThan(0);
+    expect(capped(run)[0]!.fields).toEqual({ attempt: 1 });
+    const charge = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .filter((row) => row.kind === "RENEWAL");
+    expect(charge.map((row) => row.attempt)).toEqual([1]);
+  }, 600_000);
+
+  it("a card change on a day the old card already used both sends: the new card is charged at once (Review Focus 6)", async () => {
+    const run = await due();
+    // Send 1: the answer is lost. Send 2, the resend 31 minutes later: declined, code 20 (retried by itself, B2).
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const first = await renewNow(run);
+    const unknownAt = run.clock.now.getTime();
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { declineCode: "20", bankDeclined: true }));
+    run.clock.now = new Date(unknownAt + 31 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(first.chargeId)).toBe(true);
+    expect((await trail(first.chargeId)).slice(-3)).toEqual(["REQUESTED:RESEND_STARTED", "SUBMITTED", "FAILED:PAYMENT_DECLINED"]);
+    expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
+    expect(sendsOf(run)).toHaveLength(2);
+    const jobs = new BillingJobQueries(database.pool);
+    const changeCard = async (cardTokenId: string) => run.repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, run.ownerRef);
+      const state = foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId, client));
+      await run.repository.appendSubscriptionEvent(client, subscriptionEvent(state, "CARD_CHANGED", run.clock.now,
+        { retry_now: true }, { cardTokenId }));
+    });
+    // Control: the person confirms the SAME card, asking for a retry now. Its 2 sends of the last hour hold it.
+    run.clock.now = new Date(unknownAt + 40 * MINUTE);
+    await changeCard(run.seeded.cardTokenId);
+    run.clock.now = new Date(unknownAt + 41 * MINUTE);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts(run)).toEqual([1]);
+    expect(sendsOf(run)).toHaveLength(2);
+    expect(run.audit.events.filter((entry) => entry.event === "billing.renewal.retry_held"
+      && entry.fields.code === "SAVED_CARD_DAILY_LIMIT")).toHaveLength(1);
+    // A NEW card, stored now: its sends count from its storage, so the retry charges it at once.
+    run.clock.now = new Date(unknownAt + 45 * MINUTE);
+    const newTokenId = randomUUID();
+    const newToken = ["tok", "changed", newTokenId.slice(0, 8)].join("-");
+    const sealed = sealCardToken(TEST_RECORDS_KEY, newTokenId, testCardToken(newToken));
+    await run.repository.withTransaction((client) => run.repository.insertCardToken(client, {
+      tokenId: newTokenId, customerId: run.seeded.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+      // A card change brings its card from a payment of its own; any charge of the plan stands in for it here.
+      sourceChargeId: run.seeded.initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: run.clock.now,
+      tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId, expMonth: 12, expYear: 2031, last4: "4343",
+      cardCountry: "RO", createdAt: run.clock.now
+    }));
+    await changeCard(newTokenId);
+    run.payments.answer(run.email, (input) => report(input.orderId, "PENDING"));
+    run.clock.now = new Date(unknownAt + 46 * MINUTE);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts(run)).toEqual([1, 2]);
+    const retry = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .find((row) => row.kind === "RENEWAL" && row.attempt === 2)!;
+    expect(run.payments.chargesOf(retry.chargeId)).toHaveLength(1);
+    expect(run.payments.chargesOf(retry.chargeId)[0]!.cardToken.reveal()).toBe(newToken);
+    expect(sendsOf(run)).toHaveLength(3);
+  });
+
+  it("an outage is not counted: four calls that never reached NETOPIA, then the fifth goes out", async () => {
+    const run = await due();
+    for (let call = 0; call < 4; call += 1) {
+      run.payments.answer(run.email, () => paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "429"));
+    }
+    run.payments.answer(run.email, (input) => report(input.orderId, "PENDING"));
+    const charge = await renewNow(run);
+    const firstAt = run.clock.now.getTime();
+    // The not-sent backoff: 1, 5, 15, then 60 minutes after each not-sent call.
+    for (const minutes of [1, 1 + 5, 1 + 5 + 15, 1 + 5 + 15 + 60]) {
+      run.clock.now = new Date(firstAt + minutes * MINUTE);
+      expect(await run.renewal.recoverOpenCharge(charge.chargeId)).toBe(true);
+    }
+    expect(run.payments.chargesOf(charge.chargeId)).toHaveLength(5);
+    expect(await trail(charge.chargeId)).toEqual([
+      "REQUESTED", "REQUESTED:CHARGE_NOT_SENT",
+      "REQUESTED:RESEND_STARTED", "REQUESTED:CHARGE_NOT_SENT",
+      "REQUESTED:RESEND_STARTED", "REQUESTED:CHARGE_NOT_SENT",
+      "REQUESTED:RESEND_STARTED", "REQUESTED:CHARGE_NOT_SENT",
+      "REQUESTED:RESEND_STARTED", "SUBMITTED"
+    ]);
+    expect(capped(run)).toEqual([]);
+  });
+
+  /**
+   * Two counted sends of this plan's card at `first` and `second` (an answer lost, then a resend NETOPIA declined), on
+   * a RENEWAL charge of the CURRENT month: the stand-in for an earlier renewal's sends, which the period's own renewal
+   * never reads as its own charge.
+   */
+  async function seedTwoSends(run: Due, first: Date, second: Date): Promise<void> {
+    const quoteId = randomUUID();
+    const chargeId = randomUUID().replaceAll("-", "");
+    const location = sealQuoteLocation(TEST_RECORDS_KEY, quoteId, {
+      name: null, country: "RO", region: null, postalCode: null, city: null, street: null, ip: "192.0.2.10", ipCountry: "RO",
+      company: null
+    });
+    await run.repository.withTransaction(async (client) => {
+      await run.repository.insertQuote(client, {
+        quoteId, ownerRef: run.ownerRef, planId: "PLUS", kind: "RENEWAL", netMicros: 20_000_000, taxMicros: 4_200_000,
+        totalMicros: 24_200_000, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2_100, taxStatus: "TAXABLE",
+        taxName: "VAT", quadernoRef: null, createdAt: first, expiresAt: new Date(first.getTime() + 30 * MINUTE),
+        locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null, currency: "USD"
+      });
+      await run.repository.insertCharge(client, {
+        chargeId, ownerRef: run.ownerRef, subscriptionId: run.seeded.subscriptionId, kind: "RENEWAL", attempt: 1,
+        periodStart: run.seeded.periodStart, periodEnd: run.seeded.periodEnd, quoteId, netMicros: 20_000_000,
+        taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: first, paymentProvider: "netopia",
+        paymentEnvironment: "sandbox"
+      });
+      const fields = (errorCode: string | null, providerPaymentId: string | null = null) =>
+        ({ providerPaymentId, amountMicros: 24_200_000, errorCode });
+      for (const event of [
+        chargeEvent(chargeId, "REQUESTED", first, fields(null)),
+        chargeEvent(chargeId, "SUBMIT_UNKNOWN", first, fields("CHARGE_OUTCOME_UNKNOWN")),
+        chargeEvent(chargeId, "REQUESTED", second, fields("RESEND_STARTED")),
+        chargeEvent(chargeId, "SUBMITTED", second, fields(null, `ntp-${chargeId.slice(0, 16)}`)),
+        chargeEvent(chargeId, "FAILED", second, fields("PAYMENT_DECLINED", `ntp-${chargeId.slice(0, 16)}`))
+      ]) {
+        await run.repository.appendChargeEvent(client, event);
+      }
+    });
+  }
+
+  it("a renewal due on a day its card already made 2 sends is held (Q-1), and charged once the first is more than a day old", async () => {
+    const run = await due();
+    const dueAt = run.clock.now.getTime();
+    await seedTwoSends(run, new Date(dueAt - 2 * HOUR), new Date(dueAt - HOUR));
+    expect(await run.renewal.renew(run.seeded.subscriptionId)).toBe("skipped");
+    expect(await renewalAttempts(run)).toEqual([1]);
+    expect(sendsOf(run)).toHaveLength(0);
+    expect(capped(run).map((entry) => entry.fields)).toEqual([{ attempt: 1 }]);
+    expect(run.audit.events).toContainEqual({ event: "billing.renewal.pending", fields: { code: "SAVED_CARD_DAILY_LIMIT" } });
+    expect(await run.entitlements.current(run.ownerRef, run.clock.now)).toMatchObject({ cause: "RENEWAL_PENDING" });
+    // At 24 hours after the first send it still counts (the span includes both ends).
+    run.clock.now = new Date(dueAt + 22 * HOUR);
+    expect(await run.renewal.renew(run.seeded.subscriptionId)).toBe("skipped");
+    expect(sendsOf(run)).toHaveLength(0);
+    run.clock.now = new Date(dueAt + 22 * HOUR + MINUTE);
+    expect(await run.renewal.renew(run.seeded.subscriptionId)).toBe("charged");
+    expect(sendsOf(run)).toHaveLength(1);
+    const renewal = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .find((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === run.seeded.periodEnd.getTime());
+    expect(renewal).toBeDefined();
+    expect(sendsOf(run)[0]!.orderId).toBe(renewal!.chargeId);
   });
 });

@@ -17,7 +17,8 @@ export type MaintenanceDeps = Readonly<{
   jobs: Pick<BillingJobQueries, "lockOwner" | "withSubscriptionLease" | "liveSubscriptionIds" | "outboxJobExists">;
   entitlements: Pick<EntitlementRepository, "append">;
   renewal: Pick<RenewalService,
-    "submit" | "createRetryCharge" | "retryPrice" | "failUnpricedAttempt" | "taxRefused" | "erasureBlocks" | "earlierAttemptPaid">;
+    | "submit" | "createRetryCharge" | "retryPrice" | "failUnpricedAttempt" | "taxRefused" | "erasureBlocks" | "earlierAttemptPaid"
+    | "savedCardSendAllowed">;
   policy: BillingPolicy;
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
@@ -163,7 +164,8 @@ export class BillingMaintenance {
    * attempt may not be (`dunningProgress().autoRetry`, a PAST_DUE written before B2 reads true) and no card change asked
    * for a retry since, the attempt due on this retry day fails with no charge (`REFUSAL_NOT_RETRIED`): nothing is sent to
    * NETOPIA and nothing is priced, so M5B, M5C and the end keep their days, and their emails ask for a card. An earlier
-   * attempt that may still hold a payment holds it as a retry would be held.
+   * attempt that may still hold a payment holds it as a retry would be held. B1 (Q22): a retry whose card already made
+   * its 2 saved-card sends in the last 24 hours is held (`retry_held` SAVED_CARD_DAILY_LIMIT) and tried on a later pass.
    */
   private async retry(subscriptionId: string, report: MaintenanceReport): Promise<void> {
     const leased = await this.deps.jobs.withSubscriptionLease(subscriptionId, async (): Promise<"RETRIED" | "ENDED" | false> => {
@@ -220,6 +222,12 @@ export class BillingMaintenance {
       const earlier = await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now);
       if (earlier !== "NONE") {
         this.retryHeld(earlier);
+        return false;
+      }
+      // B1 (NETOPIA answers 2026-10-21, Q22), read under this lease right before the charge and its marker are written:
+      // a card that already made its 2 sends in the last 24 hours is not charged now; the next pass tries again.
+      if (!(await this.deps.renewal.savedCardSendAllowed(state, now, next))) {
+        this.deps.audit("billing.renewal.retry_held", { code: "SAVED_CARD_DAILY_LIMIT" });
         return false;
       }
       // Written only if the owner lock's fresh fold still allows it (still PAST_DUE here, no cancel, no erasure).

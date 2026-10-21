@@ -73,8 +73,16 @@ export type BillingAuditEvent =
   | "billing.renewal.price_missing"
   /** N11 (spec §2.9.3, §2.9.4): a NETOPIA renewal's outcome is still open past its window; O3 was queued. The attempt. */
   | "billing.renewal.outcome_open"
-  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or _UNREADABLE). */
+  /**
+   * N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or
+   * _UNREADABLE; B1's SAVED_CARD_DAILY_LIMIT: the card already made its 2 saved-card sends in the last 24 hours).
+   */
   | "billing.renewal.retry_held"
+  /**
+   * B1 (NETOPIA answers 2026-10-21, Q22): a saved-card call was not made because the card already made its 2 sends in
+   * the last 24 hours (NETOPIA allows 3 a day). The attempt, when the caller names it; nothing else.
+   */
+  | "billing.renewal.send_capped"
   /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
   | "billing.renewal.recovered_earlier"
   /**

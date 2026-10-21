@@ -21,6 +21,9 @@ import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import { hostCommand, paidAndRefundedInFull } from "./refunds.js";
 import {
+  NOT_SENT_CODES, OUR_SETUP_CODES, RESEND_STARTED, savedCardSendLeft
+} from "./renewal-markers.js";
+import {
   dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingUntil
 } from "./renewal-rules.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
@@ -111,19 +114,9 @@ function renewable(state: SubscriptionState, now: Date): boolean {
 }
 
 /**
- * A2's call markers and outcomes. Every call is preceded by a committed REQUESTED: the charge's first one (code
- * null) for the first call, `RESEND_STARTED` (the same orderID) for each later one. A call that proves nothing was
- * processed appends a REQUESTED carrying why (`CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`,
- * `CHARGE_CONFIGURATION_REFUSED`, ruling C-8; D5 5i: the request still stands). Only an outcome that may have reached
- * NETOPIA is a SUBMIT_UNKNOWN (`CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), so their count is
- * the count of blind unknowns.
+ * Ruling C-8: the not-sent marker each package error that proves nothing was processed is recorded as. The call markers
+ * and the not-sent codes themselves are renewal-markers.ts's (A2).
  */
-const RESEND_STARTED = "RESEND_STARTED";
-const NOT_SENT_CODES: ReadonlySet<string> = new Set([
-  "CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"
-]);
-/** C-8: the not-sent markers that are our own setup: never closed into the dunning, and the owner is emailed. */
-const OUR_SETUP_CODES: ReadonlySet<string> = new Set(["CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"]);
 const NETOPIA_NOT_SENT = Object.freeze({
   PAYMENT_PROVIDER_UNAVAILABLE: "CHARGE_NOT_SENT",
   PAYMENT_CREDENTIALS_REFUSED: "CHARGE_CREDENTIALS_REFUSED",
@@ -371,6 +364,32 @@ export class RenewalService {
   }
 
   /**
+   * B1 (NETOPIA answers 2026-10-21, Q22: at most 3 saved-card tries a day): whether one more saved-card call may go out
+   * for this subscription now. Allowed while its RENEWAL charges of the last 30 days hold fewer than 2 counted sends
+   * (`savedCardSendLeft`) since `max(now − 24 h, card.createdAt)`: a card's sends start when it was stored, so a new
+   * card after a card change starts from zero. The sends are read per subscription from the charge events (a charge row
+   * does not name its card; no migration), so only a send between a new token's storage and its adoption is
+   * over-counted. No usable card: no NETOPIA call will be made (the CARD_NOT_SAVED path decides), so true. Each caller asks inside the subscription lease it already holds, right
+   * before the call's marker is written, so the renewal tick's recovery and the maintenance retry never both see room
+   * for one more send. False writes one content-free line (`attempt`, when the caller names it).
+   */
+  async savedCardSendAllowed(state: SubscriptionState, now: Date, attempt?: number): Promise<boolean> {
+    const card = await usableSavedCard(this.deps.repository, state, now);
+    if (card === null) return true;
+    const since = new Date(Math.max(now.getTime() - DAY_MS, card.createdAt.getTime()));
+    const lookBack = now.getTime() - PAYMENT_LOOK_BACK_MS;
+    const charges: ChargeWithEvents[] = [];
+    for (const row of await this.deps.repository.chargesForSubscription(state.subscriptionId)) {
+      if (row.kind !== "RENEWAL" || row.createdAt.getTime() < lookBack) continue;
+      const charge = await this.deps.repository.charge(row.chargeId);
+      if (charge !== null) charges.push(charge);
+    }
+    if (savedCardSendLeft(charges, since)) return true;
+    this.deps.audit("billing.renewal.send_capped", attempt === undefined ? {} : { attempt });
+    return false;
+  }
+
+  /**
    * Runs under the subscription lease: the state is folded again here, never trusted from the due list. "dunning":
    * the tax service stayed down past Q-1's window, and the normal dunning started with no charge.
    */
@@ -407,6 +426,12 @@ export class RenewalService {
         break;
       default:
         return exhaustive(decision);
+    }
+    // B1 (NETOPIA Q22), read under this lease right before the charge and its marker are written: a card that already
+    // made its 2 sends in the last 24 hours is not charged now; the plan is kept (Q-1's hold) and a later tick tries again.
+    if (!(await this.savedCardSendAllowed(state, now, 1))) {
+      await this.holdPending(state, periodStart, now, "SAVED_CARD_DAILY_LIMIT");
+      return "skipped";
     }
     const created = await this.createCharge(state, priced, periodStart, now);
     if (created === null) return "skipped";
@@ -1167,7 +1192,8 @@ export class RenewalService {
   /**
    * A resend with the charge's own orderID, its marker committed first (a process that dies during it leaves the marker,
    * which becomes SUBMIT_INTERRUPTED). Without a usable card or payer now: a charge nothing of which reached NETOPIA fails
-   * CARD_NOT_SAVED (`..._CLOSES`); one that may hold a payment is only read on (`..._WAITS`).
+   * CARD_NOT_SAVED (`..._CLOSES`); one that may hold a payment is only read on (`..._WAITS`). B1 (NETOPIA answers
+   * 2026-10-21, Q22): a resend the card's daily allowance holds (`savedCardSendAllowed`) is not made and writes no marker.
    */
   private async resend(
     charge: ChargeWithEvents, state: SubscriptionState, now: Date, missingCard: "CARD_NOT_SAVED_CLOSES" | "CARD_NOT_SAVED_WAITS"
@@ -1185,6 +1211,8 @@ export class RenewalService {
       await this.refused(charge, "CARD_NOT_SAVED", null, now, false);
       return true;
     }
+    // B1 (NETOPIA Q22), under the caller's lease right before the marker: no third send in 24 hours; a later pass resends.
+    if (!(await this.savedCardSendAllowed(state, now, charge.attempt))) return false;
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
       chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: RESEND_STARTED })));
     await this.sendNetopia(charge, state, prepared, true);
