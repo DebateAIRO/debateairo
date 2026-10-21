@@ -658,7 +658,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
 // OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
 // data-export module above. migrate() is unchanged by this.
-const NATIVE_MIGRATE_MODULE_SHA256 = "22de0ff607b2ceabbcb1c851592f7a0be6b103d4d3795defce75f35f4fc48c40";
+// Side-by-side releases A1 (2026-10-21, spec 2026-10-21 §1): the reviewed module after StartRunInput gained releaseKey and
+// startRun stamped core.run.release_key on both insert paths (parseReleaseKey first). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "f70535f5807816adb89536bc7d41b93204f3332303e72edb7e8e909f4e54f8f1";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

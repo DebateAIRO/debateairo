@@ -623,8 +623,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     // prices (spec 2026-10-05 §2.16.6), then role rotation (spec 2026-10-11 Part 3), then the data export (V-41), then the
     // mail-locale step (S01-C05), then the debate shape's map (spec 2026-10-12 §3.4), then the language check's site cost
     // (spec 2026-10-13), then the reclaim resume (spec 2026-10-14), then the reply measures (0120, spec 2026-10-15), then
-    // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122), last (spec
-    // 2026-10-15 engine redesign R3).
+    // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122, spec
+    // 2026-10-15 engine redesign R3), then the side-by-side releases (0123), last (spec 2026-10-21 side-by-side uploads).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -637,7 +637,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });
