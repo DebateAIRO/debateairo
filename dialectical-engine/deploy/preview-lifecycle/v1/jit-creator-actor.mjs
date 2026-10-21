@@ -10,8 +10,8 @@ import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { exactKeys, strictJson } from '../../preview-auth-dev/v1/custody.mjs';
-import { LAYOUT } from './common.mjs';
-import { loadPinnedRelease } from './prestart.mjs';
+import { LAYOUT, runBounded } from './common.mjs';
+import { currentLabel, loadPinnedRelease } from './prestart.mjs';
 import { verifyReleaseForImport } from './release-guard.mjs';
 
 const ENGINE = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}\/dialectical-engine$/;
@@ -49,11 +49,27 @@ export function creatorImportPaths(engine) {
 }
 
 /**
- * This actor is the database superuser's OS identity, so it does not take the release on the
- * caller's word: it reads the pinned API release itself, requires the engine it was handed to be
- * exactly that release, and runs the launchers' source check before importing anything from it.
+ * Root's release-table reader runs psql through `runuser -u postgres --`, which only root may use.
+ * This actor already is the postgres user, so it runs the same psql argv without that prefix, and
+ * nothing else.
  */
-export async function verifyCreatorRelease({ engine, loadPinned = () => loadPinnedRelease({ service: 'api' }), guard = verifyReleaseForImport }) {
+export function asPostgresRun(run = runBounded) {
+  return (argv, options) => {
+    if (argv[0] !== LAYOUT.runuser || argv[1] !== '-u' || argv[2] !== 'postgres' || argv[3] !== '--') return Promise.reject(Object.assign(new Error('STAFF_JIT_RELEASE_REFUSED'), { code: 'STAFF_JIT_RELEASE_REFUSED' }));
+    return run(argv.slice(4), options);
+  };
+}
+
+/** Side-by-side spec §10: the current release's pinned API release, read by this actor itself. */
+const loadCurrentApi = async () => loadPinnedRelease({ service: 'api', label: await currentLabel({ layout: LAYOUT, run: asPostgresRun() }) });
+
+/**
+ * This actor is the database superuser's OS identity, so it does not take the release on the
+ * caller's word: it reads the current release's pinned API release itself (the release table names
+ * the current release), requires the engine it was handed to be exactly that release, and runs the
+ * launchers' source check before importing anything from it.
+ */
+export async function verifyCreatorRelease({ engine, loadPinned = loadCurrentApi, guard = verifyReleaseForImport }) {
   try {
     const { entry, plan } = await loadPinned();
     if (engine !== `${entry.sourceRoot}/dialectical-engine`) refuse('STAFF_JIT_RELEASE_REFUSED');
