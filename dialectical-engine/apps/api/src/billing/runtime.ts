@@ -31,6 +31,7 @@ import { QuoteService } from "./quote.js";
 import { BillingReconciler } from "./reconcile.js";
 import { RefundDesk } from "./refunds.js";
 import { RenewalService } from "./renewal.js";
+import { remindHeldRenewals } from "./renewal-resume.js";
 import { registerRetiredJobs } from "./retired-jobs.js";
 import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
 import { createInitialSettlement } from "./settlement-initial.js";
@@ -320,7 +321,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
   const ownerJobs = new OwnerJobs({
     billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
-    audit: deps.audit, clock: deps.clock, custody, refunds
+    audit: deps.audit, clock: deps.clock, custody, refunds,
+    heldRenewals: {
+      remindOwner: (now) => remindHeldRenewals({ repository, jobs, paymentEnvironment: deps.connectors.paymentEnvironment }, now)
+    }
   });
   outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
   const scheduleOwnerJobs = createCoalescingSingleFlight(

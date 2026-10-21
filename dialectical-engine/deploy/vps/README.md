@@ -2512,7 +2512,10 @@ tried twice in the last 24 hours).`, or `Nothing to resume: no
 renewal is waiting for you.` when none is held, so running it twice sends nothing twice. Each renewal released gets a
 fresh 24 hours: one released after its 72 hours is still sent, and its paid features come back once it is paid. A
 `Busy:` line means some renewals were being worked on at that moment: run it again a minute later. If NETOPIA refuses
-again, you get a new O3 and the renewal waits again.
+again, you get a new O3 and the renewal waits again. While any renewal waits for you, the daily owner job reminds you
+(O3 `RENEWAL_HELD`, with both commands) every third day, and every day in the last 3 days before one can no longer be
+sent: the resume command reaches a renewal only in the 30 days after it was made. One older than that is not sent any
+more; the tax summary lists it with the payments to check (`PAYMENT_UNSETTLED`).
 
 The company's tax codes are not `api.env` settings. In `COMPANY` (`apps/ui/lib/legal/pages.ts`), fill `cui` with the
 CUI as digits only, never with `RO`, and `vat` with `{ kind: "registered", number: "RO…" }`, the RO VAT code (`RO`

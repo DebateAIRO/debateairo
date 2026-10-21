@@ -17,7 +17,7 @@ import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, sealCardToken, sealQuoteLocation, type BillingProfile } from "../../apps/api/src/billing/records.js";
 import { RenewalService } from "../../apps/api/src/billing/renewal.js";
-import { resumeHeldRenewals } from "../../apps/api/src/billing/renewal-resume.js";
+import { remindHeldRenewals, resumeHeldRenewals } from "../../apps/api/src/billing/renewal-resume.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 
@@ -453,6 +453,19 @@ describe("N11 ruling C-8, B1: a refusal caused by our own setup waits for the ow
     expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", `charge ${charge.chargeId}`)).toHaveLength(0);
     expect(await emails(`M5A:${charge.chargeId}`)).toHaveLength(0);
     expect(await pendingHolds(run)).toBe(1);
+
+    // Follow-up of B1: three days after the refusal the daily owner job reminds the owner, naming this charge and the
+    // resume command (the count holds every renewal this file left held).
+    const third = new Date(start + 72 * HOUR);
+    expect(await remindHeldRenewals({
+      repository: run.repository, jobs: new BillingJobQueries(database.pool), paymentEnvironment: "sandbox"
+    }, third)).toBeGreaterThan(0);
+    const reminders = await outboxRows(
+      "kind = 'EMAIL' AND ref = $1 AND payload->>'param.reasonCode' = 'RENEWAL_HELD'", [`O3:RENEWAL_HELD:${third.toISOString().slice(0, 10)}`]
+    );
+    expect(reminders).toHaveLength(1);
+    expect(String(reminders[0]!.payload["param.nextSteps"])).toContain(`charge ${charge.chargeId}: waiting since `);
+    expect(String(reminders[0]!.payload["param.nextSteps"])).toContain("/usr/bin/pnpm billing:renewal-resume");
   }, 600_000);
 
   it("an unknown outcome whose resend our own setup refused stays held at the window's end on NO_SUCH_ORDER: no close, no M5, reads go on; a resume sends it once more", async () => {
