@@ -8,6 +8,8 @@ import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
 import publicEnglish from "../messages/en/public.json";
+import composeEnglish from "../messages/en/compose.json";
+import composeRomanian from "../messages/ro/compose.json";
 import { PublicDebateOverview } from "./PublicDebateOverview.js";
 import "./StaffAccessPanel.css";
 
@@ -138,7 +140,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       <div className="staffSectionHead"><h2 className="staffSectionTitle">{snapshot.question}</h2></div>
       <p className="setCardHint">{t(catalog, "staff.reviews.askedAt", { date: formatDate(locale, snapshot.asked_at, { dateStyle: "medium", timeStyle: "short" }) })}</p>
       {categories(snapshot.categories)}
-      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} viewingNote="NONE" onDetails={() => {}} onRead={() => {}} />
+      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => {}} onRead={() => {}} />
       <div className="staffActions">
         <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button>
         <button className="setBtn" type="button" disabled={busy} onClick={() => { void decide("APPROVE"); }}>{t(catalog, "staff.reviews.approve")}</button>
