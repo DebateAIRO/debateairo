@@ -102,6 +102,27 @@ export function crisisCountryOptions(locale: string): readonly Readonly<{ code: 
     .sort((left, right) => collator.compare(left.name, right.name));
 }
 
+// Server markup and the browser's first hydration render must use the same
+// names and order. ICU region labels differ across Node and browser releases
+// (notably HK); localized labels replace these after hydration.
+export const STABLE_CRISIS_COUNTRY_OPTIONS: readonly Readonly<{ code: string; name: string }>[] = Object.freeze(([
+  ["AR", "Argentina"], ["AU", "Australia"], ["AT", "Austria"], ["BE", "Belgium"],
+  ["BR", "Brazil"], ["BG", "Bulgaria"], ["CA", "Canada"], ["CL", "Chile"],
+  ["CO", "Colombia"], ["HR", "Croatia"], ["CY", "Cyprus"], ["CZ", "Czechia"],
+  ["DK", "Denmark"], ["EE", "Estonia"], ["FI", "Finland"], ["FR", "France"],
+  ["DE", "Germany"], ["GR", "Greece"], ["HK", "Hong Kong SAR China"],
+  ["HU", "Hungary"], ["IS", "Iceland"], ["IN", "India"], ["ID", "Indonesia"],
+  ["IE", "Ireland"], ["IL", "Israel"], ["IT", "Italy"], ["JP", "Japan"],
+  ["LV", "Latvia"], ["LT", "Lithuania"], ["LU", "Luxembourg"], ["MY", "Malaysia"],
+  ["MT", "Malta"], ["MX", "Mexico"], ["MD", "Moldova"], ["NL", "Netherlands"],
+  ["NZ", "New Zealand"], ["NO", "Norway"], ["PE", "Peru"], ["PL", "Poland"],
+  ["PT", "Portugal"], ["RO", "Romania"], ["SG", "Singapore"], ["SK", "Slovakia"],
+  ["SI", "Slovenia"], ["ZA", "South Africa"], ["KR", "South Korea"],
+  ["ES", "Spain"], ["SE", "Sweden"], ["CH", "Switzerland"], ["TW", "Taiwan"],
+  ["TR", "Türkiye"], ["UA", "Ukraine"], ["AE", "United Arab Emirates"],
+  ["GB", "United Kingdom"], ["US", "United States"], ["VN", "Vietnam"]
+] as const).map(([code, name]) => Object.freeze({ code, name })));
+
 /**
  * The country Cloudflare reports for the page request (`cf-ipcountry`), read by the server
  * pages. Only a hint for which helplines to show first: a wrong or forged value costs nothing

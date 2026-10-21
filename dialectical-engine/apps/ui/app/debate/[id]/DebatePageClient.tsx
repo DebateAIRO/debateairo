@@ -715,6 +715,8 @@ export default function DebatePageClient({
   const [removedByCheck, setRemovedByCheck] = useState(false);
   const heldRef = useRef(held);
   const removedByCheckRef = useRef(false);
+  const seenRunRef = useRef(initialDebate !== null);
+  const noticeTakingRef = useRef(false);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
   const [floor, setFloor] = useState<AnswerFloor | null>(initialFloor);
   const [mapView, setMapView] = useState<DebateMapView | null>(initialMapView);
@@ -807,6 +809,7 @@ export default function DebatePageClient({
         locale
       });
       if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
+      seenRunRef.current = true;
       setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       const checking = bundle.kind === "loading" && bundle.run.state === "SETTLED"
         && bundle.run.synthesis_check === "CHECKING";
@@ -858,7 +861,9 @@ export default function DebatePageClient({
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
-      if (heldRef.current && exc instanceof ContractHttpError && exc.code === "NOT_FOUND") {
+      if (seenRunRef.current && exc instanceof ContractHttpError && exc.code === "NOT_FOUND") {
+        if (noticeTakingRef.current) return;
+        noticeTakingRef.current = true;
         try {
           if ((await contractClient.takeRemovalNotice()).notice) {
             showRemovalNotice();
@@ -866,7 +871,10 @@ export default function DebatePageClient({
           }
         } catch {
           // The ordinary not-found screen remains the fallback.
+        } finally {
+          noticeTakingRef.current = false;
         }
+        if (removedByCheckRef.current) return;
       }
       heldRef.current = false;
       setHeld(false);
@@ -910,10 +918,12 @@ export default function DebatePageClient({
   }, [publicMode,privateDeletionStatus,refresh]);
 
   useEffect(() => {
-    if (!held || removedByCheck) return;
-    const timer = setInterval(() => { void refresh(true); }, 5_000);
+    if (removedByCheck || (!held && (debate === null || debateTerminal))) return;
+    // A settled run can enter the check without a new visible event while the
+    // existing stream stays open. A bounded owner read discovers that hold.
+    const timer = setInterval(() => { void refresh(true); }, held ? 5_000 : 15_000);
     return () => clearInterval(timer);
-  }, [held, removedByCheck, refresh]);
+  }, [debate, debateTerminal, held, removedByCheck, refresh]);
 
   useEffect(() => {
     setScoringState({ status: "idle", data: null, error: null });
@@ -1537,9 +1547,12 @@ export default function DebatePageClient({
   }
   if (held || removedByCheck) {
     return <div className="debateView">
+      {removedByCheck ? null : <h1 className="srOnly" lang={readQuestionLocale ?? storyLocale}
+        dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</h1>}
       <header className="debateTopBar" data-debate-reference-chrome>
         <div className="debateTopIdentityRow">
           <BrandMark />
+          <span className="debateTopDivider" aria-hidden />
           {removedByCheck ? null : <div className="debateTopClaim"><span className="debateTopTitle">{debate?.topic}</span></div>}
         </div>
         <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><DebateLocaleAndModeControls /></div>

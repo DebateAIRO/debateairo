@@ -733,7 +733,8 @@ export function hiddenNodeScoreThresholdFromDeployment(deployment: Deployment): 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
   const servedRunRefs = new Set(index.items.map((item) => item.run_ref));
   const served = index.items.map((item) => ({
-    id: item.answer_id,
+    // A held answer has no answer read yet; its page must use the owner-visible run id.
+    id: item.synthesis_check === "CHECKING" ? item.run_ref : item.answer_id,
     topic: item.question_line,
     status: "complete",
     created_at: "",

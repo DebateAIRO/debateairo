@@ -66,6 +66,22 @@ describe("S01 publication refusal", () => {
     node.remove();
   });
 
+  it("routes a resumed Publish removal to the debate's once-only notice", async () => {
+    const node = document.createElement("div"); document.body.append(node);
+    const root = createRoot(node);
+    const onRemovedByCheck = vi.fn();
+    const proof = { step_up_grant: { action: "PUBLISH", target_run_id: "run-1", token: "test-token",
+      expires_at: new Date(Date.now() + 600_000).toISOString() } };
+    await act(async () => { root.render(<SecurityActionResume catalog={{}} settingsCatalog={{}}
+      publicCatalog={publicCatalog} locale="en" takeProof={() => proof as never}
+      onRemovedByCheck={onRemovedByCheck}
+      client={{ publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
+    act(() => { node.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click(); });
+    await act(async () => { node.querySelector<HTMLButtonElement>("[data-confirm]")?.click(); });
+    expect(onRemovedByCheck).toHaveBeenCalledWith("run-1");
+    act(() => root.unmount()); node.remove();
+  });
+
   it("keeps the existing unavailable sentence for a 503", async () => {
     const flow = setup(async () => { throw refusal(503, "PUBLICATION_CHECK_UNAVAILABLE"); });
     await publish(flow);

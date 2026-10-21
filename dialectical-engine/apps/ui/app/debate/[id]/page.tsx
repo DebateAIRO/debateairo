@@ -8,6 +8,10 @@ import { createServerContractClient } from "@/lib/serverApi";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { CheckRemovalNotice, CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
 import { AiNotice } from "@/components/AiNotice";
+import { BrandMark } from "@/components/TopBar";
+import { AccountMenu } from "@/components/AccountMenu";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ModeToggle } from "@/components/ModeToggle";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -134,6 +138,10 @@ export default async function DebatePage({
         const taken = await createServerContractClient(fetch, token, userAgent, readTrustedClientIp(await headers())).takeRemovalNotice();
         if (taken.notice) {
           return <div className="debateView">
+            <header className="debateTopBar" data-debate-reference-chrome>
+              <div className="debateTopIdentityRow"><BrandMark /><span className="debateTopDivider" aria-hidden /></div>
+              <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><LanguageSwitcher /><ModeToggle compact /></div>
+            </header>
             <div className="debateAiDisclosure"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} /></div>
             <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={countryHint} />
           </div>;

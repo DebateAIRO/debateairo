@@ -24,6 +24,7 @@ export interface StoryEncryptedOwner {
   readonly ownerRef: string;
   readonly sessionId: string;
   readonly secretRoot: string;
+  readonly runKeys: FileRunContentKeyStore;
 }
 
 type StartRunInput = Parameters<RunRepository["startRun"]>[0];
@@ -52,11 +53,12 @@ export async function provisionStoryEncryptedOwner(pool: Pool): Promise<StoryEnc
   );
   const users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
   await users.store(userId, generateDek());
-  configureContentEncryption(pool, new ContentCipher(new FileRunContentKeyStore(secretRoot, users, async (candidate) => {
+  const runKeys = new FileRunContentKeyStore(secretRoot, users, async (candidate) => {
     if (candidate !== ownerRef) throw new Error("OWNER_REF_UNRESOLVED");
     return userId;
-  })));
-  return Object.freeze({ userId, ownerRef, sessionId, secretRoot });
+  });
+  configureContentEncryption(pool, new ContentCipher(runKeys));
+  return Object.freeze({ userId, ownerRef, sessionId, secretRoot, runKeys });
 }
 
 export async function releaseStoryEncryptedOwner(owner: StoryEncryptedOwner): Promise<void> {

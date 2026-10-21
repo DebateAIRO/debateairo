@@ -6,17 +6,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DebatesBuffer, PublicDebatesBuffer } from "../../apps/ui/components/DebatesBuffer";
 import { SynthesisHoldRefresher } from "../../apps/ui/components/SynthesisHoldRefresher";
-import DebatePageClient from "../../apps/ui/app/debate/[id]/DebatePageClient";
-import { debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter";
+import DebatePage from "../../apps/ui/app/debate/[id]/page";
+import { debateDetailFromRunProjection, debateSummariesFromIndex } from "../../apps/ui/lib/v3/adapter";
 import home from "../../apps/ui/messages/en/home.json";
 import publicCatalog from "../../apps/ui/messages/en/public.json";
 import time from "../../apps/ui/messages/en/time.json";
 import type { DebateSummary } from "../../apps/ui/lib/types";
 
-const refresh = vi.fn();
+const { refresh, serverRead } = vi.hoisted(() => ({ refresh: vi.fn(), serverRead: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "en", catalog: home }) }));
-afterEach(() => { vi.useRealTimers(); refresh.mockClear(); });
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
+vi.mock("@/lib/serverApi", async (original) => ({ ...(await original() as object),
+  readSessionCookie: () => "test-session", readTrustedClientIp: () => null,
+  getDebateServer: serverRead, questionLanguageTagOf: () => null }));
+vi.mock("@/lib/i18n/server", () => ({ loadNamespace: async (_locale: string, namespace: string) =>
+  namespace === "home" ? home : namespace === "public" ? publicCatalog : namespace === "time" ? time : {} }));
+afterEach(() => { vi.useRealTimers(); refresh.mockClear(); serverRead.mockReset(); });
 
 const row: DebateSummary = {
   id: "run-1",
@@ -49,8 +55,12 @@ describe("S01 owner library card", () => {
   });
 
   it("shows the still checking state instead of the result", () => {
-    const html = ownerMarkup({ ...row, synthesis_flag: { verdict: "FLAGGED" }, synthesis_check: "CHECKING" });
+    const summaries = debateSummariesFromIndex({ items: [{ answer_id: "answer-1", run_ref: "run-1",
+      question_line: row.topic, created_at_sequence: 1, synthesis_flag: { verdict: "FLAGGED" },
+      synthesis_check: "CHECKING", models: [] }], open_runs: [], limit: 10, offset: 0, total: 1 } as never);
+    const html = ownerMarkup(summaries[0]);
     expect(html).toContain("Checking the debate…");
+    expect(html).toContain('href="/debate/run-1"');
     expect(html).toContain('data-state="generating"');
     expect(html).not.toContain('data-flagged="true"');
     expect(html).not.toContain('class="libFlagMark"');
@@ -90,13 +100,13 @@ describe("S01 owner library card", () => {
     expect(start).toBeLessThan(css.indexOf("/* === consent-ui S01 === */"));
   });
 
-  it("keeps the owner's debate page free of the library flag before Publish", () => {
+  it("keeps the real owner debate page free of the library flag before Publish", async () => {
     const detail = debateDetailFromRunProjection({ run_ref: "run-1", question_line: row.topic,
       state: "SETTLED", hold_until: null, waits_until: null, waits_for: null } as never);
-    const html = renderToStaticMarkup(<DebatePageClient id="run-1"
-      initialDebate={{ ...detail, status: "complete", synthesis_flag: { verdict: "FLAGGED" } } as never}
-      timeCatalog={time} homeCatalog={home} publicCatalog={publicCatalog}
-      storyLocale="en" storyCatalog={publicCatalog} />);
+    serverRead.mockResolvedValue({ ok: true,
+      debate: { ...detail, status: "complete", synthesis_flag: { verdict: "FLAGGED" } },
+      answer: null, floor: null, mapView: null });
+    const html = renderToStaticMarkup(await DebatePage({ params: Promise.resolve({ id: "run-1" }) }));
     expect(html).not.toContain("data-flagged");
     expect(html).not.toContain("libFlagMark");
     expect(html).not.toContain(">FLAGGED<");

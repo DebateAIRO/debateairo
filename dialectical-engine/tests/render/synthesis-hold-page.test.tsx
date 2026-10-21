@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createRoot, hydrateRoot } from "react-dom/client";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import DebatePageClient from "../../apps/ui/app/debate/[id]/DebatePageClient";
 import DebatePage from "../../apps/ui/app/debate/[id]/page";
@@ -12,10 +12,10 @@ import home from "../../apps/ui/messages/en/home.json";
 import publicCatalog from "../../apps/ui/messages/en/public.json";
 import time from "../../apps/ui/messages/en/time.json";
 
-const { takeNotice, serverRead } = vi.hoisted(() => ({ takeNotice: vi.fn(), serverRead: vi.fn() }));
+const { takeNotice, serverRead, stream } = vi.hoisted(() => ({ takeNotice: vi.fn(), serverRead: vi.fn(), stream: vi.fn() }));
 vi.mock("@/lib/api", async (original) => {
   const actual = await original() as Record<string, unknown>;
-  return { ...actual, contractClient: { ...(actual.contractClient as object), takeRemovalNotice: takeNotice } };
+  return { ...actual, contractClient: { ...(actual.contractClient as object), takeRemovalNotice: takeNotice, streamEvents: stream } };
 });
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "en", catalog: home }) }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
@@ -27,7 +27,14 @@ vi.mock("@/lib/serverApi", async (original) => ({ ...(await original() as object
   createServerContractClient: () => ({ takeRemovalNotice: takeNotice }) }));
 vi.mock("@/lib/i18n/server", () => ({ loadNamespace: async (_locale: string, namespace: string) =>
   namespace === "home" ? home : namespace === "public" ? publicCatalog : {} }));
-afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); takeNotice.mockReset(); serverRead.mockReset(); document.body.innerHTML = ""; });
+beforeEach(() => { stream.mockImplementation((_id: string, _emit: unknown, signal: AbortSignal) =>
+  new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }))); });
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); takeNotice.mockReset(); serverRead.mockReset(); stream.mockReset(); document.body.innerHTML = ""; });
+
+const running = debateDetailFromRunProjection({
+  run_ref: "run-1", question_line: "Should the city change its plan?", state: "RUNNING",
+  hold_until: null, waits_until: null, waits_for: null
+} as never);
 
 const held = debateDetailFromRunProjection({
   run_ref: "run-1", question_line: "Should the city change its plan?", state: "SETTLED",
@@ -42,6 +49,8 @@ describe("S01 held debate page", () => {
     expect(html).toContain("Should the city change its plan?");
     expect(html).toContain('class="checkingNotice"');
     expect(html).toContain("Checking the debate…");
+    expect(html).toContain('<h1 class="srOnly"');
+    expect(html).toContain('class="debateTopDivider"');
     expect(html).not.toContain("Publication controls");
     expect(html).not.toContain("The full story");
   });
@@ -100,7 +109,10 @@ describe("S01 held debate page", () => {
     await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={held} initialPending
       timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home}
       storyLocale="en" storyCatalog={publicCatalog} />); });
+    expect(takeNotice).toHaveBeenCalledTimes(1);
+    await act(async () => { await Promise.resolve(); });
     expect(node.querySelector('[data-dialog="removal-notice"]')).not.toBeNull();
+    expect(node.querySelector(".debateTopDivider")).not.toBeNull();
     expect(node.querySelector(".debateTopClaim")).toBeNull();
     expect(node.textContent).not.toContain("Should the city change its plan?");
     expect(takeNotice).toHaveBeenCalledTimes(1);
@@ -152,8 +164,99 @@ describe("S01 held debate page", () => {
     serverRead.mockResolvedValue({ ok: false, kind: "not_found" });
     takeNotice.mockResolvedValueOnce({ notice: true }).mockResolvedValueOnce({ notice: false });
     const shown = await DebatePage({ params: Promise.resolve({ id: "run-1" }) });
-    expect(renderToStaticMarkup(shown)).toContain("We deleted this debate");
+    const markup = renderToStaticMarkup(shown);
+    expect(markup).toContain("We deleted this debate");
+    expect(markup).toContain('class="debateTopBar"');
+    expect(markup).toContain('class="debateTopDivider"');
+    expect(markup).toContain('data-mode-toggle="true"');
     await expect(DebatePage({ params: Promise.resolve({ id: "run-1" }) })).rejects.toThrow("NEXT_NOT_FOUND_TEST");
     expect(takeNotice).toHaveBeenCalledTimes(2);
+  });
+
+  it("hydrates the removed page without losing the topbar mode control", async () => {
+    serverRead.mockResolvedValue({ ok: false, kind: "not_found" });
+    takeNotice.mockResolvedValue({ notice: true });
+    const shown = await DebatePage({ params: Promise.resolve({ id: "run-1" }) });
+    const node = document.createElement("div");
+    node.innerHTML = renderToString(shown);
+    document.body.append(node);
+    const priorLanguages = Object.getOwnPropertyDescriptor(navigator, "languages");
+    Object.defineProperty(navigator, "languages", { configurable: true, value: ["en-US"] });
+    const originalOf = Intl.DisplayNames.prototype.of;
+    vi.spyOn(Intl.DisplayNames.prototype, "of").mockImplementation(function (this: Intl.DisplayNames, code: string) {
+      return code === "HK" ? "Hong Kong" : originalOf.call(this, code);
+    });
+    const recovered: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(node, shown,
+        { onRecoverableError: (error) => recovered.push(error) }); });
+      expect(recovered).toEqual([]);
+      expect(node.querySelector('[data-mode-toggle="true"]')).not.toBeNull();
+    } finally {
+      await act(async () => { root?.unmount(); });
+      if (priorLanguages) Object.defineProperty(navigator, "languages", priorLanguages);
+      else delete (navigator as { languages?: readonly string[] }).languages;
+      node.remove();
+    }
+  });
+
+  it("learns the hold while an already-open live stream has not closed", async () => {
+    vi.useFakeTimers();
+    let closeStream = () => {};
+    stream.mockImplementation((_id: string, emit: (event: unknown) => void) => new Promise<void>((resolve) => {
+      emit({ event_id: "e-1", event_type: "run.running", run_ref: "run-1", at_sequence: 1, payload: { phase: "RUNNING" } });
+      closeStream = resolve;
+    }));
+    vi.spyOn(api, "getDebateBundle")
+      .mockResolvedValueOnce({ kind: "loading", detail: running, run: { state: "RUNNING" }, questionLanguage: null } as never)
+      .mockResolvedValue({ kind: "loading", detail: held, run: { state: "SETTLED", synthesis_check: "CHECKING" }, questionLanguage: null } as never);
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
+    await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={running} initialPending
+      timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
+    expect(stream).toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(30_000); });
+    expect(node.querySelector(".checkingNotice")).not.toBeNull();
+    await act(async () => { closeStream(); });
+    act(() => root.unmount()); node.remove();
+  });
+
+  it("drops a streamed draft and tree when run.terminal leads into the hold", async () => {
+    vi.useFakeTimers();
+    const tree = running.tree!;
+    const prior = { ...running, tree: { ...tree, children: [{ ...tree, id: "draft", claim: "Sensitive draft", children: [] }] } };
+    stream.mockImplementation((_id: string, emit: (event: unknown) => void) => {
+      emit({ event_id: "terminal-1", event_type: "run.terminal", run_ref: "run-1", at_sequence: 2,
+        payload: { state: "SETTLED" } });
+      return new Promise<void>(() => {});
+    });
+    vi.spyOn(api, "getDebateBundle")
+      .mockResolvedValueOnce({ kind: "loading", detail: prior, run: { state: "RUNNING" }, questionLanguage: null } as never)
+      .mockResolvedValue({ kind: "loading", detail: held, run: { state: "SETTLED", synthesis_check: "CHECKING" }, questionLanguage: null } as never);
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
+    await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={prior} initialPending
+      timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
+    expect(node.querySelector(".checkingNotice")).not.toBeNull();
+    expect(node.textContent).not.toContain("Sensitive draft");
+    act(() => root.unmount()); node.remove();
+  });
+
+  it("takes the once-only notice when a live run vanishes before it entered the held view", async () => {
+    vi.useFakeTimers();
+    let closeStream = () => {};
+    stream.mockImplementation(() => new Promise<void>((resolve) => { closeStream = resolve; }));
+    const missing = Object.assign(Object.create(ContractHttpError.prototype), { code: "NOT_FOUND", serverCode: "NOT_FOUND", status: 404 });
+    vi.spyOn(api, "getDebateBundle")
+      .mockResolvedValueOnce({ kind: "loading", detail: running, run: { state: "RUNNING" }, questionLanguage: null } as never)
+      .mockRejectedValue(missing);
+    takeNotice.mockResolvedValue({ notice: true });
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
+    await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={running} initialPending
+      timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
+    await act(async () => { vi.advanceTimersByTime(30_000); });
+    await act(async () => { closeStream(); });
+    expect(node.querySelector('[data-dialog="removal-notice"]')).not.toBeNull();
+    expect(takeNotice).toHaveBeenCalledTimes(1);
+    act(() => root.unmount()); node.remove();
   });
 });

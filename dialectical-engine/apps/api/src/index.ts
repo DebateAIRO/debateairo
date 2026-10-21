@@ -3850,9 +3850,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? snapshotRunEventItems(snapshot(signal))
         : tailRunEvents({
           snapshot,
-          mark: markSignal => application.eventMark === undefined
-            ? Promise.resolve(null)
-            : application.eventMark(runId.data, request.session, ownership, markSignal),
+          mark: async markSignal => {
+            // The owner may enter the synthesis hold while this SSE response is
+            // open. Stop the stream before a heartbeat or a later event reveals
+            // any private progress from the held run.
+            if (await access.stateOf({ runId: runId.data }) !== "SHOW") return null;
+            return application.eventMark === undefined
+              ? null : application.eventMark(runId.data, request.session, ownership, markSignal);
+          },
           signal,
           ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
           ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
@@ -3936,21 +3941,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
       };
       let answer: Answer | null;
-      let erased: unknown;
       try { answer = await contentLease.run(contentLease.readAnswer); }
       catch (error) {
         if (!(error instanceof TypedDomainError) || error.code !== "PRIVATE_CONTENT_ERASED") throw error;
         answer = null;
-        erased = error;
       }
       if (answer === null) {
         const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
         const ownerRef = ownershipFor(request).ownerRef;
-        if (ownerRef !== null && await access.stateOf({ runId: runId.data }) === "REMOVED"
+        if (ownerRef !== null && await access.ownerOf?.(runId.data) === ownerRef
+          && await access.stateOf({ runId: runId.data }) === "REMOVED"
           && await access.removalNoticeExists(ownerRef)) {
           return reply.status(410).send({ error: DEBATE_REMOVED_BY_CHECK, message: DEBATE_REMOVED_BY_CHECK });
         }
-        if (erased !== undefined) throw erased;
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const synthesisDecision = await (options.synthesisPublishGate ?? UNCONFIGURED_SYNTHESIS_PUBLISH_GATE).decide({
