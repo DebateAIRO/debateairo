@@ -1,8 +1,8 @@
 // Side-by-side spec §10: each release reads its own env files, derived from the live ones. Only the keys that must
 // differ per release change; every other line is copied byte for byte. The SAME checks prove two releases share the
 // spending gates, the scope and the team, and never share a worker identity or a port.
-import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { afterAll, describe, expect, it } from 'vitest';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const releaseEnv = await import('../../deploy/' + 'preview-lifecycle/v1/release-env.mjs');
@@ -136,7 +136,7 @@ describe('sameChecks', () => {
     const results = sameChecks([older, newer]);
     expect(bad(results)).toEqual([]);
     expect(results.map(result => result.check)).toEqual(expect.arrayContaining([
-      'SAME_BUDGET_SOCKET', 'SAME_ANTHROPIC_BUDGET_SOCKET', 'SAME_SCOPE_ID', 'SAME_DEBATEAI_DEPLOYMENT_MODE', 'SAME_HATCHET_WORKFLOW_NAME',
+      'SAME_BUDGET_SOCKET', 'SAME_ANTHROPIC_BUDGET_SOCKET', 'SAME_SCOPE_ID', 'SAME_DEBATEAI_DEPLOYMENT_MODE', 'SAME_HATCHET_WORKFLOW_NAME', 'SAME_PREVIEW_TEAM_USER_IDS_JSON',
       'DIFFERENT_RELEASE_KEY', 'DIFFERENT_RUNNER_WORKER_ID', 'DIFFERENT_HATCHET_WORKER_NAME', 'DIFFERENT_API_PORT', 'DIFFERENT_PORT',
       'SAME_API_RUNNER_PREVIEW_PROVIDER_TEST_CONFIG_JSON:new-v1', 'SAME_API_RUNNER_PREVIEW_TEAM_USER_IDS_JSON:old-v1', 'SAME_UI_API_RELEASE_KEY:new-v1', 'SLOT_API_PORT:old-v1', 'SLOT_PORT:new-v1'
     ]));
@@ -153,6 +153,9 @@ describe('sameChecks', () => {
     expect(bad(sameChecks([older, otherGate]))).toEqual(['SAME_ANTHROPIC_BUDGET_SOCKET']);
     const otherWorkflow = { ...newer, api: { ...newer.api, HATCHET_WORKFLOW_NAME: 'other' }, runner: { ...newer.runner, HATCHET_WORKFLOW_NAME: 'other' } };
     expect(bad(sameChecks([older, otherWorkflow]))).toEqual(['SAME_HATCHET_WORKFLOW_NAME']);
+    // Another team in both of the newer release's files: each release agrees with itself, only the cross check sees it.
+    const otherTeam = { ...newer, api: { ...newer.api, PREVIEW_TEAM_USER_IDS_JSON: '[]' }, runner: { ...newer.runner, PREVIEW_TEAM_USER_IDS_JSON: '[]' } };
+    expect(bad(sameChecks([older, otherTeam]))).toEqual(['SAME_PREVIEW_TEAM_USER_IDS_JSON']);
     // The same slot twice: both ports collide.
     expect(bad(sameChecks([older, release('new-v1', 'A', NEW_KEY)]))).toEqual(['DIFFERENT_API_PORT', 'DIFFERENT_PORT']);
   });
@@ -186,9 +189,13 @@ describe('sameChecks', () => {
 });
 
 describe('release-env.mjs (root CLI)', () => {
+  // Each setup()'s temp folder, removed when the file's tests end (owner clean-up rule).
+  const roots: string[] = [];
+  afterAll(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
   const sink = () => { const lines: string[] = []; return { lines, stream: { write: (text: string) => { lines.push(text); return true; } } }; };
   const setup = () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'release-env-')));
+    roots.push(root);
     const layout = { ...common.LAYOUT, nativePlanRoot: root, ownerUid: me.uid, ownerGid: me.gid };
     for (const service of ['api', 'ui', 'runner'] as const) { writeFileSync(join(root, `${service}.env`), SOURCES[service]); chmodSync(join(root, `${service}.env`), 0o640); }
     const run = async (argv: string[], options: Record<string, unknown> = {}) => {
@@ -236,6 +243,9 @@ describe('release-env.mjs (root CLI)', () => {
     const write = async (path: string, bytes: Buffer, owner: { uid: number; gid: number; mode: number }) => common.atomicWrite(path, Buffer.from(bytes.toString('utf8').replace('API_PORT=3201', 'API_PORT=3101')), owner);
     const result = await run(['derive', '--service', 'api', '--from', join(root, 'api.env'), '--label', 'new-v1', '--slot', 'B', '--release-key', NEW_KEY], { deps: { write } });
     expect([result.code, JSON.parse(result.stderr).reason]).toEqual([1, 'WRITE_VERIFY_FAILED']);
+    // The file is kept for the operator to look at and move aside; until then a rerun refuses.
+    expect(existsSync(join(root, 'api-new-v1.env'))).toBe(true);
+    expect(JSON.parse((await run(['derive', '--service', 'api', '--from', join(root, 'api.env'), '--label', 'new-v1', '--slot', 'B', '--release-key', NEW_KEY])).stderr).reason).toBe('OUTPUT_EXISTS');
   });
 
   it('refuses to overwrite an existing env file', async () => {
@@ -268,13 +278,32 @@ describe('release-env.mjs (root CLI)', () => {
 
   it('refuses wrong arguments and anyone but root on Linux before reading anything', async () => {
     const { run, derive } = setup();
-    for (const argv of [[], ['derive'], ['derive', '--service', 'api'], ['same', '--labels', 'a,b,c'], ['same', '--labels', 'a,a'], ['same', '--labels', 'A'], ['same', '--labels', 'a', '--x', 'y'], ['other']]) {
+    for (const argv of [[], ['derive'], ['derive', '--service', 'api'], ['same', '--labels', 'a,b,c'], ['same', '--labels', 'a,a'], ['same', '--labels', 'A'], ['same', '--labels', 'a', '--x', 'y'], ['other'],
+      ['same', '--slots', 'A'], ['same', '--labels', 'a,b', '--slots', 'A'], ['same', '--labels', 'a', '--slots', 'A,B'], ['same', '--labels', 'a,b', '--slots', 'A,A'],
+      ['same', '--labels', 'a', '--slots', 'C'], ['same', '--labels', 'a', '--slots', 'toString'], ['same', '--labels', 'a', '--slots', 'A', '--slots', 'A'], ['same', '--labels', 'a', '--slots'],
+      ['derive', '--service', 'api', '--from', '/x', '--label', 'n', '--slot', 'A', '--release-key', NEW_KEY, '--slots', 'A']]) {
       expect(JSON.parse((await run(argv)).stderr).reason).toBe('ARGUMENTS_REFUSED');
     }
     expect(JSON.parse((await derive('api', 'new-v1', 'C' as 'A', NEW_KEY)).stderr).reason).toBe('ARGUMENTS_REFUSED');
     expect(JSON.parse((await run(['derive', '--service', 'api', '--from', '/x', '--label', 'n', '--slot', 'A', '--release-key', NEW_KEY], { uid: 1000 })).stderr).reason).toBe('ARGUMENTS_REFUSED');
     expect(JSON.parse((await run(['same', '--labels', 'n'], { uid: 1000 })).stderr).reason).toBe('ACTOR_REFUSED');
     expect(JSON.parse((await run(['same', '--labels', 'n'], { platform: 'darwin' })).stderr).reason).toBe('ACTOR_REFUSED');
+  });
+
+  it('same --slots checks each release against the slot the operator expects', async () => {
+    const { derive, run } = setup();
+    for (const service of ['api', 'ui', 'runner'] as const) { await derive(service, 'old-v1', 'A', OLD_KEY); await derive(service, 'new-v1', 'B', NEW_KEY); }
+    const good = await run(['same', '--labels', 'old-v1,new-v1', '--slots', 'A,B']);
+    expect(good.code).toBe(0);
+    expect(good.stdout).toBe((await run(['same', '--labels', 'old-v1,new-v1'])).stdout);
+    // The releases' files are each in their own slot, but not the ones expected: every slot check of both is BAD.
+    const swapped = await run(['same', '--slots', 'B,A', '--labels', 'old-v1,new-v1']);
+    expect(swapped.code).toBe(1);
+    expect(swapped.stdout.split('\n').filter(line => line.startsWith('BAD '))).toEqual(['old-v1', 'new-v1'].flatMap(label =>
+      ['SLOT_API_PORT', 'SLOT_PORT', 'SLOT_DIALECTICAL_API_BASE'].map(check => `BAD ${check}:${label}`)));
+    // One release alone, in the slot it was derived for and in the other.
+    expect((await run(['same', '--labels', 'new-v1', '--slots', 'B'])).code).toBe(0);
+    expect((await run(['same', '--labels', 'new-v1', '--slots', 'A'])).code).toBe(1);
   });
 
   it('same prints one OK or BAD line per check, and exits 1 on any BAD', async () => {
@@ -295,6 +324,10 @@ describe('release-env.mjs (root CLI)', () => {
     const api = join(root, 'api-new-v1.env');
     writeFileSync(api, readFileSync(api, 'utf8').replace('API_PORT=3201', 'API_PORT=3999'));
     expect(JSON.parse((await run(['same', '--labels', 'old-v1,new-v1'])).stderr)).toEqual({ event: 'PREVIEW_RELEASE_ENV_REFUSED', command: 'same', reason: 'RELEASE_SLOT_UNKNOWN', fields: { label: 'new-v1' } });
+    // Told each release's slot, the slot checks are real: a port that is no slot's is one BAD line, not a refusal.
+    const told = await run(['same', '--labels', 'old-v1,new-v1', '--slots', 'A,B']);
+    expect([told.code, told.stderr]).toEqual([1, '']);
+    expect(told.stdout.split('\n').filter(line => line.startsWith('BAD '))).toEqual(['BAD SLOT_API_PORT:new-v1', 'BAD DIFFERENT_RUNNER_WORKER_ID']);
     // A missing file refuses and names the file's service and label.
     expect(JSON.parse((await run(['same', '--labels', 'old-v1,gone'])).stderr)).toEqual({ event: 'PREVIEW_RELEASE_ENV_REFUSED', command: 'same', reason: 'ENV_FILE_UNREADABLE', fields: { service: 'api', label: 'gone' } });
   });

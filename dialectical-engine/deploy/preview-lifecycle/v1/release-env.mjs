@@ -10,10 +10,14 @@
 //   release-env.mjs derive --service api|ui|runner --from <file> --label <label> --slot A|B --release-key <key>
 //       <file>: /etc/debateai-v3-preview/auth-dev-v1/<service>.env or <service>-<older label>.env (root-owned, 0640).
 //       Writes /etc/debateai-v3-preview/auth-dev-v1/<service>-<label>.env with the source's owner, group and mode;
-//       refuses OUTPUT_EXISTS when that file is already there (it never replaces one).
-//   release-env.mjs same --labels <label>[,<label>]
-//       Prints `OK <check>` or `BAD <check>` per check; exit 1 on any BAD. Each release's slot is the one its own
-//       api file's API_PORT names (the lock does not pin a release yet when this runs, side-by-side plan D15).
+//       refuses OUTPUT_EXISTS when that file is already there (it never replaces one). That check and the write are
+//       two steps: only root writes this folder, so the window between them is root's own (one operator, one run).
+//       A WRITE_VERIFY_FAILED file stays where it is; the operator moves it aside before running derive again.
+//   release-env.mjs same --labels <label>[,<label>] [--slots A|B[,A|B]]
+//       Prints `OK <check>` or `BAD <check>` per check; exit 1 on any BAD. --slots names the slot the operator expects
+//       for each label, in the same order, and the SLOT_* checks hold each release to it. Without it, each release's
+//       slot is the one its own api file's API_PORT names (the lock does not pin a release yet when this runs,
+//       side-by-side plan D15), so SLOT_API_PORT then always passes; the guide passes --slots.
 //
 // Every refusal is one JSON line on stderr and exit 1. Output carries codes, check names, key names, labels, release
 // keys and ports only; never a value read from an env file (they hold secrets and paths to secrets).
@@ -96,15 +100,15 @@ function configField(environment, field) {
 
 const WITHIN_API_RUNNER = Object.freeze([['PREVIEW_PROVIDER_TEST_CONFIG_JSON', false], ['PREVIEW_TEAM_USER_IDS_JSON', false], ['DEBATEAI_DEPLOYMENT_MODE', false], ['REGISTER_VERSION', true], ['RELEASE_KEY', true]]);
 const ACROSS_CONFIG = Object.freeze(['budget_socket', 'anthropic_budget_socket', 'scope_id']);
-const ACROSS_SAME = Object.freeze(['DEBATEAI_DEPLOYMENT_MODE', 'HATCHET_WORKFLOW_NAME']);
+const ACROSS_SAME = Object.freeze(['DEBATEAI_DEPLOYMENT_MODE', 'HATCHET_WORKFLOW_NAME', 'PREVIEW_TEAM_USER_IDS_JSON']);
 const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_ID', 'runner'], ['HATCHET_WORKER_NAME', 'runner'], ['API_PORT', 'api'], ['PORT', 'ui']]);
 
 /**
  * Side-by-side spec §10, the SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
  * preview configuration, the team, the deployment mode, the site version and the release key; its website names the
  * API's release key; its ports and API address are its slot's. Across releases (two only): every API and runner file
- * names the same spending gates and scope, deployment mode and workflow; the release keys, runner identities and ports
- * all differ. Returns every check, OK or not, in a fixed order.
+ * names the same spending gates and scope, deployment mode, workflow and team; the release keys, runner identities
+ * and ports all differ. Returns every check, OK or not, in a fixed order.
  */
 export function sameChecks(releases) {
   if (!Array.isArray(releases) || releases.length < 1 || releases.length > 2
@@ -135,7 +139,8 @@ const custodyOf = layout => ({ root: layout.nativePlanRoot, uid: ownerOf(layout)
 
 async function deriveCommand({ service, from, label, slot, releaseKey }, layout, write) {
   const out = envPathFor(layout, service, label);
-  // Checked before the source is read: a release's file is never replaced, not even by itself.
+  // Checked before the source is read: a release's file is never replaced, not even by itself. atomicWrite's rename
+  // would replace a file created after this check; only root writes the folder, so that window is root's own.
   const present = await lstat(out).then(() => true, error => (error?.code === 'ENOENT' ? false : refuse('OUTPUT_PATH_REFUSED')));
   if (present) refuse('OUTPUT_EXISTS');
   const custody = custodyOf(layout);
@@ -148,6 +153,8 @@ async function deriveCommand({ service, from, label, slot, releaseKey }, layout,
   await write(out, Buffer.from(text, 'utf8'), owner);
   // Read back through the launchers' own reader, with the custody they will demand.
   let readBack;
+  // On WRITE_VERIFY_FAILED the written file is kept (never deleted here); a rerun refuses OUTPUT_EXISTS until the
+  // operator moves it aside.
   try { readBack = await readEnvironmentFile(out, { ...custody, gid: owner.gid }); } catch { refuse('WRITE_VERIFY_FAILED'); }
   if (canonicalJson(readBack) !== canonicalJson(after)) refuse('WRITE_VERIFY_FAILED');
   return Object.freeze({
@@ -164,15 +171,15 @@ function readEnvironmentText(path, custody) {
   });
 }
 
-async function sameCommand({ labels }, layout, stdout) {
+async function sameCommand({ labels, slots }, layout, stdout) {
   const custody = custodyOf(layout);
   const releases = [];
-  for (const label of labels) {
+  for (const [index, label] of labels.entries()) {
     const files = {};
     for (const service of SERVICES) {
       try { files[service] = await readEnvironmentFile(envPathFor(layout, service, label), custody); } catch { refuse('ENV_FILE_UNREADABLE', { service, label }); }
     }
-    const slot = Object.keys(PREVIEW_SLOTS).find(name => PREVIEW_SLOTS[name].apiPort === files.api.API_PORT) ?? refuse('RELEASE_SLOT_UNKNOWN', { label });
+    const slot = slots?.[index] ?? Object.keys(PREVIEW_SLOTS).find(name => PREVIEW_SLOTS[name].apiPort === files.api.API_PORT) ?? refuse('RELEASE_SLOT_UNKNOWN', { label });
     releases.push({ label, slot, ...files });
   }
   const results = sameChecks(releases);
@@ -180,21 +187,28 @@ async function sameCommand({ labels }, layout, stdout) {
   return results.every(({ ok }) => ok) ? 0 : 1;
 }
 
-/** Exact flags, each once; every value checked before any path is touched. */
+/** Exact flags (every required one, any optional one), each once; every value checked before any path is touched. */
 function parseArguments(argv, layout) {
   const [command, ...rest] = argv;
-  const flags = { derive: ['--service', '--from', '--label', '--slot', '--release-key'], same: ['--labels'] }[command];
-  if (!flags || rest.length !== flags.length * 2) refuse('ARGUMENTS_REFUSED');
+  const spec = {
+    derive: { required: ['--service', '--from', '--label', '--slot', '--release-key'], optional: [] },
+    same: { required: ['--labels'], optional: ['--slots'] }
+  }[command];
+  if (!spec || rest.length % 2 !== 0) refuse('ARGUMENTS_REFUSED');
   const options = {};
   for (let index = 0; index < rest.length; index += 2) {
     const [flag, value] = [rest[index], rest[index + 1]];
-    if (!flags.includes(flag) || Object.hasOwn(options, flag) || typeof value !== 'string') refuse('ARGUMENTS_REFUSED');
+    if (!(spec.required.includes(flag) || spec.optional.includes(flag)) || Object.hasOwn(options, flag) || typeof value !== 'string') refuse('ARGUMENTS_REFUSED');
     options[flag] = value;
   }
+  if (!spec.required.every(flag => Object.hasOwn(options, flag))) refuse('ARGUMENTS_REFUSED');
   if (command === 'same') {
     const labels = options['--labels'].split(',');
     if (labels.length > 2 || !labels.every(isLabel) || new Set(labels).size !== labels.length) refuse('ARGUMENTS_REFUSED');
-    return { command, labels };
+    // Two releases never share a slot (side-by-side spec §6), so an expected list naming one twice is a typo.
+    const slots = options['--slots']?.split(',');
+    if (slots && (slots.length !== labels.length || !slots.every(isSlot) || new Set(slots).size !== slots.length)) refuse('ARGUMENTS_REFUSED');
+    return { command, labels, ...(slots ? { slots } : {}) };
   }
   const service = options['--service'], from = options['--from'], label = options['--label'], slot = options['--slot'], releaseKey = options['--release-key'];
   const match = fromPattern(layout).exec(from);
