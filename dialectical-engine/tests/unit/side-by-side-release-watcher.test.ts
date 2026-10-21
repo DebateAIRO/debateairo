@@ -235,6 +235,22 @@ describe("side-by-side C3: the API's release watcher", () => {
     now -= 1;
     expect(w.ownIsCurrent()).toBe(false);
     expect(w.readiness().reasons).toContain("DATABASE_UNREACHABLE");
+    // Stale, not forgotten: the last successful answer (this release) still says "not draining".
+    expect(w.draining()).toBe(false);
+    expect(w.readiness().reasons).not.toContain("NOT_CURRENT");
+    w.stop();
+  });
+
+  it("a wall clock stepped back keeps the last successful answer for draining and NOT_CURRENT while freshness stays false", async () => {
+    current = { releaseKey: NEXT, takeTrafficFrom: new Date(START - 60_000) };
+    const w = watcher(true);
+    await w.start();
+    w.markBooted();
+    expect(w.draining()).toBe(true);
+    now -= 1;
+    expect(w.ownIsCurrent()).toBe(false);
+    expect(w.draining()).toBe(true);
+    expect(w.readiness().reasons).toEqual(["DATABASE_UNREACHABLE", "NOT_CURRENT"]);
     w.stop();
   });
 
@@ -448,5 +464,13 @@ describe("side-by-side C3: the API's release watcher", () => {
     expect(stop).toBeLessThan(source.indexOf("    pool,", pools));
     expect(source.trimEnd().endsWith("releaseWatcher.markBooted();")).toBe(true);
     expect(source.indexOf("releaseWatcher.markBooted();")).toBeGreaterThan(source.indexOf("triggerEmailRecoveryReconciliation();}"));
+  });
+
+  it("main.ts hands the watcher's drain to the shutdown lifecycle (plan C6)", () => {
+    const source = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    const owner = source.indexOf("installStartupResourceOwner({");
+    const drain = source.indexOf("drain: { begin: () => releaseWatcher.beginDrain() },", owner);
+    expect(drain).toBeGreaterThan(owner);
+    expect(drain).toBeLessThan(source.indexOf("databasePools: [", owner));
   });
 });

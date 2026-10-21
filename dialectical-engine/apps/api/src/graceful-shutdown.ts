@@ -158,6 +158,12 @@ export async function drainGracefulShutdownResources(
  * HTTP handlers before `onClose` force-finalizes and durably drains that work.
  * Only after those evidence/mail joins succeed may secret-bearing hashing state,
  * workers, and database handles be destroyed.
+ *
+ * Drain (side-by-side spec §6, plan C6): a signal or the controller close calls
+ * `drain.begin()` before `api.close()`, so every live run-event stream ends with
+ * a clean close at its next poll (tailRunEvents) instead of holding Fastify's
+ * close open until the 20 s deadline. It is called once; a throw is swallowed,
+ * so the drain can never block the shutdown.
  */
 export function installGracefulShutdown(options: Readonly<{
   api: FastifyInstance;
@@ -170,6 +176,7 @@ export function installGracefulShutdown(options: Readonly<{
   logger?: ShutdownLogger;
   deadlineMs?: number;
   escalationGraceMs?: number;
+  drain?: Readonly<{ begin(): void }>;
 }>): Readonly<{ close(reason?: string): Promise<void> }> {
   const shutdownProcess = options.process ?? process;
   const logger = options.logger ?? console;
@@ -187,6 +194,7 @@ export function installGracefulShutdown(options: Readonly<{
   let failureReported = false;
   let signalHandlersInstalled = true;
   let terminationRequested = false;
+  let drainBegun = false;
 
   const drainAdmissions = (): Promise<void> => {
     admissionDrain ??= options.registration.drainRegistrationAdmissions();
@@ -197,6 +205,16 @@ export function installGracefulShutdown(options: Readonly<{
     drainMailDispatches: () => options.registration.drainMailDispatches(),
     drainMailCapacitySignals: () => options.registration.drainMailCapacitySignals(),
     drainRateLimitAuditFlushes: () => options.registration.drainRateLimitAuditFlushes()
+  };
+
+  const beginDrain = (): void => {
+    if (drainBegun) return;
+    drainBegun = true;
+    try {
+      options.drain?.begin();
+    } catch {
+      // The drain only shortens open streams; Fastify's close and the deadline still end them.
+    }
   };
 
   const reportFailure = (): void => {
@@ -328,6 +346,7 @@ export function installGracefulShutdown(options: Readonly<{
       return;
     }
     armDeadline();
+    beginDrain();
     void closeApi().catch(() => {
       terminateAfterRepeatedSignalFailure();
     });
@@ -377,6 +396,7 @@ export function installGracefulShutdown(options: Readonly<{
   return Object.freeze({
     close(_reason = "api.close"): Promise<void> {
       armDeadline();
+      beginDrain();
       return closeApi();
     }
   });

@@ -1741,6 +1741,8 @@ api.addHook("onClose",async()=>{
 });
 const startup = installStartupResourceOwner({
   api,
+  // Side-by-side spec §6 (plan C6): SIGTERM drains first, so live run-event streams close cleanly before api.close().
+  drain: { begin: () => releaseWatcher.beginDrain() },
   registration,
   auditContextHasher,
   argon2Pool,

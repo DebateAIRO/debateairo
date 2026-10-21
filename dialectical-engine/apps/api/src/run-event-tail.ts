@@ -10,8 +10,15 @@
  * work item DONE or FAILED) and nothing new arrived for `settledGraceMs` — a
  * run already settled when the stream opens ends right after its replay; when
  * the run is no longer the caller's (the mark reads null); when the client went
- * away (the abort signal: no further query); or after `maxLifeMs` (the page
- * reconnects). No connection is held between polls.
+ * away (the abort signal: no further query); when this process drains (below);
+ * or after `maxLifeMs` (the page reconnects). No connection is held between polls.
+ *
+ * Drain (side-by-side spec §6, plan C6): once `draining()` answers true — SIGTERM,
+ * or another release took the traffic — the stream ends with a clean close: right
+ * after the replay, or at its next poll, before that poll's mark read. No new event
+ * type is sent (an old page refuses unknown events); the page treats the clean
+ * close as "reconnect after 5 s and replay" (apps/ui/lib/v3/liveEvents.ts), and
+ * every stream ends within about one `pollMs`, well inside Fastify's 20 s close deadline.
  *
  * Before 2026-10-11 the reply ended after the replay and the page reconnected
  * about once a second, spending the whole `publicReads` admission budget of its
@@ -85,10 +92,13 @@ export async function* tailRunEvents(input: Readonly<{
   signal: AbortSignal;
   timing?: Partial<RunEventTailTiming>;
   clock?: RunEventTailClock;
+  /** True once this process drains (side-by-side spec §6); read after the replay and after every sleep. */
+  draining?: () => boolean;
 }>): AsyncGenerator<RunEventTailItem, void, undefined> {
   const timing = { ...RUN_EVENT_TAIL_TIMING, ...input.timing };
   const clock = input.clock ?? SYSTEM_RUN_EVENT_TAIL_CLOCK;
   const { signal } = input;
+  const draining = (): boolean => input.draining?.() === true;
   const sent = new Set<string>();
   let terminal = false;
   const started = clock.now();
@@ -115,7 +125,7 @@ export async function* tailRunEvents(input: Readonly<{
   // the next mark, so it is read again and sent once — never lost.
   let last = await input.mark(signal);
   yield* fresh();
-  if (last === null || terminal || last.settled || signal.aborted) return;
+  if (last === null || terminal || last.settled || signal.aborted || draining()) return;
   let lastChange = clock.now();
 
   while (!signal.aborted) {
@@ -129,7 +139,7 @@ export async function* tailRunEvents(input: Readonly<{
       continue;
     }
     await clock.sleep(Math.min(timing.pollMs, remaining, untilHeartbeat), signal);
-    if (signal.aborted) return;
+    if (signal.aborted || draining()) return;
     const current = await input.mark(signal);
     if (signal.aborted || current === null) return;
     if (current.mark !== last.mark) {

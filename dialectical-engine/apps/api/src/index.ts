@@ -1772,7 +1772,7 @@ export interface ApiOptions {
   /**
    * Side-by-side spec §6 (plan C5): the release watcher's answers behind GET /readyz. Always supplied by main; absent
    * (test compositions), /readyz answers ready with `releaseKey` (null when that is absent too) and no reasons.
-   * `draining` is carried for the drain work that follows (plan C); /readyz reads only `readiness()`.
+   * /readyz reads only `readiness()`; `draining()` ends every live run-event stream at its next poll (plan C6).
    */
   readonly readiness?: Pick<ReleaseWatcher, "readiness" | "draining">;
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
@@ -3835,8 +3835,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       connection: "keep-alive"
     });
     // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
-    // replays the stored events, then follows the run until its terminal event.
+    // replays the stored events, then follows the run until its terminal event — or until this
+    // process drains (side-by-side spec §6, plan C6): a clean close, and the page reconnects and
+    // replays. A replay-only stream (no change mark) ends on its own.
     const application = options.application;
+    const readiness = options.readiness;
     const snapshot = (signal: AbortSignal) => options.application.events(runId.data, request.session, ownership, signal);
     await streamAuthorizedEvents({
       events: signal => application.eventMark === undefined
@@ -3847,6 +3850,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
             ? Promise.resolve(null)
             : application.eventMark(runId.data, request.session, ownership, markSignal),
           signal,
+          ...(readiness === undefined ? {} : { draining: () => readiness.draining() }),
           ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
           ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
         }),

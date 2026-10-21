@@ -26,7 +26,8 @@ import { readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from
  * slot of the 20-connection runtime pool, and the database stops the statement itself (a transaction-local
  * statement_timeout of the same bound). Every log line is content-free: an event code and at most a driver code, never
  * an error's text, a key or a value; a read that fails after stop() prints nothing. A wall clock stepped back
- * invalidates the last read (fail closed until a new read).
+ * makes the last read stale (fail closed until a new read) without forgetting it: draining() and NOT_CURRENT keep the
+ * last successful answer, as they do for an unreachable database (plan C6, from C3's review).
  */
 export type { ReleaseLifecycleState };
 export type ReleaseState = Readonly<{ state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean }>;
@@ -125,7 +126,7 @@ export class ReleaseWatcher {
   /** Each listener and whether it already fired in the current period (reset when a poll sees not current). */
   readonly #listeners = new Map<() => void, { fired: boolean }>();
   #last: LastRead | null = null;
-  /** The latest clock reading: a reading below it is a backward step, which invalidates the last read. */
+  /** The latest clock reading: a reading below it is a backward step, which makes the last read stale. */
   #clockHigh = Number.NEGATIVE_INFINITY;
   #failing = false;
   #wasCurrent = false;
@@ -215,10 +216,15 @@ export class ReleaseWatcher {
     return () => { this.#listeners.delete(own); };
   }
 
-  /** The clock, checked: a backward step drops the last read (stale until a new one) and becomes the new baseline. */
+  /**
+   * The clock, checked: a backward step marks the last read stale (its answer kept for draining() and NOT_CURRENT,
+   * never fresh again until a new read) and becomes the new baseline.
+   */
   #now(): number {
     const now = this.#clock();
-    if (now < this.#clockHigh) this.#last = null;
+    if (now < this.#clockHigh && this.#last !== null) {
+      this.#last = Object.freeze({ ...this.#last, readAt: Number.NEGATIVE_INFINITY });
+    }
     this.#clockHigh = now;
     return now;
   }
