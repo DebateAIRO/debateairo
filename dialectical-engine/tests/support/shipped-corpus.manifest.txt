@@ -940,6 +940,7 @@ packages/db/src/publication.ts
 packages/db/src/recovery-candidate.ts
 packages/db/src/recovery-email.ts
 packages/db/src/recovery.ts
+packages/db/src/release-state.ts
 packages/db/src/run-cost-substitution.ts
 packages/db/src/run-wait.ts
 packages/db/src/schema.ts

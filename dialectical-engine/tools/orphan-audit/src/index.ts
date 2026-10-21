@@ -660,7 +660,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // data-export module above. migrate() is unchanged by this.
 // Side-by-side releases A1 (2026-10-21, spec 2026-10-21 §1): the reviewed module after StartRunInput gained releaseKey and
 // startRun stamped core.run.release_key on both insert paths (parseReleaseKey first). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "f70535f5807816adb89536bc7d41b93204f3332303e72edb7e8e909f4e54f8f1";
+// Side-by-side releases A2 (2026-10-21, spec 2026-10-21 §4, §6): the reviewed module after it re-exported
+// ./release-state.js (the release table's readers and writers). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "3bb8d4909671ced43870f78ea27ebd1f315d9c04d1503f38b018d2938d5c3efe";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -815,7 +817,9 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
       blocking.push(`${where} reads a clock or randomness inside the pure core`);
     }
     blocking.push(...auditProductionFixtureImports(where,source));
-    if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
+    // \b: a switch STATEMENT, not an identifier ending in "switch" (0123's SQL function core.record_release_switch(...),
+    // named in packages/db/src/release-state.ts and the 0123 loader, side-by-side spec 2026-10-21 §6).
+    if (/\bswitch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
     blocking.push(...auditNumericSourceLiteralExports(where, source));
