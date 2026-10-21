@@ -182,6 +182,7 @@ import {
 } from "./account-erasure.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
+import { PostgresReleaseStateReader, ReleaseWatcher } from "./release-state.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
@@ -343,6 +344,15 @@ await boot.run("ask-admission-pools", async () => {
 });
 const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure));
 const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport));
+// Side-by-side spec §4, §6 (plan C3): which release is current, read every second on the runtime pool (debateai_runtime
+// holds EXECUTE on 0123's readers). With no release recorded a local API is current, as before; a hosted one is not.
+// Held from here so a failed boot stops it; started before the boot's first background pass; stopped first at close.
+const releaseWatcher = new ReleaseWatcher({
+  releaseKey: environment.RELEASE_KEY,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  reader: new PostgresReleaseStateReader(pool)
+});
+boot.hold({ end: async () => { releaseWatcher.stop(); } });
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
 await boot.run("database-roles", () => Promise.all([
@@ -1168,6 +1178,8 @@ const publications = publicationCipher === undefined
       new RepositoryPublicationStoryReader(storyRepository),
       mapViews
     );
+// Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
+await boot.run("release-watcher", () => releaseWatcher.start());
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
@@ -1730,6 +1742,8 @@ const startup = installStartupResourceOwner({
   auditContextHasher,
   argon2Pool,
   databasePools: [
+    // Side-by-side (plan C3): the release watcher stops before the runtime pool it reads on closes.
+    { end: async () => { releaseWatcher.stop(); } },
     pool,
     ...(authorizationPool === pool ? [] : [authorizationPool]),
     ...(publicationCleanupPool === pool || publicationCleanupPool === authorizationPool
@@ -1829,3 +1843,5 @@ staffAlerts?.start();
 
 if(triggerPasswordResetReconciliation){passwordResetTimer=setInterval(triggerPasswordResetReconciliation,30_000);passwordResetTimer.unref();triggerPasswordResetReconciliation();}
 if(triggerEmailRecoveryReconciliation){emailRecoveryTimer=setInterval(triggerEmailRecoveryReconciliation,30_000);emailRecoveryTimer.unref();triggerEmailRecoveryReconciliation();}
+// Side-by-side spec §6 (plan C3): boot finished, so BOOTING is no longer a readiness reason.
+releaseWatcher.markBooted();

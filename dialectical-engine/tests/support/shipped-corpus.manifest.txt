@@ -154,6 +154,7 @@ apps/api/src/question-language/transport.ts
 apps/api/src/recovery-email.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
+apps/api/src/release-state.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-event-tail.ts
