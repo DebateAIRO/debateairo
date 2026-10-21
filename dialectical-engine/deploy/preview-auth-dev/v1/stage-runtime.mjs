@@ -40,7 +40,8 @@ export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment
   if(event.pid!==api.child.pid||event.platform!==process.platform||event.registerVersion!==publication.registerVersion||event.mainSha256!==mainSha256)refuse('PREVIEW_STAGE_EVENT_REFUSED');
   const apiBase=`http://127.0.0.1:${environment.API_PORT}`;
   const apiProofs={};for(const path of ['/v1/deployment','/v1/auth/password-reset/status','/v1/auth/mfa-recovery/status']){const result=await fetch(apiBase+path,{signal:AbortSignal.timeout(5000)});if(result.status!==401)refuse('PREVIEW_STAGE_API_RESPONSE_REFUSED');apiProofs[path]={status:result.status};await result.body?.cancel();}
-  const uiEnv={NODE_ENV:'production',PORT:String(uiPort),DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:apiBase,PUBLIC_APP_URL:PREVIEW_ORIGIN,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:modelRoster,TURNSTILE_SITE_KEY:PREVIEW_SITE_KEY,PATH:'/usr/local/bin:/usr/bin:/bin'};
+  // The website refuses to start without its release key (side-by-side spec §1); it is the API's, the same release.
+  const uiEnv={NODE_ENV:'production',RELEASE_KEY:environment.RELEASE_KEY,PORT:String(uiPort),DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:apiBase,PUBLIC_APP_URL:PREVIEW_ORIGIN,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:modelRoster,TURNSTILE_SITE_KEY:PREVIEW_SITE_KEY,PATH:'/usr/local/bin:/usr/bin:/bin'};
   ui=ownedChild(process.execPath,[join(uiRoot,'apps/ui/server.mjs')],{cwd:join(uiRoot,'apps/ui'),env:uiEnv});
   const uiBase=`http://127.0.0.1:${uiPort}`;
   await eventually(async()=>{const r=await fetch(uiBase+'/login',{signal:AbortSignal.timeout(1000)});await r.body?.cancel();return r.status===200;},ui);

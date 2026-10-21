@@ -7,9 +7,11 @@
 // produced, runs the reviewed checks before writing, and never overwrites a file.
 //
 //   release-artifacts.mjs source-manifest --repository <clean git clone> --root <release root> --role api|ui|runner --out <file>
-//   release-artifacts.mjs build-env [--models glm-only|multi-model|all-models]
-//   release-artifacts.mjs ui-build --source <ui source manifest> [--models glm-only|multi-model|all-models] --out <file>
+//   release-artifacts.mjs build-env --release-key <key> [--models glm-only|multi-model|all-models]
+//   release-artifacts.mjs ui-build --source <ui source manifest> --release-key <key> [--models glm-only|multi-model|all-models] --out <file>
 //       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
+//       (--release-key names the release the website is built for, r<site version>-<first 12 hex of the UI source's
+//        revision>: side-by-side spec §1, §7; ui-build refuses a key of another revision)
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>
 //   release-artifacts.mjs launch-plan --service api|ui|runner --slot A|B --from <existing plan> --root <release root>
@@ -49,7 +51,7 @@ import { PREVIEW_ENV_ROOT, PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifact
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
-import { PREVIEW_MODEL_ROSTER_FLAGS } from '../../preview-auth-dev/v1/environment.mjs';
+import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
@@ -65,20 +67,28 @@ export const LAYOUT = Object.freeze({
 /** The reviewed public model lists, by stage name (environment.mjs PREVIEW_MODEL_ROSTER_FLAGS); glm-only is the default. */
 export const UI_MODEL_ROSTERS = Object.freeze(Object.keys(PREVIEW_MODEL_ROSTER_FLAGS));
 const DEFAULT_MODEL_ROSTER = 'glm-only';
-const publicBuildValues = flag => Object.freeze({ NODE_ENV: 'production', PUBLIC_APP_URL: PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: flag, TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY });
+/**
+ * The RELEASE_KEY of the build-value template below. It is never a release key: every build and every build-env names
+ * its own (`--release-key`), and a build given this text refuses (apps/ui/release-edge.mjs: RELEASE_KEY_INVALID).
+ */
+export const RELEASE_KEY_NOT_GIVEN = 'RELEASE_KEY_NOT_GIVEN';
+const publicBuildValues = (flag, releaseKey) => Object.freeze({ NODE_ENV: 'production', PUBLIC_APP_URL: PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: flag, TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY, RELEASE_KEY: releaseKey });
 /**
  * Public values the website is BUILT with. Each one is the exact value the reviewed runtime gate
  * (environment.mjs narrowEnvironment, service ui) demands from ui.env, imported from the same
  * constants, so the build and the running site cannot disagree. Nothing here is read from ui.env.
  * The model list is one of the reviewed lists, picked by stage name (`--models`); the build records
  * which one (ui-build.mjs), and the UI launcher demands that ui.env names the same list.
+ * RELEASE_KEY is the release the build is for (side-by-side spec §1, §7): the website bakes its code part in and
+ * refuses to serve under another release's key; the UI launcher demands ui.env's key be the plan's.
  */
-export function uiPublicBuildValues(models = DEFAULT_MODEL_ROSTER) {
+export function uiPublicBuildValues(models = DEFAULT_MODEL_ROSTER, releaseKey) {
   if (typeof models !== 'string' || !UI_MODEL_ROSTERS.includes(models)) refuse('ARGUMENTS_REFUSED', ['--models']);
-  return publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[models]);
+  if (typeof releaseKey !== 'string' || !RELEASE_KEY_PATTERN.test(releaseKey)) refuse('RELEASE_KEY_REFUSED', ['--release-key']);
+  return publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[models], releaseKey);
 }
-/** The default (glm-only) public build values. */
-export const UI_PUBLIC_BUILD_VALUES = publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[DEFAULT_MODEL_ROSTER]);
+/** The default (glm-only) public build values, with RELEASE_KEY_NOT_GIVEN where each build puts its own key. */
+export const UI_PUBLIC_BUILD_VALUES = publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[DEFAULT_MODEL_ROSTER], RELEASE_KEY_NOT_GIVEN);
 /** The complete environment of the build child: the public values plus fixed tool settings. */
 export const UI_BUILD_ENVIRONMENT = Object.freeze({
   PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC', CI: 'true', NEXT_TELEMETRY_DISABLED: '1',
@@ -88,7 +98,7 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
  * pnpm, next and the route check start `node` from PATH. Put the running Node's own folder first
  * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
  */
-export const buildEnvironment = (execPath = process.execPath, models = DEFAULT_MODEL_ROSTER) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(models), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
+export const buildEnvironment = (execPath = process.execPath, models = DEFAULT_MODEL_ROSTER, releaseKey) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(models, releaseKey), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -96,8 +106,8 @@ const ROLES = ['api', 'ui', 'runner'];
 const ACTOR_ENV = ['PATH', 'LANG', 'LC_ALL', 'TZ'];
 const COMMANDS = Object.freeze({
   'source-manifest': { required: ['--repository', '--root', '--role', '--out'], optional: [] },
-  'build-env': { required: [], optional: ['--models'] },
-  'ui-build': { required: ['--source', '--out'], optional: ['--models'] },
+  'build-env': { required: ['--release-key'], optional: ['--models'] },
+  'ui-build': { required: ['--source', '--release-key', '--out'], optional: ['--models'] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
@@ -233,16 +243,18 @@ async function sourceManifestCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], manifest, { layout });
 }
 
-/** The public build values (for one reviewed model list) and their sha256, for comparing with ui.env without printing it. */
-export function buildEnvironmentReport(models = DEFAULT_MODEL_ROSTER) {
-  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(models)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
+/** The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env without printing it. */
+export function buildEnvironmentReport(models = DEFAULT_MODEL_ROSTER, releaseKey) {
+  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(models, releaseKey)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
 }
 
 async function uiBuildCommand(options, { layout, deps }) {
-  const models = options['--models'] ?? DEFAULT_MODEL_ROSTER;
-  uiPublicBuildValues(models);
+  const models = options['--models'] ?? DEFAULT_MODEL_ROSTER, releaseKey = options['--release-key'];
+  uiPublicBuildValues(models, releaseKey);
   const source = await readSource(options['--source'], { layout, flag: '--source' });
   if (source.value.role !== 'ui') refuse('SOURCE_ROLE_REFUSED');
+  // Side-by-side spec §1, §7: the build bakes the key's code part in, so it must be this source's revision.
+  if (releaseKey.slice(releaseKey.indexOf('-') + 1) !== source.value.sourceRevision.slice(0, 12)) refuse('RELEASE_KEY_REFUSED', ['--release-key']);
   await assertOutputFree(options['--out'], { layout });
   // A fresh build only: a folder that already has a build may be the one the live site serves.
   const buildRoot = join(source.value.sourceRoot, 'dialectical-engine/apps/ui/.next');
@@ -250,7 +262,7 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath, models));
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath, models, releaseKey));
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
@@ -597,7 +609,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const context = { layout, deps };
   switch (command) {
     case 'source-manifest': return sourceManifestCommand(options, context);
-    case 'build-env': return buildEnvironmentReport(options['--models']);
+    case 'build-env': return buildEnvironmentReport(options['--models'], options['--release-key']);
     case 'ui-build': return uiBuildCommand(options, context);
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);

@@ -23,9 +23,17 @@ command to run, so earlier releases were staged with throwaway scripts and hand-
   environment (`env -i`). On a Mac it refuses.
 
 The website is built with a fixed list of public values (the site address, the Turnstile site key,
-the model list, `NODE_ENV=production`). They are the same constants the reviewed start-up
-check demands from `ui.env`, so the build and the running site cannot disagree. `build-env`
-prints them with their sha256 so you can compare `ui.env` by hash, without printing it.
+the model list, `NODE_ENV=production`) and the release key it is built for. They are the same
+values the reviewed start-up check demands from `ui.env`, so the build and the running site cannot
+disagree. `build-env` prints them with their sha256 so you can compare `ui.env` by hash, without
+printing it.
+
+The release key (`--release-key`, required on `build-env` and `ui-build`) is
+`r<site version>-<first 12 hex of the release's git revision>`, for example `r17-d50e33165a1b`
+(side-by-side spec §1). The website keeps the 12 hex from its build and refuses to serve under
+another release's key, so `ui-build` refuses (`RELEASE_KEY_REFUSED`) a key whose 12 hex are not
+the UI source manifest's revision. Each release's `ui-<label>.env` names the same key, and the
+UI start-up check refuses any key but its launch plan's.
 
 The model list is one of three reviewed lists, picked by name with `--models` (on `build-env` and
 `ui-build`): `glm-only` (the default: GLM only), `multi-model` (Free: GLM and DeepSeek; Premium: GLM,
@@ -65,8 +73,8 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | Command | What it does |
 |---|---|
 | `source-manifest --repository <clean git clone> --root <release root> --role api\|ui\|runner --out <file>` | runs `generateSourceManifest` with uid 0 and writes it; prints `{path,sha256,bytes}` |
-| `build-env [--models glm-only\|multi-model\|all-models]` | prints the fixed public UI build values (for that model list; default `glm-only`) and their sha256; reads no file |
-| `ui-build --source <ui source manifest> [--models glm-only\|multi-model\|all-models] --out <file>` | checks the UI root against its manifest, builds with the fixed values and that model list (default `glm-only`), records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
+| `build-env --release-key <key> [--models glm-only\|multi-model\|all-models]` | prints the fixed public UI build values (for that model list, default `glm-only`, and that release key) and their sha256; reads no file |
+| `ui-build --source <ui source manifest> --release-key <key> [--models glm-only\|multi-model\|all-models] --out <file>` | refuses a key of another revision (`RELEASE_KEY_REFUSED`), checks the UI root against its manifest, builds with the fixed values, that model list (default `glm-only`) and that release key, records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
 | `verify --source <file> [--ui-build <file>]` | re-runs `verifySourceManifest` (and `verifyUiBuildManifest`) against the exact file bytes |
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |

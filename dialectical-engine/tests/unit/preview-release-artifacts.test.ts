@@ -15,6 +15,8 @@ const prestart = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.m
 const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const digest = 'a'.repeat(64), revision = 'a'.repeat(40), tree = 'b'.repeat(40), newRevision = 'c'.repeat(40), newTree = 'd'.repeat(40);
+// Side-by-side spec §1: the new release's key, r<site version>-<first 12 hex of the UI source manifest's revision>.
+const NEW_KEY = `r10-${newRevision.slice(0, 12)}`;
 const publication = { publicationId: '11111111-1111-4111-8111-111111111111', publicationKind: 'GENERAL', baseRegisterVersion: '8', registerVersion: '9', requestSha256: digest, snapshotSha256: digest, rowCount: 68, recordedAt: '2026-10-06T12:00:00.000Z' };
 // Release roots end in their service (side-by-side spec §10): the label is what sits between the kind and the service.
 const OLD_ROOT = { api: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-api', ui: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-ui', runner: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-runner' } as const;
@@ -76,7 +78,10 @@ const run = (argv: string[], layout: any, deps: Record<string, unknown> = {}) =>
 
 describe('command line', () => {
   it('accepts each subcommand with exactly its flags', () => {
-    expect(tool.parseArguments(['build-env'])).toMatchObject({ command: 'build-env' });
+    expect(tool.parseArguments(['build-env', '--release-key', NEW_KEY])).toMatchObject({ command: 'build-env' });
+    // Side-by-side spec §1: the website is built only for a named release.
+    expect(() => tool.parseArguments(['build-env'])).toThrow(/ARGUMENTS_REFUSED/);
+    expect(() => tool.parseArguments(['ui-build', '--source', '/x.json', '--out', '/y.json'])).toThrow(/ARGUMENTS_REFUSED/);
     expect(tool.parseArguments(['verify', '--source', '/x.json', '--ui-build', '/y.json']).options['--ui-build']).toBe('/y.json');
   });
   it.each([
@@ -219,36 +224,43 @@ describe('operator digest', () => {
 
 describe('UI build values', () => {
   const runtimeOnly = { PORT: '3100', DIALECTICAL_UI_HOST: '127.0.0.1', DIALECTICAL_API_BASE: 'http://127.0.0.1:3101' };
+  const plan = { uiPort: '3100', apiPort: '3101', sourceRevision: newRevision }, pin = { registerVersion: '10' };
   it('are exactly what the reviewed runtime gate demands from ui.env, from the same constants', () => {
-    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY });
-    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual(tool.uiPublicBuildValues('glm-only'));
+    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY, RELEASE_KEY: tool.RELEASE_KEY_NOT_GIVEN });
+    // The template's RELEASE_KEY is never a key: every build names its own (--release-key), and a build given the template refuses.
+    expect(environment.RELEASE_KEY_PATTERN.test(tool.UI_PUBLIC_BUILD_VALUES.RELEASE_KEY)).toBe(false);
+    expect(tool.uiPublicBuildValues('glm-only', NEW_KEY)).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, RELEASE_KEY: NEW_KEY });
     expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model', 'all-models']);
     for (const models of tool.UI_MODEL_ROSTERS) {
-      const values = tool.uiPublicBuildValues(models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
-      expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] });
-      expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, null, { uiPort: '3100', apiPort: '3101' })).not.toThrow();
+      const values = tool.uiPublicBuildValues(models, NEW_KEY), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
+      expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models], RELEASE_KEY: NEW_KEY });
+      expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, pin, plan)).not.toThrow();
       for (const key of Object.keys(values)) {
-        expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, null, { uiPort: '3100', apiPort: '3101' })).toThrow();
+        expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, pin, plan)).toThrow();
       }
     }
-    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(models)).toThrow(/ARGUMENTS_REFUSED/);
+    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(models, NEW_KEY)).toThrow(/ARGUMENTS_REFUSED/);
+    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', 'r0-cccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues('glm-only', key), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
   });
 
   it('the build child gets only the public values plus fixed tool settings, never a secret path or a stray public flag', () => {
-    expect(Object.keys(tool.UI_BUILD_ENVIRONMENT).sort()).toEqual(['CI', 'LANG', 'LC_ALL', 'NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON', 'NEXT_TELEMETRY_DISABLED', 'NODE_ENV', 'PATH', 'PUBLIC_APP_URL', 'TURNSTILE_SITE_KEY', 'TZ']);
+    expect(Object.keys(tool.UI_BUILD_ENVIRONMENT).sort()).toEqual(['CI', 'LANG', 'LC_ALL', 'NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON', 'NEXT_TELEMETRY_DISABLED', 'NODE_ENV', 'PATH', 'PUBLIC_APP_URL', 'RELEASE_KEY', 'TURNSTILE_SITE_KEY', 'TZ']);
     expect(tool.UI_BUILD_ENVIRONMENT.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
   });
 
   it('build-env prints each value with its sha256 so ui.env can be compared by hash only', async () => {
-    const report = await run(['build-env'], tool.LAYOUT);
+    const report = await run(['build-env', '--release-key', NEW_KEY], tool.LAYOUT);
     expect(report.values.TURNSTILE_SITE_KEY).toEqual({ value: turnstile.PREVIEW_SITE_KEY, sha256: sha(turnstile.PREVIEW_SITE_KEY) });
+    expect(report.values.RELEASE_KEY).toEqual({ value: NEW_KEY, sha256: sha(NEW_KEY) });
     expect(Object.keys(report.values)).toEqual(Object.keys(tool.UI_PUBLIC_BUILD_VALUES));
     expect(report.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON.value).toBe(environment.PREVIEW_MODEL_ROSTER_FLAGS['glm-only']);
-    const multi = await run(['build-env', '--models', 'multi-model'], tool.LAYOUT);
+    const multi = await run(['build-env', '--models', 'multi-model', '--release-key', NEW_KEY], tool.LAYOUT);
     expect(multi.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model']) });
-    const all = await run(['build-env', '--models', 'all-models'], tool.LAYOUT);
+    const all = await run(['build-env', '--release-key', NEW_KEY, '--models', 'all-models'], tool.LAYOUT);
     expect(all.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models']) });
-    await expect(run(['build-env', '--models', 'everything'], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(['build-env', '--models', 'everything', '--release-key', NEW_KEY], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    for (const key of ['legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc'])
+      await expect(run(['build-env', '--release-key', key], tool.LAYOUT), key).rejects.toMatchObject({ code: 'RELEASE_KEY_REFUSED' });
   });
 });
 
@@ -259,9 +271,9 @@ describe('ui-build and verify', () => {
     const events: string[] = [];
     const build = { schema: 'preview-auth-dev-ui-build-v1', buildId: 'x', files: [] };
     const out = join(s.art, 'candidate-ui-build.json');
-    const result = await run(['ui-build', '--source', source.path, '--out', out], s.layout, {
+    const result = await run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', out], s.layout, {
       verifySourceManifest: async (_m: unknown, binding: any) => { events.push(`verify:${binding.manifestSha256}`); },
-      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
+      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
       verifyUiBuildManifest: async () => { events.push('verify-build'); }, execPath: '/opt/node/bin/node'
     });
     expect(events).toEqual([`verify:${source.sha256}`, 'build', `verify:${source.sha256}`, 'verify-build']);
@@ -273,21 +285,39 @@ describe('ui-build and verify', () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let seen: any;
-    await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+    await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
       verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
       buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
     });
-    expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
+    expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
     const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); } };
-    await expect(run(['ui-build', '--source', source.path, '--models', 'all', '--out', join(s.art, 'other-ui-build.json')], s.layout, never)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(['ui-build', '--source', source.path, '--models', 'all', '--release-key', NEW_KEY, '--out', join(s.art, 'other-ui-build.json')], s.layout, never)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
     expect(existsSync(join(s.art, 'other-ui-build.json'))).toBe(false);
+  });
+
+  // Side-by-side spec §1, §7: the website bakes its release's code part in when it is built, so the key must be this source's.
+  it('--release-key of another revision, or not a release key, refuses RELEASE_KEY_REFUSED before anything is verified or built', async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); }, verifyUiBuildManifest: async () => { throw new Error('ran'); } };
+    for (const key of [`r17-${'d'.repeat(12)}`, 'r10-cccccccccccd', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) {
+      await expect(run(['ui-build', '--source', source.path, '--release-key', key, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, never), key).rejects.toMatchObject({ code: 'RELEASE_KEY_REFUSED' });
+    }
+    expect(existsSync(join(s.art, 'candidate-ui-build.json'))).toBe(false);
+    // Any site version is admitted with this source's 12 hex (the number is checked when the release starts).
+    let seen: any;
+    await run(['ui-build', '--source', source.path, '--release-key', `r17-${newRevision.slice(0, 12)}`, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
+      buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
+    });
+    expect(seen.RELEASE_KEY).toBe(`r17-${newRevision.slice(0, 12)}`);
   });
 
   it('writes nothing when the build changed an inventoried source byte', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let calls = 0;
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
       verifySourceManifest: async () => { if (++calls === 2) throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); },
       buildUiArtifact: async () => ({ schema: 'preview-auth-dev-ui-build-v1' }), verifyUiBuildManifest: async () => undefined
     })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
@@ -301,15 +331,15 @@ describe('ui-build and verify', () => {
     const layout = { ...s.layout, releasesRoot: releases };
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui', { sourceRoot: root }));
     const never = { buildUiArtifact: async () => { throw new Error('built'); }, verifySourceManifest: async () => { throw new Error('verified'); } };
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'candidate-ui-build.json')], layout, never)).rejects.toMatchObject({ code: 'UI_BUILD_EXISTS' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], layout, never)).rejects.toMatchObject({ code: 'UI_BUILD_EXISTS' });
     const out = s.write(join(s.art, 'candidate-ui-build.json'), '{}').path;
-    await expect(run(['ui-build', '--source', source.path, '--out', out], layout, never)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', out], layout, never)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
   });
 
   it('refuses to build from a non-UI manifest', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api'));
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'b.json')], s.layout, { buildUiArtifact: async () => { throw new Error('built'); } })).rejects.toMatchObject({ code: 'SOURCE_ROLE_REFUSED' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'b.json')], s.layout, { buildUiArtifact: async () => { throw new Error('built'); } })).rejects.toMatchObject({ code: 'SOURCE_ROLE_REFUSED' });
   });
 
   it('verify re-runs the reviewed verifiers against the exact manifest bytes', async () => {
