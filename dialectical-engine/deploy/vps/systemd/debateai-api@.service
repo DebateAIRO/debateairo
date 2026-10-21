@@ -1,14 +1,20 @@
-# deploy/vps/systemd/debateai-api.service
+# deploy/vps/systemd/debateai-api@.service
+# One API instance per release (side-by-side spec §10): debateai-api@<label>.service, %i = the release label
+# (dashes kept). Each release runs from its own root-owned folder /opt/debateai/releases/<label>/, never from the
+# operator checkout, so updating code can never change it under a live older runner. Only the current release's
+# instance is enabled at boot (README §5 "Side-by-side upgrades"); the slot (port) comes from the release's overlay.
+#
 # One OS user per service (audit L7 "C2/C3 validation"): the UI must not be able to read
 # /etc/debateai/api.env, and the runner must not be able to read the blind-index key, the audit
 # key store or the audit source-IP salt. See README "Custody and the three service users" for the
 # one place where that separation is currently blocked (the shared user-DEK store).
 [Unit]
-Description=DebateAI API (Fastify)
+Description=DebateAI API (Fastify), release %i
 Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
 After=network-online.target postgresql.service debateai-hatchet.service
-Wants=network-online.target
-Requires=postgresql.service debateai-hatchet.service
+# Hatchet is wanted, never required (side-by-side spec §4): a Hatchet restart must not stop a release's API.
+Wants=network-online.target debateai-hatchet.service
+Requires=postgresql.service
 
 [Service]
 Type=simple
@@ -16,14 +22,29 @@ User=debateai-api
 Group=debateai-api
 # Postfix's sendmail is setgid postdrop; NoNewPrivileges=true neuters setgid, so the maildrop
 # write has to be reachable by group membership instead (README §7, MAIL_SENDMAIL_PATH).
-# V-19: the custody group, for the same reason — see debateai-runner.service.
+# V-19: the custody group, for the same reason — see debateai-runner@.service.
 SupplementaryGroups=postdrop debateai-custody
-WorkingDirectory=/opt/debateai/dialectical-engine
+WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine
+# The base file every release shares, then the release's own overlay (env/releases/api.env.example: site version,
+# release key, the slot's port). systemd reads them in this order and the later file wins. The overlay has no "-":
+# a release without its own file does not start.
 EnvironmentFile=/etc/debateai/api.env
+EnvironmentFile=/etc/debateai/releases/%i/api.env
 Environment=NODE_ENV=production
 Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
-ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/api/src/main.ts
+# Root's start check (`+` = root, outside this unit's sandbox; side-by-side plan D16b): a release that is draining or
+# retired, or one the release table does not know, is refused before the API starts again.
+ExecStartPre=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service api --label %i
+ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/api/src/main.ts
+# After every stop root writes down what it saw (side-by-side spec §4): a draining release whose API is gone gets
+# FRONT_PAIR_STOPPED once, which is what that release's retirement waits for.
+ExecStopPost=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs stopped --service api --label %i
+# Restart=on-failure stays on this server (spec §4): a restarted API starts on its own release ("database ahead").
 Restart=on-failure
+# Straight back to starting, without passing through inactive or failed: otherwise the website's BindsTo= on this
+# instance would stop the website at every crash restart, and nothing would start it again. Needs systemd >= 254
+# (README §2); an older systemd ignores the line with a warning.
+RestartMode=direct
 RestartSec=5
 TimeoutStopSec=30
 KillMode=mixed

@@ -1,14 +1,21 @@
-# deploy/vps/systemd/debateai-runner.service
+# deploy/vps/systemd/debateai-runner@.service
+# One runner per live release (side-by-side spec §4, §10): debateai-runner@<label>.service, %i = the release label.
+# It runs from the release's own root-owned folder and claims only its own release's debates. An older release's
+# runner keeps running after a switch until its debates finish, then retires by itself (exit 0, not restarted);
+# never `systemctl stop` a busy one (README §5 "Side-by-side upgrades"). Only the current release's instance is
+# enabled at boot; the stop recorder disables an older one once it has retired.
+#
 # The runner never writes custody: it loads the KEK from its OWN 0600 copy and READS the run
 # content keys the API wrote (packages/crypto FileRunContentKeyStore.load / FileUserDekStore.load
 # — only ContentCipher.provisionRun writes, and that runs on the API's content-provision path,
 # apps/api + packages/db/src/index.ts:1101). Hence ReadOnlyPaths, not ReadWritePaths.
 [Unit]
-Description=DebateAI runner (Hatchet worker)
+Description=DebateAI runner (Hatchet worker), release %i
 Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
 After=network-online.target postgresql.service debateai-hatchet.service
-Wants=network-online.target
-Requires=postgresql.service debateai-hatchet.service
+# Hatchet is wanted, never required (side-by-side spec §4): a Hatchet restart must not kill a draining runner mid-call.
+Wants=network-online.target debateai-hatchet.service
+Requires=postgresql.service
 
 [Service]
 Type=simple
@@ -19,8 +26,11 @@ Group=debateai-runner
 # -G debateai-custody debateai-runner` alone would NOT put the process in the
 # group, and every user-DEK read would refuse. Declared here so it cannot be.
 SupplementaryGroups=debateai-custody
-WorkingDirectory=/opt/debateai/dialectical-engine
+WorkingDirectory=/opt/debateai/releases/%i/dialectical-engine
+# The shared base file, then the release's own overlay (env/releases/runner.env.example: site version, release key,
+# worker identity); the later file wins. No "-": a release without its own file does not start.
 EnvironmentFile=/etc/debateai/runner.env
+EnvironmentFile=/etc/debateai/releases/%i/runner.env
 Environment=NODE_ENV=production
 Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
 # ProtectHome=true empties /home and /root, so the maker CLIs get a private HOME under the state
@@ -29,7 +39,15 @@ StateDirectory=debateai-runner
 StateDirectoryMode=0700
 Environment=HOME=/var/lib/debateai-runner
 Environment=XDG_CONFIG_HOME=/var/lib/debateai-runner/config
-ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/runner/src/main.ts
+# Root's start check (side-by-side plan D16b): a retired release's runner, or one the release table does not know, is
+# refused. A draining release's runner may start again: its debates resume on their own release.
+ExecStartPre=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service runner --label %i
+ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/runner/src/main.ts
+# After every stop root writes down what it saw (side-by-side spec §4): a runner that printed its retirement line and
+# exited 0 marks its release RETIRED, and its instance is disabled so it never starts at boot again.
+ExecStopPost=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs stopped --service runner --label %i
+# Restart=on-failure stays on this server (spec §4), safe because a restarted runner starts in "database ahead" mode
+# on its own release. A retired runner exits 0 and is not restarted.
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

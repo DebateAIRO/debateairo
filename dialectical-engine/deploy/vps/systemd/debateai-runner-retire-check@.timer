@@ -1,0 +1,22 @@
+# deploy/vps/systemd/debateai-runner-retire-check@.timer -> /etc/systemd/system/ (root 0644)
+# The 25-minute check of release %i (side-by-side spec §4). This template names NO time: right after it writes
+# RETIRE_REQUESTED, debateai-runner-retire@%i.service (release.mjs retire-request) writes
+#   debateai-runner-retire-check@<label>.timer.d/50-at.conf
+# with one absolute UTC OnCalendar= = the latest request + 1,500 s (rounded up to the second), reloads systemd,
+# enables this instance and (re)starts it. The check itself refuses to act before then.
+# Without that drop-in systemd refuses to load an instance (a timer needs a time): nothing fires by accident.
+# Persistent=true + [Install]: a reboot before the check time does not lose it; a server that was off at that time
+# runs the check at the next boot. RemainAfterElapse=false: once it has fired the timer is inactive again, so a later
+# request (a second drain after a rollback, a re-run) arms it anew. Retirement disables it.
+[Unit]
+Description=DebateAI: check release %i 25 minutes after it was asked to retire
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+
+[Timer]
+Unit=debateai-runner-retire-check@%i.service
+Persistent=true
+AccuracySec=1s
+RemainAfterElapse=false
+
+[Install]
+WantedBy=timers.target

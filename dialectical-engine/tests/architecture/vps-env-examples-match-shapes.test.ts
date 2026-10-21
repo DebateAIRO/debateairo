@@ -48,7 +48,7 @@ const CASES = [
 describe("VPS env examples cover the strict environment shapes (Task 14 amendment)", () => {
   it("provisions each API export custody directory as owner-only and writable under the unit", () => {
     const example = readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8");
-    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api.service"), "utf8");
+    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api@.service"), "utf8");
     const readme = readFileSync(resolve(engineRoot, "deploy/vps/README.md"), "utf8");
     const path = /^DATA_EXPORT_STORE_PATH=(.+)$/m.exec(example)?.[1];
     expect(path).toBe("/var/lib/debateai/data-exports");
@@ -59,7 +59,7 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
   });
   it("B3a: the optional billing notice spool is commented in the example, writable under the unit, and provisioned 0700", () => {
     const example = readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8");
-    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api.service"), "utf8");
+    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api@.service"), "utf8");
     const readme = readFileSync(resolve(engineRoot, "deploy/vps/README.md"), "utf8");
     expect(inventory("API_ENVIRONMENT_KEYS").optional).toContain("BILLING_NOTICE_SPOOL_PATH");
     expect(exampleKeys("deploy/vps/env/api.env.example").has("BILLING_NOTICE_SPOOL_PATH")).toBe(false);

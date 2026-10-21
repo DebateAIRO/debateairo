@@ -636,7 +636,7 @@ describe("P22 the Billing runbook", () => {
     expect(paragraph).not.toContain("until you restart them, the services keep the version they run");
     // The facts behind those words: the units read the pinned files and restart on failure by themselves.
     for (const unit of ["api", "runner"]) {
-      const service = read(`deploy/vps/systemd/debateai-${unit}.service`);
+      const service = read(`deploy/vps/systemd/debateai-${unit}@.service`);
       expect(service).toContain(`EnvironmentFile=/etc/debateai/${unit}.env`);
       expect(service).toContain("Restart=on-failure");
     }
