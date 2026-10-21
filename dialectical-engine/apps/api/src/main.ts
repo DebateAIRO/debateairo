@@ -1665,6 +1665,9 @@ const api = buildApi({
   emailChange,
   accountProfile,
   recoveryEmail,
+  // Side-by-side spec §6 (plan C5): the release header on every answer, and /readyz from the watcher's last read.
+  releaseKey: environment.RELEASE_KEY,
+  readiness: releaseWatcher,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   // B7a: the room read and, while billing is on, the usage read. Absent, the

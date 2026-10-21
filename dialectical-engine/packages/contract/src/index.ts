@@ -1691,6 +1691,9 @@ export const contractInventory = Object.freeze({
     "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
+    // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
+    "GET /livez",
+    "GET /readyz",
     "GET /v1/dev/evaluator",
     "POST /v1/dev/evaluator/consumer-selection",
     "GET /v1/answers",

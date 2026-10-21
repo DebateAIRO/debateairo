@@ -2,6 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
+import type { ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -1434,6 +1435,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+  // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
+  // them); neither reads a person's data nor charges an admission budget.
+  { route: "GET /livez", auth: "public", resource: "deployment", action: "liveness" },
+  { route: "GET /readyz", auth: "public", resource: "deployment", action: "readiness" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -1759,6 +1764,17 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  /**
+   * Side-by-side spec §6 (plan C5): this process's RELEASE_KEY, sent as `x-debateai-release` on every response (JSON,
+   * refusals, the house 404, the run-event stream's raw head). Always supplied by main; absent, no header is sent.
+   */
+  readonly releaseKey?: string;
+  /**
+   * Side-by-side spec §6 (plan C5): the release watcher's answers behind GET /readyz. Always supplied by main; absent
+   * (test compositions), /readyz answers ready with `releaseKey` (null when that is absent too) and no reasons.
+   * `draining` is carried for the drain work that follows (plan C); /readyz reads only `readiness()`.
+   */
+  readonly readiness?: Pick<ReleaseWatcher, "readiness" | "draining">;
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
@@ -2302,6 +2318,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.addHook("onSend", async (request, reply, payload) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
     reply.header("cache-control", "no-store");
+    // Side-by-side spec §6 (plan C5): every answer names the release that wrote it; the browser compares its code part.
+    if (options.releaseKey !== undefined) reply.header("x-debateai-release", options.releaseKey);
     // Reissue the same opaque generation after successful cookie auth so the
     // browser transport observes the ruled sliding 14-day idle lifetime. The
     // conditional database refresh remains the sole authorization decision,
@@ -3489,6 +3507,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
   });
 
+  /**
+   * Side-by-side spec §6 (plan C5): the process probes. Neither needs a session, reads the database or charges an
+   * admission budget: /readyz answers from the release watcher's last read (never a query of its own), so the website's
+   * /readyz and Caddy's health check can poll it every second. `cache-control: no-store` comes from the onSend hook.
+   */
+  api.get("/livez", routePolicy("GET /livez"), async (_request, reply) => reply.send({ live: true }));
+  api.get("/readyz", routePolicy("GET /readyz"), async (_request, reply) => {
+    const readiness = options.readiness?.readiness()
+      ?? Object.freeze({ ready: true, releaseKey: options.releaseKey ?? null, reasons: Object.freeze([]) });
+    return reply.status(readiness.ready ? 200 : 503)
+      .send({ ready: readiness.ready, releaseKey: readiness.releaseKey, reasons: [...readiness.reasons] });
+  });
+
   if (options.evaluatorDevMenu !== undefined) {
     if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)
       || options.evaluatorDevMenuRegisterVersion! < 1) {
@@ -3788,6 +3819,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
       "cache-control": "no-store",
+      // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
+      ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
       ...(request.cookieRefresh === undefined
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
