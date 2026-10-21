@@ -10,7 +10,9 @@
 --       advisory lock, owned by the new NOLOGIN role debateai_release_owner (A2);
 --   §4  re-admission records: core.run_supersession and its guard, core.resolve_run_ref, core.run_waiting_v redefined
 --       so a superseded run no longer waits, the readmitted run's key provision, and the API runtime's reads (A3);
---   §5  core.run_wait_reason.waits_for widened with SITE_BUSY and SWITCHING (A3).
+--   §5  core.run_wait_reason.waits_for widened with SITE_BUSY and SWITCHING (A3);
+--   §6  the five funding functions that tied a grant to the selection's or the run's version, redefined in place
+--       without that comparison, and staff.read_internal_funding_policy_at, the funding publication at a version (A4).
 --
 -- n1 (spec §5, the database rule):
 -- n1: drained
@@ -468,23 +470,24 @@ GRANT EXECUTE ON FUNCTION core.record_release_switch(text,text,timestamptz,text,
 GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO debateai_release_operator;
 
 -- §4. Re-admission records (spec §4, §9, §13; INTERFACE "Database") ----------------------------------------------
--- A debate that waits while a new release takes the traffic is re-admitted under the current release as a NEW run
--- (plan C, START): the old row is never touched (core.run is never updated), so its re-admission is a record.
+-- A debate that waits while a new release takes the traffic is re-admitted under the current release as a NEW run (plan
+-- C, START): the old row is never touched (core.run is never updated), so its re-admission is a record.
 -- core.run_supersession is that record, append-only: old_run_id → new_run_id, reason READMITTED. Its guard refuses an
 -- edge unless the old run still waits (a core.run_wait row and no core.run_wait_start row: a started debate is never
--- re-admitted, ruling O1, plan A review focus 4) and the new run has no edge of its own, so a cycle cannot form (an edge
--- X → Y needs Y without an outgoing edge). The new run must also be live (no FAILED work item) and, when its execution
--- binding marks it as a re-admission (readmitted_from_run_id, below), the re-admission of this old run (A3 review). The guard takes ONE advisory lock, so two edges written at once are checked
--- one after the other, and it locks the old run's wait row FOR UPDATE, which waits for a transaction starting that run
--- (its run_wait_start insert holds KEY SHARE on the row) and then reads its start. The primary key refuses a second edge
--- out of a run (23505), UNIQUE new_run_id a second edge into one. Both runs must belong to the same person (A3 review):
--- their principal, read as core.run_waiting_v reads it (the latest ownership event's owner, otherwise the asker id),
--- must be the same, so an old id can never resolve to another person's run. Both race guards rely on READ COMMITTED,
--- the isolation every writer of the line uses: after waiting for the lock, the guard's next statement takes a new
--- snapshot and so reads what the lock's holder committed. The API writes the edge inside START, as
--- debateai_billing_runtime: the API's own capability role (0093; the API's login holds it, the runner's does not), so
--- the runner can neither record nor resolve a supersession (least privilege, controller ruling 2026-10-22 on A-x2).
--- The other direction is guarded too: once a run is superseded, starting it is refused RUN_SUPERSEDED (below).
+-- re-admitted, ruling O1, plan A review focus 4) and the new run has no edge of its own, so a cycle cannot form (an
+-- edge X → Y needs Y without an outgoing edge). The new run must also be live (no FAILED work item) and, when its
+-- execution binding marks it as a re-admission (readmitted_from_run_id, below), the re-admission of this old run (A3
+-- review). The guard takes ONE advisory lock, so two edges written at once are checked one after the other, and it
+-- locks the old run's wait row FOR UPDATE, which waits for a transaction starting that run (its run_wait_start insert
+-- holds KEY SHARE on the row) and then reads its start. The primary key refuses a second edge out of a run (23505),
+-- UNIQUE new_run_id a second edge into one. Both runs must belong to the same person (A3 review): their principal, read
+-- as core.run_waiting_v reads it (the latest ownership event's owner, otherwise the asker id), must be the same, so an
+-- old id can never resolve to another person's run. Both race guards rely on READ COMMITTED, the isolation every writer
+-- of the line uses: after waiting for the lock, the guard's next statement takes a new snapshot and so reads what the
+-- lock's holder committed. The API writes the edge inside START, as debateai_billing_runtime: the API's own capability
+-- role (0093; the API's login holds it, the runner's does not), so the runner can neither record nor resolve a
+-- supersession (least privilege, controller ruling 2026-10-22 on A-x2). The other direction is guarded too: once a run
+-- is superseded, starting it is refused RUN_SUPERSEDED (below).
 CREATE TABLE IF NOT EXISTS core.run_supersession (
   old_run_id uuid PRIMARY KEY REFERENCES core.run(run_id),
   new_run_id uuid NOT NULL UNIQUE REFERENCES core.run(run_id),
@@ -869,6 +872,229 @@ ALTER TABLE core.run_wait_reason
   ADD CONSTRAINT run_wait_reason_waits_for_check CHECK (waits_for IN ('SITE','PERSON','SITE_BUSY','SWITCHING')) NOT VALID;
 ALTER TABLE core.run_wait_reason VALIDATE CONSTRAINT run_wait_reason_waits_for_check;
 
+-- §6. Funding grants stay valid under the version they were issued with (spec §9, C15; INTERFACE "Database") ---------
+-- Drained T, spec §9, C15: a release runs its debates on its own register version, and the funding selection
+-- (staff.funding_policy_selection) may name a later or an earlier version than either, so the database may no longer
+-- tie a grant to the selection's version or to the run's. 0092 and 0093 compared the grant's policy_register_version
+-- with both; this section redefines the five functions that did, in place (same signatures, owner, definer, path and
+-- grants), each body copied from its migration with only the named comparison removed. 0063's rule ("never CREATE OR
+-- REPLACE a function another migration defines") is broken for these five only, because T is drained (no debate waits
+-- or runs while it is applied, spec "The transition"), as 0120 did for its reader. What stays:
+--   * staff.configure_internal_allowance is unchanged: a new grant takes the selection's version (spec §9).
+--   * a revoke names the grant's own version (the command-vs-grant equality stays); the command-vs-selection one goes.
+--   * funding switched off stays off: no selection row → read_internal_allowance refuses INTERNAL_FUNDING_UNAVAILABLE
+--     for a grant (its `v_policy IS NULL` gate stays), the charge-scope guard refuses, and the run state is UNAVAILABLE.
+-- Why no "is it still sealed" check on the grant's version: a grant's version is the selection's at issue (configure
+-- compares), the selection references a sealed version, and a sealed version never changes, so validity cannot lapse.
+-- read_internal_run_state still validates the funding rows, now those of the grant's own version. The new reader
+-- staff.read_internal_funding_policy_at(bigint) reads the funding publication of any version with those same checks, so
+-- the application checks a grant against the policy of the version it was issued with, never the pointer (plan B, B14).
+
+-- 0093:58-129 minus the core.run.register_version = policyRegisterVersion condition (0093:83).
+CREATE OR REPLACE FUNCTION billing.reserve_internal_provider_call(p_call uuid,p_run uuid,p_projected bigint,p_source text,p_phase text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_scope billing.run_charge_scope%ROWTYPE;v_grant jsonb;v_now timestamptz;v_start timestamptz;v_from timestamptz;
+ v_limit bigint;v_span interval;v_to timestamptz;v_spent numeric;v_committed numeric;v_index integer;v_owner uuid;v_user uuid;
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM core.run WHERE run_id=p_run) THEN RAISE EXCEPTION 'RUN_PROVIDER_ACCOUNT_UNAVAILABLE';END IF;
+ SELECT * INTO v_scope FROM billing.run_charge_scope WHERE run_id=p_run;
+ v_owner:=v_scope.owner_ref;
+ IF v_owner IS NULL THEN SELECT owner_ref INTO v_owner FROM core.run_ownership_event WHERE run_id=p_run ORDER BY at_seq DESC LIMIT 1;END IF;
+ IF v_owner IS NOT NULL THEN
+  SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=v_owner;
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=v_owner;
+  IF v_user IS NULL OR identity.read_account_security_hold(v_user) THEN RAISE EXCEPTION 'RUN_PROVIDER_ACCOUNT_UNAVAILABLE';END IF;
+ END IF;
+ IF v_scope.run_id IS NULL OR v_scope.funding_kind='SUBSCRIPTION' THEN RETURN false;END IF;
+ IF p_call IS NULL OR p_call::text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  OR p_projected IS NULL OR p_projected<1 OR p_projected>9007199254740991 OR p_source IS NULL
+  OR NOT COALESCE((p_source='RUN' AND p_phase IN('BODY','SERVE')) OR (p_source='STORY' AND p_phase IS NULL),false) THEN
+  RAISE EXCEPTION 'INTERNAL_PROVIDER_ADMISSION_INVALID';END IF;
+ -- Task10 reader holds the account security lock, protecting revoke/replace/hold races.
+ v_grant:=billing.read_internal_allowance_for_run(p_run,clock_timestamp());
+ PERFORM pg_advisory_xact_lock(hashtextextended('funding:provider:'||v_scope.internal_grant_id::text,0));
+ v_now:=clock_timestamp();
+ -- Side-by-side spec §9: the run's register version is no longer compared with the grant's.
+ IF v_grant IS NULL OR v_now>=(v_grant->>'expiresAt')::timestamptz OR v_now<(v_grant->>'startsAt')::timestamptz THEN
+  RAISE EXCEPTION 'INTERNAL_FUNDING_UNAVAILABLE';END IF;
+ -- Replay never grants a second permission to send provider bytes.
+ IF EXISTS(SELECT 1 FROM billing.internal_provider_admission WHERE call_id=p_call) THEN RAISE EXCEPTION 'INTERNAL_PROVIDER_ADMISSION_REPLAY';END IF;
+ v_start:=(v_grant->>'startsAt')::timestamptz;
+ FOR v_index IN 1..3 LOOP
+  v_limit:=CASE v_index WHEN 1 THEN (v_grant->>'dayMicros')::bigint WHEN 2 THEN (v_grant->>'weekMicros')::bigint ELSE (v_grant->>'amountMicros')::bigint END;
+  v_span:=CASE v_index WHEN 1 THEN interval '24 hours' WHEN 2 THEN interval '168 hours' ELSE NULL END;
+  v_from:=CASE WHEN v_span IS NULL THEN v_start ELSE v_start+floor(extract(epoch FROM(v_now-v_start))/extract(epoch FROM v_span))*v_span END;
+  v_to:=CASE WHEN v_span IS NULL THEN (v_grant->>'expiresAt')::timestamptz ELSE least(v_from+v_span,(v_grant->>'expiresAt')::timestamptz) END;
+  v_spent:=billing.read_internal_grant_spent(v_scope.owner_ref,v_scope.internal_grant_id,v_scope.internal_grant_event_id,v_from,v_to,v_index=3);
+  v_committed:=billing.read_internal_grant_commitments(v_scope.owner_ref,v_scope.internal_grant_id,v_scope.internal_grant_event_id,p_run);
+  IF v_spent+v_committed+p_projected>v_limit THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_REACHED';END IF;
+ END LOOP;
+ INSERT INTO billing.internal_provider_admission(call_id,run_id,grant_id,grant_event_id,projected_micros,spend_source,spend_phase,admitted_at)
+  VALUES(p_call,p_run,v_scope.internal_grant_id,v_scope.internal_grant_event_id,p_projected,p_source,p_phase,v_now);
+ RETURN true;
+END $$;
+ALTER FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text) TO debateai_runtime;
+
+-- 0093:134-174, validating the funding rows of the grant's own policy_register_version instead of the selection's
+-- (0093:141-158). A selection row must still exist (funding switched off stays off), but nothing compares its version,
+-- and the run-version equality (0093:161-162) is dropped. The grant is read first, since its version names the rows.
+CREATE OR REPLACE FUNCTION billing.read_internal_run_state(p_run uuid) RETURNS text
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_scope billing.run_charge_scope%ROWTYPE;v_grant billing.internal_grant%ROWTYPE;v_policy jsonb;v_rows jsonb;v_version bigint;v_sealed boolean;v_count bigint;v_key text;v_user uuid;v_latest uuid;v_now timestamptz;
+BEGIN
+ SELECT * INTO v_scope FROM billing.run_charge_scope WHERE run_id=p_run;
+ IF NOT FOUND OR v_scope.funding_kind<>'INTERNAL' THEN RETURN 'UNAVAILABLE';END IF;
+ -- Passive MVCC reads only: the full locked validator remains exclusively on admission.
+ IF NOT EXISTS(SELECT 1 FROM staff.funding_policy_selection f WHERE f.singleton) THEN RETURN 'UNAVAILABLE';END IF;
+ SELECT * INTO v_grant FROM billing.internal_grant WHERE grant_id=v_scope.internal_grant_id;
+ IF NOT FOUND OR v_grant.configured_event_id IS DISTINCT FROM v_scope.internal_grant_event_id THEN RETURN 'UNAVAILABLE';END IF;
+ SELECT v.register_version,v.sealed,v.row_count INTO v_version,v_sealed,v_count
+  FROM register.register_version v WHERE v.register_version=v_grant.policy_register_version;
+ IF v_version IS NULL OR v_sealed IS DISTINCT FROM true
+  OR v_count IS DISTINCT FROM (SELECT count(*) FROM register.register_row WHERE register_version=v_version) THEN RETURN 'UNAVAILABLE';END IF;
+ SELECT jsonb_object_agg(row_key,value_json) INTO v_rows FROM register.register_row WHERE register_version=v_version
+  AND row_key IN('productRolePolicy','staffAccessPolicy','internalAllowancePolicy') AND length(btrim(source_ref))>0;
+ IF (SELECT count(*) FROM register.register_row WHERE register_version=v_version AND row_key IN('productRolePolicy','staffAccessPolicy','internalAllowancePolicy') AND length(btrim(source_ref))>0)<>3
+  OR v_rows->'productRolePolicy'->'policy_version' IS DISTINCT FROM '2'::jsonb OR v_rows->'staffAccessPolicy'->'policy_version' IS DISTINCT FROM '2'::jsonb
+  OR v_rows->'productRolePolicy'->'funding_policy_version' IS DISTINCT FROM '1'::jsonb OR v_rows->'staffAccessPolicy'->'funding_policy_version' IS DISTINCT FROM '1'::jsonb THEN RETURN 'UNAVAILABLE';END IF;
+ v_policy:=v_rows->'internalAllowancePolicy';
+ IF core.jsonb_has_exact_keys(v_policy,ARRAY['enabled','funding_policy_version','currency','maximum_grant_micros','maximum_day_micros','maximum_week_micros','maximum_lifetime_ms','finish_allowance_bp']) IS DISTINCT FROM true
+  OR v_policy->'enabled' IS DISTINCT FROM 'true'::jsonb OR v_policy->'funding_policy_version' IS DISTINCT FROM '1'::jsonb
+  OR v_policy->>'currency' IS DISTINCT FROM 'USD' OR v_policy->'finish_allowance_bp' IS DISTINCT FROM '10000'::jsonb THEN RETURN 'UNAVAILABLE';END IF;
+ FOREACH v_key IN ARRAY ARRAY['maximum_grant_micros','maximum_day_micros','maximum_week_micros','maximum_lifetime_ms'] LOOP
+  IF jsonb_typeof(v_policy->v_key) IS DISTINCT FROM 'number' OR (v_policy->>v_key) !~ '^[1-9][0-9]*$' OR (v_policy->>v_key)::numeric>9007199254740991 THEN RETURN 'UNAVAILABLE';END IF;
+ END LOOP;
+ IF (v_policy->>'maximum_lifetime_ms')::numeric>2678400000 OR (v_policy->>'maximum_day_micros')::numeric>(v_policy->>'maximum_week_micros')::numeric
+  OR (v_policy->>'maximum_week_micros')::numeric>(v_policy->>'maximum_grant_micros')::numeric THEN RETURN 'UNAVAILABLE';END IF;
+ SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=v_scope.owner_ref;
+ IF v_user IS NULL THEN RETURN 'ERASED';END IF;
+ IF v_grant.owner_ref IS DISTINCT FROM v_scope.owner_ref THEN RETURN 'UNAVAILABLE';END IF;
+ SELECT grant_id INTO v_latest FROM billing.internal_grant WHERE owner_ref=v_scope.owner_ref ORDER BY revision DESC LIMIT 1;
+ IF v_latest IS DISTINCT FROM v_grant.grant_id THEN RETURN 'REPLACED';END IF;
+ IF v_grant.revoked_at IS NOT NULL THEN RETURN 'REVOKED';END IF;
+ v_now:=clock_timestamp();
+ IF v_now>=v_grant.expires_at THEN RETURN 'EXPIRED';END IF;
+ IF v_now<v_grant.starts_at THEN RETURN 'UNAVAILABLE';END IF;
+ IF identity.read_account_security_hold(v_user) THEN RETURN 'HELD';END IF;
+ RETURN 'ACTIVE';
+END $$;
+ALTER FUNCTION billing.read_internal_run_state(uuid) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.read_internal_run_state(uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION billing.read_internal_run_state(uuid) TO debateai_runtime;
+
+-- 0092:548-566 minus the INTERNAL_FUNDING_POLICY_MISMATCH refusal (0092:563). The `v_policy IS NULL` gate stays.
+CREATE OR REPLACE FUNCTION billing.read_internal_allowance(p_owner uuid,p_now timestamptz) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_policy jsonb; v_grant billing.internal_grant%ROWTYPE; v_user uuid;
+BEGIN
+  IF p_now IS NULL OR NOT isfinite(p_now) THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_TIME_INVALID'; END IF;
+  SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=p_owner;
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  SELECT * INTO v_grant FROM billing.internal_grant WHERE owner_ref=p_owner ORDER BY revision DESC LIMIT 1 FOR SHARE;
+  v_policy:=staff.read_internal_funding_policy();
+  IF v_policy IS NULL THEN
+    IF v_grant.grant_id IS NOT NULL THEN RAISE EXCEPTION 'INTERNAL_FUNDING_UNAVAILABLE'; END IF;
+    RETURN NULL;
+  END IF;
+  IF v_grant.grant_id IS NULL THEN RETURN NULL; END IF;
+  IF v_user IS NULL OR identity.read_account_security_hold(v_user) THEN RAISE EXCEPTION 'INTERNAL_FUNDING_UNAVAILABLE'; END IF;
+  IF v_grant.revoked_at IS NOT NULL OR p_now<v_grant.starts_at OR p_now>=v_grant.expires_at THEN RETURN NULL; END IF;
+  RETURN billing.internal_grant_json(v_grant);
+END $$;
+ALTER FUNCTION billing.read_internal_allowance(uuid,timestamptz) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.read_internal_allowance(uuid,timestamptz) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz) TO debateai_runtime;
+
+-- 0092:578-593 minus the policy_register_version-vs-selection term (0092:589). Its trigger (0092:594) is unchanged.
+CREATE OR REPLACE FUNCTION billing.guard_internal_charge_scope() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_policy jsonb; v_grant billing.internal_grant%ROWTYPE; v_user uuid;
+BEGIN
+  IF NEW.funding_kind='SUBSCRIPTION' THEN RETURN NEW; END IF;
+  SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=NEW.owner_ref;
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  v_policy:=staff.read_internal_funding_policy();
+  SELECT * INTO v_grant FROM billing.internal_grant WHERE grant_id=NEW.internal_grant_id FOR SHARE;
+  IF v_policy IS NULL OR v_user IS NULL OR identity.read_account_security_hold(v_user)
+    OR v_grant.owner_ref IS DISTINCT FROM NEW.owner_ref OR v_grant.configured_event_id IS DISTINCT FROM NEW.internal_grant_event_id
+    OR v_grant.revoked_at IS NOT NULL
+    OR NEW.admitted_at<v_grant.starts_at OR NEW.admitted_at>=v_grant.expires_at OR clock_timestamp()>=v_grant.expires_at
+    OR v_grant.grant_id IS NULL THEN RAISE EXCEPTION 'INTERNAL_FUNDING_UNAVAILABLE'; END IF;
+  RETURN NEW;
+END $$;
+ALTER FUNCTION billing.guard_internal_charge_scope() OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.guard_internal_charge_scope() FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+
+-- 0092:489-513 minus the command-vs-selection equality (0092:499). The command-vs-grant equality (0092:505) stays.
+CREATE OR REPLACE FUNCTION staff.revoke_internal_allowance(p_context jsonb,p_proof uuid,p_binding jsonb,p_command jsonb,p_alert jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_owner uuid; v_user uuid; v_operation uuid; v_grant billing.internal_grant%ROWTYPE; v_revision bigint; v_request jsonb; v_replay jsonb;
+BEGIN
+  v_owner:=(p_command->>'ownerRef')::uuid;
+  SELECT user_id INTO v_user FROM identity."user" WHERE owner_ref=v_owner;
+  PERFORM identity.lock_security_subjects(ARRAY[(p_context->>'userId')::uuid,v_user]);
+  IF v_user IS DISTINCT FROM (p_context->>'userId')::uuid OR staff.authorize_action(p_context,'ALLOWANCE_WRITE') IS DISTINCT FROM true
+    OR staff.read_internal_funding_policy() IS NULL THEN RAISE EXCEPTION 'STAFF_AUTHORITY_INVALID'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('funding:owner:'||v_owner::text,0));
+  PERFORM staff.assert_internal_allowance_binding('ALLOWANCE_REVOKE',p_binding,p_command);
+  v_operation:=(p_command->>'operationId')::uuid; v_request:=jsonb_build_array(p_context->>'staffId',p_binding,p_command);
+  v_replay:=staff.replay_mutation(v_operation,v_request); IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  SELECT * INTO v_grant FROM billing.internal_grant WHERE grant_id=(p_command->>'grantId')::uuid AND owner_ref=v_owner FOR UPDATE;
+  IF NOT FOUND OR v_grant.revoked_at IS NOT NULL THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_TARGET_INVALID'; END IF;
+  IF v_grant.policy_register_version IS DISTINCT FROM (p_command->>'policyRegisterVersion')::bigint THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_POLICY_MISMATCH'; END IF;
+  SELECT COALESCE(max(revision),0) INTO v_revision FROM billing.internal_grant WHERE owner_ref=v_owner;
+  IF staff.expected_revision(p_binding) IS DISTINCT FROM v_revision THEN RAISE EXCEPTION 'STAFF_REVISION_INVALID'; END IF;
+  PERFORM staff.consume_action(p_context,p_proof,p_binding,'ALLOWANCE_WRITE','ALLOWANCE_REVOKE',v_grant.grant_id,v_operation);
+  UPDATE billing.internal_grant SET revoked_at=clock_timestamp(),revision=v_revision+1 WHERE grant_id=v_grant.grant_id;
+  INSERT INTO billing.internal_grant_event(event_id,grant_id,event_type,operation_id,revision)
+    VALUES(gen_random_uuid(),v_grant.grant_id,'REVOKED',v_operation,v_revision+1);
+  RETURN staff.record_mutation(v_operation,'ALLOWANCE_REVOKED',(p_context->>'staffId')::uuid,(p_context->>'staffId')::uuid,p_command->'reason',v_user,p_alert,v_request);
+END $$;
+ALTER FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
+
+-- The funding publication AT a version (addendum from plan B; B14 consumes it as readPolicyAt): the same object
+-- staff.read_internal_funding_policy() returns for the selection ({registerVersion, policy, sourceRef}), for any sealed
+-- version, or NULL when that version is no enabled funding publication. It never reads the selection, so a grant is
+-- checked against the policy of the version it was issued with, never the pointer. Its checks are
+-- read_internal_run_state's above (sealed, complete, the three rows with a source, the two companion policies at
+-- policy_version 2 and funding_policy_version 1, the allowance policy's exact shape and bounds): the version a grant
+-- names passed read_internal_funding_policy()'s stricter checks when the grant was configured, and a sealed version
+-- never changes. A staff-schema definer (0123 adds no billing function, so 0111's verifier stays in force), owned and
+-- granted like staff.read_internal_funding_policy() (0092:660-661, 688); STABLE, since it takes no lock.
+CREATE OR REPLACE FUNCTION staff.read_internal_funding_policy_at(p_version bigint) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_sealed boolean; v_count bigint; v_rows jsonb; v_policy jsonb; v_key text;
+BEGIN
+  SELECT v.sealed,v.row_count INTO v_sealed,v_count FROM register.register_version v WHERE v.register_version=p_version;
+  IF NOT FOUND OR v_sealed IS DISTINCT FROM true
+    OR v_count IS DISTINCT FROM (SELECT count(*) FROM register.register_row WHERE register_version=p_version) THEN RETURN NULL; END IF;
+  SELECT jsonb_object_agg(row_key,value_json) INTO v_rows FROM register.register_row WHERE register_version=p_version
+    AND row_key IN('productRolePolicy','staffAccessPolicy','internalAllowancePolicy') AND length(btrim(source_ref))>0;
+  IF (SELECT count(*) FROM register.register_row WHERE register_version=p_version AND row_key IN('productRolePolicy','staffAccessPolicy','internalAllowancePolicy') AND length(btrim(source_ref))>0)<>3
+    OR v_rows->'productRolePolicy'->'policy_version' IS DISTINCT FROM '2'::jsonb OR v_rows->'staffAccessPolicy'->'policy_version' IS DISTINCT FROM '2'::jsonb
+    OR v_rows->'productRolePolicy'->'funding_policy_version' IS DISTINCT FROM '1'::jsonb OR v_rows->'staffAccessPolicy'->'funding_policy_version' IS DISTINCT FROM '1'::jsonb THEN RETURN NULL; END IF;
+  v_policy:=v_rows->'internalAllowancePolicy';
+  IF core.jsonb_has_exact_keys(v_policy,ARRAY['enabled','funding_policy_version','currency','maximum_grant_micros','maximum_day_micros','maximum_week_micros','maximum_lifetime_ms','finish_allowance_bp']) IS DISTINCT FROM true
+    OR v_policy->'enabled' IS DISTINCT FROM 'true'::jsonb OR v_policy->'funding_policy_version' IS DISTINCT FROM '1'::jsonb
+    OR v_policy->>'currency' IS DISTINCT FROM 'USD' OR v_policy->'finish_allowance_bp' IS DISTINCT FROM '10000'::jsonb THEN RETURN NULL; END IF;
+  FOREACH v_key IN ARRAY ARRAY['maximum_grant_micros','maximum_day_micros','maximum_week_micros','maximum_lifetime_ms'] LOOP
+    IF jsonb_typeof(v_policy->v_key) IS DISTINCT FROM 'number' OR (v_policy->>v_key) !~ '^[1-9][0-9]*$'
+      OR (v_policy->>v_key)::numeric>9007199254740991 THEN RETURN NULL; END IF;
+  END LOOP;
+  IF (v_policy->>'maximum_lifetime_ms')::numeric>2678400000 OR (v_policy->>'maximum_day_micros')::numeric>(v_policy->>'maximum_week_micros')::numeric
+    OR (v_policy->>'maximum_week_micros')::numeric>(v_policy->>'maximum_grant_micros')::numeric THEN RETURN NULL; END IF;
+  RETURN jsonb_build_object('registerVersion',p_version,'policy',v_policy,'sourceRef',
+    (SELECT source_ref FROM register.register_row WHERE register_version=p_version AND row_key='internalAllowancePolicy'));
+END $$;
+ALTER FUNCTION staff.read_internal_funding_policy_at(bigint) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.read_internal_funding_policy_at(bigint) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint) TO debateai_runtime;
+
 -- THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0122's closing shape). Each section adds its own checks.
 DO $side_by_side_releases_contract$
 DECLARE
@@ -883,6 +1109,13 @@ DECLARE
   v_readmit regprocedure := to_regprocedure('core.prepare_readmitted_run_key_provision(uuid,uuid)');
   v_readmit_lock regprocedure := to_regprocedure('core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)');
   v_start_guard regprocedure := to_regprocedure('core.refuse_starting_superseded_run()');
+  v_funding regprocedure[] := ARRAY[
+    to_regprocedure('billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)'),
+    to_regprocedure('billing.read_internal_run_state(uuid)'),
+    to_regprocedure('billing.read_internal_allowance(uuid,timestamptz)'),
+    to_regprocedure('billing.guard_internal_charge_scope()'),
+    to_regprocedure('staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)'),
+    to_regprocedure('staff.read_internal_funding_policy_at(bigint)')];
 BEGIN
   -- §1: the stamp column, its default, and its validated shape CHECK.
   IF NOT EXISTS (
@@ -1029,6 +1262,37 @@ BEGIN
       WHERE conrelid = 'core.run_wait_reason'::regclass AND conname = 'run_wait_reason_names_its_recheck' AND contype = 'c'
         AND convalidated) THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE';
+  END IF;
+  -- §6: the six functions owned by debateai_staff_security_owner as definers with the pinned path; none callable by
+  -- PUBLIC or the recovery role; all but the charge-scope guard callable by the runtime; no definition comparing a grant
+  -- with the selection's or the run's version any more; configure still taking the selection's version; the guard
+  -- still on run_charge_scope; and the funding reader at a version never reading the selection.
+  IF array_position(v_funding, NULL) IS NOT NULL
+    OR (SELECT count(*) FROM pg_proc AS p
+        WHERE p.oid = ANY(v_funding) AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']
+          AND pg_get_userbyid(p.proowner) = 'debateai_staff_security_owner') <> 6
+    OR EXISTS (SELECT 1 FROM unnest(v_funding) AS f(oid)
+               WHERE has_function_privilege('public', f.oid, 'EXECUTE')
+                 OR has_function_privilege('debateai_staff_recovery', f.oid, 'EXECUTE')
+                 OR has_function_privilege('debateai_runtime', f.oid, 'EXECUTE')
+                    IS DISTINCT FROM (f.oid <> 'billing.guard_internal_charge_scope()'::regprocedure))
+    OR strpos(pg_get_functiondef(v_funding[1]), 'register_version=(v_grant->>''policyRegisterVersion'')') > 0
+    OR strpos(pg_get_functiondef(v_funding[2]), 'register_version=v_grant.policy_register_version') = 0
+    OR strpos(pg_get_functiondef(v_funding[2]), 'f.register_version') > 0
+    OR strpos(pg_get_functiondef(v_funding[2]), 'FROM core.run') > 0
+    OR strpos(pg_get_functiondef(v_funding[3]), 'INTERNAL_FUNDING_POLICY_MISMATCH') > 0
+    OR strpos(pg_get_functiondef(v_funding[4]), 'policy_register_version') > 0
+    OR strpos(pg_get_functiondef(v_funding[5]), '(staff.read_internal_funding_policy())->''registerVersion''') > 0
+    OR strpos(pg_get_functiondef(v_funding[5]),
+         'v_grant.policy_register_version IS DISTINCT FROM (p_command->>''policyRegisterVersion'')::bigint') = 0
+    OR strpos(pg_get_functiondef(v_funding[6]), 'funding_policy_selection') > 0
+    OR strpos(pg_get_functiondef('staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)'::regprocedure),
+         'p_command->''policyRegisterVersion'' IS DISTINCT FROM v_policy->''registerVersion''') = 0
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_trigger
+      WHERE tgrelid = 'billing.run_charge_scope'::regclass AND tgname = 'internal_charge_scope_guard' AND NOT tgisinternal
+        AND tgenabled IN ('O', 'A') AND tgfoid = v_funding[4]) THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE';
   END IF;
 END
 $side_by_side_releases_contract$;

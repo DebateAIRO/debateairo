@@ -44,6 +44,18 @@ async function selectFunding() {
   }
   await database.pool.query("INSERT INTO staff.funding_policy_selection(singleton,register_version) VALUES(true,2) ON CONFLICT(singleton) DO UPDATE SET register_version=2");
 }
+let publishedNext = false;
+/** Publishes the same synthetic policy as sealed version 3 (once) and moves the funding selection to it. */
+async function selectNextFunding() {
+  if (!publishedNext) {
+    const policy = internalAllowancePolicyFromValue(rawPolicy, "test:synthetic-funding");
+    if (!policy.enabled) throw new Error("Enabled synthetic policy required");
+    const rows = await buildDevelopmentStaffV2DeploymentRegisterPublicationRows(await loadBootstrapRegister(), TEST_DEVELOPMENT_PROVIDER_PANEL, undefined, "local", policy);
+    await createPostgresRegisterPublicationPort(database.pool).importHistorical({ registerVersion: parseRegisterVersionText("3"), rows });
+    publishedNext = true;
+  }
+  await database.pool.query("UPDATE staff.funding_policy_selection SET register_version=3 WHERE singleton");
+}
 async function fundedActor() {
   await selectFunding();
   const actor = await owner();
@@ -82,13 +94,13 @@ async function configure(actor: Awaited<ReturnType<typeof fundedActor>>, command
   return runtime.query("SELECT staff.configure_internal_allowance($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb) AS receipt", [actor.context, bound.proofId, bound.binding, command, bound.alert]);
 }
 
- async function revoke(actor: Awaited<ReturnType<typeof fundedActor>>, grantId:string, expectedRevision=1) {
-  const command=configureCommand(actor,{expectedRevision}),proof=await boundProof(actor,command,"ALLOWANCE_REVOKE",grantId);
-  return runtime.query("SELECT staff.revoke_internal_allowance($1::jsonb,$2,$3::jsonb,$4::jsonb,$5::jsonb)",[actor.context,proof.proofId,proof.binding,{ownerRef:actor.ownerRef,grantId,expectedRevision,policyRegisterVersion:2,operationId:command.operationId,reason:command.reason},proof.alert]);
+ async function revoke(actor: Awaited<ReturnType<typeof fundedActor>>, grantId:string, expectedRevision=1, policyRegisterVersion=2) {
+  const command=configureCommand(actor,{expectedRevision,policyRegisterVersion}),proof=await boundProof(actor,command,"ALLOWANCE_REVOKE",grantId);
+  return runtime.query("SELECT staff.revoke_internal_allowance($1::jsonb,$2,$3::jsonb,$4::jsonb,$5::jsonb) AS receipt",[actor.context,proof.proofId,proof.binding,{ownerRef:actor.ownerRef,grantId,expectedRevision,policyRegisterVersion,operationId:command.operationId,reason:command.reason},proof.alert]);
  }
- async function run(ownerRef:string, planTier:"free"|"premium"="premium") {
-  const runId=await new RunRepository(pool).startRun({questionLine:"Can finite internal funding admit this fake provider?", principal:{kind:"legacy",legacyAskerId:`task11:${randomUUID()}`},sessionId:randomUUID(),callerScope:"ASKER",asOf:new Date(),askerRiskTier:"casual",effectiveRiskTier:"casual",tierSource:"ASKER",tierProvenanceRef:"asker:test",compositionBudgetTier:"low",planTier,depthParams:{depth:1},discoveredPanel:fixtureDiscoveredPanel(2),strangerSampleRate:0,envelopeBasis:fixtureStructuralCeiling(4),registerVersion:2,batteryVersion:"test",askContract:{},batteryRows:[]});
+ async function run(ownerRef:string, planTier:"free"|"premium"="premium", registerVersion=2) {
+  const runId=await new RunRepository(pool).startRun({questionLine:"Can finite internal funding admit this fake provider?", principal:{kind:"legacy",legacyAskerId:`task11:${randomUUID()}`},sessionId:randomUUID(),callerScope:"ASKER",asOf:new Date(),askerRiskTier:"casual",effectiveRiskTier:"casual",tierSource:"ASKER",tierProvenanceRef:"asker:test",compositionBudgetTier:"low",planTier,depthParams:{depth:1},discoveredPanel:fixtureDiscoveredPanel(2),strangerSampleRate:0,envelopeBasis:fixtureStructuralCeiling(4),registerVersion,batteryVersion:"test",askContract:{},batteryRows:[]});
   await pool.query("SELECT core.append_run_ownership_event($1,$2)",[runId,ownerRef]);return runId;
  }
- return {fundedActor,configureCommand,configure,revoke,run,selectFunding};
+ return {fundedActor,configureCommand,configure,revoke,run,selectFunding,selectNextFunding};
 }

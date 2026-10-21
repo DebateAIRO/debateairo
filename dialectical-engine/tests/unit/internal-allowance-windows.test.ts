@@ -18,7 +18,7 @@ function source(current: InternalGrant | null = grant, basis: FundingBasis | nul
   } }).FundingAwarePersonAllowanceSource;
   return new Constructor({ allowances: { readPolicy: async () => ({registerVersion:2, policy:{enabled:true,fundingPolicyVersion:1,currency:"USD",maximumGrantMicros:1000000,maximumDayMicros:100000,maximumWeekMicros:500000,maximumLifetimeMs:2678400000,finishAllowanceBp:10000,sourceRef:"test:task11",...policyChange}}), current: async () => current, forRun: async () => pinned },
     entitlements: { current: async () => ({ planId: "FREE", eventId, periodAnchorAt: new Date("2026-10-01T10:00:00Z"), monthCreditOverrideMicros: null }),
-      readRunFundingBasis: async () => basis }, plans, closeBasisPoints: 9500, registerVersion: 2 });
+      readRunFundingBasis: async () => basis }, plans, closeBasisPoints: 9500 });
 }
 describe("finite internal windows preserve the grant rather than a subscription", () => {
   it("uses grant-anchored day/week and total with expiry-clipped edges and zero finish overrun", async () => {
@@ -44,9 +44,23 @@ describe("finite internal windows preserve the grant rather than a subscription"
   it("refuses malformed amounts, owner/version/date and out-of-window grants", async () => {
     for (const malformed of [
       {...grant,amountMicros:Number.MAX_SAFE_INTEGER+1},{...grant,dayMicros:0},{...grant,weekMicros:1000001},
-      {...grant,ownerRef:randomUUID()},{...grant,policyRegisterVersion:3},{...grant,expiresAt:new Date(NaN)},
+      {...grant,ownerRef:randomUUID()},{...grant,policyRegisterVersion:0},{...grant,expiresAt:new Date(NaN)},
       {...grant,expiresAt:now},{...grant,startsAt:new Date("2026-10-10T00:00:00Z")}
     ]) await expect(source(malformed).read(ownerRef,now)).rejects.toThrow();
+  });
+  // Side-by-side spec §9, C15: a grant stays valid under the version it was issued with. The selection's maxima bind a
+  // grant of the selection's own version; a grant of another version keeps its own bounds.
+  it("keeps a grant of another version valid under its own bounds, and the selection's maxima for its own version", async () => {
+    const earlier = { ...grant, policyRegisterVersion: 1, amountMicros: 1100000, weekMicros: 600000, dayMicros: 200000 };
+    expect((await source(earlier).read(ownerRef, now)).map(w => [w.scope, w.limitMicros]))
+      .toEqual([["PERSON_DAY", 200000], ["PERSON_WEEK", 600000], ["PERSON_GRANT", 1100000]]);
+    expect((await source(grant, null, grant, {}).read(ownerRef, now)).map(w => w.scope)).toEqual(["PERSON_DAY", "PERSON_WEEK", "PERSON_GRANT"]);
+    for (const malformed of [
+      { ...earlier, dayMicros: 700000 }, { ...earlier, weekMicros: 1200000 },
+      { ...earlier, startsAt: new Date("2026-09-08T10:00:00Z") } // a lifetime above 31 days
+    ]) await expect(source(malformed).read(ownerRef, now)).rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
+    for (const aboveMaximum of [{ ...grant, amountMicros: 1100000 }, { ...grant, dayMicros: 200000, weekMicros: 600000, amountMicros: 1000000 }])
+      await expect(source(aboveMaximum).read(ownerRef, now)).rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });
   });
   it("does not turn missing pinned funding into an unbounded allowance", async () => {
     await expect(source(null,null).read(ownerRef,now,{runId:randomUUID()})).rejects.toThrow();

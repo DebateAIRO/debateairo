@@ -13,14 +13,17 @@ export interface FundingAllowancePort extends InternalAllowanceReadPort {
   readRunState(runId:string):Promise<InternalRunFundingState>;
   readPolicy(): Promise<Readonly<{ registerVersion: number; policy: Extract<InternalAllowancePolicy, { enabled: true }> }> | null>;
 }
-/** Consumption only: no privileged mutation or recovery-login readiness dependency. */
+/**
+ * Consumption only: no privileged mutation or recovery-login readiness dependency. It holds no register version: a
+ * grant stays valid under the version it was issued with, whatever the selection or the process's version is now
+ * (side-by-side spec §9, C15).
+ */
 export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource {
   private readonly customer: BillingPersonAllowanceSource;
   constructor(private readonly options: Readonly<{
     allowances: FundingAllowancePort; entitlements: FundingEntitlementPort; plans: BillingPlans;
-    closeBasisPoints: number; registerVersion: number;
+    closeBasisPoints: number;
   }>) {
-    if (!positive(options.registerVersion)) throw unavailable();
     this.customer = new BillingPersonAllowanceSource({ ...options, entitlements: {
       current: async (owner, now) => { const value = await options.entitlements.current(owner, now); if (value === null) throw unavailable(); return value; }
     } });
@@ -47,7 +50,7 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
       if (basis.kind === "SUBSCRIPTION") return null;
     }
     const selected = await this.options.allowances.readPolicy();
-    if (selected === null || selected.registerVersion !== this.options.registerVersion || selected.policy.enabled !== true
+    if (selected === null || !positive(selected.registerVersion) || selected.policy.enabled !== true
       || selected.policy.fundingPolicyVersion !== 1 || selected.policy.currency !== "USD" || selected.policy.finishAllowanceBp !== 10000
       || !positive(selected.policy.maximumGrantMicros) || !positive(selected.policy.maximumDayMicros) || !positive(selected.policy.maximumWeekMicros)
       || !positive(selected.policy.maximumLifetimeMs) || selected.policy.maximumLifetimeMs > 2678400000
@@ -55,12 +58,16 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
       || typeof selected.policy.sourceRef !== "string" || selected.policy.sourceRef.trim() === "") throw unavailable();
     const grant = context === undefined ? await this.options.allowances.current(ownerRef, now) : await this.options.allowances.forRun(context.runId, now);
     if (grant === null) { if (basis !== null) throw unavailable(); return null; }
+    // The selection's maxima bind a grant of the selection's own version only; a grant of another version keeps its
+    // own bounds (day ≤ week ≤ amount, lifetime ≤ 31 days), which its own version's policy admitted at issue.
     const p = selected.policy, start = grant.startsAt?.getTime(), expiry = grant.expiresAt?.getTime();
+    const sameVersion = grant.policyRegisterVersion === selected.registerVersion;
     if (!UUID.test(grant.grantId) || !UUID.test(grant.grantEventId) || grant.ownerRef !== ownerRef || !positive(grant.revision)
-      || grant.policyRegisterVersion !== this.options.registerVersion || !positive(grant.amountMicros) || !positive(grant.dayMicros) || !positive(grant.weekMicros)
-      || grant.dayMicros > grant.weekMicros || grant.weekMicros > grant.amountMicros || grant.amountMicros > p.maximumGrantMicros
-      || grant.dayMicros > p.maximumDayMicros || grant.weekMicros > p.maximumWeekMicros
-      || !Number.isFinite(start) || !Number.isFinite(expiry) || expiry <= start || expiry - start > p.maximumLifetimeMs
+      || !positive(grant.policyRegisterVersion) || !positive(grant.amountMicros) || !positive(grant.dayMicros) || !positive(grant.weekMicros)
+      || grant.dayMicros > grant.weekMicros || grant.weekMicros > grant.amountMicros
+      || (sameVersion && (grant.amountMicros > p.maximumGrantMicros || grant.dayMicros > p.maximumDayMicros || grant.weekMicros > p.maximumWeekMicros))
+      || !Number.isFinite(start) || !Number.isFinite(expiry) || expiry <= start
+      || expiry - start > (sameVersion ? p.maximumLifetimeMs : 2678400000)
       || now.getTime() < start || now.getTime() >= expiry
       || (basis?.kind === "INTERNAL" && (basis.grantId !== grant.grantId || basis.grantEventId !== grant.grantEventId))) throw unavailable();
     return grant;

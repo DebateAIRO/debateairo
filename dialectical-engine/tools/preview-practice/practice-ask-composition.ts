@@ -177,7 +177,7 @@ export async function composePracticeAskMoney(input: Readonly<{
     assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
     const spend = new PostgresModelSpendStore(pool);
     const entitlements = null;
-    const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+    const allowances = new PostgresInternalAllowanceRepository(pool);
     const selectedFunding = await allowances.readPolicy();
     // The preview's api.env names no internal allowance (README H1), so main.ts's `configuredFunding` is undefined there.
     if (selectedFunding !== null) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");

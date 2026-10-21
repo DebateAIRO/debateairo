@@ -7,7 +7,9 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 /**
  * 0123 (side-by-side uploads spec 2026-10-21 §1, §5; plan A, tasks A1-A5) is ONE chain step built section by section:
  * A1 gives it the release stamp on core.run and the encrypted insert path that writes it; A2 the release table, its view,
- * its two readers and its two serialized writers (§3); A3 the re-admission records and the two new wait reasons (§4, §5).
+ * its two readers and its two serialized writers (§3); A3 the re-admission records and the two new wait reasons (§4, §5);
+ * A4 the funding functions redefined so a grant stays valid under the version it was issued with, and the funding
+ * publication reader at a version (§6).
  * It is the drained transition
  * upload's step (`-- n1: drained`) and adds no billing object, so 0111's effective verifier stays in force
  * (`-- n1: keeps-verifier`, migrations/lineage/README.md step 3).
@@ -180,6 +182,46 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("ADD CONSTRAINT run_wait_reason_waits_for_check CHECK (waits_for IN ('SITE','PERSON','SITE_BUSY','SWITCHING')) NOT VALID;");
     expect(sql).toContain("ALTER TABLE core.run_wait_reason VALIDATE CONSTRAINT run_wait_reason_waits_for_check;");
     expect(sql).toContain("SIDE_BY_SIDE_WAIT_REASON_CONTRACT_INCOMPLETE");
+  });
+
+  it("§6 redefines the five funding functions without the version comparisons, re-asserting owner and grants, and adds the reader at a version", () => {
+    const body = (signature: string): string => {
+      const start = sql.indexOf(`CREATE OR REPLACE FUNCTION ${signature}`);
+      expect(start, signature).toBeGreaterThan(sql.indexOf("-- §6. Funding grants stay valid"));
+      return sql.slice(start, sql.indexOf("END $$;", start));
+    };
+    expect(sql).toContain("-- Drained T, spec §9, C15:");
+    const reserve = body("billing.reserve_internal_provider_call(");
+    expect(reserve).not.toContain("register_version=(v_grant->>'policyRegisterVersion')");
+    expect(reserve).toContain("IF v_grant IS NULL OR v_now>=(v_grant->>'expiresAt')::timestamptz OR v_now<(v_grant->>'startsAt')::timestamptz THEN");
+    const state = body("billing.read_internal_run_state(");
+    expect(state).toContain("IF NOT EXISTS(SELECT 1 FROM staff.funding_policy_selection f WHERE f.singleton) THEN RETURN 'UNAVAILABLE';END IF;");
+    expect(state).toContain("FROM register.register_version v WHERE v.register_version=v_grant.policy_register_version;");
+    expect(state).not.toContain("FROM core.run");
+    expect(body("billing.read_internal_allowance(")).not.toContain("INTERNAL_FUNDING_POLICY_MISMATCH");
+    expect(body("billing.read_internal_allowance(")).toContain("IF v_policy IS NULL THEN");
+    expect(body("billing.guard_internal_charge_scope(")).not.toContain("policy_register_version");
+    const revoke = body("staff.revoke_internal_allowance(");
+    expect(revoke).not.toContain("(staff.read_internal_funding_policy())->'registerVersion'");
+    expect(revoke).toContain("IF v_grant.policy_register_version IS DISTINCT FROM (p_command->>'policyRegisterVersion')::bigint THEN RAISE EXCEPTION 'INTERNAL_ALLOWANCE_POLICY_MISMATCH'; END IF;");
+    // configure is not redefined: new grants take the selection's version.
+    expect(sql).not.toContain("FUNCTION staff.configure_internal_allowance(");
+    expect(body("staff.read_internal_funding_policy_at(")).not.toContain("funding_policy_selection");
+    for (const signature of ["billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)", "billing.read_internal_run_state(uuid)",
+      "billing.read_internal_allowance(uuid,timestamptz)", "billing.guard_internal_charge_scope()",
+      "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.read_internal_funding_policy_at(bigint)"]) {
+      expect(sql).toContain(`ALTER FUNCTION ${signature} OWNER TO debateai_staff_security_owner;`);
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,debateai_runtime,debateai_staff_recovery;`);
+      if (signature !== "billing.guard_internal_charge_scope()") expect(sql).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_runtime;`);
+    }
+    expect(sql).not.toContain("GRANT EXECUTE ON FUNCTION billing.guard_internal_charge_scope()");
+    // No billing function is added: every billing function §6 names already exists in 0092/0093.
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION billing\.(?!reserve_internal_provider_call\(|read_internal_run_state\(|read_internal_allowance\(|guard_internal_charge_scope\()/u);
+    expect(sql).toContain("SIDE_BY_SIDE_FUNDING_CONTRACT_INCOMPLETE");
+    // The loader digests the new reader; the five redefinitions are checked by the closing block and the tests.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("'staff.read_internal_funding_policy_at(bigint)'");
+    expect(loader).not.toContain("'billing.read_internal_allowance(uuid,timestamptz)'");
   });
 
   it("§2's closing check covers every role 0040's REVOKE names, not only PUBLIC and the runtime", () => {

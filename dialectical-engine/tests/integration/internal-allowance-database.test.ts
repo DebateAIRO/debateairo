@@ -203,7 +203,7 @@ it("pins INTERNAL basis once through the repository and refuses revoked, expired
   await configure(actor, command);
   expect(db).toHaveProperty("PostgresInternalAllowanceRepository");
   const Repository = (db as unknown as Record<string, new (...args: unknown[]) => { current(owner: string, now: Date): Promise<unknown>; forRun(run: string, now: Date): Promise<unknown> }>).PostgresInternalAllowanceRepository!;
-  const allowances = new Repository(runtime, { registerVersion: 2 });
+  const allowances = new Repository(runtime);
   const grant = await allowances.current(actor.ownerRef, new Date()) as { grantId: string; grantEventId: string };
   expect(grant).toMatchObject({ grantId: command.operationId, amountMicros: 1000000, dayMicros: 100000, weekMicros: 500000 });
   await seedStaffPrivateObject(database.pool, { userId: actor.userId, ownerRef: actor.ownerRef, ordinarySessionId: actor.sessionId });
@@ -243,7 +243,10 @@ it("severs the account mapping on actual erasure while retaining immutable grant
   await expect(runtime.query("SELECT staff.read_self_allowance_command($1::jsonb,$2,$3)", [actor.context, hash(actor.sessionId), command.operationId])).rejects.toThrow();
 });
 
-it("invalidates old proofs and pinned grants after switching to a different valid funded register", async () => {
+// Side-by-side spec §9, C15: switching the selection to another valid funded register refuses every command bound to
+// the old selection (a new grant takes the selection's version, and the proof binds the version it names), but a grant
+// issued under the old version stays valid under that version: nothing compares it with the selection any more.
+it("refuses old proofs after switching to a different valid funded register, while a pinned grant stays valid under its own version", async () => {
   const actor = await fundedActor(), command = configureCommand(actor), proof = await boundProof(actor, command);
   const policy = internalAllowancePolicyFromValue(rawPolicy, "test:synthetic-funding");
   if (!policy.enabled) throw Error("Enabled synthetic policy required");
@@ -252,13 +255,16 @@ it("invalidates old proofs and pinned grants after switching to a different vali
   await database.pool.query("UPDATE staff.funding_policy_selection SET register_version=3 WHERE singleton");
   await expect(configure(actor, command, proof)).rejects.toThrow("INTERNAL_ALLOWANCE_POLICY_MISMATCH");
   await expect(configure(actor, { ...command, policyRegisterVersion: 3 }, proof)).rejects.toThrow("STAFF_PROOF_INVALID");
-  const repository = new db.PostgresInternalAllowanceRepository(runtime, { registerVersion: 2 });
-  await expect(repository.readSelfCommand(actor.context, hash(actor.sessionId), null)).rejects.toThrow();
-  await expect(repository.readPolicy()).rejects.toThrow();
+  // The repository holds no version of its own: the self command and the policy name the selection's, never refused.
+  const repository = new db.PostgresInternalAllowanceRepository(runtime);
+  expect(await repository.readSelfCommand(actor.context, hash(actor.sessionId), null)).toMatchObject({ ownerRef: actor.ownerRef, policyRegisterVersion: 3 });
+  expect((await repository.readPolicy())?.registerVersion).toBe(3);
   await selectFunding();
   await configure(actor, command, proof);
   await database.pool.query("UPDATE staff.funding_policy_selection SET register_version=3 WHERE singleton");
-  await expect(repository.current(actor.ownerRef, new Date())).rejects.toThrow("INTERNAL_FUNDING_POLICY_MISMATCH");
+  expect(await repository.current(actor.ownerRef, new Date())).toMatchObject({ grantId: command.operationId, policyRegisterVersion: 2 });
+  expect((await runtime.query("SELECT billing.read_internal_allowance($1::uuid,clock_timestamp()) AS value", [actor.ownerRef])).rows[0].value)
+    .toMatchObject({ grantId: command.operationId, policyRegisterVersion: 2 });
   await selectFunding();
 });
 

@@ -12,7 +12,7 @@ const plans=billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value,"t
 beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_admission LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
 afterEach(async()=>{await database.pool.query("INSERT INTO core.run_wait_start(run_id,started_at) SELECT run_id,clock_timestamp() FROM core.run_waiting_v");});
 afterAll(async()=>{await runtime?.end();await database?.stop();});
-function source(){const C=(billing as unknown as {FundingAwarePersonAllowanceSource:new(input:unknown)=>any}).FundingAwarePersonAllowanceSource;return new C({allowances:new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}),entitlements:new EntitlementRepository(runtime),plans,closeBasisPoints:9500,registerVersion:2});}
+function source(){const C=(billing as unknown as {FundingAwarePersonAllowanceSource:new(input:unknown)=>any}).FundingAwarePersonAllowanceSource;return new C({allowances:new PostgresInternalAllowanceRepository(runtime),entitlements:new EntitlementRepository(runtime),plans,closeBasisPoints:9500});}
 const settingsClass={planTier:"premium",compositionBudgetTier:"low",makerCount:2,depth:1} as const;
 function room(personAllowance:ReturnType<typeof source>,ceiling=10000000){return new AskRoom({lockPool:database.pool,spend:new PostgresModelSpendStore(runtime),line:new RunWaitRepository(runtime),estimator:{estimateMicros:async()=>1000},personAllowance,entitlements:new EntitlementRepository(runtime),funding:personAllowance,billingPlans:plans,dailyCeilingMicros:ceiling,closeBasisPoints:9500,waitingLinePerPerson:1} as never);}
 describe("actual grant-aware room and waiting admission",()=>{
@@ -57,7 +57,7 @@ describe("actual grant-aware room and waiting admission",()=>{
   expect(await room(funding).startWaiting((await new RunWaitRepository(runtime).readWaiting(premium))!,async()=>"must-not-dispatch")).toEqual({kind:"PLAN_CHANGED"});expect(await entitlements.readRunFundingBasis(premium)).toEqual(premiumPin);
  });
  it("does not debit a revoked internal grant's spend to the ordinary customer allowance",async()=>{
-  const actor=await fixture.fundedActor(),command=fixture.configureCommand(actor);await fixture.configure(actor,command);const allowances=new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}),grant=(await allowances.current(actor.ownerRef,new Date()))!,runId=await fixture.run(actor.ownerRef),tx=await runtime.connect();
+  const actor=await fixture.fundedActor(),command=fixture.configureCommand(actor);await fixture.configure(actor,command);const allowances=new PostgresInternalAllowanceRepository(runtime),grant=(await allowances.current(actor.ownerRef,new Date()))!,runId=await fixture.run(actor.ownerRef),tx=await runtime.connect();
   try{await new EntitlementRepository(runtime).recordRunChargeScope(tx,{runId,ownerRef:actor.ownerRef,basis:{kind:"INTERNAL",grantId:grant.grantId,grantEventId:grant.grantEventId},admittedAt:new Date()});}finally{tx.release();}
   await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'RUN',$1,'fake-provider',current_date,10000,1,1)",[runId]);
   await fixture.revoke(actor,grant.grantId);const window=(await source().read(actor.ownerRef,new Date()))[0];
@@ -113,9 +113,9 @@ describe("actual grant-aware room and waiting admission",()=>{
   await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'SUPPORT','fake-provider',current_date,1,1,1)");
   await r.decide({access:{ownerRef:actor.ownerRef,legacyAskerId:null},settingsClass},async({tx,now})=>r.enterWait(tx,runId,now));const pin=await new EntitlementRepository(runtime).readRunFundingBasis(runId),question=(await database.pool.query("SELECT question_line FROM core.run WHERE run_id=$1",[runId])).rows;
   await new Promise(resolve=>setTimeout(resolve,Math.max(0,Date.parse(command.expiresAt)-Date.now())+30));
-  expect(await new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}).readRunState(runId)).toBe("EXPIRED");expect(await room(funding).startWaiting((await line.readWaiting(runId))!,async()=>"must-not-dispatch")).toEqual({kind:"FUNDING_FAILED"});
-  await fixture.configure(actor,fixture.configureCommand(actor,{expectedRevision:1,startsAt:new Date().toISOString()}));expect(await new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}).readRunState(runId)).toBe("REPLACED");
-  await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1',[actor.userId]);expect(await new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}).readRunState(runId)).toBe("ERASED");
+  expect(await new PostgresInternalAllowanceRepository(runtime).readRunState(runId)).toBe("EXPIRED");expect(await room(funding).startWaiting((await line.readWaiting(runId))!,async()=>"must-not-dispatch")).toEqual({kind:"FUNDING_FAILED"});
+  await fixture.configure(actor,fixture.configureCommand(actor,{expectedRevision:1,startsAt:new Date().toISOString()}));expect(await new PostgresInternalAllowanceRepository(runtime).readRunState(runId)).toBe("REPLACED");
+  await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1',[actor.userId]);expect(await new PostgresInternalAllowanceRepository(runtime).readRunState(runId)).toBe("ERASED");
   expect(await line.readWaiting(runId)).toBeNull();expect(await new EntitlementRepository(runtime).readRunFundingBasis(runId)).toEqual(pin);expect((await database.pool.query("SELECT question_line FROM core.run WHERE run_id=$1",[runId])).rows).toEqual(question);
  });
 
@@ -123,7 +123,7 @@ describe("actual grant-aware room and waiting admission",()=>{
   const actor=await fixture.fundedActor(),command=fixture.configureCommand(actor);await fixture.configure(actor,command);const funding=source(),r=room(funding,1),runId=await fixture.run(actor.ownerRef);
   await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'SUPPORT','fake-provider',current_date,1,1,1)");
   await r.decide({access:{ownerRef:actor.ownerRef,legacyAskerId:null},settingsClass},async({tx,now})=>r.enterWait(tx,runId,now));const lock=await database.pool.connect();let read:Promise<string>|undefined;
-  try{await lock.query("BEGIN");await lock.query("SELECT singleton FROM staff.funding_policy_selection FOR UPDATE");read=new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}).readRunState(runId);
+  try{await lock.query("BEGIN");await lock.query("SELECT singleton FROM staff.funding_policy_selection FOR UPDATE");read=new PostgresInternalAllowanceRepository(runtime).readRunState(runId);
    expect(await Promise.race([read.then(()=>"READ"),new Promise(resolve=>setTimeout(()=>resolve("BLOCKED"),750))])).toBe("READ");
   }finally{await lock.query("ROLLBACK");lock.release();await read;}
  });
