@@ -1,11 +1,18 @@
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import { configureContentEncryption, contentCipherFor, createPool, migrate } from "@debateai/db";
+import { SynthesisCheckRepository } from "@debateai/serve";
+import { PostgresAskApplication } from "../../apps/api/src/index.js";
 import { collectSnapshot, type RawExportRows } from "../../apps/api/src/data-export/snapshot.js";
 import { OwnerViewAdapter } from "../../apps/api/src/data-export/owner-view-adapter.js";
 import { renderYourDataHtml } from "../../apps/api/src/data-export/html-page.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import type { SynthesisCheckEntry } from "../../apps/api/src/data-export/types.js";
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
+import { startTestDatabase, createTestAskAdmissionPoolFacades } from "../support/testDatabase.js";
+import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
+import { persistTerminalRun } from "../support/settledRun.js";
 
 const rawFixture = JSON.parse(readFileSync(new URL("../fixtures/data-export/raw-a.json", import.meta.url), "utf8"));
 const checks = [
@@ -51,12 +58,48 @@ function pageWithChecks(locale: "en" | "ro") {
 
 describe("synthesis checks in the owner's data export", () => {
   it("the export of an owner with one FLAGGED and one CLEAR version lists both: verdict, category codes and checked_at in the JSON", async () => {
+    const db = await startTestDatabase();
+    let runtime: ReturnType<typeof createPool> | undefined;
+    let owner: Awaited<ReturnType<typeof provisionStoryEncryptedOwner>> | undefined;
+    try {
+      await migrate(db.pool);
+      owner = await provisionStoryEncryptedOwner(db.pool);
+      const url = new URL(db.connectionString);
+      url.searchParams.set("options", "-c role=debateai_runtime");
+      runtime = createPool(url.toString());
+      configureContentEncryption(runtime, contentCipherFor(db.pool)!);
+      const runId = await createEncryptedStoryRun(db.pool, owner, `Export check ${randomUUID()}?`);
+      const { answerId } = await persistTerminalRun({
+        pool: db.pool, runId, fixtureKey: randomUUID(),
+        factBundle: { facts: [], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+          reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null }
+      });
+      const repository = new SynthesisCheckRepository(runtime);
+      const attempt = await repository.startPublishAttempt({ runId, answerId, answerVersion: 1 });
+      expect(await repository.insertResult({
+        attemptId: attempt.attemptId, runId, answerId, answerVersion: 1, synthesisOriginVersion: 1,
+        outcome: { verdict: "CLEAR", categories: [] }, modelProviderRef: null, modelId: null,
+        policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 0, deadlineMs: 60_000
+      })).toBe("INSERTED");
+      const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
+        createTestAskAdmissionPoolFacades(runtime));
+      const adapter = new OwnerViewAdapter({ application }, { exists: async () => true });
+      const real = exportHarness();
+      real.ownerView.readRunAnswer.mockResolvedValue({ answer_id: answerId, answer_version: 1 });
+      real.ownerView.readSynthesisChecks.mockImplementation((ownerRef, id) => adapter.readSynthesisChecks(ownerRef, id));
+      const exported = (await real.collect(owner.ownerRef)).debates.debates[0]?.answers?.[0]?.synthesis_checks;
+      expect(exported).toEqual([{ answer_version: 1, verdict: "CLEAR", categories: [], checked_at: expect.any(String) }]);
+    } finally {
+      await runtime?.end();
+      await db.stop();
+      if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
+    }
     const h = exportHarness();
     const answer = (await h.collect()).debates.debates[0]?.answers?.[0];
     expect(answer?.synthesis_checks).toEqual(checks);
     expect(JSON.stringify(answer)).toContain('"TERRORISM"');
     expect(h.ownerView.readSynthesisChecks).toHaveBeenCalledWith("owner-1", "answer-1");
-  });
+  }, 180_000);
 
   it("the export lists nothing of another account's checks", async () => {
     const h = exportHarness();
