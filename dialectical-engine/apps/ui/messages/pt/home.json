@@ -130,5 +130,9 @@
   "home.removal.automatic": "Esta decisão foi tomada por uma ferramenta automatizada, sem qualquer pessoa envolvida.",
   "home.removal.ground": "Terreno: os nossos Termos de Serviço, secção 9 (debate as nossas exclusões de cheques).",
   "home.removal.complain": "Para reclamar, escreva para office@dezbatere.ro dentro de seis meses. Uma reclamação não pode trazer o debate de volta.",
-  "home.removal.close": "Fechar"
+  "home.removal.close": "Fechar",
+  "home.flag.underReview": "SINALIZADO · EM REVISÃO",
+  "home.flag.approved": "APROVADO",
+  "home.flag.refused": "NÃO APROVADO",
+  "home.takeDown.button": "Retirar"
 }

@@ -128,5 +128,9 @@
   "home.removal.automatic": "이 결정은 사람의 개입 없이 자동화된 도구가 내렸습니다.",
   "home.removal.ground": "근거: 서비스 약관 제9조(검사로 삭제되는 토론).",
   "home.removal.complain": "이의를 제기하려면 6개월 이내에 office@dezbatere.ro로 연락해 주세요. 이의를 제기해도 토론을 복원할 수는 없습니다.",
-  "home.removal.close": "닫기"
+  "home.removal.close": "닫기",
+  "home.flag.underReview": "신고됨 · 검토 중",
+  "home.flag.approved": "승인됨",
+  "home.flag.refused": "승인되지 않음",
+  "home.takeDown.button": "내리기"
 }

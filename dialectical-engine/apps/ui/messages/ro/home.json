@@ -130,5 +130,9 @@
   "home.removal.automatic": "Această decizie a fost luată de un instrument automat, fără nicio persoană implicată.",
   "home.removal.ground": "Temei: Condițiile noastre de utilizare, secțiunea 9 (dezbate ștergerea cecului nostru).",
   "home.removal.complain": "Pentru a depune o plângere, scrieți la office@dezbatere.ro în termen de șase luni. O plângere nu poate readuce dezbaterea.",
-  "home.removal.close": "Închideți"
+  "home.removal.close": "Închideți",
+  "home.flag.underReview": "MARGAT · ÎN REEXAMINARE",
+  "home.flag.approved": "APROBAT",
+  "home.flag.refused": "NU APROBAT",
+  "home.takeDown.button": "Retrageți"
 }

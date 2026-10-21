@@ -129,5 +129,9 @@
   "home.removal.automatic": "Deze beslissing werd genomen door een geautomatiseerde tool, waarbij geen persoon betrokken was.",
   "home.removal.ground": "Grond: onze Gebruiksvoorwaarden, sectie 9 (debates our check deletes).",
   "home.removal.complain": "Schrijf binnen zes maanden naar office@dezbatere.ro om een klacht in te dienen. Een klacht kan het debat niet terugbrengen.",
-  "home.removal.close": "Sluiten"
+  "home.removal.close": "Sluiten",
+  "home.flag.underReview": "GEMARKEERD · WORDT BEOORDEELD",
+  "home.flag.approved": "GOEDGEKEURD",
+  "home.flag.refused": "NIET GOEDGEKEURD",
+  "home.takeDown.button": "Offline halen"
 }

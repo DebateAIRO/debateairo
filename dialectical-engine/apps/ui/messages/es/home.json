@@ -130,5 +130,9 @@
   "home.removal.automatic": "Esta decisión fue tomada por una herramienta automatizada, sin ninguna persona involucrada.",
   "home.removal.ground": "Motivo: nuestros Términos de servicio, sección 9 (debate que nuestro cheque elimina).",
   "home.removal.complain": "Para presentar una queja, escriba a office@dezbatere.ro en un plazo de seis meses. Una queja no puede devolver el debate.",
-  "home.removal.close": "Cerrar"
+  "home.removal.close": "Cerrar",
+  "home.flag.underReview": "MARCADO · EN REVISIÓN",
+  "home.flag.approved": "APROBADO",
+  "home.flag.refused": "NO APROBADO",
+  "home.takeDown.button": "Retirar"
 }

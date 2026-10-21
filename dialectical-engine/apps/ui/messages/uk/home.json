@@ -131,5 +131,9 @@
   "home.removal.automatic": "Це рішення ухвалив автоматизований інструмент без участі людини.",
   "home.removal.ground": "Підстава: наші Умови надання послуг, розділ 9 (обговорення, які видаляє наша перевірка).",
   "home.removal.complain": "Щоб подати скаргу, напишіть на office@dezbatere.ro протягом шести місяців. Скарга не може повернути обговорення.",
-  "home.removal.close": "Закрити"
+  "home.removal.close": "Закрити",
+  "home.flag.underReview": "ПОМІЧЕНО · НА ПЕРЕГЛЯДІ",
+  "home.flag.approved": "ЗАТВЕРДЖЕНО",
+  "home.flag.refused": "НЕ ЗАТВЕРДЖЕНО",
+  "home.takeDown.button": "Прибрати"
 }

@@ -129,5 +129,9 @@
   "home.crisisSupport.misread": "If we misread your question, you can reword it.",
   "home.crisisSupport.back": "Back to my question",
   "home.crisisSupport.chooseCountry": "Choose your country to see its helplines.",
-  "home.crisisSupport.emergencyAnywhere": "If you or someone else is in immediate danger, call your local emergency number now."
+  "home.crisisSupport.emergencyAnywhere": "If you or someone else is in immediate danger, call your local emergency number now.",
+  "home.flag.underReview": "FLAGGED · UNDER REVIEW",
+  "home.flag.approved": "APPROVED",
+  "home.flag.refused": "NOT APPROVED",
+  "home.takeDown.button": "Take down"
 }

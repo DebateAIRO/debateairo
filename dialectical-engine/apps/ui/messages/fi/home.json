@@ -129,5 +129,9 @@
   "home.removal.automatic": "Tämä päätös tehtiin automaattisella työkalulla, johon ei osallistunut ketään.",
   "home.removal.ground": "Perustelut: Käyttöehtojemme kohta 9 (keskustelujen tarkistus poistetaan).",
   "home.removal.complain": "Voit tehdä valituksen kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa. Kantelu ei voi tuoda keskustelua takaisin.",
-  "home.removal.close": "Sulje"
+  "home.removal.close": "Sulje",
+  "home.flag.underReview": "LIPUTETTU · TARKASTELTU ON",
+  "home.flag.approved": "HYVÄKSYTTY",
+  "home.flag.refused": "EI HYVÄKSYTTY",
+  "home.takeDown.button": "Poista näkyvistä"
 }

@@ -130,5 +130,9 @@
   "home.removal.automatic": "Šo lēmumu pieņēma automatizēts rīks, neiesaistot nevienu personu.",
   "home.removal.ground": "Pamatojums: mūsu pakalpojumu sniegšanas noteikumu 9. sadaļa (debates par mūsu čeka dzēšanu).",
   "home.removal.complain": "Lai iesniegtu sūdzību, sešu mēnešu laikā rakstiet uz office@dezbatere.ro. Sūdzība nevar atgriezt debates.",
-  "home.removal.close": "Aizvērt"
+  "home.removal.close": "Aizvērt",
+  "home.flag.underReview": "ATZĪMĒTS · NOTIEK PĀRSKATĪŠANA",
+  "home.flag.approved": "APSTIPRINĀTS",
+  "home.flag.refused": "NAV APSTIPRINĀTS",
+  "home.takeDown.button": "Noņemt"
 }

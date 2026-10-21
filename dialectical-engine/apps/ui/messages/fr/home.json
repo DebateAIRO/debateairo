@@ -130,5 +130,9 @@
   "home.removal.automatic": "Cette décision a été prise par un outil automatisé, sans personne impliquée.",
   "home.removal.ground": "Terrain : nos Conditions d'utilisation, section 9 (débats que notre chèque supprime).",
   "home.removal.complain": "Pour vous plaindre, écrivez à office@dezbatere.ro dans les six mois. Une plainte ne peut pas ramener le débat.",
-  "home.removal.close": "Fermer"
+  "home.removal.close": "Fermer",
+  "home.flag.underReview": "SIGNALÉ · EN COURS DE RÉVISION",
+  "home.flag.approved": "APPROUVÉ",
+  "home.flag.refused": "NON APPROUVÉ",
+  "home.takeDown.button": "Retirer"
 }

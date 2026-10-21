@@ -131,5 +131,9 @@
   "home.removal.automatic": "Decyzja ta została podjęta przez zautomatyzowane narzędzie, bez udziału żadnej osoby.",
   "home.removal.ground": "Podstawa: nasze Warunki Świadczenia Usług, sekcja 9 (debaty, które usuwa nasz czek).",
   "home.removal.complain": "Aby złożyć skargę, napisz na adres office@dezbatere.ro w ciągu sześciu miesięcy. Skarga nie może przywrócić debaty.",
-  "home.removal.close": "Zamknięty"
+  "home.removal.close": "Zamknięty",
+  "home.flag.underReview": "OZNACZONY · W TRAKCIE PRZEGLĄDU",
+  "home.flag.approved": "ZATWIERDZONE",
+  "home.flag.refused": "NIE ZATWIERDZONO",
+  "home.takeDown.button": "Wycofaj"
 }

@@ -129,5 +129,9 @@
   "home.removal.automatic": "Ezt a döntést egy automatizált eszközzel hozták meg, személy bevonása nélkül.",
   "home.removal.ground": "Indokolás: Általános Szerződési Feltételeink, 9. szakasz (a csekkünk törlésével kapcsolatos viták).",
   "home.removal.complain": "Ha panaszt szeretnél tenni, írj a office@dezbatere.ro címre hat hónapon belül. A panasz nem hozhatja vissza a vitát.",
-  "home.removal.close": "Bezárás"
+  "home.removal.close": "Bezárás",
+  "home.flag.underReview": "MEGJELÖLVE · FELÜLVIZSGÁLAT ALATT",
+  "home.flag.approved": "JÓVÁHAGYVA",
+  "home.flag.refused": "NEM JÓVÁHAGYVA",
+  "home.takeDown.button": "Levétel"
 }

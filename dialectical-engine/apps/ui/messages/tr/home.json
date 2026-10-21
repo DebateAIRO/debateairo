@@ -129,5 +129,9 @@
   "home.removal.automatic": "Bu karar, hiçbir kişinin katılımı olmadan otomatik bir araç tarafından verildi.",
   "home.removal.ground": "Dayanak: Hizmet Şartlarımızın 9. bölümü (kontrolümüzün sildiği tartışmalar).",
   "home.removal.complain": "Şikâyet etmek için altı ay içinde office@dezbatere.ro adresine yazın. Şikâyet, tartışmayı geri getiremez.",
-  "home.removal.close": "Kapat"
+  "home.removal.close": "Kapat",
+  "home.flag.underReview": "BAYRAKLI · İNCELENİYOR",
+  "home.flag.approved": "ONAYLANDI",
+  "home.flag.refused": "ONAYLANMADI",
+  "home.takeDown.button": "Yayından kaldır"
 }

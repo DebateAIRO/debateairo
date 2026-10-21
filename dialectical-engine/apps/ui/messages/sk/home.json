@@ -131,5 +131,9 @@
   "home.removal.automatic": "Toto rozhodnutie bolo vykonané automatizovaným nástrojom bez účasti žiadnej osoby.",
   "home.removal.ground": "Dôvod: naše zmluvné podmienky, oddiel 9 (debaty o odstránení šeku).",
   "home.removal.complain": "Ak chcete podať sťažnosť, napíšte na adresu office@dezbatere.ro do šiestich mesiacov. Sťažnosť nemôže vrátiť diskusiu späť.",
-  "home.removal.close": "Zatvoriť"
+  "home.removal.close": "Zatvoriť",
+  "home.flag.underReview": "OZNAČENÉ · PRED KONTROLOU",
+  "home.flag.approved": "SCHVÁLENÉ",
+  "home.flag.refused": "NESCHVÁLENÉ",
+  "home.takeDown.button": "Stiahnuť"
 }

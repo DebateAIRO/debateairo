@@ -129,5 +129,9 @@
   "home.removal.automatic": "Denne beslutning blev truffet af et automatiseret værktøj uden nogen involveret person.",
   "home.removal.ground": "Grund: vores Servicevilkår, afsnit 9 (debatterer vores sletning af check).",
   "home.removal.complain": "Hvis du vil klage, skal du skrive til office@dezbatere.ro inden for seks måneder. En klage kan ikke bringe debatten tilbage.",
-  "home.removal.close": "Luk"
+  "home.removal.close": "Luk",
+  "home.flag.underReview": "FLAGET · UNDER ANMELDELSE",
+  "home.flag.approved": "GODKENDT",
+  "home.flag.refused": "IKKE GODKENDT",
+  "home.takeDown.button": "Tag ned"
 }

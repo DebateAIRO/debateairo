@@ -129,5 +129,9 @@
   "home.removal.automatic": "See otsus tehti automatiseeritud vahendi abil, ilma et sellega oleks seotud keegi.",
   "home.removal.ground": "Ground: meie teenusetingimuste 9. jaotis (meie tšeki üle arutlemine kustutatakse).",
   "home.removal.complain": "Kaebuse esitamiseks kirjutage aadressile office@dezbatere.ro kuue kuu jooksul. Kaebus ei saa arutelu tagasi tuua.",
-  "home.removal.close": "Sule"
+  "home.removal.close": "Sule",
+  "home.flag.underReview": "MÄRGITUD · ÜLEVAATAMISEL",
+  "home.flag.approved": "KINNITUD",
+  "home.flag.refused": "EI KINNITUD",
+  "home.takeDown.button": "Eemaldage avalikust vaatest"
 }

@@ -130,5 +130,9 @@
   "home.removal.automatic": "החלטה זו נעשתה על ידי כלי אוטומטי, ללא מעורבות של אדם.",
   "home.removal.ground": "קרקע: התנאים וההגבלות שלנו, סעיף 9 (דן במחיקת ההמחאה שלנו).",
   "home.removal.complain": "כדי להתלונן, יש לכתוב ל - office@dezbatere.ro תוך שישה חודשים. תלונה לא יכולה להחזיר את הדיון.",
-  "home.removal.close": "סגירה"
+  "home.removal.close": "סגירה",
+  "home.flag.underReview": "מסומן · בבדיקה",
+  "home.flag.approved": "אושר",
+  "home.flag.refused": "לא אושר",
+  "home.takeDown.button": "הסרה"
 }

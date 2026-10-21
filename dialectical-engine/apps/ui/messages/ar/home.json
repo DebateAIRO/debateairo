@@ -133,5 +133,9 @@
   "home.removal.automatic": "تم اتخاذ هذا القرار بواسطة أداة آلية، دون مشاركة أي شخص.",
   "home.removal.ground": "الأرضية: بنود الخدمة الخاصة بنا، القسم 9 (يناقش حذف الشيك الخاص بنا).",
   "home.removal.complain": "لتقديم شكوى، اكتب إلى office@dezbatere.ro في غضون ستة أشهر. لا يمكن للشكوى أن تعيد النقاش.",
-  "home.removal.close": "خاتمة"
+  "home.removal.close": "خاتمة",
+  "home.flag.underReview": "تم وضع علامة عليها · قيد المراجعة",
+  "home.flag.approved": "تمت الموافقة عليه",
+  "home.flag.refused": "غير معتمد",
+  "home.takeDown.button": "إزالة"
 }

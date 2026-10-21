@@ -61,7 +61,7 @@ describe("a timed-out confirmation says the confirmation expired", () => {
 
   it("on a resumed debate action", async () => {
     const proof = grant("PUBLISH", 60, { target_run_id: "33333333-3333-4333-8333-333333333333" });
-    const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
+    const client = { readPublicationReview: vi.fn().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
     const host = await render(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={publicCatalog} locale="en" client={client} takeProof={() => proof as never} />);
     await wait(120);
     expect(host.querySelector("[role=status]")?.textContent).toBe(EXPIRED);

@@ -129,5 +129,9 @@
   "home.removal.automatic": "Detta beslut fattades av ett automatiserat verktyg, utan någon inblandad person.",
   "home.removal.ground": "Grund: våra användarvillkor, avsnitt 9 (debatterar våra borttagningar av kontroller).",
   "home.removal.complain": "För att klaga, skriv till office@dezbatere.ro inom sex månader. Ett klagomål kan inte återuppliva debatten.",
-  "home.removal.close": "Stäng"
+  "home.removal.close": "Stäng",
+  "home.flag.underReview": "FLAGGAD · UNDER GRANSKNING",
+  "home.flag.approved": "GODKÄNT",
+  "home.flag.refused": "EJ GODKÄND",
+  "home.takeDown.button": "Ta ned"
 }

@@ -131,5 +131,9 @@
   "home.removal.automatic": "Šis sprendimas buvo priimtas automatizuotu įrankiu, nedalyvaujant jokiam asmeniui.",
   "home.removal.ground": "Pagrindas: mūsų paslaugų teikimo sąlygų 9 skyrius (diskusijos dėl mūsų čekio ištrynimo).",
   "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius rašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti diskusijos.",
-  "home.removal.close": "Užverti"
+  "home.removal.close": "Užverti",
+  "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRA",
+  "home.flag.approved": "PATVIRTINTA",
+  "home.flag.refused": "NEPATVIRTINTA",
+  "home.takeDown.button": "Nuimti"
 }
