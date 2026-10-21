@@ -1,5 +1,5 @@
 {
- "note": "Real replies from the preview practice runs of 2026-10-14 to 2026-10-21, verbatim: each member holds a few Chinese characters inside a sentence otherwise in the question's language (GLM-5.3-Flash and MiMo-V2.6-Pro). The reply-language check of 2026-10-12 read every one as the expected language, and the R19 story's paragraph was served to readers. path is the member's machine path in its reply; siblings is the whole array when the member is an array element; language is the question's language.",
+ "note": "Real replies from the preview practice runs of 2026-10-14 to 2026-10-21, verbatim: each of these eight members holds a few Chinese characters inside a sentence otherwise in the question's language, English or Romanian (GLM-5.3-Flash, MiMo-V2.6-Pro, Qwen3.8-Flash and Claude Haiku 5.5). The reply-language check of 2026-10-12 read every one as the expected language, so each reply was accepted, and the R19 story's paragraph was served to readers. path is the member's machine path in its reply; siblings is the whole array when the member is an array element; language is the question's language.",
  "cases": [
   {
    "source": "2026-10-14-shape-s8/language-debate-2#132",
@@ -41,6 +41,47 @@
    "question": "Is new nuclear power cheaper than wind and solar with storage for cutting the emissions of a country?",
    "path": "long.sections.2.paragraphs.5.text",
    "text": "Nothing that argued for a different conclusion was thrown out and shown false. The one branch that pushed hardest against our answer — that a renewables-heavy grid's hidden system costs are大于 the renewables camp admits — was explored through the debate and resembles position P2's caveat, which our answer keeps. A few supporting statements were duplicates of positions already stated and added nothing new; what they held was counted where it matched, and where they contradicted the positions they claimed to support, that mismatch is described above."
+  },
+  {
+   "source": "2026-10-14-shape-s8/compare/ro-euro/today#224",
+   "model": "claude-haiku-5-5",
+   "callSiteKey": "PANEL:JUDGE:cross-root:1->0:preview:claude-haiku-5-5",
+   "language": "ro",
+   "question": "Ar trebui România să adopte moneda euro în următorii cinci ani?",
+   "path": "fallacy.fatalFlags.0.description",
+   "text": "Afirmația că Estonia, Letonia și Lituania au reformat mai rapid datorită unui orizont fix este prezentată fără surse, fără date comparative și fără控 control pentru alți factori (de exemplu, integrarea economică, ritmul de creștere sau presiunea externă). Concluzia cauzală rămâne nesusținută în forma prezentată."
+  },
+  {
+   "source": "2026-10-14-shape-s8/compare/ro-euro/today#372",
+   "model": "Qwen/Qwen3.8-Flash",
+   "callSiteKey": "PANEL:JUDGE:cross-root:0->2:preview:qwen-3-8-flash",
+   "language": "ro",
+   "question": "Ar trebui România să adopte moneda euro în următorii cinci ani?",
+   "path": "steelman.summary",
+   "text": "Nodul susține o poziție nuanțată și coerentă: amânarea aderării la euro nu este o respingere a monedei unice, ci o condiționare a acesteia de convergență reală și sustenabilă. Argumentul se sprijină pe trei piloni interconectați – (1) distincția dintre îndeplinirea formală și cea sustenabilă a criteriilor de la Maastricht, (2) riscul transferului costurilor de ajustare asupra salariilor reale și ocupării într-o economie expusă șocuri asimetrice cu piețe parțial rigide, și (3) pericolul固化irii dezechilibrelor structurale prin ancorarea cursului de schimb înainte de consolidare fiscală credibilă. Structura logică este ierarhică și progresivă, fiecare premisă susținând concluzia."
+  },
+  {
+   "source": "2026-10-14-shape-s8/compare/ro-euro/today#571",
+   "model": "zai-org/GLM-5.3-Flash",
+   "callSiteKey": "PANEL:JUDGE:defender:root3:r1:p3:preview:fixture-a",
+   "language": "ro",
+   "question": "Ar trebui România să adopte moneda euro în următorii cinci ani?",
+   "path": "context.ambiguityFlags.2",
+   "text": "Nu se precizează criteriile Maastricht nemet不懈 (deficit, datorie, inflație) vs. criterii informale, deși România are derogare și obligație tratatarială de adopțiune.",
+   "siblings": [
+    "Convergența reală nu este definită operațional (PBB, QBB, productivitate, sincronizarea ciclului?); nu sunt cuantificați indicatorii care ar justifica premisa.",
+    "„Capacitatea instituțională” este vagă; nu se precizează ce instituții sau mecanisme lipsesc și ce prag ar trebui atins.",
+    "Nu se precizează criteriile Maastricht nemet不懈 (deficit, datorie, inflație) vs. criterii informale, deși România are derogare și obligație tratatarială de adopțiune."
+   ]
+  },
+  {
+   "source": "2026-10-14-shape-s8/compare/ro-strainatate/today#304",
+   "model": "claude-haiku-5-5",
+   "callSiteKey": "PANEL:JUDGE:cross-root:2->3:preview:claude-haiku-5-5",
+   "language": "ro",
+   "question": "Merită să mă mut în străinătate pentru un salariu de două ori mai mare, dacă familia mea rămâne în România?",
+   "path": "critic.summary",
+   "text": "Nodul tratează salariul ca指 factor dominant, fără să cântărească suficient costurile nemonetare ale separării de familie: relațiile, dezvoltarea copiilor, sprijinul emoțional și reversibilitatea deciziei. Diferențele reale de cost al vieții, impozitare, cheltuieli de relocare și rata de succes a schimbării nu sunt menționate. Afirmația că „orice calcul serios” duce la da este o generalizare excesivă, deoarece un calcul serios depinde de ponderile atribuite fiecărui factor și nu este unic determinat de cifra salarială."
   }
  ]
 }

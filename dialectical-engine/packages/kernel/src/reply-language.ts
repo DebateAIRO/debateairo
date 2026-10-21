@@ -19,9 +19,10 @@ import { detectArgumentLanguage, foreignLatinLetterCount, matrixClause } from ".
  * STRAY LETTERS (2026-10-21). One rule reads letters rather than languages: Chinese characters, Japanese kana or Korean
  * Hangul inside a member whose expected script is another one (`replyTextHasStrayScript`). The R19 practice debate
  * served readers an English story whose paragraph said "hidden system costs are大于 the renewables camp admits", and
- * practice runs from 2026-10-14 on held three more such slips from GLM-5.3-Flash and MiMo-V2.6-Pro (a map statement, a
- * judge's attack, a panel's ambiguity flag); the language reading above found each one EXPECTED, since a few foreign
- * letters never outweigh a sentence. Prose in a language written in another script never borrows these four scripts
+ * practice runs from 2026-10-14 on held seven more such slips, in English and Romanian, from four makers: GLM-5.3-Flash,
+ * MiMo-V2.6-Pro, Qwen3.8-Flash and Claude Haiku 5.5 (a map statement, judges' attacks, summaries and flags), so about
+ * eight slips in some 3,200 replies; the language reading above found each one EXPECTED, since a few foreign letters
+ * never outweigh a sentence. Prose in a language written in another script never borrows these four scripts
  * unchanged, and a name from Chinese, Japanese or Korean is written in the reader's own letters, so one such letter is
  * enough. A quoted span is not read (a reply may quote a term), and the rule is off when the question line itself holds
  * such letters (`questionHasStrayScript`). The refusal reuses TEXT_NOT_IN_QUESTION_LANGUAGE, so the existing short

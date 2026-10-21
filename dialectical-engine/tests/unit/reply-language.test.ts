@@ -309,9 +309,12 @@ describe("the check's rules", () => {
 describe("a few Chinese characters inside a sentence in the question's language (practice 2026-10-14 to R19)", () => {
   const toPath = (dotted: string) => dotted.split(".").map((segment) => /^\d+$/u.test(segment) ? Number(segment) : segment);
 
-  it("holds the four real slips: GLM and MiMo, map, judge, panel and story", () => {
-    expect(STRAY.cases.map((entry) => entry.callSiteKey)).toEqual(
-      ["MAP:choose", "JUDGE:cross-root:4->0", "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro", "STORY:STORYTELLER:2"]);
+  it("holds the eight real slips: GLM, MiMo, Qwen and Haiku, map, judge, panel and story", () => {
+    expect(STRAY.cases.map((entry) => entry.callSiteKey)).toEqual([
+      "MAP:choose", "JUDGE:cross-root:4->0", "PANEL:JUDGE:defender:root0:r1:p0:preview:mimo-v2-6-pro", "STORY:STORYTELLER:2",
+      "PANEL:JUDGE:cross-root:1->0:preview:claude-haiku-5-5", "PANEL:JUDGE:cross-root:0->2:preview:qwen-3-8-flash",
+      "PANEL:JUDGE:defender:root3:r1:p3:preview:fixture-a", "PANEL:JUDGE:cross-root:2->3:preview:claude-haiku-5-5"
+    ]);
   });
 
   it.each(STRAY.cases.map((entry) => [entry.source, entry] as const))("%s: read as its own language, refused at its own path only", (_source, entry) => {
