@@ -11031,3 +11031,22 @@ a:focus-visible {
 }
 
 /* === end consent-ui S02 === */
+
+/* S04 threat reports staff console; colors follow Terracotta and Chamber tokens. */
+.threatReportsLinkRow { max-width: 720px; margin: 0 auto 18px; }
+.threatReportsLink { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.threatReportsCount { display: inline-flex; align-items: center; border: 1px solid var(--dispute-border); border-radius: var(--r-pill); background: var(--dispute-bg); color: var(--dispute-text); padding: 2px 8px; font-size: 10px; font-weight: 700; }
+.staffAccess .staffBadge[data-state="unread"] { color: var(--dispute-text); background: var(--dispute-bg); border-color: var(--dispute-border); }
+.staffAccess .staffBadge[data-state="unread"]::before { background: var(--dispute); }
+.threatReportsBackTop { display: inline-block; text-decoration: none; margin: 0 0 18px; }
+.threatReportsList { list-style: none; margin: 16px 0 0; padding: 0; }
+.threatReportsRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.threatReportsKeptAt { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
+.threatReportsQuestion { margin: 16px 0 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
+.threatReportsFacts { display: grid; gap: 9px; margin: 16px 0 0; }
+.threatReportsFacts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: baseline; gap: 12px; }
+.threatReportsFacts dt { color: var(--text-2); font-size: 11px; }
+.threatReportsFacts dd { margin: 0; overflow-wrap: anywhere; font-size: 12px; color: var(--ink); }
+.threatReportsDecideHint { margin-top: 18px; }
+.threatReportsBackList { margin-top: 18px; }
+@media (max-width: 560px) { .threatReportsRow { grid-template-columns: minmax(0, 1fr) auto; } .threatReportsRow .setBtn { grid-column: 1 / -1; justify-self: start; } }

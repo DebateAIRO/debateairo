@@ -9,7 +9,7 @@ import { OwnerPossessionPanel, type OwnerPossessionRecord } from "./OwnerPossess
 import "./StaffAccessPanel.css";
 type Member = StaffTeamPage["members"][number];
 type MutationKind = "invite" | "grant" | "disable" | "compromise";
-const delegatedCapabilities = ["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW"] as const;
+const delegatedCapabilities = ["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE", "PUBLICATION_REVIEW", "THREAT_REPORT"] as const;
 function failureKey(failure: unknown): string {
     if (failure instanceof Error && failure.message.startsWith("STAFF_WEBAUTHN_"))
         return "staff.webauthn";
