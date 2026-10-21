@@ -86,7 +86,7 @@ import {
   type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
-import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
+import { PracticeRefusal, practiceReleaseKeyAt, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
 import {
   practiceCheckEmptyReasons,
   practiceMapReaders,
@@ -766,11 +766,15 @@ export async function runPracticeDebate(input: Readonly<{
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     // The practice's own override version (no --register-next) keeps the settings' mode.
+    // Side-by-side spec §1, §3: on the next version the one release key is renumbered with it (practiceReleaseKeyAt).
+    const nextReleaseKey = () => practiceReleaseKeyAt(input.settings.runner.RELEASE_KEY, nextVersion);
     const settings: PracticeSettings = receipt.codeNext !== undefined
       ? Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+        RELEASE_KEY: nextReleaseKey(),
         ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) })
       : overrideVersion === null ? input.settings
-        : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
+        : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+          RELEASE_KEY: nextReleaseKey() }) });
     const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`

@@ -2496,6 +2496,12 @@ export function createPostgresReviewCatchUpDependencies(input: {
 
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
+  /**
+   * Side-by-side spec §3: the release this runner runs as (RELEASE_KEY). It claims, renews, sweeps and fails only work
+   * items of runs stamped with this key; another release's item is NO_WORK (RUNNER_RELEASE_MISMATCH). Absent means
+   * `legacy` (runs written before 0123 or without a key); every shipped composition sets it.
+   */
+  readonly releaseKey?: string;
   readonly claimMs: number;
   readonly claimMarginMs: number;
   readonly judgeBound: CallBound;
@@ -4969,9 +4975,12 @@ export class WalkingSkeletonRunner {
     private readonly settings: WalkingSkeletonSettings
   ) {
     this.#runs = new RunRepository(pool);
-    // Side-by-side spec §3 (plan B D2): the runner's own failure writes land under its own live claim, so its
-    // repository knows its worker id. The release stays `legacy` until the runner is told its key (B6).
-    this.#work = new WorkItemRepository(pool, { releaseKey: LEGACY_RELEASE_KEY, workerId: settings.workerId });
+    // Side-by-side spec §3 (plan B D2): the runner claims and fails only its own release's work items, and its own
+    // failure writes land under its own live claim, so its repository knows both its release and its worker id.
+    this.#work = new WorkItemRepository(pool, {
+      releaseKey: settings.releaseKey ?? LEGACY_RELEASE_KEY,
+      workerId: settings.workerId
+    });
     this.#graph = new GraphRepository(pool);
     // L4-F9 repair: every model call the runner makes goes through the keep-alive
     // of the debate making it, refused once that debate must stop.
@@ -5162,6 +5171,19 @@ export class WalkingSkeletonRunner {
   }
 
   private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
+    // Side-by-side spec §3: another release's debate is that release's alone. Asked for one (a job sent to the wrong
+    // task, an old retry, a hand dispatch), this runner answers NO_WORK with one content-free line BEFORE every gate
+    // below, so a foreign item meets no claim check, no probe and no call, and is left READY for its own runner.
+    if (workItemId !== undefined) {
+      const releaseKey = this.settings.releaseKey ?? LEGACY_RELEASE_KEY;
+      const runReleaseKey = await this.#work.releaseKeyOf(workItemId);
+      if (runReleaseKey !== null && runReleaseKey !== releaseKey) {
+        console.warn(JSON.stringify({
+          kind: "DEBATEAI_RUNNER_CLAIM", event: "RUNNER_RELEASE_MISMATCH", workItemId, runReleaseKey, releaseKey
+        }));
+        return { kind: "NO_WORK" };
+      }
+    }
     // W10/3: the claim must cover the LONGEST call this execution can make, and
     // since the synthesis legs now spend their own sealed bounds those two
     // deadlines belong in the max. The composer/conformance pair STAYS: both are
@@ -12594,6 +12616,14 @@ export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
  */
 export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
 
+/**
+ * The stops after which the task's catch records nothing: the work item is another runner's to settle. A claim
+ * another copy took (L4-F9), and a debate of another release (side-by-side spec §3; `execute` answers NO_WORK for one
+ * before anything runs, so this is the defence for a mismatch raised anywhere later). Neither becomes a
+ * `terminal_reason`.
+ */
+const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set(["RUNNER_CLAIM_LOST", "RUNNER_RELEASE_MISMATCH"]);
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -12693,8 +12723,9 @@ export function declareHatchetWalkingSkeletonTask(input: {
           }));
           // L4-F9 repair: a copy whose claim another copy took leaves the work
           // item to that copy. Recording FAILED here would end a debate that is
-          // still running, under the asker's eyes.
-          if (error instanceof TypedDomainError && error.code === "RUNNER_CLAIM_LOST") {
+          // still running, under the asker's eyes. Side-by-side spec §3: the same
+          // for another release's debate — that release finishes or fails it.
+          if (error instanceof TypedDomainError && LEAVES_WORK_ITEM_ALONE.has(error.code)) {
             throw scrubbedTaskFailure(error);
           }
           const recorded = await input.failures.recordTerminalFailure({

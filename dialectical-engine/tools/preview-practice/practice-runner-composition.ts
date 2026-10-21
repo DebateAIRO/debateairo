@@ -120,6 +120,11 @@ import { PracticeCallStats } from "./practice-parallel.js";
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
 export type PracticeRunnerSettings = Readonly<{
   REGISTER_VERSION: number;
+  /**
+   * Side-by-side spec §1, §3: the practice's one release key (practice-settings.ts, practiceReleaseKey). Its runner runs
+   * as this key and its ask stamps every run with it, so the runner never answers NO_WORK to its own practice debate.
+   */
+  RELEASE_KEY: string;
   PREVIEW_PROVIDER_TEST_CONFIG: PreviewProviderTestConfig;
   PROVIDER_DISCOVERY_TARGETS_JSON: string;
   DEPLOYMENT_MODE: DeploymentMode;
@@ -411,6 +416,8 @@ export async function composePracticeRunner(input: Readonly<{
   const wait = input.wait ?? ((cooldownMs: number) => new Promise<void>((resolve) => setTimeout(resolve, cooldownMs)));
   const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
     workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
+    // Side-by-side spec §3, as main.ts: the runner runs only debates of its release (the practice's one key).
+    releaseKey: environment.RELEASE_KEY,
     judgeBound: policy.bounds.JUDGE,
     composerBound: policy.bounds.COMPOSER,
     conformanceBound: policy.bounds.CONFORMANCE,
@@ -485,7 +492,7 @@ export async function composePracticeRunner(input: Readonly<{
     callSubjects: previewCallSubjects(previewConfig),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
-    renewals: new WorkItemRepository(input.keepAlivePool),
+    renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),
     holdRecorder: {
       countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
       record: (event) => runRepository.recordRunLifecycleEvent({

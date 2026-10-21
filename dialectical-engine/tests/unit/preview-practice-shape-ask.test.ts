@@ -31,6 +31,9 @@ const seen = vi.hoisted(() => ({
   readVersions: [] as number[],
   askVersions: [] as number[],
   runnerVersions: [] as number[],
+  /** The release key each composition was handed (side-by-side §1, §3: one key, at the version it reads). */
+  askKeys: [] as string[],
+  runnerKeys: [] as string[],
   requests: [] as Record<string, unknown>[],
   /** When set, the stand-in ask refuses the request with it (an admission refusal). */
   submitError: null as Error | null
@@ -75,6 +78,7 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   practiceRemainingPorts: () => ({ deepinfra: async () => { throw new Error("no gate"); }, anthropic: async () => { throw new Error("no gate"); } }),
   composePracticeAsk: vi.fn(async (input: { settings: PracticeSettings }) => {
     seen.askVersions.push(input.settings.runner.REGISTER_VERSION);
+    seen.askKeys.push(input.settings.runner.RELEASE_KEY);
     // Admits nothing: the debate ends as an ask that was not dispatched, after the request was handed over.
     // Local mode, as the real composition returns it (hosted: null); submit answers QUEUED as the real ask does.
     return { application: { submit: async (request: Record<string, unknown>) => {
@@ -86,8 +90,9 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   })
 }));
 vi.mock("../../tools/preview-practice/practice-runner-composition.js", () => ({
-  composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number } }) => {
+  composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number; RELEASE_KEY: string } }) => {
     seen.runnerVersions.push(input.environment.REGISTER_VERSION);
+    seen.runnerKeys.push(input.environment.RELEASE_KEY);
     return { runner: {}, callStats: { summary: () => ({}) }, money: null };
   })
 }));
@@ -104,7 +109,7 @@ const REGISTER = parsePracticeRegisterExport(JSON.stringify({
   rows: [{ register_version: "4", row_key: "alpha", value_json: "1", source_ref: "live" },
     { register_version: "5", row_key: "alpha", value_json: "1", source_ref: "live" }]
 }));
-const SETTINGS = { runner: { REGISTER_VERSION: 5 }, previewConfig: { premium_model_ids: [] } } as unknown as PracticeSettings;
+const SETTINGS = { runner: { REGISTER_VERSION: 5, RELEASE_KEY: "r5-d50e33165a1b" }, previewConfig: { premium_model_ids: [] } } as unknown as PracticeSettings;
 const SOCKETS = { deepinfra: "/nowhere/deepinfra.sock", anthropic: "/nowhere/anthropic.sock" } as PracticeSockets;
 const ASK = Object.freeze({ depthMode: "fixed", scrutiny: "deep", answerLength: "short" } as const);
 const LIVE: PracticeRegisterImportReceipt = Object.freeze({ registerVersion: "5", steps: [] });
@@ -122,7 +127,9 @@ beforeEach(() => {
   seen.lengthRows.clear();
   seen.receipt = LIVE;
   seen.submitError = null;
-  for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests]) list.length = 0;
+  for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests, seen.askKeys, seen.runnerKeys]) {
+    list.length = 0;
+  }
 });
 
 describe("practice debate shape: runPracticeDebate receives the shape (Task 1's notes)", () => {
@@ -134,6 +141,8 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(seen.published[0]![2]).toBe(LIVE);
     expect(seen.published[0]![3]).toEqual({ shape: policy, length: null });
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
+    // Side-by-side §1, §3: both compositions get the ONE key, renumbered to the version they read (same code part).
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([["r6-d50e33165a1b"], ["r6-d50e33165a1b"]]);
     expect(seen.requests).toHaveLength(1);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
     // Task 1's note (b): a comparison question id is asked, word for word.
@@ -153,6 +162,7 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     const result = await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
     expect(seen.published).toEqual([]);
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([["r6-d50e33165a1b"], ["r6-d50e33165a1b"]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
     // The import's receipt already names the code's next version: it is reported as it is (M-2).
     expect(result.register).toBe(seen.receipt);
@@ -196,6 +206,7 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(result.register).toBe(LIVE);
     expect(seen.published).toEqual([]);
     expect([seen.askVersions, seen.runnerVersions]).toEqual([[5], [5]]);
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([["r5-d50e33165a1b"], ["r5-d50e33165a1b"]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1 });
   });
 

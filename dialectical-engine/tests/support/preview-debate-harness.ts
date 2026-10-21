@@ -335,6 +335,8 @@ export function previewDebateHarness(input: Readonly<{
       engine?: EngineRunnerSettings;
       /** R2 (B12): every composition budget's bound at one byte, so no digest can exist and the answer ends at its floor. */
       noDigest?: boolean;
+      /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
+      releaseKey?: string;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -465,6 +467,7 @@ export function previewDebateHarness(input: Readonly<{
       ...(options.structureRepair !== true || options.money?.structureRepairCeiling !== undefined ? {}
         : { structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute) }),
       callSubjects: previewCallSubjects(PREVIEW),
+      ...(options.releaseKey === undefined ? {} : { releaseKey: options.releaseKey }),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
         record: async (event) => { holdRecords.push(event); },
@@ -506,6 +509,8 @@ export function previewDebateHarness(input: Readonly<{
      * (tests/support/fixed-run-id.ts); absent, startRun mints a random id as today.
      */
     runId?: string;
+    /** Side-by-side spec §1 (B6): the release the run is stamped with (startRun's `releaseKey`); absent, `legacy`. */
+    releaseKey?: string;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -540,7 +545,8 @@ export function previewDebateHarness(input: Readonly<{
           argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
           argumentLanguageName: (admission.language ?? { name: "English" }).name
         }),
-        registerVersion: 1, batteryVersion: "s00", batteryRows
+        registerVersion: 1, batteryVersion: "s00", batteryRows,
+        ...(admission.releaseKey === undefined ? {} : { releaseKey: admission.releaseKey })
       });
     } finally {
       if (admission.runId !== undefined) clearPendingRunId();

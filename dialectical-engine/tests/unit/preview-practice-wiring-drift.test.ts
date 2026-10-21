@@ -281,6 +281,18 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
   });
 
+  it("one release key (side-by-side §1, §3): the practice's runner runs as, and its ask stamps runs with, settings.runner.RELEASE_KEY", () => {
+    // The practice composes its runner in this process, so no RELEASE_KEY is booted: parsePracticeSettings derives the
+    // one key (a RELEASE_KEY line, else the checkout's revision, else locally the development key). A runner fenced by
+    // one key never claims a run stamped with another (NO_WORK), so the ask may read no other derivation.
+    const runner = withoutComments(PRACTICE_RUNNER);
+    expect(runner).toContain("releaseKey: environment.RELEASE_KEY,");
+    expect(runner).toContain("renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID })");
+    const ask = withoutComments(PRACTICE_ASK);
+    expect(ask).not.toContain("developmentReleaseKey(");
+    for (const stamp of ask.match(/\breleaseKey:[^,\n}]*/gu) ?? []) expect(stamp).toBe("releaseKey: settings.runner.RELEASE_KEY");
+  });
+
   it("control: the reader sees a key that is missing", () => {
     const shipped = objectKeys("{ a: 1, ...(x ? {} : { b: 2, c: { d: 3 } }), e: f(g, { h: 1 }), m(n: string) { return { o: n }; }, i }");
     expect([...shipped].sort()).toEqual(["a", "b", "c", "e", "i", "m"]);

@@ -113,6 +113,18 @@ describe("the task's catch tells the two stops apart", () => {
     expect(recorded).toEqual([]);
   });
 
+  it("leaves the work item alone when it belongs to another release", async () => {
+    // Side-by-side spec §3: another release's debate is that release's to finish or fail, never this runner's.
+    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const task = taskOver({
+      recorded,
+      execute: async () => { throw new TypedDomainError("RUNNER_RELEASE_MISMATCH", "the debate belongs to another release"); }
+    });
+    await expect(task({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() }))
+      .rejects.toMatchObject({ code: "RUNNER_RELEASE_MISMATCH" });
+    expect(recorded).toEqual([]);
+  });
+
   it("records a debate stopped at the limit as failed, under its own code", async () => {
     const recorded: { runId: string; workItemId: string; reason: string }[] = [];
     const task = taskOver({

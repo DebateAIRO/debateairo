@@ -12,7 +12,7 @@ import { configureContentEncryption, createPool, EntitlementRepository, Postgres
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { LEGACY_RELEASE_KEY, releaseTaskName, TypedDomainError } from "@debateai/kernel";
+import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
@@ -485,8 +485,13 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
     clock: () => new Date()
   });
 }
+// Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
+// renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
+const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
+  // Side-by-side spec §3: the runner runs only this release's debates; another release's is NO_WORK.
+  releaseKey: environment.RELEASE_KEY,
   judgeBound: policy.bounds.JUDGE,
   composerBound: policy.bounds.COMPOSER,
   conformanceBound: policy.bounds.CONFORMANCE,
@@ -602,7 +607,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
-  renewals: new WorkItemRepository(keepAlivePool),
+  renewals: new WorkItemRepository(keepAlivePool, workFence),
   ...(previewConfig === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)
@@ -632,8 +637,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
 const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
-  // Side-by-side spec §3 (plan B D2): a failed task records FAILED under this worker's own live claim.
-  failures: new WorkItemRepository(pool, { releaseKey: LEGACY_RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),
+  // Side-by-side spec §3: a failed task records FAILED only on this release's item, under this worker's own live claim.
+  failures: new WorkItemRepository(pool, workFence),
   workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
@@ -652,7 +657,7 @@ await worker.registerWorkflows([task]);
 const started = worker.start();
 await worker.waitUntilReady(30_000);
 const startupReconciliation = await reconcileRunnerStartupWork({
-  work: new WorkItemRepository(pool),
+  work: new WorkItemRepository(pool, workFence),
   dispatcher: {
     dispatch: async ({ runId, workItemId }) => {
       await hatchet.runNoWait(taskName, { runId, workItemId }, {

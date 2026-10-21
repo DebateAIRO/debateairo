@@ -130,6 +130,18 @@ import {
 
 const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+/**
+ * The checkout's source revision (`git rev-parse --verify HEAD`), or null when git cannot answer. Side-by-side spec §1:
+ * it names the practice's release when the settings carry no RELEASE_KEY (practice-settings.ts, practiceReleaseKey).
+ */
+function sourceRevision(): string | null {
+  try {
+    return execFileSync("git", ["rev-parse", "--verify", "HEAD"], { cwd: ENGINE_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
 /** The repository's top folder (git's answer; the engine folder's parent if git cannot answer). */
 export function repositoryRoot(): string {
   try {
@@ -588,7 +600,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     }
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
-    const settings = readPracticeSettings(required(args, "--settings"));
+    const settings = readPracticeSettings(required(args, "--settings"), sourceRevision());
     if (settings.runner.DEPLOYMENT_MODE === "hosted") {
       log(mode === "debate"
         ? "settings: hosted mode (the hosted runner and ask path, their ceilings and the story's money row; billing kept off in "

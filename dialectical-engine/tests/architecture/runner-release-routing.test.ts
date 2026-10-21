@@ -34,6 +34,24 @@ describe("the runner registers and re-sends under its release's own task name (s
     expect(main).not.toContain("workflowName: environment.HATCHET_WORKFLOW_NAME");
   });
 
+  it("main.ts fences every work repository and hands the runner its release", async () => {
+    // Side-by-side spec §3: the runner claims, renews, sweeps and fails only its own release's work items. Every
+    // repository main.ts builds is fenced by RELEASE_KEY and this worker's id; none serves the `legacy` default.
+    const main = await readFile(RUNNER_MAIN, "utf8");
+    expect(main).toContain("const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });");
+    const runnerSettings = main.slice(
+      main.indexOf("const runner = new WalkingSkeletonRunner("),
+      main.indexOf("const taskName = releaseTaskName(")
+    );
+    expect(runnerSettings).toContain("releaseKey: environment.RELEASE_KEY,");
+    expect(main).toContain("new WorkItemRepository(keepAlivePool, workFence)");
+    expect(main).toContain("failures: new WorkItemRepository(pool, workFence)");
+    expect(main).toContain("work: new WorkItemRepository(pool, workFence)");
+    expect(main).not.toContain("new WorkItemRepository(pool)");
+    expect(main).not.toContain("new WorkItemRepository(keepAlivePool)");
+    expect(occurrences(main, "new WorkItemRepository(")).toBe(occurrences(main, "workFence)"));
+  });
+
   it("sends to Hatchet only from main.ts, where the release's task name lives", async () => {
     const files = (await readdir(RUNNER_SOURCE)).filter((name) => name.endsWith(".ts"));
     const senders: string[] = [];
