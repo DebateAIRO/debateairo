@@ -137,12 +137,13 @@ apps/api/src/publication-check/judge-transport.ts
 apps/api/src/publication-check/material.ts
 apps/api/src/publication-check/policy.ts
 apps/api/src/publication-check/verdict.ts
+apps/api/src/publications.ts
+apps/api/src/question-check/ask-gate.ts
 apps/api/src/question-check/check.ts
 apps/api/src/question-check/contract.ts
 apps/api/src/question-check/instruction.ts
 apps/api/src/question-check/transport.ts
 apps/api/src/question-check/verdict.ts
-apps/api/src/publications.ts
 apps/api/src/question-language/boot.ts
 apps/api/src/question-language/decide.ts
 apps/api/src/question-language/decider.ts
@@ -482,6 +483,7 @@ apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
 apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
+apps/ui/components/HarmHelpLine.tsx
 apps/ui/components/InvestigationDrawer.tsx
 apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
@@ -502,6 +504,7 @@ apps/ui/components/PublicHonestyDrawer.tsx
 apps/ui/components/PublicationControl.tsx
 apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
+apps/ui/components/QuestionRefusal.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/RegionField.tsx
@@ -516,8 +519,8 @@ apps/ui/components/StaffAccessPanel.tsx
 apps/ui/components/StaffInvitationPanel.tsx
 apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
-apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/SynthesisHoldRefresher.tsx
+apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
@@ -742,6 +745,7 @@ apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
+apps/ui/lib/questionRefusal.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
 apps/ui/lib/report/ReportDocument.tsx
@@ -882,6 +886,7 @@ packages/contract/src/crisis-lexicon/zh.ts
 packages/contract/src/crisis.ts
 packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
+packages/contract/src/harm-helpline.ts
 packages/contract/src/http-error.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts
@@ -890,6 +895,7 @@ packages/contract/src/map-view.ts
 packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts
+packages/contract/src/question-check.ts
 packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts

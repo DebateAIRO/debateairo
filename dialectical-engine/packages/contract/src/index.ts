@@ -21,6 +21,7 @@ import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdic
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
+export * from "./harm-helpline.js";
 import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
 export * from "./synthesis-check.js";
 import { PublicationReviewSummarySchema } from "./publication-review.js";

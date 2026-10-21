@@ -9943,6 +9943,43 @@ a:focus-visible {
 }
 /* === end crisis support === */
 
+/* Refusal and check-unavailable screens use the crisis modal's calm frame. */
+.questionRefusal {
+  width: min(600px, calc(100vw - 32px));
+  color: var(--ink);
+}
+
+.questionRefusal .policyTitle:focus {
+  outline: none;
+}
+
+.questionRefusal .crisisSupportBody > p {
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+
+.questionRefusalRule {
+  color: var(--ink);
+}
+
+.questionRefusalComplain {
+  color: var(--text-2);
+}
+
+.questionRefusalKept {
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+}
+
+.harmHelpLine {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+}
+
 /* ============================================================
    Phone layout — 2026-09-30 responsiveness pass.
    Placed after every layout rule (only the delimited consent-ui blocks,

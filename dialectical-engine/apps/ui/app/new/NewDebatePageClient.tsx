@@ -21,6 +21,7 @@ import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom, type AskRoomQuery
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
+import { useQuestionRefusal } from "@/components/QuestionRefusal";
 import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
@@ -201,6 +202,7 @@ function NewDebateForm({
   const submitFlight = useRef(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  const questionRefusal = useQuestionRefusal({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
   const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
   const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });
@@ -417,6 +419,7 @@ function NewDebateForm({
         crisis.offer();
         return;
       }
+      if (questionRefusal.offer(exc)) return;
       // DL3-F7: see lib/v3/requestFailure.ts. ALREADY_WAITING is answered by
       // the room notice (sentence D, with its start time), not by a banner:
       // from the room re-read, or, when that read fails, from the refusal's
@@ -657,6 +660,7 @@ function NewDebateForm({
         </form>
         {consent.dialog}
         {crisis.dialog}
+        {questionRefusal.dialog}
         {languageChoice.dialog}
       </div>
       <SupportWidget />
