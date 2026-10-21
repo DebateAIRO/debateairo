@@ -15,25 +15,31 @@ const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, 
 type Options = Partial<{
   state: string; frontPairStopped: boolean; retireRequested: boolean; apiActive: boolean; runnerActive: boolean; mainStatus: string;
   journals: string[]; gates: Record<string, [string, string]>; openWork: number; writeFails: 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'REFUSED' | null;
-  stopFails: boolean; noticeFails: boolean; activateFails: string[];
+  stopFails: boolean; noticeFails: boolean; activateFails: string[]; requestedAgoMs: number | null; apiShow: string; journalStepMs: number;
 }>;
+const START = Date.parse('2026-10-22T08:00:00.000Z');
+const MINUTE = 60_000;
 /** A fake server: the release table, systemd, the journal and the two gates, all behind `deps`. */
 function harness(options: Options = {}) {
   const o = { state: 'DRAINING', frontPairStopped: false, retireRequested: false, apiActive: false, runnerActive: true, mainStatus: '0',
     journals: [retiredJournal()], gates: { deepinfra: ['active', 'active'], anthropic: ['active', 'active'] } as Record<string, [string, string]>,
-    openWork: 0, writeFails: null, stopFails: false, noticeFails: false, activateFails: [] as string[], ...options };
+    openWork: 0, writeFails: null, stopFails: false, noticeFails: false, activateFails: [] as string[], requestedAgoMs: 26 * MINUTE as number | null,
+    apiShow: null as string | null, journalStepMs: 0, ...options };
   const table = { state: o.state, frontPairStopped: o.frontPairStopped, retireRequested: o.retireRequested };
   const events: [string, string | null][] = [], systemctl: string[][] = [], shown: string[][] = [], journal: string[][] = [], gateCalls: string[][] = [], slept: number[] = [];
-  let runnerStopped = false, journalReads = 0;
+  let runnerStopped = false, journalReads = 0, clock = START;
+  const timeouts: number[] = [];
   const gateOf = (argv: string[]) => GATES.find((gate: any) => argv.includes(gate.privateDir))!;
   const run = async (argv: string[], opts: any) => {
     expect(opts.env).not.toHaveProperty('NODE_OPTIONS');
+    timeouts.push(opts.timeoutMs);
     if (argv[0] === layout.systemctl) {
       const rest = argv.slice(1);
       if (rest[0] === 'show') {
         shown.push(rest);
         const unit = rest[1];
         if (rest.includes('--property=InvocationID,ExecMainStatus,Result')) return result(`InvocationID=${INVOCATION}\nExecMainStatus=${o.mainStatus}\nResult=success\n`);
+        if (unit === API && o.apiShow) return result(o.apiShow);
         if (unit === API) return result(o.apiActive ? 'ActiveState=active\nSubState=running\nMainPID=4242\n' : 'ActiveState=deactivating\nSubState=stop-post\nMainPID=0\n');
         if (unit === RUNNER) return result(`ActiveState=${o.runnerActive && !runnerStopped ? 'active' : 'inactive'}\n`);
         return result('', 1);
@@ -43,7 +49,7 @@ function harness(options: Options = {}) {
       if (rest[0] === 'start' && rest[1] === '--no-block' && o.noticeFails) return result('', 1);
       return result();
     }
-    if (argv[0] === layout.journalctl) { journal.push(argv.slice(1)); return result(o.journals[Math.min(journalReads++, o.journals.length - 1)]); }
+    if (argv[0] === layout.journalctl) { journal.push(argv.slice(1)); clock += o.journalStepMs; return result(o.journals[Math.min(journalReads++, o.journals.length - 1)]); }
     if (argv[0] === '/usr/bin/python3') {
       const gate = gateOf(argv);
       gateCalls.push([gate.name, argv[3]!]);
@@ -54,7 +60,13 @@ function harness(options: Options = {}) {
   };
   const fail = (code: string) => Object.assign(new Error(code), { code });
   const deps: Record<string, any> = {
-    run, sleep: async (ms: number) => { slept.push(ms); },
+    run, now: () => clock, sleep: async (ms: number) => { slept.push(ms); clock += ms; },
+    readReleaseEvents: async ({ releaseKey }: { releaseKey: string }) => {
+      expect(releaseKey).toBe(KEY);
+      const at = (ms: number) => new Date(ms).toISOString();
+      return [{ kind: 'DRAINING', recordedAt: at(START - 8 * 60 * MINUTE), reason: null },
+        ...(o.requestedAgoMs === null ? [] : [{ kind: 'RETIRE_REQUESTED', recordedAt: at(START - o.requestedAgoMs), reason: 'BACKSTOP' }])];
+    },
     readLock: async () => ({ lock: { releases: { 'old-v1': { releaseKey: KEY, slot: 'A' }, 'new-v2': { releaseKey: OTHER_KEY, slot: 'B' } } } }),
     readReleaseState: async ({ releaseKey }: { releaseKey: string }) => { expect(releaseKey).toBe(KEY); return { ...table }; },
     recordReleaseEvent: async ({ releaseKey, kind, recordedBy, reason }: any) => {
@@ -69,7 +81,7 @@ function harness(options: Options = {}) {
     },
     countOpenWork: async ({ releaseKey }: { releaseKey: string }) => { expect(releaseKey).toBe(KEY); return o.openWork; }
   };
-  return { deps, events, systemctl, shown, journal, gateCalls, slept, table };
+  return { deps, events, systemctl, shown, journal, gateCalls, slept, table, timeouts };
 }
 const rejectsWith = async (promise: Promise<unknown>, code: string) => { await expect(promise).rejects.toMatchObject({ code }); };
 
@@ -89,6 +101,14 @@ describe('the stop recorder (ExecStopPost, side-by-side spec §4)', () => {
     const running = harness({ apiActive: true });
     expect((await recordStop({ service: 'api', label: 'old-v1', layout, deps: running.deps })).recorded).toBeNull();
     expect(running.shown).toEqual([['show', API, '--property=ActiveState,SubState,MainPID', '--no-pager']]);
+    // Still in its own stop (the main process is being signalled), or no main process left but before stop-post.
+    for (const apiShow of ['ActiveState=deactivating\nSubState=stop-sigterm\nMainPID=4242\n', 'ActiveState=deactivating\nSubState=stop-sigterm\nMainPID=0\n', 'ActiveState=activating\nSubState=auto-restart\nMainPID=0\n']) {
+      const stopping = harness({ apiShow });
+      expect((await recordStop({ service: 'api', label: 'old-v1', layout, deps: stopping.deps })).recorded, apiShow).toBeNull();
+      expect(stopping.events).toEqual([]);
+    }
+    for (const apiShow of ['ActiveState=deactivating\nSubState=final-sigterm\nMainPID=0\n', 'ActiveState=inactive\nSubState=dead\nMainPID=0\n', 'ActiveState=failed\nSubState=failed\nMainPID=0\n'])
+      expect((await recordStop({ service: 'api', label: 'old-v1', layout, deps: harness({ apiShow }).deps })).recorded, apiShow).toBe('FRONT_PAIR_STOPPED');
     const again = harness({ frontPairStopped: true });
     expect((await recordStop({ service: 'api', label: 'old-v1', layout, deps: again.deps })).event).toBe('PREVIEW_RELEASE_STOP_IGNORED');
     expect(running.events).toEqual([]); expect(again.events).toEqual([]);
@@ -126,6 +146,13 @@ describe('the stop recorder (ExecStopPost, side-by-side spec §4)', () => {
     expect((await recordStop({ service: 'runner', label: 'old-v1', layout, deps: never.deps })).recorded).toBeNull();
     expect(never.journal).toHaveLength(5);
     expect(never.slept).toEqual([1000, 1000, 1000, 1000]);
+    // ExecStopPost runs inside TimeoutStopSec=30: one 25 s deadline for every read, each child cut to what is left.
+    const slow = harness({ journals: [''], journalStepMs: 9000 });
+    await rejectsWith(recordStop({ service: 'runner', label: 'old-v1', layout, deps: slow.deps }), 'STOP_RECORD_DEADLINE');
+    expect(slow.journal.length).toBeLessThan(5);
+    expect(slow.events).toEqual([]);
+    expect(slow.timeouts.every(ms => ms <= 25_000)).toBe(true);
+    expect(slow.timeouts.at(-1)).toBeLessThan(10_000);
     // A clean exit whose journal cannot be read at all is loud, never a silent "not retired".
     const blind = harness();
     const fake = blind.deps.run;
@@ -209,7 +236,7 @@ describe('the 25-minute check (side-by-side spec §4)', () => {
   it('stops the runner and re-opens only a gate that the stop halted', async () => {
     const h = harness({ retireRequested: true, openWork: 2, gates: { deepinfra: ['active', 'halted'], anthropic: ['halted', 'halted'] } });
     const outcome = await checkRetire({ label: 'old-v1', layout, deps: h.deps });
-    expect(outcome).toEqual({ event: 'PREVIEW_RELEASE_FORCED_STOP', label: 'old-v1', releaseKey: KEY, openWork: 2, gatesReactivated: ['deepinfra'], gatesReactivationFailed: [] });
+    expect(outcome).toEqual({ event: 'PREVIEW_RELEASE_FORCED_STOP', label: 'old-v1', releaseKey: KEY, openWork: 2, gatesReactivated: ['deepinfra'], gatesReactivationFailed: [], gatesUnknown: [] });
     expect(h.systemctl).toEqual([['stop', RUNNER], ['start', '--no-block', 'debateai-preview-notice@release-forced-old_v1.service']]);
     expect(h.slept).toEqual([5000]);
     expect(h.gateCalls).toEqual([['deepinfra', 'status'], ['anthropic', 'status'], ['deepinfra', 'status'], ['anthropic', 'status'], ['deepinfra', 'activate']]);
@@ -228,22 +255,37 @@ describe('the 25-minute check (side-by-side spec §4)', () => {
     expect(calls.at(-1)).toEqual(['/usr/bin/python3', '-I', '/opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py', 'activate', '--private', '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', '--go', '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json']);
   });
 
-  it('never re-opens a gate whose state before the stop was unreadable, and exits non-zero when a re-open fails', async () => {
-    const h = harness({ retireRequested: true, gates: { deepinfra: ['halted', 'halted'], anthropic: ['active', 'halted'] }, activateFails: ['anthropic'] });
-    const outcome = await checkRetire({ label: 'old-v1', layout, deps: h.deps });
-    expect(outcome).toMatchObject({ gatesReactivated: [], gatesReactivationFailed: ['anthropic'] });
+  it('never re-opens a gate whose state before the stop was unreadable, and exits non-zero for any gate the owner must check', async () => {
+    // Unreadable before, halted after: maybe the stop's doing, so the owner looks; never re-opened blind.
+    const h = harness({ retireRequested: true, gates: { deepinfra: ['unreadable', 'halted'], anthropic: ['active', 'halted'] }, activateFails: ['anthropic'] });
+    expect(await checkRetire({ label: 'old-v1', layout, deps: h.deps })).toMatchObject({ gatesReactivated: [], gatesReactivationFailed: ['anthropic'], gatesUnknown: ['deepinfra'] });
+    expect(h.gateCalls.filter(([, phase]) => phase === 'activate')).toEqual([['anthropic', 'activate']]);
+    // Active before, unreadable after: the owner looks (exit 1), even with nothing else wrong.
+    const after = harness({ retireRequested: true, gates: { deepinfra: ['active', 'unreadable'], anthropic: ['active', 'active'] } });
     const out: string[] = [], err: string[] = [];
-    const again = harness({ retireRequested: true, gates: { deepinfra: ['active', 'active'], anthropic: ['active', 'halted'] }, activateFails: ['anthropic'] });
-    expect(await main(['retire-check', '--label', 'old-v1'], { platform: 'linux', uid: 0, layout, deps: again.deps, stdout: { write: (s: string) => out.push(s) }, stderr: { write: (s: string) => err.push(s) } })).toBe(1);
-    expect(JSON.parse(err[0]!)).toMatchObject({ event: 'PREVIEW_RELEASE_FORCED_STOP', gatesReactivationFailed: ['anthropic'] });
-    const garbled = harness({ retireRequested: true, gates: { deepinfra: ['active', 'halted'], anthropic: ['active', 'active'] } });
-    const fake = garbled.deps.run;
-    let first = true;
-    garbled.deps.run = async (argv: string[], opts: any) => {
-      if (argv[0] === '/usr/bin/python3' && argv[3] === 'status' && argv.includes(GATES[0].privateDir) && first) { first = false; return result('not json'); }
-      return fake(argv, opts);
-    };
-    expect((await checkRetire({ label: 'old-v1', layout, deps: garbled.deps })).gatesReactivated).toEqual([]);
+    expect(await main(['retire-check', '--label', 'old-v1'], { platform: 'linux', uid: 0, layout, deps: after.deps, stdout: { write: (s: string) => out.push(s) }, stderr: { write: (s: string) => err.push(s) } })).toBe(1);
+    expect(out).toEqual([]);
+    expect(JSON.parse(err[0]!)).toMatchObject({ event: 'PREVIEW_RELEASE_FORCED_STOP', gatesReactivated: [], gatesReactivationFailed: [], gatesUnknown: ['deepinfra'] });
+    expect(after.gateCalls.filter(([, phase]) => phase === 'activate')).toEqual([]);
+    // A re-open that fails exits non-zero too.
+    const refused = harness({ retireRequested: true, gates: { deepinfra: ['active', 'active'], anthropic: ['active', 'halted'] }, activateFails: ['anthropic'] });
+    expect(await main(['retire-check', '--label', 'old-v1'], { platform: 'linux', uid: 0, layout, deps: refused.deps, stdout: { write: () => undefined }, stderr: { write: () => undefined } })).toBe(1);
+    // Halted on both sides, or unreadable on both sides: not the stop's doing, nothing to say.
+    const steady = harness({ retireRequested: true, gates: { deepinfra: ['halted', 'halted'], anthropic: ['unreadable', 'unreadable'] } });
+    expect(await checkRetire({ label: 'old-v1', layout, deps: steady.deps })).toMatchObject({ gatesReactivated: [], gatesReactivationFailed: [], gatesUnknown: [] });
+  });
+
+  it('never stops a runner before 25 minutes have passed since the request', async () => {
+    for (const requestedAgoMs of [0, 24 * MINUTE, 25 * MINUTE - 1]) {
+      const h = harness({ retireRequested: true, requestedAgoMs });
+      await rejectsWith(checkRetire({ label: 'old-v1', layout, deps: h.deps }), 'RETIRE_CHECK_TOO_EARLY');
+      expect(h.systemctl).toEqual([]); expect(h.gateCalls).toEqual([]);
+    }
+    const missing = harness({ retireRequested: true, requestedAgoMs: null });
+    await rejectsWith(checkRetire({ label: 'old-v1', layout, deps: missing.deps }), 'RETIRE_STATE_REFUSED');
+    expect(missing.systemctl).toEqual([]);
+    const due = harness({ retireRequested: true, requestedAgoMs: 25 * MINUTE });
+    expect((await checkRetire({ label: 'old-v1', layout, deps: due.deps })).event).toBe('PREVIEW_RELEASE_FORCED_STOP');
   });
 
   it('reports a stranded release when its runner is already gone', async () => {
@@ -253,8 +295,9 @@ describe('the 25-minute check (side-by-side spec §4)', () => {
     expect(h.gateCalls).toEqual([]);
   });
 
-  it("never stops the runner of a release that is not draining under a standing request", async () => {
-    for (const options of [{ state: 'CURRENT', retireRequested: false }, { state: 'STAGED', retireRequested: false }, { state: 'DRAINING', retireRequested: false }]) {
+  it("neither stops nor reports a runner of a release that is not draining under a standing request (a stale timer)", async () => {
+    for (const options of [{ state: 'CURRENT', retireRequested: false }, { state: 'STAGED', retireRequested: false }, { state: 'DRAINING', retireRequested: false },
+      { state: 'STAGED', retireRequested: false, runnerActive: false }, { state: 'DRAINING', retireRequested: false, runnerActive: false }, { state: 'UNKNOWN', runnerActive: false }]) {
       const h = harness(options);
       await rejectsWith(checkRetire({ label: 'old-v1', layout, deps: h.deps }), 'RETIRE_STATE_REFUSED');
       expect(h.systemctl).toEqual([]); expect(h.gateCalls).toEqual([]);
@@ -281,7 +324,7 @@ describe('the drained path', () => {
     expect(drained.events).toEqual([['RETIRED', 'DRAINED']]);
     expect(drained.systemctl).toEqual([]);
     const done = harness({ state: 'RETIRED', runnerActive: false });
-    expect((await markDrainedRetired({ label: 'old-v1', layout, deps: done.deps })).event).toBe('PREVIEW_RELEASE_RETIRE_NOT_NEEDED');
+    expect(await markDrainedRetired({ label: 'old-v1', layout, deps: done.deps })).toEqual({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label: 'old-v1', releaseKey: KEY });
     expect(done.events).toEqual([]);
   });
 });

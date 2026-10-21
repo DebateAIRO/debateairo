@@ -40,7 +40,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exactKeys, protectedPath, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { LAYOUT, atomicWrite, ensureDirectory, logLine, runBounded, sha256 } from './common.mjs';
+import { LAYOUT, RELEASE_LABEL, atomicWrite, ensureDirectory, logLine, runBounded, sha256 } from './common.mjs';
 
 export const ALERT_WINDOW_MS = 30 * 60 * 1000;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|target|mount|path)$/;
@@ -124,6 +124,8 @@ const NOTICES = Object.freeze({
 export function parseNotice(text) {
   const match = typeof text === 'string' ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
   if (match && (match[1].endsWith('-unbilled') || match[1].endsWith('-booked')) && unbilledCode(match[2]) === null) return null;
+  // A release notice's code must read back as a release label, so the runner unit it names is a real instance name.
+  if (match && match[1].startsWith('release-') && !RELEASE_LABEL.test(releaseOf(match[2]))) return null;
   return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
 }
 
@@ -177,7 +179,7 @@ const RELEASE_NOTICES = Object.freeze({
     const label = releaseOf(code);
     return {
       subject: `Preview: release ${label}'s runner was stopped 25 minutes after the retire request`,
-      ...restartRunner(label, `Release ${label}'s runner was still running 25 minutes after it was asked to retire, so it was stopped. If the stop cut off a model call and that halted a spending gate, the gate was re-opened.`)
+      ...restartRunner(label, `Release ${label}'s runner was still running 25 minutes after it was asked to retire, so it was stopped. A spending gate the stop halted was re-opened when possible; if not, or if a gate's state could not be read, you get a separate failure email for the retire check.`)
     };
   },
   'release-stranded': code => {

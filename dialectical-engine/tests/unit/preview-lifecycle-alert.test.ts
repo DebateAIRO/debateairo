@@ -736,7 +736,8 @@ describe('release notices', () => {
       expect(alert.parseNotice(`${kind}-old_v1`)).toEqual({ kind, code: 'old_v1', unit: unitName });
       expect(alert.parseAlertArgs(['--notice', `${kind}-old_v1`])).toEqual({ unit: unitName, test: false, notice: { kind, code: 'old_v1', unit: unitName } });
     }
-    for (const name of ['release-retire-old-v1', 'release-retire-Old_v1', 'release-retire-', `release-retire-${'a'.repeat(65)}`, 'release-other-old_v1', 'release-forced-old_v1.service'])
+    // The code must read back as a release label: no leading or trailing dash once `_` becomes `-`.
+    for (const name of ['release-retire-_x', 'release-forced-x_', 'release-stranded-_', 'release-retire-old-v1', 'release-retire-Old_v1', 'release-retire-', `release-retire-${'a'.repeat(65)}`, 'release-other-old_v1', 'release-forced-old_v1.service'])
       expect(alert.parseNotice(name), name).toBeNull();
   });
 
@@ -767,6 +768,7 @@ describe('release notices', () => {
       expect(mail, kind).toContain(subject);
       expect(mail).toContain('  systemctl start debateai-preview-runner@old-v1');
       expect(mail).toContain('it closes its unfinished debates with a plain sentence and no quota use');
+      if (kind === 'release-forced') expect(mail).toContain('re-opened when possible; if not, or if a gate\'s state could not be read, you get a separate failure email');
       expect(mail).toContain('systemctl status debateai-preview-runner@old-v1.service');
       expect(mail).not.toMatch(/\$|usd/i);
     }

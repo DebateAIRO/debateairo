@@ -19,7 +19,7 @@
 import { pathToFileURL } from 'node:url';
 import { LAYOUT, RELEASE_LABEL, logLine, runBounded, unitNameFor } from './common.mjs';
 import { STARTABLE, readLock, unitIsActive as prestartUnitIsActive } from './prestart.mjs';
-import { countOpenWork, readReleaseState, recordReleaseEvent } from './release-table.mjs';
+import { countOpenWork, readReleaseEvents, readReleaseState, recordReleaseEvent } from './release-table.mjs';
 
 /** The two spending gates (deploy/preview-gate/v3), named and placed exactly as alert.mjs's re-open commands. */
 export const GATES = Object.freeze([
@@ -28,8 +28,14 @@ export const GATES = Object.freeze([
 ]);
 const PYTHON = '/usr/bin/python3';
 const RECORDED_BY = 'root:release-retire';
-/** Side-by-side plan D: the check runs 25 minutes after the request; the stopped runner's last calls settle in 5 s. */
+/** Side-by-side plan D: the check runs 25 minutes (1,500 s) after the request; the stopped runner's last calls settle in 5 s. */
+export const RETIRE_CHECK_AFTER_MS = 1_500_000;
 const GATE_SETTLE_MS = 5000;
+/**
+ * The stop recorder runs as ExecStopPost inside the unit's TimeoutStopSec=30: every read and write it makes shares
+ * one 25 s deadline (each child's own timeout is cut to what is left), and running out refuses loudly.
+ */
+export const STOP_RECORD_DEADLINE_MS = 25_000;
 /** ExecStopPost may run before journald has stored the last lines of the invocation: read up to 5 times, 1 s apart. */
 const JOURNAL_TRIES = 5;
 const JOURNAL_PAUSE_MS = 1000;
@@ -38,6 +44,8 @@ const JOURNAL_LINES = '500';
 const INVOCATION_ID = /^[0-9a-f]{32}$/;
 const EXIT_STATUS = /^(?:0|[1-9][0-9]{0,2})$/;
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);
+/** systemd's sub-states of a deactivating service after its main process is gone (ExecStopPost and the final kills). */
+const AFTER_MAIN_SUBSTATES = Object.freeze(['stop-post', 'final-watchdog', 'final-sigterm', 'final-sigkill']);
 const NOTICE_CODE = /^[a-z0-9_]{1,64}$/;
 const SERVICES = Object.freeze(['api', 'ui', 'runner']);
 
@@ -61,15 +69,25 @@ function noticeCodeOf(label) {
   return NOTICE_CODE.test(code) ? code : refuse('RELEASE_NOTICE_LABEL_REFUSED');
 }
 
-/** The dependencies with the server's defaults; tests replace them. */
-function withDefaults(layout, deps) {
+/**
+ * The dependencies with the server's defaults; tests replace them. With a `deadline` (ms since the epoch), every child
+ * process gets at most the time left (the release-table calls run through the same `run`) and every step refuses
+ * STOP_RECORD_DEADLINE once it has passed.
+ */
+function withDefaults(layout, deps, deadline = null) {
+  const now = deps.now ?? Date.now;
+  const left = () => { const ms = deadline - now(); return ms > 0 ? ms : refuse('STOP_RECORD_DEADLINE'); };
+  const baseRun = deps.run ?? runBounded;
+  const run = deadline === null ? baseRun : (argv, options) => baseRun(argv, { ...options, timeoutMs: Math.min(options.timeoutMs, left()) });
+  const guarded = fn => (deadline === null ? fn : input => { left(); return fn(input); });
   return {
-    run: deps.run ?? runBounded,
+    now, run,
     sleep: deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
     readLock: deps.readLock ?? readLock,
-    readReleaseState: deps.readReleaseState ?? (input => readReleaseState({ ...input, layout })),
-    recordReleaseEvent: deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout })),
-    countOpenWork: deps.countOpenWork ?? (input => countOpenWork({ ...input, layout }))
+    readReleaseState: guarded(deps.readReleaseState ?? (input => readReleaseState({ ...input, layout, run }))),
+    recordReleaseEvent: guarded(deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout, run }))),
+    readReleaseEvents: deps.readReleaseEvents ?? (input => readReleaseEvents({ ...input, layout, run })),
+    countOpenWork: deps.countOpenWork ?? (input => countOpenWork({ ...input, layout, run }))
   };
 }
 
@@ -114,12 +132,14 @@ const unitIsActive = (unit, layout, io) => prestartUnitIsActive({ unit, layout, 
 
 /**
  * The API's process is gone. ExecStopPost runs while systemd still calls the unit `deactivating` (sub-state
- * stop-post), so that counts as stopped once no main process is left; a later manual call sees inactive or failed.
+ * stop-post), so that counts as stopped once no main process is left and the sub-state is one that comes after the
+ * main process (stop-post or a final kill); a later manual call sees inactive or failed.
  */
 async function apiHasStopped(unit, layout, io) {
-  const { ActiveState: state, MainPID: pid } = await showUnit(unit, ['ActiveState', 'SubState', 'MainPID'], layout, io);
+  const { ActiveState: state, SubState: subState, MainPID: pid } = await showUnit(unit, ['ActiveState', 'SubState', 'MainPID'], layout, io);
   if (!UNIT_STATES.includes(state) || !/^[0-9]{1,10}$/.test(pid)) refuse('UNIT_STATE_UNREADABLE');
-  return pid === '0' && ['inactive', 'failed', 'deactivating'].includes(state);
+  if (pid !== '0') return false;
+  return state === 'inactive' || state === 'failed' || (state === 'deactivating' && AFTER_MAIN_SUBSTATES.includes(subState));
 }
 
 /** `systemctl <args…>`; true when systemd accepted it. A stop waits for the unit's own TimeoutStopSec (30 s). */
@@ -144,6 +164,7 @@ async function runnerRetiredCleanly(unit, releaseKey, layout, io) {
       { env: {}, timeoutMs: 10_000, maxOutputBytes: 1024 * 1024 });
     readable = Boolean(result) && !result.timedOut && !result.overflow && !result.error && result.code === 0;
     if (readable && retiredLinesFound(String(result.stdout), releaseKey)) return true;
+    // Past the deadline the next read refuses STOP_RECORD_DEADLINE (loud), never a silent "not retired".
     if (attempt < JOURNAL_TRIES) await io.sleep(JOURNAL_PAUSE_MS);
   }
   // A clean exit whose lines could not be read at all is not "no retirement": the owner must look (exit 1).
@@ -160,7 +181,7 @@ async function runnerRetiredCleanly(unit, releaseKey, layout, io) {
  */
 export async function recordStop({ service, label, layout = LAYOUT, deps = {} }) {
   if (service !== 'api' && service !== 'runner') refuse('ARGUMENTS_REFUSED');
-  const io = withDefaults(layout, deps);
+  const io = withDefaults(layout, deps, (deps.now ?? Date.now)() + STOP_RECORD_DEADLINE_MS);
   const releaseKey = await releaseKeyOf(label, layout, io);
   const { state, frontPairStopped } = await io.readReleaseState({ releaseKey });
   const unit = unitNameFor(layout, service, label);
@@ -226,10 +247,12 @@ async function activateGate(gate, io) {
 }
 
 /**
- * 25 minutes after the request. RETIRED: honoured. Runner already gone without retiring: stranded, owner emailed,
- * nothing stopped. Runner still running under a standing request of a DRAINING release: read both gates, stop that
- * one unit, wait 5 s, read them again, re-open only a gate that was active before and is halted after, email the
- * owner. A running runner of any other release state is refused untouched (a stale timer after a rollback).
+ * 25 minutes after the request. RETIRED: honoured. Anything but a DRAINING release under a standing request is
+ * refused untouched (a stale timer after a rollback). Runner already gone without retiring: stranded, owner emailed,
+ * nothing stopped. Runner still running: only once 25 minutes have passed since the latest RETIRE_REQUESTED row (a
+ * manual or mis-armed run never stops a busy runner early), read both gates, stop that one unit, wait 5 s, read them
+ * again, re-open only a gate that was active before and is halted after, email the owner. A gate whose state could
+ * not be read on either side of the stop (and that might be halted) is listed in gatesUnknown for the owner.
  */
 export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
@@ -237,27 +260,35 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   const code = noticeCodeOf(label);
   const { state, retireRequested } = await io.readReleaseState({ releaseKey });
   const unit = unitNameFor(layout, 'runner', label);
-  const finish = async (event, kind, extra = {}) => {
+  const finish = async (event, kind, gates = null) => {
     const noticed = kind === null || await systemctl(['start', '--no-block', noticeUnit(layout, kind, code)], layout, io);
     const openWork = await io.countOpenWork({ releaseKey });
     if (!noticed) refuse('NOTICE_START_FAILED', { event, openWork });
-    return Object.freeze({ event, label, releaseKey, openWork, gatesReactivated: Object.freeze(extra.reactivated ?? []), ...(extra.failed ? { gatesReactivationFailed: Object.freeze(extra.failed) } : {}) });
+    return Object.freeze({
+      event, label, releaseKey, openWork, gatesReactivated: Object.freeze(gates?.reactivated ?? []),
+      ...(gates ? { gatesReactivationFailed: Object.freeze(gates.failed), gatesUnknown: Object.freeze(gates.unknown) } : {})
+    });
   };
   if (state === 'RETIRED') return finish('PREVIEW_RELEASE_RETIRE_HONOURED', null);
-  if (!await unitIsActive(unit, layout, io)) return finish('PREVIEW_RELEASE_STRANDED', 'release-stranded');
   if (state !== 'DRAINING' || !retireRequested) refuse('RETIRE_STATE_REFUSED', { state });
+  if (!await unitIsActive(unit, layout, io)) return finish('PREVIEW_RELEASE_STRANDED', 'release-stranded');
+  const requests = (await io.readReleaseEvents({ releaseKey })).filter(event => event.kind === 'RETIRE_REQUESTED');
+  const requestedAt = requests.length ? Date.parse(requests.at(-1).recordedAt) : Number.NaN;
+  if (!Number.isFinite(requestedAt)) refuse('RETIRE_STATE_REFUSED', { state });
+  if (io.now() - requestedAt < RETIRE_CHECK_AFTER_MS) refuse('RETIRE_CHECK_TOO_EARLY');
   const before = [];
   for (const gate of GATES) before.push(await gateState(gate, io));
   if (!await systemctl(['stop', unit], layout, io)) refuse('RUNNER_STOP_FAILED');
   await io.sleep(GATE_SETTLE_MS);
   const after = [];
   for (const gate of GATES) after.push(await gateState(gate, io));
-  const reactivated = [], failed = [];
+  const reactivated = [], failed = [], unknown = [];
   for (const [index, gate] of GATES.entries()) {
-    if (before[index] !== 'active' || after[index] !== 'halted') continue;
-    (await activateGate(gate, io) ? reactivated : failed).push(gate.name);
+    if (before[index] === 'active' && after[index] === 'halted') (await activateGate(gate, io) ? reactivated : failed).push(gate.name);
+    // Active before and unreadable after, or unreadable before and halted after: the stop may have halted it.
+    else if ((before[index] === 'active' && after[index] === 'unknown') || (before[index] === 'unknown' && after[index] === 'halted')) unknown.push(gate.name);
   }
-  return finish('PREVIEW_RELEASE_FORCED_STOP', 'release-forced', { reactivated, failed });
+  return finish('PREVIEW_RELEASE_FORCED_STOP', 'release-forced', { reactivated, failed, unknown });
 }
 
 /**
@@ -269,7 +300,7 @@ export async function markDrainedRetired({ label, layout = LAYOUT, deps = {} }) 
   const io = withDefaults(layout, deps);
   const releaseKey = await releaseKeyOf(label, layout, io);
   const { state } = await io.readReleaseState({ releaseKey });
-  if (state === 'RETIRED') return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey, openWork: 0 });
+  if (state === 'RETIRED') return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
   if (state !== 'DRAINING') refuse('RETIRE_STATE_REFUSED', { state });
   if (await unitIsActive(unitNameFor(layout, 'runner', label), layout, io)) refuse('RELEASE_RUNNER_ACTIVE');
   const openWork = await io.countOpenWork({ releaseKey });
@@ -294,15 +325,16 @@ const FAILED_EVENT = Object.freeze({
 const COMMANDS = Object.freeze({ stopped: recordStop, 'may-start': mayStart, 'retire-request': requestRetire, 'retire-check': checkRetire, 'mark-retired': markDrainedRetired });
 const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-/** One JSON line per run; 0 on success, 1 on any refusal (and on a forced stop that left a gate halted). */
+/** One JSON line per run; 0 on success, 1 on any refusal (and on a forced stop that may have left a gate halted). */
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
   let args = null;
   try {
     args = parseArguments(argv);
     if (platform !== 'linux' || uid !== 0) refuse('ACTOR_REFUSED');
     const result = await COMMANDS[args.command]({ service: args.service, label: args.label, layout, deps });
-    // A gate the stop halted and that would not re-open is the owner's to look at: the unit fails so OnFailure emails.
-    if (result.gatesReactivationFailed?.length) { logLine(stderr, result); return 1; }
+    // A gate the stop halted that would not re-open, or one whose state could not be read, is the owner's to look at:
+    // the unit fails so OnFailure emails (the forced-stop notice says this email may follow).
+    if (result.gatesReactivationFailed?.length || result.gatesUnknown?.length) { logLine(stderr, result); return 1; }
     logLine(stdout, result);
     return 0;
   } catch (error) {
