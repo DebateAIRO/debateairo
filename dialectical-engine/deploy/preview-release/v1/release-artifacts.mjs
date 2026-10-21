@@ -45,14 +45,14 @@ import { pathToFileURL } from 'node:url';
 import { protectedPath, sha256, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
 import { generateSourceManifest, operatorFiles, operatorManifestSha256, verifySourceManifest } from '../../preview-auth-dev/v1/source-manifest.mjs';
 import { buildUiArtifact, verifyUiBuildManifest } from '../../preview-auth-dev/v1/ui-build.mjs';
-import { PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifactBytes, previewEnvironmentPath, validateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
+import { PREVIEW_ENV_ROOT, PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifactBytes, previewEnvironmentPath, validateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
 import { PREVIEW_MODEL_ROSTER_FLAGS } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 
-/** The fixed server folders the reviewed launchers already require (launch-plan.mjs:6,17,37). */
+/** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
 export const LAYOUT = Object.freeze({
   artifactsRoot: '/opt/debateai-v3-preview/artifacts',
   releasesRoot: '/opt/debateai-v3-preview/releases',
@@ -277,7 +277,6 @@ async function operatorDigestCommand(options, { layout }) {
 
 /** The runner's OS account; its passwd entry is the only source of the runner plan's UID/GID. */
 export const RUNNER_OS_ACCOUNT = 'debateai-preview-runner';
-const ENV_ROOT = '/etc/debateai-v3-preview/auth-dev-v1';
 const NO_LOGIN_SHELLS = ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false', '/usr/bin/false'];
 const accountId = value => (/^[0-9]{1,10}$/.test(value ?? '') ? Number(value) : NaN);
 /**
@@ -318,7 +317,13 @@ async function launchPlanCommand(options, { layout, deps }) {
   try { label = labelOfSourceRoot(root, service); } catch { refuse('RELEASE_ROOT_REFUSED'); }
   await assertOutputFree(options['--out'], { layout, name: `${service}-launch.json` });
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
-  try { validatePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
+  // --from is checked by the reviewed rules with its env path set to its own release's file: that field is never copied
+  // (this command derives it from --root), and a plan written before side-by-side (R19: /etc/…/api.env) still names a
+  // valid base. Every other field must pass as it stands (side-by-side spec §10, the transition).
+  try {
+    const fromPath = previewEnvironmentPath(from.value.service, labelOfSourceRoot(from.value.sourceRoot, from.value.service));
+    validatePlan({ ...from.value, environment: { ...from.value.environment, path: fromPath } });
+  } catch { refuse('FROM_PLAN_INVALID'); }
   // The first runner plan has no runner plan to copy: it is derived from the API plan (below).
   const derivedRunner = service === 'runner' && from.value.service === 'api';
   if (from.value.service !== service && !derivedRunner) refuse('FROM_PLAN_INVALID');
@@ -340,10 +345,11 @@ async function launchPlanCommand(options, { layout, deps }) {
   try {
     validateNativeAttestation(native.value, { sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree, nativeSourceSha256: source.value.nativeSha256, publication }, Date.parse(native.value?.verifiedAt));
   } catch { refuse('NATIVE_ATTESTATION_MISMATCH'); }
-  let { serviceUid, serviceGid } = from.value, environment = { ...from.value.environment, path: previewEnvironmentPath(service, label) };
+  const envPath = previewEnvironmentPath(service, label);
+  let { serviceUid, serviceGid } = from.value, environment = { ...from.value.environment, path: envPath };
   if (derivedRunner) {
     ({ uid: serviceUid, gid: serviceGid } = await (deps.lookupRunnerAccount ?? lookupRunnerAccount)());
-    environment = { path: previewEnvironmentPath(service, label), root: ENV_ROOT, uid: 0, gid: serviceGid, mode: 0o640, parentUid: 0 };
+    environment = { path: envPath, root: PREVIEW_ENV_ROOT, uid: 0, gid: serviceGid, mode: 0o640, parentUid: 0 };
   }
   const plan = {
     schema: from.value.schema, service, artifact: kind, sourceRoot: root, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,

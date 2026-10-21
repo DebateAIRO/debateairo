@@ -383,6 +383,28 @@ describe('launch-plan', () => {
     const plan = JSON.parse(readFileSync((await run(t.argv({ '--from': from.path, '--slot': 'A' }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
     expect(plan).toMatchObject({ uiPort: '3100', apiPort: '3101', environment: { path: `${ENV_ROOT}/ui-new-v1.env` } });
   });
+  // The transition (release T): R19's live plans predate per-release env files and name /etc/…/api.env.
+  const r19Plan = (service: 'api' | 'ui' | 'runner') => {
+    const root = `/opt/debateai-v3-preview/releases/auth-dev-candidate-r19x-${service}`;
+    return { ...oldPlan(service), sourceRoot: root, mailExecutable: `${root}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`,
+      environment: { ...oldPlan(service).environment, path: `${ENV_ROOT}/${service}.env` } };
+  };
+  it.each(['api', 'ui', 'runner'] as const)('accepts an R19-shaped %s plan as --from and writes a valid new plan', async service => {
+    const t = staged(service);
+    const from = t.s.write(join(t.s.art, `r19-${service}-launch.json`), r19Plan(service));
+    const plan = JSON.parse(readFileSync((await run(t.argv({ '--from': from.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
+    expect(plan).toMatchObject({ sourceRoot: NEW_ROOT[service], uiPort: '3100', apiPort: '3101', environment: { ...oldPlan(service).environment, path: `${ENV_ROOT}/${service}-new-v1.env` } });
+    expect(() => realValidator(t.s.layout)(plan)).not.toThrow();
+  });
+  it.each([
+    ['another sender', { mailFrom: 'x@dezbatere.ro' }], ['a mixed port pair', { uiPort: '3100', apiPort: '3201' }], ['a root of another service', { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-r19x-ui' }],
+    ['an env file outside the env folder', { environment: { ...r19Plan('api').environment, root: '/etc' } }], ['an env file of the wrong group', { environment: { ...r19Plan('api').environment, gid: 1 } }]
+  ])('still refuses an R19-shaped --from with %s', async (_name, patch) => {
+    const t = staged('api');
+    const from = t.s.write(join(t.s.art, 'r19-api-launch.json'), { ...r19Plan('api'), ...patch });
+    await expect(run(t.argv({ '--from': from.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    expect(existsSync(join(t.s.art, 'api-launch.json'))).toBe(false);
+  });
   it.each([['no --slot', { '--slot': null }], ['--slot C', { '--slot': 'C' }], ['--slot a', { '--slot': 'a' }]])('refuses %s and writes nothing', async (_name, patch) => {
     const t = staged('api');
     await expect(run(t.argv(patch), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });

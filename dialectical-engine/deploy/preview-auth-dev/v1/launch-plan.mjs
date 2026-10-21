@@ -8,16 +8,17 @@ const SERVICES=Object.freeze(['api','ui','runner']);
 export const PREVIEW_SLOTS=Object.freeze({A:Object.freeze({uiPort:'3100',apiPort:'3101'}),B:Object.freeze({uiPort:'3200',apiPort:'3201'})});
 /** Side-by-side spec §10: a release label names unit instances, /etc files and folders, so it never holds a dot, slash or upper case. */
 export const RELEASE_LABEL=/^[a-z0-9](?:[a-z0-9-]{0,70}[a-z0-9])?$/;
-const ENV_ROOT='/etc/debateai-v3-preview/auth-dev-v1';
+/** The one folder every preview env file lives in (root-owned; the files are root:<service group> 0640). */
+export const PREVIEW_ENV_ROOT='/etc/debateai-v3-preview/auth-dev-v1';
 // One anchored pattern built from RELEASE_LABEL's body: kind, label, then the service as the last segment.
 const ROOT=new RegExp(`^/opt/debateai-v3-preview/releases/auth-dev-(candidate|fallback)-(${RELEASE_LABEL.source.slice(1,-1)})-(api|ui|runner)$`);
-/** The release label of a release folder whose last segment is `service` (`…/auth-dev-candidate-<label>-api`); anything else refuses. */
+/** Side-by-side spec §10: the release label of a release folder whose last segment is `service` (`…/auth-dev-candidate-<label>-api`); anything else refuses. */
 export function labelOfSourceRoot(sourceRoot,service) {
  const match=typeof sourceRoot==='string'?ROOT.exec(sourceRoot):null;
  if(!match||match[3]!==service)refuse('PREVIEW_LAUNCH_PLAN_REFUSED');
  return match[2];
 }
-/** The slot a port pair belongs to; any other pair (a mixed one included) refuses. */
+/** Side-by-side spec §6: the slot a port pair belongs to; any other pair (a mixed one included) refuses. */
 export function slotOfPorts(uiPort,apiPort) {
  const slot=Object.keys(PREVIEW_SLOTS).find(name=>PREVIEW_SLOTS[name].uiPort===uiPort&&PREVIEW_SLOTS[name].apiPort===apiPort);
  return slot??refuse('PREVIEW_LAUNCH_PLAN_REFUSED');
@@ -25,7 +26,7 @@ export function slotOfPorts(uiPort,apiPort) {
 /** Side-by-side spec §10: each release reads its own env file, `<service>-<label>.env`. */
 export function previewEnvironmentPath(service,label) {
  if(!SERVICES.includes(service)||typeof label!=='string'||!RELEASE_LABEL.test(label))refuse('PREVIEW_LAUNCH_PLAN_REFUSED');
- return `${ENV_ROOT}/${service}-${label}.env`;
+ return `${PREVIEW_ENV_ROOT}/${service}-${label}.env`;
 }
 export function validateLaunchPlan(plan) {
  exactKeys(plan,['schema','service','artifact','sourceRoot','sourceRevision','sourceTree','serviceUid','serviceGid','sourceManifest','nativeAttestation','uiBuild','publication','operatorManifestSha256','environment','apiPort','uiPort','mailExecutable','mailFrom'],'PREVIEW_LAUNCH_PLAN_REFUSED');
@@ -42,7 +43,7 @@ export function validateLaunchPlan(plan) {
  }
  const custody=plan.environment;
  exactKeys(custody,['path','root','uid','gid','mode','parentUid']);
- if(custody.path!==previewEnvironmentPath(plan.service,labelOfSourceRoot(plan.sourceRoot,plan.service))||custody.root!==ENV_ROOT
+ if(custody.path!==previewEnvironmentPath(plan.service,labelOfSourceRoot(plan.sourceRoot,plan.service))||custody.root!==PREVIEW_ENV_ROOT
   ||custody.uid!==0||custody.parentUid!==0||custody.gid!==plan.serviceGid||custody.mode!==0o640)refuse('PREVIEW_LAUNCH_PLAN_REFUSED');
  if((plan.service==='ui')!==(plan.uiBuild!==null))refuse('PREVIEW_LAUNCH_PLAN_REFUSED');
  return plan;
