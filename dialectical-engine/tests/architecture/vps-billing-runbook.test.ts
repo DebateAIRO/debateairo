@@ -1205,7 +1205,7 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
       "5. **Close the window** (§4 step 5).",
       "6. **Publish the v2 `billingPlans`**",
       "7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.",
-      "8. **Restart both**: `systemctl restart debateai-api@$label debateai-runner@$label`."
+      "8. **Restart both**, with `unfinished` at 0: `systemctl restart debateai-api@$label debateai-runner@$label`."
     ];
     let previous = -1;
     for (const step of steps) {

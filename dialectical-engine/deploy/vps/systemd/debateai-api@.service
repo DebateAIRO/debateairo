@@ -15,6 +15,13 @@ After=network-online.target postgresql.service debateai-hatchet.service
 # Hatchet is wanted, never required (side-by-side spec §4): a Hatchet restart must not stop a release's API.
 Wants=network-online.target debateai-hatchet.service
 Requires=postgresql.service
+# A start the release tool refuses (a draining or retired release) fails in ExecStartPre=, and Restart=on-failure
+# would retry it every 5 s for ever. RestartPreventExitStatus= cannot stop that (systemd reads it from the main
+# process only, never from ExecStartPre=), so the start limit does: 20 tries in 10 minutes (about 100 s of retries,
+# enough for a PostgreSQL restart or a boot-order race), then the instance stays failed and shows in
+# `systemctl --failed` until it is started again by hand (README §5 "The current release").
+StartLimitIntervalSec=600
+StartLimitBurst=20
 
 [Service]
 Type=simple
@@ -33,12 +40,14 @@ EnvironmentFile=/etc/debateai/releases/%i/api.env
 Environment=NODE_ENV=production
 Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
 # Root's start check (`+` = root, outside this unit's sandbox; side-by-side plan D16b): a release that is draining or
-# retired, or one the release table does not know, is refused before the API starts again.
-ExecStartPre=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service api --label %i
+# retired, or one the release table does not know, is refused before the API starts again. Root's node runs through
+# `env -i` with PATH only: `+` drops the sandbox but not this unit's environment, and the base env file is owned by
+# the service user, so a NODE_OPTIONS line written there must never reach a root process (same in every root hook).
+ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service api --label %i
 ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/api/src/main.ts
 # After every stop root writes down what it saw (side-by-side spec §4): a draining release whose API is gone gets
 # FRONT_PAIR_STOPPED once, which is what that release's retirement waits for.
-ExecStopPost=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs stopped --service api --label %i
+ExecStopPost=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs stopped --service api --label %i
 # Restart=on-failure stays on this server (spec §4): a restarted API starts on its own release ("database ahead").
 Restart=on-failure
 # Straight back to starting, without passing through inactive or failed: otherwise the website's BindsTo= on this

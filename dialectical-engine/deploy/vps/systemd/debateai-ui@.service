@@ -13,6 +13,13 @@ After=network-online.target debateai-api@%i.service
 Wants=network-online.target
 # Bound to its own release's API (spec §6 "Unit coupling"): when that API stops, this website stops with it.
 BindsTo=debateai-api@%i.service
+# A start the release tool refuses (a draining or retired release) fails in ExecStartPre=, and Restart=on-failure
+# would retry it every 5 s for ever. RestartPreventExitStatus= cannot stop that (systemd reads it from the main
+# process only, never from ExecStartPre=), so the start limit does: 20 tries in 10 minutes (about 100 s of retries,
+# enough for a PostgreSQL restart or a boot-order race), then the instance stays failed and shows in
+# `systemctl --failed` until it is started again by hand (README §5 "The current release").
+StartLimitIntervalSec=600
+StartLimitBurst=20
 
 [Service]
 Type=simple
@@ -33,7 +40,7 @@ Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1
 # on the Caddy side (README §4).
 Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret
 # Root's start check (side-by-side plan D16b): a draining or retired release's website is refused.
-ExecStartPre=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service ui --label %i
+ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service ui --label %i
 ExecStart=/usr/bin/node /opt/debateai/releases/%i/dialectical-engine/apps/ui/server.mjs
 Restart=on-failure
 RestartSec=5

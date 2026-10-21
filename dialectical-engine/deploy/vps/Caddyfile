@@ -36,6 +36,7 @@
 		lb_try_duration 10s
 		lb_try_interval 250ms
 		health_uri /readyz
+		health_status 200
 		health_interval 2s
 		health_timeout 1s
 		health_passes 1

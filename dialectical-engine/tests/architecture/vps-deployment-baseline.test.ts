@@ -339,7 +339,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     for (const needle of [
       "reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {",
       "lb_policy first", "lb_try_duration 10s", "lb_try_interval 250ms",
-      "health_uri /readyz", "health_interval 2s", "health_timeout 1s", "health_passes 1", "health_fails 1",
+      "health_uri /readyz", "health_status 200", "health_interval 2s", "health_timeout 1s", "health_passes 1", "health_fails 1",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",
       "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}"
@@ -434,11 +434,18 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     // Nothing the service runs comes from the operator checkout except root's own release.mjs.
     expect(execs.filter((line) => line.includes("/opt/debateai/dialectical-engine/") && !line.includes("/opt/debateai/dialectical-engine/deploy/vps/release.mjs "))).toEqual([]);
     expect(unit).not.toContain("%I");
-    expect(lines).toContain(`ExecStartPre=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs may-start --service ${service} --label %i`);
-    const stopPost = `ExecStopPost=+/usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs stopped --service ${service} --label %i`;
+    // Root's hooks get PATH only: `+` keeps the unit's environment, and the base env file is the service user's, so a
+    // NODE_OPTIONS line in it must never reach a root process.
+    const root = "+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs";
+    expect(lines.filter((line) => /^Exec[A-Za-z]*=\+/.test(line) && !line.includes(`=${root} `))).toEqual([]);
+    expect(lines).toContain(`ExecStartPre=${root} may-start --service ${service} --label %i`);
+    const stopPost = `ExecStopPost=${root} stopped --service ${service} --label %i`;
     if (service === "ui") expect(unit).not.toContain("ExecStopPost=");
     else expect(lines).toContain(stopPost);
     expect(lines).toContain("Restart=on-failure");
+    // A refused start (ExecStartPre=) does not retry every 5 s for ever: the start limit ends it.
+    expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitIntervalSec=600$[\s\S]*^\[Service\]/m);
+    expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitBurst=20$[\s\S]*^\[Service\]/m);
     expect(unit).toMatch(/^\[Install\]\nWantedBy=multi-user\.target$/m);
   });
 
@@ -1125,6 +1132,8 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     return readme.slice(start, end);
   };
   const shBlocks = (text: string): string[] => [...text.matchAll(/```sh\n([\s\S]*?)```/gu)].map((match) => match[1] ?? "");
+  const ORDER_LINE = "> Order: §5 \"Side-by-side upgrades\": the new checkout is the new release's folder, and this section's pin and "
+    + "restart lines mean that order's steps 3 and 9 to 12 (§5 \"A new register version is a new release\"). This section adds only what this release needs.";
 
   it("§5 has the side-by-side section, in its order, before every per-release upgrade section", () => {
     const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
@@ -1179,9 +1188,77 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     for (const heading of headings) {
       const after = readme.slice((heading.index ?? 0) + heading[0].length).replace(/^\n+/u, "");
       expect(after.split("\n")[0], heading[2]).toBe(
-        "> Order: §5 \"Side-by-side upgrades\" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs."
+        ORDER_LINE
       );
     }
+  });
+
+  /**
+   * Fix round 1: REGISTER_VERSION and RELEASE_KEY are per release (the overlay wins, and the key carries the version),
+   * so "pin the new version in both files and restart" would silently change nothing. The runbook names the rule once
+   * and every pin instruction sits in a section that points to it.
+   */
+  it("a new register version is a new release: the rule is stated once and every pin instruction points to it", () => {
+    const current = between("### The current release (`$label`)", "### The first release");
+    const rule = /\*\*A new register version is a new release\.\*\*([\s\S]*?)\n\n/u.exec(current)?.[1] ?? "";
+    for (const needle of ["`REGISTER_VERSION`", "`RELEASE_KEY`", "win", "a new label and a new key on the same commit", "steps 3 and 9 to 12"]) {
+      expect(rule, needle).toContain(needle);
+    }
+    const pins = /REGISTER_VERSION=` line into|[Pp]in (?:it|that version|the version|the newest version|the gated version)[^.]*\b(?:both|REGISTER_VERSION)\b|`REGISTER_VERSION` in both|REGISTER_VERSION` to that version/u;
+    const sections = readme.split(/^(?=#{2,4} )/mu);
+    const unpointed = sections.filter((section) => pins.test(section))
+      .filter((section) => !section.includes(ORDER_LINE) && !section.includes("§5 \"A new register version is a new release\"")
+        && !section.startsWith("### The current release"))
+      .map((section) => section.split("\n")[0]);
+    expect(unpointed).toEqual([]);
+  });
+
+  it("every runner restart in place waits for `unfinished` at 0", () => {
+    const restarts = [...readme.matchAll(/systemctl restart[^\n`]*debateai-runner@\$label/gu)];
+    expect(restarts.length).toBeGreaterThanOrEqual(6);
+    for (const restart of restarts) {
+      const at = restart.index ?? 0;
+      expect(readme.slice(Math.max(0, at - 700), at + restart[0].length + 200), readme.slice(at - 120, at + 80)).toContain("`unfinished`");
+    }
+    // `unfinished` is defined where `$label` is: the open work of every release, from the work items themselves.
+    expect(between("### The current release (`$label`)", "### The first release")).toContain("AS unfinished");
+  });
+
+  it("a mistyped name never reaches a path: each read unsets on refusal and each path block checks again", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    const LABEL = "grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?'";
+    const reads = section.split("\n").filter((line) => line.startsWith("read -r "));
+    expect(reads).toHaveLength(2);
+    expect(reads[0]).toMatch(/ \|\| unset new key$/u);
+    expect(reads[1]).toMatch(/ \|\| unset old$/u);
+    for (const block of shBlocks(section)) {
+      if (block.startsWith("read -r ")) continue;
+      for (const name of ["new", "old", "label"]) {
+        if (!new RegExp(`\\$${name}\\b`, "u").test(block)) continue;
+        for (const line of block.split("\n").filter((entry) => new RegExp(`\\$${name}\\b`, "u").test(entry) && !entry.startsWith("  "))) {
+          expect(line, line).toContain(`printf '%s\\n' "$${name}" | ${LABEL}`);
+        }
+      }
+      if (/\$\{?key\b/u.test(block)) expect(block, block).toContain(`printf '%s\\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}'`);
+    }
+    // The archive refuses a name already in the archive, for the folder and for the overlays.
+    expect(section).toContain('test ! -e "/opt/debateai/archive/$old"');
+    expect(section).toContain('test ! -e "/opt/debateai/archive/etc/$old"');
+  });
+
+  it("the first release is staged, started and only then switched (the switch waits for Caddy to route to it)", () => {
+    const first = between("### The first release", "### Side-by-side upgrades");
+    const stage = first.indexOf("`stage`");
+    const enable = first.indexOf("systemctl enable --now");
+    const switched = first.lastIndexOf("`switch`");
+    expect(stage).toBeGreaterThan(-1);
+    expect(enable).toBeGreaterThan(stage);
+    expect(switched).toBeGreaterThan(enable);
+  });
+
+  it("the operator checkout moves forward only to a reviewed commit and only while no release drains", () => {
+    const units = between("## 5. Application units", "### The current release");
+    expect(units).toMatch(/operator checkout[^.]*forward[^.]*reviewed commit[^.]*no release is draining/u);
   });
 
   it("every command on an application unit names a release instance", () => {
@@ -1221,6 +1298,16 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     expect(block.indexOf("pg_dump --format=custom")).toBeLessThan(block.indexOf("tar -cf -"));
     for (const forbidden of ["rclone", "scp", "BACKUP_ESCROW_RECIPIENT"]) expect(block, forbidden).not.toContain(forbidden);
     expect(section).toContain("`backup.sh`");
+    // restore-drill.sh takes one *.tar.age; these three parts are restored by hand, in order.
+    expect(section).toContain("`restore-drill.sh` does not take this layout");
+    const restore = section.slice(section.indexOf("does not take this layout"));
+    expect(restore).toContain("age -d");
+    let previous = -1;
+    for (const file of ["globals.sql.age", "debateai.dump.age", "custody.tar.age"]) {
+      const at = restore.indexOf(file, previous + 1);
+      expect(at, file).toBeGreaterThan(previous);
+      previous = at;
+    }
   });
 });
 

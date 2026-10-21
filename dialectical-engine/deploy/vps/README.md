@@ -439,7 +439,8 @@ would mean nothing.
 
 They now hold both keys, and every new record they write is wrapped under the
 new one. Nothing is unreadable during this window, which is what makes the
-rotation an ordinary maintenance task rather than an outage:
+rotation an ordinary maintenance task rather than an outage. A runner restart stops a busy runner,
+so restart with `unfinished` at 0 (§5 "The current release"):
 
 ```sh
 systemctl restart debateai-api@$label debateai-runner@$label
@@ -527,9 +528,9 @@ opened is never a clean store;
 keep the previous key in place, investigate those records, and run it again.
 
 Once the pass is clean, remove every `*_KEK_PREVIOUS_PATH` line from `api.env`
-and `runner.env`, restart both units so neither process holds the old key any
-more, and only then destroy the old key files. Their absence is the normal
-steady state, and the shred is what makes the rotation meaningful:
+and `runner.env`, restart both units (with `unfinished` at 0, §5 "The current release") so neither
+process holds the old key any more, and only then destroy the old key files. Their absence is the
+normal steady state, and the shred is what makes the rotation meaningful:
 
 ```sh
 systemctl restart debateai-api@$label debateai-runner@$label
@@ -769,7 +770,9 @@ pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-regi
 pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
 ```
 
-Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`. A
+Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`: these are the base
+files, and the first release's overlays carry the same number (§5 "The first release", and
+§5 "A new register version is a new release"). A
 `HOSTED_REGISTER_NOT_BOOT_READY` line instead means the version was sealed but a start-up reader
 refused it: pin nothing, read the refusal code, correct the file and publish again (a new
 version; the refused one stays sealed and unused).
@@ -812,6 +815,10 @@ names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`,
 **built in the follow-up task D16b**, after the preview's switch and check tools. Until it is
 installed the application units refuse to start, and no step below that names it can be done.
 
+The operator checkout serves every release (its `release.mjs`, `backup.sh`, `restore-drill.sh` and the billing
+tools), so move the operator checkout forward (`git -C /opt/debateai/dialectical-engine checkout` of a fetched
+commit) only to the reviewed commit of the current release, and only while no release is draining.
+
 ### The current release (`$label`)
 
 `$label` in any command of this runbook is the current release's label. The current release is
@@ -824,16 +831,31 @@ set -- /etc/systemd/system/multi-user.target.wants/debateai-api@*.service && tes
 
 A changed base file reaches the current release at its next restart:
 `systemctl restart debateai-api@$label` (and `debateai-ui@$label`). A runner restart is a stop:
-restart `debateai-runner@$label` only while it runs no debate and no release is draining.
+restart `debateai-runner@$label` only while no release is draining and `unfinished`, the open work
+of every release, is 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+```
+
+An instance whose start the release tool refuses, or that fails 20 times within 10 minutes, stays
+failed (`systemctl --failed` lists it) until it is started again by hand (`systemctl start`); the
+unit's start limit keeps a refused start from retrying every 5 seconds for ever.
+
+**A new register version is a new release.** `REGISTER_VERSION` and `RELEASE_KEY` are per release: each release's overlays (`/etc/debateai/releases/<label>/api.env` and `runner.env`) are read after the base files and win, and the release key carries the register version (`r<version>-…`), so a running release never changes version. Writing a new `REGISTER_VERSION` into the base files and restarting `@$label` therefore changes nothing, and a release's overlays are written once and never edited. So wherever this runbook says to pin a new version ("copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`", "pin it in both `EnvironmentFile`s") and then restart the API and the runner, do a side-by-side upgrade instead (below): a new label and a new key on the same commit, the key's number being the version to pin. Its steps 3 and 9 to 12 are that pin and that restart (the overlays name the version; stage, start, switch); when the version is already published, skip step 8, and step 7 has nothing to apply.
+
+The base files' own `REGISTER_VERSION` is read by no service (the overlay wins) but by the operator
+commands that load a base file alone (`systemd-run … --property=EnvironmentFile=/etc/debateai/api.env`,
+§11, §14). After each switch set it in both base files to the current release's version, so those
+commands read the version the site runs.
 
 ### The first release
 
 Install Hatchet's compose file first ("Side-by-side upgrades" below, "Hatchet's compose file").
 Then prepare the first release's folder and its overlays exactly as steps 1 to 3 of "Side-by-side
-upgrades" below say, with slot A (`ui=3001 api=8790`), then make it the current release: run
-`label=$new` in your shell, and record it in the release table with the release tool's `stage`
-and `switch` (built in the follow-up task D16b; the first release has no older release to switch
-from). Then:
+upgrades" below say, with slot A (`ui=3001 api=8790`), run `label=$new` in your shell, and record
+it in the release table as staged with the release tool's `stage` (built in the follow-up task
+D16b), so its instances may start. Then install the units and start the first release:
 
 ```sh
 install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/
@@ -842,6 +864,10 @@ systemctl start debateai-geoip-refresh.service
 test -n "$label" && systemctl enable --now debateai-hatchet debateai-api@$label debateai-ui@$label debateai-runner@$label \
   debateai-backup.timer debateai-geoip-refresh.timer
 ```
+
+Then make it the current release with the release tool's `switch` (built in the follow-up task
+D16b; the first release has no older release, so no `--from`). The switch waits until Caddy sends
+traffic to the new pair, so it comes after the start, never before.
 
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
 enabled by the fourth (§12). The first line also installs the root timers each release's
@@ -912,11 +938,12 @@ set in step 1.
 
 **1. The release folder.** Name the new release: its label (lowercase letters, digits and dashes,
 for example `d50e33165-r20-v1`) and its release key, `r` + the register version it will publish
-(the next one) + `-` + the first 12 hex of its commit. The line checks both and refuses a label
-already in use:
+(the next one) + `-` + the first 12 hex of its commit. The line checks both, refuses a label
+already in use, and forgets both names when it refuses; every later block checks them again
+before it touches a path:
 
 ```sh
-read -r new && read -r key && printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test "$new" != "$label" && test ! -e "/opt/debateai/releases/$new" && echo "new release: $new ($key)"
+read -r new && read -r key && printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test "$new" != "$label" && test ! -e "/opt/debateai/releases/$new" && echo "new release: $new ($key)" || unset new key
 ```
 
 Then fetch the reviewed commit into the operator checkout (a fetch changes no file there) and
@@ -924,7 +951,7 @@ export it into the new folder with `git archive`, root-owned, files `0644` and f
 
 ```sh
 git -C /opt/debateai/dialectical-engine fetch origin
-test -n "$new" && test -n "$key" && test ! -e "/opt/debateai/releases/$new" && git -C /opt/debateai/dialectical-engine cat-file -e "${key##*-}^{commit}" && install -d -m 0755 -o root -g root /opt/debateai/releases "/opt/debateai/releases/$new" "/opt/debateai/releases/$new/dialectical-engine" && git -c tar.umask=0022 -C /opt/debateai/dialectical-engine archive --format=tar "${key##*-}" | tar -x --no-same-owner -C "/opt/debateai/releases/$new/dialectical-engine" && echo "exported: /opt/debateai/releases/$new"
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test ! -e "/opt/debateai/releases/$new" && git -C /opt/debateai/dialectical-engine cat-file -e "${key##*-}^{commit}" && install -d -m 0755 -o root -g root /opt/debateai/releases "/opt/debateai/releases/$new" "/opt/debateai/releases/$new/dialectical-engine" && git -c tar.umask=0022 -C /opt/debateai/dialectical-engine archive --format=tar "${key##*-}" | tar -x --no-same-owner -C "/opt/debateai/releases/$new/dialectical-engine" && echo "exported: /opt/debateai/releases/$new"
 ```
 
 **2. Dependencies, offline.** Fill root's package store for this lockfile (the only step that
@@ -932,9 +959,9 @@ downloads), then install the folder from the store with the network off, and bui
 release needs (the contract and the website; the website build stamps `RELEASE_KEY`):
 
 ```sh
-test -n "$new" && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" fetch
-test -n "$new" && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" install --frozen-lockfile --offline
-test -n "$new" && test -n "$key" && RELEASE_KEY="$key" pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run build
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" fetch
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" install --frozen-lockfile --offline
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && RELEASE_KEY="$key" pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run build
 ```
 
 **3. The three overlay files.** The new release takes the slot the current one does not use:
@@ -942,14 +969,14 @@ website `3002` and API `8791` when the current release's website is on `3001`, o
 and `8790`. This picks it:
 
 ```sh
-test -n "$label" && if grep -qx 'PORT=3001' "/etc/debateai/releases/$label/ui.env"; then ui=3002 api=8791; else ui=3001 api=8790; fi && echo "new slot: website $ui, API $api"
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && if grep -qx 'PORT=3001' "/etc/debateai/releases/$label/ui.env"; then ui=3002 api=8791; else ui=3001 api=8790; fi && echo "new slot: website $ui, API $api"
 ```
 
 Then write the overlays (`0640`, root-owned, read by each service's group), once; the block
 refuses a release that already has them:
 
 ```sh
-test -n "$new" && test -n "$key" && test -n "$ui" && test -n "$api" && test ! -e "/etc/debateai/releases/$new" && \
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test -n "$ui" && test -n "$api" && test ! -e "/etc/debateai/releases/$new" && \
   install -d -m 0755 -o root -g root /etc/debateai/releases "/etc/debateai/releases/$new" && v=${key#r} && v=${v%%-*} && \
   (umask 0137 && printf 'REGISTER_VERSION=%s\nRELEASE_KEY=%s\nAPI_PORT=%s\n' "$v" "$key" "$api" > "/etc/debateai/releases/$new/api.env" && \
   printf 'REGISTER_VERSION=%s\nRELEASE_KEY=%s\nRUNNER_WORKER_ID=debateai-prod-runner-%s\nHATCHET_WORKER_NAME=debateai-prod-runner-%s\n' "$v" "$key" "$key" "$key" > "/etc/debateai/releases/$new/runner.env" && \
@@ -973,15 +1000,15 @@ folder. The older release keeps serving throughout; each step is a quick transac
 timeout:
 
 ```sh
-test -n "$new" && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" db:migrate
-test -n "$new" && sudo -u postgres psql -v ON_ERROR_STOP=1 -f "/opt/debateai/releases/$new/dialectical-engine/deploy/postgres/hardening.sql"
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" db:migrate
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && sudo -u postgres psql -v ON_ERROR_STOP=1 -f "/opt/debateai/releases/$new/dialectical-engine/deploy/postgres/hardening.sql"
 ```
 
 **8. Publish the new register version**, still inside the window, from the new release's folder
 (§11 "Publishing the settings register on this host"; run it with `--dry-run` first):
 
 ```sh
-test -n "$new" && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" register:publish-hosted --file /etc/debateai/register/hosted-register.json
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" register:publish-hosted --file /etc/debateai/register/hosted-register.json
 ```
 
 The printed `REGISTER_VERSION=` must be the number in the new release key; the overlays already
@@ -995,15 +1022,15 @@ new release as staged, so its instances may start.
 **10. Start the new runner**, then check that its ready line names the new key:
 
 ```sh
-test -n "$new" && systemctl start debateai-runner@$new
-test -n "$new" && journalctl -u debateai-runner@$new -o cat --no-pager | grep DEBATEAI_RUNNER_READY
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl start debateai-runner@$new
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && journalctl -u debateai-runner@$new -o cat --no-pager | grep DEBATEAI_RUNNER_READY
 ```
 
 **11. Start the new API and website** in the spare slot. They come up but stay not-ready
 (`NOT_CURRENT`): Caddy keeps sending everything to the current pair.
 
 ```sh
-test -n "$new" && systemctl start debateai-api@$new debateai-ui@$new
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl start debateai-api@$new debateai-ui@$new
 test -n "$api" && curl -s "http://127.0.0.1:$api/readyz"
 ```
 
@@ -1023,14 +1050,15 @@ running 7.5 hours after the switch. `release.mjs status` (built in the follow-up
 each release's state and writes the receipt of the upgrade.
 
 **14. The archive**, later and on the owner's yes: move the retired release's folder and overlays
-aside. Name it first (the line refuses the current release and a release with a running unit):
+aside. Name it first (the line refuses the current release and a release with a running unit, and forgets a
+name it refuses):
 
 ```sh
-read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && ! systemctl is-active --quiet debateai-api@$old debateai-ui@$old debateai-runner@$old && echo "to archive: $old"
+read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && ! systemctl is-active --quiet debateai-api@$old debateai-ui@$old debateai-runner@$old && echo "to archive: $old" || unset old
 ```
 
 ```sh
-test -n "$old" && test "$old" != "$label" && install -d -m 0700 -o root -g root /opt/debateai/archive /opt/debateai/archive/etc && test ! -e "/opt/debateai/archive/$old" && mv /opt/debateai/releases/$old /opt/debateai/archive/ && mv /etc/debateai/releases/$old /opt/debateai/archive/etc/
+printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && install -d -m 0700 -o root -g root /opt/debateai/archive /opt/debateai/archive/etc && test ! -e "/opt/debateai/archive/$old" && test ! -e "/opt/debateai/archive/etc/$old" && mv /opt/debateai/releases/$old /opt/debateai/archive/ && mv /etc/debateai/releases/$old /opt/debateai/archive/etc/
 ```
 
 **Going back.** Before the switch: stop the new API and website, and the new runner (it has no
@@ -1042,7 +1070,7 @@ is a last resort only.
 
 ### Upgrading to the verdict-story release, and rolling it back
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release (the verdict story and the engine money rule, spec 2026-09-26 §14) changes what the
 API hands the runner and the website, and older code reads the new shapes strictly. Keep to this
@@ -1075,7 +1103,7 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
 
 ### Upgrading to the model-scorecard release
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). The picker chooses no model until a
 model scorecard is sealed into the hosted register with `--scorecard`, but two things act from the first restart on
@@ -1125,7 +1153,7 @@ backup grow by roughly the size of every prompt sent; plan disk and backup space
 
 ### Upgrading to the publication-check deadline release
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release moves the deadline of the safety check that runs before a debate is published (60 seconds) out of
 the code and into the register, as the code-owned row `publicationCheckPolicy` (owner's ruling 2026-10-04). The API
@@ -1143,7 +1171,7 @@ reads it at start-up and refuses a register version without it (`PUBLICATION_CHE
 
 ### Upgrading to the billing-role release (go-live row 41)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Migration `migrations/0093_billing_runtime_role.sql` moves every billing privilege from `debateai_runtime`, the
 role the API, the runner and the liveness sweep all hold, to a new role `debateai_billing_runtime` that only the
@@ -1163,7 +1191,7 @@ this code:
    its `EnvironmentFile` before the envelope is destroyed). It moves `debateai_prod_api_runtime` from
    `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=19`.
 4. **Close the migrator window** (§4 step 5).
-5. **Restart the API and the runner** (`systemctl restart debateai-api@$label debateai-runner@$label`) so both connect with the
+5. **Restart the API and the runner**, with `unfinished` at 0 (`systemctl restart debateai-api@$label debateai-runner@$label`) so both connect with the
    passwords step 3 set.
 
 Check: one `retention.purged` line at the API's first purge check after the restart, and no
@@ -1172,7 +1200,7 @@ privileges through the new membership, because the role inherits `debateai_runti
 
 ### Upgrading to the legal-role release (migration 0094)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Migration `migrations/0094_legal_runtime_api_only.sql` does for the acceptance record what 0093 did for billing. It
 moves the legal schema, `legal.acceptance`, the legal retention purge (`legal.purge_expired_acceptance`), sign-up
@@ -1196,7 +1224,7 @@ check, and a test sign-up that succeeds. **Rolling back** the code needs nothing
 
 ### Upgrading to the answer-writer prompt v2 release (serve.synthesizer.v2)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release supersedes the answer writer's sealed prompt `serve.synthesizer.v1` with `serve.synthesizer.v2`, which
 also tells the model the exact name of the one served-number slot (`number:final-strength`) and the identifier form
@@ -1217,7 +1245,7 @@ the runner accepts. Its fingerprint is the code-owned row `composerContractHash`
 
 ### Upgrading to the answer writer v3 and answer checker v2 release (serve.synthesizer.v3, serve.evaluator.v2)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release supersedes `serve.synthesizer.v2` with `serve.synthesizer.v3` and `serve.evaluator.v1` with
 `serve.evaluator.v2` (owner-approved wording, 2026-10-12): the answer writer and its checker are told that the
@@ -1236,7 +1264,7 @@ move: `composerContractHash` and `conformanceContractHash`. No migration, no new
 
 ### Upgrading to the debate shape
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds the debate shape: before the debate, the AIs map the question (the points people raise and the
 answers worth arguing); then several answers are argued, each by a different AI, and the final answer has a set
@@ -1292,13 +1320,13 @@ them.
 
 ### Upgrading to length guidance LG-A (reply measures)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds one migration, `migrations/0120_reply_measures.sql` (after the reclaim resume's `migrations/0119_reclaim_resume.sql`; `pnpm db:migrate` applies 0119 first if the host does not have it yet). Apply it BEFORE the new code runs: the new code writes six new columns of `ledger.raw_artifact` (`reply_repairs`, `reply_failure_class`, `reply_form`, `cached_input_tokens`, `guided_words`, `actual_words`) with every model call it records, so on a database without them every model call fails. The migration also redefines the terminal facts function `core.read_terminal_recorded_facts` (same signature, owner and grants), so that a step whose answer was put into its form by the structure-repair call counts like that step; the older code never writes such rows, so it reads the same counts as before. Apply it as step 1 of the debate-shape upgrade above does (open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API and the runner. No register version and no new environment key. The structure-repair call itself is wired only where the preview provider config is set; a hosted production host keeps today's follow-ups. Rolling back the code needs no database step: the six columns and the function stay, and the older code never writes the columns.
 
 ### Upgrading to length guidance LG-C (the length row)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 The length row is OFF until a register version carries the `lengthGuidancePolicy` member (`deploy/vps/register/README.md`).
 
@@ -1335,7 +1363,7 @@ and restart both: the older runner refuses this release's seals the other way (`
 
 ### Upgrading to the engine row
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Not before the program's switch-on release: engine 2's AI wording (the story v4 texts) awaits the owners' approval, and the
 comparing judges, investigations and answer check arrive in R2-R3. Until then publish no version with this member.
@@ -1359,7 +1387,7 @@ engine-2 debate (`ENGINE_RUNNER_UNCONFIGURED`).
 
 ### Upgrading to the engine redesign R2a (the engine seal and migration 0121)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 A register version for this code carries the code-owned `engineContractHash` row with `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` (was
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`): R2a seals the investigation's prompt contract.
@@ -1378,7 +1406,7 @@ The runner's journal gains one line kind, `DEBATEAI_POINT_INVESTIGATION` (engine
 
 ### Upgrading to the engine redesign R2b (the engine seal)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 A register version for this code carries the code-owned `engineContractHash` row with `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` (was `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` after R2a, or
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24` from a release before R2a): R2b appends the comparing
@@ -1389,7 +1417,7 @@ The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 o
 
 ### Upgrading to the engine redesign R3 (the engine seal and migration 0122)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
 
@@ -1403,7 +1431,7 @@ never reads them.
 
 ### Upgrading an existing host (paid plans Part 1a)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
 sealed under a new key, and ships the country gate switched off. A host that already runs an
@@ -1525,7 +1553,8 @@ Publish no register version that carries `countryPolicy` until ALL of these hold
 Then turn the gate on: open a migrator window (§4 steps 2 and 5), copy the `countryPolicy` member
 from `deploy/vps/register/country-policy.example.json` into the top-level object of
 `/etc/debateai/register/hosted-register.json`, beside `costEnvelopePolicy`, and publish as §11
-"Publishing the settings register on this host" says; pin the version it prints. To turn the gate
+"Publishing the settings register on this host" says; pin the version it prints (a new release,
+§5 "A new register version is a new release"). To turn the gate
 off again, remove the member and publish again: that new version has no row.
 
 To check the last refresh:
@@ -1741,8 +1770,14 @@ covers them.
 ```
 
 `ONLINE_BACKUP_OK` and the folder name are the pass; without that line, do not start the
-migrations. Restoring it is the restore drill's procedure (below) on these three parts, with the
-data recipient's private key, which is off this host.
+migrations.
+
+`restore-drill.sh` does not take this layout: it expects one `*.tar.age` holding all three files. To
+restore from this backup, on a machine that holds the data recipient's private key (never this
+host), first check the parts with `sha256sum -c SHA256SUMS` in the folder, then decrypt and restore
+them in the drill's own order, with the services stopped: `age -d` `globals.sql.age` and run it
+with `psql` (the roles first), then `age -d` `debateai.dump.age` into `pg_restore`, then `age -d`
+`custody.tar.age` and unpack it over the custody stores' parent folders.
 
 ### Restore drill — **quarterly**, and it is not optional
 
@@ -2051,11 +2086,12 @@ vendor is refused there rather than at boot.
 
 Publishing it is §11 "Publishing the settings register on this host": add the vendor to
 `/etc/debateai/register/hosted-register.json` and run `pnpm register:publish-hosted` inside a
-migrator window. `REGISTER_VERSION` in both `EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
+migrator window. The new version then reaches the services as a new release whose overlays name it
+(§5 "A new register version is a new release"). Every `provider_ref` in step 3 must appear in this
 row and in the same order, or both services refuse at boot with
 `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
 
-Restart `debateai-api@$label` and `debateai-runner@$label` after steps 3 and 4. A vendor whose endpoint does not
+Restart `debateai-api@$label` and, with `unfinished` at 0, `debateai-runner@$label` after steps 3 and 4. A vendor whose endpoint does not
 answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
 service.
 
@@ -2127,8 +2163,8 @@ The three are all or none (`COST_ENVELOPE_POLICY_INVALID` otherwise). Their rang
 1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`. In the same file, add the top-level `askRoomReads` member too, so the one new version seals the band and the room read's budget together. `askRoomReads` is your budget for the room read (`GET /v1/asks/room`, the "is there room for my question" check), and it is required whenever the band is there. The kit's example carries an EXAMPLE budget: `"key": "owner"`, `"limit": 60`, `"window_ms": 60000`, `"capacity": 65536`; set your own. See "The room read's budget" in `deploy/vps/register/README.md`.
 2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing. It also prints `ask_room_reads key=owner limit=… window_ms=… capacity=…`. While the band is there and the budget is missing, it refuses with `ASK_ROOM_ADMISSION_UNSEALED`.
 3. Publish.
-4. Pin `REGISTER_VERSION` in both `EnvironmentFile`s.
-5. Restart both units.
+4. Pin it: a new release with this version (§5 "A new register version is a new release").
+5. Start and switch to it (§5 "Side-by-side upgrades", steps 9 to 12).
 
 Publish them only on a build that runs the whole rule. The waiting line, holds, the waker, the running wall and the boot check ship together.
 
@@ -2247,11 +2283,11 @@ journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE
 | A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, kept in `core.work_item.terminal_reason` (the asker sees "This debate reached its limit…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
 | A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:ROLE_ROTATION`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", or for `PLAN_CHANGED` "Your paid plan ended or was paused while this question waited…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), saving which AI models take the debate's answer and story writing and checking roles when those roles rotate between debates (`ROLE_ROTATION`, only while role rotation is on, in `core.run_role_rotation`), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. On the private preview only (see `api.wait.preview_team_only`), `RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY` is kept the same way, and its owner reads the same "Something went wrong on our side before this debate began…": the question's owner is not on the preview's team, so the question was never started. It is not a fault. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
-| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
-| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
+| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it (§5 "A new register version is a new release"). |
+| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once and pin the new version: a new release (§5 "A new register version is a new release"). |
 | `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
 | `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
-| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish, pin the new version in both `EnvironmentFile`s and restart both units. After billing is switched on it means the API and the runner are on different register versions: pin the same `REGISTER_VERSION` in both and restart both. |
+| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
 | `"kind":"DEBATEAI_COMPARING_JUDGE"`, `"event":"JUDGE_FAILED"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per comparing judge whose call ended without a usable answer: one of the up to three AIs that compare the debate's answers side by side gave no vote (the call failed or was refused, or the money stopped it). `callSiteKey` names the judge's seat (`VERDICT:judge:<n>`, the judge's seat number). `code` is the error's code or class name, never AI or vendor text. The judge is recorded as failed and its vote is missing; the debate goes on and the other judges' votes decide. With no judge left, the answer is chosen by its honest strength and labelled at most "Close call". | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
 
@@ -2263,7 +2299,7 @@ ids and a bounded diagnostic only:
 | `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
 | `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
 | `"event":"api.ask.role_rotation_counts_unavailable"`, with `diagnostic` | Only while role rotation is on (the register's `answerRoleRotationPolicy` row). A new question needed the per-model role counts (`core.run_role_rotation`) to pick its writing and checking models, and they could not be read, most likely a database fault. The question was refused before any debate record was written, and the asker was asked to try again in a minute ("a model this debate needs cannot be reached right now"); no question is ever started without its picked models. | One: nothing. Several in a row: read the API's `api.request.failed` lines from the same minutes and check the database. |
-| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner@$label.service`; a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
+| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner@$label.service` when `unfinished` counts only those queued debates (a restart stops the debates the runner is running); a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
 | `"event":"api.wait.redispatch_failed"`, with `runId` and `diagnostic` | The waker tried to hand a started debate's first job to the job system again (the job had waited five minutes, see the row above) and the job system refused. The job stays queued, its hold keeps counting, and the next tick tries again. Nothing is marked failed, because the job may already be on its way. | One: nothing. Every minute: the job system is not taking work. The `diagnostic` names the code; check `debateai-hatchet` and the API's `api.request.failed` lines, as for `RUN_SETUP_FAILED:DISPATCH`. |
 | `"event":"api.wait.preview_team_only"`, with `runId` | Private preview only (`PREVIEW_PROVIDER_TEST_CONFIG_JSON` set). The waker found a waiting question, or a started debate's first job still waiting for a runner, whose owner is not on the team (`PREVIEW_TEAM_USER_IDS_JSON`), or that belongs to a legacy asker. It was not started or handed over; it was recorded failed (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`), so its owner reads "Something went wrong on our side before this debate began". With an empty team list nothing is started, handed over or failed, and no such line appears. Never on the real site. | Nothing; the rule worked. Many at once after a cutover: expected, they are the questions that waited from before it. If a team member's question shows here, their identity user id is missing from `PREVIEW_TEAM_USER_IDS_JSON`. The API's rule does not cover the runner's own start-up recovery, which hands every queued job over without a team check: start the runner only with an empty queue. |
 | `"event":"api.wait.start_failed"`, with `runId` and `diagnostic` | The waker tried to start a waiting question, and the attempt failed inside its locked transaction (most likely the database): before the room was measured, while starting it, or while recording why it still waits. Nothing of the start was written: no hold, no job, no start mark. The question stays in the line, in its place, and the next tick tries again. | One: nothing. Every minute for the same `runId`: that question cannot start, although the tick goes on to the questions behind it. Read the `diagnostic` and the API's `api.request.failed` lines from the same minutes. A typed code is a defect to report with the `runId`. |
@@ -2408,12 +2444,11 @@ rows a hosted start-up refuses without:
 sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy') ORDER BY row_key"
 ```
 
-Four rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
-and restart both units.
+Four rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
 
 ### Upgrading to role rotation
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Per-debate role rotation (spec 2026-10-11) gives each of a debate's four jobs (the answer writer, the answer
 checker, the storyteller and the story checker) to a model of that debate's own panel: the one that has done that
@@ -2435,7 +2470,7 @@ next start on this code:
    `/etc/debateai/register/hosted-register.json` (`deploy/vps/register/README.md`), then run the dry run and the
    publish exactly as above. The plan's `row_keys=` line names `answerRoleRotationPolicy`. Pin the version the publish
    prints as `REGISTER_VERSION` in both `EnvironmentFile`s.
-3. **Restart the API and the runner** (`systemctl restart debateai-api@$label debateai-runner@$label`). The API reads the setting at
+3. **Restart the API and the runner**, with `unfinished` at 0 (`systemctl restart debateai-api@$label debateai-runner@$label`). The API reads the setting at
    start-up; the runner never reads it, and a debate accepted before the restart keeps the roles it was given. A
    debate whose panel has models from two or more companies is rotated once the API runs the new version; a panel
    from one company keeps the fixed roles.
@@ -2946,7 +2981,8 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
 ```
 
 Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`, then restart both. Every change
-below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited.
+below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited. On this
+host "pin, restart" is a new release with that version (§5 "A new register version is a new release").
 
 **A price change reaches only new subscriptions.** Each subscription keeps the net price it was sold at (its
 `recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
@@ -2955,7 +2991,7 @@ notice of Terms §12 exists (it is not built yet).
 
 #### Upgrading to Part C (migration 0113)
 
-> Order: §5 "Side-by-side upgrades" (the new checkout is the new release's folder, and a restart is that order's start and switch). This section adds only what this release needs.
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Part C prices every plan in RON, EUR and USD at once. Its migration `migrations/0113_billing_price_currencies.sql` adds
 each quote's currency and lets a charge be in RON or EUR as well as USD; Part C's code writes and reads that currency,
@@ -2974,7 +3010,7 @@ this code. The engine also refuses to start on a register version whose `billing
    The publish runs inside a migrator window (§4 steps 2 and 5): open one again for it, or do this step before
    closing the window in step 5.
 7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.
-8. **Restart both**: `systemctl restart debateai-api@$label debateai-runner@$label`.
+8. **Restart both**, with `unfinished` at 0: `systemctl restart debateai-api@$label debateai-runner@$label`.
 
 **Rolling back** past Part C: before restarting the older code, pin the register version it ran on (the one you
 replaced) in both `api.env` and `runner.env`, because the forward migration stays applied and older code refuses a v2
@@ -3282,7 +3318,8 @@ case.
 Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and
 restart the two services (§14.4): a question can join the line in the minutes between. If it is not 0 then, pin
 nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.
-Wait for the line to empty, check again, then pin and restart.
+Wait for the line to empty, check again, then pin and restart. Here, as everywhere on this host, pinning and
+restarting is a new release with the published version (§5 "A new register version is a new release").
 
 On a host without the band, you can instead publish the band (the three members of go-live line 13, with
 `askRoomReads`, the room read's budget, which every version with the band needs) in the same version that switches
