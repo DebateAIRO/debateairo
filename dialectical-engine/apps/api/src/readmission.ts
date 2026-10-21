@@ -20,7 +20,8 @@ import { AskRefusal, type PlannedAskAdmission, type RunCreationSettings } from "
  *      or different is a choice the new version no longer offers: ASK_AGAIN. A member the normaliser adds is a new
  *      default, kept.
  *   3. It is evaluated (`evaluate`: the waker passes `evaluationOrRefusal`). A refusal of the person's own choice
- *      (`READMISSION_CHOICE_REFUSALS`) is ASK_AGAIN; any other refusal (models busy, the daily envelope, the preview
+ *      (`READMISSION_CHOICE_REFUSALS`), or one that holds for as long as this version runs
+ *      (`READMISSION_PERMANENT_REFUSALS`), is ASK_AGAIN; any other refusal (models busy, the daily envelope, the preview
  *      gate) is NOT_NOW and the run keeps its place in line; any other error is thrown.
  *   4. Otherwise READMIT, with the hold the picker planned (`pickedHoldMicros`, else null: the room's estimator) and
  *      the new ask's settings class.
@@ -31,6 +32,24 @@ import { AskRefusal, type PlannedAskAdmission, type RunCreationSettings } from "
  */
 export const READMISSION_CHOICE_REFUSALS: ReadonlySet<string> = new Set(["ASK_PLAN_TIER_INVALID"]);
 
+/**
+ * C10 review, item 3 — THE REFUSALS THAT DO NOT PASS. `evaluateAskAdmission` turns every typed failure into an
+ * `AskRefusal`, so some refusals hold for as long as this version runs, whatever the waker's next tick sees: the depth
+ * is above this version's sealed maximum, the debate costs more than this site allows for one debate, or this
+ * version's own shape, length or engine rows cannot price it. The waiting line has no expiry of its own (0083, 0123
+ * §4: a run waits until it starts, fails or is superseded), so as NOT_NOW such a run would be planned again, with its
+ * probes, at every tick for ever. They are ASK_AGAIN instead: the person asks again, under what this version offers,
+ * and nothing of their allowance was used. Every other refusal names something that passes (models busy or
+ * unreachable, the day's envelope, the preview gate) and stays NOT_NOW.
+ */
+export const READMISSION_PERMANENT_REFUSALS: ReadonlySet<string> = new Set([
+  "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM",
+  "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
+  "ENGINE_REQUIRES_LENGTH_POLICY",
+  "STRUCTURAL_CEILING_ENGINE_INVALID",
+  "STRUCTURAL_CEILING_TREE_INVALID"
+]);
+
 export type ReadmissionPlan =
   | Readonly<{ kind: "READMIT"; ask: AskRequest; shapePlan: DebateShapePlanKey; planId: PlanId | null;
       evaluation: PlannedAskAdmission; settingsClass: RunSettingsClass; holdMicros: number | null; stored: StoredAsk }>
@@ -39,13 +58,19 @@ export type ReadmissionPlan =
 
 const ASK_AGAIN: ReadmissionPlan = Object.freeze({ kind: "ASK_AGAIN" });
 
-/** Step 1: the ask the run was stored with, as an `AskRequest`; null when it no longer parses as one. */
+/**
+ * Step 1: the ask the run was stored with, as an `AskRequest`; null when it no longer parses as one.
+ * C10 review, item 1: `core.run.tier_source` keeps the RESOLVED source, which is DEPLOYMENT_POLICY whenever the
+ * deployment's risk tier outranked the asker's (`preserveSubmittedTierSource`), while an ask's source is only ASKER or
+ * MACHINE_DEFAULT. The stored `asker_risk_tier` is the person's own tier, so a stored DEPLOYMENT_POLICY is read as
+ * ASKER: the re-evaluation resolves DEPLOYMENT_POLICY again by itself for as long as the policy still outranks.
+ */
 function rebuiltAsk(stored: StoredAsk): AskRequest | null {
   const contract = stored.askContract;
   const parsed = AskRequestSchema.safeParse({
     question_line: stored.questionLine,
     risk_tier: stored.askerRiskTier,
-    tier_source: stored.tierSource,
+    tier_source: stored.tierSource === "DEPLOYMENT_POLICY" ? "ASKER" : stored.tierSource,
     tier_provenance_ref: stored.tierProvenanceRef,
     composition_budget_tier: stored.compositionBudgetTier,
     plan_tier: stored.planTier,
@@ -78,7 +103,8 @@ export async function planReadmission(input: Readonly<{
   if (!keepsEveryStoredChoice(input.stored.depthParams, ask.depth_params)) return ASK_AGAIN;
   const evaluation = await input.evaluate(ask, shapePlan);
   if (evaluation instanceof AskRefusal) {
-    return READMISSION_CHOICE_REFUSALS.has(evaluation.code) ? ASK_AGAIN : Object.freeze({ kind: "NOT_NOW", code: evaluation.code });
+    return READMISSION_CHOICE_REFUSALS.has(evaluation.code) || READMISSION_PERMANENT_REFUSALS.has(evaluation.code)
+      ? ASK_AGAIN : Object.freeze({ kind: "NOT_NOW", code: evaluation.code });
   }
   return Object.freeze({
     kind: "READMIT",

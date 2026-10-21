@@ -8,7 +8,7 @@ import {
 import { AskRefusal, type PlannedAskAdmission } from "@debateai/api";
 import { runSettingsClassOfAsk } from "../../apps/api/src/ask-room.js";
 import {
-  READMISSION_CHOICE_REFUSALS, planReadmission, readmittedAskContract, type ReadmissionPlan
+  READMISSION_CHOICE_REFUSALS, READMISSION_PERMANENT_REFUSALS, planReadmission, readmittedAskContract, type ReadmissionPlan
 } from "../../apps/api/src/readmission.js";
 
 /**
@@ -121,6 +121,33 @@ describe("planReadmission (side-by-side spec §4, O3)", () => {
     expect(evaluate).not.toHaveBeenCalled();
   });
 
+  it("re-admits that same stored ask under a policy that still offers a fixed depth (the control)", async () => {
+    const depthParams = { depth: 2, depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } as const;
+    const { result, evaluate } = plan({
+      stored: stored({ planTier: "premium", depthParams }), debateShapePolicy: debateShapePolicyStartValues()
+    });
+    const value = readmitted(await result);
+    expect(value.ask.depth_params).toEqual(depthParams);
+    expect(value.shapePlan).toBe("premium");
+    expect(evaluate).toHaveBeenCalledWith(value.ask, "premium");
+  });
+
+  it("re-admits a run whose deployment's risk tier outranked the asker: the stored DEPLOYMENT_POLICY reads as ASKER", async () => {
+    // core.run.tier_source keeps the RESOLVED source; the ask schema accepts only ASKER or MACHINE_DEFAULT. The stored
+    // asker_risk_tier is the person's own tier, so re-evaluation resolves DEPLOYMENT_POLICY again while it still outranks.
+    const { result, evaluate } = plan({ stored: stored({ tierSource: "DEPLOYMENT_POLICY" }) });
+    const value = readmitted(await result);
+    expect(value.ask.tier_source).toBe("ASKER");
+    expect(value.ask.risk_tier).toBe("casual");
+    expect(value.ask.tier_provenance_ref).toBe("asker:side-by-side-c10");
+    expect(evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a stored MACHINE_DEFAULT source as it is", async () => {
+    const value = readmitted(await plan({ stored: stored({ tierSource: "MACHINE_DEFAULT" }) }).result);
+    expect(value.ask.tier_source).toBe("MACHINE_DEFAULT");
+  });
+
   it("asks again when the shape row the choices were made under is withdrawn (a stored member goes missing)", async () => {
     const { result, evaluate } = plan({
       stored: stored({ planTier: "premium", depthParams: { depth: 2, depthMode: "fixed", scrutiny: "standard", answerLength: "standard" } })
@@ -161,10 +188,25 @@ describe("planReadmission (side-by-side spec §4, O3)", () => {
     expect(await result).toEqual({ kind: "ASK_AGAIN" });
   });
 
-  it("is NOT_NOW, with the code, on any other refusal: the run stays in line", async () => {
-    const { result } = plan({ evaluate: async () => refusal("ASK_PLAN_TIER_MODEL_UNAVAILABLE") });
-    expect(await result).toEqual({ kind: "NOT_NOW", code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
+  it("asks again on a refusal that holds for as long as this version runs: the line has no expiry to end it", async () => {
+    expect([...READMISSION_PERMANENT_REFUSALS].sort()).toEqual([
+      "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
+      "ENGINE_REQUIRES_LENGTH_POLICY",
+      "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM",
+      "STRUCTURAL_CEILING_ENGINE_INVALID",
+      "STRUCTURAL_CEILING_TREE_INVALID"
+    ]);
+    for (const code of READMISSION_PERMANENT_REFUSALS) {
+      expect(await plan({ evaluate: async () => refusal(code) }).result, code).toEqual({ kind: "ASK_AGAIN" });
+    }
   });
+
+  it.each(["ASK_PLAN_TIER_MODEL_UNAVAILABLE", "ASK_MODEL_CANDIDATE_UNAVAILABLE", "MAKER_INVENTORY_UNSATISFIED", "DAILY_COST_ENVELOPE_REACHED"])(
+    "is NOT_NOW, with the code, on a passing refusal (%s): the run stays in line", async (code) => {
+      const { result } = plan({ evaluate: async () => refusal(code) });
+      expect(await result).toEqual({ kind: "NOT_NOW", code });
+    }
+  );
 
   it("rethrows any other error", async () => {
     const failure = new TypeError("engine fault");
