@@ -18,6 +18,8 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+const DEV_RELEASE_KEY = ["r424242", "000000000000"].join("-");
+
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
@@ -25,7 +27,7 @@ function apiEnvironment(): Readonly<Record<string, string>> {
     PROVIDER_PROBE_TIMEOUT_MS: String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS),
     REGISTER_VERSION: "424242",
     // Side-by-side §1: the dev API's own release key (dev-api-environment.ts derives r<REGISTER_VERSION>-000000000000).
-    RELEASE_KEY: ["r424242", "000000000000"].join("-"),
+    RELEASE_KEY: DEV_RELEASE_KEY,
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
     REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
     KEK_PATH: "/private/dev/kek.bin",
@@ -71,10 +73,12 @@ function operations(input: Readonly<{
       if (input.exitFirst === true) {
         exited.resolve(Object.freeze({ code: 1, signal: null }));
       } else {
+        // A well-behaved runner announces the release it was handed (side-by-side spec §1).
         ready.resolve(input.ready ?? Object.freeze({
           kind: "DEBATEAI_RUNNER_READY",
           worker: "debateai-dev-runner",
-          registerVersion: "424242"
+          registerVersion: "424242",
+          releaseKey: values.RELEASE_KEY
         }));
       }
       return child;
@@ -112,10 +116,13 @@ describe("development runner process lifecycle", () => {
   });
 
   it.each([
-    ["wrong kind", { kind: "WRONG", worker: "debateai-dev-runner", registerVersion: "424242" }],
-    ["wrong worker", { kind: "DEBATEAI_RUNNER_READY", worker: "wrong", registerVersion: "424242" }],
-    ["numeric reconstruction", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: 424242 }],
-    ["wrong register", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "999" }]
+    ["wrong kind", { kind: "WRONG", worker: "debateai-dev-runner", registerVersion: "424242", releaseKey: DEV_RELEASE_KEY }],
+    ["wrong worker", { kind: "DEBATEAI_RUNNER_READY", worker: "wrong", registerVersion: "424242", releaseKey: DEV_RELEASE_KEY }],
+    ["numeric reconstruction", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: 424242, releaseKey: DEV_RELEASE_KEY }],
+    ["wrong register", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "999", releaseKey: DEV_RELEASE_KEY }],
+    // Side-by-side spec §1: the ready line names the release, and it must be the API's own.
+    ["a missing releaseKey", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "424242" }],
+    ["another release's key", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "424242", releaseKey: "r4-0123456789ab" }]
   ] as const)("terminates on %s readiness", async (_label, ready) => {
     const runtime = operations({ ready });
     await expect(startDevelopmentRunnerProcess({

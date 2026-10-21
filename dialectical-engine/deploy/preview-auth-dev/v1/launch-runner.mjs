@@ -7,19 +7,32 @@ import { afterRunnerReady,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 /** The in-process readiness event apps/runner/src/runner-ready.ts announces (RUNNER_READY_PROCESS_EVENT). */
 export const RUNNER_READY_PROCESS_EVENT='debateai:runner-ready';
-/** Prepare-only (the default, `--plan <file>`): validates plan, custody and environment; starts nothing. */
+/**
+ * Side-by-side uploads spec 2026-10-21 §1: the preview launcher checks runner.env's RELEASE_KEY
+ * against the plan, so a runner never starts (or is prepared) as another release. The only key it
+ * admits is r<plan register pin>-<first 12 hex of the plan's source revision>; anything else
+ * refuses PREVIEW_RUNNER_RELEASE_KEY_MISMATCH, naming no value.
+ */
+export function assertRunnerReleaseKey(configured,plan,source) {
+ if(configured.RELEASE_KEY!==`r${plan.publication.registerVersion}-${source.sourceRevision.slice(0,12)}`)refuse('PREVIEW_RUNNER_RELEASE_KEY_MISMATCH');
+}
+/** Prepare-only (the default, `--plan <file>`): validates plan, custody, environment and release key; starts nothing. */
 export async function prepareRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
  const runtime=await tsImport(join(plan.sourceRoot,'dialectical-engine/packages/register/src/runtime-environment.ts'),import.meta.url);
- narrowEnvironment('runner',await readEnvironmentFile(plan.environment.path,plan.environment),runtime,plan.publication,plan);
+ const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
+ narrowEnvironment('runner',configured,runtime,plan.publication,plan);
+ assertRunnerReleaseKey(configured,plan,source);
  return {schema:'preview-auth-dev-runner-prepared-v1',sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,registerVersion:plan.publication.registerVersion,started:false,runtimeSelectionVerified:false};
 }
 /**
  * Start (`--start --plan <file>`), the API launcher's sequence for the runner: the same shared
  * prepareLaunch custody gate, the same narrowed environment for role 'runner', the selected
- * restricted runner connection checked, then the real main imported in this same process. The
- * content-free PREVIEW_RUNNER_STARTED event is printed only after the real main announced
- * readiness (worker ready, start-up re-dispatch done) with an unchanged register selection.
+ * restricted runner connection checked, the release key tied to the plan (assertRunnerReleaseKey),
+ * then the real main imported in this same process. The content-free PREVIEW_RUNNER_STARTED event
+ * (with its releaseKey, side-by-side spec §1) is printed only after the real main announced
+ * readiness (worker ready, start-up re-dispatch done) naming that release, with an unchanged
+ * register selection.
  */
 export async function launchRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
@@ -35,6 +48,7 @@ export async function launchRunner(argv) {
  await verify.assertSelectedRunnerConnection(configured,plan.publication);
  const entry=join(engine,'apps/runner/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/runner/src/main.ts');
  if(!main)refuse('PREVIEW_RUNNER_MAIN_UNBOUND');
+ assertRunnerReleaseKey(configured,plan,source);
  process.chdir(engine);installNarrowEnvironment(selected.environment);
  return afterRunnerReady({binding:{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,sourceManifestSha256:plan.sourceManifest.sha256,operatorManifestSha256:plan.operatorManifestSha256,contractSha256:source.contractSha256,runnerMainSha256:main.sha256},publication:plan.publication,identity:await linuxProcessIdentity(),
   readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE}),

@@ -519,7 +519,9 @@ describe("S02 — the development stack names its deployment mode", () => {
       ready: Promise.resolve({
         kind: "DEBATEAI_RUNNER_READY",
         worker: "debateai-dev-runner",
-        registerVersion: "424242"
+        registerVersion: "424242",
+        // Side-by-side §1: the ready line names the release the runner was handed.
+        releaseKey: ["r424242", "000000000000"].join("-")
       }),
       exited,
       async terminate() {

@@ -665,6 +665,8 @@ announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
   registerVersion: String(environment.REGISTER_VERSION),
+  // Side-by-side spec §1: the ready line names the release this runner runs as.
+  releaseKey: environment.RELEASE_KEY,
   startupDispatched: startupReconciliation.dispatched
 });
 await started;

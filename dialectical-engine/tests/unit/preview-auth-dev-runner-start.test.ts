@@ -19,7 +19,9 @@ const publication = { publicationId: '11111111-1111-4111-8111-111111111111', pub
 const binding = { sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifestSha256: hash, operatorManifestSha256: hash, contractSha256: hash, runnerMainSha256: hash };
 const identity = { pid: 123, uid: 992, bootId: '11111111-1111-4111-8111-111111111111', startTicks: '10001' };
 const selection = { REGISTER_VERSION: '12', DEBATEAI_DEPLOYMENT_MODE: 'local' };
-const ready = { kind: 'DEBATEAI_RUNNER_READY', worker: 'preview-runner', registerVersion: '12', startupDispatched: 0 };
+// Side-by-side spec §1: the release this runner is, r<register>-<first 12 hex of the plan's source revision>.
+const releaseKey = `r${publication.registerVersion}-${binding.sourceRevision.slice(0, 12)}`;
+const ready = { kind: 'DEBATEAI_RUNNER_READY', worker: 'preview-runner', registerVersion: '12', releaseKey, startupDispatched: 0 };
 
 /** A fake main: announces `message` (or nothing) after a tick, then keeps running until `stop`. */
 function fakeMain(message: unknown, options: { failBefore?: boolean; failAfter?: boolean; endBefore?: boolean } = {}) {
@@ -71,6 +73,35 @@ describe('runner startup event (afterRunnerReady)', () => {
     expect(() => receipt.validateRunnerRuntimeEvent({ ...started.event, deploymentMode: 'staging' })).toThrow();
   });
 
+  // Side-by-side spec §1: every ready line announces its release, and the event names the plan's own.
+  it("the event carries the release key built from the plan's source revision and register version", async () => {
+    const main = fakeMain(ready);
+    const events: unknown[] = [];
+    const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: (event: unknown) => events.push(event) });
+    main.stop(); await started.running;
+    expect(started.event.releaseKey).toBe('r12-aaaaaaaaaaaa');
+    expect(events).toEqual([started.event]);
+    expect(receipt.parseRunnerRuntimeEvent(`PREVIEW_RUNNER_STARTED ${JSON.stringify(started.event)}`)).toEqual(started.event);
+    // The event's key is its own register and source revision, never another release's.
+    for (const other of ['r11-aaaaaaaaaaaa', 'r12-bbbbbbbbbbbb', 'r12-000000000000', 'legacy', undefined])
+      expect(() => receipt.validateRunnerRuntimeEvent({ ...started.event, releaseKey: other }), String(other)).toThrow('PREVIEW_RUNTIME_RECEIPT_REFUSED');
+    // A source revision that is not text refuses with the code, before main, never a raw TypeError.
+    let imported = 0;
+    await expect(receipt.afterRunnerReady({ binding: { ...binding, sourceRevision: 42 }, publication, identity, readSelection: () => selection, subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
+    expect(imported).toBe(0);
+  });
+
+  it.each([
+    ['a ready message without releaseKey is not ready', (() => { const { releaseKey: _dropped, ...withoutKey } = ready; return withoutKey; })()],
+    ['a ready message naming another release is not ready', { ...ready, releaseKey: 'r12-bbbbbbbbbbbb' }]
+  ])('%s', async (_name, message) => {
+    const main = fakeMain(message);
+    const events: unknown[] = [];
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: (x: unknown) => events.push(x) })).rejects.toThrow(/^PREVIEW_RUNNER_NOT_READY$/);
+    expect(events).toEqual([]);
+    main.stop();
+  });
+
   it('hands a failure after readiness to the caller through `running`', async () => {
     const main = fakeMain(ready, { failAfter: true });
     const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: () => undefined });
@@ -109,7 +140,9 @@ describe('runner startup event (afterRunnerReady)', () => {
     const facts = { unit: 'debateai-preview-runner.service', expectedUnit: 'debateai-preview-runner.service', rootMatched: true, mainPidMatched: true, publication };
     expect(receipt.verifyRunnerRuntimeReadback(event, event, facts)).toEqual({ selectionVerified: true, service: 'runner', registerVersion: '12', pid: 123 });
     for (const key of ['pid', 'uid', 'bootId', 'startTicks', 'sourceRevision', 'runnerMainSha256'] as const) {
-      const observed = { ...event, [key]: key === 'pid' || key === 'uid' ? 999 : key === 'bootId' ? '22222222-2222-4222-8222-222222222222' : key === 'startTicks' ? '20002' : key === 'sourceRevision' ? 'c'.repeat(40) : 'c'.repeat(64) };
+      const observed = { ...event, [key]: key === 'pid' || key === 'uid' ? 999 : key === 'bootId' ? '22222222-2222-4222-8222-222222222222' : key === 'startTicks' ? '20002' : key === 'sourceRevision' ? 'c'.repeat(40) : 'c'.repeat(64),
+        // Another source revision is another release, whose own event names its own key (side-by-side spec §1).
+        ...(key === 'sourceRevision' ? { releaseKey: 'r12-cccccccccccc' } : {}) };
       expect(() => receipt.verifyRunnerRuntimeReadback(event, observed, facts), key).toThrow('PREVIEW_RUNTIME_READBACK_REFUSED');
     }
     for (const patch of [{ unit: 'debateai-preview-api.service' }, { expectedUnit: 'debateai-preview-api.service', unit: 'debateai-preview-api.service' }, { rootMatched: false }, { mainPidMatched: false }, { publication: { ...publication, snapshotSha256: 'c'.repeat(64) } }])
@@ -139,7 +172,7 @@ describe('runner startup event (afterRunnerReady)', () => {
   });
 
   it('keeps the API event schema separate from the runner one', () => {
-    const event = { schemaVersion: 'preview-auth-dev-runner-startup-v1', service: 'runner', ...binding, ...identity, selectedRegisterVersion: '12', nativeRequestSha256: hash, nativeSnapshotSha256: hash, deploymentMode: 'local', startupDispatched: 0 };
+    const event = { schemaVersion: 'preview-auth-dev-runner-startup-v1', service: 'runner', ...binding, ...identity, selectedRegisterVersion: '12', releaseKey, nativeRequestSha256: hash, nativeSnapshotSha256: hash, deploymentMode: 'local', startupDispatched: 0 };
     expect(receipt.validateRunnerRuntimeEvent(event)).toEqual(event);
     expect(() => receipt.validateRuntimeEvent(event)).toThrow();
     expect(() => receipt.parseRunnerRuntimeEvent(`PREVIEW_API_STARTED ${JSON.stringify(event)}`)).toThrow();
@@ -153,8 +186,10 @@ describe('the real readiness seam', () => {
     const heard: unknown[] = [];
     const listener = (value: unknown) => heard.push(value);
     process.once(RUNNER_READY_PROCESS_EVENT, listener);
-    announceRunnerReady(ready as never);
-    expect(heard).toEqual([ready]);
+    const announced = { ...ready, registerVersion: '1', releaseKey: 'r1-0123456789ab' };
+    announceRunnerReady(announced as never);
+    expect(heard).toEqual([announced]);
+    expect((heard[0] as { releaseKey?: unknown }).releaseKey).toBe('r1-0123456789ab');
     expect(Object.isFrozen(heard[0])).toBe(true);
   });
 
@@ -173,7 +208,7 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
     const start = code.slice(code.indexOf('export async function launchRunner'));
     const steps = ["prepareLaunch(argv,'runner',import.meta.url)", 'readEnvironmentFile(plan.environment.path,plan.environment)', "narrowEnvironment('runner',configured,runtime,plan.publication,plan)",
-      'verify.assertSelectedRunnerConnection(configured,plan.publication)', "refuse('PREVIEW_RUNNER_MAIN_UNBOUND')", 'installNarrowEnvironment(selected.environment)', 'afterRunnerReady(', 'importMain:()=>tsImport(entry,import.meta.url)'];
+      'verify.assertSelectedRunnerConnection(configured,plan.publication)', "refuse('PREVIEW_RUNNER_MAIN_UNBOUND')", 'assertRunnerReleaseKey(configured,plan,source)', 'installNarrowEnvironment(selected.environment)', 'afterRunnerReady(', 'importMain:()=>tsImport(entry,import.meta.url)'];
     const at = steps.map(step => start.indexOf(step));
     expect(at.every(index => index > 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -183,6 +218,17 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     const prepare = code.slice(code.indexOf('export async function prepareRunner'), code.indexOf('export async function launchRunner'));
     expect(prepare).not.toMatch(/installNarrowEnvironment\(|tsImport\(entry|apps\/runner\/src\/main/);
     expect(prepare).toContain('started:false');
+    // Side-by-side spec §1: prepare-only checks the release key right after the narrowed environment, as the start does.
+    const narrowed = prepare.indexOf("narrowEnvironment('runner',configured,runtime,plan.publication,plan)"), keyed = prepare.indexOf('assertRunnerReleaseKey(configured,plan,source)');
+    expect(narrowed).toBeGreaterThan(0); expect(keyed).toBeGreaterThan(narrowed);
+  });
+
+  // Side-by-side spec §1: the preview launcher ties RELEASE_KEY to the plan's register pin and source revision.
+  it('assertRunnerReleaseKey admits only r<plan register>-<first 12 hex of the plan source revision>', () => {
+    const plan = { publication: { registerVersion: '12' } }, source = { sourceRevision: '0123456789ab'.padEnd(40, 'c') };
+    expect(() => launcher.assertRunnerReleaseKey({ RELEASE_KEY: 'r12-0123456789ab' }, plan, source)).not.toThrow();
+    for (const other of ['r11-0123456789ab', 'r12-cccccccccccc', 'r12-000000000000', 'R12-0123456789AB', 'r12-0123456789ab ', 'legacy', '', undefined])
+      expect(() => launcher.assertRunnerReleaseKey({ RELEASE_KEY: other }, plan, source), String(other)).toThrow(/^PREVIEW_RUNNER_RELEASE_KEY_MISMATCH$/);
   });
 
   // Pretend to be the reviewed Linux/Node so each case proves the argv check itself, on every CI host.
