@@ -59,6 +59,7 @@ import {
   PracticeRefusal,
   parseGateStatus,
   parsePracticeSettings,
+  practiceReleaseKeyAt,
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
@@ -371,6 +372,17 @@ describe("practice start refusals", () => {
       expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
       expect(() => parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: "d50e33165a1b" })).toThrow(PracticeRefusal);
       expect(parsePracticeSettings(versionOne("local").join("\n")).runner.RELEASE_KEY).toBe("r1-000000000000");
+    });
+    it("renumbered for the next version, the key is checked again against the mode the practice finally runs in", () => {
+      expect(practiceReleaseKeyAt("r1-0123456789ab", 2, "hosted")).toBe("r2-0123456789ab");
+      expect(practiceReleaseKeyAt("r1-000000000000", 2, "local")).toBe("r2-000000000000");
+      // A local development key, renumbered when --register-next switches the practice to hosted: refused, as the
+      // settings parser refuses it (B6 review).
+      let refusal: unknown;
+      try { practiceReleaseKeyAt("r1-000000000000", 2, "hosted"); } catch (error) { refusal = error; }
+      expect(refusal).toBeInstanceOf(PracticeRefusal);
+      expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
+      expect((refusal as Error).message).toBe("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY: RELEASE_KEY_INVALID");
     });
   });
   it("refuses a key outside the allow-list (a database address, a team list), a key-shaped value, a credential; admits hosted mode", () => {

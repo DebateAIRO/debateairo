@@ -4949,6 +4949,8 @@ async function runnerStage<T>(code: string, operation: () => Promise<T>): Promis
 export class WalkingSkeletonRunner {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
+  /** Side-by-side spec §3: this runner's ONE release key, fixed at construction (absent = legacy); fence and check share it. */
+  readonly #releaseKey: string;
   readonly #graph: GraphRepository;
   readonly #judge: Judge;
   readonly #judgements: JudgementRepository;
@@ -4977,8 +4979,9 @@ export class WalkingSkeletonRunner {
     this.#runs = new RunRepository(pool);
     // Side-by-side spec §3 (plan B D2): the runner claims and fails only its own release's work items, and its own
     // failure writes land under its own live claim, so its repository knows both its release and its worker id.
+    this.#releaseKey = settings.releaseKey ?? LEGACY_RELEASE_KEY;
     this.#work = new WorkItemRepository(pool, {
-      releaseKey: settings.releaseKey ?? LEGACY_RELEASE_KEY,
+      releaseKey: this.#releaseKey,
       workerId: settings.workerId
     });
     this.#graph = new GraphRepository(pool);
@@ -5175,7 +5178,7 @@ export class WalkingSkeletonRunner {
     // task, an old retry, a hand dispatch), this runner answers NO_WORK with one content-free line BEFORE every gate
     // below, so a foreign item meets no claim check, no probe and no call, and is left READY for its own runner.
     if (workItemId !== undefined) {
-      const releaseKey = this.settings.releaseKey ?? LEGACY_RELEASE_KEY;
+      const releaseKey = this.#releaseKey;
       const runReleaseKey = await this.#work.releaseKeyOf(workItemId);
       if (runReleaseKey !== null && runReleaseKey !== releaseKey) {
         console.warn(JSON.stringify({

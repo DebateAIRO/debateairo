@@ -124,8 +124,12 @@ function practiceReleaseKey(line: string | undefined, registerVersion: number, m
     ? `r${String(registerVersion)}-${sourceRevision.slice(0, 12)}`
     : mode === "hosted" ? undefined : developmentReleaseKey(registerVersion));
   if (key === undefined) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "RELEASE_KEY");
+  return checkedPracticeReleaseKey(key, registerVersion, mode);
+}
+
+/** assertReleaseKeyForRegister as a practice refusal. Content-free: the check's own code, never the value. */
+function checkedPracticeReleaseKey(key: string, registerVersion: number, mode: DeploymentMode): string {
   try { return assertReleaseKeyForRegister(key, registerVersion, mode); } catch (error) {
-    // Content-free: the check's own code, never the value.
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID",
       `RELEASE_KEY${error instanceof TypedDomainError ? `: ${error.code}` : ""}`);
   }
@@ -134,10 +138,14 @@ function practiceReleaseKey(line: string | undefined, registerVersion: number, m
 /**
  * The practice's key at another register version (practice-debate.ts runs on the live version + 1 with --register-next
  * or its own override version): the same code part, the new number, so the key still names the version both
- * compositions read (side-by-side spec §1) and the ask and the runner still share it.
+ * compositions read (side-by-side spec §1) and the ask and the runner still share it. Checked again against the mode
+ * the practice finally runs in (B6 review): --register-next with a kit v3 composer switches it to hosted, where a local
+ * development key is refused exactly as parsePracticeSettings refuses it.
  */
-export function practiceReleaseKeyAt(releaseKey: string, registerVersion: number): string {
-  return parseReleaseKey(`r${String(registerVersion)}-${parseReleaseKey(releaseKey).codeRevision12}`).releaseKey;
+export function practiceReleaseKeyAt(releaseKey: string, registerVersion: number, mode: DeploymentMode): string {
+  return checkedPracticeReleaseKey(
+    parseReleaseKey(`r${String(registerVersion)}-${parseReleaseKey(releaseKey).codeRevision12}`).releaseKey,
+    registerVersion, mode);
 }
 
 /**
