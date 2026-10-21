@@ -28,7 +28,7 @@ const TX = Object.freeze({ marker: "the start's own transaction" }) as unknown a
 
 function waitingRun(person: Readonly<{ ownerRef?: string; legacyAskerId?: string }>): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-10-07T12:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-10-07T12:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
     ownerRef: person.ownerRef ?? null, legacyAskerId: person.ownerRef === undefined ? (person.legacyAskerId ?? "legacy:x") : null,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 1,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-10-07T12:00:00.000Z")

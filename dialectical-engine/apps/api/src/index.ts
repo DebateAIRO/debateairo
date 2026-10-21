@@ -4902,8 +4902,11 @@ type RunSetupStep =
  */
 type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
-/** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
-async function evaluationOrRefusal(
+/**
+ * An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. Side-by-side C10:
+ * exported as the re-admission plan's `evaluate` (apps/api/src/readmission.ts), which the waker passes in C11.
+ */
+export async function evaluationOrRefusal(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,

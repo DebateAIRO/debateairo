@@ -1604,6 +1604,35 @@ export interface StartRunInput {
   readonly releaseKey?: string;
 }
 
+/**
+ * Side-by-side uploads spec 2026-10-21 §4, O3 (plan C task C10) — A WAITING DEBATE'S ASK, AS IT WAS STORED: the
+ * columns its run row was written with and its decrypted content (`questionLine`, `askContract`). The API rebuilds the
+ * ask from it and re-evaluates it under the current release (apps/api/src/readmission.ts); C11 starts the re-admitted
+ * run from the plan. `askerRiskTier`, `tierSource` and `tierProvenanceRef` are the columns as written (the asker's risk
+ * tier, the admitted tier source and provenance); `contentEncrypted` says the question and contract came from the
+ * run's envelope, so the new run must be encrypted too. Content: only `questionLine` and `askContract` carry any.
+ */
+export type StoredAsk = Readonly<{
+  runId: string;
+  releaseKey: string;
+  registerVersion: number;
+  questionLine: string;
+  askContract: Readonly<Record<string, unknown>>;
+  askerId: string;
+  sessionId: string;
+  callerScope: "ASKER" | "OPERATOR";
+  asOf: Date;
+  askerRiskTier: RiskTier;
+  tierSource: TierSource;
+  tierProvenanceRef: string;
+  compositionBudgetTier: CompositionBudgetTier;
+  planTier: "free" | "premium" | null;
+  depthParams: Readonly<Record<string, unknown>>;
+  argumentLanguageTag: string;
+  argumentLanguageName: string;
+  contentEncrypted: boolean;
+}>;
+
 export type RunCreationPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
@@ -2585,6 +2614,79 @@ export class RunRepository {
       strangerSampleRate: Number(row.stranger_sample_rate),
       envelopeBasis: Object.freeze({ ...row.envelope_basis })
     };
+    });
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (plan C task C10): the run's ask as it was stored (`StoredAsk`), null when no such run.
+   * Like `readFrozenHead`, under the run's content lease, and the question and contract are decrypted from the run's
+   * envelope (an encrypted run with no cipher configured refuses CONTENT_CIPHER_UNAVAILABLE); a run written in the
+   * clear is read as stored. It reads 0123's release stamp, so it is for a database at 0123 or later. The run's
+   * existence is read first: the lease itself refuses an id with no run (PRIVATE_CONTENT_ERASED), which is not "none".
+   */
+  async readStoredAsk(runId: string): Promise<StoredAsk | null> {
+    const exists = await this.pool.query("SELECT 1 FROM core.run WHERE run_id = $1", [runId]);
+    if (exists.rowCount === 0) return null;
+    return withRunContentLease(this.pool, [runId], async () => {
+      const result = await this.pool.query<{
+        run_id: string;
+        release_key: string;
+        register_version: number | string;
+        question_line: string;
+        ask_contract: Record<string, unknown>;
+        asker_id: string;
+        session_id: string;
+        caller_scope: "ASKER" | "OPERATOR";
+        as_of: Date;
+        asker_risk_tier: RiskTier;
+        tier_source: TierSource;
+        tier_provenance_ref: string;
+        composition_budget_tier: CompositionBudgetTier;
+        plan_tier: "free" | "premium" | null;
+        depth_params: Record<string, unknown>;
+        argument_language_tag: string;
+        argument_language_name: string;
+        content_encryption_version: number | null;
+        content_ciphertext: CryptoEnvelope | null;
+      }>(
+        `SELECT run_id, release_key, register_version, question_line, ask_contract, asker_id, session_id,
+                caller_scope, as_of, asker_risk_tier, tier_source, tier_provenance_ref, composition_budget_tier, plan_tier,
+                depth_params, argument_language_tag, argument_language_name, content_encryption_version, content_ciphertext
+         FROM core.run WHERE run_id = $1`,
+        [runId]
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      if (row.content_encryption_version === 1 && contentCipherFor(this.pool) === undefined) {
+        throw new TypedDomainError(
+          "CONTENT_CIPHER_UNAVAILABLE",
+          "Encrypted content cannot be read without the external key store"
+        );
+      }
+      const content = await decryptContentForRun<{ questionLine: string; askContract: Record<string, unknown> }>(
+        this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext,
+        { questionLine: row.question_line, askContract: row.ask_contract }
+      );
+      return Object.freeze({
+        runId: row.run_id,
+        releaseKey: row.release_key,
+        registerVersion: Number(row.register_version),
+        questionLine: content.questionLine,
+        askContract: Object.freeze({ ...content.askContract }),
+        askerId: row.asker_id,
+        sessionId: row.session_id,
+        callerScope: row.caller_scope,
+        asOf: row.as_of,
+        askerRiskTier: row.asker_risk_tier,
+        tierSource: row.tier_source,
+        tierProvenanceRef: row.tier_provenance_ref,
+        compositionBudgetTier: row.composition_budget_tier,
+        planTier: row.plan_tier,
+        depthParams: Object.freeze({ ...row.depth_params }),
+        argumentLanguageTag: row.argument_language_tag,
+        argumentLanguageName: row.argument_language_name,
+        contentEncrypted: row.content_ciphertext !== null
+      });
     });
   }
 }

@@ -94,12 +94,14 @@ const NOW = new Date("2026-10-22T10:00:20.000Z");
  */
 const SITE_LOCK = "site-lock:SELECT pg_advisory_xact_lock(hashtextextended('debateai.site_concurrent_debates', 0))";
 const OWNER = "44444444-4444-4444-8444-444444444444";
+/** The gate's own release; every waiting run here was admitted by it (side-by-side C10: `WaitingRun.releaseKey`). */
+const RELEASE = ["r17", "0123456789ab"].join("-");
 const CLASS = Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 });
 const MINE = Object.freeze({ access: Object.freeze({ ownerRef: OWNER, legacyAskerId: null }), settingsClass: CLASS });
 
 function waitingRun(input: Partial<WaitingRun> = {}): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-10-22T09:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-10-22T09:00:00.000Z"), releaseKey: RELEASE,
     ownerRef: null, legacyAskerId: `legacy:${randomUUID()}`,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-10-22T09:00:00.000Z"),
@@ -118,7 +120,7 @@ function arrange(input: { current?: boolean; active?: number; line?: readonly Wa
     release: vi.fn()
   };
   const gate: AskAdmissionGate = {
-    releaseKey: ["r17", "0123456789ab"].join("-"),
+    releaseKey: RELEASE,
     siteConcurrentDebates: 8,
     ownReleaseIsCurrent: async (executor) => {
       asked.push(executor === (tx as unknown) ? "current:tx" : "current:other");
