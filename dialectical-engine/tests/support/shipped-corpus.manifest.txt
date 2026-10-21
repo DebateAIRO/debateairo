@@ -193,9 +193,12 @@ apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
 apps/api/src/synthesis-check/check.ts
+apps/api/src/synthesis-check/hold.ts
 apps/api/src/synthesis-check/policy.ts
+apps/api/src/synthesis-check/publish-gate.ts
 apps/api/src/synthesis-check/transport.ts
 apps/api/src/synthesis-check/verdict.ts
+apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
 apps/api/src/verification-email.ts
 apps/evaluator-worker/src/index.ts

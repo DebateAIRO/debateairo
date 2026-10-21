@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket, previewModelRow } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion, questionLanguagePolicyStartValues, readQuestionLanguagePolicy } from "@debateai/register";
 import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -56,7 +56,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
@@ -163,6 +163,14 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication } from "./publications.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
+import { SynthesisCheckRepository, synthesisTextOf } from "@debateai/serve";
+import { ownerSession } from "./owner-read.js";
+import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
+import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
+import { createSynthesisPublishGate } from "./synthesis-check/publish-gate.js";
+import { createSynthesisAnswerAccess } from "./synthesis-check/hold.js";
+import { createSynthesisCheckTransport, synthesisCheckOffFlagPath } from "./synthesis-check/transport.js";
+import { createLocalOffFlagSwitch } from "./publication-check/judge-transport.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
@@ -1183,6 +1191,9 @@ const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
 );
+const synthesisCheckErasure = new SynthesisCheckErasureCoordinator(
+  new PostgresSynthesisCheckErasureRepository(erasurePool), runKeyStore, publicationCipher
+);
 const erasureApplication=new PostgresAccountErasureApplication(
   accountErasureRepository,privateErasure
 );
@@ -1203,6 +1214,7 @@ const reconcileErasure = async ():Promise<void> => {
   try { await consumerSecurityNotices.reconcile(100); } catch { console.error('[CONSUMER_SECURITY_NOTICE_PENDING]'); }
   await erasureNotifications.reconcile(100);
   await accountErasure.reconcileRunKeyProvisionIntents(100);
+  try { await synthesisCheckErasure.reconcile(100); } catch { console.error('[SYNTHESIS_CHECK_ERASURE_PENDING]'); }
   await privateErasure.reconcile(reconciliationSource(),100);
   await accountErasure.reconcile(reconciliationSource(),100);
 };
@@ -1337,6 +1349,61 @@ const publicationContentCheck = createPublicationContentCheck({
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
+const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
+  : createSynthesisCheckTransport(supportModelTarget, {
+    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    reportDiagnostic: reportSupportDiagnostic,
+    deadlineMs: publicationCheckPolicy.deadlineMs
+  }), { offFlagPath: synthesisCheckOffFlag });
+const synthesisCheckRepository = new SynthesisCheckRepository(pool);
+const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs });
+const synthesisCheckDeps: SynthesisCheckDeps = {
+  port: synthesisCheckSwitch.current,
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  ...(costEnvelopeRows === undefined ? {} : { dayPot: {
+    ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+    spentMicros: (day: string) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
+  } }),
+  recordSpend: (entry) =>
+    new PostgresModelSpendStore(pool).recordSpend({ ...entry, spendId: randomUUID() }),
+  priceOf: (model: string) => {
+    const row = previewModelRow(model);
+    return row === undefined ? null : { inputUsdPerM: row.inputUsdPerM, outputUsdPerM: row.outputUsdPerM };
+  },
+  clock: () => new Date(),
+  log: (line: { event: string; answer_id: string; answer_version: number; code: string }) => console.error(JSON.stringify(line))
+};
+const readSynthesisAnswer = (runId: string, answerId: string, version: number, ownerRef: string) =>
+  application.readAnswer(answerId, ownerSession(ownerRef, "00000000-0000-0000-0000-000000000000"),
+    version, { ownerRef, legacyAskerId: null });
+const synthesisPublishGate = createSynthesisPublishGate({
+  repository: synthesisCheckRepository,
+  readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
+    const texts = new Map<number, string | null>();
+    for (let version = 1; version <= maxVersion; version++) {
+      const answer = await readSynthesisAnswer(runId, answerId, version, ownerRef);
+      if (answer === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
+      texts.set(version, synthesisTextOf(answer));
+    }
+    return texts;
+  },
+  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
+  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+});
+const synthesisCheckWorker = new SynthesisCheckWorker({
+  repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
+  withContentLease: (runId, use) => application.withContentLease(runId, use),
+  readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  log: (line) => console.error(`[${line}]`)
+});
+const SYNTHESIS_CHECK_TICK_MS = 5_000;
+const triggerSynthesisCheckWork = createSingleFlightErasureReconciler(
+  () => synthesisCheckWorker.runOnce(), () => console.error("[SYNTHESIS_CHECK_WORK_PENDING]")
+);
+const synthesisCheckTimer = setInterval(triggerSynthesisCheckWork, SYNTHESIS_CHECK_TICK_MS);
+synthesisCheckTimer.unref();
 if (publicationJudgeOffFlag !== null) installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({
   processId: `support-api-${process.pid}`,
@@ -1556,7 +1623,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
     from: environment.MAIL_FROM,
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }));
-  const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures };
+  const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures, synthesisAnswerAccess };
   dataExport = new DataExportApplication({
     repository, store, mail, archiveCatalog: loadArchiveCatalog,
     publicAppUrl: environment.PUBLIC_APP_URL, workerId: randomUUID(),
@@ -1681,6 +1748,8 @@ const api = buildApi({
   },
   ...(publications === undefined ? {} : { publications }),
   publicationContentCheck,
+  synthesisPublishGate,
+  synthesisAnswerAccess,
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,
@@ -1691,6 +1760,7 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
 api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => providerOnlyJobs?.stop());
