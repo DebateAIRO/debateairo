@@ -344,10 +344,11 @@ function parseUnit(text: string) {
   return out;
 }
 
-describe('debateai-preview-runner.service template', () => {
-  it('is the confined runner identity with soft ordering on the four supporting units and no fixtures', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
-    const supporting = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-provider-budget.service'];
+// Side-by-side spec §10: one runner instance per release, debateai-preview-runner@<label>.service.
+describe('debateai-preview-runner@.service template', () => {
+  it('is the confined runner identity with soft ordering on the five supporting units (both spending gates) and no fixtures', async () => {
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
+    const supporting = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-provider-budget.service', 'debateai-preview-anthropic-budget.service'];
     expect(unit['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual([...supporting].sort());
     expect(unit['[Unit]After']!.join(' ').split(' ').sort()).toEqual([...supporting].sort());
     expect(Object.keys(unit).filter(key => /Requires|BindsTo|Requisite|PartOf|ExecStart|\[Install\]/.test(key))).toEqual([]);
@@ -359,7 +360,7 @@ describe('debateai-preview-runner.service template', () => {
   });
 
   it('loads no environment file, unsets loader variables and sets only PATH, NODE_ENV and the Hatchet CA', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
     expect(unit['[Service]EnvironmentFile']).toEqual(['']);
     expect(unit['[Service]PassEnvironment']).toEqual(['']);
     expect(unit['[Service]UnsetEnvironment']).toEqual(['', 'LD_LIBRARY_PATH LD_PRELOAD NODE_OPTIONS NODE_PATH']);
@@ -367,7 +368,7 @@ describe('debateai-preview-runner.service template', () => {
   });
 
   it('keeps the API base unit hardening, loopback-only IP and the three deliberate differences', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
     const api: Record<string, string> = { ProtectSystem: 'strict', ProtectHome: 'true', PrivateTmp: 'true', UMask: '0077', NoNewPrivileges: 'true', ProtectProc: 'invisible',
       ProtectKernelTunables: 'true', ProtectKernelModules: 'true', ProtectKernelLogs: 'true', ProtectControlGroups: 'true', ProtectClock: 'true', RestrictNamespaces: 'true',
       RestrictRealtime: 'true', RestrictSUIDSGID: 'true', LockPersonality: 'true', CapabilityBoundingSet: '', AmbientCapabilities: '', SystemCallArchitectures: 'native',
@@ -379,5 +380,11 @@ describe('debateai-preview-runner.service template', () => {
     expect(JSON.stringify(unit)).not.toMatch(/fchown|RestrictSUIDSGID":\["false/);
     const denied = unit['[Service]InaccessiblePaths']!.join(' ');
     for (const path of ['/etc/debateai-v3-preview/api', '/var/lib/debateai-v3-preview/api/audit-keys', '/var/lib/debateai-v3-preview/provider-team-authority-v2', '/var/lib/debateai-v3-preview/provider-test-authority']) expect(denied).toContain(path);
+  });
+
+  it("reads only its own release's env file", async () => {
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
+    const readable = unit['[Service]ReadOnlyPaths']!.join(' ').split(' ');
+    expect(readable.filter(path => path.includes('.env'))).toEqual(['/etc/debateai-v3-preview/auth-dev-v1/runner-%i.env']);
   });
 });

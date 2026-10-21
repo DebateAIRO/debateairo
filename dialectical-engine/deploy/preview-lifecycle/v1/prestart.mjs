@@ -240,20 +240,22 @@ export async function checkRunnerUnit({ label, layout = LAYOUT, run = runBounded
 }
 
 /**
- * Website and API instances: every drop-in comes from the reviewed template's folder, except the one
- * instance release drop-in, which must be there (it is what points the instance at its own release).
- * The website is bound to its own release's API instance.
+ * Website and API instances: the instance loads the reviewed template file itself (not the old fixed unit,
+ * not a runtime or instance-only file of the same name), every drop-in comes from the template's folder,
+ * except the one instance release drop-in, which must be there (it is what points the instance at its own
+ * release). The website is bound to its own release's API instance.
  */
 export async function checkFrontUnit({ service, label, layout = LAYOUT, run = runBounded }) {
   if (!FRONT.includes(service)) refuse('SERVICE_REFUSED');
   const unit = unitNameFor(layout, service, label);
-  const shown = await showUnit({ unit, properties: service === 'ui' ? ['DropInPaths', 'BindsTo'] : ['DropInPaths'], layout, run, code: 'FRONT_UNIT_UNREADABLE' });
+  const shown = await showUnit({ unit, properties: service === 'ui' ? ['FragmentPath', 'DropInPaths', 'BindsTo'] : ['FragmentPath', 'DropInPaths'], layout, run, code: 'FRONT_UNIT_UNREADABLE' });
   const unitDir = unitDirOf(layout);
   const templateDir = `${unitDir}/${layout.unitPrefix}${service}@.service.d/`;
   const releaseDropin = `${unitDir}/${unit}.d/${RELEASE_DROPIN_NAME}`;
   const fromTemplate = path => path.startsWith(templateDir) && /^[A-Za-z0-9._-]+\.conf$/.test(path.slice(templateDir.length));
   const paths = (shown.DropInPaths ?? '').split(/\s+/).filter(Boolean);
   const fields = [];
+  if (shown.FragmentPath !== `${unitDir}/${layout.unitPrefix}${service}@.service`) fields.push('FragmentPath');
   if (!paths.includes(releaseDropin) || !paths.every(path => path === releaseDropin || fromTemplate(path))) fields.push('DropInPaths');
   if (service === 'ui' && shown.BindsTo !== unitNameFor(layout, 'api', label)) fields.push('BindsTo');
   if (fields.length) refuse('FRONT_UNIT_REFUSED', fields);

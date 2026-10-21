@@ -755,13 +755,14 @@ describe('runner unit check (before any database work)', () => {
 
 describe('website and API unit check (before any database work)', () => {
   const dir = '/etc/systemd/system';
-  const apiArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-api@v1.service', '--property=DropInPaths', '--no-pager'];
-  const uiArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-ui@v1.service', '--property=DropInPaths', '--property=BindsTo', '--no-pager'];
+  const apiArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-api@v1.service', '--property=FragmentPath', '--property=DropInPaths', '--no-pager'];
+  const uiArgv = ['/usr/bin/systemctl', 'show', 'debateai-preview-ui@v1.service', '--property=FragmentPath', '--property=DropInPaths', '--property=BindsTo', '--no-pager'];
+  const fragment = (service: string) => `FragmentPath=${dir}/debateai-preview-${service}@.service`;
   const release = (service: string) => `${dir}/debateai-preview-${service}@v1.service.d/zzzzzzzzzz-lifecycle-release.conf`;
   it('accepts the template drop-ins plus the instance release drop-in', async () => {
-    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [`DropInPaths=${dir}/debateai-preview-api@.service.d/50-lifecycle.conf ${dir}/debateai-preview-api@.service.d/60-memory.conf ${release('api')}`]) })).resolves.toBeUndefined();
-    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [`DropInPaths=${release('api')}`]) })).resolves.toBeUndefined();
-    await expect(prestart.checkFrontUnit({ service: 'ui', label: 'v1', layout: common.LAYOUT, run: show(uiArgv, [`DropInPaths=${dir}/debateai-preview-ui@.service.d/50-lifecycle.conf ${release('ui')}`, 'BindsTo=debateai-preview-api@v1.service']) })).resolves.toBeUndefined();
+    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [fragment('api'), `DropInPaths=${dir}/debateai-preview-api@.service.d/50-lifecycle.conf ${dir}/debateai-preview-api@.service.d/60-memory.conf ${release('api')}`]) })).resolves.toBeUndefined();
+    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [fragment('api'), `DropInPaths=${release('api')}`]) })).resolves.toBeUndefined();
+    await expect(prestart.checkFrontUnit({ service: 'ui', label: 'v1', layout: common.LAYOUT, run: show(uiArgv, [fragment('ui'), `DropInPaths=${dir}/debateai-preview-ui@.service.d/50-lifecycle.conf ${release('ui')}`, 'BindsTo=debateai-preview-api@v1.service']) })).resolves.toBeUndefined();
   });
   it.each([
     ['a drop-in of its own other than the release drop-in', `${dir}/debateai-preview-api@v1.service.d/99-provider-high-v1.conf ${release('api')}`],
@@ -771,14 +772,26 @@ describe('website and API unit check (before any database work)', () => {
     ['a drop-in nested below the template folder', `${dir}/debateai-preview-api@.service.d/x/50-lifecycle.conf ${release('api')}`],
     ["the website's template drop-in", `${dir}/debateai-preview-ui@.service.d/50-lifecycle.conf ${release('api')}`]
   ])('refuses an api instance with %s', async (_name, paths) => {
-    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [`DropInPaths=${paths}`]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_REFUSED', fields: ['DropInPaths'] });
+    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [fragment('api'), `DropInPaths=${paths}`]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_REFUSED', fields: ['DropInPaths'] });
+  });
+  // D4 review: like the runner, the instance must load the reviewed template file itself, not a unit of the same name elsewhere.
+  it.each([
+    ['the old single unit', 'api', `FragmentPath=${dir}/debateai-preview-api.service`],
+    ['a runtime override fragment', 'api', 'FragmentPath=/run/systemd/system/debateai-preview-api@.service'],
+    ['an instance file of its own', 'api', `FragmentPath=${dir}/debateai-preview-api@v1.service`],
+    ["the website's template", 'api', `FragmentPath=${dir}/debateai-preview-ui@.service`],
+    ['no file at all (not loaded)', 'api', 'FragmentPath='],
+    ['the old single website unit', 'ui', `FragmentPath=${dir}/debateai-preview-ui.service`]
+  ] as const)('refuses an instance loaded from %s', async (_name, service, line) => {
+    const lines = service === 'api' ? [line, `DropInPaths=${release('api')}`] : [line, `DropInPaths=${release('ui')}`, 'BindsTo=debateai-preview-api@v1.service'];
+    await expect(prestart.checkFrontUnit({ service, label: 'v1', layout: common.LAYOUT, run: show(service === 'api' ? apiArgv : uiArgv, lines) })).rejects.toMatchObject({ code: 'FRONT_UNIT_REFUSED', fields: ['FragmentPath'] });
   });
   it.each([['another release', 'BindsTo=debateai-preview-api@v2.service'], ['the old single unit', 'BindsTo=debateai-preview-api.service'], ['nothing', 'BindsTo='], ['two units', 'BindsTo=debateai-preview-api@v1.service debateai-preview-api@v2.service']])('refuses a website bound to %s', async (_name, line) => {
-    await expect(prestart.checkFrontUnit({ service: 'ui', label: 'v1', layout: common.LAYOUT, run: show(uiArgv, [`DropInPaths=${release('ui')}`, line]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_REFUSED', fields: ['BindsTo'] });
+    await expect(prestart.checkFrontUnit({ service: 'ui', label: 'v1', layout: common.LAYOUT, run: show(uiArgv, [fragment('ui'), `DropInPaths=${release('ui')}`, line]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_REFUSED', fields: ['BindsTo'] });
   });
   it('refuses an unreadable or ambiguous answer, and any service but api or ui', async () => {
-    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [`DropInPaths=${release('api')}`], 1) })).rejects.toMatchObject({ code: 'FRONT_UNIT_UNREADABLE' });
-    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [`DropInPaths=${release('api')}`, `DropInPaths=${release('api')}`]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_UNREADABLE' });
+    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [fragment('api'), `DropInPaths=${release('api')}`], 1) })).rejects.toMatchObject({ code: 'FRONT_UNIT_UNREADABLE' });
+    await expect(prestart.checkFrontUnit({ service: 'api', label: 'v1', layout: common.LAYOUT, run: show(apiArgv, [fragment('api'), `DropInPaths=${release('api')}`, `DropInPaths=${release('api')}`]) })).rejects.toMatchObject({ code: 'FRONT_UNIT_UNREADABLE' });
     await expect(prestart.checkFrontUnit({ service: 'runner', label: 'v1', layout: common.LAYOUT, run: async () => { throw new Error('ran'); } })).rejects.toMatchObject({ code: 'SERVICE_REFUSED' });
   });
 });
