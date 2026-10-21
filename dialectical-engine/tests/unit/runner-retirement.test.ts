@@ -419,6 +419,37 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
   });
 
+  it("a backstop pass that throws is logged and retried at the next 60 s read: set aside, then retired", async () => {
+    const run = monitor({
+      facts: async () => requested(),
+      // The first pass throws on its first count (inside BACKSTOP_STARTED); the second pass counts 0.
+      running: (read) => { if (read === 1) throw new Error("count failed"); return 0; },
+      setAside: async () => 2
+    });
+    await run.time.advance(60_000);
+    expect(run.signal.claimsStopped()).toBe(true);
+    expect(run.signal.callsStopped()).toBe(true);
+    expect(run.setAsides).toEqual([]);
+    expect(run.lines).toEqual([line("BACKSTOP_FAILED")]);
+    expect(run.outcome()).toBeUndefined();
+
+    await run.time.advance(59_999);
+    expect(run.reads).toHaveLength(1);
+    await run.time.advance(1);
+    expect(run.reads).toHaveLength(2);
+    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 120_000 }]);
+    expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
+    expect(run.lines).toEqual([
+      line("BACKSTOP_FAILED"),
+      line("BACKSTOP_STARTED", { executing: 0, openWork: 2 }),
+      line("BACKSTOP_SET_ASIDE", { count: 2 }),
+      line("RETIRING", { how: "BACKSTOP" })
+    ]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+    await run.time.advance(300_000);
+    expect(run.reads).toHaveLength(2);
+  });
+
   it("a front pair not yet recorded stopped does not delay it (root asked; the old pair is stopped anyway)", async () => {
     const run = monitor({ facts: async () => requested({ frontPairStopped: false, openWork: 1 }), setAside: async () => 1 });
     await run.time.advance(60_000);

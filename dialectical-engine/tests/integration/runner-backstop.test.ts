@@ -91,7 +91,7 @@ async function waivers() {
 describe("set aside, never charged (side-by-side §4, §9)", () => {
   let a1: Job, a2: Job, a3: Job, b1: Job, b2: Job, ownerRef: string;
   const now = Date.now();
-  const startOfDay = new Date(now - 3_600_000), endOfDay = new Date(now + 3_600_000);
+  const windowStart = new Date(now - 3_600_000), windowEnd = new Date(now + 3_600_000);
   const today = costEnvelopeDay(new Date(now));
 
   beforeAll(async () => {
@@ -129,7 +129,7 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
 
   it("before the set-aside the person's window and the site day both count A2's 1,000 micros", async () => {
     const spend = new PostgresModelSpendStore(runtime);
-    expect(await spend.readOwnerSpentMicros(ownerRef, startOfDay, endOfDay)).toBe(1_000);
+    expect(await spend.readOwnerSpentMicros(ownerRef, windowStart, windowEnd)).toBe(1_000);
     expect(await spend.readDaySpentMicros(today)).toBe(1_000);
   });
 
@@ -155,7 +155,7 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
 
   it("the person's window no longer counts A2's spend; the site day still does (§9)", async () => {
     const spend = new PostgresModelSpendStore(runtime);
-    expect(await spend.readOwnerSpentMicros(ownerRef, startOfDay, endOfDay)).toBe(0);
+    expect(await spend.readOwnerSpentMicros(ownerRef, windowStart, windowEnd)).toBe(0);
     expect(await spend.readDaySpentMicros(today)).toBe(1_000);
   });
 
@@ -191,7 +191,8 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
     expect(await store.setAsideOpenWork(R1, "BACKSTOP")).toBe(0);
     expect(await waivers()).toHaveLength(7);
     // Another release's key is refused before anything is written (O1: never another release's debates).
-    await expect(store.setAsideOpenWork(R2, "BACKSTOP")).rejects.toBeInstanceOf(TypeError);
+    await expect(store.setAsideOpenWork(R2, "BACKSTOP")).rejects.toThrow("RETIREMENT_RELEASE_KEY_MISMATCH");
     expect(await jobRow(b2.workItemId)).toMatchObject({ state: "CLAIMED" });
+    expect(await waivers()).toHaveLength(7);
   });
 });

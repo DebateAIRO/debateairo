@@ -88,6 +88,7 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *      (spec §9: no quota use; the site day keeps counting real spend), retried every 5 s on failure, never skipped
  *      (BACKSTOP_SET_ASIDE_FAILED, then BACKSTOP_SET_ASIDE with the count);
  *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP".
+ * A pass that throws is logged (BACKSTOP_FAILED) and runs again at the next read; every step is safe to repeat.
  * `stop()` ends a backstop between steps: the process is ending on its own signal.
  *
  * Lines are content-free (`kind: "DEBATEAI_RUNNER_RETIREMENT"`): an event, a state, how it retired, counts, a
@@ -253,7 +254,10 @@ export function startRunnerRetirement(input: Readonly<{
     settle(how);
   };
 
-  /** Part 3 (spec §4, the backstop): runs once; the poll chain is not re-armed after it (`retiring`). */
+  /**
+   * Part 3 (spec §4, the backstop): runs once; the poll chain is not re-armed after it (`retiring`), unless the pass
+   * threw (BACKSTOP_FAILED): then the next read runs it again.
+   */
   const backstop = async (facts: ReleaseRetirementFacts): Promise<void> => {
     retiring = true;
     input.signal.stopClaims();
@@ -302,7 +306,18 @@ export function startRunnerRetirement(input: Readonly<{
       input.log(Object.freeze({ kind: KIND, event: "RETIRE_REQUEST_IGNORED", state: facts.state }));
     }
     if (facts.state === "DRAINING" && facts.retireRequested) {
-      await backstop(facts);
+      // A pass that throws (a count or a log line) is retried at the next read: the backstop is level-triggered, and
+      // stopping claims and calls, the set-aside and its waivers are safe to repeat. Swallowing it would leave claims
+      // and calls stopped with nothing set aside and no waiver (spec §9: no quota use). retire()'s own failures are
+      // caught inside it and keep `retiring` (B10).
+      await backstop(facts).catch(() => {
+        retiring = false;
+        try {
+          input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_FAILED" }));
+        } catch {
+          // A throwing log sink never keeps the next read from being armed.
+        }
+      });
       return;
     }
     const drained = facts.state === "DRAINING" && facts.frontPairStopped && facts.openWork === 0;
