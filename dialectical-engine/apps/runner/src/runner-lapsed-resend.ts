@@ -16,6 +16,8 @@ import type { DispatchableWorkItem } from "@debateai/battery";
  *    for the next pass, oldest first;
  *  · a re-send that fails is logged by its work item id and the pass goes on; a list that fails is logged with its
  *    SQLSTATE only and the next pass still runs;
+ *  · a re-send still unsettled after `everyMs` is given up the same way (LAPSED_RESEND_FAILED): one hung Hatchet call
+ *    never stalls the chain, so later passes still run (the item is lapsed again and listed by a later pass);
  *  · while this release retires (claims stopped, spec §4) a pass lists nothing: its runner would answer NO_WORK, and
  *    the backstop sets those debates aside.
  *
@@ -40,6 +42,18 @@ const KIND = "DEBATEAI_RUNNER_RESEND";
 function sqlStateOf(error: unknown): Readonly<{ sqlState?: string }> {
   const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
   return typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? { sqlState: code } : {};
+}
+
+/** "SENT" when `sending` settles first, "TIMED_OUT" when `ms` pass first; a rejection of `sending` rejects. */
+async function sentWithin(sending: Promise<void>, clock: ResendClock, ms: number): Promise<"SENT" | "TIMED_OUT"> {
+  let handle: unknown;
+  const timeout = new Promise<"TIMED_OUT">((resolve) => { handle = clock.setTimeout(() => resolve("TIMED_OUT"), ms); });
+  try {
+    // Promise.race subscribes to `sending`, so a late rejection after a time-out is handled, never unhandled.
+    return await Promise.race([sending.then(() => "SENT" as const), timeout]);
+  } finally {
+    clock.clearTimeout(handle);
+  }
 }
 
 export function startLapsedClaimResend(input: Readonly<{
@@ -67,12 +81,14 @@ export function startLapsedClaimResend(input: Readonly<{
     }
     let count = 0;
     for (const item of listed.slice(0, LAPSED_RESEND.limit)) {
+      let sent = false;
       try {
-        await input.dispatch(item);
-        count += 1;
+        sent = await sentWithin(input.dispatch(item), clock, LAPSED_RESEND.everyMs) === "SENT";
       } catch {
-        input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESEND_FAILED", workItemId: item.workItemId }));
+        sent = false;
       }
+      if (sent) count += 1;
+      else input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESEND_FAILED", workItemId: item.workItemId }));
     }
     if (count > 0) input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESENT", count }));
   };

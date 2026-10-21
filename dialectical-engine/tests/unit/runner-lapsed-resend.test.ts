@@ -163,12 +163,13 @@ describe("lapsed claims are re-sent by their own release every five minutes (sid
   it("ticks never overlap: a list that takes 400 s is followed by the next five minutes after it finished", async () => {
     const time = fakeClock();
     const listStarts: number[] = [];
+    const limits: number[] = [];
     startLapsedClaimResend({
       work: {
         listLapsedClaimed: (limit) => {
           listStarts.push(time.now());
+          limits.push(limit);
           if (listStarts.length > 1) return Promise.resolve([]);
-          expect(limit).toBe(101);
           return new Promise((resolve) => { time.clock.setTimeout(() => resolve([]), 400_000); });
         }
       },
@@ -181,6 +182,31 @@ describe("lapsed claims are re-sent by their own release every five minutes (sid
     expect(listStarts).toEqual([300_000]);
     await time.advance(1);
     expect(listStarts).toEqual([300_000, 1_000_000]);
+    expect(limits).toEqual([101, 101]);
+  });
+
+  it("a re-send that never settles is given up after five minutes: logged, the next item sent, the timer goes on", async () => {
+    let calls = 0;
+    const { time, listCalls, dispatched, lines } = harness({
+      list: async () => {
+        calls += 1;
+        return calls === 1 ? [item(1), item(2)] : [];
+      },
+      dispatch: (entry) => entry.workItemId === "work-1" ? new Promise<void>(() => undefined) : Promise.resolve()
+    });
+    await time.advance(300_000);
+    expect(dispatched).toEqual(["work-1"]);
+    expect(lines).toEqual([]);
+    await time.advance(299_999);
+    expect(dispatched).toEqual(["work-1"]);
+    await time.advance(1);
+    expect(dispatched).toEqual(["work-1", "work-2"]);
+    expect(lines).toEqual([
+      { kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESEND_FAILED", workItemId: "work-1" },
+      { kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESENT", count: 1 }
+    ]);
+    await time.advance(300_000);
+    expect(listCalls.map((call) => call.at)).toEqual([300_000, 900_000]);
   });
 
   it("stop() ends the re-send: no further list", async () => {
