@@ -1,5 +1,11 @@
 export type ContentStatus = "READABLE" | "UNRECOVERABLE";
 export type Row = Readonly<Record<string, unknown>>;
+export type SynthesisCheckEntry = Readonly<{
+  answer_version: number;
+  verdict: "FLAGGED" | "CLEAR" | "NO_SYNTHESIS" | "UNAVAILABLE";
+  categories: readonly ("TERRORISM" | "HATE_SPEECH" | "SUICIDE_OR_HARM_TO_OTHERS" | "WEAPONS_OR_DRUGS")[];
+  checked_at: string;
+}>;
 
 /** SPEC-v11 row C7 (V-42): origin/dev's core.run_role_rotation row of a C1 run, every column but run_id. */
 export type RoleRotationRole = Readonly<{ provider_ref: string; model_id: string; maker: string }>;
@@ -32,6 +38,7 @@ export type DebateEntry = Readonly<{
     ledger_digest: unknown;
     story: unknown;
     disclosure: unknown;
+    synthesis_checks?: readonly SynthesisCheckEntry[];
     versions: Readonly<{
       version: number;
       answer: unknown;

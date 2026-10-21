@@ -163,7 +163,7 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication } from "./publications.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
-import { SynthesisCheckRepository, synthesisTextOf } from "@debateai/serve";
+import { PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
@@ -1357,6 +1357,7 @@ const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === und
     deadlineMs: publicationCheckPolicy.deadlineMs
   }), { offFlagPath: synthesisCheckOffFlag });
 const synthesisCheckRepository = new SynthesisCheckRepository(pool);
+const publicationReviewRepository = new PublicationReviewRepository(pool);
 const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs });
 const synthesisCheckDeps: SynthesisCheckDeps = {
   port: synthesisCheckSwitch.current,
@@ -1379,6 +1380,7 @@ const readSynthesisAnswer = (runId: string, answerId: string, version: number, o
     version, { ownerRef, legacyAskerId: null });
 const synthesisPublishGate = createSynthesisPublishGate({
   repository: synthesisCheckRepository,
+  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
   readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
     const texts = new Map<number, string | null>();
     for (let version = 1; version <= maxVersion; version++) {
@@ -1748,6 +1750,35 @@ const api = buildApi({
   },
   ...(publications === undefined ? {} : { publications }),
   publicationContentCheck,
+  publicationReviews: {
+    repository: publicationReviewRepository,
+    readOwnedAnswer: async ({ runId, authenticated }) => {
+      const live = await pool.query<{ live: boolean }>(
+        "SELECT core.run_private_content_is_live($1) AND NOT serve.run_removed_by_synthesis_check($1) AS live",
+        [runId]
+      );
+      if (!live.rows[0]?.live) return null;
+      return application.withContentLease(runId, () => application.readRunAnswer(
+        runId, authenticated.session, { ownerRef: authenticated.ownerRef, legacyAskerId: null }
+      ));
+    },
+    readVerdictOfRecord: async ({ runId, authenticated, answer }) => {
+      const texts = await application.withContentLease(runId, async () => {
+        const versions = new Map<number, string | null>();
+        for (let version = 1; version <= answer.answer_version; version++) {
+          const candidate = await readSynthesisAnswer(runId, answer.answer_id, version, authenticated.ownerRef);
+          if (candidate === null) return null;
+          versions.set(version, synthesisTextOf(candidate));
+        }
+        return versions;
+      });
+      if (texts === null) return null;
+      const origin = originVersionOf(texts, answer.answer_version);
+      return verdictOfRecord(await synthesisCheckRepository.readRecords({
+        runId, answerId: answer.answer_id, maxVersion: answer.answer_version
+      }), candidate => candidate === origin);
+    }
+  },
   synthesisPublishGate,
   synthesisAnswerAccess,
   allowedOrigin: environment.PUBLIC_APP_URL,
