@@ -78,6 +78,7 @@ import { applyPreviewGateCapacities, previewCallSubjects, structureRepairThrough
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import type { EngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
+import type { RunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import {
   startPreviewGateStubs,
   type GateDebateScripts,
@@ -337,6 +338,8 @@ export function previewDebateHarness(input: Readonly<{
       noDigest?: boolean;
       /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
       releaseKey?: string;
+      /** Side-by-side spec §4 (B8): the retirement signal, as main.ts passes it; absent, the runner never retires. */
+      retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
     }> = {}
   ) {
     const probeSleeps: number[] = [];
@@ -468,6 +471,7 @@ export function previewDebateHarness(input: Readonly<{
         : { structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute) }),
       callSubjects: previewCallSubjects(PREVIEW),
       ...(options.releaseKey === undefined ? {} : { releaseKey: options.releaseKey }),
+      ...(options.retirement === undefined ? {} : { retirement: options.retirement }),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
         record: async (event) => { holdRecords.push(event); },

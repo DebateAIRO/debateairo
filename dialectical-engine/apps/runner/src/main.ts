@@ -63,6 +63,7 @@ import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
+import { createRunnerRetirementSignal, createTaskExecutionCounter } from "./runner-retirement.js";
 
 const environment = loadRunnerEnvironment();
 const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
@@ -488,10 +489,16 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
 // Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
 // renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
 const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });
+// Side-by-side spec §4 (D1): this process's running tasks (each whole task, the verdict story included) and its two
+// retirement stops (claims, then new model calls), both off until this release retires.
+const executions = createTaskExecutionCounter();
+const retirementSignal = createRunnerRetirementSignal();
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   // Side-by-side spec §3: the runner runs only this release's debates; another release's is NO_WORK.
   releaseKey: environment.RELEASE_KEY,
+  // Side-by-side spec §4: a retiring release stops claiming and starts no new model call (RUNNER_RETIRING).
+  retirement: retirementSignal,
   judgeBound: policy.bounds.JUDGE,
   composerBound: policy.bounds.COMPOSER,
   conformanceBound: policy.bounds.CONFORMANCE,
@@ -639,6 +646,8 @@ const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
   // Side-by-side spec §3: a failed task records FAILED only on this release's item, under this worker's own live claim.
   failures: new WorkItemRepository(pool, workFence),
+  // Side-by-side spec §4: every task counted while it runs, the story included.
+  executions,
   workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up

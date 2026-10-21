@@ -115,6 +115,7 @@ import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, stru
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { readDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import { readEngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
+import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -418,6 +419,8 @@ export async function composePracticeRunner(input: Readonly<{
     workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
     // Side-by-side spec §3, as main.ts: the runner runs only debates of its release (the practice's one key).
     releaseKey: environment.RELEASE_KEY,
+    // Side-by-side spec §4, as main.ts: the practice never retires (both stops stay off); the drift guard keeps the keys equal.
+    retirement: createRunnerRetirementSignal(),
     judgeBound: policy.bounds.JUDGE,
     composerBound: policy.bounds.COMPOSER,
     conformanceBound: policy.bounds.CONFORMANCE,

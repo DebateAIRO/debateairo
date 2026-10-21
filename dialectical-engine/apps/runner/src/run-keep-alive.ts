@@ -24,6 +24,8 @@ import type { ProviderGateway } from "@debateai/providers";
  *    arriving), or the claim is somebody else's, every further model call is
  *    refused before anything is sent. Nothing more is spent, whatever catch the
  *    refusal travels through on its way out.
+ *  · Side-by-side spec §4: the same once this release is retiring
+ *    (RUNNER_RETIRING), and the calls already sent settle.
  */
 
 /** Owner ruling 2026-10-11: no debate is reported "still working" after six hours. */
@@ -43,7 +45,10 @@ export type RunnerTaskControl = Readonly<{
 }>;
 
 export interface RunKeepAlive {
-  /** Throws RUNNER_CLAIM_LOST or RUNNER_TIME_LIMIT_REACHED when the debate must make no further model call. */
+  /**
+   * Throws RUNNER_CLAIM_LOST, RUNNER_RETIRING (side-by-side spec §4: this release is retiring) or
+   * RUNNER_TIME_LIMIT_REACHED, in that order, when the debate must make no further model call.
+   */
   assertMayCall(): void;
   /** A model call finished, answered or failed. */
   progressed(): void;
@@ -92,6 +97,11 @@ export function startRunKeepAlive(input: Readonly<{
   task?: RunnerTaskControl;
   clock?: KeepAliveClock;
   log?: (line: Readonly<Record<string, string>>) => void;
+  /**
+   * Side-by-side spec §4 (D1): true once this release is retiring. A retiring release "lets calls in flight settle":
+   * nothing already sent is cut off, and every further call is refused before it is sent (RUNNER_RETIRING).
+   */
+  stopCalls?: () => boolean;
 }>): RunKeepAlive {
   if (!Number.isFinite(input.renewEveryMs) || input.renewEveryMs <= 0) {
     throw new TypeError("RUNNER_CLAIM_RENEWAL_INTERVAL_INVALID");
@@ -131,6 +141,10 @@ export function startRunKeepAlive(input: Readonly<{
     assertMayCall() {
       if (lost) {
         throw new TypedDomainError("RUNNER_CLAIM_LOST", "Another copy of this debate holds its work item");
+      }
+      // After the lost claim (another copy holds the debate, whatever this release does), before the time limit.
+      if (input.stopCalls?.() === true) {
+        throw new TypedDomainError("RUNNER_RETIRING", "This release is retiring; the debate makes no further model call");
       }
       if (task !== undefined && (task.signal?.aborted === true || clock.now() >= limitAt)) {
         throw new TypedDomainError("RUNNER_TIME_LIMIT_REACHED", "The debate reached its time limit");
