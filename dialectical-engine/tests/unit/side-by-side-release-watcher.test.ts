@@ -463,7 +463,7 @@ describe("side-by-side C3: the API's release watcher", () => {
     expect(stop).toBeGreaterThan(pools);
     expect(stop).toBeLessThan(source.indexOf("    pool,", pools));
     expect(source.trimEnd().endsWith("releaseWatcher.markBooted();")).toBe(true);
-    expect(source.indexOf("releaseWatcher.markBooted();")).toBeGreaterThan(source.indexOf("triggerEmailRecoveryReconciliation();}"));
+    expect(source.indexOf("releaseWatcher.markBooted();")).toBeGreaterThan(source.indexOf("triggerEmailRecoveryReconciliation?.();"));
   });
 
   it("main.ts hands the watcher's drain to the shutdown lifecycle (plan C6)", () => {

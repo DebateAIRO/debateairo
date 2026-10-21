@@ -15,7 +15,8 @@ describe("data export production wiring", () => {
 
   it("W2 schedules the module-private 15-second worker and clears it on close", () => {
     expect(source).toMatch(/(?<!export\s)const DATA_EXPORT_TICK_MS = 15_000;/);
-    expect(source).toMatch(/dataExportTimer = setInterval\(triggerDataExportWork, DATA_EXPORT_TICK_MS\);\s*dataExportTimer\.unref\(\)/);
+    // Side-by-side C7: gated on the current release; gatedInterval unrefs it (tests/unit/side-by-side-release-loops).
+    expect(source).toMatch(/dataExportTimer = gatedInterval\(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS\);/);
     expect(source).toMatch(/onClose[\s\S]*clearInterval\(dataExportTimer\)/);
   });
 

@@ -184,14 +184,18 @@ export async function createStaffRuntime(input: Readonly<{
             running = dispatcher.drain({ limit: operator.dispatch.batchSize }).catch(() => { input.log?.('TRANSPORT_UNAVAILABLE'); }).finally(() => { running = undefined; });
         };
         return Object.freeze({ readiness, funding, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
-            start() {
+            // Side-by-side spec §4 (plan C7): every dispatch tick and the first drain ask `when` (main.ts: the release
+            // watcher's ownIsCurrent), so a release that is not current claims no alert row.
+            start(options?: Readonly<{ when?: () => boolean }>) {
                 if (closed)
                     throw unavailable();
                 if (timer !== undefined)
                     return;
-                timer = setInterval(trigger, operator.dispatch.intervalMs);
+                const when = options?.when ?? (() => true);
+                const gated = (work: () => void) => (): void => { if (when()) work(); };
+                timer = setInterval(gated(trigger), operator.dispatch.intervalMs);
                 timer.unref();
-                trigger();
+                gated(trigger)();
             },
             async close() {
                 if (closed)
