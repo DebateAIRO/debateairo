@@ -662,7 +662,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // startRun stamped core.run.release_key on both insert paths (parseReleaseKey first). migrate() is byte-identical.
 // Side-by-side releases A2 (2026-10-21, spec 2026-10-21 §4, §6): the reviewed module after it re-exported
 // ./release-state.js (the release table's readers and writers). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "3bb8d4909671ced43870f78ea27ebd1f315d9c04d1503f38b018d2938d5c3efe";
+// Side-by-side releases A3 (2026-10-22, spec 2026-10-21 §4): the reviewed module after it re-exported
+// ./run-supersession.js and CONTENT_PROVISION_SIGNATURES gained core.prepare_readmitted_run_key_provision(uuid,uuid).
+// migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "af9df4f10720255e9f88ab43493c523a02025a606c9718d40c04351fa3e10af8";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

@@ -10,25 +10,42 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * core.create_encrypted_run(jsonb,uuid,uuid,jsonb) in place (0072's body plus the stamp) so the encrypted insert path
  * writes it; §3 adds the release table core.release_event, its view core.release_state_v, its two readers and its two
  * serialized writers, owned by the new NOLOGIN role debateai_release_owner (the writers callable by
- * debateai_release_operator). It adds no billing relation and no billing function, so the effective verifier in force
- * (0111's) stays in force and is named as its own. Its checks are its postcondition (below), compared on every later
- * migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the
- * lists below.
+ * debateai_release_operator); §4 adds the re-admission record core.run_supersession with its guard
+ * core.guard_run_supersession(), the start guard core.refuse_starting_superseded_run() (its trigger on
+ * core.run_wait_start is checked by the closing block), core.resolve_run_ref(uuid), the readmitted run's key provision
+ * and its commit lock, the marker columns on core.run_key_provision_intent and identity.run_execution_binding (one live
+ * re-admission per old run), and redefines core.run_waiting_v; §5 widens core.run_wait_reason's waits_for CHECK; §6
+ * redefines in place the five funding functions that tied a grant to the selection's or the run's version (billing's
+ * reserve_internal_provider_call, read_internal_run_state, read_internal_allowance and guard_internal_charge_scope, and
+ * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
+ * and adds staff.read_internal_funding_policy_at(bigint). The view, that CHECK, the two indexes on the marker and §6's
+ * six redefinitions are checked by the closing block and by tests, not digested, so a later drained step may widen or
+ * redefine them again (as 0121's CHECKs are handled). It adds no billing relation and no billing function, so the
+ * effective verifier in force (0111's) stays in force and is named as its own. Its checks are its postcondition
+ * (below), compared on every later migrate(); it has no supplemental verifier, so no replayVerifierSql. Each later
+ * section appends its objects to the lists below.
  */
 const NAME='0123_side_by_side_releases.sql';
 const VERSION='side-by-side-releases-forward0123-v1';
 const MANIFEST_PATH='lineage/side-by-side-releases-forward0123.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql'; // README step 3: 0123 adds no billing relation or billing function, so it names the verifier in force (0111's, which 0112 to 0123 keep)
 const PREVIOUS='0122_engine_map_check.sql';
-/** §1: the column 0123 adds, as table.column. */
-const COLUMNS=['core.run.release_key'] as const;
+/** §1, §4: the columns 0123 adds, as table.column. */
+const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_from_run_id',
+ 'identity.run_execution_binding.readmitted_from_run_id'] as const;
 /** §1: the CHECKs 0123 adds, as table.constraint. */
 const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
-/** §2: the function 0123 redefines in place, §3: the four it adds (whole: owner, definer, path, volatility, definition, ACL). */
-const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.read_current_release()','core.read_release_state(text)',
- 'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)'] as const;
-/** §3: the table 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 digests its own. */
-const TABLES=['core.release_event'] as const;
+/**
+ * §2: the function 0123 redefines in place, §3: the four it adds, §4: the five it adds, §6: the one it adds (whole: owner,
+ * definer, path, volatility, definition, ACL).
+ */
+const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_run_supersession()',
+ 'core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)',
+ 'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.read_current_release()','core.read_release_state(text)',
+ 'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)',
+ 'core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)','staff.read_internal_funding_policy_at(bigint)'] as const;
+/** §3, §4: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 does. */
+const TABLES=['core.release_event','core.run_supersession'] as const;
 /** §3: the view 0123 adds (owner, ACL, definition). */
 const VIEWS=['core.release_state_v'] as const;
 /** §3: the two NOLOGIN NOINHERIT roles 0123 adds (their attributes and memberships). */

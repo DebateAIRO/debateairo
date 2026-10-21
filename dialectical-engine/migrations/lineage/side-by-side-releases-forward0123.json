@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0123_side_by_side_releases.sql",
-    "sha256": "6405f1b96a7d8f2fae1a129208059d586088525389ae3600fdea13d348ebc204"
+    "sha256": "64489b6d69e1dd95d8cb1d8ed903c97055bd0c521ba17fc1a464257e92bfd735"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

@@ -196,6 +196,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const moneyInFlight = createRunInFlight();",
       "const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);",
       "const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);",
+      // Side-by-side spec §9: the funding repository holds no register version (a grant lives under its own).
+      "const allowances = new PostgresInternalAllowanceRepository(pool);",
       "const selectedFunding = await allowances.readPolicy();",
       "if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== \"hosted\" || envelopeBand === null || billingPlans === null)) throw new TypedDomainError(\"INTERNAL_FUNDING_UNAVAILABLE\",",
       "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
