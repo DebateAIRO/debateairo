@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
 import { validApiEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 const env=await import('../../deploy/'+'preview-auth-dev/v1/environment.mjs');
@@ -81,12 +83,16 @@ describe('hosted preview environment', async () => {
  const INVOICING = { QUADERNO_API_BASE_URL: 'https://dezbatere-test.sandbox-quadernoapp.com/api', QUADERNO_API_KEY_PATH: '/etc/debateai-v3-preview/billing/quaderno-api-key',
   SMARTBILL_API_BASE_URL: 'https://smartbill.invalid', SMARTBILL_CREDENTIALS_PATH: '/etc/debateai-v3-preview/billing/smartbill-credentials', SMARTBILL_SERIES: 'DBAI',
   OWNER_REPORT_EMAIL_PATH: '/etc/debateai-v3-preview/billing/owner-report-email' };
+ const SPOOL = '/var/lib/debateai-v3-preview/api/billing-notice-spool';
  const narrow = (input: Record<string, string>) => env.narrowEnvironment('api', input, runtime, native, approved);
  it.each([
   ['hosted, billing off', {}],
   ['hosted with NETOPIA\'s sandbox alone (the provider-only mode)', NETOPIA],
   ['hosted with the whole billing group', { ...NETOPIA, ...INVOICING }],
-  ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }]
+  ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }],
+  // B3a (NETOPIA answers 2026-10-21): the optional spool of NETOPIA messages the database could not store.
+  ['hosted with NETOPIA\'s sandbox alone and the billing notice spool', { ...NETOPIA, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['hosted with the whole billing group and the billing notice spool', { ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }]
  ])('admits %s', (_name, patch) => {
   const result = narrow({ ...hosted(), ...patch });
   expect(result.deploymentMode).toBe('hosted');
@@ -117,6 +123,11 @@ describe('hosted preview environment', async () => {
   ['the moved billing clock (owner ruling 2026-10-13: still refused)', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
   ['the moved billing clock in local mode', { ...configured(), BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
   ['a billing setting in local mode', { ...configured(), ...NETOPIA }],
+  ['the billing notice spool without NETOPIA\'s settings (hosted, billing off)', { ...hosted(), BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['the billing notice spool beside the invoicing settings without NETOPIA\'s', { ...hosted(), ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['the billing notice spool in the hosted kit\'s folder', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: '/var/lib/debateai/api/billing-notice-spool' }],
+  ['the billing notice spool with a trailing slash', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: `${SPOOL}/` }],
+  ['the billing notice spool in local mode', { ...configured(), BILLING_NOTICE_SPOOL_PATH: SPOOL }],
   ['proxy settings in the environment file', { ...hosted(), HTTPS_PROXY: 'http://127.0.0.1:3180' }],
   ['Node\'s proxy switch in the environment file', { ...hosted(), NODE_USE_ENV_PROXY: '1' }]
  ])('refuses %s without emitting values', (_name, input) => expect(() => narrow(input)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
@@ -137,5 +148,46 @@ describe('hosted preview environment', async () => {
   expect(egress.PREVIEW_EGRESS_PROXY_URL).toBe('http://127.0.0.1:3180');
   expect(process.env).toEqual(before);
   expect(() => env.installHostedEgress('staging', setProxy)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+});
+
+// B3a (NETOPIA answers 2026-10-21): the preview's spool folder, the API unit's write permission for it and the guide agree.
+describe('the billing notice spool on the preview', () => {
+ const read = (path: string) => readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8');
+ const SPOOL = env.PREVIEW_HOSTED_FIXED_VALUES.BILLING_NOTICE_SPOOL_PATH;
+ const DROPIN = 'deploy/preview-auth-dev/v1/debateai-preview-api-notice-spool.conf';
+ const INSTALLED = 'zzzzzzzzzz-billing-notice-spool.conf';
+ it('is an optional key of the API, in the preview\'s own state folder under the hosted kit\'s name', () => {
+  expect(runtime.API_ENVIRONMENT_KEYS.optional).toContain('BILLING_NOTICE_SPOOL_PATH');
+  expect(SPOOL).toBe('/var/lib/debateai-v3-preview/api/billing-notice-spool');
+  const vps = /^# BILLING_NOTICE_SPOOL_PATH=(.+)$/m.exec(read('deploy/vps/env/api.env.example'))?.[1];
+  expect(vps?.replace('/var/lib/debateai/', '/var/lib/debateai-v3-preview/')).toBe(SPOOL);
+ });
+ it('the drop-in adds exactly that one write path, optional, and sorts after the older drop-ins and before the release one', async () => {
+  const text = read(DROPIN);
+  expect(text.split('\n').filter(line => line !== '' && !line.startsWith('#'))).toEqual(['[Service]', `ReadWritePaths=-${SPOOL}`]);
+  expect(text).toContain(`# Install as /etc/systemd/system/debateai-preview-api.service.d/${INSTALLED}\n`);
+  // The release drop-in sets no ReadWritePaths= (its lines are pinned in preview-lifecycle-prestart.test.ts).
+  const { RELEASE_DROPIN_NAME } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+  const order = ['50-lifecycle.conf', '60-hosted-egress.conf', 'zzzzzzzzz-auth-dev-task12-final.conf', INSTALLED, RELEASE_DROPIN_NAME];
+  expect([...order].sort()).toEqual(order);
+ });
+ it('the guide makes the folder 0700 as the API\'s user, installs that drop-in under that name and reloads, then adds the line once', () => {
+  const guide = read('deploy/preview-release/v1/README.md');
+  const steps = [
+   `SP=${SPOOL}`,
+   'install -d -m 0700 -o "$AU" -g "$AGRP" "$SP"',
+   `install -o root -g root -m 0644 "$CAPI/dialectical-engine/${DROPIN}" /etc/systemd/system/debateai-preview-api.service.d/${INSTALLED}`,
+   'systemctl daemon-reload',
+   'systemctl show -p ReadWritePaths debateai-preview-api',
+   `grep -q '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env" || printf '\\nBILLING_NOTICE_SPOOL_PATH=%s\\n' "$SP" >> "$E/api.env"`
+  ];
+  let from = guide.indexOf('### H9. The billing notice spool');
+  expect(from).toBeGreaterThan(0);
+  for (const step of steps) {
+   const at = guide.indexOf(step, from);
+   expect(at, step).toBeGreaterThan(from);
+   from = at;
+  }
  });
 });

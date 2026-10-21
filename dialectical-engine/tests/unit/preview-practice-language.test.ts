@@ -19,6 +19,7 @@ import {
   practiceDebateLanguageBlock,
   practiceDebateLanguageFromArgs,
   practiceDebateLanguageLines,
+  practiceDebateSiteLanguage,
   practiceFastCheckRecord,
   practiceLanguageCaseRecord,
   practiceLanguageDryReading,
@@ -67,8 +68,8 @@ const recordOf = (entry: PracticeLanguageCase, eld: EldReading, fast: FastCheckR
 /** Every case read as expected, eld unsure of each (so the fast reading decides, except where the fast check is off). */
 const allRight = (): PracticeLanguageCaseRecord[] => PRACTICE_LANGUAGE_CASES.map((entry) => recordOf(entry, NO_READING, expectedReading(entry)));
 
-describe("practice language: the fixed cases (P2L amendment P2d-3 word for word, then the P2L final review's I3 and I1)", () => {
-  it("the nine cases, each with its site, the lock it must reach, whether it must be offered a rewrite and whether the fast check is off", () => {
+describe("practice language: the fixed cases (P2L amendment P2d-3 word for word, the P2L final review's I3 and I1, then the stray-letter case)", () => {
+  it("the ten cases, each with its site, the lock it must reach, whether it must be offered a rewrite and whether the fast check is off", () => {
     expect(PRACTICE_LANGUAGE_CASES.map((entry) => [entry.id, entry.site, entry.questionLine, entry.expectedLock, entry.offerExpected,
       entry.fastCheck ?? "ON"])).toEqual([
       ["lang-ro-plain", "ro", "Ar trebui sa renuntam la leu si sa trecem la euro?", "ro", false, "ON"],
@@ -79,8 +80,21 @@ describe("practice language: the fixed cases (P2L amendment P2d-3 word for word,
       ["lang-id", "id", "Apakah Indonesia harus menaikkan pajak karbon?", "id", false, "ON"],
       ["lang-ro-borrowed", "ro", "Merită să lucrez la un startup de AI în loc de o corporație?", "ro", false, "ON"],
       ["lang-zh-short", "en", "人工智能会取代大多数工作吗？", "zh", false, "OFF"],
-      ["lang-ku-arab", "ar", "ئایا دەبێت باجی کاربۆن زیاد بکرێت؟", "ku", false, "ON"]
+      ["lang-ku-arab", "ar", "ئایا دەبێت باجی کاربۆن زیاد بکرێت؟", "ku", false, "ON"],
+      ["lang-en-hukou", "en", "Should China abolish the hukou household registration system to reduce inequality between cities and the countryside?",
+        "en", false, "ON"]
     ]);
+  });
+
+  it("the stray-letter case is an English question about an East-Asian topic, in Latin letters only, debated on the English site", () => {
+    // PR #194's rule refuses Chinese, Japanese and Korean letters in English replies, and is off when the question itself
+    // holds such letters: a rewording that adds one (a gloss in the question) would leave the rule unmeasured.
+    const hukou = caseOf("lang-en-hukou");
+    const letters = hukou.questionLine.match(/\p{L}/gu) ?? [];
+    expect(letters.length).toBeGreaterThan(0);
+    expect(letters.filter((letter) => !/\p{Script=Latin}/u.test(letter))).toEqual([]);
+    expect(practiceDebateQuestion("lang-en-hukou")).toEqual({ id: "lang-en-hukou", questionLine: hukou.questionLine });
+    expect(practiceDebateSiteLanguage(practiceDebateQuestion("lang-en-hukou"), undefined)).toBe("en");
   });
 
   it("every site is a site language, every lock a language the kernel names, every id a practice debate question", () => {
