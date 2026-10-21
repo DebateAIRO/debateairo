@@ -1662,6 +1662,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/export",
     "POST /v1/account/export",
     "POST /v1/account/export/download",
+    "POST /v1/account/removal-notice/take",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
