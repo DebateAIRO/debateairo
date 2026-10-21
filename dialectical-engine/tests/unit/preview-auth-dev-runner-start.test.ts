@@ -201,6 +201,17 @@ describe('the real readiness seam', () => {
     expect(gate).toBeLessThan(worker); expect(worker).toBeLessThan(start); expect(start).toBeLessThan(reconcile); expect(reconcile).toBeLessThan(announce);
     expect(source).not.toContain('process.send(');
   });
+
+  // Side-by-side spec §4: the retirement monitor starts only once the runner is ready, and both timers stop once the worker ended.
+  it('runner main starts the retirement monitor after readiness and stops both timers after the worker ended', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    const announce = source.indexOf('announceRunnerReady({'), resend = source.indexOf('startLapsedClaimResend({'),
+      retire = source.indexOf('startRunnerRetirement({'), ended = source.indexOf('await started;');
+    expect(announce).toBeGreaterThan(0);
+    expect(announce).toBeLessThan(resend); expect(resend).toBeLessThan(retire); expect(retire).toBeLessThan(ended);
+    expect(source.slice(ended)).toContain('lapsedResend.stop();\nretirement.stop();');
+    expect(source).toContain('stopWorker: async () => { lapsedResend.stop(); await worker.stop(); }');
+  });
 });
 
 describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays the default', () => {

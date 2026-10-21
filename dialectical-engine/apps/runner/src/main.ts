@@ -64,7 +64,13 @@ import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
-import { createRunnerRetirementSignal, createTaskExecutionCounter } from "./runner-retirement.js";
+import {
+  createRunnerRetirementSignal,
+  createTaskExecutionCounter,
+  postgresRunnerRetirementStore,
+  RUNNER_RETIRED_PROCESS_EVENT,
+  startRunnerRetirement
+} from "./runner-retirement.js";
 
 const environment = loadRunnerEnvironment();
 const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
@@ -707,4 +713,20 @@ const lapsedResend = startLapsedClaimResend({
   paused: () => retirementSignal.claimsStopped(),
   log: (line) => console.warn(JSON.stringify(line))
 });
+// Side-by-side spec §4: every 60 s this runner reads its release's facts in one snapshot; once it is DRAINING, its
+// front pair stopped, none of its work is READY or CLAIMED and no task of it runs, it says DEBATEAI_RUNNER_RETIRED
+// (stdout and the in-process event the preview launcher hears) BEFORE it stops the worker, so main ends as asked.
+const retirement = startRunnerRetirement({
+  releaseKey: environment.RELEASE_KEY,
+  store: postgresRunnerRetirementStore(pool, workFence),
+  executions,
+  signal: retirementSignal,
+  stopWorker: async () => { lapsedResend.stop(); await worker.stop(); },
+  log: (line) => console.warn(JSON.stringify(line)),
+  announce: (line) => process.stdout.write(line),
+  emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)
+});
 await started;
+// The worker ended (retired, or stopped by a signal): no further re-send pass or retirement read.
+lapsedResend.stop();
+retirement.stop();

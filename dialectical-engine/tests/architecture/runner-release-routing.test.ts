@@ -54,7 +54,10 @@ describe("the runner registers and re-sends under its release's own task name (s
     expect(main).toContain("work: new WorkItemRepository(pool, workFence)");
     expect(main).not.toContain("new WorkItemRepository(pool)");
     expect(main).not.toContain("new WorkItemRepository(keepAlivePool)");
-    expect(occurrences(main, "new WorkItemRepository(")).toBe(occurrences(main, "workFence)"));
+    // Every repository, each with the fence as its second argument (the retirement store below also takes it).
+    expect(main.match(/new WorkItemRepository\(\w+, workFence\)/gu)?.length).toBe(occurrences(main, "new WorkItemRepository("));
+    // Side-by-side spec §4: the retirement store is built with the same fence (plan B Task B11's set-aside writes under it).
+    expect(main).toContain("store: postgresRunnerRetirementStore(pool, workFence),");
   });
 
   it("sends to Hatchet only from main.ts, where the release's task name lives", async () => {
