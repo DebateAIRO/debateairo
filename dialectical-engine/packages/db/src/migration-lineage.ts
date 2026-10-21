@@ -1,6 +1,6 @@
 import { loadForward108, type Forward108Plan } from "./migration-forward108.js";
 import { loadForward110, type Forward110Plan } from "./migration-forward110.js";
-import { appliedForwardSteps, loadForwardChain, type ForwardStepPlan } from "./migration-forward-chain.js";
+import { appliedForwardSteps, loadForwardChain, type ChainStep } from "./migration-forward-chain.js";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import type { PoolClient } from "pg";
@@ -24,8 +24,11 @@ export type MigrationPlan = Readonly<{
   effectiveCapabilityVerifierSql: string;
   forward108: Forward108Plan;
   forward110: Forward110Plan;
-  /** PR-54, PR-58: the forward steps after dev's 0110, in order (0111 first); migrations/lineage/README.md. */
-  forwardChain: readonly ForwardStepPlan[];
+  /**
+   * PR-54, PR-58: the forward steps after dev's 0110, in order (0111 first); migrations/lineage/README.md. Each carries
+   * its n1 header (side-by-side spec 2026-10-21 §5, migration-n1.ts).
+   */
+  forwardChain: readonly ChainStep[];
 }>;
 
 const migrationsDirectory = new URL("../../../migrations/", import.meta.url);

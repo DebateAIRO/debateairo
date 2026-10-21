@@ -692,4 +692,31 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       await rm(root, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it("keeps loadMigrationPlan's import closure self-contained: node built-ins and ./migration-*.js only (A6 ruling B)", async () => {
+    // The plan is loaded by standalone probes (the temporary copies above, which hold only packages/db/src/migration-*.ts)
+    // and by the preview's superuser JIT creator (deploy/preview-lifecycle/v1/jit-creator-actor.mjs). A package import
+    // (for example @debateai/kernel for TypedDomainError) would break the first and widen the second, so the loader
+    // family's refusals are plain Errors carrying `.code` (migration-n1.ts migrationRefusal). Type-only imports are erased.
+    const seen = new Set<string>();
+    const pending = ["migration-lineage.ts"];
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const source = await readFile(new URL(file, DB_SOURCE), "utf8");
+      expect(source, file).not.toMatch(/\bimport\s*\(|\brequire\s*\(/u);
+      for (const [statement, specifier] of [...source.matchAll(/^\s*(?:import|export)\s[^'"]*?\bfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gmu)]
+        .map((match) => [match[0], match[1] ?? match[2]!] as const)) {
+        if (/^\s*(?:import|export)\s+type\s/u.test(statement)) continue;
+        if (specifier.startsWith("node:")) continue;
+        expect(specifier, `${file} imports ${specifier}`).toMatch(/^\.\/migration-[a-z0-9-]+\.js$/u);
+        pending.push(specifier.slice(2).replace(/\.js$/u, ".ts"));
+      }
+    }
+    // The walk reaches the n1 parser; the per-step transaction module (house TypedDomainError) stays outside it.
+    expect(seen).toContain("migration-forward-chain.ts");
+    expect(seen).toContain("migration-n1.ts");
+    expect(seen).not.toContain("migration-transaction.ts");
+  });
 });

@@ -257,14 +257,50 @@ every file and constant that carries the number, recompute the manifest, re-pin 
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
 last one: after 0112, 0111's billing objects stay digest-checked), and every applied step that declares one runs its
-own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again after a run applies new steps, before
-COMMIT — so a step's promises (for example the batch's "no runtime may
-publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
+own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again after each step a run applies, with
+that step included, before that step's COMMIT — so a step's promises (for example the batch's "no runtime may publish
+staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
 cannot silently pass. The effective-capability verifier of the last applied step (after 0123: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step and the side-by-side releases
 keep) still runs at the end of every `migrate()`.
+
+## One transaction per step (side-by-side §5)
+
+`migrate()` no longer applies every pending step in one transaction (side-by-side uploads, spec
+`docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §5, "Each step runs on its own"; plan A, task A6).
+It takes the `debateai:schema-migrations` advisory lock for its session (`pg_advisory_lock`, released in `finally`;
+a connection that cannot send the unlock is destroyed, which ends the lock with the session), then:
+
+1. the prologue, one transaction: the ledger tables, the lineage and its receipts, the base recipe, the effective
+   verifier, 0108, 0110 and `replayForwardChain` (the receipt table, its ACL, every applied step's binding, own checks
+   and postcondition), which returns the applied prefix;
+2. each pending step, its own transaction (`applyForwardStep`): the step's SQL, its verifier and postcondition, its
+   ledger row and receipt, every applied step's own checks and postcondition with this step included, the receipt
+   ACL, and the 0093 compatibility re-seal when the step moved `lineageEvidence`, all before that step's COMMIT.
+
+Every transaction (`packages/db/src/migration-transaction.ts`) checks read committed and sets
+`SET LOCAL lock_timeout = '2s'`: a step waits at most 2 s for a lock, so page reads that queue behind its waiting
+`ALTER` wait at most that long too. A lock wait that ran out (SQLSTATE `55P03`) rolls the try back, logs
+`[MIGRATION_LOCK_RETRY] <step> try <n>/5`, pauses 2 s and tries again; after the fifth it refuses
+`MIGRATION_LOCK_TIMEOUT <step>` (or `PROLOGUE`) and nothing of that step remains. Any other failure is refused at once.
+A step that fails, or a migrator killed between steps, leaves every earlier step committed with its receipt and its
+re-sealed compatibility row; the next run replays them and continues at the next step.
+
+Each step after `0122_engine_map_check.sql` declares its n1 header in its leading comment block
+(`packages/db/src/migration-n1.ts` `parseN1Header`, the one parser A7 and A8 reuse): exactly one of `-- n1: expand` /
+`-- n1: drained`, `-- n1: keeps-verifier` when its manifest names the verifier of the step before (the loader refuses
+`MIGRATION_FORWARD_CHAIN_N1_KEEPS_VERIFIER` when the two disagree), and `-- n1: outside-transaction` for an expand step
+whose whole body is one `CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON <schema>.<table> …`. Such a step runs on
+the session first with the same 2 s lock wait and retries (`runOutsideTransactionStep`: an INVALID index of that name
+is dropped concurrently before the build); its step transaction then refuses
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID` unless the index is valid, and records the step like any other.
+0122 and earlier declare nothing (all false). The modules `loadMigrationPlan` loads import only node built-ins and
+`./migration-*.js` (standalone probes and the preview's superuser JIT creator load them), so their refusals are plain
+Errors whose message starts with the code and which carry it as `.code`. The reviewed bytes of `migrate()`'s module
+and of `migration-transaction.ts` are sealed in `tools/orphan-audit` (`NATIVE_MIGRATE_MODULE_SHA256`,
+`NATIVE_MIGRATE_TRANSACTION_SHA256`) with their ordered controls.
 
 ## Merge order: check the preview first
 

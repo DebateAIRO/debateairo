@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { loadMigrationPlan, type MigrationPlan } from "../../packages/db/src/migration-lineage.js";
-import { applyForwardChain, effectiveForwardVerifierSql, type ForwardStepPlan } from "../../packages/db/src/migration-forward-chain.js";
+import { applyForwardStep, effectiveForwardVerifierSql, pendingForwardSteps, replayForwardChain, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
+import type { N1Declaration } from "../../packages/db/src/migration-n1.js";
 import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward-auth-db-batch.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -26,24 +27,31 @@ const ROLE_ROTATION = "0114_role_rotation.sql";
 afterAll(async () => { await db?.stop(); });
 
 const READINESS_PUBLISH = "staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)";
+/** Every probe is an expand step that keeps the verifier (side-by-side §5's n1 header, migration-n1.ts). */
+const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests; `checks` is its own replay verifier (like the batch's), if any. */
-function probe(previous: ForwardStepPlan, name: string, sql = "SELECT 1", checks?: string): ForwardStepPlan {
+function probe(previous: ChainStep, name: string, sql = "SELECT 1", checks?: string): ChainStep {
   return Object.freeze({
     name, version: `${name}-v1`, manifestSha256: "f".repeat(64), sourceSha256: "e".repeat(64), sql,
     previousName: previous.name, previousManifestSha256: previous.manifestSha256, previousVerifierSha256: previous.verifierSha256,
     verifierPath: previous.verifierPath, verifierSha256: previous.verifierSha256, verifierSql: previous.verifierSql,
-    postconditionEvidence: async () => "d".repeat(64), ...(checks === undefined ? {} : { replayVerifierSql: checks })
+    postconditionEvidence: async () => "d".repeat(64), n1: EXPAND, ...(checks === undefined ? {} : { replayVerifierSql: checks })
   });
 }
 let plan: MigrationPlan;
-let first: ForwardStepPlan;
-const chainOf = (...steps: ForwardStepPlan[]): MigrationPlan => ({ ...plan, forwardChain: Object.freeze([...plan.forwardChain, ...steps]) });
+let first: ChainStep;
+const chainOf = (...steps: ChainStep[]): MigrationPlan => ({ ...plan, forwardChain: Object.freeze([...plan.forwardChain, ...steps]) });
 const ledger = async (): Promise<string[]> => (await db.pool.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration")).rows.map((row) => row.name);
+/** The chain part of migrate() in one transaction: the replay of the applied prefix, then each pending step. */
 async function run(extended: MigrationPlan): Promise<void> {
   const client = await db.pool.connect();
   try {
     await client.query("BEGIN");
-    await applyForwardChain(client, extended, new Set(await ledger()));
+    let done = await replayForwardChain(client, extended, new Set(await ledger()));
+    for (const step of pendingForwardSteps(extended, done)) {
+      await applyForwardStep(client, extended, step, done);
+      done = [...done, step];
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

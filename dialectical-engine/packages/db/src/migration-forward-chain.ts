@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { MigrationPlan } from './migration-lineage.js';
+import { migrationRefusal, N1_GRANDFATHERED_THROUGH, parseN1Header, type N1Declaration } from './migration-n1.js';
 import { loadForward111 } from './migration-forward111.js';
 import { loadForwardAuthDbBatch } from './migration-forward-auth-db-batch.js';
 import { loadForward0113 } from './migration-forward0113.js';
@@ -21,7 +22,9 @@ import { loadForward0123 } from './migration-forward0123.js';
  * the first) and to the effective-capability verifier it supersedes (the sealed one for the first: 0110 keeps it in
  * force); its own loader; and its own receipt row in public.debateai_schema_migration_step. The verifier of the last
  * applied step replaces dev's sealed verifier at the end of every migrate(). A new step appends its loader to STEPS and
- * edits no earlier step's file.
+ * edits no earlier step's file. Side-by-side spec 2026-10-21 §5: migrate()'s prologue replays the applied prefix
+ * (replayForwardChain), then each pending step commits on its own (applyForwardStep inside its own transaction), so a
+ * step's locks never outlive it and a step that fails leaves every earlier step applied.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
 export type ForwardStepPlan=Readonly<{
@@ -37,6 +40,12 @@ export type ForwardStepPlan=Readonly<{
  replayVerifierSql?:string;
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
+/**
+ * A loaded chain step with its n1 header (side-by-side spec 2026-10-21 §5; migration-n1.ts), parsed once from the
+ * step's own reviewed SQL: whether it is expand or drained, keeps the verifier in force, or builds one index outside a
+ * transaction.
+ */
+export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
 
 /**
  * The chain, in order: 0111 (NETOPIA), then the auth DB batch (0112), then Part C's prices (0113, spec 2026-10-05
@@ -53,20 +62,26 @@ const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 
-export async function loadForwardChain(first:ForwardStepAnchor):Promise<readonly ForwardStepPlan[]>{
- const chain:ForwardStepPlan[]=[];let anchor=first;
+export async function loadForwardChain(first:ForwardStepAnchor):Promise<readonly ChainStep[]>{
+ const chain:ChainStep[]=[];let anchor=first;
  for(const load of STEPS){
   const step=await load(anchor);
   if(!STEP_NAME.test(step.name)||step.name<=anchor.previousName||step.previousName!==anchor.previousName
    ||step.previousManifestSha256!==anchor.previousManifestSha256||step.previousVerifierSha256!==anchor.previousVerifierSha256)fail('ORDER');
-  chain.push(step);
+  // side-by-side §5: after 0122 the header says whether the step keeps the verifier in force, and its manifest must
+  // agree (it names the verifier of the step before it exactly when it keeps it).
+  const n1=parseN1Header(step.name,step.sql);
+  if(step.name>N1_GRANDFATHERED_THROUGH&&n1.keepsVerifier!==(step.verifierSha256===step.previousVerifierSha256)){
+   throw migrationRefusal('MIGRATION_FORWARD_CHAIN_N1_KEEPS_VERIFIER',step.name);
+  }
+  chain.push(Object.freeze({...step,n1}));
   anchor={baseRecipeSha256:first.baseRecipeSha256,previousName:step.name,previousManifestSha256:step.manifestSha256,previousVerifierSha256:step.verifierSha256};
  }
  return Object.freeze(chain);
 }
 
 /** The applied prefix of the chain; any other applied subset is refused. */
-export function appliedForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,applied:ReadonlySet<string>):readonly ForwardStepPlan[]{
+export function appliedForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,applied:ReadonlySet<string>):readonly ChainStep[]{
  const done=plan.forwardChain.filter(step=>applied.has(step.name));
  if(done.some((step,index)=>step!==plan.forwardChain[index]))return fail('ORDER');
  return done;
@@ -119,7 +134,7 @@ async function assertReceiptAcl(client:PoolClient,owner:Readonly<{oid:string}>):
  if(row?.valid!==true)return fail('RECEIPT_ACL_DRIFT');
 }
 
-function preconditionDigest(plan:MigrationPlan,step:ForwardStepPlan,owner:unknown):string{
+function preconditionDigest(plan:MigrationPlan,step:ChainStep,owner:unknown):string{
  const index=plan.forwardChain.indexOf(step);
  return sha(JSON.stringify({version:step.version,baseRecipeSha256:plan.recipeSha256,baseTerminal:[...plan.manifest.order].sort(),
   forward108:{name:plan.forward108.name,manifestSha256:plan.forward108.manifestSha256},
@@ -129,14 +144,25 @@ function preconditionDigest(plan:MigrationPlan,step:ForwardStepPlan,owner:unknow
 }
 
 type Receipt=Readonly<Record<(typeof RECEIPT_COLUMNS)[number],string>>;
+const readReceipts=async(client:PoolClient):Promise<readonly Receipt[]>=>
+ (await client.query<Receipt>('SELECT * FROM public.debateai_schema_migration_step ORDER BY source_name')).rows;
 /**
- * Runs after applyForward110. Before any step: 0108 and 0110 are applied and the sealed verifier has passed. Each
- * pending step runs its SQL, then its superseding verifier, then records its ledger row and its receipt. Applied steps
- * are replayed only by their receipts (and the last one's postcondition); their SQL never runs twice.
+ * Every applied step's postcondition digest is compared, not only the last one's: appending a step must not retire the
+ * check of an earlier step's objects (a later step never changes an earlier step's objects without its own design).
  */
-export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,applied:ReadonlySet<string>):Promise<void>{
+async function assertPostconditions(client:PoolClient,applied:readonly ChainStep[],receipts:readonly Receipt[]):Promise<void>{
+ for(const [index,step] of applied.entries())if(receipts[index]?.postcondition_evidence_digest!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);
+}
+
+/**
+ * Runs in migrate()'s prologue transaction, after applyForward110: 0108 and 0110 are applied and the effective
+ * verifier has passed. It creates the private receipt table on first use, checks its ACL, binds every applied step to
+ * its receipt, and runs every applied step's own checks and postcondition. Applied steps are replayed only by their
+ * receipts; their SQL never runs twice. Returns the applied prefix of the chain (side-by-side spec 2026-10-21 §5).
+ */
+export async function replayForwardChain(client:PoolClient,plan:MigrationPlan,applied:ReadonlySet<string>):Promise<readonly ChainStep[]>{
  const done=appliedForwardSteps(plan,applied);
- if(plan.forwardChain.length===0)return;
+ if(plan.forwardChain.length===0)return done;
  // applyForward110 has just replayed or applied 0110 (after 0108) in this transaction; its ledger row is the chain's base.
  const base=(await client.query<{present:boolean}>('SELECT EXISTS(SELECT 1 FROM public.debateai_schema_migration WHERE name=$1) AND EXISTS(SELECT 1 FROM public.debateai_schema_migration WHERE name=$2) present',[plan.forward108.name,plan.forward110.name])).rows[0];
  if(base?.present!==true)return fail('BASE_STATE');
@@ -158,7 +184,7 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
   await client.query('REVOKE ALL ON public.debateai_schema_migration_step FROM PUBLIC');
  }
  await assertReceiptAcl(client,owner);
- const receipts=(await client.query<Receipt>('SELECT * FROM public.debateai_schema_migration_step ORDER BY source_name')).rows;
+ const receipts=await readReceipts(client);
  if(receipts.length!==done.length)return fail('RECEIPT_BINDING_DRIFT');
  for(const [index,step] of done.entries()){
   const receipt=receipts[index];
@@ -168,23 +194,76 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
  }
  // Every applied step's own checks run on every replay, whichever step is last.
  for(const step of done)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
- // Every applied step's postcondition digest is compared, not only the last one's: appending a step must not retire
- // the check of an earlier step's objects (a later step never changes an earlier step's objects without its own design).
- const postconditions=async()=>{for(const [index,step] of done.entries())if(receipts[index]?.postcondition_evidence_digest!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);};
- await postconditions();
- for(const step of plan.forwardChain.slice(done.length)){
-  await client.query(step.sql);
-  await client.query(step.verifierSql);
-  const post=await step.postconditionEvidence(client);
-  await client.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[step.name]);
-  await client.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
-   [step.name,plan.recipeSha256,step.previousManifestSha256,step.manifestSha256,step.sourceSha256,step.verifierSha256,preconditionDigest(plan,step,owner),post]);
- }
- // A step applied in THIS run must keep every earlier step's rules too: all applied steps' own checks run again here,
- // before the caller commits, so a breaking step is rolled back instead of caught on the next migrate().
- if(plan.forwardChain.length>done.length){
-  for(const step of plan.forwardChain)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
-  await postconditions();
- }
+ await assertPostconditions(client,done,receipts);
+ return done;
+}
+
+/** The steps after the replayed prefix `done`, in chain order. */
+export function pendingForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,done:readonly ChainStep[]):readonly ChainStep[]{
+ if(done.some((step,index)=>step!==plan.forwardChain[index]))return fail('ORDER');
+ return plan.forwardChain.slice(done.length);
+}
+
+/**
+ * Applies ONE pending step inside the caller's transaction (migrate()'s step transaction, side-by-side spec §5): its
+ * SQL (or, for an outside-transaction step, the check that runOutsideTransactionStep left a valid index), its
+ * superseding verifier and its postcondition; then its ledger row and its receipt; then every applied step's own
+ * checks and postcondition with this step included, and the receipt ACL, so a step that breaks an earlier step's rules
+ * is rolled back before its COMMIT instead of caught on the next migrate().
+ */
+export async function applyForwardStep(client:PoolClient,plan:MigrationPlan,step:ChainStep,done:readonly ChainStep[]):Promise<void>{
+ if(done.some((entry,index)=>entry!==plan.forwardChain[index])||plan.forwardChain[done.length]!==step)return fail('ORDER');
+ const owner=await executor(client);
+ // replayForwardChain created the receipt table in the prologue, before any step.
+ if((await client.query<{present:boolean}>("SELECT to_regclass('public.debateai_schema_migration_step') IS NOT NULL present")).rows[0]?.present!==true)return fail('RECEIPT_MISSING');
+ if(step.n1.outsideTransaction)await assertConcurrentIndexValid(client,step);
+ else await client.query(step.sql);
+ await client.query(step.verifierSql);
+ const post=await step.postconditionEvidence(client);
+ await client.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[step.name]);
+ await client.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
+  [step.name,plan.recipeSha256,step.previousManifestSha256,step.manifestSha256,step.sourceSha256,step.verifierSha256,preconditionDigest(plan,step,owner),post]);
+ // This step must keep every earlier step's rules too: all applied steps' own checks, this one's included, before COMMIT.
+ const applied=[...done,step];
+ for(const entry of applied)if(entry.replayVerifierSql!==undefined)await client.query(entry.replayVerifierSql);
+ const receipts=await readReceipts(client);
+ if(receipts.length!==applied.length||receipts.some((receipt,index)=>receipt.source_name!==applied[index]?.name))return fail(`RECEIPT_BINDING_DRIFT ${step.name}`);
+ await assertPostconditions(client,applied,receipts);
  await assertReceiptAcl(client,owner);
+}
+
+const PLAIN_NAME=/^[a-z_][a-z0-9_]*$/;
+/** The index an outside-transaction step builds; its names are plain, as parseN1Header admits them. */
+const concurrentIndexOf=(step:ChainStep):Readonly<{schema:string;name:string}>=>{
+ const index=step.n1.concurrentIndex;
+ if(!step.n1.outsideTransaction||index===null||!PLAIN_NAME.test(index.schema)||!PLAIN_NAME.test(index.name)){
+  throw migrationRefusal('MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED',step.name);
+ }
+ return index;
+};
+
+async function assertConcurrentIndexValid(client:PoolClient,step:ChainStep):Promise<void>{
+ const index=concurrentIndexOf(step);
+ const row=(await client.query<{valid:boolean}>('SELECT indisvalid valid FROM pg_index WHERE indexrelid=to_regclass($1)',[`${index.schema}.${index.name}`])).rows[0];
+ if(row?.valid!==true)throw migrationRefusal('MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID',step.name);
+}
+
+/**
+ * The one statement of an outside-transaction step (n1 `outside-transaction`: a concurrent index build, which cannot
+ * run inside a transaction), on the migration session with the same 2 s lock wait. An INVALID index of that name, left
+ * by a build that was interrupted or timed out, is dropped concurrently first, so the build starts clean (IF NOT EXISTS
+ * would keep the invalid one). migrate() then records the step in a normal step transaction, which refuses unless the
+ * index is valid. The caller retries a lock wait that ran out (withMigrationLockRetry).
+ */
+export async function runOutsideTransactionStep(client:PoolClient,step:ChainStep):Promise<void>{
+ const index=concurrentIndexOf(step);
+ const qualified=`${index.schema}.${index.name}`;
+ await client.query("SET lock_timeout = '2s'");
+ try{
+  const invalid=(await client.query<{invalid:boolean}>('SELECT EXISTS(SELECT 1 FROM pg_index WHERE indexrelid=to_regclass($1) AND NOT indisvalid) invalid',[qualified])).rows[0]?.invalid===true;
+  if(invalid)await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${qualified}`);
+  await client.query(step.sql);
+ }finally{
+  await client.query('RESET lock_timeout');
+ }
 }

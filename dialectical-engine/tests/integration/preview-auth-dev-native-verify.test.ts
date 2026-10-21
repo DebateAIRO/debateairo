@@ -4,9 +4,11 @@ import pg from 'pg';
 // Test-only: hold back the forward chain while the database is built, so it stands where a release that predates the
 // chain left it — base recipe and 0108 applied, the sealed verifier passed, no forward step (no receipt table either).
 const chain=vi.hoisted(()=>({hold:false}));
-vi.mock('../../packages/db/src/migration-forward-chain.js',async original=>{
- const real=await original<typeof import('../../packages/db/src/migration-forward-chain.js')>();
- return {...real,applyForwardChain:async(...args:Parameters<typeof real.applyForwardChain>)=>chain.hold?undefined:real.applyForwardChain(...args)};
+// The plan migrate() loads is the real one with an empty forward chain while held (side-by-side §5: there is no single
+// chain call to stub any more; the prologue replays the chain and each step commits on its own).
+vi.mock('../../packages/db/src/migration-lineage.js',async original=>{
+ const real=await original<typeof import('../../packages/db/src/migration-lineage.js')>();
+ return {...real,loadMigrationPlan:async()=>{const plan=await real.loadMigrationPlan();return chain.hold?{...plan,forwardChain:Object.freeze(plan.forwardChain.slice(0,0))}:plan;}};
 });
 import { migrate } from '@debateai/db';
 import { loadBootstrapRegister,createPostgresRegisterPublicationPort,canonicalRegisterJson,computeRegisterSnapshotSha256,parseRegisterVersionText } from '@debateai/register';
