@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { addBusinessDays, foldSubscription } from "@debateai/billing-core";
 import { renderMail } from "@debateai/mail-templates";
-import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
+import { BillingMaintenance, NO_CARD_STEPS } from "../../apps/api/src/billing/maintenance.js";
 import { addYearsClamped } from "../../apps/api/src/billing/renewal-rules.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { testBillingPolicy } from "../support/billingFixtures.js";
@@ -587,3 +587,79 @@ async function changeCard(subscriptionId: string, chargeId: string): Promise<str
     subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { cardTokenId })));
   return cardTokenId;
 }
+
+describe("B3 the owner hears once when a first payment brought no saved card (NETOPIA answers 2026-10-21)", () => {
+  /**
+   * A first payment NETOPIA confirmed with no saved card: no message carried one (only the first does; its resent copies
+   * never do), and the status read carried none either. The plan is ACTIVE with no card, from `h.clock.now`.
+   */
+  async function activateWithoutCard() {
+    const bought = await h.buy();
+    const charge = await h.repository.charge(bought.chargeId);
+    if (charge === null) throw new Error("NO_CHARGE");
+    h.payments.pay(bought.chargeId, { amountMicros: charge.totalMicros, cardCountry: "RO" });
+    await h.settle(bought.chargeId);
+    expect(foldSubscription(await h.repository.subscriptionEvents(bought.subscriptionId)))
+      .toMatchObject({ status: "ACTIVE", cardTokenId: null, activatedAt: h.clock.now });
+    return { ...bought, activatedAt: h.clock.now };
+  }
+  /** Every O3 about this subscription, whatever its ref: the dedupe must hold, not just the ref. */
+  const ownerAlerts = async (subscriptionId: string) => (await h.database.pool.query<{ ref: string; payload: Record<string, unknown> }>(
+    "SELECT ref, payload FROM billing.outbox WHERE kind = 'EMAIL' AND payload->>'template' = 'O3' AND payload->>'param.reference' = $1",
+    [`subscription ${subscriptionId}`]
+  )).rows;
+  const at = (start: Date, ms: number) => new Date(start.getTime() + ms);
+
+  it("waits 30 minutes for NETOPIA's copies and a spool replay, then emails the owner once, and never again", async () => {
+    const plan = await activateWithoutCard();
+    h.clock.now = at(plan.activatedAt, 10 * MINUTE);
+    await h.maintenance.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toEqual([]);
+
+    h.clock.now = at(plan.activatedAt, 31 * MINUTE);
+    await h.maintenance.runOnce();
+    const alerts = await ownerAlerts(plan.subscriptionId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      ref: `O3:FIRST_PAYMENT_NO_CARD:${plan.subscriptionId}`,
+      payload: {
+        recipient: "OWNER", "param.jobKind": "PAYMENT", "param.reasonCode": "FIRST_PAYMENT_NO_CARD",
+        "param.nextSteps": NO_CARD_STEPS, "param.paymentAlert": "true"
+      }
+    });
+
+    h.clock.now = at(plan.activatedAt, 41 * MINUTE);
+    await h.maintenance.runOnce();
+    h.clock.now = at(plan.activatedAt, 3 * DAY);
+    await h.maintenance.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toHaveLength(1);
+  });
+
+  it("says nothing for a plan whose first payment saved its card", async () => {
+    const plan = await h.activate();
+    expect(foldSubscription(await h.repository.subscriptionEvents(plan.subscriptionId)).cardTokenId).toBe(plan.cardTokenId);
+    h.clock.now = at(h.clock.now, 31 * MINUTE);
+    await h.maintenance.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toEqual([]);
+  });
+
+  it("says nothing for a plan activated more than 7 days before the pass first saw it (it predates this alert)", async () => {
+    const plan = await activateWithoutCard();
+    h.clock.now = at(plan.activatedAt, 8 * DAY);
+    await h.maintenance.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toEqual([]);
+  });
+
+  it("says nothing from the other NETOPIA system's pass; the plan's own system's pass says it (D5 5h)", async () => {
+    const live = new BillingMaintenance({
+      repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal, policy: testBillingPolicy,
+      publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "live", audit: h.audit, clock: h.clock.read
+    });
+    const plan = await activateWithoutCard();
+    h.clock.now = at(plan.activatedAt, 31 * MINUTE);
+    await live.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toEqual([]);
+    await h.maintenance.runOnce();
+    expect(await ownerAlerts(plan.subscriptionId)).toHaveLength(1);
+  });
+});

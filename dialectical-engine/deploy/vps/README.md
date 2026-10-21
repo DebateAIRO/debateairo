@@ -3227,6 +3227,12 @@ paid, refused, or unknown to NETOPIA at the end of its window (3 days for a rene
 NETOPIA confirms it holds is never closed as failed: the plan stays held and you are emailed (O3
 `RENEWAL_OUTCOME_OPEN`); look it up in NETOPIA's admin.
 
+**A first payment that brought no saved card.** NETOPIA sends the saved card only once, in its first message about a
+payment. If no card has reached the site 30 minutes after a plan started, the plan still works, and you are emailed
+once for that plan (O3 `FIRST_PAYMENT_NO_CARD`). About 10 days before its renewal the person is asked to add a card.
+On the test site this is expected until NETOPIA turns on sending the card for our test account; on the live site, do
+what the O3 says. Plans that started more than 7 days before this check shipped are not reported.
+
 **What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the
 status reads against NETOPIA every 10 minutes (each payment is read at its own times, by the spec's §2.14), the
 saved-card upkeep once a day, and the job queue (payment checks, refunds, invoices, credit notes and emails) every 5

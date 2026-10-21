@@ -6,6 +6,7 @@ import type { BillingAudit } from "./audit.js";
 import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
 import { enqueueOnce, isThisPaymentSystem } from "./outbox.js";
+import { queuePaymentAlert } from "./payment-alert.js";
 import { paidAndRefundedInFull } from "./refunds.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
 import { addDays, anniversaryDue, dunningProgress, REFUSAL_NOT_RETRIED } from "./renewal-rules.js";
@@ -32,6 +33,23 @@ export type MaintenanceDeps = Readonly<{
   custody?: Pick<CardCustody, "askForCard">;
   clock: () => Date;
 }>;
+
+/**
+ * B3 (NETOPIA answers 2026-10-21): how long after a plan's ACTIVATED its card may still arrive. NETOPIA sends the saved
+ * card only in its first message about a payment and resends that message up to 5 times, 5 minutes apart (about 25
+ * minutes), and a message the database could not take is replayed from the disk spool on a later tick.
+ */
+const NO_CARD_AFTER_MS = 30 * 60_000;
+/** B3: a plan activated longer ago than this predates the no-card alert and is left alone. */
+const NO_CARD_WITHIN_MS = 7 * 86_400_000;
+
+/** B3: O3 FIRST_PAYMENT_NO_CARD's steps (owner-facing English, spec §2.7 O3; the owner catalogue is English only). */
+export const NO_CARD_STEPS = "This person's first payment went through, but NETOPIA sent no saved card with it. NETOPIA"
+  + " sends the card only once, in its first message about the payment. The plan works now. About 10 days before the"
+  + " renewal the person is emailed to add a card; if they don't, the renewal fails and the usual \"update your card\""
+  + " emails follow. On the test site this is expected until NETOPIA turns on the setting that sends the card for our"
+  + " test account. On the live site, check that NETOPIA's messages reach the site (the notify address answers) and that"
+  + " recurring payments are switched on for the account.";
 
 export type MaintenanceReport = { visited: number; ended: number; retried: number; reminded: number; announced: number; failed: number };
 
@@ -97,6 +115,7 @@ export class BillingMaintenance {
           await this.announce(state, now, report);
           await this.deps.custody?.askForCard(state, now);
         }
+        await this.noCardAlert(state, now);
         return;
       case "PAST_DUE":
         // Spec §1.3 / §2.5.6: a cancel while past due ends the plan now; it is never retried or dunned again.
@@ -317,6 +336,24 @@ export class BillingMaintenance {
     });
     const sent = await this.deps.repository.withTransaction((client) => enqueueOnce(this.deps, client, job));
     if (sent) report.reminded += 1;
+  }
+
+  /**
+   * B3 (NETOPIA answers 2026-10-21): a served ACTIVE plan still without a saved card 30 minutes after its ACTIVATED
+   * (`NO_CARD_AFTER_MS`) will not get one: the plan works now, but its first renewal needs the person to add a card (M12
+   * asks ten days ahead). The owner gets O3 FIRST_PAYMENT_NO_CARD once per subscription, ever (`queuePaymentAlert`'s
+   * dedupe ref), so NETOPIA's missing card setting or an unreachable notify address shows on the first such payment. A
+   * plan activated more than 7 days ago (`NO_CARD_WITHIN_MS`) predates this alert; another payment system's plan is
+   * that system's pass's (D5 5h). Content-free: our subscription id and the code.
+   */
+  private async noCardAlert(state: SubscriptionState, now: Date): Promise<void> {
+    if (state.cardTokenId !== null || state.activatedAt === null || !this.served(state)) return;
+    const age = now.getTime() - state.activatedAt.getTime();
+    if (age < NO_CARD_AFTER_MS || age > NO_CARD_WITHIN_MS) return;
+    await queuePaymentAlert(this.deps, {
+      code: "FIRST_PAYMENT_NO_CARD", reference: `subscription ${state.subscriptionId}`, nextSteps: NO_CARD_STEPS,
+      dedupeRef: `FIRST_PAYMENT_NO_CARD:${state.subscriptionId}`, now
+    });
   }
 
   private async announce(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {
