@@ -236,14 +236,19 @@ selection's or the run's version (`billing.reserve_internal_provider_call`, `bil
 `billing.read_internal_allowance`, `billing.guard_internal_charge_scope`, `staff.revoke_internal_allowance`), so a grant
 stays valid under the version it was issued with, and `staff.read_self_allowance_command` (a revoke names its grant's
 own version), and adds `staff.read_internal_funding_policy_at(bigint)` (owned by `debateai_staff_security_owner`,
-EXECUTE for `debateai_runtime`), the funding publication at a version. Its header declares `-- n1: drained` (T is
+EXECUTE for `debateai_runtime`), the funding publication at a version; §7 adds the append-only spend waiver
+`ledger.model_spend_waiver` (one row per run, reason `BACKSTOP`, `OWNER_STOPPED`, `SETTINGS_VERSION_UNSUPPORTED` or
+`RELEASE_NOT_SERVED`; SELECT, INSERT for `debateai_runtime`, SELECT for `debateai_staff_security_owner` and
+`debateai_replay`) and redefines `billing.read_internal_grant_spent` in place (same signature, owner, definer, path and
+grants) so a waived run's spend leaves a funded person's window; site-day readers still count it. Its header declares `-- n1: drained` (T is
 uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier functions, each such
 section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
 `replayVerifierSql`: its postcondition is the three columns (type, NOT NULL, default), the CHECK (name, validation,
-definition), the redefined and added functions whole (§6's six redefinitions excepted), the release and supersession
-tables whole, the release view (owner, ACL, definition) and the two roles' attributes and memberships.
-`core.run_waiting_v`, the `waits_for` CHECK, the marker indexes and §6's six funding redefinitions are checked by the
+definition), the redefined and added functions whole (§6's six and §7's one redefinitions excepted), the release,
+supersession and waiver tables whole, the release view (owner, ACL, definition) and the two roles' attributes and
+memberships. `core.run_waiting_v`, the `waits_for` CHECK, the marker indexes and the seven funding redefinitions of §6
+and §7 are checked by the
 closing block and by tests, not digested, so a later drained step may widen or redefine them again. While the build is
 open each task appends its section and recomputes `migration.sha256` with the one-liner at the end of this file; once
 merged, 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename every file and constant

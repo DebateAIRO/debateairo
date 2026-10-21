@@ -2251,7 +2251,8 @@
         "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
         "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
         "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
-        "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)"
+        "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)",
+        "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)"
       ]
     }
   ],
