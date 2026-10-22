@@ -183,6 +183,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret, the UI's copy |
 | `/etc/debateai/ui-edge.caddy.secret` | `0640` | `root:caddy` | the same bytes, Caddy's copy (the `Caddyfile` reads this one) |
+| `/etc/debateai/payment-marks/` | `0755` | `root:root` | `netopia.svg`, `visa.svg`, `mastercard.svg` (each `0644`, owned by root): the official payment marks Caddy serves at `/payment-marks/<name>.svg` (§6, §14.7); never in the repository or a release folder |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
 | `/run/debateai/support-config/` | `0700` | `root:root` | `operator.json`, the JIT support-config operator credential the provisioner publishes (§4, §13). Under `/run`, so it does not survive a reboot |
 | `/run/debateai/support-data/` | `0700` | `root:root` | `api-support.json`, the support data credential `support:status` and `support:shred` read (§13), written for the length of an operator session |
@@ -1749,6 +1750,20 @@ refuses would leave the site down after the restart.
 - `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}` — without it, any local
   process able to open `127.0.0.1:3001` or `127.0.0.1:3002` could forge a client address and evade the per-IP
   admission limits and the audit source IP.
+- **Payment marks.** The website's footer shows the NETOPIA, Visa and Mastercard marks at
+  `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg`. The
+  brands' artwork may not be redistributed, so it is never in the repository or a release folder:
+  root keeps the official files in `/etc/debateai/payment-marks/` (§3), and the public site serves
+  exactly these three names from there (`handle @paymentMarks`, with `Content-Type image/svg+xml`,
+  a `Content-Security-Policy` that runs nothing and `nosniff`) before any request reaches the
+  website. Any other path under `/payment-marks/` goes on to the website as before; the loopback
+  check site has no such rule. A missing file is Caddy's own `404`. The website shows only the marks
+  its `PAYMENT_MARKS_AVAILABLE` setting names (§14.7). The check below prints `200 image/svg+xml`
+  once `visa.svg` is in the folder and `404` before:
+
+```sh
+(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/payment-marks/visa.svg")
+```
 
 ---
 
