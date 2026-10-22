@@ -6,7 +6,9 @@
 //   - check        the verdict: SIDE_BY_SIDE (every check passes), DRAINED_PATH (a new database step does not say both
 //                  `-- n1: expand` and `-- n1: keeps-verifier`: the upload takes the drained path, spec §5's escape
 //                  hatch) or NOT_READY (anything else failed: stop and ask). Each check is named, with a plain detail;
-//   - status       every pinned release: its state in the release table, its three units and its open work;
+//   - status       every pinned release: its state in the release table, its three units and its open work, and in
+//                  `bad` every draining release whose runner is stopped while it still has open work (a reboot or a
+//                  runner crash in a drain), with the command that starts that runner again;
 //   - receipt      the release retired by itself (spec §4, G4): its RETIRED row, its runner's clean exit and retirement
 //                  lines (from systemd, or from the journal once systemd has unloaded the stopped instance), and no
 //                  failure email for that runner since the switch, written as a NEW root-only JSON file;
@@ -20,7 +22,8 @@
 //
 // The two manifests are the candidate API source manifests (root-owned 0644, release-artifacts.mjs source-manifest) of
 // the current release and of the new one. Read-only: the one file this tool writes is the receipt it is asked for.
-// Exit 0 for SIDE_BY_SIDE and for the other commands; 2 for a DRAINED_PATH or NOT_READY verdict; 1 on a refusal.
+// Exit 0 for SIDE_BY_SIDE and for the other commands; 2 for a DRAINED_PATH or NOT_READY verdict, and for a status whose
+// `bad` is not empty; 1 on a refusal.
 // One JSON line per run: codes, labels, keys, counts, file paths of the source tree and digests only.
 import { randomBytes } from 'node:crypto';
 import { constants, link, lstat, open, readFile, realpath, statfs, unlink } from 'node:fs/promises';
@@ -442,6 +445,20 @@ export async function releaseStatus({ layout = LAYOUT, deps = {} }) {
   return Object.freeze(rows);
 }
 
+/**
+ * The status rows that need the operator now (final fix wave X1): a DRAINING release with open work whose runner is
+ * stopped (inactive or failed). A runner instance has no [Install] and the boot target starts only the current
+ * release's website and API, so after a reboot (or a runner crash) nobody re-sends that release's CLAIMED work and
+ * nobody honours its backstop; 25 minutes after the backstop root would only email STRANDED. `next` is the one command
+ * that fixes it: the runner starts again (prestart runs it in database-ahead mode when the database is newer), finishes
+ * or sets aside its own debates, and retires by itself. The guide: "After a reboot or a runner crash during a drain".
+ */
+export function statusBad(rows, layout = LAYOUT) {
+  return Object.freeze(rows.filter(row => row.state === 'DRAINING' && row.openWork > 0 && STOPPED.includes(row.units.runner))
+    .map(row => Object.freeze({ code: 'DRAINING_RUNNER_STOPPED', label: row.label, openWork: row.openWork, runner: row.units.runner,
+      next: `systemctl start ${unitNameFor(layout, 'runner', row.label).replace(/\.service$/, '')}` })));
+}
+
 /** release-retire.mjs's own line when, at ExecStopPost, it read ExecMainStatus=0 and both lines and recorded RETIRED. */
 function recordedRetired(message, label, releaseKey) {
   let line;
@@ -572,7 +589,7 @@ function parseArguments(argv) {
 }
 const FAILED_EVENT = Object.freeze({ check: 'PREVIEW_RELEASE_CHECK_REFUSED', status: 'PREVIEW_RELEASE_STATUS_REFUSED', receipt: 'PREVIEW_RELEASE_RECEIPT_REFUSED', maintenance: 'PREVIEW_MAINTENANCE_REFUSED' });
 
-/** One JSON line per run: the result on stdout (exit 0, or 2 for a verdict other than SIDE_BY_SIDE), or one refusal on stderr (exit 1). */
+/** One JSON line per run: the result on stdout (exit 0, or 2 for a verdict other than SIDE_BY_SIDE or a status with `bad`), or one refusal on stderr (exit 1). */
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
   let args = null;
   try {
@@ -586,9 +603,14 @@ export async function main(argv, { platform = process.platform, uid = process.ge
       logLine(stdout, result);
       return result.verdict === 'SIDE_BY_SIDE' ? 0 : 2;
     }
-    const result = args.command === 'status' ? Object.freeze({ event: 'PREVIEW_RELEASE_STATUS', releases: await releaseStatus({ layout, deps }) })
-      : args.command === 'receipt' ? await writeRetirementReceipt({ label: args.label, out: args.out, layout, deps })
-        : await maintenanceAllowed({ layout, deps });
+    if (args.command === 'status') {
+      const releases = await releaseStatus({ layout, deps });
+      const bad = statusBad(releases, layout);
+      logLine(stdout, Object.freeze({ event: 'PREVIEW_RELEASE_STATUS', releases, bad }));
+      return bad.length ? 2 : 0;
+    }
+    const result = args.command === 'receipt' ? await writeRetirementReceipt({ label: args.label, out: args.out, layout, deps })
+      : await maintenanceAllowed({ layout, deps });
     logLine(stdout, result);
     return 0;
   } catch (error) {

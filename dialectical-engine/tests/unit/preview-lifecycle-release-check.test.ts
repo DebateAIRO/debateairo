@@ -11,7 +11,7 @@ const check = await import('../../deploy/' + 'preview-lifecycle/v1/release-check
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
 
-const { releaseCheck, releaseStatus, writeRetirementReceipt, maintenanceAllowed, portRefuses, CHECK_NAMES, RECEIPT_SCHEMA, main } = check;
+const { releaseCheck, releaseStatus, statusBad, writeRetirementReceipt, maintenanceAllowed, portRefuses, CHECK_NAMES, RECEIPT_SCHEMA, main } = check;
 const LAYOUT = common.LAYOUT;
 const { gateFilesPathFor, GATE_FILES_SCHEMA } = releaseSwitch;
 
@@ -587,6 +587,7 @@ describe('the command line', () => {
     const status = await cli(['status']);
     expect(status.code).toBe(0);
     expect(status.out[0].event).toBe('PREVIEW_RELEASE_STATUS');
+    expect(status.out[0].bad).toEqual([]);
     expect(status.out[0].releases.map((release: { label: string }) => release.label)).toEqual([PREV, OLD]);
     expect((await cli(['maintenance'])).code).toBe(0);
     const refused = await cli(['maintenance'], { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING' } } });
@@ -595,6 +596,34 @@ describe('the command line', () => {
     const receipt = await cli(['receipt', '--label', OLD, '--out', '/root/preview-archive/x/retirement-receipt.json'], { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING' } } });
     expect(receipt.code).toBe(1);
     expect(receipt.err[0]).toEqual({ event: 'PREVIEW_RELEASE_RECEIPT_REFUSED', label: OLD, reason: 'RECEIPT_NOT_RETIRED', fields: { state: 'DRAINING' } });
+  });
+
+  it('status names a draining release whose runner is stopped with open work, with the command that starts it again, and exits 2 (final fix wave X1)', async () => {
+    const base: Options = { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING', frontPairStopped: true }, [NEW]: { key: NEW_KEY, slot: 'B', state: 'CURRENT' } }, current: NEW_KEY };
+    // After a reboot: a runner instance has no [Install] and the boot target starts only the current pair, so the
+    // draining release's runner is inactive while 3 of its items are still open.
+    const rebooted = await cli(['status'], { ...base, openWork: { [OLD_KEY]: 3 } });
+    expect(rebooted.code).toBe(2);
+    expect(rebooted.out[0].releases.map((release: { label: string }) => release.label)).toEqual([OLD, NEW]);
+    expect(rebooted.out[0].bad).toEqual([{ code: 'DRAINING_RUNNER_STOPPED', label: OLD, openWork: 3, runner: 'inactive', next: 'systemctl start debateai-preview-runner@old-v1' }]);
+    // A crashed runner (failed) is the same case.
+    const crashed = await cli(['status'], { ...base, openWork: { [OLD_KEY]: 1 }, units: { [U('runner', OLD)]: 'failed' } });
+    expect([crashed.code, crashed.out[0].bad.map((entry: { runner: string }) => entry.runner)]).toEqual([2, ['failed']]);
+    // Not this case: the draining runner runs; nothing of it is open; it retired; or the CURRENT release's runner is the
+    // stopped one (the transition's TB6 to TB8 and a drained upload's DR2 to DR6 stop it on purpose).
+    for (const options of [
+      { ...base, openWork: { [OLD_KEY]: 3 }, units: { [U('runner', OLD)]: 'active' } },
+      { ...base, openWork: {} },
+      { ...base, releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'RETIRED' }, [NEW]: { key: NEW_KEY, slot: 'B', state: 'CURRENT' } }, openWork: { [OLD_KEY]: 2 } },
+      { ...base, openWork: { [NEW_KEY]: 2 }, units: { [U('runner', NEW)]: 'inactive' } }
+    ] as Options[]) {
+      const ok = await cli(['status'], options);
+      expect([ok.code, ok.out[0].bad]).toEqual([0, []]);
+    }
+    // The public server's units: the same command with its own unit name.
+    const rows = [{ label: OLD, releaseKey: OLD_KEY, slot: 'A', state: 'DRAINING', frontPairStopped: true, retireRequested: true, units: { api: 'inactive', ui: 'inactive', runner: 'inactive' }, openWork: 4 }];
+    expect(statusBad(rows, common.VPS_LAYOUT)).toEqual([{ code: 'DRAINING_RUNNER_STOPPED', label: OLD, openWork: 4, runner: 'inactive', next: 'systemctl start debateai-runner@old-v1' }]);
+    expect(Object.isFrozen(statusBad(rows))).toBe(true);
   });
 
   it('refuses any other argument shape, and anyone but root on Linux, before reading anything', async () => {

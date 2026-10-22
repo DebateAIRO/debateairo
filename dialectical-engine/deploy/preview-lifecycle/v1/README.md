@@ -159,13 +159,24 @@ launchers still re-check every byte exactly as before.
 ## Boot sequence (what to expect after a reboot)
 
 1. `debateai-preview-postgresql` starts (it restarts itself 10 s after a crash).
-2. `debateai-preview-api` starts after the supporting services. Its root prestart first runs the
-   cheap checks, then waits up to 60 s for PostgreSQL to accept connections on its socket
-   (`pg_isready`), then runs the database verifier (about 12 s), then the launcher re-hashes the
-   release and starts the API. If PostgreSQL is still not ready, prestart refuses with
-   `POSTGRES_NOT_READY` and systemd tries again 30 s later (at most 4 tries in 15 minutes).
-3. `debateai-preview-ui` is ordered `After=` the API, so its own prestart (the same wait and
-   verifier) only begins once the API's start job is done; the two verifiers do not overlap at boot.
+2. `debateai-preview.target` starts the CURRENT release's API and website instances only: every switch (and the
+   transition's seed) writes `debateai-preview.target.d/60-current-release.conf` naming
+   `debateai-preview-api@<label>.service` and `debateai-preview-ui@<label>.service` (side-by-side spec §10); the
+   folder's other drop-ins (the Anthropic gate's `50-anthropic-gate.conf`) start as before.
+   The API instance starts after the supporting services. Its root prestart first runs the cheap checks (the release
+   table must call its release CURRENT or STAGED), then waits up to 60 s for PostgreSQL to accept connections on its
+   socket (`pg_isready`), then runs the database verifier (about 12 s), then the launcher re-hashes the release and
+   starts the API. If PostgreSQL is still not ready, prestart refuses with `POSTGRES_NOT_READY` and systemd tries again
+   30 s later (at most 4 tries in 15 minutes).
+3. The website instance is `BindsTo=` and `After=` its own release's API instance, so its own prestart (the same wait
+   and verifier) only begins once the API's start job is done; the two verifiers do not overlap at boot.
+4. **No runner starts at boot.** A runner instance has no `[Install]` section and the target does not want it. Start
+   the current release's runner by hand: `systemctl start debateai-preview-runner@<label>`. If a release was draining,
+   its runner is down too and its claimed work waits for nobody: `release-check.mjs status` names it in `bad` (exit 2)
+   with that same command, and the stranded email names it too. The release guide's "After a reboot or a runner crash
+   during a drain" (SB14b, `deploy/preview-release/v1/README.md`) checks both gates, then starts the draining runner
+   (database-ahead mode if needed: it finishes or sets aside its own debates and retires) and then the current one. A
+   draining release's backstop timer only asks its runner to retire: it needs a running runner to honour it.
 
 `TimeoutStartSec=300` covers the wait (60 s), the verifier (hard cap 150 s) and the rest.
 

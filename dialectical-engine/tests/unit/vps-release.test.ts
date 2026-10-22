@@ -408,7 +408,7 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(status.out).toEqual({ event: "PREVIEW_RELEASE_STATUS", releases: [
       { label: "new-v1", releaseKey: NEW_KEY, slot: "B", state: "CURRENT", frontPairStopped: false, retireRequested: false, units: { api: "active", ui: "active", runner: "active" }, openWork: 0 },
       { label: "old-v1", releaseKey: OLD_KEY, slot: "A", state: "DRAINING", frontPairStopped: true, retireRequested: false, units: { api: "inactive", ui: "inactive", runner: "active" }, openWork: 0 }
-    ] });
+    ], bad: [] });
     // An overlay that sets a value no release may change, or names no slot's API port, is refused, never guessed.
     const extra = serverFiles([OLD], (entry) => `REGISTER_VERSION=19\nRELEASE_KEY=${entry.key}\nAPI_PORT=8790\nDATABASE_URL=elsewhere\n`);
     expect((await cli(["status"], extra.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });

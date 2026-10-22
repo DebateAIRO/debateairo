@@ -69,7 +69,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -166,6 +166,34 @@ describe('the preview release guide: transition T, side by side, the way back, t
     const rp = tb7.findIndex(line => line.startsWith("RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz"));
     expect(rp).toBeGreaterThan(-1);
     expect(tb7[rp + 1]).toMatch(/^\[ "\$RP" = 404 \] \|\| back /);
+  });
+
+  it('after a reboot or a runner crash during a drain: status stops the steps, and SB14b starts the draining runner, then the current one (final fix wave X1)', () => {
+    const sb14b = scriptOf('SB14B').lines;
+    const gates = sb14b.findIndex(line => line.includes('jq -r .state)" = active ]') && line.includes('SB14B_NOT_DONE'));
+    const loop = sb14b.indexOf('for RL in "$OLABEL" "$LABEL"; do');
+    expect(gates).toBeGreaterThan(-1);
+    expect(gates).toBeLessThan(loop);
+    expect(sb14b).toContain('  systemctl start "$RU" || echo "systemctl start $RU returned non-zero"');
+    expect(sb14b.join('\n')).not.toContain('systemctl stop');
+    expect(sb14b.at(-2)).toMatch(/^\[ "\$SX" = 0 \] \|\| \{ echo "\$ST"; echo "SB14B_NOT_DONE: /);
+    expect(sideBySide).toContain('\n### SB14b. After a reboot or a runner crash during a drain\n');
+    // Every status read stops on a bad list (exit 2), except the two rollbacks that start that very runner first, SB14b
+    // itself, and TB9 and DR2 (which only read a field and go on).
+    const allowed = new Map([['WB2', '"$OLABEL"'], ['WB3', '"$LABEL"']]);
+    for (const block of scripts) {
+      const step = stepOf(block)!;
+      for (const line of block.lines.filter(code)) {
+        if (!line.includes('lc release-check.mjs status')) continue;
+        if (step === 'TB9' || step === 'DR2') continue;
+        if (allowed.has(step) || step === 'SB14B') {
+          expect(line, step).toBe('SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?');
+          if (allowed.has(step)) expect(block.lines.join('\n'), step).toContain(`[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = ${allowed.get(step)} ]; }`);
+          continue;
+        }
+        expect(line.startsWith(`ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "${step}_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work`), `${step}: ${line}`).toBe(true);
+      }
+    }
   });
 
   it('the caddy step restores the old file on a failed check', () => {

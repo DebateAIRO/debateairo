@@ -2410,7 +2410,8 @@ How to read what it printed:
   database-ahead tool. The `nobody` line proves the database-ahead child can run there (it never runs as root).
 - `STAMP_AT_START yes`: a reboot that skips a backstop time still fires it at the next boot. `no`: that catch-up is not
   proven on this systemd; after a reboot during a drain, run `systemctl start debateai-preview-runner-retire@<label>.service`
-  by hand once the backstop time has passed (`release-check.mjs status` shows which release drains).
+  by hand once the backstop time has passed (`release-check.mjs status` shows which release drains). Either way, after
+  a reboot during a drain no runner runs until SB14b starts them.
 
 ### TA1. Names, the archive `$S` and the copies the way back needs
 
@@ -3374,7 +3375,7 @@ lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchai
 printf '%s\n' "$NN" | grep -qxE 'r[0-9]+' && printf '%s\n' "$REV" | grep -qxE '[0-9a-f]{40}' || { echo "SB1_NOT_DONE: NN or REV is not filled in"; exit 1; }
 [ -d "$OSTORE/v11" ] || { echo "SB1_NOT_DONE: OSTORE is not a pnpm store"; exit 1; }
 [ "$(jq -r '.schema // "none"' "$LOCK")" = preview-lifecycle-release-lock-v2 ] || { echo "SB1_NOT_DONE: the lock is not v2: the transition (T) comes first"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB1_NOT_DONE: release-check.mjs status refused (above)"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (above: run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.releaseKey) slot \(.slot) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner) open work \(.openWork)"' <<<"$ST"
 OLABEL=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST")
 [ -n "$OLABEL" ] || { echo "SB1_NOT_DONE: the release table does not name exactly one current release"; exit 1; }
@@ -3634,7 +3635,7 @@ LEDGER0=$(cat "$S/ledger-before"); REG0=$(cat "$S/register-before")
 OB=$(cat "$S/online-backup-folder")
 ( cd "$OB" && sha256sum -c --quiet online.sha256 ) || { echo "SB8_NOT_DONE: no checked online backup (SB7 first)"; exit 1; }
 [ -s "$S/new-migrations.txt" ] || { echo "SB8_SKIPPED: this release adds no migration"; exit 0; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB8_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB8_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | "\(.state) \(.units.api) \(.units.ui)"' <<<"$ST")" = "CURRENT active active" ] || { echo "SB8_NOT_DONE: the old release is not current with its API and website up"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" && cmp -s "$ART/native-plan-plan.json" "$NP" || { echo "SB8_NOT_DONE: the old verify plan moved, or this release's native-plan file is not SB3's plan"; exit 1; }
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "SB8_NOT_DONE: the ledger or the register moved since SB1"; exit 1; }
@@ -3767,7 +3768,7 @@ set -euo pipefail
 # SB11: start the new release's runner by hand. Refuses on any start-up, register, engine, capacity or login refusal line.
 V=$(cat "$S/new-register-version"); RU=debateai-preview-runner@$LABEL
 case "$(systemctl is-active "$RU" || true)" in inactive|failed) ;; *) echo "SB11_NOT_DONE: the new runner is already running"; exit 1;; esac
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB11_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB11_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = STAGED ] && [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] || { echo "SB11_NOT_DONE: this release is not STAGED, or the old one is not CURRENT"; exit 1; }
 [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/runner-$LABEL.env")" = 1 ] && [ "$(grep -c "^RELEASE_KEY=$KEY\$" "$E/runner-$LABEL.env")" = 1 ] || { echo "SB11_NOT_DONE: runner-$LABEL.env is not this release's on $V"; exit 1; }
 [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "SB11_NOT_DONE: a spending gate is not active; the runner is not started"; exit 1; }
@@ -3852,7 +3853,7 @@ case "$SC" in
 esac
 [ "$(jq -r '[.event, .toKey, .fromKey, (.bad | length), .edgeFailures] | map(tostring) | join(" ")' <<<"$SW")" = "PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0 0" ] || { echo "SB13_NOT_DONE: the switch line is not this switch with nothing bad"; exit 1; }
 echo "backstop for $OLABEL at $(jq -r .backstopAt <<<"$SW")"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB13_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB13_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner) open work \(.openWork)"' <<<"$ST"
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "SB13_NOT_DONE: the release table does not name this release current"; exit 1; }
 case "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | "\(.state) \(.units.api) \(.units.ui)"' <<<"$ST")" in "DRAINING inactive inactive"|"RETIRED inactive inactive") ;; *) echo "SB13_NOT_DONE: the old release is not draining with its pair stopped"; exit 1;; esac
@@ -3892,7 +3893,7 @@ root stops it and emails the owner. Run SB14 now and then; it writes the receipt
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB14: read the release table; once the old release is RETIRED, write its retirement receipt (a new root-only file).
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB14_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB14_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) retire requested \(.retireRequested) runner \(.units.runner) open work \(.openWork)"' <<<"$ST"
 OS=$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")
 [ "$OS" = RETIRED ] || { echo "SB14_NOT_DONE: $OLABEL is still $OS: run SB14 again later"; exit 1; }
@@ -3907,6 +3908,52 @@ A refusal names what is missing: `RECEIPT_RUNNER_NOT_CLEAN` (the runner did not 
 (no retirement lines), `RECEIPT_ALERT_SENT` (a failure email for that runner since the switch). `retiredReason` is
 `RUNNER_RETIRED` for a runner that retired by itself.
 
+### SB14b. After a reboot or a runner crash during a drain
+
+**In plain words.** No runner starts by itself: a runner instance has no `[Install]` section, and the boot target starts
+only the current release's website and API. So after a server restart (or when a runner crashed) during a drain, the
+draining release's runner is down: its claimed work is never handed out again, its backstop finds no runner to ask, and
+25 minutes later root only emails "stranded". The current release's runner is down too after a restart, so new debates
+wait. `release-check.mjs status` says so: its `bad` list names each draining release whose runner is stopped while it
+still has open work, with the command that starts it (`next`), and it exits 2; the stranded email names the same command.
+
+SB14b, with the latest upload's names file (the current release is `LABEL`, the draining one `OLABEL`): both spending
+gates must be active (a gate a crash left halted is re-opened first, its README's "Re-open after a halt", with the
+owner's yes), then the draining release's runner starts, then the current one's. The draining runner starts in
+database-ahead mode when the database is newer (its prestart, from its lock pin), finishes or sets aside its own debates
+(with no quota use) and retires by itself, as it would have without the restart. A release that is neither current nor
+draining is left as it is. Nothing is stopped.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB14B: after a reboot or a runner crash during a drain. Both gates active, then the draining release's runner, then the current one's.
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || [ "$SX" = 2 ] || { echo "$ST"; echo "SB14B_NOT_DONE: release-check.mjs status refused"; exit 1; }
+jq -r '.releases[] | "\(.label) \(.state) runner \(.units.runner) open work \(.openWork)"' <<<"$ST"
+jq -r '.bad[] | "BAD \(.code) \(.label): \(.next)"' <<<"$ST"
+[ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "SB14B_NOT_DONE: $LABEL is not the current release (use the latest upload's names file): ask"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "SB14B_NOT_DONE: a spending gate is not active (re-open it first, with the owner's yes); no runner was started"; exit 1; }
+for RL in "$OLABEL" "$LABEL"; do
+  RU=debateai-preview-runner@$RL
+  RS=$(jq -r --arg r "$RL" '.releases[] | select(.label == $r) | .state' <<<"$ST")
+  case "$RS" in CURRENT|DRAINING) ;; *) echo "$RL is ${RS:-not pinned}: its runner is left as it is"; continue;; esac
+  case "$(systemctl is-active "$RU" || true)" in inactive|failed) ;; *) echo "$RU is already running"; continue;; esac
+  T0=$(date +%s)
+  systemctl start "$RU" || echo "systemctl start $RU returned non-zero"
+  for i in $(seq 1 80); do [ "$(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE|RETIRED)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+  BADL=$(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -E 'GATE_CAPACITY_UNREAD|UNAUTHENTICATED|STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE' || true)
+  [ -z "$BADL" ] || { echo "$BADL" | cut -c1-300; echo "SB14B_NOT_DONE: $RU refused to start (above): ask"; exit 1; }
+  echo "$RU: $(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -oE '^PREVIEW_RUNNER_(STARTED|RETIRED)' | tr '\n' ' ')"
+done
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { echo "$ST"; echo "SB14B_NOT_DONE: release-check.mjs status still names a stopped draining runner, or refused (above): ask"; exit 1; }
+echo SB14B_DONE
+```
+
+A draining runner with nothing left to do prints `PREVIEW_RUNNER_RETIRED` at once and stops (its stop recorder writes
+RETIRED); one with open work prints `PREVIEW_RUNNER_STARTED` and keeps running until it retires. Then SB14 as usual.
+
 ### SB15. Later, on the owner's yes: the archive
 
 `release-archive.mjs archive` moves a RETIRED release's folders, `/etc` files and unit drop-ins into two root-only
@@ -3920,7 +3967,7 @@ set -euo pipefail
 # SB15: archive the release that retired before OLABEL (owner's yes). Nothing is deleted.
 PREV='<the label of the release that was current before OLABEL>'
 printf '%s\n' "$PREV" | grep -qxE '[a-z0-9][a-z0-9-]{0,62}[a-z0-9]' && [ "$PREV" != "$OLABEL" ] && [ "$PREV" != "$LABEL" ] || { echo "SB15_NOT_DONE: PREV is not filled in, or is the old or the new release"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB15_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB15_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg p "$PREV" '.releases[] | select(.label == $p) | .state' <<<"$ST")" = RETIRED ] || { echo "SB15_NOT_DONE: $PREV is not a RETIRED release of the lock"; exit 1; }
 AR=$(lc release-archive.mjs archive --label "$PREV" 2>&1) || { echo "$AR"; echo "SB15_NOT_DONE: the archive refused (DAEMON_RELOAD_FAILED: the label is already unpinned; run systemctl daemon-reload by hand)"; exit 1; }
 echo "$AR"
@@ -3959,7 +4006,7 @@ untouched and its backstop armed again.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB1: the new release goes away before the switch. Nothing user-facing changes.
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB1_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] || { echo "WB1_NOT_DONE: $OLABEL is not current: the switch happened (WB2)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = STAGED ] || { echo "WB1_NOT_DONE: $LABEL is not STAGED (before SB10's stage nothing runs: stop here)"; exit 1; }
 RB=$(lc release-switch.mjs rollback --before-switch --label "$LABEL" 2>&1) || { echo "$RB"; echo "WB1_NOT_DONE: the rollback refused (openWork: the new release already holds work: ask)"; exit 1; }
@@ -3979,7 +4026,8 @@ it already started (O1); it retires by itself like any old release.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB2: the old release serves again, by the switch the other way. Exit 0 or 2 (read bad), 1 = refused.
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB2_NOT_DONE: release-check.mjs status refused"; exit 1; }
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { [ "$SX" = 2 ] && [ "$(jq -r '[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = "$OLABEL" ]; } || { echo "$ST"; echo "WB2_NOT_DONE: release-check.mjs status refused, or its bad list names another release than $OLABEL (whose runner the rollback starts first)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB2_NOT_DONE: $LABEL is not current (before the switch: WB1)"; exit 1; }
 RC=0; RB=$(lc release-switch.mjs rollback --to "$OLABEL" --from "$LABEL" 2>&1) || RC=$?
 echo "$RB"
@@ -4003,7 +4051,8 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB3: after SWITCH_REVERTED, once the reason is fixed: the switch again, through the rollback command (it stages the new release again).
 RZ=$(readyz "$UIP"); echo "new website /readyz on $UIP: ${RZ##*$'\n'} $(jq -c '{releaseKey, reasons}' <<<"${RZ%$'\n'*}" 2>/dev/null || echo '(no JSON)')"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB3_NOT_DONE: release-check.mjs status refused"; exit 1; }
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { [ "$SX" = 2 ] && [ "$(jq -r '[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = "$LABEL" ]; } || { echo "$ST"; echo "WB3_NOT_DONE: release-check.mjs status refused, or its bad list names another release than $LABEL (whose runner the rollback starts first)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] && [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = DRAINING ] || { echo "WB3_NOT_DONE: this is not the state SWITCH_REVERTED leaves (old CURRENT, new DRAINING): ask"; exit 1; }
 RC=0; RB=$(lc release-switch.mjs rollback --to "$LABEL" --from "$OLABEL" 2>&1) || RC=$?
 echo "$RB"
@@ -4027,7 +4076,7 @@ set -euo pipefail
 # WB4: finish a switch whose database write landed. Never writes the switch itself. After DR6: bash -s -- drained.
 DRAINED=${1:-}
 [ -z "$DRAINED" ] || [ "$DRAINED" = drained ] || { echo "WB4_NOT_DONE: the one argument is drained (after DR6's switch), or none"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB4_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB4_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB4_NOT_DONE: the release table does not name $LABEL current: the write did not land (run SB13, or DR6's switch, again after reading its refusal)"; exit 1; }
 RC=0; FN=$(lc release-switch.mjs switch --finish --to "$LABEL" --from "$OLABEL" ${DRAINED:+--old-pair-stopped} 2>&1) || RC=$?
 echo "$FN"
@@ -4386,7 +4435,7 @@ set -euo pipefail
 MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending
 [ -e "$MF" ] || { echo "MT2_NOT_DONE: there is no maintenance flag"; exit 1; }
 mv "$MF" "$S/maintenance-pending.done-$(date -u +%Y%m%dT%H%M%SZ)"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "MT2_NOT_DONE: release-check.mjs status refused (the flag is already moved)"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "MT2_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again; the flag is already moved)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner)"' <<<"$ST"
 echo MT2_DONE
 ```
