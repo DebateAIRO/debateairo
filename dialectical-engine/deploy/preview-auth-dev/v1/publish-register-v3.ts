@@ -33,6 +33,9 @@
 // Engine redesign (R1d): the operator's optional engineVersionPolicy row passes through to v2's builder (v2's ninth argument);
 // the sealed engineContractHash (a required v2 key) is parsed; a carried engineVersionPolicy row is parsed; and with an
 // engine row (enabled or not) the hosted runner's own engine boot refusals are asked before anything is sealed.
+// Line-up and answer seats (side-by-side spec §13, addition D23; owner 2026-10-22): the plan's optional `lineUp` and
+// `answerSeats` pass through to v2's builder (its tenth and eleventh arguments, v3's eleventh and twelfth); the hosted story rows
+// v3 compares are built with the same seats; a carried previewLineUpPolicy row is re-parsed by the register's own reader.
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
@@ -47,7 +50,7 @@ import {
   QUESTION_LANGUAGE_POLICY_ROW_KEY, parseQuestionLanguagePolicy,
   LENGTH_GUIDANCE_POLICY_ROW_KEY, parseLengthGuidancePolicy,
   ENGINE_CONTRACT_HASH_ROW_KEY, parseEngineContractHash, ENGINE_VERSION_POLICY_ROW_KEY, parseEngineVersionPolicy,
-  type EngineVersionPolicy,
+  type EngineVersionPolicy, PREVIEW_LINE_UP_POLICY_ROW_KEY, previewLineUpPolicyFromValue,
   type BootstrapRegister, type CallConcurrencyPolicy, type DebateShapePolicy, type LengthGuidancePolicy, type QuestionLanguagePolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { costEnvelopeGuardPolicy } from '@debateai/budget';
@@ -55,15 +58,16 @@ import { mapPromptContractHash } from '@debateai/map';
 import { resolveDebateShapeRunnerSettings } from '../../../apps/runner/src/debate-shape-boot.js';
 import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
 import { buildDevelopmentStoryRegisterRows } from '../../../apps/runner/src/dev-deployment-register.js';
+import type { PreviewLineUp } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot } from './publish-register.js';
 import {
-  buildPreviewSourceRowsV2, previewCheckerRoleRef, previewDeltaSha256V2, assertBaseIsCurrent, assertPreviewEngineBootRows,
-  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, PREVIEW_SYNTHESIZER_ROLE_REF,
-  type PreviewCheckerChoice, type PreviewRoleRotationChoice, type SnapshotDeltaV2
+  buildPreviewSourceRowsV2, previewAnswerSeatRefs, previewStorySeatRows, previewDeltaSha256V2, assertBaseIsCurrent, assertPreviewEngineBootRows,
+  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS,
+  type PreviewAnswerSeatsChoice, type PreviewCheckerChoice, type PreviewRoleRotationChoice, type SnapshotDeltaV2
 } from './publish-register-v2.js';
 /** The sealed-snapshot reader and the current-base check are v2's, unchanged; the native operator reads them through this module. */
 export { readSealedSnapshot, assertBaseIsCurrent, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError } from './publish-register-v2.js';
@@ -131,15 +135,18 @@ const withSuffix = (sourceRef:string,suffix:string) => {
  * question language). `debateShape` is v2's sixth argument, passed through (default null: no row; 'off': the start
  * values disabled); `questionLanguage` is v2's seventh (default null: no row, the code's start values); `lengthGuidance`
  * is v2's eighth (default null: no row; LG-C); `engineVersion` is v2's ninth (default null: no row; 'off': the start values
- * disabled; R1d).
+ * disabled; R1d); `lineUp` is v2's tenth (default null: no row; addition D23) and `answerSeats` v2's eleventh (default null:
+ * today's seats; the hosted story rows follow the same seats).
  */
-export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
+export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runtime:RuntimeObservation, hosted:unknown, checker?:PreviewCheckerChoice, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null, lineUp:PreviewLineUp|null=null, answerSeats:PreviewAnswerSeatsChoice|null=null):Promise<readonly RegisterPublicationRow[]> {
   const choice=previewHostedBillingChoice(hosted);
-  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage,lengthGuidance,engineVersion);
+  const local=await buildPreviewSourceRowsV2(bootstrap,runtime,checker,roleRotation,callConcurrency,debateShape,questionLanguage,lengthGuidance,engineVersion,lineUp,answerSeats);
   const byKey=new Map(local.map(row=>[row.rowKey,row]));
   // The hosted builder's story rows: every one but the money row must be v2's, so the hosted build differs by that row alone.
-  const story=buildDevelopmentStoryRegisterRows({synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:previewCheckerRoleRef(checker)},'hosted')
-    .map(row=>({rowKey:row.rowKey,valueJsonText:canonicalValue(row.value),sourceRef:row.sourceRef}));
+  // Addition D23: built with the same seats v2 sealed (v2 already checked them), story seats chosen on their own applied alike.
+  const seats=previewAnswerSeatRefs(answerSeats,checker);
+  const story=previewStorySeatRows(buildDevelopmentStoryRegisterRows({synthesizerRoleRef:seats.synthesizerRoleRef,evaluatorRoleRef:seats.evaluatorRoleRef},'hosted')
+    .map(row=>({rowKey:row.rowKey,valueJsonText:canonicalValue(row.value),sourceRef:row.sourceRef})),seats);
   for(const row of story){
     if(row.rowKey===STORY_COST_ENVELOPE_POLICY_ROW_KEY)continue;
     const same=byKey.get(row.rowKey);
@@ -310,6 +317,7 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText));
   }
   // The sealed map prompts' hash: a required source key (v2's builder makes it), parsed by the register's own reader.
   parseMapContractHash(JSON.parse(sourceMap.get(MAP_CONTRACT_HASH_ROW_KEY)!.valueJsonText));

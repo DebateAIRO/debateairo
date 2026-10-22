@@ -73,6 +73,34 @@ export function validateLengthGuidanceChoice(value) {
  return value;
 }
 /**
+ * The operator's optional line-up (side-by-side spec §13, addition D12, D23; owner 2026-10-22): kit v2's tenth argument and
+ * kit v3's eleventh, sealed as the previewLineUpPolicy row. Exactly the three members the env carries today
+ * (`free_model_ids`, `premium_model_ids`: lists of model-id texts; `thinking_levels`: the owner's table, or null for every AI
+ * at its default), so `check-thinking-levels.ts --print-line-up` output pastes in unchanged. Shape only here: the providers'
+ * line-up parser checks the values (reviewed ids, the maker rule, each level on its AI's menu) where the rows are built,
+ * before any row is, and its message is the refusal. Like the checker choice, only plan and publish may carry it.
+ */
+export function validateLineUpChoice(value) {
+ const plain=item=>item!==null&&typeof item==='object'&&!Array.isArray(item)&&Object.getPrototypeOf(item)===Object.prototype;
+ exactKeys(value,['free_model_ids','premium_model_ids','thinking_levels'],'PREVIEW_NATIVE_PLAN_REFUSED');
+ const roster=list=>Array.isArray(list)&&list.every(id=>typeof id==='string');
+ if(!plain(value)||!roster(value.free_model_ids)||!roster(value.premium_model_ids)||(value.thinking_levels!==null&&!plain(value.thinking_levels)))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
+ * The operator's optional four answer seats (addition D23; publish-register-v2.ts PreviewAnswerSeatsChoice): kit v2's eleventh
+ * argument and kit v3's twelfth. `writer` and `checker` required, `storyteller` and `storyChecker` optional (they otherwise
+ * follow the writer and the checker), each a non-empty text. Shape only here: the kit refuses a ref outside the reviewed
+ * preview refs before any row is built. One way to set the checker: a plan may not carry both `answerSeats` and
+ * `checkerChoice`. Like the checker choice, only plan and publish may carry it.
+ */
+export function validateAnswerSeatsChoice(value) {
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ exactKeys(value,['writer','checker',...['storyteller','storyChecker'].filter(key=>Object.hasOwn(value,key))],'PREVIEW_NATIVE_PLAN_REFUSED');
+ if(Object.values(value).some(ref=>typeof ref!=='string'||ref.length<1))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
  * Sanity bounds on the owner's hosted-preview ceilings (publish-register-v3.ts PREVIEW_HOSTED_CEILING_BOUNDS; a unit
  * test pins the two equal). They catch a typed extra digit; the ceilings themselves are always the owner's inputs.
  */
@@ -102,7 +130,9 @@ export function validateNativePlan(plan) {
  const language=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'questionLanguage');
  const lengthGuided=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lengthGuidance');
  const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[])]);
+ const lineUp=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lineUp');
+ const seated=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'answerSeats');
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[]),...(lineUp?['lineUp']:[]),...(seated?['answerSeats']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -125,6 +155,15 @@ export function validateNativePlan(plan) {
  if(lengthGuided){
   validateLengthGuidanceChoice(plan.lengthGuidance);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ // Addition D23: the line-up and the seats, shape only (the kit's parsers run before any row is built).
+ if(lineUp){
+  validateLineUpChoice(plan.lineUp);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(seated){
+  validateAnswerSeatsChoice(plan.answerSeats);
+  if(!['plan','publish'].includes(plan.operation)||chosen)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
  // Unlike the choices above, every operation may carry it: once a hosted version is the base, verify and
  // apply-and-plan compose with kit v3 too (kit v2 refuses a base with billing on).
@@ -211,8 +250,8 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
   if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null)
-   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null);
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});

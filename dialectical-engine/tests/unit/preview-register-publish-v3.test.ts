@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
@@ -367,7 +367,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {
@@ -424,5 +424,64 @@ describe('publish kit v3: the optional engineVersionPolicy row and the engine se
     // No engine row = engine 1: the seal is never read.
     const today = [...compose(await v3(null), f.v12).rows] as Row[];
     expect(() => assertHostedPreviewBootRows(edit(today, ENGINE_CONTRACT_HASH_ROW_KEY, () => 'e'.repeat(64)) as any)).not.toThrow();
+  });
+});
+
+/**
+ * Side-by-side spec §13, addition D23 (owner 2026-10-22): kit v3 passes the plan's line-up and answer seats through to
+ * kit v2's builder (v3's eleventh and twelfth arguments); the hosted story rows follow the chosen seats; a carried
+ * previewLineUpPolicy row is re-parsed by the register's own reader.
+ */
+describe('publish kit v3: the optional previewLineUpPolicy row and the answer seats (side-by-side §13 addition D23)', () => {
+  const GLM = 'zai-org/GLM-5.3-Flash', DEEPSEEK_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash', MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro', QWEN = 'Qwen/Qwen3.8-Flash', HAIKU = 'claude-haiku-5-5';
+  const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
+  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  const HAIKU_REF = 'preview:claude-haiku-5-5', GLM_B = 'preview:fixture-b', DEEPSEEK_REF = 'preview:deepseek-v4-1-flash';
+  const v3 = async (lineUp?: unknown, answerSeats?: unknown, checker?: unknown) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON,
+      checker, undefined, null, null, null, null, null, lineUp, answerSeats)] as Row[];
+  const v2 = async (lineUp?: unknown, answerSeats?: unknown) =>
+    [...await (buildPreviewSourceRowsV2 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime,
+      undefined, undefined, null, null, null, null, null, lineUp, answerSeats)] as Row[];
+  const lineUpRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  const seats = (rows: readonly Row[]) => ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef'].map(key => value(rows, key).providerRef);
+
+  it('passes the line-up through to kit v2: the same row v2 builds; null or nothing = no row, byte for byte today\'s', async () => {
+    const given = await v3(LIVE), absent = await v3();
+    expect(lineUpRow(given)).toEqual(lineUpRow(await v2(LIVE)));
+    expect(lineUpRow(absent)).toBeUndefined();
+    expect(await v3(null, null)).toEqual(absent);
+    expect(absent).toEqual([...await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, ON)]);
+    expect(given.filter(row => row.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY)).toEqual(absent);
+    await expect(v3({ ...LIVE, thinking_levels: { [QWEN]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+  });
+
+  it('R19: a base line-up row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
+    const f = await fixture();
+    const published = compose(await v3(LIVE), f.v12);
+    expect(published.addedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    const base = [...published.rows] as Row[];
+    const kept = compose(await v3(), base, '13');
+    expect(lineUpRow([...kept.rows] as Row[])).toEqual(lineUpRow(base));
+    expect(kept.delta).toEqual([]);
+    const broken = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"PREVIEW_LINE_UP_POLICY"', '"X"') } : row);
+    const source = await v3();
+    expect(refusal(() => compose(source, broken, '13'))).toContain('PREVIEW_LINE_UP_POLICY_INVALID:kind');
+  });
+
+  it('the answer seats reach the hosted story rows: the Haiku writer seals the synthesizer and the storyteller; the story seats may move alone', async () => {
+    const f = await fixture();
+    const haiku = await v3(null, { writer: HAIKU_REF, checker: GLM_B });
+    expect(seats(haiku)).toEqual([HAIKU_REF, GLM_B, HAIKU_REF, GLM_B]);
+    expect(value(haiku, STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toEqual(value(await v3(), STORY_COST_ENVELOPE_POLICY_ROW_KEY));
+    expect(() => compose(haiku, f.v12)).not.toThrow();
+    const story = await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF, storyteller: HAIKU_REF, storyChecker: GLM_B });
+    expect(seats(story)).toEqual(['preview:fixture-a', DEEPSEEK_REF, HAIKU_REF, GLM_B]);
+    expect(() => compose(story, f.v12)).not.toThrow();
+    // Seats equal to today's choice change nothing.
+    expect(await v3(null, { writer: 'preview:fixture-a', checker: GLM_B })).toEqual(await v3());
+    expect(await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF })).toEqual(await v3(null, null, { checker: 'deepseek', deepseekEnabledOnGate: true }));
+    await expect(v3(null, { writer: 'preview:other', checker: GLM_B })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed');
+    await expect(v3(null, { writer: HAIKU_REF, checker: GLM_B }, { checker: 'glm' })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-with-checker-choice');
   });
 });

@@ -1364,6 +1364,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
   (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
   `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
+  With `--print-line-up` it prints the value's line-up instead, as the publish kit's plan member `{"lineUp":{…}}`
+  (side-by-side spec §13 addition D23; deploy/preview-auth-dev/v1/README.md, "Line-up and answer seats on the preview").
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-hosted.test.ts` (hosted settings and the
   kit-v3 `--register-next`), `tests/unit/preview-practice-levels.test.ts`,

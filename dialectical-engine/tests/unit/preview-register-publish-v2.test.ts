@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY, previewLineUpPolicyFromValue, previewLineUpPolicyRow } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
@@ -319,7 +319,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, PREVIEW_LINE_UP_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(CALL_CONCURRENCY_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== CALL_CONCURRENCY_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === CALL_CONCURRENCY_POLICY_ROW_KEY)!.valueJsonText)).toEqual({ kind: 'CALL_CONCURRENCY_POLICY', ...policy });
@@ -373,7 +373,7 @@ describe('publish kit v2: the optional callConcurrencyPolicy row (absent by defa
     const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
     const calls = text.split('publisher.buildPreviewSourceRowsV2(');
     expect(calls).toHaveLength(2); // the operator's one builder call
-    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null\);/);
+    expect(calls[1]).toMatch(/^await register\.loadBootstrapRegister\(\),\{[^}]*\},plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\);/);
     // What it hands over is the plan's value exactly as the plan check accepted it.
     const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
     const plan = operator.validateNativePlan({ schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
@@ -398,7 +398,7 @@ describe('publish kit v2: the optional debateShapePolicy row (absent by default,
     const absent = await build(), given = await build(policy);
     expect(absent.map(row => row.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(await build(null)).toEqual(absent);
-    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY]);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toEqual([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, PREVIEW_LINE_UP_POLICY_ROW_KEY]);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
     expect(given.filter(row => row.rowKey !== DEBATE_SHAPE_POLICY_ROW_KEY)).toEqual(absent);
     expect(JSON.parse(given.find(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY)!.valueJsonText)).toEqual(JSON.parse(JSON.stringify(policy)));
@@ -688,5 +688,168 @@ describe('publish kit v2: the optional engineVersionPolicy row (engine redesign 
     const lonely = base.filter(row => row.rowKey !== LENGTH_GUIDANCE_POLICY_ROW_KEY);
     const noRows = await build(null);
     expect(() => compose(noRows, lonely, '10')).toThrowError(expect.objectContaining({ code: 'ENGINE_REQUIRES_LENGTH_POLICY' }));
+  });
+});
+
+/**
+ * Side-by-side spec §13, addition D23 (owner 2026-10-22): the operator's plan may name the preview's line-up (`lineUp`, the
+ * optional previewLineUpPolicy row, D12) and the four answer seats (`answerSeats`). Kit v2's tenth and eleventh builder
+ * arguments. A plan without either builds exactly what it built before (R19 carries a base line-up row unchanged).
+ */
+describe('publish kit v2: the optional previewLineUpPolicy row and the answer seats (side-by-side §13 addition D23)', () => {
+  const GLM = 'zai-org/GLM-5.3-Flash', DEEPSEEK_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash', MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro', QWEN = 'Qwen/Qwen3.8-Flash', HAIKU = 'claude-haiku-5-5';
+  /** The owner's live table (final, 2026-10-13), pasted verbatim as SA1's and SA2's tests carry it. */
+  const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
+  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  const HAIKU_REF = 'preview:claude-haiku-5-5';
+  /** v2's tenth argument is the line-up and its eleventh the answer seats; the checker choice is the third. */
+  const build = async (lineUp?: unknown, answerSeats?: unknown, checker?: unknown, at = runtime) =>
+    [...await (buildPreviewSourceRowsV2 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), at,
+      checker, undefined, null, null, null, null, null, lineUp, answerSeats)] as Row[];
+  const lineUpRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  const ref = (rows: readonly Row[], key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText).providerRef;
+  const seats = (rows: readonly Row[]) => ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef'].map(key => ref(rows, key));
+  const plan = { schema: 'preview-auth-dev-native-plan-v1', operation: 'plan', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api',
+    sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifest: {}, operatorManifestSha256: 'c'.repeat(64), selectedBaseRegisterVersion: '9',
+    selectedBaseSnapshotSha256: 'd'.repeat(64), publicationId: '11111111-1111-4111-8111-111111111111', approval: null };
+  const operator = () => import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+
+  it('(1) a plan without lineUp builds no row, byte for byte today\'s source; the key is optional, never in the closure', async () => {
+    const f = await fixture();
+    expect(lineUpRow(await build())).toBeUndefined();
+    expect(await build()).toEqual(f.source);
+    expect(await build(null, null)).toEqual(f.source);
+    expect(PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  });
+
+  it('(1) R19: a plan without lineUp carries the base version\'s row unchanged (no delta entry); a broken base row is refused, never carried', async () => {
+    const f = await fixture();
+    const published = compose(await build(LIVE), f.v9);
+    const base = [...published.rows] as Row[];
+    const kept = compose(f.source, base, '10');
+    expect(lineUpRow([...kept.rows] as Row[])).toEqual(lineUpRow(base));
+    expect(kept.delta).toEqual([]);
+    expect(kept.snapshotSha256).toBe(published.snapshotSha256);
+    const offMenu = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY
+      ? { ...row, valueJsonText: canonical({ ...JSON.parse(row.valueJsonText), thinking_levels: { [QWEN]: { level: 'high' } } }) } : row);
+    expect(() => compose(f.source, offMenu, '10')).toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    const wrongKind = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"PREVIEW_LINE_UP_POLICY"', '"X"') } : row);
+    expect(() => compose(f.source, wrongKind, '10')).toThrow('PREVIEW_LINE_UP_POLICY_INVALID:kind');
+  });
+
+  it('(2) the owner\'s live table builds one row equal to previewLineUpPolicyRow\'s; the delta lists it added, then changed with old and new values', async () => {
+    const f = await fixture();
+    const given = await build(LIVE);
+    const row = lineUpRow(given)!;
+    expect(given.filter(entry => entry.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY)).toEqual(f.source);
+    const expected = previewLineUpPolicyRow(previewLineUpPolicyFromValue({ kind: 'PREVIEW_LINE_UP_POLICY', ...LIVE }), row.sourceRef);
+    expect(row.valueJsonText).toBe(expected.valueJsonText);
+    expect(row.sourceRef).toBe('side-by-side spec §13 addition D12, D23 (the operator\'s plan lineUp); owner 2026-10-22');
+    expect(JSON.parse(row.valueJsonText)).toEqual({ kind: 'PREVIEW_LINE_UP_POLICY', ...LIVE });
+    const added = compose(given, f.v9);
+    const entry = added.delta.find(item => item.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)!;
+    expect(entry).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null, newValueJsonText: row.valueJsonText, newValueSha256: sha(row.valueJsonText) });
+    expect(added.addedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    // A new value on top: one changed row, old and new canonical values in the delta.
+    const noTable = { ...LIVE, thinking_levels: null };
+    const changed = compose(await build(noTable), [...added.rows] as Row[], '10');
+    expect(changed.changedKeys).toEqual([PREVIEW_LINE_UP_POLICY_ROW_KEY]);
+    const next = changed.delta.find(item => item.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)!;
+    expect(JSON.parse(next.oldValueJsonText!)).toEqual({ kind: 'PREVIEW_LINE_UP_POLICY', ...LIVE });
+    expect(JSON.parse(next.newValueJsonText)).toEqual({ kind: 'PREVIEW_LINE_UP_POLICY', ...noTable });
+    // The same value again is no change at all; the key order of the plan value never changes the sealed bytes.
+    const reordered = { thinking_levels: OWNER_LIVE_TABLE, premium_model_ids: LIVE.premium_model_ids, free_model_ids: LIVE.free_model_ids };
+    expect(compose(await build(reordered), [...added.rows] as Row[], '10').delta).toEqual([]);
+  });
+
+  it('(3) an invalid lineUp (Qwen at high) is refused with the parser\'s message before any row is built', async () => {
+    const qwenHigh = { ...LIVE, thinking_levels: { ...OWNER_LIVE_TABLE, [QWEN]: { level: 'high' } } };
+    await expect(build(qwenHigh)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    // Checked before anything else: even a runtime the gate refuses never gets that far.
+    await expect(build(qwenHigh, undefined, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    await expect(build({ ...LIVE, free_model_ids: [GLM] })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:maker_rule');
+    await expect(build({ ...LIVE, extra: true })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
+    await expect(build({ free_model_ids: LIVE.free_model_ids, premium_model_ids: LIVE.premium_model_ids })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
+    await expect(build('off')).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:value');
+  });
+
+  it('(3) the native plan check takes a well-shaped lineUp on plan and publish only; the parser refuses its values when the rows are built', async () => {
+    const op = await operator();
+    const value = JSON.parse(JSON.stringify(LIVE));
+    expect(op.validateLineUpChoice(value)).toBe(value);
+    expect(op.validateLineUpChoice({ ...value, thinking_levels: null })).toBeTruthy();
+    for (const bad of ['off', null, [], 7, true, { ...value, extra: 1 }, { free_model_ids: value.free_model_ids, premium_model_ids: value.premium_model_ids },
+      { ...value, free_model_ids: 'GLM' }, { ...value, premium_model_ids: [7] }, { ...value, thinking_levels: [] }, { ...value, thinking_levels: 'high' }])
+      expect(() => op.validateLineUpChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    for (const operation of ['plan', 'publish']) expect(op.validateNativePlan({ ...plan, operation, lineUp: value })).toBeTruthy();
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => op.validateNativePlan({ ...plan, operation, lineUp: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    expect(() => op.validateNativePlan({ ...plan, lineUp: 'off' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const qwenHigh = { ...value, thinking_levels: { ...value.thinking_levels, [QWEN]: { level: 'high' } } };
+    expect(op.validateNativePlan({ ...plan, lineUp: qwenHigh })).toBeTruthy(); // shape only: the parser runs where the rows are built
+    await expect(build(op.validateNativePlan({ ...plan, lineUp: qwenHigh }).lineUp)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+  });
+
+  it('(4) answerSeats with the Haiku writer seals the synthesizer and the storyteller to it; absent seats keep today\'s refs byte for byte', async () => {
+    const f = await fixture();
+    const haikuWriter = await build(null, { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF });
+    expect(seats(haikuWriter)).toEqual([HAIKU_REF, PREVIEW_EVALUATOR_ROLE_REF, HAIKU_REF, PREVIEW_EVALUATOR_ROLE_REF]);
+    const differing = haikuWriter.filter(row => JSON.stringify(row) !== JSON.stringify(f.source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
+    expect(differing).toEqual(['storytellerRoleRef', 'synthesizerRoleRef']);
+    // Absent seats: today's refs, byte for byte, for either checker choice; today's seats named explicitly change nothing.
+    expect(seats(await build())).toEqual([PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF]);
+    expect(await build(null, null, DEEPSEEK)).toEqual(await build(undefined, undefined, DEEPSEEK));
+    expect(seats(await build(null, null, DEEPSEEK))).toEqual([PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF]);
+    expect(await build(null, { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_EVALUATOR_ROLE_REF })).toEqual(f.source);
+    expect(await build(null, { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF })).toEqual(await build(null, null, DEEPSEEK));
+    // The two story seats may be chosen on their own; only their two rows move.
+    const story = await build(null, { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF });
+    expect(seats(story)).toEqual([PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, HAIKU_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF]);
+    expect(story.filter(row => JSON.stringify(row) !== JSON.stringify(f.source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort())
+      .toEqual(['storyCheckerRoleRef', 'storytellerRoleRef']);
+    const storyRow = story.find(row => row.rowKey === 'storytellerRoleRef')!;
+    expect(storyRow.sourceRef).toBe(f.source.find(row => row.rowKey === 'storytellerRoleRef')!.sourceRef);
+    expect(JSON.parse(storyRow.valueJsonText)).toEqual({ kind: 'STORYTELLER_ROLE_REF', providerRef: HAIKU_REF, provisional: true });
+    expect(parseCanonicalRegisterJson(Buffer.from(storyRow.valueJsonText))).toBe(storyRow.valueJsonText);
+    // The delta shows the moved seats with old and new values.
+    const moved = compose(haikuWriter, [...compose(f.source, f.v9).rows] as Row[], '10');
+    expect(moved.changedKeys).toEqual(['storytellerRoleRef', 'synthesizerRoleRef']);
+  });
+
+  it.each([
+    ['an unreviewed ref', { writer: 'preview:other', checker: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seat-unreviewed'],
+    ['a model id instead of a ref', { writer: HAIKU, checker: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seat-unreviewed'],
+    ['an unreviewed story checker', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyChecker: 'preview:other' }, 'answer-seat-unreviewed'],
+    ['no checker', { writer: HAIKU_REF }, 'answer-seats-choice'],
+    ['an extra seat', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, judge: HAIKU_REF }, 'answer-seats-choice'],
+    ['a seat that is not text', { writer: HAIKU_REF, checker: 7 }, 'answer-seats-choice'],
+    ['a bare string', HAIKU_REF, 'answer-seats-choice'],
+    ['an array', [HAIKU_REF], 'answer-seats-choice']
+  ])('(4) refuses %s, by its own rule, before building any row', async (_name, choice, rule) => {
+    await expect(build(null, choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+    await expect(build(null, choice, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+  });
+
+  it('(4) answerSeats and a checker choice together are refused: one way to set the checker', async () => {
+    const both = { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF };
+    for (const checker of [DEEPSEEK, { checker: 'glm' }])
+      await expect(build(null, both, checker)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-with-checker-choice');
+    const op = await operator();
+    expect(op.validateNativePlan({ ...plan, answerSeats: both })).toBeTruthy();
+    expect(() => op.validateNativePlan({ ...plan, answerSeats: both, checkerChoice: { checker: 'deepseek', deepseekEnabledOnGate: true } })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+  });
+
+  it('(4) the native plan check takes well-shaped answerSeats on plan and publish only; the kit checks the refs when the rows are built', async () => {
+    const op = await operator();
+    const value = { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_EVALUATOR_ROLE_REF };
+    expect(op.validateAnswerSeatsChoice(value)).toBe(value);
+    expect(op.validateAnswerSeatsChoice({ writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF })).toBeTruthy();
+    for (const bad of ['haiku', null, [], 7, { writer: HAIKU_REF }, { checker: HAIKU_REF }, { ...value, judge: HAIKU_REF }, { writer: HAIKU_REF, checker: '' }, { writer: HAIKU_REF, checker: 7 }])
+      expect(() => op.validateAnswerSeatsChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    for (const operation of ['plan', 'publish']) expect(op.validateNativePlan({ ...plan, operation, answerSeats: value })).toBeTruthy();
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => op.validateNativePlan({ ...plan, operation, answerSeats: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
+    const unreviewed = { writer: 'preview:other', checker: PREVIEW_EVALUATOR_ROLE_REF };
+    expect(op.validateNativePlan({ ...plan, answerSeats: unreviewed })).toBeTruthy(); // shape only
+    await expect(build(null, unreviewed)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed');
   });
 });

@@ -37,6 +37,12 @@
 // Length guidance (spec 2026-10-15, LG-C): likewise optional; the source carries a lengthGuidancePolicy row only when the operator hands one
 // (the eighth builder argument), re-parsed by the register's own parser; a carried base row is re-parsed too. No 'off' word: the rollback is
 // a version without the row.
+// Line-up and answer seats (side-by-side spec §13, addition D23; owner 2026-10-22): the operator's plan may name the preview's
+// line-up (`lineUp`: the two rosters and the thinking-level table, the optional previewLineUpPolicy row, D12), the tenth builder
+// argument, checked by the providers' line-up parser before any row is built; a carried base row is re-parsed by the register's
+// own reader (R19: a plan without it keeps the current one). The plan may also name the four answer seats (`answerSeats`, the
+// eleventh argument): writer and checker, and optionally the storyteller and the story checker (which otherwise follow them),
+// each a reviewed preview ref. Without seats the refs are today's, byte for byte; seats and a checker choice together refuse.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -51,13 +57,14 @@ import {
   LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, parseLengthGuidancePolicy, type LengthGuidancePolicy,
   ENGINE_CONTRACT_HASH_ROW_KEY, parseEngineContractHash, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyRow,
   engineVersionPolicyStartValues, parseEngineVersionPolicy, type EngineVersionPolicy,
+  PREVIEW_LINE_UP_POLICY_ROW_KEY, previewLineUpPolicyFromValue, previewLineUpPolicyRow,
   type BootstrapRegister, type CallConcurrencyPolicy, type RegisterPublicationRow
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { resolveEngineRunnerSettings } from '../../../apps/runner/src/engine-boot.js';
 import { engineContractHash } from '../../../apps/runner/src/engine-contracts.js';
 import { assertQuestionLanguagePolicyBootable } from '../../../apps/api/src/question-language/boot.js';
-import { parseProviderDiscoveryTargets } from '@debateai/providers';
+import { parseProviderDiscoveryTargets, parsePreviewLineUp, type PreviewLineUp } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
 import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
@@ -100,7 +107,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
  * never in PREVIEW_SOURCE_ROW_KEYS_V2's exact closure. A base row with such a key that the source leaves out is
  * carried from the base unchanged (R19: a plan that does not name the value keeps the current one); it is never dropped.
  */
-export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY] as const);
+export const PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2 = Object.freeze([CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, QUESTION_LANGUAGE_POLICY_ROW_KEY, LENGTH_GUIDANCE_POLICY_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, PREVIEW_LINE_UP_POLICY_ROW_KEY] as const);
 
 /** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
@@ -121,6 +128,63 @@ export function previewCheckerRoleRef(choice:unknown={checker:'glm'}):string {
   if(value.checker!=='deepseek'||!['checker','checker,deepseekEnabledOnGate'].includes(keys))fail('checker-choice');
   if(value.deepseekEnabledOnGate!==true)fail('checker-deepseek-not-enabled-on-gate');
   return PREVIEW_DEEPSEEK_CHECKER_ROLE_REF;
+}
+
+/**
+ * The four answer seats an operator's plan may choose (side-by-side spec §13, addition D23; owner 2026-10-22): `writer`
+ * (synthesizerRoleRef) and `checker` (evaluatorRoleRef), and optionally `storyteller` (storytellerRoleRef, else the writer's)
+ * and `storyChecker` (storyCheckerRoleRef, else the checker's), as story-policy.ts pairs them. Each is a reviewed preview ref
+ * (PREVIEW_REVIEWED_PROVIDER_REFS): the source's provider set holds exactly those, so a seat is always served by a configured
+ * identity; whether the live gates switch its model on is activation's check (addition D21), not the kit's.
+ */
+export type PreviewAnswerSeatsChoice = Readonly<{ writer: string; checker: string; storyteller?: string; storyChecker?: string }>;
+/** The four sealed seat refs, in register row names. */
+export type PreviewAnswerSeatRefs = Readonly<{ synthesizerRoleRef: string; evaluatorRoleRef: string; storytellerRoleRef: string; storyCheckerRoleRef: string }>;
+const ANSWER_SEAT_KEYS = Object.freeze(['checker','storyChecker','storyteller','writer']);
+/**
+ * Addition D23: the seat refs for a plan. No seats (undefined or null) = today's refs, byte for byte: the writer fixture-a and
+ * the checker from `checker` (default GLM), the story seats following them. Seats are one way to set the checker, so seats
+ * with any checker choice refuse (answer-seats-with-checker-choice); a malformed choice refuses as answer-seats-choice and a
+ * ref outside the reviewed rows as answer-seat-unreviewed, each before any row is built.
+ */
+export function previewAnswerSeatRefs(seats:unknown, checker?:unknown):PreviewAnswerSeatRefs {
+  if(seats===undefined||seats===null){
+    const synthesizerRoleRef=PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef=previewCheckerRoleRef(checker);
+    return Object.freeze({synthesizerRoleRef,evaluatorRoleRef,storytellerRoleRef:synthesizerRoleRef,storyCheckerRoleRef:evaluatorRoleRef});
+  }
+  if(typeof seats!=='object'||Object.getPrototypeOf(seats)!==Object.prototype)fail('answer-seats-choice');
+  const value=seats as Record<string,unknown>,keys=Object.keys(value);
+  if(!Object.hasOwn(value,'writer')||!Object.hasOwn(value,'checker')||keys.some(key=>!ANSWER_SEAT_KEYS.includes(key))
+    ||keys.some(key=>typeof value[key]!=='string'))fail('answer-seats-choice');
+  if(keys.some(key=>!(PREVIEW_REVIEWED_PROVIDER_REFS as readonly string[]).includes(value[key] as string)))fail('answer-seat-unreviewed');
+  if(checker!==undefined)fail('answer-seats-with-checker-choice');
+  const synthesizerRoleRef=value.writer as string,evaluatorRoleRef=value.checker as string;
+  return Object.freeze({synthesizerRoleRef,evaluatorRoleRef,
+    storytellerRoleRef:(value.storyteller as string|undefined)??synthesizerRoleRef,storyCheckerRoleRef:(value.storyChecker as string|undefined)??evaluatorRoleRef});
+}
+/**
+ * Addition D23: the two story seat rows set to the chosen refs. The story builder seals the storyteller to the writer and the
+ * story checker to the checker (story-policy.ts); a story seat chosen on its own replaces only that row's providerRef (same
+ * kind, same source reference, canonical JSON). A row already holding its ref is returned unchanged, so no seats (or seats
+ * the story rows already follow) keep every byte. Kit v3 applies the same to the hosted builder's story rows it compares.
+ */
+export function previewStorySeatRows<T extends Readonly<{rowKey:string;valueJsonText:string;sourceRef:string}>>(rows:readonly T[], refs:PreviewAnswerSeatRefs):T[] {
+  const wanted:Readonly<Record<string,string>>={storytellerRoleRef:refs.storytellerRoleRef,storyCheckerRoleRef:refs.storyCheckerRoleRef};
+  return rows.map(row=>{
+    if(!Object.hasOwn(wanted,row.rowKey))return row;
+    const value=JSON.parse(row.valueJsonText) as Record<string,unknown>;
+    if(value.providerRef===wanted[row.rowKey])return row;
+    return {...row,valueJsonText:parseCanonicalRegisterJson(Buffer.from(JSON.stringify({...value,providerRef:wanted[row.rowKey]}),'utf8'))};
+  });
+}
+/**
+ * Addition D12, D23: the operator's optional line-up as its row (null or undefined: no row). The providers' parser checks the
+ * plan value whole first (exactly the three members; reviewed, unique ids; the maker rule; each level on its AI's menu), so a
+ * refusal is that parser's own message (PREVIEW_LINE_UP_POLICY_INVALID:<detail> or PREVIEW_THINKING_LEVELS_INVALID:<detail>).
+ */
+export function previewLineUpRows(lineUp:unknown):readonly RegisterPublicationRow[] {
+  if(lineUp===undefined||lineUp===null)return [];
+  return [previewLineUpPolicyRow(parsePreviewLineUp(lineUp),'side-by-side spec §13 addition D12, D23 (the operator\'s plan lineUp); owner 2026-10-22')];
 }
 
 /**
@@ -153,12 +217,16 @@ const sourceKeysReviewed = (keys:readonly string[]) => {
  * `fastCheck: null`, P2L Task 12); `lengthGuidance` the owners' optional length guidance (default null: no row; LG-C);
  * `engineVersion` the operator's optional engine row (default null: no row, engine 1; 'off': the start
  * values with enabled false, so the row stays and a runner still finishes the engine-2 debates admitted before; engine redesign
- * R1d), checked by the register's own parser (ENGINE_VERSION_POLICY_INVALID).
- * All are checked before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID,
+ * R1d), checked by the register's own parser (ENGINE_VERSION_POLICY_INVALID); `lineUp` the operator's optional preview line-up
+ * (default null: no row, the env's line-up; addition D12, D23), checked by the providers' line-up parser; `answerSeats` the
+ * operator's optional four seats (default null: today's refs; with a checker choice it refuses, previewAnswerSeatRefs).
+ * The line-up and the seats are checked first, then the rest; all before anything else is built (each policy by the register's own parser, CALL_CONCURRENCY_POLICY_INVALID,
  * DEBATE_SHAPE_POLICY_INVALID, QUESTION_LANGUAGE_POLICY_INVALID or LENGTH_GUIDANCE_POLICY_INVALID).
  */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null):Promise<readonly RegisterPublicationRow[]> {
-  const evaluatorRoleRef=previewCheckerRoleRef(checker);
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker?:PreviewCheckerChoice, roleRotation:PreviewRoleRotationChoice='on', callConcurrency:CallConcurrencyPolicy|null=null, debateShape:DebateShapePolicy|'off'|null=null, questionLanguage:QuestionLanguagePolicy|null=null, lengthGuidance:LengthGuidancePolicy|null=null, engineVersion:EngineVersionPolicy|'off'|null=null, lineUp:PreviewLineUp|null=null, answerSeats:PreviewAnswerSeatsChoice|null=null):Promise<readonly RegisterPublicationRow[]> {
+  // Addition D23: the plan's line-up and seats, before anything else (each refusal its own parser's or rule's).
+  const lineUpRows=previewLineUpRows(lineUp);
+  const seats=previewAnswerSeatRefs(answerSeats,checker);
   const rotationEnabled=previewRoleRotationEnabled(roleRotation);
   const concurrencyRows=callConcurrency===null?[]:[callConcurrencyPolicyRow(callConcurrency,'docs/superpowers/specs/2026-10-12-parallel-calls-design.md; owner 2026-10-12')];
   // Debate shape (P2b Task 6): 'off' = the START VALUES with enabled false (this function never sees the base), so the
@@ -186,7 +254,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const panel={configuredProviders,requiredDistinctMakers:1,healthyProviderRefs:[],targets,targetsJson};
   const projected:BootstrapRegister={...bootstrap,values:{...bootstrap.values,nodeRuntimeVersion:runtime.nodeVersion},resolution:{...bootstrap.resolution,
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
-  const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef},'local'),
+  // Addition D23: the writer and checker seal the synthesis rows and, by default, the two story seats; a story seat chosen
+  // on its own then replaces only its row's ref.
+  const rows=[...previewStorySeatRows(await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:seats.synthesizerRoleRef,evaluatorRoleRef:seats.evaluatorRoleRef},'local'),seats),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef})),
     // Role rotation (spec 2026-10-11): the preview rotates the four roles over each debate's own panel, unless the
     // operator published with roleRotation 'off' (the row stays, disabled: behaviour is then today's).
@@ -200,7 +270,9 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     // Length guidance (LG-C, spec 2026-10-15 §3.1): only when the operator supplied a policy.
     ...lengthRows,
     // Engine redesign (spec 2026-10-15 §3): only when the operator supplied a policy (or 'off').
-    ...engineRows];
+    ...engineRows,
+    // Line-up (side-by-side spec §13, addition D12, D23): only when the operator's plan names one.
+    ...lineUpRows];
   if(!sourceKeysReviewed(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
@@ -311,6 +383,7 @@ export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly Reg
     if(row.rowKey===QUESTION_LANGUAGE_POLICY_ROW_KEY)parseQuestionLanguagePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===LENGTH_GUIDANCE_POLICY_ROW_KEY)parseLengthGuidancePolicy(JSON.parse(row.valueJsonText));
     if(row.rowKey===ENGINE_VERSION_POLICY_ROW_KEY)parseEngineVersionPolicy(JSON.parse(row.valueJsonText));
+    if(row.rowKey===PREVIEW_LINE_UP_POLICY_ROW_KEY)previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText));
   }
   // Any other base row the source no longer builds is never dropped silently.
   if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)&&!optional.includes(row.rowKey)))fail('base-row-dropped');
