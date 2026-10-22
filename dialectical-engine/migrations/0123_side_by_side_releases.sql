@@ -294,7 +294,8 @@ $$;
 
 -- still_draining (final review A4): a DRAINING event with no later RETIRED event, the same test record_release_event
 -- makes below, so a draining release staged again for a rollback (latest state STAGED) still reads true while its
--- drained debates may run, and a release that never drained, or drained and retired, reads false.
+-- drained debates may run, and a release that never drained, or drained and retired, reads false. A release switched
+-- back to CURRENT by that rollback reads true as well until it drains and retires: harmless, CURRENT serves every run.
 CREATE OR REPLACE FUNCTION core.read_release_state(p_release_key text)
 RETURNS TABLE(state text, front_pair_stopped boolean, retire_requested boolean, still_draining boolean)
 LANGUAGE sql

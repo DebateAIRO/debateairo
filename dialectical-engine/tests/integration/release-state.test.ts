@@ -470,5 +470,13 @@ describe("0123 §3 on a fresh database: the race, the whole drain path, abandoni
     await recordReleaseEvent(database.pool, { releaseKey: A, kind: "RETIRED", recordedBy: BY, reason: "DRAINED" });
     expect(await raw(A)).toEqual([{ state: "RETIRED", retire_requested: true, still_draining: false }]);
     expect(await state(A)).toEqual({ state: "RETIRED", frontPairStopped: false, retireRequested: true });
+    // A rollback that does switch back: A current, B draining, B staged again, then B current again. B's earlier drain
+    // never retired, so it reads true while CURRENT (harmless: CURRENT serves every run).
+    await stage(A);
+    await recordReleaseSwitch(database.pool, { newReleaseKey: A, expectedCurrent: B, takeTrafficFrom: T5, recordedBy: BY });
+    await stage(B);
+    await recordReleaseSwitch(database.pool, { newReleaseKey: B, expectedCurrent: A, takeTrafficFrom: T6, recordedBy: BY });
+    expect(await raw(B)).toEqual([{ state: "CURRENT", retire_requested: false, still_draining: true }]);
+    expect(await raw(A)).toEqual([{ state: "DRAINING", retire_requested: false, still_draining: true }]);
   });
 });
