@@ -346,10 +346,16 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  * - `ownReleaseIsCurrent` is the watcher's rule (`#lastSaysOwn`) over a fresh `core.read_current_release()`: this
  *   release is current when the row names it, or when there is no row and the deployment is not hosted (today's
  *   single-release world); hosted with no row is not current (fail closed).
+ *   Side-by-side spec §13 "The API re-checks at admission" (Task S11): given the settings version the decision would
+ *   start on, a current release must also have passed it — one query, after the release read and on the same
+ *   transaction (`settingsVersionPassed`); not passed is not current (the decision waits, SWITCHING). This covers an
+ *   ask in flight across an activation or a switch and the 1 s pointer cache; the current release's waker starts it
+ *   within a tick, re-admitted under O3 (S13). Without a version, the release alone, as in Phase 1.
  * - `activeDebates` counts the runs with a READY or CLAIMED job across every release (0083's partial index
  *   work_item_live_run_idx answers it without reading history).
  *
- * Both reads are debateai_runtime's (EXECUTE on 0123's reader, SELECT on core.work_item), the room decision pool's login.
+ * Every read is debateai_runtime's (EXECUTE on 0123's reader and on 0124's `register.settings_version_passed`, SELECT
+ * on core.work_item), the room decision pool's login.
  */
 export class PostgresAskAdmissionGate implements AskAdmissionGate {
   readonly releaseKey: string;
@@ -364,9 +370,11 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
     this.#hosted = options.hosted;
   }
 
-  async ownReleaseIsCurrent(tx: Pick<PoolClient, "query">): Promise<boolean> {
+  async ownReleaseIsCurrent(tx: Pick<PoolClient, "query">, registerVersion?: number): Promise<boolean> {
     const current = await readCurrentRelease(tx as Pick<Pool, "query">);
-    return current === null ? !this.#hosted : current.releaseKey === this.releaseKey;
+    const own = current === null ? !this.#hosted : current.releaseKey === this.releaseKey;
+    if (!own || registerVersion === undefined) return own;
+    return settingsVersionPassed(tx, this.releaseKey, registerVersion);
   }
 
   async activeDebates(tx: Pick<PoolClient, "query">): Promise<number> {
@@ -378,4 +386,24 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
     if (!Number.isSafeInteger(active) || (active as number) < 0) throw new TypeError("ASK_ADMISSION_GATE_COUNT_INVALID");
     return active as number;
   }
+}
+
+/** The re-check's one query (0124; the plan's exact text). */
+const SETTINGS_VERSION_PASSED_SQL = "SELECT register.settings_version_passed($1::text, $2::bigint) AS passed";
+
+/**
+ * Side-by-side spec §13 "The API re-checks at admission", plan D1 (Task S11) — HAS THIS RELEASE PASSED THIS SETTINGS
+ * VERSION? Migration 0124's one rule (`register.settings_version_passed`): the version is the release key's own site
+ * version, or the release's latest verdict for it is PASS; `legacy` passes nothing. Asked on the executor it is given
+ * (the decision's own transaction in the room; the API's runtime pool on the direct path), once per decision. EXECUTE is
+ * debateai_runtime's, which the API's runtime login holds through debateai_billing_runtime (P3 membershipGrants). An
+ * answer that is not a boolean is never guessed (ASK_ADMISSION_GATE_SETTINGS_INVALID).
+ */
+export async function settingsVersionPassed(
+  executor: Pick<PoolClient, "query">, releaseKey: string, registerVersion: number
+): Promise<boolean> {
+  const result = await executor.query<{ passed: unknown }>(SETTINGS_VERSION_PASSED_SQL, [releaseKey, registerVersion]);
+  const passed = result.rows[0]?.passed;
+  if (typeof passed !== "boolean") throw new TypeError("ASK_ADMISSION_GATE_SETTINGS_INVALID");
+  return passed;
 }

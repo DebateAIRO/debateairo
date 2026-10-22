@@ -63,8 +63,10 @@ import type { AdmissionRunMembers, AdmissionVersionSettings } from "../../apps/a
 import { createAdmissionSettingsCache, createAdmissionView } from "../../apps/api/src/admission-settings.js";
 import type { AskBilling } from "../../apps/api/src/ask-billing.js";
 import {
-  AskRoom, type AskRoomLine, type AskRoomPort, type AskRoomReader, type AskRoomSpend, type RoomDecision, type RoomQuestion
+  AskRoom, type AskAdmissionGate, type AskRoomLine, type AskRoomPort, type AskRoomReader, type AskRoomSpend, type Readmission,
+  type RoomDecision, type RoomQuestion
 } from "../../apps/api/src/ask-room.js";
+import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import type { PreviewBudgetGateSettings, PreviewVersionTerms } from "../../apps/api/src/preview-budget-estimate.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { testReleaseKey } from "../support/releaseKey.js";
@@ -113,8 +115,20 @@ const session: Session = {
 };
 const principal = { kind: "server" as const, userId: "66666666-6666-4666-8666-666666666666", ownerRef: OWNER_REF };
 
-function stubPool(): Pool {
-  const query = vi.fn(async () => ({ rows: [{ locked: true, unlocked: true }], rowCount: 1 } as unknown as QueryResult));
+/**
+ * A pool whose every query answers the lease's row. Task S11: the direct path's re-check
+ * (`register.settings_version_passed`) answers `passed` and is recorded in `asked` (its text and values), and as
+ * "passed?" in `used`, in order with the ask's other steps.
+ */
+function stubPool(passed = true, asked: unknown[][] = [], used: string[] = []): Pool {
+  const query = vi.fn(async (sql: unknown, values?: unknown) => {
+    if (typeof sql === "string" && sql.includes("register.settings_version_passed")) {
+      asked.push([sql, values]);
+      used.push("passed?");
+      return { rows: [{ passed }], rowCount: 1 } as unknown as QueryResult;
+    }
+    return { rows: [{ locked: true, unlocked: true }], rowCount: 1 } as unknown as QueryResult;
+  });
   const client = Object.assign(new EventEmitter(), { query, release: vi.fn() }) as unknown as PoolClient;
   return { connect: vi.fn(async () => client), query } as unknown as Pool;
 }
@@ -180,6 +194,8 @@ type Arranged = Readonly<{
   used: string[];
   pointer: ReturnType<typeof vi.fn>;
   membersFor: ReturnType<typeof vi.fn>;
+  /** Task S11: the direct path's re-check queries on the API's pool, each its text and values. */
+  settingsAsked: unknown[][];
 }>;
 
 /**
@@ -195,6 +211,8 @@ function arrange(input: Readonly<{
   room?: AskRoomPort;
   billing?: AskBilling;
   refuse?: (version: number) => unknown;
+  /** Task S11: what the direct path's re-check answers (default: passed). */
+  passed?: boolean;
 }> = {}): Arranged {
   const started: StartRunInput[] = [];
   const memory: Array<Readonly<Record<string, unknown>>> = [];
@@ -237,9 +255,10 @@ function arrange(input: Readonly<{
     ...(input.billing === undefined ? {} : { billing: input.billing }),
     ...(input.noReader === true ? {} : { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: membersFor } })
   };
-  const application = new PostgresAskApplication(stubPool(), { dispatch: vi.fn(async () => undefined) }, settings,
-    { read: async () => [] }, stubPool(), { server: stubPool(), legacy: stubPool() });
-  return { application, started, memory, used, pointer, membersFor };
+  const settingsAsked: unknown[][] = [];
+  const application = new PostgresAskApplication(stubPool(input.passed ?? true, settingsAsked, used), { dispatch: vi.fn(async () => undefined) },
+    settings, { read: async () => [] }, stubPool(), { server: stubPool(), legacy: stubPool() });
+  return { application, started, memory, used, pointer, membersFor, settingsAsked };
 }
 
 afterEach(() => {
@@ -334,13 +353,13 @@ describe("(3) without the reader, today's single-version admission", () => {
 });
 
 describe("a version this API cannot load (should never happen: activation needs a PASS of the same loader)", () => {
-  it("is one ADMISSION_SETTINGS_UNSUPPORTED line (version, code) and the ask is not started: nothing written", async () => {
+  it("is one ADMISSION_SETTINGS_UNSUPPORTED line (version, code); without a room the ask is not started: nothing written", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { application, started, memory } = arrange({
       refuse: () => new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED")
     });
-    // The plain "cannot be reached right now, please try again in a minute" refusal, with its retry instant: S11 turns
-    // it into its SWITCHING outcome (the ask waits in line) at the same seam.
+    // The direct path (no room, so no waiting line: P7) answers the plain "cannot be reached right now, please try again
+    // in a minute" refusal, with its retry instant (S11, ruling R47); with a room the ask waits in line (S11's cases).
     await expect(application.submit(ask(), session, principal)).rejects.toMatchObject({
       name: "AskRefusal", code: "ASK_MODEL_CANDIDATE_UNAVAILABLE", retryAt: expect.any(Date)
     });
@@ -668,7 +687,8 @@ describe("(2, source) the ask path reads its settings only through the one per-v
   it("submit binds the version first; submit, #submitWithRoom and #readmit read no `this.settings` after it", () => {
     const submit = method("  async submit(\n");
     expect(submit.split("this.settings")).toHaveLength(2);
-    const binding = "const settings = await askSettingsOf(this.settings);";
+    // S11 (ruling R47): the binding also names whether this API could load the version (`settingsUnavailable`).
+    const binding = "const { settings, settingsUnavailable } = await askSettingsOf(this.settings);";
     expect(submit).toContain(`  ): Promise<AskAccepted> {\n    // Side-by-side spec §13 (S10): the active settings version, read ONCE, first, before anything is decided; every\n`);
     expect(submit.indexOf(binding)).toBeLessThan(submit.indexOf("if (principal.kind === \"server\")"));
     for (const header of ["  async #submitWithRoom(\n", "  async #readmit(\n"]) {
@@ -845,5 +865,240 @@ describe("(SA6) on the preview an ask is admitted on its version's line-up (addi
     const read = await roomRead(undefined);
     expect(read.map((question) => question.settingsClass.makerCount)).toEqual([5]);
     expect(read[0]).not.toHaveProperty("registerVersion");
+  });
+});
+
+/**
+ * Task S11 (side-by-side spec §13 "The API re-checks at admission") — THE ADMISSION RE-CHECK ALSO NEEDS A PASSED
+ * SETTINGS VERSION. Plain words: the moment an ask would start, the API asks the database once more whether its own
+ * release has passed the settings version the ask was admitted on. If not (an ask caught across an activation, a switch
+ * or the 1 s pointer cache), the ask is not started: with a room it waits in line ("switching"), with no charge, no
+ * hold and no error to the person; on the direct path (no room, no line) it gets the plain "try again in a minute"
+ * (ruling R47). A version this API cannot load is treated the same way.
+ */
+describe("(S11) the admission re-check also needs a passed settings version (side-by-side spec §13)", () => {
+  const PASSED_SQL = "SELECT register.settings_version_passed($1::text, $2::bigint) AS passed";
+  const RELEASE = testReleaseKey(SITE);
+  const OTHER_RELEASE = testReleaseKey(16);
+  const CLASS = Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 });
+  const ACCESS = Object.freeze({ ownerRef: null, legacyAskerId: "legacy:s11" });
+
+  /** A decision's transaction for the real gate: the release table names `current` (none when null), the re-check answers `passed`. */
+  function gateTx(input: Readonly<{ current?: string | null; passed?: unknown }> = {}) {
+    const asked: string[] = [];
+    const values: unknown[] = [];
+    const tx = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql.includes("core.read_current_release()")) {
+          asked.push("release");
+          const current = input.current ?? null;
+          return { rows: current === null ? [] : [{ release_key: current, take_traffic_from: NOW }] };
+        }
+        asked.push(sql);
+        values.push(params);
+        return { rows: [{ passed: "passed" in input ? input.passed : true }] };
+      })
+    } as unknown as PoolClient;
+    return { tx, asked, values };
+  }
+
+  it("the gate: after the release read, ONE query on the same transaction, the plan's text with (RELEASE_KEY, the version)", async () => {
+    const gate = new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false });
+    const open = gateTx({ passed: true });
+    expect(await gate.ownReleaseIsCurrent(open.tx, ACTIVE)).toBe(true);
+    expect(open.asked).toEqual(["release", PASSED_SQL]);
+    expect(open.values).toEqual([[RELEASE, ACTIVE]]);
+    const closed = gateTx({ current: RELEASE, passed: false });
+    expect(await gate.ownReleaseIsCurrent(closed.tx, ACTIVE)).toBe(false);
+    expect(closed.asked).toEqual(["release", PASSED_SQL]);
+  });
+
+  it("the gate: a release that is not current is not asked about its version; without a version, the release alone (Phase 1)", async () => {
+    const gate = new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false });
+    const other = gateTx({ current: OTHER_RELEASE });
+    expect(await gate.ownReleaseIsCurrent(other.tx, ACTIVE)).toBe(false);
+    expect(other.asked).toEqual(["release"]);
+    const hostedNone = gateTx();
+    expect(await new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: true }).ownReleaseIsCurrent(hostedNone.tx, ACTIVE)).toBe(false);
+    expect(hostedNone.asked).toEqual(["release"]);
+    const noVersion = gateTx({ passed: false });
+    expect(await gate.ownReleaseIsCurrent(noVersion.tx)).toBe(true);
+    expect(noVersion.asked).toEqual(["release"]);
+  });
+
+  it("the gate: an answer that is not a boolean is never guessed", async () => {
+    const gate = new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false });
+    await expect(gate.ownReleaseIsCurrent(gateTx({ passed: null }).tx, ACTIVE)).rejects.toThrow("ASK_ADMISSION_GATE_SETTINGS_INVALID");
+    await expect(gate.ownReleaseIsCurrent(gateTx({ passed: "t" }).tx, ACTIVE)).rejects.toThrow("ASK_ADMISSION_GATE_SETTINGS_INVALID");
+  });
+
+  /** A room with a gate that records each question (on the decision's own transaction? which version?). */
+  function gatedRoom(input: Readonly<{ passed?: (version: number) => boolean; line?: readonly WaitingRun[] }> = {}) {
+    const asked: Array<Readonly<{ onTx: boolean; version: number | undefined }>> = [];
+    const holds: string[] = [];
+    const reasons: Array<Readonly<{ runId: string; waitsFor: string }>> = [];
+    const entered: string[] = [];
+    const started: string[] = [];
+    const client = { query: vi.fn(async () => ({ rows: [], rowCount: 0 })), release: vi.fn() };
+    const gate: AskAdmissionGate = {
+      releaseKey: RELEASE,
+      siteConcurrentDebates: 8,
+      ownReleaseIsCurrent: async (executor, version) => {
+        asked.push(Object.freeze({ onTx: executor === (client as unknown), version }));
+        return version === undefined || (input.passed?.(version) ?? true);
+      },
+      activeDebates: async () => 0
+    };
+    const spend: AskRoomSpend = {
+      readDaySpentMicros: async () => 0, readSiteCountedHoldsMicros: async () => 0, readOwnerSpentMicros: async () => 0,
+      readOwnerCountedHoldsMicros: async () => 0, openHold: async (_client, hold) => { holds.push(hold.runId); }
+    };
+    const line: AskRoomLine = {
+      siteLineBlocking: async () => false, wakeCandidates: async () => [], waitingForOwner: async () => [],
+      waitingForLegacyAsker: async () => [],
+      readWaiting: async (runId) => (input.line ?? []).find((run) => run.runId === runId) ?? null,
+      isWaiting: async (_executor, runId) => (input.line ?? []).some((run) => run.runId === runId),
+      enterWait: async (_client, runId) => { entered.push(runId); },
+      recordReason: async (_client, runId, reason) => { reasons.push(Object.freeze({ runId, waitsFor: reason.waitsFor })); },
+      markStarted: async (_client, runId) => { started.push(runId); }
+    };
+    const room = new AskRoom({
+      lockPool: { connect: vi.fn(async () => client) } as unknown as Pool,
+      spend, line, estimator: estimator(1_000), personAllowance: { read: async () => [] }, entitlements: null,
+      dailyCeilingMicros: 100_000, closeBasisPoints: 9_500, waitingLinePerPerson: 1, clock: () => NOW, gate
+    });
+    return { room, asked, holds, reasons, entered, started };
+  }
+
+  function waiting(extra: Partial<WaitingRun> = {}): WaitingRun {
+    return Object.freeze({ runId: randomUUID(), waitingSince: new Date("2026-10-22T11:00:00.000Z"), releaseKey: RELEASE,
+      ownerRef: null, legacyAskerId: "legacy:s11", planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
+      waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-10-22T11:00:00.000Z"), ...extra });
+  }
+
+  it("the locked decision asks the gate ONCE, on its own transaction, with the question's version; not passed → WAIT SWITCHING", async () => {
+    const { room, asked, holds, reasons } = gatedRoom({ passed: (version) => version !== ACTIVE });
+    const question = Object.freeze({ access: ACCESS, settingsClass: CLASS, registerVersion: ACTIVE });
+    await room.precheck(question);
+    expect(asked).toEqual([]);
+    const admission = await room.decide(question, async ({ admission, tx }) => {
+      await room.enterWait(tx, RUN_ID, NOW);
+      return admission;
+    });
+    expect(admission).toMatchObject({ kind: "WAIT", cause: "SWITCHING" });
+    expect(asked).toEqual([{ onTx: true, version: ACTIVE }]);
+    expect(reasons).toEqual([{ runId: RUN_ID, waitsFor: "SWITCHING" }]);
+    expect(holds).toEqual([]);
+  });
+
+  it("a passed version decides as before (START), with the same one question", async () => {
+    const { room, asked } = gatedRoom();
+    const admission = await room.decide(Object.freeze({ access: ACCESS, settingsClass: CLASS, registerVersion: ACTIVE }),
+      async ({ admission }) => admission);
+    expect(admission.kind).toBe("START");
+    expect(asked).toEqual([{ onTx: true, version: ACTIVE }]);
+  });
+
+  it("the waker's start: a run of this release on a version it has not passed starts nothing and writes nothing (SWITCHING)", async () => {
+    const unpassed = waiting({ registerVersion: ACTIVE });
+    const own = waiting({ registerVersion: SITE });
+    const { room, asked, holds, reasons, started } = gatedRoom({ passed: (version) => version !== ACTIVE, line: [unpassed, own] });
+    await expect(room.startWaiting(unpassed, async () => "job")).resolves.toEqual({ kind: "SWITCHING" });
+    expect(asked).toEqual([{ onTx: true, version: ACTIVE }]);
+    expect(holds).toEqual([]);
+    expect(reasons).toEqual([]);
+    expect(started).toEqual([]);
+    await expect(room.startWaiting(own, async () => "job")).resolves.toMatchObject({ kind: "STARTED", runId: own.runId });
+    expect(asked).toEqual([{ onTx: true, version: ACTIVE }, { onTx: true, version: SITE }]);
+  });
+
+  it("another release's run: phase one asks the release alone; its re-admission's START asks the new run's version", async () => {
+    const stale = waiting({ releaseKey: OTHER_RELEASE, registerVersion: 16 });
+    const { room, asked, holds } = gatedRoom({ passed: (version) => version !== ACTIVE, line: [stale] });
+    await expect(room.startWaiting(stale, async () => "job")).resolves.toMatchObject({ kind: "NEEDS_READMISSION" });
+    expect(asked).toEqual([{ onTx: true, version: undefined }]);
+    const createRun = vi.fn(async () => "new-run");
+    const readmission: Readmission = {
+      plan: { kind: "READMIT", planId: null, holdMicros: 1_000, settingsClass: CLASS } as unknown as Readmission["plan"],
+      createRun,
+      registerVersion: ACTIVE
+    };
+    await expect(room.startWaiting(stale, async () => "job", readmission)).resolves.toEqual({ kind: "SWITCHING" });
+    expect(asked).toEqual([{ onTx: true, version: undefined }, { onTx: true, version: ACTIVE }]);
+    expect(createRun).not.toHaveBeenCalled();
+    expect(holds).toEqual([]);
+  });
+
+  it("through the room: an ask on a version this release has not passed waits in line (SWITCHING): stamped, no hold, no error", async () => {
+    const gated = gatedRoom({ passed: (version) => version !== ACTIVE });
+    const { application, started, settingsAsked } = arrange({ room: gated.room });
+    const accepted = await application.submit(ask(), session, principal);
+    expect(accepted).toMatchObject({ run_ref: RUN_ID, status: "WAITING" });
+    expect(started).toHaveLength(1);
+    expect(started[0]!.registerVersion).toBe(ACTIVE);
+    expect(gated.asked).toEqual([{ onTx: true, version: ACTIVE }]);
+    expect(gated.entered).toEqual([RUN_ID]);
+    expect(gated.reasons).toEqual([{ runId: RUN_ID, waitsFor: "SWITCHING" }]);
+    expect(gated.holds).toEqual([]);
+    expect(vi.mocked(WorkItemRepository.prototype.enqueueOn)).not.toHaveBeenCalled();
+    // The room's transaction asked; the direct path's query is not asked on the room path.
+    expect(settingsAsked).toEqual([]);
+  });
+
+  it("through the room: a passed version is unchanged: QUEUED, its hold opened and its first job queued", async () => {
+    const gated = gatedRoom();
+    const { application } = arrange({ room: gated.room });
+    await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(gated.asked).toEqual([{ onTx: true, version: ACTIVE }]);
+    expect(gated.holds).toEqual([RUN_ID]);
+    expect(gated.reasons).toEqual([]);
+  });
+
+  it("through the room: a version this API cannot load waits in line too (ruling R47): on the site version, SWITCHING, no error", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const gated = gatedRoom();
+    const { application, started, used } = arrange({
+      room: gated.room, refuse: () => new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED")
+    });
+    await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ run_ref: RUN_ID, status: "WAITING" });
+    expect(started[0]!.registerVersion).toBe(SITE);
+    expect(gated.reasons).toEqual([{ runId: RUN_ID, waitsFor: "SWITCHING" }]);
+    expect(gated.holds).toEqual([]);
+    // Held without asking: the version it could not load is not the one it was evaluated on.
+    expect(gated.asked).toEqual([]);
+    expect(used.filter((part) => part.endsWith(`:${String(ACTIVE)}`))).toEqual([`members:${String(ACTIVE)}`]);
+    expect(errors.mock.calls.map(([line]) => String(line)).filter((line) => line.includes("ADMISSION_SETTINGS_UNSUPPORTED"))).toEqual([
+      JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version: ACTIVE, cause: "PREVIEW_LINE_UP_REQUIRED" })
+    ]);
+  });
+
+  it("the direct path (no room, no line): not passed → the plain 'try again in a minute', nothing written, one line (ruling R47)", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { application, started, memory, settingsAsked } = arrange({ passed: false });
+    await expect(application.submit(ask(), session, principal)).rejects.toMatchObject({
+      name: "AskRefusal", code: "ASK_MODEL_CANDIDATE_UNAVAILABLE", retryAt: expect.any(Date)
+    });
+    expect(settingsAsked).toEqual([[PASSED_SQL, [RELEASE, ACTIVE]]]);
+    expect(started).toEqual([]);
+    expect(memory).toEqual([]);
+    expect(vi.mocked(WorkItemRepository.prototype.enqueue)).not.toHaveBeenCalled();
+    expect(errors.mock.calls.map(([line]) => String(line))).toContainEqual(JSON.stringify({
+      kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_NOT_PASSED", version: ACTIVE
+    }));
+  });
+
+  it("the direct path: a passed version is admitted as before; the one query runs once, after the evaluation, before the run is written", async () => {
+    const { application, started, settingsAsked, used } = arrange();
+    await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(settingsAsked).toEqual([[PASSED_SQL, [RELEASE, ACTIVE]]]);
+    expect(used.indexOf("passed?")).toBeGreaterThan(used.indexOf("discovery"));
+    expect(used.indexOf("passed?")).toBeLessThan(used.indexOf("startRun"));
+    expect(started[0]!.registerVersion).toBe(ACTIVE);
+  });
+
+  it("the direct path without the reader asks nothing: the site version, which its own release always passes (D1)", async () => {
+    const { application, settingsAsked } = arrange({ noReader: true });
+    await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ status: "QUEUED" });
+    expect(settingsAsked).toEqual([]);
   });
 });

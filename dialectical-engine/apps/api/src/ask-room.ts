@@ -58,11 +58,14 @@ export class AskAlreadyWaitingError extends TypedDomainError {
 
 /**
  * A question the room is asked. `registerVersion` (side-by-side spec §13, S10): the settings version the ask is admitted
- * on; the room estimates it with that version's estimator (`AskRoomOptions.estimatorFor`). Absent (a composition before
- * S10): the room's own estimator.
+ * on; the room estimates it with that version's estimator (`AskRoomOptions.estimatorFor`), and the locked decision asks
+ * the gate whether this release has passed it (S11). Absent (a composition before S10): the room's own estimator, and
+ * the release alone. `settingsUnavailable` (S11, ruling R47): this API could not load the active version, so the ask is
+ * evaluated on the site version and the locked decision holds it (SWITCHING): it waits in line, nothing charged.
  */
 export type RoomQuestion = Readonly<{
   access: RunOwnershipAccess; settingsClass: RunSettingsClass; fundingBasis?: FundingBasis; registerVersion?: number;
+  settingsUnavailable?: true;
 }>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
@@ -152,6 +155,8 @@ const SITE_CONCURRENT_DEBATES_LOCK = "SELECT pg_advisory_xact_lock(hashtextexten
  * - `ownReleaseIsCurrent` — the release watcher's rule, read now and not from the watcher's last poll: this release is
  *   the one `core.read_current_release()` names, or none is named and the deployment is not hosted. An ask the API
  *   admits while a switch moves the traffic away waits in line (SWITCHING) instead of starting on the old release.
+ *   Side-by-side spec §13 (Task S11): given the version the decision would start on, this release must also have
+ *   passed it (0124's `register.settings_version_passed`), else SWITCHING too.
  * - `activeDebates` — the runs with a READY or CLAIMED job, across every release; at `siteConcurrentDebates` (8, the
  *   runners' own capacity) the question waits in line (SITE_BUSY). The day lock does NOT serialize it: two decisions on
  *   either side of midnight UTC hold different day keys. So the room counts under one constant site-wide transaction
@@ -163,7 +168,12 @@ const SITE_CONCURRENT_DEBATES_LOCK = "SELECT pg_advisory_xact_lock(hashtextexten
 export interface AskAdmissionGate {
   readonly releaseKey: string;
   readonly siteConcurrentDebates: number;
-  ownReleaseIsCurrent(tx: Pick<PoolClient, "query">): Promise<boolean>;
+  /**
+   * Side-by-side spec §13 "The API re-checks at admission" (Task S11): with `registerVersion`, the version the decision
+   * would start on, current also needs (this release, that version) passed — one query more, after the release read,
+   * on the same transaction; false either way is SWITCHING.
+   */
+  ownReleaseIsCurrent(tx: Pick<PoolClient, "query">, registerVersion?: number): Promise<boolean>;
   activeDebates(tx: Pick<PoolClient, "query">): Promise<number>;
 }
 
@@ -268,6 +278,11 @@ export type WaitingStart<T> =
 export type Readmission = Readonly<{
   plan: Extract<ReadmissionPlan, { kind: "READMIT" | "ASK_AGAIN" }>;
   createRun(): Promise<string>;
+  /**
+   * Side-by-side spec §13 (Task S11): the settings version the new run is admitted on (the one `createRun` stamps); the
+   * START re-checks that this release has passed it. Absent: the release alone.
+   */
+  registerVersion?: number;
 }>;
 
 /** What the waker asks of the room (B7b). */
@@ -467,7 +482,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   async decide<T>(question: RoomQuestion, apply: (context: RoomDecisionContext) => Promise<T>): Promise<T> {
     return this.#locked(question.access.ownerRef, async (tx, now) => {
       // Side-by-side C8: the site's cap and the release re-check, in the lock, on the decision's own transaction.
-      const evaluation = await this.#evaluate(question, now, await this.#holdOf(tx));
+      const evaluation = await this.#evaluate(question, now, await this.#holdOf(tx, question));
       const admission = evaluation.admission;
       if (admission.kind === "REFUSE_ALREADY_WAITING") throw alreadyWaiting(evaluation);
       // A wait the hold alone decides is recorded as the hold (SITE_BUSY or SWITCHING); any other as measured.
@@ -634,6 +649,9 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * Side-by-side C8 (with a gate): a release that is not current starts nothing and writes nothing (SWITCHING), asked
    * before anything else; a run the room would START while the site runs its cap of debates is held back (SITE_BUSY,
    * its reason appended only when it was not already SITE_BUSY).
+   * Side-by-side spec §13 "The API re-checks at admission" (Task S11): the same first question also needs this release
+   * to have passed the version the start would run on (`startVersion`); not passed is SWITCHING too, and the waker's
+   * tick stops there (ruling R11).
    *
    * Side-by-side spec §4, O3 (Q1 → a); INTERFACE run_supersession — THE TWO-PHASE RULE (with a gate). A run another
    * release admitted (`run.releaseKey` is not this release's) never starts on its own row: no code, setting or prompt
@@ -659,8 +677,13 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const gate = this.#options.gate;
     const readmit = readmission?.plan.kind === "READMIT" ? readmission.plan : null;
     const stale = gate !== undefined && run.releaseKey !== gate.releaseKey;
+    // Side-by-side spec §13 (Task S11): the version this start would run on — the run's own stamp, or a re-admission's
+    // new one. Phase one of a run another release admitted starts nothing (its old version is not this release's to
+    // pass), and neither does an ASK_AGAIN plan: the release alone.
+    const startVersion = readmit !== null ? readmission?.registerVersion
+      : readmission === undefined && !stale ? run.registerVersion : undefined;
     return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
-      if (gate !== undefined && !(await gate.ownReleaseIsCurrent(tx))) return Object.freeze({ kind: "SWITCHING" as const });
+      if (gate !== undefined && !(await gate.ownReleaseIsCurrent(tx, startVersion))) return Object.freeze({ kind: "SWITCHING" as const });
       if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
       const basis = await this.#options.entitlements?.readRunFundingBasis?.(run.runId) ?? null;
       if (basis?.kind === "INTERNAL") {
@@ -808,11 +831,17 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * Side-by-side C8: what holds every new question back right now, read on the decision's transaction: SWITCHING when
    * this release is not current (the count is then not needed), SITE_BUSY at the site's cap, null otherwise or with no
    * gate.
+   * Side-by-side spec §13 "The API re-checks at admission" (Task S11): covers an ask in flight across an activation or a
+   * switch and the 1 s pointer cache; the current release's waker starts it within a tick, re-admitted under O3 (S13).
+   * The release check also asks, once and on this transaction, whether this release has passed the question's version
+   * (`registerVersion`); not passed is SWITCHING: the ask waits in line, no charge, no hold, no error to the person. A
+   * question whose version this API could not load (`settingsUnavailable`, ruling R47) is SWITCHING without a query.
    */
-  async #holdOf(tx: PoolClient): Promise<AdmissionHold | null> {
+  async #holdOf(tx: PoolClient, question: RoomQuestion): Promise<AdmissionHold | null> {
+    if (question.settingsUnavailable === true) return "SWITCHING";
     const gate = this.#options.gate;
     if (gate === undefined) return null;
-    if (!(await gate.ownReleaseIsCurrent(tx))) return "SWITCHING";
+    if (!(await gate.ownReleaseIsCurrent(tx, question.registerVersion))) return "SWITCHING";
     return await this.#siteIsBusy(tx, gate) ? "SITE_BUSY" : null;
   }
 

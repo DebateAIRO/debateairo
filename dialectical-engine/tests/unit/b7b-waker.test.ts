@@ -452,18 +452,37 @@ describe("side-by-side C11: the waker re-admits a run another release admitted",
       resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) =>
         ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef: `${tierProvenanceRef}:v2` })
     };
-    const { application, dispatched } = arrange({
+    const { application, dispatched, readmissions } = arrange({
       pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] },
       extra: { ...readmittable(), admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => versionTwo } },
       stored: (runId) => storedAsk(runId)
     });
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
     expect(dispatched).toEqual([`new:${a.runId}`]);
+    // S11: the START is told the version the new run is stamped with, so it re-checks that this release passed it.
+    expect(readmissions.map((readmission) => readmission?.registerVersion)).toEqual([undefined, 2]);
     const row = vi.mocked(RunRepository.prototype.startReadmittedRun).mock.calls[0]![0];
     expect(row).toMatchObject({ fromRunId: a.runId, registerVersion: 2, tierProvenanceRef: "asker:b7b:v2", releaseKey: TEST_RELEASE_KEY });
     expect(row.envelopeBasis).toMatchObject({ version_mark: 2 });
     expect(vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls[0]![0]).toMatchObject({ policyVersion: 2 });
     expect(pointer).toHaveBeenCalledTimes(1);
+  });
+
+  it("side-by-side §13 (S11, ruling R47): a version this API cannot load re-admits nothing; the run keeps its place", async () => {
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const { application, tried, dispatched, recorded, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] },
+      extra: { ...readmittable(), admissionSettings: { activeSettingsVersion: async () => 2, admissionSettingsFor: async () => {
+        throw new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED");
+      } } },
+      stored: (runId) => storedAsk(runId)
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 1, started: 0, skipped: 1, failed: 0, stopped: false, redispatched: 0 });
+    expect(tried).toEqual([a.runId]);
+    expect(dispatched).toEqual([]);
+    expect(recorded).toEqual([]);
+    expect(lines()).toContainEqual({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version: 2, cause: "PREVIEW_LINE_UP_REQUIRED" });
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_not_now", runId: a.runId, code: "ADMISSION_SETTINGS_UNSUPPORTED" });
   });
 
   it("a START that committed is never recorded FAILED when the lease's release then fails: its job is handed over later", async () => {

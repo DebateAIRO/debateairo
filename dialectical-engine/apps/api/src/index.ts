@@ -2,7 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
-import type { ReleaseLifecycleState, ReleaseState, ReleaseWatcher } from "./release-state.js";
+import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -4586,8 +4586,21 @@ function settingsOfVersion(process: RunCreationSettings, members: AdmissionRunMe
 /** The one content-free line of a version this API cannot admit on (Task S10): the version and the loader's code. */
 const ADMISSION_SETTINGS_UNSUPPORTED = "ADMISSION_SETTINGS_UNSUPPORTED";
 
-/** How long the "please try again in a minute" answer of an ask on an unsupported version asks the caller to wait. */
+/** The one content-free line of a direct-path ask on a version this release has not passed (Task S11, ruling R47). */
+const ADMISSION_SETTINGS_NOT_PASSED = "ADMISSION_SETTINGS_NOT_PASSED";
+
+/**
+ * How long the "please try again in a minute" answer of a direct-path ask on a version this API cannot load or has not
+ * passed asks the caller to wait.
+ */
 const ADMISSION_SETTINGS_RETRY_MS = 60000;
+
+/**
+ * Side-by-side spec §13 (S10, S11): the settings one ask is admitted on. `settingsUnavailable` (ruling R47): the active
+ * version could not be loaded by this API, so `settings` are the application's own (the site version's) and the ask may
+ * not start: with a room it waits (SWITCHING), without one it is refused plainly (`settingsUnavailableRefusal`).
+ */
+type AskSettings = Readonly<{ settings: RunCreationSettings; settingsUnavailable: boolean }>;
 
 /** Side-by-side spec §13 (S10): each application's settings per version, by its process settings (built once a version). */
 const VERSION_SETTINGS = new WeakMap<RunCreationSettings, Map<number, RunCreationSettings>>();
@@ -4601,24 +4614,26 @@ const VERSION_SETTINGS = new WeakMap<RunCreationSettings, Map<number, RunCreatio
  * replace every version member of the application's settings (`settingsOfVersion`); the result is kept per version
  * (sealed versions never change). Without `admissionSettings` (test compositions, acceptance) every ask is admitted on
  * the application's settings. A version the cache refuses with a settings code never reaches an ask in practice
- * (activation needs a PASS that ran the same loader): `unsupportedAdmissionVersion` is its seam. A database failure is
+ * (activation needs a PASS that ran the same loader): `unsupportedAdmissionVersion` says so once and the answer is
+ * `settingsUnavailable` (Task S11, ruling R47: the room's SWITCHING wait, else the plain refusal). A database failure is
  * not a settings refusal: it propagates. A module function over the settings alone (not a private member), so submit's
  * pre-admission refusals stay callable on a bare `{ settings }` (preview-team-only-asks, preview-budget-estimate).
  */
-async function askSettingsOf(process: RunCreationSettings): Promise<RunCreationSettings> {
+async function askSettingsOf(process: RunCreationSettings): Promise<AskSettings> {
   const source = process.admissionSettings;
-  if (source === undefined) return process;
+  if (source === undefined) return Object.freeze({ settings: process, settingsUnavailable: false });
   const version = await source.activeSettingsVersion();
   let versions = VERSION_SETTINGS.get(process);
   const kept = versions?.get(version);
-  if (kept !== undefined) return kept;
+  if (kept !== undefined) return Object.freeze({ settings: kept, settingsUnavailable: false });
   let members: AdmissionRunMembers;
   try {
     members = await source.admissionSettingsFor(version);
   } catch (error) {
     const code = settingsRefusalCode(error);
     if (code === null) throw error;
-    return unsupportedAdmissionVersion(version, code);
+    unsupportedAdmissionVersion(version, code);
+    return Object.freeze({ settings: process, settingsUnavailable: true });
   }
   if (members.registerVersion !== version) throw new TypeError("ADMISSION_SETTINGS_VERSION_MISMATCH");
   const settings = settingsOfVersion(process, members);
@@ -4627,18 +4642,25 @@ async function askSettingsOf(process: RunCreationSettings): Promise<RunCreationS
     VERSION_SETTINGS.set(process, versions);
   }
   versions.set(version, settings);
-  return settings;
+  return Object.freeze({ settings, settingsUnavailable: false });
 }
 
 /**
- * Side-by-side spec §13 (S10) — THE SEAM FOR AN ACTIVE VERSION THIS API CANNOT ADMIT ON. One content-free line
- * (ADMISSION_SETTINGS_UNSUPPORTED: the version and the loader's code), and the ask is not started: nothing is written
- * or charged, and the person reads the plain "cannot be reached right now, please try again in a minute" refusal with
- * its retry instant. S11 builds the full re-check of (release, version) and replaces this answer with its SWITCHING
- * outcome (the ask waits in line, plan C's reason) — here, at this one seam.
+ * Side-by-side spec §13 (S10) — AN ACTIVE VERSION THIS API CANNOT ADMIT ON: one content-free line
+ * (ADMISSION_SETTINGS_UNSUPPORTED: the version and the loader's code). What the ask then comes to is the caller's
+ * (Task S11, ruling R47): with a room it waits in line (SWITCHING), without one the plain refusal below.
  */
-function unsupportedAdmissionVersion(version: number, code: string): never {
+function unsupportedAdmissionVersion(version: number, code: string): void {
   console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_UNSUPPORTED, version, cause: code }));
+}
+
+/**
+ * Side-by-side spec §13 "The API re-checks at admission" (Task S11, ruling R47) — THE DIRECT PATH'S ANSWER (no room, so
+ * no waiting line: final fix wave P7) to an ask on a version this API cannot load or this release has not passed: the
+ * ask is not started, nothing is written or charged, and the person reads the plain "cannot be reached right now,
+ * please try again in a minute" refusal with its retry instant.
+ */
+function settingsUnavailableRefusal(): never {
   return markAskRefusal(new PreviewGateUnavailableRefusal(new Date(Date.now() + ADMISSION_SETTINGS_RETRY_MS)));
 }
 
@@ -5303,7 +5325,9 @@ export class PostgresAskApplication implements AskApplication {
   ): Promise<AskAccepted> {
     // Side-by-side spec §13 (S10): the active settings version, read ONCE, first, before anything is decided; every
     // step of this ask, and everything frozen at its admission, reads `settings` (that version over the process members).
-    const settings = await askSettingsOf(this.settings);
+    // S11 (ruling R47): a version this API cannot load waits in the room's line (SWITCHING), else is refused plainly.
+    const { settings, settingsUnavailable } = await askSettingsOf(this.settings);
+    if (settingsUnavailable && settings.room === undefined) settingsUnavailableRefusal();
     if (principal.kind === "server") {
       if (session.ownership_provenance !== "server_session" || session.asker_id !== `owner:${principal.ownerRef}`) {
         throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "The server session and opaque run owner must match");
@@ -5391,7 +5415,8 @@ export class PostgresAskApplication implements AskApplication {
     // the reply carries what the server applied (QUEUED or WAITING).
     if (settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        settings, ask, plannedAsk, session, principal, ownership, settings.room, substitutedAt, shapePlan, questionLanguageLock, fundingBasis
+        settings, ask, plannedAsk, session, principal, ownership, settings.room, substitutedAt, shapePlan, questionLanguageLock,
+        settingsUnavailable, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -5406,6 +5431,16 @@ export class PostgresAskApplication implements AskApplication {
     // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
     const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
     const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
+    // Side-by-side spec §13 "The API re-checks at admission" (Task S11, ruling R47): the direct path has no room and so no
+    // waiting line (P7). Just before anything is written, one query asks whether this release has passed the version
+    // the ask was admitted on; not passed, the ask is refused plainly (nothing written, nothing charged) with one
+    // content-free line. Without the reader (`admissionSettings` absent) the ask is admitted on the site version, which
+    // its own release always passes (D1; RELEASE_KEY's number is REGISTER_VERSION), so nothing is asked.
+    if (settings.admissionSettings !== undefined
+      && !(await settingsVersionPassed(this.pool, settings.releaseKey, settings.registerVersion))) {
+      console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_NOT_PASSED, version: settings.registerVersion }));
+      settingsUnavailableRefusal();
+    }
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
     // after that, and the run then exists with nothing to start it.
@@ -5637,13 +5672,17 @@ export class PostgresAskApplication implements AskApplication {
     substitutedAt: Date | null,
     shapePlan: DebateShapePlanKey,
     questionLanguageLock: QuestionLanguageLock | null,
+    settingsUnavailable: boolean,
     fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    // Side-by-side spec §13 (S10): the room estimates the question with its version's estimator (`estimatorFor`).
-    const question = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(ask,settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+    // Side-by-side spec §13 (S10): the room estimates the question with its version's estimator (`estimatorFor`). S11: the
+    // locked decision re-checks that this release has passed that version (SWITCHING if not); a version this API could
+    // not load (`settingsUnavailable`, ruling R47) is held SWITCHING, so the ask waits in line on the site version.
+    const unavailable = settingsUnavailable ? { settingsUnavailable: true as const } : {};
+    const question = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(ask,settings.previewProviderTestConfig,shapePlan), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -5680,7 +5719,7 @@ export class PostgresAskApplication implements AskApplication {
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(plannedAsk,settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+          decisionQuestion = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(plannedAsk,settings.previewProviderTestConfig,shapePlan), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -5962,7 +6001,8 @@ export class PostgresAskApplication implements AskApplication {
           continue;
         }
         // Side-by-side C8: a busy site (its cap of debates) or a release that is not current holds back every run
-        // after this one too, so the pass ends here, as for a full site's day.
+        // after this one too, so the pass ends here, as for a full site's day. Side-by-side spec §13 (S11, ruling R11):
+        // so does a start on a version this release has not passed (SWITCHING too).
         if (outcome.kind === "SITE_FULL" || outcome.kind === "SITE_BUSY" || outcome.kind === "SWITCHING") {
           stopped = true;
           break;
@@ -6039,7 +6079,12 @@ export class PostgresAskApplication implements AskApplication {
     // ONE version read through the ask's own per-version path (`askSettingsOf`), the version `#readmit` stamps. While the
     // pointer is empty that is this release's site version: today's re-admission, byte for byte. S13 owns re-admitting a
     // run onto the active version (the pointer read on the START transaction, and the room's estimate at that version).
-    const settings = await askSettingsOf(this.settings);
+    // S11 (ruling R47): a version this API cannot load starts nothing; the run keeps its place, as for NOT_NOW.
+    const { settings, settingsUnavailable } = await askSettingsOf(this.settings);
+    if (settingsUnavailable) {
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: ADMISSION_SETTINGS_UNSUPPORTED })));
+      return null;
+    }
     const plan = await planReadmission({
       stored, planId: first.planId, settings,
       evaluate: (ask, shapePlan) => evaluationOrRefusal(settings, ask, personRoom, shapePlan)
@@ -6055,6 +6100,8 @@ export class PostgresAskApplication implements AskApplication {
       try {
         const outcome = await line.startWaiting(run, enqueue, {
           plan,
+          // S11: the START re-checks that this release has passed the version the new run is stamped with.
+          registerVersion: settings.registerVersion,
           // The room never asks an ASK_AGAIN plan for a run.
           createRun: plan.kind === "READMIT"
             ? () => this.#readmit(settings, run, plan, principal, lease, readmitted)
