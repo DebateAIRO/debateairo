@@ -1011,6 +1011,79 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     expect(existsSync(out)).toBe(false);
   });
 
+  /**
+   * Side-by-side spec §13, addition D23 (owner 2026-10-22; fix round 1 of SA9): the line-up and the answer seats. `--line-up`
+   * names a root-owned JSON file holding the plan member `check-thinking-levels --print-line-up` prints, or the bare line-up;
+   * `--answer-seats` is one JSON object. Both on `plan` only; publish carries the plan's values unchanged.
+   */
+  const LINE_UP = { free_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash'],
+    premium_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash', 'XiaomiMiMo/MiMo-V2.6-Pro', 'Qwen/Qwen3.8-Flash', 'claude-haiku-5-5'],
+    thinking_levels: JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) };
+  const SEATS = { writer: 'preview:claude-haiku-5-5', checker: 'preview:fixture-b' };
+
+  it('plan --line-up <file> and --answer-seats: the plan carries both, publish carries them on, and none is the default', async () => {
+    const t = await staged();
+    const member = t.s.write(join(t.s.art, 'line-up-member.json'), `${JSON.stringify({ lineUp: LINE_UP })}\n`);
+    const out = join(t.s.art, 'native-plan-line-up.json');
+    const plan = read(await run(t.nativePlan('plan', ['--line-up', member.path, '--answer-seats', JSON.stringify(SEATS)]).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, lineUp: LINE_UP, answerSeats: SEATS });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.lineUp).toEqual(LINE_UP);
+    expect(publish.answerSeats).toEqual(SEATS);
+    expect(operator.validateNativePlan(publish)).toBeTruthy();
+    // The bare line-up object is accepted too, and gives the same plan member.
+    const bare = t.s.write(join(t.s.art, 'line-up-bare.json'), JSON.stringify(LINE_UP));
+    expect(read(await run(t.nativePlan('plan', ['--line-up', bare.path]).with(-1, join(t.s.art, 'native-plan-bare.json')), t.s.layout))).toEqual({ ...t.plan, lineUp: LINE_UP });
+    expect(Object.hasOwn(t.plan, 'lineUp')).toBe(false);
+    expect(Object.hasOwn(t.plan, 'answerSeats')).toBe(false);
+  });
+
+  it.each([
+    ['a member with another key beside lineUp', { lineUp: LINE_UP, extra: true }],
+    ['a line-up missing its table member', { free_model_ids: LINE_UP.free_model_ids, premium_model_ids: LINE_UP.premium_model_ids }],
+    ['a roster that is not a list', { ...LINE_UP, free_model_ids: 'GLM' }],
+    ['a JSON array', [LINE_UP]],
+    ['a JSON string', 'off'],
+    ['an empty object', {}]
+  ])('refuses --line-up with %s and writes nothing', async (_name, value) => {
+    const t = await staged();
+    const file = t.s.write(join(t.s.art, 'line-up-bad.json'), JSON.stringify(value));
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan('plan', ['--line-up', file.path]).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--line-up'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it.each([
+    ['the option on publish (publish takes them only from its --from plan)', 'publish'], ['the option on verify', 'verify'], ['the option on apply-and-plan', 'apply-and-plan']
+  ])('refuses --line-up and --answer-seats on %s and writes nothing', async (_name, operation) => {
+    const t = await staged();
+    const file = t.s.write(join(t.s.art, 'line-up-member.json'), JSON.stringify({ lineUp: LINE_UP }));
+    const review = operation === 'publish' ? ['--proposal', t.writeProposal(t.proposalOf()).path, '--approved-delta-sha256', t.snapshot.deltaSha256] : [];
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, [...review, '--line-up', file.path]).with(-1, out), t.s.layout, deps)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--line-up'] });
+    await expect(run(t.nativePlan(operation, [...review, '--answer-seats', JSON.stringify(SEATS)]).with(-1, out), t.s.layout, deps)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--answer-seats'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it.each([
+    ['text that is not JSON', ['--answer-seats', 'haiku']],
+    ['JSON null', ['--answer-seats', 'null']],
+    ['no checker', ['--answer-seats', JSON.stringify({ writer: SEATS.writer })]],
+    ['an extra seat', ['--answer-seats', JSON.stringify({ ...SEATS, judge: SEATS.writer })]],
+    // Ruling R27b: one AI must not check its own answer.
+    ['the writer as its own checker', ['--answer-seats', JSON.stringify({ writer: SEATS.writer, checker: SEATS.writer })]],
+    // One way to set the checker.
+    ['beside --checker', ['--answer-seats', JSON.stringify(SEATS), '--checker', 'glm']],
+    ['beside --checker deepseek', ['--answer-seats', JSON.stringify(SEATS), '--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes']]
+  ])('refuses --answer-seats with %s and writes nothing', async (_name, extra) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan('plan', extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--answer-seats'] });
+    expect(existsSync(out)).toBe(false);
+  });
+
   it('refuses the option on publish: publish takes the policy only from its --from plan', async () => {
     const t = await staged();
     const out = join(t.s.art, 'native-plan-concurrency.json');

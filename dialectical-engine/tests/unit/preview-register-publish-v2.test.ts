@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, CALL_CONCURRENCY_POLICY_ROW_KEY, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyRow, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY, previewLineUpPolicyFromValue, previewLineUpPolicyRow } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
+import { printLineUp } from '../../tools/preview-practice/check-thinking-levels.js';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
@@ -790,6 +791,18 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     await expect(build(op.validateNativePlan({ ...plan, lineUp: qwenHigh }).lineUp)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
   });
 
+  it('(5) the --print-line-up member, merged into a plan, passes the plan check and the builder seals exactly that row', async () => {
+    const env = { deployment: 'v3-preview', requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/deepinfra-budget-v3.sock',
+      anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock', scope_id: 'preview-kit-unit', ...LIVE };
+    const printed = printLineUp(`PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(env)}`);
+    expect(printed.exitCode).toBe(0);
+    const member = JSON.parse(printed.lines[0]!) as { lineUp: unknown };
+    expect(Object.keys(member)).toEqual(['lineUp']);
+    const checked = (await operator()).validateNativePlan({ ...plan, ...JSON.parse(JSON.stringify(member)) });
+    const row = lineUpRow(await build(checked.lineUp))!;
+    expect(row.valueJsonText).toBe(previewLineUpPolicyRow(previewLineUpPolicyFromValue({ kind: 'PREVIEW_LINE_UP_POLICY', ...LIVE }), row.sourceRef).valueJsonText);
+  });
+
   it('(4) answerSeats with the Haiku writer seals the synthesizer and the storyteller to it; absent seats keep today\'s refs byte for byte', async () => {
     const f = await fixture();
     const haikuWriter = await build(null, { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF });
@@ -824,7 +837,10 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     ['an extra seat', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, judge: HAIKU_REF }, 'answer-seats-choice'],
     ['a seat that is not text', { writer: HAIKU_REF, checker: 7 }, 'answer-seats-choice'],
     ['a bare string', HAIKU_REF, 'answer-seats-choice'],
-    ['an array', [HAIKU_REF], 'answer-seats-choice']
+    ['an array', [HAIKU_REF], 'answer-seats-choice'],
+    // Ruling R27b: one AI must not check its own answer.
+    ['the writer as its own checker', { writer: HAIKU_REF, checker: HAIKU_REF }, 'answer-seats-writer-is-checker'],
+    ['GLM\'s writer ref as its own checker, with story seats elsewhere', { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_SYNTHESIZER_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seats-writer-is-checker']
   ])('(4) refuses %s, by its own rule, before building any row', async (_name, choice, rule) => {
     await expect(build(null, choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
     await expect(build(null, choice, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
@@ -844,7 +860,8 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     const value = { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_EVALUATOR_ROLE_REF };
     expect(op.validateAnswerSeatsChoice(value)).toBe(value);
     expect(op.validateAnswerSeatsChoice({ writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF })).toBeTruthy();
-    for (const bad of ['haiku', null, [], 7, { writer: HAIKU_REF }, { checker: HAIKU_REF }, { ...value, judge: HAIKU_REF }, { writer: HAIKU_REF, checker: '' }, { writer: HAIKU_REF, checker: 7 }])
+    for (const bad of ['haiku', null, [], 7, { writer: HAIKU_REF }, { checker: HAIKU_REF }, { ...value, judge: HAIKU_REF }, { writer: HAIKU_REF, checker: '' }, { writer: HAIKU_REF, checker: 7 },
+      { writer: HAIKU_REF, checker: HAIKU_REF }]) // Ruling R27b: the writer never checks its own answer
       expect(() => op.validateAnswerSeatsChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
     for (const operation of ['plan', 'publish']) expect(op.validateNativePlan({ ...plan, operation, answerSeats: value })).toBeTruthy();
     for (const operation of ['verify', 'apply-and-plan']) expect(() => op.validateNativePlan({ ...plan, operation, answerSeats: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');

@@ -144,8 +144,9 @@ const ANSWER_SEAT_KEYS = Object.freeze(['checker','storyChecker','storyteller','
 /**
  * Addition D23: the seat refs for a plan. No seats (undefined or null) = today's refs, byte for byte: the writer fixture-a and
  * the checker from `checker` (default GLM), the story seats following them. Seats are one way to set the checker, so seats
- * with any checker choice refuse (answer-seats-with-checker-choice); a malformed choice refuses as answer-seats-choice and a
- * ref outside the reviewed rows as answer-seat-unreviewed, each before any row is built.
+ * with any checker choice refuse (answer-seats-with-checker-choice); a malformed choice refuses as answer-seats-choice, a
+ * ref outside the reviewed rows as answer-seat-unreviewed and a writer seated as its own checker as
+ * answer-seats-writer-is-checker (Ruling R27b), each before any row is built.
  */
 export function previewAnswerSeatRefs(seats:unknown, checker?:unknown):PreviewAnswerSeatRefs {
   if(seats===undefined||seats===null){
@@ -157,6 +158,8 @@ export function previewAnswerSeatRefs(seats:unknown, checker?:unknown):PreviewAn
   if(!Object.hasOwn(value,'writer')||!Object.hasOwn(value,'checker')||keys.some(key=>!ANSWER_SEAT_KEYS.includes(key))
     ||keys.some(key=>typeof value[key]!=='string'))fail('answer-seats-choice');
   if(keys.some(key=>!(PREVIEW_REVIEWED_PROVIDER_REFS as readonly string[]).includes(value[key] as string)))fail('answer-seat-unreviewed');
+  // Ruling R27b (SA9 fix round 1): one AI must not check its own answer.
+  if(value.writer===value.checker)fail('answer-seats-writer-is-checker');
   if(checker!==undefined)fail('answer-seats-with-checker-choice');
   const synthesizerRoleRef=value.writer as string,evaluatorRoleRef=value.checker as string;
   return Object.freeze({synthesizerRoleRef,evaluatorRoleRef,

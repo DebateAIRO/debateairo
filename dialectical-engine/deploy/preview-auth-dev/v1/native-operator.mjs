@@ -90,7 +90,7 @@ export function validateLineUpChoice(value) {
 /**
  * The operator's optional four answer seats (addition D23; publish-register-v2.ts PreviewAnswerSeatsChoice): kit v2's eleventh
  * argument and kit v3's twelfth. `writer` and `checker` required, `storyteller` and `storyChecker` optional (they otherwise
- * follow the writer and the checker), each a non-empty text. Shape only here: the kit refuses a ref outside the reviewed
+ * follow the writer and the checker), each a non-empty text, the writer never its own checker (Ruling R27b). Shape only here: the kit refuses a ref outside the reviewed
  * preview refs before any row is built. One way to set the checker: a plan may not carry both `answerSeats` and
  * `checkerChoice`. Like the checker choice, only plan and publish may carry it.
  */
@@ -98,6 +98,8 @@ export function validateAnswerSeatsChoice(value) {
  if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  exactKeys(value,['writer','checker',...['storyteller','storyChecker'].filter(key=>Object.hasOwn(value,key))],'PREVIEW_NATIVE_PLAN_REFUSED');
  if(Object.values(value).some(ref=>typeof ref!=='string'||ref.length<1))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ // Ruling R27b (SA9 fix round 1): one AI must not check its own answer (the kit refuses it too, answer-seats-writer-is-checker).
+ if(value.writer===value.checker)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  return value;
 }
 /**

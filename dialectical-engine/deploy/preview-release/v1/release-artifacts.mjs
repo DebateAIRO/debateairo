@@ -22,7 +22,7 @@
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
 //       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>'] [--question-language '<JSON object>']
-//       [--length-guidance '<JSON object>']
+//       [--length-guidance '<JSON object>'] [--line-up <line-up file>] [--answer-seats '<JSON object>']
 //       [--hosted-billing '<JSON object>']
 //       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
@@ -36,6 +36,12 @@
 //        policy switches the fast language check off)
 //       (--length-guidance only with --operation plan; publish carries the plan's choice; default: the base's length-guidance row
 //        kept as it is, or none)
+//       (--line-up and --answer-seats only with --operation plan; publish carries the plan's choices (side-by-side spec §13
+//        addition D23): --line-up names a root-owned 0644 JSON file in the artifacts folder holding the plan member that
+//        check-thinking-levels.ts --print-line-up prints ({"lineUp":{…}}) or the bare line-up; default: the base's
+//        previewLineUpPolicy row kept as it is, or none (the env's line-up). --answer-seats '{"writer":"preview:…","checker":
+//        "preview:…"}' (optional "storyteller", "storyChecker") chooses the four answer seats, never beside --checker and
+//        never with the writer as its own checker; default: today's seats)
 //   release-artifacts.mjs database-ahead --older-source-manifest <old candidate api manifest> --newer-source-manifest <new candidate api manifest>
 //       --out <artifacts folder>/database-ahead-<older label>.json
 //       (side-by-side spec §5: the database steps the newer release adds, each with both n1 header lines, and the newer
@@ -118,7 +124,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--hosted-billing'] },
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--line-up', '--answer-seats', '--hosted-billing'] },
   'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
 });
 
@@ -493,6 +499,15 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--length-guidance']);
   let lengthValue;
   if (lengthText !== undefined) try { lengthValue = strictJson(Buffer.from(lengthText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  // Line-up and answer seats (side-by-side spec §13, addition D23): for a new `plan` only. --line-up names a JSON file (read
+  // below); --answer-seats is one JSON object, one way to set the checker (never beside --checker). native-operator.mjs
+  // validateLineUpChoice / validateAnswerSeatsChoice below; the kit's parsers check the values again before any row is built.
+  const lineUpPath = options['--line-up'];
+  if (lineUpPath !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--line-up']);
+  const seatsText = options['--answer-seats'];
+  if (seatsText !== undefined && (operation !== 'plan' || checker !== undefined)) refuse('ARGUMENTS_REFUSED', ['--answer-seats']);
+  let seatsValue;
+  if (seatsText !== undefined) try { seatsValue = strictJson(Buffer.from(seatsText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--answer-seats']); }
   // The hosted preview (owner rulings 2026-10-13): the owner's billing switch, ceilings and room-read budget, as one JSON
   // object, for a new `plan` only (native-operator.mjs validateHostedBillingChoice below; publish-register-v3.ts checks it again).
   const hostedText = options['--hosted-billing'];
@@ -522,6 +537,19 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined) {
     const check = deps.validateLengthGuidanceChoice ?? (await nativeOperator()).validateLengthGuidanceChoice;
     try { lengthChoice = check(lengthValue); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  }
+  let lineUpChoice;
+  if (lineUpPath !== undefined) {
+    // The plan member --print-line-up prints ({"lineUp":{…}}, exactly that one key) or the bare line-up; anything else refuses.
+    const file = await readJson(lineUpPath, { layout, flag: '--line-up', maxBytes: MAX_PLAN_BYTES });
+    const value = plainObject(file.value) && Object.keys(file.value).length === 1 && Object.hasOwn(file.value, 'lineUp') ? file.value.lineUp : file.value;
+    const check = deps.validateLineUpChoice ?? (await nativeOperator()).validateLineUpChoice;
+    try { lineUpChoice = check(value); } catch { refuse('ARGUMENTS_REFUSED', ['--line-up']); }
+  }
+  let seatsChoice;
+  if (seatsText !== undefined) {
+    const check = deps.validateAnswerSeatsChoice ?? (await nativeOperator()).validateAnswerSeatsChoice;
+    try { seatsChoice = check(seatsValue); } catch { refuse('ARGUMENTS_REFUSED', ['--answer-seats']); }
   }
   let hostedChoice;
   if (hostedText !== undefined) {
@@ -589,6 +617,9 @@ async function nativePlanCommand(options, { layout, deps }) {
   const questionLanguage = operation === 'plan' ? languageChoice : operation === 'publish' ? from.value.questionLanguage : undefined;
   // The same for the length-guidance policy (LG-C): the policy object the plan's operator gave.
   const lengthGuidance = operation === 'plan' ? lengthChoice : operation === 'publish' ? from.value.lengthGuidance : undefined;
+  // The same for the line-up and the answer seats (addition D23): the values the plan's operator gave.
+  const lineUp = operation === 'plan' ? lineUpChoice : operation === 'publish' ? from.value.lineUp : undefined;
+  const answerSeats = operation === 'plan' ? seatsChoice : operation === 'publish' ? from.value.answerSeats : undefined;
   // The hosted inputs: a new plan's own; every other operation carries the --from plan's, so publish recomposes the
   // approved snapshot and verify and apply-and-plan compose from a hosted base with kit v3.
   const hostedBilling = operation === 'plan' ? hostedChoice : from.value.hostedBilling;
@@ -602,6 +633,8 @@ async function nativePlanCommand(options, { layout, deps }) {
     ...(debateShape === undefined ? {} : { debateShape }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     ...(lengthGuidance === undefined ? {} : { lengthGuidance }),
+    ...(lineUp === undefined ? {} : { lineUp }),
+    ...(answerSeats === undefined ? {} : { answerSeats }),
     ...(hostedBilling === undefined ? {} : { hostedBilling })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
