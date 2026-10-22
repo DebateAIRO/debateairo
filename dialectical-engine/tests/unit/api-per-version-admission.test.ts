@@ -44,7 +44,7 @@ import {
 } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
 import type { CostEstimator } from "@debateai/budget";
-import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
+import { AskRoomResponseSchema, PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import {
   RunCostSubstitutionRepository, RunRepository, type DiscoveredPanelMember, type StartRunInput, type StoredAsk, type WaitingRun,
   type WaitingRunRef
@@ -871,6 +871,78 @@ describe("(SA6) on the preview an ask is admitted on its version's line-up (addi
     const read = await roomRead(undefined);
     expect(read.map((question) => question.settingsClass.makerCount)).toEqual([5]);
     expect(read[0]).not.toHaveProperty("registerVersion");
+  });
+
+  /**
+   * Task SA7 part A (addition D24): the room read also names the line-up of the version it was read from
+   * (`preview_rosters`), taken from the same composed config its class counts, so the list /new shows and the class can
+   * never disagree. Off the preview (no composed config) the member is never written: today's body, byte for byte.
+   */
+  async function roomBody(input: Readonly<{ view?: () => Promise<unknown>; staticConfig?: PreviewProviderTestConfig;
+    funding?: boolean }>): Promise<Record<string, unknown>> {
+    const identity = testHttpIdentity("sa7a-room-read");
+    const askRoom: AskRoomReader = {
+      readRoom: async () => ({ room: "FITS", scope: null, resetsAt: null, waitingRunRef: null, planId: null,
+        ...(input.funding === true ? { funding: { kind: "INTERNAL" as const, expiresAt: new Date("2026-10-23T00:00:00.000Z") } } : {}) })
+    };
+    const api = buildApi({ application: fixtureApplication(), sessions: testSessionApplication([identity]),
+      allowedOrigin: TEST_APP_ORIGIN, askRoom,
+      ...(input.staticConfig === undefined ? {} : { previewProviderTestConfig: input.staticConfig,
+        previewTeamUserIds: [identity.authenticated.userId] }),
+      ...(input.view === undefined ? {} : { admissionView: input.view as never }) });
+    try {
+      const response = await api.inject({ method: "GET", headers: testSessionHeaders(identity),
+        url: "/v1/asks/room?plan_tier=premium&composition_budget_tier=high&depth=3" });
+      expect(response.statusCode).toBe(200);
+      return response.json() as Record<string, unknown>;
+    } finally {
+      await api.close();
+    }
+  }
+
+  it("(SA7A) the room read names the active version's rosters beside its version, from admissionView()'s config", async () => {
+    const view = vi.fn(async () => Object.freeze({ registerVersion: ACTIVE, modelScorecardInForce: false,
+      previewProviderTestConfig: ACTIVE_CONFIG }));
+    const body = await roomBody({ view, staticConfig: SITE_CONFIG });
+    expect(body.settings_version).toBe(ACTIVE);
+    expect(body.preview_rosters).toEqual({ free: [GLM, HAIKU], premium: [GLM, QWEN, HAIKU] });
+    expect(view).toHaveBeenCalledTimes(1);
+  });
+
+  it("(SA7A) an internal-funded room read (the second schema) names them too", async () => {
+    const view = vi.fn(async () => Object.freeze({ registerVersion: ACTIVE, modelScorecardInForce: false,
+      previewProviderTestConfig: ACTIVE_CONFIG }));
+    const body = await roomBody({ view, staticConfig: SITE_CONFIG, funding: true });
+    expect(body.funding).toMatchObject({ kind: "INTERNAL" });
+    expect(body.preview_rosters).toEqual({ free: [GLM, HAIKU], premium: [GLM, QWEN, HAIKU] });
+  });
+
+  it("(SA7A) without the view, the static (site) config's rosters, as the class counts them", async () => {
+    const body = await roomBody({ staticConfig: SITE_CONFIG });
+    expect(body).not.toHaveProperty("settings_version");
+    expect(body.preview_rosters).toEqual({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU] });
+  });
+
+  it("(SA7A) off the preview the member is never written: today's body, byte for byte", async () => {
+    const view = vi.fn(async () => Object.freeze({ registerVersion: ACTIVE, modelScorecardInForce: false }));
+    expect(await roomBody({ view })).toEqual({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null,
+      settings_version: ACTIVE });
+    expect(await roomBody({})).toEqual({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null });
+  });
+
+  it("(SA7A) the contract stays additive: the member is optional in both room-read schemas, strict when present", () => {
+    const fits = Object.freeze({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null });
+    const internal = Object.freeze({ ...fits, funding: { kind: "INTERNAL", expires_at: "2026-10-23T00:00:00.000Z" } });
+    const rosters = Object.freeze({ free: [GLM], premium: [GLM, QWEN] });
+    for (const body of [fits, internal]) {
+      // An older API's answer (no member) is read unchanged, and the new member is read as written.
+      expect(AskRoomResponseSchema.parse(body)).toEqual(body);
+      expect(AskRoomResponseSchema.parse({ ...body, preview_rosters: rosters })).toEqual({ ...body, preview_rosters: rosters });
+      for (const bad of [{ free: [GLM] }, { free: [], premium: [GLM] }, { free: [GLM], premium: [GLM], extra: [GLM] },
+        { free: [""], premium: [GLM] }, { free: GLM, premium: [GLM] }]) {
+        expect(AskRoomResponseSchema.safeParse({ ...body, preview_rosters: bad }).success).toBe(false);
+      }
+    }
   });
 });
 

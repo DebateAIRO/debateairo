@@ -1,4 +1,4 @@
-import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
+import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
@@ -3849,7 +3849,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ...(view.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const }),
       // Side-by-side spec §13 (Task S12): the version this answer was read from, which the page sends back with its ask;
       // without the view (no version named) the member is never written: today's body, byte for byte.
-      ...(view.registerVersion === undefined ? {} : { settings_version: view.registerVersion })
+      ...(view.registerVersion === undefined ? {} : { settings_version: view.registerVersion }),
+      // Addition D24 (Task SA7 part A): on the preview, the line-up of that same version, from the composed config the
+      // class above counts (previewLineUpOfConfig), so the list /new shows and the room's class can never disagree. Off
+      // the preview (no composed config) the member is never written: today's body, byte for byte.
+      ...((): Record<string, unknown> => {
+        if (view.previewProviderTestConfig === undefined) return {};
+        const lineUp = previewLineUpOfConfig(view.previewProviderTestConfig);
+        return { preview_rosters: { free: [...lineUp.free_model_ids], premium: [...lineUp.premium_model_ids] } };
+      })()
     }));
   });
 

@@ -43,6 +43,14 @@ export function parsePreviewRosterFlag(source: string): PreviewRosters | undefin
     // Step 1 (owner, 2026-10-08): Premium runs on the same single GLM on the private preview.
     return Object.freeze({ free: Object.freeze([LEGACY_PREVIEW_MODEL]), premium: Object.freeze([LEGACY_PREVIEW_MODEL]) });
   }
+  return reviewedRosters(decoded);
+}
+
+/**
+ * The object form's checks, shared by the build flag and the room read's member: a plain object with exactly the keys
+ * `free` and `premium`, each a non-empty list of unique reviewed ids, and the two-maker rule. Frozen copies, or undefined.
+ */
+function reviewedRosters(decoded: unknown): PreviewRosters | undefined {
   if (decoded === null || typeof decoded !== "object" || Object.getPrototypeOf(decoded) !== Object.prototype) return undefined;
   const keys = Object.keys(decoded).sort();
   if (keys.length !== 2 || keys[0] !== "free" || keys[1] !== "premium") return undefined;
@@ -53,6 +61,16 @@ export function parsePreviewRosterFlag(source: string): PreviewRosters | undefin
   const allMakers = makers([...free, ...premium]);
   if (allMakers.size >= 2 && (makers(free).size < 2 || makers(premium).size < 2)) return undefined;
   return Object.freeze({ free, premium });
+}
+
+/**
+ * Side-by-side spec §13 addition, D24 (Task SA7 part A): the room read's `preview_rosters` member — the line-up of the
+ * settings version the read was read from — checked exactly as the build flag's object form is (reviewed ids, each once,
+ * the two-maker rule), so the page never shows an id nobody reviewed. Undefined when the member is absent (an older API,
+ * or off the preview) or fails a check; the page then shows its build list. Never throws.
+ */
+export function previewRostersOfRoomRead(member: unknown): PreviewRosters | undefined {
+  return reviewedRosters(member);
 }
 
 /** Public build metadata only. Normal builds preserve the contract's roster. */

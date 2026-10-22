@@ -36,7 +36,7 @@ import {
   planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
-import { previewPlanRoster } from "@/lib/previewPlanRoster";
+import { previewPlanRoster, previewRostersOfRoomRead, type PreviewRosters } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   ANSWER_LENGTHS,
@@ -58,6 +58,7 @@ import {
 import billingEnglish from "@/messages/en/billing.json";
 
 // NEXT_PUBLIC is intentionally a direct reference so Next inlines this public build flag.
+// Addition D24 (Task SA7 part A): the fallback list only — the plan cards name the room read's line-up when it has one.
 const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, PLAN_TIER_ROSTERS);
 // Owner ruling 2026-10-10: a preview build (its public model-list flag is set) offers a shallower ceiling,
 // declared beside the depth bound in @debateai/contract; hosted builds keep the whole range.
@@ -247,6 +248,10 @@ function NewDebateForm({
   // Ruling R50: after a 409 whose room re-read failed, the version is forgotten and the next read naming one is adopted
   // as a switch (its switches apply as they are), without saying the sentence a second time.
   const adoptNextVersion = useRef(false);
+  // Addition D24 (Task SA7 part A): the line-up of the version the room read was read from (`preview_rosters`, checked
+  // against the reviewed ids), which the plan cards name; null until a read carries one, and then the build list shows.
+  // Kept across a later failed read, like the switches above (the cards still name that version's AIs).
+  const [roomRosters, setRoomRosters] = useState<PreviewRosters | null>(null);
   /**
    * Ruling R51 — A READ FROM ANOTHER VERSION IS AUTHORITATIVE: its shape and length switches apply as they are (they may
    * turn off, the one case they do), and the model-strength lock is read again from GET /v1/session (locked while that
@@ -255,6 +260,8 @@ function NewDebateForm({
   const adoptSettingsRead = useCallback((read: AskRoom) => {
     setShapeSettings(read.shape_settings === true);
     setLengthSettings(read.length_settings === true);
+    // Addition D24: that version's line-up, or the build list when the read carries none (or one that fails a check).
+    setRoomRosters(previewRostersOfRoomRead(read.preview_rosters) ?? null);
     setModelScorecard("PENDING");
     void contractClient.readSession().then(
       (session) => { setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE"); },
@@ -274,6 +281,8 @@ function NewDebateForm({
     } else {
       if (room.shape_settings === true) setShapeSettings(true);
       if (room.length_settings === true) setLengthSettings(true);
+      const rosters = previewRostersOfRoomRead(room.preview_rosters);
+      if (rosters !== undefined) setRoomRosters(rosters);
     }
     if (room.answer_words !== undefined) setAnswerWords(room.answer_words);
     if (named !== undefined) settingsVersion.current = named;
@@ -531,7 +540,7 @@ function NewDebateForm({
                 >
                   <span className="ndTierName">{t(catalog, option.nameKey)}</span>
                   <span className="ndTierPromise">{t(catalog, option.promiseKey)}</span>
-                  <PlanCardModels plan={option.value} scorecard={modelScorecard} catalog={catalog} />
+                  <PlanCardModels plan={option.value} rosters={roomRosters ?? displayPlanTierRosters} scorecard={modelScorecard} catalog={catalog} />
                 </button>
               ))}
             </div>
@@ -724,7 +733,9 @@ function NewDebateForm({
    session says no scored model list is in force — the one state in which that
    list is what a debate is seated with. Otherwise (in force, pending, failed)
    it carries one plain line, true in every one of those states. */
-function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecard: ScorecardSignal; catalog: MessageCatalog }) {
+function PlanCardModels({ plan, rosters, scorecard, catalog }: {
+  plan: PlanTier; rosters: PreviewRosters; scorecard: ScorecardSignal; catalog: MessageCatalog;
+}) {
   if (!planCardNamesRoster(scorecard)) {
     return (
       <span className="ndTierModels">
@@ -734,7 +745,7 @@ function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecar
   }
   return (
     <span className="ndTierModels">
-      {displayPlanTierRosters[plan].map((modelId) => (
+      {rosters[plan].map((modelId) => (
         <span key={modelId} className="ndTierModel">
           <span
             className="modelDot"
