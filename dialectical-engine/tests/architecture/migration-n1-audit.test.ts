@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { N1_GRANDFATHERED_THROUGH, parseN1Header } from "../../packages/db/src/migration-n1.js";
 import {
@@ -8,6 +9,7 @@ import {
   auditNumericSourceLiteralExports,
   auditSourceRules,
   definedFunctionNames,
+  definedRelationNames,
   N1_GRANDFATHERED_COUNT,
   type N1AuditContext
 } from "../../tools/orphan-audit/src/index.js";
@@ -20,10 +22,12 @@ import {
  */
 const PROBE = "migrations/0199_probe.sql";
 const HEADER = "-- probe\n-- n1: expand\n-- n1: keeps-verifier\n";
-const KEEPS: N1AuditContext = { earlierFunctions: new Set<string>(), keepsVerifier: true };
+/** core.run is a table an earlier step created: the release before reads and writes it. */
+const KEEPS: N1AuditContext = { earlierFunctions: new Set<string>(), earlierRelations: new Set(["core.run"]), keepsVerifier: true };
+const context = (changes: Partial<N1AuditContext>): N1AuditContext => ({ ...KEEPS, ...changes });
 const expandFindings = (body: string, context: N1AuditContext = KEEPS): readonly string[] =>
   auditMigrationN1Compatibility(PROBE, `${HEADER}${body}\n`, context);
-const repository = (path: string): string => new URL(`../../${path}`, import.meta.url).pathname;
+const repository = (path: string): string => fileURLToPath(new URL(`../../${path}`, import.meta.url));
 
 describe("side-by-side §5: the N-1 audit", () => {
   it("the real tree is clean", async () => {
@@ -60,15 +64,18 @@ describe("side-by-side §5: the N-1 audit", () => {
       [
         "CREATE OR REPLACE FUNCTION core.reject_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$;",
         "N1_FORBIDDEN_REPLACE",
-        { earlierFunctions: new Set(["core.reject_mutation"]), keepsVerifier: true }
+        context({ earlierFunctions: new Set(["core.reject_mutation"]) })
       ],
-      ["CREATE OR REPLACE VIEW core.run_waiting_v AS SELECT 1 AS one;", "N1_FORBIDDEN_REPLACE"],
+      [
+        "CREATE OR REPLACE VIEW core.run_waiting_v AS SELECT 1 AS one;", "N1_FORBIDDEN_REPLACE",
+        context({ earlierRelations: new Set(["core.run", "core.run_waiting_v"]) })
+      ],
       ["CREATE TRIGGER t BEFORE INSERT ON core.run FOR EACH ROW EXECUTE FUNCTION core.reject_mutation();", "N1_FORBIDDEN_TRIGGER"],
       ["CREATE INDEX IF NOT EXISTS i ON core.run (a);", "N1_STRONG_LOCK_INDEX"],
       ["ALTER TABLE core.run ADD CONSTRAINT c CHECK (a > 0);", "N1_STRONG_LOCK_CONSTRAINT"],
       ["ALTER TABLE core.run ADD CONSTRAINT u UNIQUE (a) NOT VALID;", "N1_STRONG_LOCK_CONSTRAINT"],
       [
-        "ALTER TABLE core.run ADD CONSTRAINT c CHECK (a > 0) NOT VALID;\nALTER TABLE core.run VALIDATE CONSTRAINT c;",
+        "-- n1: reviewed the release before writes only positive values\nALTER TABLE core.run ADD CONSTRAINT c CHECK (a > 0) NOT VALID;\nALTER TABLE core.run VALIDATE CONSTRAINT c;",
         "N1_STRONG_LOCK_VALIDATE"
       ],
       ["UPDATE core.run SET a = 1;", "N1_STRONG_LOCK_BACKFILL"],
@@ -76,7 +83,28 @@ describe("side-by-side §5: the N-1 audit", () => {
       ["INSERT INTO core.run (a) SELECT 1;", "N1_STRONG_LOCK_BACKFILL"],
       ["LOCK TABLE core.run;", "N1_STRONG_LOCK_LOCK_TABLE"],
       ["REINDEX TABLE core.run;", "N1_STRONG_LOCK_LOCK_TABLE"],
-      ["DO $x$ BEGIN EXECUTE 'DROP TABLE core.run'; END $x$;", "N1_DYNAMIC_SQL"]
+      ["DO $x$ BEGIN EXECUTE 'DROP TABLE core.run'; END $x$;", "N1_DYNAMIC_SQL"],
+      // A8 review, item 4: the statements that rewrite or empty a table, or block its reads.
+      ["TRUNCATE core.run;", "N1_STRONG_LOCK_TRUNCATE"],
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k uuid NOT NULL DEFAULT gen_random_uuid();", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k bigint DEFAULT nextval('core.k_seq');", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k bigserial;", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k timestamptz DEFAULT clock_timestamp();", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k int GENERATED ALWAYS AS (a + 1) STORED;", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run SET LOGGED;", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run SET UNLOGGED;", "N1_STRONG_LOCK_REWRITE"],
+      ["ALTER TABLE core.run SET TABLESPACE fast;", "N1_STRONG_LOCK_REWRITE"],
+      ["REFRESH MATERIALIZED VIEW core.run_totals;", "N1_STRONG_LOCK_REFRESH"],
+      // A8 review, item 5: a new restriction on an existing table needs review, and some are never expand.
+      ["ALTER TABLE core.run ADD CONSTRAINT c CHECK (a > 0) NOT VALID;", "N1_UNREVIEWED_RESTRICTION"],
+      ["ALTER TABLE core.run ADD CONSTRAINT f FOREIGN KEY (a) REFERENCES core.other (id) NOT VALID;", "N1_UNREVIEWED_RESTRICTION"],
+      ["ALTER TABLE core.run ENABLE ROW LEVEL SECURITY;", "N1_FORBIDDEN_ROW_SECURITY"],
+      ["CREATE POLICY p ON core.run FOR SELECT USING (true);", "N1_FORBIDDEN_ROW_SECURITY"],
+      ["CREATE RULE r AS ON INSERT TO core.run DO INSTEAD NOTHING;", "N1_FORBIDDEN_RULE"],
+      ["ALTER TABLE core.run DISABLE TRIGGER run_guard;", "N1_FORBIDDEN_TRIGGER"],
+      ["ALTER TABLE core.run ENABLE TRIGGER run_guard;", "N1_FORBIDDEN_TRIGGER"],
+      // A8 review, item 3: CREATE TABLE IF NOT EXISTS of a table an earlier step made does not make it new.
+      ["CREATE TABLE IF NOT EXISTS core.run (a int);\nCREATE INDEX IF NOT EXISTS i ON core.run (a);", "N1_STRONG_LOCK_INDEX"]
     ];
     for (const [body, code, context] of seeded) {
       const findings = expandFindings(body, context);
@@ -98,7 +126,21 @@ describe("side-by-side §5: the N-1 audit", () => {
       ],
       [
         "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS y text;",
-        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS w int NOT NULL DEFAULT 0;"
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS w int NOT NULL DEFAULT 0;",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS v text NOT NULL DEFAULT 'en';",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS u jsonb NOT NULL DEFAULT '{}'::jsonb;",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS t timestamptz NOT NULL DEFAULT now();",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS s timestamptz DEFAULT CURRENT_TIMESTAMP;",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS r boolean NOT NULL DEFAULT false;"
+      ],
+      [
+        "-- n1: reviewed every row the release before writes has a positive a",
+        "ALTER TABLE core.run ADD CONSTRAINT p CHECK (a > 0) NOT VALID;",
+        "REFRESH MATERIALIZED VIEW CONCURRENTLY core.run_totals;",
+        "CREATE OR REPLACE VIEW core.new_v AS SELECT 1 AS one;",
+        "CREATE TABLE IF NOT EXISTS core.fresh (a int);",
+        "ALTER TABLE core.fresh ENABLE ROW LEVEL SECURITY;",
+        "CREATE POLICY fresh_read ON core.fresh FOR SELECT USING (true);"
       ],
       ["CREATE INDEX CONCURRENTLY IF NOT EXISTS j ON core.run (a);"],
       [
@@ -138,20 +180,64 @@ describe("side-by-side §5: the N-1 audit", () => {
       "ALTER TABLE core.run DROP CONSTRAINT IF EXISTS c;",
       "ALTER TABLE core.run ADD CONSTRAINT d CHECK (a >= 0) NOT VALID;"
     ].join("\n"));
-    expect(findings).toHaveLength(1);
-    expect(findings[0]).toContain(" N1_FORBIDDEN_DROP ");
+    // The drop is no pair, and the new constraint d is a restriction nobody reviewed (the line stands above the drop).
+    expect(findings.map((finding) => finding.split(" ")[1])).toEqual(["N1_FORBIDDEN_DROP", "N1_UNREVIEWED_RESTRICTION"]);
     // Unreviewed, a guard pair on a table the release before uses is a drop and a new trigger there.
     expect(expandFindings("DROP TRIGGER IF EXISTS g ON core.run;\nCREATE TRIGGER g BEFORE UPDATE ON core.run FOR EACH ROW EXECUTE FUNCTION f();")
       .map((finding) => finding.split(" ")[1])).toEqual(["N1_FORBIDDEN_DROP", "N1_FORBIDDEN_TRIGGER"]);
+  });
+
+  // A8 review, item 1: a DO body runs when the step applies, so its statements are read like the file's own.
+  it("a DO block's statements are checked, with or without EXECUTE", () => {
+    const codes = (body: string): readonly string[] => expandFindings(body).map((finding) => finding.split(" ")[1]!);
+    expect(codes([
+      "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'c') THEN",
+      "  ALTER TABLE core.run ADD CONSTRAINT c CHECK (a > 0);",
+      "END IF; END $$;"
+    ].join("\n"))).toEqual(["N1_STRONG_LOCK_CONSTRAINT"]);
+    expect(codes("DO $$ BEGIN UPDATE core.run SET a = 1; ALTER TABLE core.run DROP COLUMN x; END $$;"))
+      .toEqual(["N1_STRONG_LOCK_BACKFILL", "N1_FORBIDDEN_DROP"]);
+    expect(codes("DO $do$ BEGIN\n  IF true THEN TRUNCATE core.run; ELSE LOCK TABLE core.run; END IF;\nEND $do$;"))
+      .toEqual(["N1_STRONG_LOCK_TRUNCATE", "N1_STRONG_LOCK_LOCK_TABLE"]);
+    // Its own literals and nested bodies stay text; a reviewed EXECUTE still has its statements read.
+    expect(codes("DO $$ BEGIN RAISE NOTICE 'DROP TABLE core.run; UPDATE core.run SET a = 1'; END $$;")).toEqual([]);
+    expect(codes("-- n1: reviewed probe\nDO $$ BEGIN EXECUTE 'SELECT 1'; UPDATE core.run SET a = 1; END $$;")).toEqual(["N1_STRONG_LOCK_BACKFILL"]);
+    // The line is the statement's own line in the file.
+    expect(expandFindings("DO $$\nBEGIN\n  UPDATE core.run SET a = 1;\nEND $$;")[0]).toMatch(new RegExp(`^${PROBE}:6 N1_STRONG_LOCK_BACKFILL `, "u"));
+  });
+
+  // A8 review, item 2: one lexer pass, so a comment marker inside a literal hides nothing.
+  it("a comment marker inside a literal hides no statement", () => {
+    const codes = (body: string): readonly string[] => expandFindings(body).map((finding) => finding.split(" ")[1]!);
+    expect(codes([
+      "COMMENT ON COLUMN core.run.a IS 'release key -- side by side';",
+      "ALTER TABLE core.run DROP COLUMN x;",
+      "UPDATE core.run SET a = 1;"
+    ].join("\n"))).toEqual(["N1_FORBIDDEN_DROP", "N1_STRONG_LOCK_BACKFILL"]);
+    expect(codes("SELECT '/*';\nALTER TABLE core.run DROP COLUMN x;\nSELECT '*/';")).toEqual(["N1_FORBIDDEN_DROP"]);
+    expect(codes("SELECT E'it\\'s -- not a comment';\nALTER TABLE core.run DROP COLUMN x;")).toEqual(["N1_FORBIDDEN_DROP"]);
+    expect(codes("SELECT 'it''s /* still text';\nUPDATE core.run SET a = 1;")).toEqual(["N1_STRONG_LOCK_BACKFILL"]);
+    // And the other way round: a quote inside a comment opens nothing.
+    expect(codes("-- the run's columns\nALTER TABLE core.run DROP COLUMN x;\n/* it's */ UPDATE core.run SET a = 1;"))
+      .toEqual(["N1_FORBIDDEN_DROP", "N1_STRONG_LOCK_BACKFILL"]);
+  });
+
+  // A8 review, item 6: a new overload of an earlier function's name does not make a revoke on that name new.
+  it("a revoke on an earlier function is a finding even beside a new overload", () => {
+    const findings = expandFindings(
+      "CREATE OR REPLACE FUNCTION core.reject_mutation(p int) RETURNS int LANGUAGE sql AS $$ SELECT p $$;\nREVOKE ALL ON FUNCTION core.reject_mutation(int) FROM PUBLIC;",
+      context({ earlierFunctions: new Set(["core.reject_mutation"]) })
+    );
+    expect(findings.map((finding) => finding.split(" ")[1])).toEqual(["N1_FORBIDDEN_REPLACE", "N1_FORBIDDEN_REVOKE"]);
   });
 
   it("header findings", () => {
     const none = auditMigrationN1Compatibility(PROBE, "-- probe\nSELECT 1;\n", KEEPS);
     expect(none).toHaveLength(1);
     expect(none[0]).toMatch(/^migrations\/0199_probe\.sql:1 N1_HEADER_INVALID EXPAND_OR_DRAINED$/u);
-    expect(auditMigrationN1Compatibility(PROBE, `${HEADER}SELECT 1;\n`, { earlierFunctions: new Set(), keepsVerifier: false }))
+    expect(auditMigrationN1Compatibility(PROBE, `${HEADER}SELECT 1;\n`, context({ keepsVerifier: false })))
       .toEqual([`${PROBE}:1 N1_KEEPS_VERIFIER_MISMATCH the header says true, the lineage manifest says false`]);
-    expect(auditMigrationN1Compatibility(PROBE, `${HEADER}SELECT 1;\n`, { earlierFunctions: new Set(), keepsVerifier: null }))
+    expect(auditMigrationN1Compatibility(PROBE, `${HEADER}SELECT 1;\n`, context({ keepsVerifier: null })))
       .toEqual([`${PROBE}:1 N1_KEEPS_VERIFIER_MISMATCH the header says true, no lineage manifest names the file`]);
     expect(auditMigrationN1Compatibility(PROBE, "-- n1: drained\n-- n1: keeps-verifier\nDROP TABLE core.run;\n", KEEPS)).toEqual([]);
     expect(auditMigrationN1Compatibility("migrations/0050_old.sql", "DROP TABLE core.run;\nUPDATE core.run SET a = 1;\n", KEEPS))
@@ -168,6 +254,12 @@ describe("side-by-side §5: the N-1 audit", () => {
       "-- CREATE FUNCTION core.commented() …",
       "CREATE FUNCTION billing.read_x(p uuid) RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;"
     ].join("\n"))).toEqual(["core.reject_mutation", "billing.read_x"]);
+    expect(definedRelationNames([
+      "CREATE TABLE IF NOT EXISTS Core.Run (a int);",
+      "CREATE OR REPLACE VIEW core.run_waiting_v AS SELECT 'CREATE TABLE core.hidden' AS x;",
+      "CREATE MATERIALIZED VIEW IF NOT EXISTS core.run_totals AS SELECT 1;",
+      "CREATE TABLE identity.\"user\" (id uuid);"
+    ].join("\n"))).toEqual(["core.run", "identity._user_", "core.run_waiting_v", "core.run_totals"]);
   });
 
   // The server's release check (deploy/preview-lifecycle/v1/migration-steps.mjs, built in another lane) reads the same

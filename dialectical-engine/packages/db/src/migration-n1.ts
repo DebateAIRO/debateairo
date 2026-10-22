@@ -14,8 +14,9 @@
  * After 0122 exactly one of expand/drained is required, and a declaration placed after the first statement, doubled or
  * misspelled is refused, so a header can never be silently ignored. One line is not a declaration: `-- n1: reviewed
  * <reason>` (N1_REVIEWED_LINE), placed directly above a statement the N-1 audit (tools/orphan-audit migration-n1.ts)
- * admits only once reviewed; it may stand anywhere, and without a reason it is refused like any misspelled declaration. 0122 and earlier predate the rule: they declare
- * nothing and read all false (0117-0122 state their verifier in their loaders, migration-forward0122.ts:9-10).
+ * admits only once reviewed; it may stand anywhere, and without a reason it is refused like any misspelled declaration.
+ * 0122 and earlier predate the rule: they declare nothing and read all false (0117-0122 state their verifier in their
+ * loaders, migration-forward0122.ts:9-10).
  *
  * Self-contained, like every module loadMigrationPlan loads (node built-ins and ./migration-*.js only: the plan is
  * loaded by standalone probes and by the preview's superuser JIT creator), so a refusal is a plain Error whose message
@@ -50,7 +51,7 @@ const DECLARATIONS: ReadonlyMap<string, DeclarationKey> = new Map([
 ]);
 /** Any line that looks like a declaration, exact or not (a misspelled or misplaced one is refused, never skipped). */
 const DECLARATION_LIKE = /^--\s*n1\s*:/u;
-/** A reviewed exception of the N-1 audit (side-by-side §5, plan A task A8), with its reason; read on the trimmed line. */
+/** A reviewed exception of the N-1 audit (side-by-side §5, plan A task A8), with its reason; read trimmed. */
 export const N1_REVIEWED_LINE = /^-- n1: reviewed \S/u;
 const declarationLike = (line: string): boolean => DECLARATION_LIKE.test(line) && !N1_REVIEWED_LINE.test(line);
 /** The one statement an outside-transaction body may hold: plain lowercase names, no `;` before its own end. */

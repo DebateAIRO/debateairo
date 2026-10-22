@@ -30,20 +30,30 @@ below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116
 7. The SQL file's leading comment block carries its n1 header lines (side-by-side spec §5, "The N-1 rule"; below):
    `-- n1: expand` for every step after 0123 (only a drained upload, like 0123, may say `-- n1: drained`), and
    `-- n1: keeps-verifier` exactly when step 3 made no new verifier. CI's N-1 audit (`tools/orphan-audit`
-   `auditMigrationN1Compatibility`, run by `auditSourceRules` on every `migrations/*.sql`) refuses a missing or wrong
-   header, a `keeps-verifier` line the manifest contradicts, and, in an expand step, anything the release before
-   cannot run beside: a `DROP`, `RENAME`, column type change, `SET NOT NULL`, `ADD COLUMN … NOT NULL` without
-   `DEFAULT`, a `REVOKE` or `CREATE OR REPLACE` of what earlier steps made (a new function or view supersedes it;
-   a new view is written `CREATE VIEW`), a new trigger on an existing table, and every strong lock on one: `CREATE
-   INDEX` without `CONCURRENTLY`, `ADD CONSTRAINT` without `NOT VALID` (and any `UNIQUE`, `PRIMARY KEY` or `EXCLUDE`),
-   `VALIDATE CONSTRAINT` in the step that adds it, `UPDATE` / `DELETE` / `INSERT … SELECT`, `LOCK TABLE`, `CLUSTER`,
-   `VACUUM FULL` and `REINDEX` without `CONCURRENTLY`. Function bodies are not read (they run when called). Tables the
-   step creates itself are free. Three exceptions pass with a `-- n1: reviewed <reason>` line directly above them,
-   the reason saying why the older release is unaffected: `DROP TRIGGER IF EXISTS t ON x` followed by
-   `CREATE TRIGGER t … ON x`; `ALTER TABLE x DROP CONSTRAINT IF EXISTS c` followed by
-   `ALTER TABLE x ADD CONSTRAINT c … NOT VALID` (same name, same table; on a table the step creates neither pair needs
-   the line); and a `DO` block that runs `EXECUTE`. A reviewed line without a reason is refused like a misspelled
-   declaration. Files up to `0122_engine_map_check.sql` predate the rule and are not audited; their count is pinned
+   `auditMigrationN1Compatibility`, run by `auditSourceRules` on every `migrations/*.sql`; GitHub workflow
+   `security.yml`, job `verify`, step `pnpm run test:ci-gate`, which runs `tests/architecture/migration-n1-audit.test.ts`
+   and `scaffold.test.ts`) refuses a missing or wrong header, a `keeps-verifier` line the manifest contradicts, and,
+   in an expand step, anything the release before cannot run beside. The SQL is read in one lexer pass (comments,
+   literals, quoted names and dollar bodies in source order); a function body is not read (it runs when called), a
+   `DO` body is (it runs when the step applies). A table or view is new only when this step creates it and no earlier
+   step did; everything else is existing. Refused in an expand step:
+   - `DROP`, `RENAME`, a column type change, `SET NOT NULL`, `ADD COLUMN … NOT NULL` without `DEFAULT`;
+   - `REVOKE` on an existing object (an earlier function's name counts, even beside a new overload) and
+     `CREATE OR REPLACE` of an earlier function or view (a new one supersedes it);
+   - on an existing table: a new trigger, `ENABLE`/`DISABLE TRIGGER`, any row-level-security change or policy, a
+     rule, and an `ADD CONSTRAINT` that is not `NOT VALID` or adds `UNIQUE`, `PRIMARY KEY` or `EXCLUDE`;
+   - every strong lock on an existing table: `CREATE INDEX` without `CONCURRENTLY`, `VALIDATE CONSTRAINT` in the step
+     that adds it, `UPDATE` / `DELETE` / `INSERT … SELECT`, `ADD COLUMN` with a default other than a constant (a
+     literal, a number, `TRUE`/`FALSE`/`NULL`, `now()`, `CURRENT_TIMESTAMP`, each optionally cast) or a generated or
+     serial value, `SET LOGGED` / `UNLOGGED` / `TABLESPACE`; and anywhere `TRUNCATE`, `LOCK TABLE`, `CLUSTER`,
+     `VACUUM FULL`, `REINDEX` and `REFRESH MATERIALIZED VIEW` without `CONCURRENTLY`.
+   A `-- n1: reviewed <reason>` line directly above a statement, the reason saying why the older release is
+   unaffected, admits exactly four things: `DROP TRIGGER IF EXISTS t ON x` followed by `CREATE TRIGGER t … ON x`;
+   `ALTER TABLE x DROP CONSTRAINT IF EXISTS c` followed by `ALTER TABLE x ADD CONSTRAINT c … NOT VALID` (same name,
+   same table; on a table the step creates neither pair needs the line); any other `ADD CONSTRAINT … NOT VALID` on an
+   existing table (a new restriction its writes meet); and a `DO` block that runs `EXECUTE` (its other statements are
+   still read). A reviewed line without a reason is refused like a misspelled declaration. Files up to
+   `0122_engine_map_check.sql` predate the rule and are not audited; their count is pinned
    (`N1_GRANDFATHERED_COUNT`), so a file slipped in before the cut-off is refused too.
 
 `migrate()` then runs the base recipe, 0108, the sealed verifier and 0110 as before, then each pending step in order:

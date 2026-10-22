@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { EVENT_CONSUMERS } from "@debateai/contract";
 import { loadMigrationPlan, sha256, type MigrationPlan } from "../../../packages/db/src/migration-lineage.js";
 import { lineAt, maskSqlComments, maskSqlQuotedLiterals, sqlDoBlocks, type SqlDoBlock } from "./sql-text.js";
-import { auditMigrationN1Compatibility, auditN1GrandfatheredCount, definedFunctionNames, readLineageKeepsVerifier } from "./migration-n1.js";
+import { auditMigrationN1Compatibility, auditN1GrandfatheredCount, definedFunctionNames, definedRelationNames, readLineageKeepsVerifier } from "./migration-n1.js";
 
 // Side-by-side spec 2026-10-21 §5 (plan A, task A8): the N-1 audit, run below by auditSourceRules.
 export * from "./migration-n1.js";
@@ -776,15 +776,17 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
   const migrateSource = await readFile(join(root, "packages/db/src/index.ts"), "utf8");
   const transactionSource = await readFile(join(root, "packages/db/src/migration-transaction.ts"), "utf8");
   const migrationNames = (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort();
-  // Side-by-side §5 (A8): each file's N-1 audit knows the functions of the files sorted before it and whether its
-  // lineage manifest keeps the verifier in force.
+  // Side-by-side §5 (A8): each file's N-1 audit knows the functions, tables and views of the files sorted before it and
+  // whether its lineage manifest keeps the verifier in force. CI runs this (security.yml, job verify: test:ci-gate).
   const keepsVerifier = await readLineageKeepsVerifier(join(migrationsDirectory, "lineage"));
   const earlierFunctions = new Set<string>();
+  const earlierRelations = new Set<string>();
   for (const name of migrationNames) {
     const source = await readFile(join(migrationsDirectory, name), "utf8");
     blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource, transactionSource }));
-    blocking.push(...auditMigrationN1Compatibility(`migrations/${name}`, source, { earlierFunctions, keepsVerifier: keepsVerifier.get(name) ?? null }));
+    blocking.push(...auditMigrationN1Compatibility(`migrations/${name}`, source, { earlierFunctions, earlierRelations, keepsVerifier: keepsVerifier.get(name) ?? null }));
     for (const defined of definedFunctionNames(source)) earlierFunctions.add(defined);
+    for (const defined of definedRelationNames(source)) earlierRelations.add(defined);
   }
   blocking.push(...auditN1GrandfatheredCount(migrationNames));
   await auditOrphans();
