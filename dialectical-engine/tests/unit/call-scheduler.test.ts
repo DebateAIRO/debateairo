@@ -47,6 +47,32 @@ describe("call scheduler", () => {
     expect(one.stats().peakInFlight).toBe(1);
     expect(three.stats().peakInFlight).toBe(3);
   });
+  it("reads perModelPerDebate from the lane, not the policy: a lane allowing one call of a model holds its second back, and one allowing three runs all three", async () => {
+    const s = createCallScheduler({ policy: { perDebate: 2, perModelPerDebate: 2, perModelPerRunner: { default: 1000 } } });
+    const narrow = s.openLane("d1", { perDebate: 3, perModelPerDebate: 1 });
+    const started: string[] = []; const gs = Array.from({ length: 3 }, deferred);
+    const runs = [t("A"), t("A"), t("B")].map((ticket, i) => narrow.run(ticket, () => { started.push(`${ticket.model}${i}`); return gs[i]!.promise; }));
+    await flush();
+    expect(started).toEqual(["A0", "B2"]); // A1 waits: the lane allows one call of A, the policy's two would start it
+    gs.forEach((g) => g.resolve("ok")); await Promise.all(runs);
+    const wide = s.openLane("d2", { perDebate: 3, perModelPerDebate: 3 });
+    const wideStarted: string[] = []; const ws = Array.from({ length: 3 }, deferred);
+    const wideRuns = [0, 1, 2].map((i) => wide.run(t("A"), () => { wideStarted.push(`A${i}`); return ws[i]!.promise; }));
+    await flush();
+    expect(wideStarted).toEqual(["A0", "A1", "A2"]); // all three: the lane allows three of A, the policy's two would hold the third
+    ws.forEach((g) => g.resolve("ok")); await Promise.all(wideRuns);
+  });
+  it("copies a lane's limits when it opens: changing the caller's object afterwards changes nothing", async () => {
+    const s = createCallScheduler({ policy });
+    const limits = { perDebate: 1, perModelPerDebate: 1 };
+    const lane = s.openLane("d1", limits);
+    limits.perDebate = 3; limits.perModelPerDebate = 3;
+    expect(lane.callsAtOnce).toBe(1);
+    const gs = Array.from({ length: 2 }, deferred); const started: string[] = [];
+    const runs = gs.map((g, i) => lane.run(t("A"), () => { started.push(`A${i}`); return g.promise; }));
+    await flush(); expect(started).toEqual(["A0"]);
+    gs.forEach((g) => g.resolve("ok")); await Promise.all(runs);
+  });
   it("the runner-wide per-model cap still holds across two lanes that each carry their own limits: a model with cap 2 never runs three", async () => {
     const s = createCallScheduler({ policy: { perDebate: 2, perModelPerDebate: 2, perModelPerRunner: { default: 2 } } });
     const l1 = s.openLane("d1", { perDebate: 3, perModelPerDebate: 3 });
@@ -79,7 +105,10 @@ describe("call scheduler", () => {
       { perDebate: 1, perModelPerDebate: 0 }, { perDebate: 1, perModelPerDebate: 17 },
       { perDebate: 1.5, perModelPerDebate: 1 }, { perDebate: 1, perModelPerDebate: 2.5 }, { perDebate: Number.NaN, perModelPerDebate: 1 }
     ];
-    for (const limits of refused) expect(() => s.openLane("d1", limits)).toThrow(new TypeError("CALL_LANE_LIMITS_INVALID"));
+    for (const limits of refused) {
+      expect(() => s.openLane("d1", limits)).toThrowError(TypeError);
+      expect(() => s.openLane("d1", limits)).toThrow(new TypeError("CALL_LANE_LIMITS_INVALID"));
+    }
     // The bounds themselves are allowed.
     expect(s.openLane("d2", { perDebate: 64, perModelPerDebate: 16 }).callsAtOnce).toBe(64);
     expect(s.openLane("d3", { perDebate: 1, perModelPerDebate: 1 }).callsAtOnce).toBe(1);
