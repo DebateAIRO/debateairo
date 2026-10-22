@@ -43,6 +43,18 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
   const [message, setMessage] = useState<string | null>(null);
   const cardRef = useRef<HTMLElement>(null);
   const focusFromLink = useRef(false);
+  // Cancel on the security check, or the request it confirmed, unmounts the focused control: focus goes back to
+  // Export data, or to the card's heading while that button is disabled or gone (keyboard check 2026-10-22).
+  const heading = useRef<HTMLHeadingElement>(null);
+  const requestButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (!returnFocus.current) return;
+    returnFocus.current = false;
+    const back = requestButton.current;
+    if (back && back.isConnected && !back.disabled) back.focus();
+    else heading.current?.focus();
+  });
 
   useEffect(() => {
     let active = true;
@@ -103,6 +115,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
   }, [confirming]);
 
   async function request(grantToken: string): Promise<void> {
+    returnFocus.current = true;
     setConfirming(false);
     setRequesting(true);
     setMessage(null);
@@ -120,7 +133,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
 
   return (
     <section className="setCard" aria-labelledby="export-heading" ref={cardRef}>
-      <h2 className="setCardTitle" id="export-heading">{t(catalog, "settings.export.title")}</h2>
+      <h2 className="setCardTitle" id="export-heading" ref={heading} tabIndex={-1}>{t(catalog, "settings.export.title")}</h2>
       <p className="setCardHint">{t(catalog, "settings.export.hint")}</p>
       {status === null && !statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.checking")}</p> : null}
       {statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.statusUnavailable")}</p> : null}
@@ -135,7 +148,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
       {noMethod && !statusUnavailable ? <><p className="setStatus" role="status">{t(catalog, "settings.export.noMethod")}</p><div className="setCardRow"><a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a></div></> : null}
       {status !== null && !statusUnavailable && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT") && !noMethod ? (
         <div className="setCardRow">
-          <button className="setBtn" type="button" disabled={requesting} onClick={() => { if (!confirming) void beginConfirmation(); }}>
+          <button className="setBtn" type="button" ref={requestButton} disabled={requesting} onClick={() => { if (!confirming) void beginConfirmation(); }}>
             {requesting ? t(catalog, "settings.export.requesting")
               : status.status === "SENT" ? t(catalog, "settings.export.requestAgain")
               : t(catalog, "settings.export.request")}
@@ -146,7 +159,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
       {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "EXPORT_DATA" }}
         onError={() => setMessage(t(catalog, "settings.export.notAuthorized"))}
         onConfirmed={(result) => request(result.step_up_grant.token)}
-        onCancel={() => { setConfirming(false); setMessage(null); }} /> : null}
+        onCancel={() => { returnFocus.current = true; setConfirming(false); setMessage(null); }} /> : null}
       {message ? <p className="setStatus" role="status">{message}</p> : null}
     </section>
   );

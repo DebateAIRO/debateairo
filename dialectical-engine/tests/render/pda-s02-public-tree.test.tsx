@@ -264,6 +264,32 @@ describe("S02 shared tree leaves in public read-only mode", () => {
     );
     expect(drawer.textContent).toContain("⚐ Challenge");
   });
+
+  it("gives every Thread row a Challenge button, named with its claim, that opens the challenge", async () => {
+    // 2026-10-22 keyboard audit: Thread took the callback and never rendered it, so a keyboard
+    // user could challenge from Tree and Split but not from Thread.
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const onChallengeNode = vi.fn();
+    const thread = await render(
+      <DebateThread
+        root={rootNode}
+        expanded={new Set()}
+        collapsed={new Set()}
+        meta={{ nodes: 1, depth: 1 }}
+        onOpenNode={() => undefined}
+        onChallengeNode={onChallengeNode}
+        onToggleExpand={() => undefined}
+        onToggleCollapse={() => undefined}
+      />
+    );
+    const button = thread.querySelector<HTMLButtonElement>(`#thread-challenge-${CSS.escape(child.id)}`)!;
+    expect(button.textContent).toBe("⚐ Challenge");
+    const name = button.getAttribute("aria-labelledby")!.split(" ").map((id) => document.getElementById(id)?.textContent);
+    expect(name).toEqual(["⚐ Challenge", child.claim]);
+
+    await act(async () => button.click());
+    expect(onChallengeNode).toHaveBeenCalledWith(expect.objectContaining({ id: child.id }), button);
+  });
 });
 
 describe("S02 public argument-tree projection", () => {

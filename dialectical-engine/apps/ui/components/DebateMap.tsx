@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
@@ -90,6 +90,8 @@ export function DebateMap({
   const { catalog } = useChromeI18n();
   const textLang = useDebateTextLang();
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const segmentRefs = useRef(new Map<string, SVGElement>());
 
   const maxDepth = Math.max(1, treeDepth(root));
   const ringW = (MAX_R - HUB_R - GAP - RING_GAP * (maxDepth - 1)) / maxDepth;
@@ -120,6 +122,35 @@ export function DebateMap({
     });
   };
   place(root, 0, START, START + Math.PI * 2 - 0.024);
+
+  // The whole map is ONE Tab stop: the hub, then every wedge in the order the tree reads (depth
+  // first), and the arrow keys walk between them (Home and End jump to either end). A Tab stop per
+  // wedge put dozens of stops between a keyboard reader and the readout on a large debate.
+  const segmentIds = [root.id, ...arcs.map((arc) => arc.id)];
+  const tabStopId = activeId !== null && segmentIds.includes(activeId) ? activeId : root.id;
+  const segmentRef = (id: string) => (element: SVGElement | null) => {
+    if (element === null) segmentRefs.current.delete(id);
+    else segmentRefs.current.set(id, element);
+  };
+  function onSegmentKeyDown(event: KeyboardEvent<SVGElement>, id: string, open: () => void) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      open();
+      return;
+    }
+    const index = segmentIds.indexOf(id);
+    const last = segmentIds.length - 1;
+    const next = event.key === "ArrowRight" || event.key === "ArrowDown"
+      ? (index === last ? 0 : index + 1)
+      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+        ? (index === 0 ? last : index - 1)
+        : event.key === "Home" ? 0 : event.key === "End" ? last : null;
+    if (next === null) return;
+    event.preventDefault();
+    const nextId = segmentIds[next]!;
+    setActiveId(nextId);
+    segmentRefs.current.get(nextId)?.focus();
+  }
 
   const readoutNode = hoverId ? arcs.find((a) => a.id === hoverId)?.node ?? root : root;
   const readoutRole = roleOf(readoutNode);
@@ -156,18 +187,17 @@ export function DebateMap({
                 opacity={(hoverId && hoverId !== arc.id ? 0.55 : 1) * arc.opacity}
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
                 role="button"
-                tabIndex={0}
+                tabIndex={arc.id === tabStopId ? 0 : -1}
+                ref={segmentRef(arc.id)}
                 aria-label={`${localizedRoleLabel(arc.node, catalog, debateChromeCatalog)}: ${arc.node.claim}`}
                 lang={textLang.lang}
                 onClick={() => onOpenSplit(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
-                onFocus={() => setHoverId(arc.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onOpenSplit(arc.id);
-                  }
+                onFocus={() => {
+                  setHoverId(arc.id);
+                  setActiveId(arc.id);
                 }}
+                onKeyDown={(event) => onSegmentKeyDown(event, arc.id, () => onOpenSplit(arc.id))}
               >
                 <title>{arc.node.claim}</title>
               </path>
@@ -181,21 +211,22 @@ export function DebateMap({
               strokeWidth={2.5}
               style={{ cursor: "pointer" }}
               role="button"
-              tabIndex={0}
+              tabIndex={root.id === tabStopId ? 0 : -1}
+              ref={segmentRef(root.id)}
               aria-label={root.claim}
               lang={textLang.lang}
               onClick={() => {
                 setHoverId(null);
                 onOpenSplit(root.id);
               }}
-              onFocus={() => setHoverId(null)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setHoverId(null);
-                  onOpenSplit(root.id);
-                }
+              onFocus={() => {
+                setHoverId(null);
+                setActiveId(root.id);
               }}
+              onKeyDown={(event) => onSegmentKeyDown(event, root.id, () => {
+                setHoverId(null);
+                onOpenSplit(root.id);
+              })}
             >
               <title>{root.claim}</title>
             </circle>

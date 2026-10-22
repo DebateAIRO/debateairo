@@ -1193,7 +1193,13 @@ export function Assistant({
           <div className="supportSuggestions" aria-label={t(chromeCatalog,"support.suggestions")}>
             {HELP_SUGGESTIONS.map((suggestionKey) => <button
               type="button" key={suggestionKey} disabled={inert}
-              onClick={() => void sendRequest(t(chromeCatalog,suggestionKey))}
+              onClick={() => {
+                // Sending disables every suggestion until the answer arrives, which would drop the
+                // pressed one's keyboard focus to the page. The conversation goes on in the composer,
+                // where a topic already puts focus; the disabled suggestions and Send still say it is busy.
+                inputRef.current?.focus();
+                void sendRequest(t(chromeCatalog,suggestionKey));
+              }}
             >{t(chromeCatalog,suggestionKey)}</button>)}
           </div>
         </div>

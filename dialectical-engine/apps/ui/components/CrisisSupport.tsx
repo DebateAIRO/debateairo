@@ -32,12 +32,24 @@ export function isCrisisSupportRefusal(failure: unknown): boolean {
  * the help screen instead of doing nothing. It answers `false` until the patterns are warm, so
  * a keystroke never waits for the first compile; the caller's Start runs `offerIfCrisis`
  * first either way.
+ *
+ * `returnFocusRef` names where keyboard focus goes when the screen closes and the control that
+ * opened it could not keep focus: after the API refused an ask, Start was disabled while the
+ * request ran, so the browser had already dropped focus to the page. Callers pass their question
+ * field — "Back to my question" means exactly that. When Start still holds focus (the pre-check),
+ * closing returns to Start as before.
  */
 export function useCrisisSupport({
   catalog,
   locale,
-  countryHint = null
-}: Readonly<{ catalog: MessageCatalog; locale: string; countryHint?: string | null }>): Readonly<{
+  countryHint = null,
+  returnFocusRef
+}: Readonly<{
+  catalog: MessageCatalog;
+  locale: string;
+  countryHint?: string | null;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
+}>): Readonly<{
   offerIfCrisis: (question: string) => boolean;
   flags: (question: string) => boolean;
   offer: () => void;
@@ -63,6 +75,7 @@ export function useCrisisSupport({
       locale={locale}
       countryHint={countryHint}
       onBack={() => setOpen(false)}
+      returnFocusRef={returnFocusRef}
     />
   ) : null;
   const flags = (question: string): boolean =>
@@ -117,12 +130,15 @@ export function CrisisSupportDialog({
   catalog,
   locale,
   countryHint,
-  onBack
+  onBack,
+  returnFocusRef
 }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint: string | null;
   onBack: () => void;
+  /** Where focus goes on close when the opener can no longer hold it (see the hook above). */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }>): React.ReactElement {
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const titleRef = React.useRef<HTMLElement | null>(null);
@@ -133,7 +149,7 @@ export function CrisisSupportDialog({
   // Esc and "Back to my question" close it. The backdrop does not: a stray click must not take
   // the numbers away from someone who needs them.
   useHideOutside(dialogRef);
-  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: titleRef, onClose: onBack });
+  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: titleRef, onClose: onBack, returnFocusRef });
 
   return (
     <div className="policyScrim">

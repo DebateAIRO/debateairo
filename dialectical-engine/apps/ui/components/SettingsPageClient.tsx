@@ -67,15 +67,21 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
 }) {
   const [changingFrom, setChangingFrom] = useState<string | null>(null);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  // Back from the change form (or its request sent) unmounts the focused control: the Email card takes focus.
+  const [returned, setReturned] = useState(false);
 
   if (changingFrom !== null) {
     return (
       <ChangeEmailScreen
         catalog={catalog}
         currentEmail={changingFrom}
-        onBack={() => setChangingFrom(null)}
+        onBack={() => {
+          setReturned(true);
+          setChangingFrom(null);
+        }}
         onRequested={() => {
           setEmailNotice(t(catalog, "settings.email.requested"));
+          setReturned(true);
           setChangingFrom(null);
         }}
       />
@@ -94,6 +100,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
           <EmailSettingsCard
             catalog={catalog}
             notice={emailNotice}
+            restoreFocus={returned}
             onChange={(currentEmail) => {
               setEmailNotice(null);
               setChangingFrom(currentEmail);

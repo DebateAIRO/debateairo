@@ -187,6 +187,7 @@ function ThreadRowCard({
   const headingId = `thread-arg-${node.id}`;
   const claimIsHeading = state === "done";
   const detailsId = `thread-details-${node.id}`;
+  const challengeId = `thread-challenge-${node.id}`;
 
   return (
     <div className="threadRow">
@@ -283,6 +284,22 @@ function ThreadRowCard({
                 </div>
               ) : null}
               <div className="nodeControls nodeReferenceFooter" data-reference-thread-footer>
+                {/* The keyboard's way to challenge a row: selecting prose needs a pointer or a
+                    screen reader's selection, so Thread offers the same button Tree does. */}
+                {onChallengeNode ? (
+                  <button
+                    type="button"
+                    className="nodeCtrl challenge"
+                    id={challengeId}
+                    aria-labelledby={`${challengeId} ${headingId}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onChallengeNode(node, event.currentTarget);
+                    }}
+                  >
+                    <span aria-hidden="true">⚐</span> {t(catalog, "debateViews.challenge")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="nodeCtrl"
