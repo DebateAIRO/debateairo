@@ -53,6 +53,16 @@ async function settled() {
   return { runId, answerId, answerVersion: 1 };
 }
 
+async function claimFor(answer: { runId: string; answerId: string; answerVersion: number }) {
+  const claims = await repository.claimNextRequests(10, 60_000);
+  const claim = claims.find((candidate) =>
+    candidate.runId === answer.runId && candidate.answerId === answer.answerId
+      && candidate.answerVersion === answer.answerVersion
+  );
+  expect(claim).toBeDefined();
+  return claim!;
+}
+
 describe("synthesis answer access under debateai_runtime", () => {
   it("reports HELD for a fresh request and SHOW after its result is stored", async () => {
     // Property: the owner hold follows the repository state of the current answer version.
@@ -61,10 +71,9 @@ describe("synthesis answer access under debateai_runtime", () => {
     await repository.insertRequest(answer);
     const access = createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 });
     expect(await access.stateOf(answer)).toBe("HELD");
-    const [claim] = await repository.claimNextRequests(1, 60_000);
-    expect(claim).toBeDefined();
+    const claim = await claimFor(answer);
     await repository.insertResult({
-      ...answer, attemptId: claim!.attemptId, synthesisOriginVersion: 1,
+      ...answer, attemptId: claim.attemptId, synthesisOriginVersion: 1,
       outcome: { verdict: "NO_SYNTHESIS", categories: [] },
       modelProviderRef: null, modelId: null,
       policyVersion: "synthesis.content-check.v1@0123456789abcdef",
@@ -105,10 +114,9 @@ describe("synthesis answer access under debateai_runtime", () => {
     const ownership = { ownerRef: owner.ownerRef, legacyAskerId: null };
     expect(await readOwnerRun({ application, synthesisAnswerAccess: access }, answer.runId, session, ownership))
       .toEqual({ ...projection, synthesis_check: "CHECKING" });
-    const [claim] = await repository.claimNextRequests(1, 60_000);
-    expect(claim).toBeDefined();
+    const claim = await claimFor(answer);
     await repository.insertResult({
-      ...answer, attemptId: claim!.attemptId, synthesisOriginVersion: 1,
+      ...answer, attemptId: claim.attemptId, synthesisOriginVersion: 1,
       outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] },
       modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
       policyVersion: "synthesis.content-check.v1@0123456789abcdef",
@@ -180,9 +188,9 @@ describe("synthesis answer access under debateai_runtime", () => {
       const heldItem = held.json().items.find((item: { run_ref: string }) => item.run_ref === answer.runId);
       expect(heldItem).not.toHaveProperty("models");
       expect(heldItem).not.toHaveProperty("synthesis_flag");
-      const [claim] = await repository.claimNextRequests(1, 60_000);
+      const claim = await claimFor(answer);
       await repository.insertResult({
-        ...answer, attemptId: claim!.attemptId, synthesisOriginVersion: 1,
+        ...answer, attemptId: claim.attemptId, synthesisOriginVersion: 1,
         outcome: { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] },
         modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
         policyVersion: "synthesis.content-check.v1@0123456789abcdef",
