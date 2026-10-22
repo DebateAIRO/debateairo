@@ -3065,6 +3065,13 @@ RZ=$(readyz "$UIP"); echo "T's website /readyz (Host 127.0.0.1:$UIP, as Caddy's 
 echo TB6_DONE
 ```
 
+Note from R20 (2026-10-22): TB6 stopped inside the downtime with `differs: ["RestrictFileSystems"]` for both the API
+and the website. The settings were the same; only the printing differed: the full `systemctl show` saved at TA0 leaves
+an empty setting out, while `systemctl show -p` prints an empty deny list as a bare `~`. The owner approved resuming
+with a copy of the TA0 capture that had a `RestrictFileSystems=~` line added, and the compare then said SAME. The tool
+now reads a bare `~` as empty (for RestrictFileSystems, RestrictAddressFamilies and SystemCallFilter), so this stop
+should not come back; a `~` followed by names is still a real list and is still compared.
+
 From TB6 on, the team unlock and the creator read the current release's API from the release table and lock v2.
 
 ### TB7. Caddy with two slots
@@ -3186,13 +3193,17 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 ```sh
 NN=rNN; REV='<the 40-character commit of T, the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
-jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r | .knownRed = []' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
 [ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 
-The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
-PR: it checks `REV`'s suites against dev's schema).
+The diff must change exactly the two lines `commit` and `reason`, and empty `knownRed` (the previous release's own stale
+tests; `setAside` stays). Once CI is green, merge it (the job itself runs on this PR: it checks `REV`'s suites against
+dev's schema). If it is red only on a test of `REV` that is red on `REV`'s own schema too (run that file at `REV`
+without `DEBATEAI_TEST_SCHEMA_FROM` to tell), fix the test on dev in this PR and add its full name to `knownRed` with
+the reason; a test that tests the migration chain itself goes to `setAside` instead (tools/n1-baseline.mjs). Never list
+a failure that only the schema migrated ahead causes: that is the incompatibility the job exists to catch.
 
 ### The way back from T
 
@@ -4002,13 +4013,17 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 ```sh
 NN=rNN; REV='<the 40-character commit of the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
-jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r | .knownRed = []' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
 [ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 
-The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
-PR: it checks `REV`'s suites against dev's schema).
+The diff must change exactly the two lines `commit` and `reason`, and empty `knownRed` (the previous release's own stale
+tests; `setAside` stays). Once CI is green, merge it (the job itself runs on this PR: it checks `REV`'s suites against
+dev's schema). If it is red only on a test of `REV` that is red on `REV`'s own schema too (run that file at `REV`
+without `DEBATEAI_TEST_SCHEMA_FROM` to tell), fix the test on dev in this PR and add its full name to `knownRed` with
+the reason; a test that tests the migration chain itself goes to `setAside` instead (tools/n1-baseline.mjs). Never list
+a failure that only the schema migrated ahead causes: that is the incompatibility the job exists to catch.
 
 ### SB14. Later: the old release retired, and its receipt
 

@@ -1,7 +1,7 @@
 {
   "schema": "debateai-n1-baseline-v1",
-  "commit": null,
-  "reason": "no fenced release yet",
+  "commit": "432cd8f09a800848fce8cab28aef79610b126ab0",
+  "reason": "432cd8f09-r20-v1",
   "suites": [
     "tests/integration/b3-holds-waiting-line.test.ts",
     "tests/integration/b7b-waiting-line.test.ts",
@@ -13,7 +13,26 @@
     "tests/integration/live-run-events.test.ts",
     "tests/integration/identity-database.test.ts",
     "tests/integration/session-database.test.ts",
-    "tests/integration/staff-access-database.test.ts",
     "tests/integration/internal-allowance-database.test.ts"
+  ],
+  "setAside": [
+    {
+      "name": "tests/integration/staff-access-database.test.ts",
+      "reason": "tests the migration chain itself: its setup builds the auth branch's historical lineage (92 migrations and its own debateai_schema_migration table) on an empty database, which HEAD's migrate-cli has already filled"
+    },
+    {
+      "name": "tests/integration/session-database.test.ts > S5 sessions on real PostgreSQL > preserves the exact 29 function identities/owners/ACLs/security while clamping only ordinary sessions",
+      "reason": "measures migration 0099 while the suite's own migrate() applies it; on a database HEAD already migrated 0099 never runs there, so there is nothing to measure"
+    }
+  ],
+  "knownRed": [
+    {
+      "name": "tests/integration/b3-holds-waiting-line.test.ts > B3 the waiting line (budget spec §2.7) > lists a waiting run oldest first with its class, until it starts or fails",
+      "reason": "stale at 432cd8f09 (R20 live): readWaiting() gained releaseKey (side-by-side 18a48127c) and the test was not updated; red on its own schema too; fixed on dev in #209; drop at the next baseline"
+    },
+    {
+      "name": "tests/integration/run-setup-failure.test.ts > a run whose setup fails after it was created > leaves a job alone that a runner already claimed before dispatch reported its error",
+      "reason": "stale at 432cd8f09 (R20 live): claimById() is fenced to the runner's release (side-by-side) and the test's runner used the legacy fence; red on its own schema too; fixed on dev in #209; drop at the next baseline"
+    }
   ]
 }

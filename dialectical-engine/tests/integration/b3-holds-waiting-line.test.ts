@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore, costEnvelopeDay, withSpendDecisionLock } from "@debateai/budget";
 import { RunRepository, RunWaitRepository, migrate } from "@debateai/db";
+import { LEGACY_RELEASE_KEY } from "@debateai/kernel";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -260,7 +261,9 @@ describe("B3 the waiting line (budget spec §2.7)", () => {
     expect(await waits.readWaiting(first)).toEqual({
       runId: first, waitingSince: since, ownerRef: null, legacyAskerId: askerId,
       planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
-      waitsFor: null, personRecheckAt: null, reasonAt: null
+      waitsFor: null, personRecheckAt: null, reasonAt: null,
+      // Side-by-side (plan C task C10): the release that admitted the run; legacyRun() stamps no key of its own.
+      releaseKey: LEGACY_RELEASE_KEY
     });
     expect(await waits.isWaiting(database.pool, first)).toBe(true);
     const oldest = (await waits.oldestWaiting(1_000)).map((run) => run.runId);

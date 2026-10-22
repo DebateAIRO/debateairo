@@ -52,6 +52,19 @@ export const COMPARED_PROPERTIES = Object.freeze(('User Group SupplementaryGroup
  * one of those still refuses (which one would be true?).
  */
 export const MULTI_VALUED_PROPERTIES = Object.freeze(['EnvironmentFiles', 'BindPaths', 'BindReadOnlyPaths', 'TemporaryFileSystem', 'DeviceAllow']);
+/**
+ * The compared properties systemd prints as a list with a leading `~` when the list is a deny list (systemctl-show.c
+ * prints these three that way: an allow list is the bare entries, a deny list is `~` then the entries). With nothing
+ * denied, a full `systemctl show` leaves the line out, but `systemctl show -p <name>` prints a bare `~` (found on the
+ * test server, systemd 259, R20 TB6 2026-10-22). So for these three a bare `~` means "nothing denied" and is read as
+ * empty; `~ext4` (a real deny list) and `ext4` (an allow list) are still compared exactly.
+ * - RestrictFileSystems: `~` = no file system type denied (the R20 case).
+ * - RestrictAddressFamilies: `~` = no socket family denied.
+ * - SystemCallFilter: `~` = no system call denied.
+ * Not here: RestrictNamespaces prints yes/no/names, never `~`; SocketBindAllow/SocketBindDeny print entries like
+ * `ipv4:tcp:80`, never `~`. A bare `~` in any other property stays a value of its own.
+ */
+export const EMPTY_DENY_LIST_PROPERTIES = Object.freeze(['RestrictAddressFamilies', 'SystemCallFilter', 'RestrictFileSystems']);
 
 class TemplateRefusal extends Error { constructor(code, fields) { super(code); this.name = 'TemplateRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new TemplateRefusal(code, fields); };
@@ -186,7 +199,8 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
 /**
  * The properties of COMPARED_PROPERTIES whose effective values differ between the old fixed unit (`before`) and the
  * new instance (`after`), in list order. The only accepted difference is the env file path `…/<service>.env` ->
- * `…/<service>-<label>.env`. A property systemd did not print (it omits empty ones) counts as empty.
+ * `…/<service>-<label>.env`. A property systemd did not print (it omits empty ones) counts as empty, and so does a
+ * bare `~` in one of EMPTY_DENY_LIST_PROPERTIES (an empty deny list, as `systemctl show -p` prints it).
  */
 export function compareEffective({ service, label, before, after, layout = LAYOUT }) {
   const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -194,7 +208,8 @@ export function compareEffective({ service, label, before, after, layout = LAYOU
   // A multi-valued property is its ordered list, one entry per line (parseShow); a single value is itself.
   const value = (record, name) => {
     const raw = Object.hasOwn(record, name) ? record[name] : undefined;
-    return typeof raw === 'string' ? raw : Array.isArray(raw) && raw.every(entry => typeof entry === 'string') ? raw.join('\n') : '';
+    const text = typeof raw === 'string' ? raw : Array.isArray(raw) && raw.every(entry => typeof entry === 'string') ? raw.join('\n') : '';
+    return text === '~' && EMPTY_DENY_LIST_PROPERTIES.includes(name) ? '' : text;
   };
   const oldPath = new RegExp(`${escape(`${layout.nativePlanRoot}/${service}.env`)}(?![A-Za-z0-9._-])`, 'g');
   const newPath = `${layout.nativePlanRoot}/${service}-${label}.env`;
