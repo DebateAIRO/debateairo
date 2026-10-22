@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Protezzjoni tal-konsumatur"
+  "chrome.footer.consumerProtection": "Protezzjoni tal-konsumatur",
+  "chrome.release.newerVersion": "Is-sit ġie aġġornat. Erġa’ tella’ l-paġna.",
+  "chrome.release.reload": "Erġa’ tella’",
+  "chrome.release.madeByNewer": "Dan id-dibattitu inħoloq minn verżjoni aktar ġdida tas-sit. Erġa’ tella’ l-paġna, jew erġa’ pprova wara ftit minuti."
 }

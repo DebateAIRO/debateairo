@@ -135,6 +135,6 @@ describe("support migration upgrade convergence", () => {
     await expect(applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS)).resolves.toBeUndefined();
     expect(await supportTelemetryShape(upgraded)).toEqual(expected);
     await expectV2CaseInsertEnforcement(upgraded);
-    await expect(migrate(upgraded.pool)).resolves.toBeUndefined();
+    await expect(migrate(upgraded.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
   });
 });

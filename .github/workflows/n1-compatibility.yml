@@ -1,0 +1,91 @@
+# .github/workflows/n1-compatibility.yml
+# Side-by-side uploads (spec 2026-10-21 §5, "The N-1 rule"; plan A, task A10). During an upload the release that is live
+# keeps running its debates on a database the new release has already migrated. This job proves the live release's code
+# still works there: it checks out the released commit (dialectical-engine/tests/n1-baseline.json `commit`, set by the
+# release guide each time a release goes live) beside HEAD, and runs that OLD commit's database suites (`suites`) with
+# DEBATEAI_TEST_SCHEMA_FROM pointing at HEAD's dialectical-engine folder: every test database is first migrated by HEAD's
+# migrate-cli, then the old suite's own migrate() meets a database migrated ahead (the database-ahead path, A7). The old
+# commit's own tools/ci-known-red.mjs and tests/ci-known-red.txt judge its own tests.
+#   - Until a release is fenced, `commit` is null: the job prints N1_BASELINE_NONE and stops green.
+#   - pnpm and node are called directly: an old checkout's tools/source-map-hotfix.mjs allow-list cannot learn a new label.
+#   - It runs on a pull request into dev or main only when a path that can change the schema or the baseline changes,
+#     and by hand. It is NOT a required check at first (a path-filtered check that never reports would block merges).
+# The job only runs in CI, never on the Mac.
+name: n1-compatibility
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "dialectical-engine/migrations/**"
+      - "dialectical-engine/packages/db/**"
+      - "dialectical-engine/packages/budget/**"
+      - "dialectical-engine/tests/n1-baseline.json"
+      - ".github/workflows/n1-compatibility.yml"
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: "n1-compatibility-${{ github.ref }}", cancel-in-progress: true }
+jobs:
+  old-code-on-new-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # L6-F7 (B24e): every action is pinned to a full commit SHA; the trailing comment is the release tag (same pins as
+      # security.yml; Dependabot keeps both current).
+      # Full history, so the released commit can be checked out beside HEAD as a second worktree.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { path: head, fetch-depth: 0 }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with: { version: 11.20.0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        # No pnpm cache: while tests/n1-baseline.json names no commit the job stops before any install, and
+        # setup-node's post step would then fail saving a store path that was never created.
+        with: { node-version: 26.8.2 }
+      # A broken baseline file refuses N1_BASELINE_INVALID here (bash -e), so it can never stop green.
+      - name: Read the released commit
+        id: baseline
+        run: |
+          commit="$(node head/dialectical-engine/tools/n1-baseline.mjs commit)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          if [ "$commit" = "none" ]; then
+            echo "N1_BASELINE_NONE: tests/n1-baseline.json names no released commit yet; nothing to check"
+          else
+            echo "N1 baseline: $commit"
+          fi
+      - name: Check out the released commit beside HEAD
+        if: steps.baseline.outputs.commit != 'none'
+        env: { N1_COMMIT: "${{ steps.baseline.outputs.commit }}" }
+        run: |
+          git -C head worktree add ../old "$N1_COMMIT"
+          # A released commit older than the DEBATEAI_TEST_SCHEMA_FROM hook would run its suites on its OWN schema and
+          # pass without testing anything; refuse instead. Both the variable and the call that runs HEAD's migrate-cli
+          # on each new test database must be there.
+          if ! grep -q DEBATEAI_TEST_SCHEMA_FROM old/dialectical-engine/tests/support/testDatabase.ts \
+            || ! grep -qF 'applyTestSchemaFrom(connectionString)' old/dialectical-engine/tests/support/testDatabase.ts; then
+            echo "N1_BASELINE_HARNESS_MISSING: $N1_COMMIT predates the DEBATEAI_TEST_SCHEMA_FROM test hook"
+            exit 1
+          fi
+      - if: steps.baseline.outputs.commit != 'none'
+        working-directory: head/dialectical-engine
+        run: pnpm install --frozen-lockfile
+      - if: steps.baseline.outputs.commit != 'none'
+        working-directory: head/dialectical-engine
+        run: pnpm run generate:contract
+      - if: steps.baseline.outputs.commit != 'none'
+        working-directory: old/dialectical-engine
+        run: pnpm install --frozen-lockfile
+      - if: steps.baseline.outputs.commit != 'none'
+        working-directory: old/dialectical-engine
+        run: pnpm run generate:contract
+      - name: Run the released commit's database suites on a schema migrated by HEAD
+        id: old_suites
+        if: steps.baseline.outputs.commit != 'none'
+        working-directory: old/dialectical-engine
+        env:
+          DEBATEAI_TEST_SCHEMA_FROM: ${{ github.workspace }}/head/dialectical-engine
+        run: |
+          # Read once on its own first: a failing reader inside $(…) would leave an empty list, never a green gate.
+          node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" suites
+          node tools/ci-known-red.mjs $(node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" suites)
+      - name: How to read a red run
+        if: always() && steps.old_suites.outcome == 'failure'
+        run: echo "N1 red whose failures read DATABASE_AHEAD_NOT_ACCEPTED NOT_EXPAND = HEAD carries a drained step; the release takes the drained upload (spec §5 escape hatch). That is not a code defect."

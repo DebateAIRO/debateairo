@@ -1,11 +1,16 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { authorizationPolicyInventory, buildApi } from "@debateai/api";
 import { BillingPlansResponseSchema, contractInventory } from "@debateai/contract";
+import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { BILLING_ROUTE_PATHS, type BillingRouteOptions } from "../../apps/api/src/billing/index.js";
+import { createBillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import type { GeoLookup } from "@debateai/geo";
-import { testBillingPlans, testRegionalPlans, unusedAskApplication } from "../support/billingFixtures.js";
+import {
+  testBillingPlans, testBillingPolicy, testCountryPolicy, testRegionalPlans, unusedAskApplication
+} from "../support/billingFixtures.js";
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 /** testBillingPlans' prices (the regional fixture shares them): every plan in every currency. */
@@ -262,5 +267,93 @@ describe("P8a the API root hands the billing runtime's routes to buildApi", () =
     expect(returned, "createBillingRuntime returns an object literal").not.toBeNull();
     const returnOpen = (returns[0] ?? 0) + (returned?.[0].length ?? 0) - 1;
     expect(topLevelMembers(runtime, returnOpen)).toContainEqual(expect.stringMatching(/^routes(?:\s*:\s*routes)?$/u));
+  });
+});
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §4 (plan C task C7): the billing runtime's five timers (outbox 5 s, renewals
+ * 60 s, the money check 10 min, the spool replay 10 min, the owner's daily jobs) and their immediate first passes run
+ * only while `when()` says this release is current; `kick` (a route's, on work this process accepted) never asks.
+ * Composed over a pool that only counts: a loop that ran would touch it.
+ */
+describe("side-by-side C7 the billing runtime's loops run only while the release is current", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  function composed() {
+    const touches = { count: 0 };
+    const query = async () => { touches.count += 1; throw new Error("COUNTING_POOL_ANSWERS_NOTHING"); };
+    const pool = { query, connect: query } as unknown as BillingRuntimeDeps["pool"];
+    const runtime = createBillingRuntime({
+      pool,
+      connectors: {
+        payments: {}, noticeTrust: {}, paymentEnvironment: "sandbox", tax: {}, invoiceRo: {}, recordsKey: Buffer.alloc(32, 7),
+        ownerReportEmail: "owner@example.test", publicAppUrl: TEST_APP_ORIGIN
+      } as unknown as BillingRuntimeDeps["connectors"],
+      policy: testBillingPolicy,
+      plans: testBillingPlans,
+      countryPolicy: testCountryPolicy,
+      geo: { lookup: () => ({ country: "XX", tor: false }), close: () => undefined } as unknown as GeoLookup,
+      legal: { requiresReacceptance: async () => false },
+      dekStore: {} as unknown as BillingRuntimeDeps["dekStore"],
+      mail: undefined,
+      audit: () => undefined,
+      clock: () => new Date(),
+      reportPending: () => undefined,
+      ownerSpend: { readOwnerSpentMicros: async () => 0 },
+      blindIndexKey: new Uint8Array(32),
+      identities: { ownerRefByEmailBlindIndex: async () => null },
+      taxAuthorities: taxAuthoritiesFromValue(
+        TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
+      )
+    });
+    const drain = vi.spyOn(runtime.outbox, "drain").mockResolvedValue(0 as never);
+    const renew = vi.spyOn(runtime.renewal, "runOnce").mockResolvedValue(undefined as never);
+    const maintain = vi.spyOn(runtime.maintenance, "runOnce").mockResolvedValue(undefined as never);
+    const sweep = vi.spyOn(runtime.erasure, "sweep").mockResolvedValue(undefined as never);
+    return { runtime, touches, drain, renew, maintain, sweep };
+  }
+
+  it("asks nothing for ten minutes while not current, and the routes' kick still drains", async () => {
+    vi.useFakeTimers();
+    const { runtime, touches, drain, renew, maintain, sweep } = composed();
+    try {
+      runtime.start({ when: () => false });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(drain).toHaveBeenCalledTimes(0);
+      expect(renew).toHaveBeenCalledTimes(0);
+      expect(maintain).toHaveBeenCalledTimes(0);
+      expect(sweep).toHaveBeenCalledTimes(0);
+      expect(touches.count).toBe(0);
+      runtime.kick();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(drain).toHaveBeenCalledTimes(1);
+    } finally { runtime.stop(); }
+  });
+
+  it("runs as before while current: the outbox 121 times in 600 s (1 at the start + 120 ticks)", async () => {
+    vi.useFakeTimers();
+    const { runtime, drain, renew, sweep } = composed();
+    try {
+      runtime.start({ when: () => true });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(drain).toHaveBeenCalledTimes(121);
+      expect(renew).toHaveBeenCalledTimes(11);
+      expect(sweep).toHaveBeenCalledTimes(2);
+    } finally { runtime.stop(); }
+  });
+
+  it("starts loops that wait for the release: they run from the first tick after it becomes current", async () => {
+    vi.useFakeTimers();
+    const { runtime, drain, renew } = composed();
+    let current = false;
+    try {
+      runtime.start({ when: () => current });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(drain).toHaveBeenCalledTimes(0);
+      current = true;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(drain).toHaveBeenCalledTimes(12);
+      expect(renew).toHaveBeenCalledTimes(1);
+    } finally { runtime.stop(); }
   });
 });

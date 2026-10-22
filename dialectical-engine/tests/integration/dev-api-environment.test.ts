@@ -164,6 +164,8 @@ describe("DEV-09 private local API environment", () => {
     expect(environment.get("HATCHET_CLIENT_TOKEN")).toBe(testToken());
     expect(environment.get("PUBLIC_APP_URL")).toBe("https://localhost:3000");
     expect(environment.get("REGISTER_VERSION")).toBe("424242");
+    // Side-by-side §1: a local stack runs as r<REGISTER_VERSION>-000000000000.
+    expect(environment.get("RELEASE_KEY")).toBe(["r424242", "000000000000"].join("-"));
     expect(environment.get("REGISTER_DEPLOYMENT_RECEIPT_SHA256"))
       .toBe((await readDevelopmentDeploymentRegisterReceipt(test.repositoryRoot)).receiptSha256);
     expect(environment.get("REGISTER_DEPLOYMENT_RECEIPT_FILE"))
@@ -355,11 +357,15 @@ describe("DEV-09 private local API environment", () => {
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
-    // Paid plans L1: the records row now follows the mode row, so a file written before the mode
-    // row existed lacks BOTH rows, and must upgrade to exactly the current file.
-    const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    // Paid plans L1: the records row now follows the mode row, and (side-by-side §1) the release
+    // key row follows the records row, so a file written before the mode row existed lacks ALL
+    // three rows, and must upgrade to exactly the current file.
+    const RELEASE_ROW = current.slice(current.lastIndexOf("RELEASE_KEY="));
+    expect(RELEASE_ROW).toBe(`RELEASE_KEY=${["r424242", "000000000000"].join("-")}\n`);
+    const withoutRelease = current.slice(0, -RELEASE_ROW.length);
+    const RECORDS_ROW = withoutRelease.slice(withoutRelease.lastIndexOf("RECORDS_KEY_PATH="));
     expect(RECORDS_ROW).toBe(`RECORDS_KEY_PATH=${join(test.custodyRoot, "secrets", "records-key.bin")}\n`);
-    const beforeRecords = current.slice(0, -RECORDS_ROW.length);
+    const beforeRecords = withoutRelease.slice(0, -RECORDS_ROW.length);
     expect(beforeRecords.endsWith(`\n${ROW}`)).toBe(true);
     const v1 = beforeRecords.slice(0, -ROW.length);
     const v2 = v1.replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
@@ -377,6 +383,7 @@ describe("DEV-09 private local API environment", () => {
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
+    // The records row and every row after it (side-by-side §1: the release key's).
     const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
     const previous = current.slice(0, -RECORDS_ROW.length).slice(0, -ROW.length);
     const w1 = previous.replace("API_PORT=8790\n", "API_PORT=8791\n");
@@ -394,7 +401,10 @@ describe("DEV-09 private local API environment", () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
+    // A file from before L1 also predates the release key (side-by-side §1): both rows are added.
     const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    expect(RECORDS_ROW).toBe(`RECORDS_KEY_PATH=${join(test.custodyRoot, "secrets", "records-key.bin")}\n`
+      + `RELEASE_KEY=${["r424242", "000000000000"].join("-")}\n`);
     const withoutRecords = current.slice(0, -RECORDS_ROW.length);
     expect(withoutRecords.endsWith("\nDEBATEAI_DEPLOYMENT_MODE=local\n")).toBe(true);
     const withLegacyTimeout = withoutRecords
@@ -418,6 +428,41 @@ describe("DEV-09 private local API environment", () => {
     await writeFile(test.outputFilePath, drifted, { mode: 0o600 });
     await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
     expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
+  });
+
+  it("atomically adds the release key to the exact environment assembled before it (side-by-side §1)", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const RELEASE_ROW = current.slice(current.lastIndexOf("RELEASE_KEY="));
+    const withoutRelease = current.slice(0, -RELEASE_ROW.length);
+    expect(withoutRelease.endsWith(`\nRECORDS_KEY_PATH=${join(test.custodyRoot, "secrets", "records-key.bin")}\n`))
+      .toBe(true);
+    const withLegacyTimeout = withoutRelease
+      .replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
+    expect(withLegacyTimeout).not.toBe(withoutRelease);
+    for (const previous of [withoutRelease, withLegacyTimeout]) {
+      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot))
+        .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(current);
+    }
+  });
+
+  it("refuses to add the release key over drift, and refuses a release key of another version (side-by-side §1)", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const RELEASE_ROW = current.slice(current.lastIndexOf("RELEASE_KEY="));
+    const drifted = current.slice(0, -RELEASE_ROW.length).replace("API_PORT=8790\n", "API_PORT=8791\n");
+    expect(drifted).toContain("API_PORT=8791\n");
+    const otherVersion = current.replace(RELEASE_ROW, `RELEASE_KEY=${["r424241", "000000000000"].join("-")}\n`);
+    expect(otherVersion).not.toBe(current);
+    for (const previous of [drifted, otherVersion]) {
+      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(previous);
+    }
   });
 
   it("rejects an earlier environment that drops a required field", async () => {

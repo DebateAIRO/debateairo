@@ -52,8 +52,10 @@ describe("P16c the retention purge (A15), in every mode", () => {
     const source = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
     // Top-level statements (no indentation): not inside the `billingConnectors === null ? … : …` composition.
     expect(source).toMatch(/^const retentionPurge = createRetentionPurge\(\{ pool,/mu);
-    expect(source).toMatch(/^const retentionPurgeTimer=setInterval\(triggerRetentionPurge,86_400_000\);$/mu);
+    expect(source).toMatch(/^const retentionPurgeTimer=gatedInterval\(releaseWatcher,triggerRetentionPurge,86_400_000\);$/mu);
     expect(source).toMatch(/^api\.addHook\("onClose",async \(\) => clearInterval\(retentionPurgeTimer\)\);$/mu);
-    expect(source).toMatch(/^triggerRetentionPurge\(\);$/mu);
+    // Side-by-side C7: the first check runs each time the release becomes current, directly inside the watcher's
+    // listener, itself a top-level statement.
+    expect(source).toMatch(/^endBecameCurrent = releaseWatcher\.onBecameCurrent\(\(\) => \{\n(?: {2}.*\n)*? {2}triggerRetentionPurge\(\);$/mu);
   });
 });

@@ -31,6 +31,8 @@
  * The unbilled refusals the app's port tells apart (packages/providers/src/preview-test.ts previewAuthorityRefusal):
  *  - the vendor refused, not billed (PROVIDER_REFUSED_UNBILLED, PreviewVendorRefusedUnbilled): the model is busy;
  *  - the model is cooling off (MODEL_COOLING, PreviewModelCooling): the model is busy;
+ *  - the gate no longer serves this model or price (MODEL_NOT_ALLOWED, RESERVATION_MISMATCH, side-by-side §9;
+ *    PreviewModelNotServed): not busy, but the runner makes it sit out the same way; neither;
  *  - the vendor was not reached (PROVIDER_NOT_REACHED): counts in the run;
  *  - the vendor answered with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED, review
  *    2026-10-12: Anthropic's 400/404/413/500; a plain PreviewUnbilledRefusal): counts in the run, as the gate counts
@@ -43,6 +45,7 @@ import {
   PROVIDER_GATE_UNAVAILABLE,
   PreviewChargeBookedMax,
   PreviewModelCooling,
+  PreviewModelNotServed,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   type PreviewBudgetExecution,
@@ -119,17 +122,21 @@ export type PracticeWireEvent = Readonly<{
 export type PracticeGateStop = Readonly<{ gate: PracticeGateName; reason: string; atSeq: number }>;
 
 /**
- * The vendor refused, not billed (busy); the model is cooling off (busy); the vendor was not reached; the vendor answered
- * with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED); the gate's own in-flight limit.
+ * The vendor refused, not billed (busy); the model is cooling off (busy); the gate no longer serves this model or price
+ * (side-by-side §9, not busy); the vendor was not reached; the vendor answered with an error that was not billed and
+ * is not "busy" (PROVIDER_ERROR_UNBILLED); the gate's own in-flight limit.
  */
-export type PracticeUnbilledKind = "VENDOR_REFUSED" | "MODEL_COOLING" | "NOT_REACHED" | "VENDOR_ERROR_UNBILLED" | "GATE_IN_FLIGHT";
+export type PracticeUnbilledKind =
+  "VENDOR_REFUSED" | "MODEL_COOLING" | "NOT_SERVED" | "NOT_REACHED" | "VENDOR_ERROR_UNBILLED" | "GATE_IN_FLIGHT";
 
 /** The unbilled refusals the gate adds to its own streak (unsent_streak): they count in the brake's run. */
 const COUNTED_IN_THE_RUN: ReadonlySet<PracticeUnbilledKind> = new Set<PracticeUnbilledKind>(["NOT_REACHED", "VENDOR_ERROR_UNBILLED"]);
 
 /** Which unbilled refusal an error is, read as the app's port raises them. */
 export function practiceUnbilledKind(error: PreviewUnbilledRefusal): PracticeUnbilledKind {
-  // PreviewModelCooling is a PreviewVendorRefusedUnbilled too, so it is tested first.
+  // PreviewModelNotServed and PreviewModelCooling are PreviewVendorRefusedUnbilled too, so they are tested first: a
+  // model the gate no longer serves is never labelled the vendor's busy refusal.
+  if (error instanceof PreviewModelNotServed) return "NOT_SERVED";
   if (error instanceof PreviewModelCooling) return "MODEL_COOLING";
   if (error instanceof PreviewVendorRefusedUnbilled) return "VENDOR_REFUSED";
   if (/calls in flight/u.test(error.message)) return "GATE_IN_FLIGHT";
@@ -151,12 +158,14 @@ export type PracticeGateSummary = Readonly<{
   calls: number;
   vendorOk: number;
   vendorError: number;
-  /** Every refusal the gate proved unbilled: the four kinds below. */
+  /** Every refusal the gate proved unbilled: the kinds below and the gate's own in-flight limit. */
   unbilled: number;
   /** The vendor refused, not billed (429/529): the model is busy. */
   vendorRefused: number;
   /** The model cooling off after such refusals (gate v4): the model is busy. */
   modelCooling: number;
+  /** The gate no longer serves this model or price (side-by-side §9): not busy; the runner makes it sit out. */
+  notServed: number;
   /** The connection failed before anything was sent: these count in a row toward the brake. */
   notReached: number;
   /** The vendor answered with an error that was not billed and is not "busy" (PROVIDER_ERROR_UNBILLED): these count in the run too. */
@@ -310,15 +319,16 @@ export class PracticeGateObserver {
   }
 
   /**
-   * The models whose LAST call through the gates ended refused by the vendor, not billed, or cooling off: in a finished
-   * debate, the members the runner made sit out for being busy (apps/runner/src/run-sit-out.ts reads the same refusals,
-   * providerCallEndedVendorRefusedUnbilled, which covers both), so they were not exercised to the end.
+   * The models whose LAST call through the gates ended refused by the vendor, not billed, cooling off, or not served by
+   * the gate: in a finished debate, the members the runner made sit out (apps/runner/src/run-sit-out.ts reads the same
+   * refusals, providerCallEndedVendorRefusedUnbilled, which covers all three), so they were not exercised to the end.
    */
   modelsEndingBusy(): readonly string[] {
     const last = new Map<string, PracticeWireEvent>();
     for (const event of this.#events) if (event.outcome !== "STOPPED") last.set(event.model, event);
     return Object.freeze([...last.values()]
-      .filter((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING")
+      .filter((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING"
+        || event.unbilledKind === "NOT_SERVED")
       .map((event) => event.model).sort());
   }
 
@@ -377,6 +387,7 @@ export class PracticeGateObserver {
       unbilled: of("UNBILLED"),
       vendorRefused: kind("VENDOR_REFUSED"),
       modelCooling: kind("MODEL_COOLING"),
+      notServed: kind("NOT_SERVED"),
       notReached: kind("NOT_REACHED"),
       vendorErrorUnbilled: kind("VENDOR_ERROR_UNBILLED"),
       concurrencyLimit: mine.filter((event) => event.concurrencyLimit).length,

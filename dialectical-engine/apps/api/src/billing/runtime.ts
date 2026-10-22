@@ -111,7 +111,8 @@ export type BillingRuntime = Readonly<{
    */
   erasure: BillingErasureHook;
   kick(): void;
-  start(): void;
+  /** Side-by-side spec §4 (plan C7): `when` gates every timer callback and first pass (absent: always). */
+  start(options?: Readonly<{ when?: () => boolean }>): void;
   stop(): void;
 }>;
 
@@ -347,31 +348,35 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     maintenance,
     erasure,
     kick: drain,
-    start() {
+    start(options?: Readonly<{ when?: () => boolean }>) {
       if (timers.length > 0) return;
-      const outboxTimer = setInterval(drain, 5_000);
+      // Side-by-side spec §4 (plan C7): every tick and every first pass asks `when` (main.ts: the release watcher's
+      // ownIsCurrent), so a release that is not current claims no billing row; `kick` above stays ungated.
+      const when = options?.when ?? (() => true);
+      const gated = (work: () => void) => (): void => { if (when()) work(); };
+      const outboxTimer = setInterval(gated(drain), 5_000);
       outboxTimer.unref();
       timers.push(outboxTimer);
-      drain();
-      const renewalTimer = setInterval(renewTick, 60_000);
+      gated(drain)();
+      const renewalTimer = setInterval(gated(renewTick), 60_000);
       renewalTimer.unref();
       timers.push(renewalTimer);
-      renewTick();
+      gated(renewTick)();
       // P14a: every 10 minutes; the reconciler itself runs the full pass once a day.
-      const reconcileTimer = setInterval(reconcile, 600_000);
+      const reconcileTimer = setInterval(gated(reconcile), 600_000);
       reconcileTimer.unref();
       timers.push(reconcileTimer);
-      reconcile();
+      gated(reconcile)();
       if (deps.noticeSpool !== undefined) {
-        const spoolTimer = setInterval(replaySpool, 600_000);
+        const spoolTimer = setInterval(gated(replaySpool), 600_000);
         spoolTimer.unref();
         timers.push(spoolTimer);
       }
       // P16c: the quarter's tax summary is queued once; checking daily is enough.
-      const ownerTimer = setInterval(scheduleOwnerJobs, 86_400_000);
+      const ownerTimer = setInterval(gated(scheduleOwnerJobs), 86_400_000);
       ownerTimer.unref();
       timers.push(ownerTimer);
-      scheduleOwnerJobs();
+      gated(scheduleOwnerJobs)();
     },
     stop() {
       for (const timer of timers.splice(0)) clearInterval(timer);

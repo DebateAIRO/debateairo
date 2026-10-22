@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Zaštita potrošača"
+  "chrome.footer.consumerProtection": "Zaštita potrošača",
+  "chrome.release.newerVersion": "Web-stranica je ažurirana. Ponovno učitajte stranicu.",
+  "chrome.release.reload": "Ponovno učitajte",
+  "chrome.release.madeByNewer": "Ovu raspravu izradila je novija verzija web-stranice. Ponovno učitajte stranicu ili pokušajte ponovno za nekoliko minuta."
 }

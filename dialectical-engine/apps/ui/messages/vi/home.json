@@ -26,6 +26,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Cuộc tranh luận này đã chạm giới hạn trước khi kịp đưa ra câu trả lời.",
   "runFailure.STOPPED": "Cuộc tranh luận này đã dừng giữa chừng do sự cố từ phía chúng tôi. Vui lòng đặt lại câu hỏi của bạn.",
   "runFailure.PLAN_ENDED": "Gói trả phí của bạn đã kết thúc hoặc bị tạm dừng trong lúc câu hỏi này đang chờ, nên cuộc tranh luận chưa bắt đầu. Bạn có thể hỏi lại.",
+  "runFailure.CHOICE_GONE": "Trang web đã được cập nhật trong lúc câu hỏi của bạn đang chờ, và một trong những lựa chọn bạn đã chọn không còn được cung cấp nữa. Vui lòng hỏi lại. Việc này không dùng đến bất kỳ phần hạn mức nào của bạn.",
+  "runFailure.SET_ASIDE": "Chúng tôi không thể hoàn tất cuộc tranh luận này vì phía chúng tôi đang cập nhật trang web. Cuộc tranh luận này không được tính vào hạn mức của bạn. Vui lòng đặt lại câu hỏi của bạn.",
   "home.status.waiting": "Đang chờ bắt đầu. Cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "home.status.waitingOwnDebates": "Hiện các cuộc tranh luận khác của bạn đang dùng phần còn lại của giới hạn. Cuộc tranh luận này sẽ tự bắt đầu ngay khi một trong số đó kết thúc.",
   "home.noPublishedDebates": "Chưa có cuộc tranh luận nào được xuất bản.",

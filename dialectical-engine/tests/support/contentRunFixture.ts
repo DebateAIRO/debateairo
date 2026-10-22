@@ -26,14 +26,18 @@ export interface ContentRunFixture {
   readonly cipher: ContentCipher;
   readonly userId: string;
   readonly ownerRef: string;
-  createEncryptedRun(questionLine: string): Promise<string>;
-  createLegacyRun(questionLine: string): Promise<string>;
+  /** The owner's identity.session id, for a test that writes an encrypted run through the database function itself. */
+  readonly authSessionId: string;
+  /** `extra.releaseKey`: the run's release stamp (side-by-side spec §1); absent, the column default `legacy` applies. */
+  createEncryptedRun(questionLine: string, extra?: RunExtra): Promise<string>;
+  createLegacyRun(questionLine: string, extra?: RunExtra): Promise<string>;
   /** Marks the run's private content erased, exactly as the V-6 erasure case does (0040's cleanup intent). */
   eraseRunContent(runId: string): Promise<void>;
   stop(): Promise<void>;
 }
 
 type StartRunInput = Parameters<RunRepository["startRun"]>[0];
+type RunExtra = Readonly<Pick<Partial<StartRunInput>, "releaseKey">>;
 
 export async function startContentRunFixture(label: string): Promise<ContentRunFixture> {
   const database = await startTestDatabase();
@@ -70,8 +74,10 @@ export async function startContentRunFixture(label: string): Promise<ContentRunF
   const input = (
     questionLine: string,
     principal: StartRunInput["principal"],
-    sessionId: string
+    sessionId: string,
+    extra: RunExtra = {}
   ): StartRunInput => ({
+    ...extra,
     questionLine,
     askContract: { audience: label },
     principal,
@@ -96,11 +102,12 @@ export async function startContentRunFixture(label: string): Promise<ContentRunF
     cipher,
     userId,
     ownerRef,
-    createEncryptedRun: (questionLine: string) =>
-      runs.startRun(input(questionLine, { kind: "server", userId, ownerRef }, authSessionId)),
-    createLegacyRun: (questionLine: string) =>
+    authSessionId,
+    createEncryptedRun: (questionLine: string, extra?: RunExtra) =>
+      runs.startRun(input(questionLine, { kind: "server", userId, ownerRef }, authSessionId, extra)),
+    createLegacyRun: (questionLine: string, extra?: RunExtra) =>
       runs.startRun(input(
-        questionLine, { kind: "legacy", legacyAskerId: `legacy-${label}-${randomUUID()}` }, randomUUID()
+        questionLine, { kind: "legacy", legacyAskerId: `legacy-${label}-${randomUUID()}` }, randomUUID(), extra
       )),
     eraseRunContent: async (runId: string) => {
       await database.pool.query(

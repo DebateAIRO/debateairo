@@ -338,6 +338,17 @@ The smallest pot that passes with all four switched on is $1.43; with a final wr
     above).
   - `AUTHORITY_HALTED`: the gate is halted, so nothing was set aside. The app shows that the gate
     is unavailable, not that the money ran out, and does not ask `/remaining`.
+  - `MODEL_NOT_ALLOWED` and `RESERVATION_MISMATCH` (side-by-side uploads, 2026-10-21): refused before
+    any reservation: this model or this price is not served by this GO. During an upload an older
+    release's debate may still ask for a model the new GO no longer switches on, or reserve at a price
+    it no longer uses. Nothing was set aside or sent; the app makes that model sit out the debate, as
+    for a busy model, and never reads it as the money running out. Before 2026-10-21 both were the
+    opaque `PREVIEW_TEST_AUTHORITY_STOPPED`. An older app does not know the new codes and reads them
+    as the money running out, without the `/remaining` check it makes for
+    `PREVIEW_TEST_AUTHORITY_STOPPED`. So on a gate that is also halted, an older release's debate
+    now stops as if its money ran out, where before it would have been told the gate is
+    unavailable and let that model sit out. Nothing is charged either way. The gate's file hash
+    changes; a new GO is written at install (the side-by-side transition installs it).
   - `PREVIEW_TEST_AUTHORITY_STOPPED`: any other refusal, for example a call that was already sent
     when the gate halted. The app is not told why.
 - **The model check script has no custody check of its own.** Like the address script, it is

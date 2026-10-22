@@ -9,6 +9,7 @@ import { ServeRepository } from "@debateai/serve";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Budget spec §2.7 (B6b) end to end, in real SQL: a hosted ask with the band
@@ -69,6 +70,7 @@ function applicationWith(room: AskRoom, dispatcher: Dispatcher): PostgresAskAppl
   const settings: RunCreationSettings = {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "b6b-integration",
     settlementWatchHandle: "b6b-integration",
     resolveDiscoveredPanel: async () => PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({

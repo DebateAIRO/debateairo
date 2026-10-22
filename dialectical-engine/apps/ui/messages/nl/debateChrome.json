@@ -302,6 +302,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Dit debat heeft zijn limiet bereikt voordat het een antwoord kon geven.",
   "runFailure.STOPPED": "Dit debat is halverwege gestopt door een probleem aan onze kant. Stel uw vraag alstublieft opnieuw.",
   "runFailure.PLAN_ENDED": "Uw betaalde abonnement is afgelopen of gepauzeerd terwijl deze vraag wachtte, dus het debat is niet begonnen. U kunt de vraag opnieuw stellen.",
+  "runFailure.CHOICE_GONE": "De website is bijgewerkt terwijl uw vraag in de wachtrij stond, en een van de gekozen opties wordt niet meer aangeboden. Stel uw vraag alstublieft nog een keer. Er is niets van uw tegoed gebruikt.",
+  "runFailure.SET_ASIDE": "Door een update aan onze kant konden we dit debat niet afronden. Er is voor dit debat niets van uw tegoed gebruikt. Stel uw vraag alstublieft opnieuw.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Dit debat zou meer kosten dan deze site voor één debat toestaat.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: voor een van de taken in het debat is momenteel geen AI-model bereikbaar. Probeer het later opnieuw.",
   "debateChrome.condition.backupModelUsed": "Waar een gepland AI-model niet kon worden gebruikt, nam een ander het over"

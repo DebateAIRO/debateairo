@@ -1,7 +1,12 @@
 # deploy/vps/systemd/debateai-hatchet.service
-# Wraps the single production container (deploy/vps/compose.prod.yaml) so systemd owns the boot
-# order: postgresql -> hatchet -> api -> ui. Runs as root because it drives the docker socket;
-# the container itself is the only thing here that is not a hardened per-service unit.
+# Wraps the single production container so systemd owns the boot order: postgresql -> hatchet ->
+# api -> ui. Runs as root because it drives the docker socket; the container itself is the only
+# thing here that is not a hardened per-service unit.
+# The compose file lives at /etc/debateai/hatchet/compose.prod.yaml (side-by-side spec §10), installed once from a
+# reviewed copy of deploy/vps/compose.prod.yaml (README §5), never in a release folder or the operator checkout:
+# Hatchet is shared by every release, and updating code must never change what it runs. The project keeps its fixed
+# name (debateai-prod), so the same container and config volume carry on after the move.
+# The app units only Want= this one (spec §4): restarting Hatchet does not stop a release's API or runner.
 [Unit]
 Description=DebateAI Hatchet engine (hatchet-lite container)
 Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
@@ -12,9 +17,9 @@ Requires=docker.service postgresql.service
 [Service]
 Type=oneshot
 RemainAfterExit=true
-WorkingDirectory=/opt/debateai/dialectical-engine/deploy/vps
-ExecStart=/usr/bin/docker compose -f /opt/debateai/dialectical-engine/deploy/vps/compose.prod.yaml up -d
-ExecStop=/usr/bin/docker compose -f /opt/debateai/dialectical-engine/deploy/vps/compose.prod.yaml down
+WorkingDirectory=/etc/debateai/hatchet
+ExecStart=/usr/bin/docker compose -f /etc/debateai/hatchet/compose.prod.yaml up -d
+ExecStop=/usr/bin/docker compose -f /etc/debateai/hatchet/compose.prod.yaml down
 TimeoutStartSec=180
 TimeoutStopSec=60
 

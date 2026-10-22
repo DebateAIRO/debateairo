@@ -309,6 +309,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Šīs debates sasniedza savu ierobežojumu, pirms spēja sniegt atbildi.",
   "runFailure.STOPPED": "Šīs debates apstājās pusceļā mūsu pusē radušās problēmas dēļ. Lūdzu, uzdodiet savu jautājumu vēlreiz.",
   "runFailure.PLAN_ENDED": "Jūsu maksas plāns beidzās vai tika apturēts, kamēr šis jautājums gaidīja, tāpēc debates nesākās. Varat to uzdot vēlreiz.",
+  "runFailure.CHOICE_GONE": "Vietne tika atjaunināta, kamēr jūsu jautājums gaidīja, un viena no izvēlētajām iespējām vairs nav pieejama. Lūdzu, uzdodiet to vēlreiz. No jūsu kvotas nekas netika izmantots.",
+  "runFailure.SET_ASIDE": "Šīs debates nevarējām pabeigt vietnes atjaunināšanas dēļ mūsu pusē. Tās netika ieskaitītas jūsu kvotā. Lūdzu, uzdodiet savu jautājumu vēlreiz.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Šīs debates izmaksātu vairāk, nekā šī vietne atļauj vienām debatēm.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kādam no debašu uzdevumiem pašlaik nav sasniedzams neviens MI modelis. Mēģiniet vēlreiz vēlāk.",
   "debateChrome.condition.backupModelUsed": "Ja plānoto MI modeli nevarēja izmantot, tā vietā stājās cits"

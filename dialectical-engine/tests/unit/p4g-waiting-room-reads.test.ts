@@ -32,12 +32,13 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ROOM_READS = Object.freeze({ key: "owner" as const, limit: 2, window_ms: 60_000, capacity: 1_024 });
 
 function waitingRun(): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
     ownerRef: null, legacyAskerId: `legacy:${randomUUID()}`,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-09-30T17:00:00.000Z")

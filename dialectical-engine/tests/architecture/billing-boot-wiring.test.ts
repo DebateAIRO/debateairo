@@ -72,13 +72,14 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
 
   it("asks the retention purge once right after the API listens, then daily, in every mode (A15, P2-M42)", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    const daily = main.indexOf("setInterval(triggerRetentionPurge,86_400_000)");
+    // Side-by-side C7: daily and gated; the first ask runs each time the release becomes current (the watcher's listener).
+    const daily = main.indexOf("gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000)");
     const listen = main.indexOf('await startup.run("listen"');
-    const first = main.indexOf("\ntriggerRetentionPurge();\n");
+    const first = main.indexOf("\n  triggerRetentionPurge();\n");
     expect(daily).toBeGreaterThan(0);
     expect(listen).toBeGreaterThan(daily);
     expect(first).toBeGreaterThan(listen);
-    expect(main.slice(listen, first)).toContain("\ntriggerErasureReconciliation();\n");
+    expect(main.slice(listen, first)).toContain("\n  triggerErasureReconciliation();\n");
     expect(main.slice(listen, first)).not.toContain("billingPolicy");
   });
 
@@ -116,10 +117,11 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(main.indexOf('consoleBillingAudit("billing.notice.spool_off", {})')).toBeGreaterThan(listen);
     const runtime = await readFile("apps/api/src/billing/runtime.ts", "utf8");
     expect(runtime).toContain("() => netopiaNotices.replaySpool(deps.clock())");
-    expect(runtime).toContain("setInterval(replaySpool, 600_000)");
+    // Side-by-side C7: each tick asks `when` (the release watcher) first.
+    expect(runtime).toContain("setInterval(gated(replaySpool), 600_000)");
     const jobs = await readFile("apps/api/src/billing/provider-only-jobs.ts", "utf8");
     expect(jobs).toContain("() => notices.replaySpool(deps.clock())");
-    expect(jobs).toContain("setInterval(replaySpool, 600_000)");
+    expect(jobs).toContain("setInterval(gated(replaySpool), 600_000)");
   });
 
   it("F7 (data-1): the provider-only mode runs the daily card job alone, started with the API like the billing runtime", async () => {
@@ -131,13 +133,14 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(built).toContain("publicAppUrl: providerOnlyConnectors.publicAppUrl");
     expect(built).toContain("reportPending: (code) => console.error(`[${code}]`)");
     const listen = main.indexOf('await startup.run("listen"');
-    const started = main.indexOf("\nproviderOnlyJobs?.start();\n");
+    // Side-by-side C7: started when the release becomes current, every tick gated on the watcher.
+    const started = main.indexOf("\n  providerOnlyJobs?.start({ when: () => releaseWatcher.ownIsCurrent() });\n");
     expect(started).toBeGreaterThan(listen);
-    expect(main.slice(listen, started + 1)).toContain("\nbillingRuntime?.start();\n");
+    expect(main.slice(listen, started + 1)).toContain("\n  billingRuntime?.start({ when: () => releaseWatcher.ownIsCurrent() });\n");
     const jobsSource = await readFile("apps/api/src/billing/provider-only-jobs.ts", "utf8");
     expect(jobsSource).toContain("new ProviderOnlyOwnerJobs({ custody, clock: deps.clock })");
     expect(jobsSource).toContain('deps.reportPending("BILLING_OWNER_JOBS_PENDING")');
-    expect(jobsSource).toContain("setInterval(schedule, 86_400_000)");
+    expect(jobsSource).toContain("setInterval(gated(schedule), 86_400_000)");
   });
 
   it("F7 (data-2): refuses a sandbox boot while live NETOPIA plans are open, beside the live boot's guard", async () => {

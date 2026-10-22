@@ -27,6 +27,7 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ORIGIN = "https://ui.s7.test";
 const OWNER_TOKEN = "o".repeat(43);
@@ -348,7 +349,7 @@ beforeAll(async () => {
   } as unknown as SessionApplication;
   api = buildApi({
     application:new PostgresAskApplication(
-      database.pool,{} as never,{} as never,undefined,database.pool,
+      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     ),
     sessions,
@@ -999,7 +1000,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     const application = new PostgresAskApplication(
       database.pool,
       {} as never,
-      {} as never,
+      { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,
       {
         read: async (targetRunId: string) => {
           expect(targetRunId).toBe(runId);

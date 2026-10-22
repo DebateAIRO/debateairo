@@ -1141,4 +1141,30 @@ describe('release check before any import from the release tree', () => {
     expect(checked[0]).toEqual({ plan, importPaths: [`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/migration-lineage.ts`, `${engine}/deploy/preview-auth-dev/v1/native-peer.mjs`] });
     await expect(creator.verifyCreatorRelease({ engine, ...deps, guard: async () => { throw Object.assign(new Error('RELEASE_UNVERIFIED'), { code: 'RELEASE_UNVERIFIED' }); } })).rejects.toMatchObject({ code: 'STAFF_JIT_RELEASE_REFUSED' });
   });
+
+  // Side-by-side spec §10: the lock pins several releases; the unlock and the creator use the one the release table names current.
+  const twoReleases = { schema: 'preview-lifecycle-release-lock-v2', releases: { 'old-v1': { releaseKey: ['r12', 'aaaaaaaaaaaa'].join('-'), slot: 'A', databaseAhead: null, services: {} }, 'new-v1': { releaseKey: ['r13', '0123456789ab'].join('-'), slot: 'B', databaseAhead: null, services: {} } } };
+  it("unlocks with the current release's API, chosen by the release table", async () => {
+    const asked: any[] = [];
+    const entry = { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-v1-api' }, plan = { sourceRoot: entry.sourceRoot };
+    const options = {
+      readCurrent: async () => ({ releaseKey: ['r13', '0123456789ab'].join('-'), takeTrafficFrom: '2026-10-21T10:00:00.000Z' }),
+      readLock: async () => ({ lock: twoReleases, lockSha256: 'a'.repeat(64) }),
+      loadPinned: async (input: any) => { asked.push(input); return { entry, plan }; }
+    };
+    await expect(unlock.loadCurrentApiRelease(options)).resolves.toEqual({ label: 'new-v1', entry, plan });
+    expect(asked).toEqual([{ service: 'api', label: 'new-v1' }]);
+    await expect(unlock.loadCurrentApiRelease({ ...options, readCurrent: async () => null })).rejects.toMatchObject({ code: 'CURRENT_RELEASE_UNPINNED' });
+    expect(asked).toHaveLength(1);
+  });
+
+  it('postgres creator actor: reads the current release itself, as the postgres user it already is', async () => {
+    const seen: string[][] = [];
+    const run = creator.asPostgresRun(async (argv: string[]) => { seen.push(argv); return { code: 0 }; });
+    await run(['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', '/usr/lib/postgresql/18/bin/psql', '-f', '-'], {});
+    expect(seen).toEqual([['/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', '/usr/lib/postgresql/18/bin/psql', '-f', '-']]);
+    await expect(run(['/usr/sbin/runuser', '-u', 'root', '--', '/usr/bin/env'], {})).rejects.toMatchObject({ code: 'STAFF_JIT_RELEASE_REFUSED' });
+    await expect(run(['/usr/bin/env', '-i', 'psql'], {})).rejects.toMatchObject({ code: 'STAFF_JIT_RELEASE_REFUSED' });
+    expect(seen).toHaveLength(1);
+  });
 });

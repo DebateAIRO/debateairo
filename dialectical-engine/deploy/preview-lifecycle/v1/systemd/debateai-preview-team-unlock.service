@@ -3,7 +3,9 @@
 #   systemctl stop debateai-preview-team-unlock     lock again now
 [Unit]
 Description=DebateAI preview: unlock team tools for one hour
-After=debateai-preview-postgresql.service debateai-preview-capture.service debateai-preview-api.service
+# No ordering on a fixed API: the API is one template instance per release (side-by-side spec §10); the
+# unlock reads the current release's instance by name and does not need it started first.
+After=debateai-preview-postgresql.service debateai-preview-capture.service
 # A window that ends FAILED (e.g. EVIDENCE_UNAVAILABLE), a run that could not lock again, or a
 # failed reset (ExecStopPost exits non-zero) marks the unit failed, and that emails.
 OnFailure=debateai-preview-alert@%n.service

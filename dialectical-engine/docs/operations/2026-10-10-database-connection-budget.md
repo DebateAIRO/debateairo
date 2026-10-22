@@ -5,7 +5,7 @@ changed, and plans the next steps: Postgres memory settings at launch, PgBouncer
 
 ## In one paragraph
 
-Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The job system (Hatchet) may take
+Postgres on the server accepts 200 connections, 3 of them kept for the administrator. The side-by-side transition raises the limit to 320 at the Postgres restart in the drained window (section 8), once the new config is on the server. The job system (Hatchet) may take
 up to 50. Before this change the website program (the API) could open up to about 104 connections. The debate runner had
 only 10, but accepted up to 100 debates at once. Each running debate keeps 2 connections busy, so **the runner would
 jam at about 5 debates at the same moment**: every debate then waits forever for a third connection that never comes,
@@ -48,7 +48,8 @@ guard that keeps the code and the numbers in step is
 | `api:support-relay-lease` | 18 | 18 | 5 s | Unchanged: up to 16 AI support chats at once (a live register setting the owner can raise without a restart) plus 2 for the queue |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
-| **Total on the server** (dev menu off) | **104** | **79** | | |
+| `api:release-watch` (since 2026-10-22, side by side; section 8) | — | 1 | 1 s | The release watcher's read of the current release, once a second, never two at once. Its own pool, so a burst of page reads on `api:runtime` can never make `/readyz` say the database is unreachable |
+| **Total on the server** (dev menu off) | **104** | **80** (79 before 2026-10-22) | | |
 
 ### Debate runner
 
@@ -62,19 +63,19 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 79 |
+| Website (API), one process | 80 (79 before 2026-10-22) |
 | Debate runner (32 + 2 for claim renewal) | 34 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **176 of 197** (162 before 2026-10-12) |
-| Left free | 21 (35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **177 of 197** (176 before 2026-10-22, 162 before 2026-10-12) |
+| Left free | 20 (21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit: 176 + 79 is more than 197. Before running two (for example to restart without a
-gap, or to grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings
-(section 3).
+A second API process does **not** fit at 200: 177 + 80 is more than 197. Two releases, each with its own API, do fit at
+the transition's 320 (section 8). Before running a further API process (for example to restart without a gap, or to
+grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings (section 3).
 
 ## 2. What happens when a pool runs dry
 
@@ -130,7 +131,7 @@ log_temp_files = 10MB             # log any query that spills more than 10 MB to
 * **Why not more `work_mem`:** it is per step, per query. 176 connections × 8 MB × a few steps could, in theory, exceed
   the RAM. In practice only about as many queries run at once as there are cores, so 8 MB is safe. Raise it only when
   `log_temp_files` shows spills.
-* **Keep `max_connections = 200`.** Each extra allowed connection costs memory even when unused, and 6 cores cannot run
+* **Keep `max_connections` at 200, or at 320 while the side-by-side transition lasts (section 8).** Each extra allowed connection costs memory even when unused, and 6 cores cannot run
   more than about 12–24 queries truly at the same time anyway. More connections do not mean more speed.
 * **When to apply:** in the launch window, because `shared_buffers` needs a restart. Put the file in the repo
   (`deploy/postgres/postgresql.memory.conf`) and the step in the runbook in the same pull request.
@@ -183,7 +184,7 @@ cursors or temporary tables were found):
 
 Fire when either is true:
 
-* **Connections in use above 150** (three quarters of 200), for two minutes in a row:
+* **Connections in use above 240** (three quarters of 320, the limit during the side-by-side transition; 150 at 200), for two minutes in a row:
 
 ```sql
 SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'client backend';
@@ -245,5 +246,48 @@ a freeze), but each still deserves its own fix:
 
 ## 7. What was not changed
 
-No server, deploy or Postgres setting changed. The one-shot commands (migrator, billing, support and owner CLIs,
-scheduler jobs) keep their own pool sizes; they run by hand, one at a time.
+In the 2026-10-10 change no server, deploy or Postgres setting changed (the 2026-10-21 raise to 320 is in section 8). The
+one-shot commands (migrator, billing, support and owner CLIs, scheduler jobs) keep their own pool sizes; they run by hand,
+one at a time.
+
+## 8. Side by side (2026-10-21)
+
+The side-by-side transition (spec §9 and its section "The transition"; the spec is `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` in the DebateAIRO folder, outside this engine repository) runs two releases
+at once while the new one takes over: the old release keeps its drained debates, and the new one takes new work. Each
+release has its own API and its own runner, so the server holds two of each while they overlap. No pool size changed;
+the server's limit did, and one pool of 1 was added.
+
+**The release watcher's own pool (2026-10-22, final fix wave P1).** Each API reads which release is current once a second
+and answers `/readyz` from that read; a read older than 5 seconds makes `/readyz` say the database is unreachable, and
+Caddy then marks that release's website and API down. The read used to wait on `api:runtime` (20 connections, a 5 s wait
+for one), so a burst of page reads could starve it and take the only front pair down: a site-wide outage. It now has its
+own pool, `api:release-watch`: 1 connection (its reads never overlap) and a 1 s wait (a read that cannot get it fails
+and the next poll, a second later, tries again). One API is 80 at most, and the spare drops from 28 to 26.
+`max_connections` stays 320.
+
+| Who | Connections at most |
+|---|---|
+| Website program (API), two releases at 80 each | 160 |
+| Debate runner, two releases at 34 each | 68 |
+| Hatchet (its role's limit) | 50 |
+| Migrator (its role's limit) | 3 |
+| Owner's commands | about 10 |
+| **Sum of ceilings** | **291** (289 before the release watcher's pool) |
+| Left free | 26 (317 = 320 less the administrator's 3; 28 before the release watcher's pool) |
+
+* **The limit is 320**, in `deploy/postgres/postgresql.hardening.conf` (`max_connections = 320`). It takes effect only at a
+  Postgres restart, made in the drained window of the side-by-side transition (spec §9, "The transition"). After that restart, `SHOW max_connections;`
+  must return 320. Until then the running server still allows 200.
+* **Memory.** Pools open connections only when needed, but a higher limit still costs some memory even when idle (section 3).
+* **Query cancellations.** A cancelled query opens a short extra connection outside its pool, and each pool allows at most
+  four of them at once (`packages/db/src/private-stream.ts`). Counted pool by pool, one API and one runner are 14 pools
+  that can cancel (12 API pools with the dev menu off, plus the runner's 2), so two releases are 28. The release
+  watcher's pool sends no cancel: a read it gives up on hands its connection back destroyed, and the database ends the
+  statement by its own statement timeout. The 26 free connections cover one cancellation for 26 of those 28 pools at
+  the same moment, with nothing left for the owner's login (28 covered all 28 before the release watcher's pool). They
+  do not cover four per pool, which would need 112. Section 1 has the same gap for one release (four per pool across 14
+  pools would need 56, against 20). No pool size or constant was changed for this; whether to raise the spare, lower the
+  cancellation cap, or accept the gap is the controller's decision.
+* **After the transition.** When the old release retires, one release's numbers from section 1 apply again (177 of 197 at
+  200). Whether the limit goes back to 200 is the owner's decision, and changing the limit also needs a restart.
+* **The alert in section 5** fires above 240 connections while the limit is 320.

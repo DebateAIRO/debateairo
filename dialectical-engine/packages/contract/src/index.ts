@@ -331,6 +331,18 @@ export const AskAlreadyWaitingSchema = z.object({
 export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
 /**
+ * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the 409 body of a debate read whose debate was made by
+ * a newer release than the API answering it — the site shows "open it on the current site", never a 404 or a crash.
+ * Sent on debate reads only (a run, its answer, a public debate): the page's sentence says "this debate".
+ */
+export const MADE_BY_NEWER_RELEASE = "MADE_BY_NEWER_RELEASE" as const;
+export const MadeByNewerReleaseSchema = z.object({
+  error: z.literal(MADE_BY_NEWER_RELEASE),
+  message: z.literal(MADE_BY_NEWER_RELEASE)
+}).strict();
+export type MadeByNewerRelease = z.infer<typeof MadeByNewerReleaseSchema>;
+
+/**
  * Question language (spec 2026-10-13, D1): the 409 body of a real-mix offer. The server signed `check_ref`; the
  * page shows the languages and the proposed rewrite and answers with `question_language_choice` on the same ask.
  * Pre-flight PF-L19 and ruling L-B64: two to six languages, each primary code once, each name at most 64 UTF-8
@@ -1691,6 +1703,9 @@ export const contractInventory = Object.freeze({
     "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
+    // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
+    "GET /livez",
+    "GET /readyz",
     "GET /v1/dev/evaluator",
     "POST /v1/dev/evaluator/consumer-selection",
     "GET /v1/answers",

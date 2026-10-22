@@ -93,7 +93,7 @@ afterAll(async () => {
 
 describe("S02 migrated graph invariants", () => {
   it("S01 finding 5 — migrate is idempotent through an applied-migrations ledger", async () => {
-    await expect(migrate(database.pool)).resolves.toBeUndefined();
+    await expect(migrate(database.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     const expectedMigrationLedger = (await readdir(new URL("../../migrations/", import.meta.url)))
       .filter((name) => /^\d+.*\.sql$/.test(name))
       .sort();

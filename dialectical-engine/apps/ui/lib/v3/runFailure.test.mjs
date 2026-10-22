@@ -7,7 +7,7 @@ import {
   RUN_FAILURE_CODES, RUN_FAILURE_FULL_CODES, RUN_FAILURE_KINDS, runFailureKind, runFailureMessage
 } from "./runFailure.ts";
 
-// A failed debate is told to its asker in one of five sentences, never by the
+// A failed debate is told to its asker in one of seven sentences, never by the
 // engine's own terminal reason code (owner ruling 2026-09-28: codes stay for
 // operators — the database, GET /v1/runs/:id, the logs, deploy/vps/README.md).
 
@@ -34,7 +34,17 @@ const ENGLISH = Object.freeze({
   MODELS_UNAVAILABLE:
     "This debate could not start because the AI models it needs were unavailable. Please try again in a while.",
   RUN_LIMIT_REACHED: "This debate reached its limit before it could produce an answer.",
-  STOPPED: "This debate stopped partway because of a problem on our side. Please ask your question again."
+  STOPPED: "This debate stopped partway because of a problem on our side. Please ask your question again.",
+  // Side-by-side uploads spec 2026-10-21 §4 (plan C13): a waiting question whose chosen option the new release no
+  // longer offers is asked to be asked again, and told it cost nothing.
+  CHOICE_GONE:
+    "The site was updated while your question waited, and one of the options you chose is no longer offered. "
+    + "Please ask it again. It did not use any of your allowance.",
+  // Side-by-side uploads spec 2026-10-21 §4, §9 (plan B15, D7): a debate an upload set aside is told it used none of the
+  // person's allowance. The brief's phrasing 1, with the site's own word "allowance" (controller ruling); the owner picks.
+  SET_ASIDE:
+    "We could not finish this debate because of an update on our side. It did not use your allowance. "
+    + "Please ask your question again."
 });
 
 test("every code family lands in its group, whether or not the runner wrapped it", () => {
@@ -64,6 +74,23 @@ test("every code family lands in its group, whether or not the runner wrapped it
     // went wrong on our side".
     ["RUN_SETUP_FAILED:PLAN_CHANGED", "PLAN_ENDED"],
     ["  RUN_SETUP_FAILED:PLAN_CHANGED  ", "PLAN_ENDED"],
+    // Side-by-side uploads (plan C11/C13): a waiting question re-admitted under a new release whose chosen option is
+    // no longer offered is told to ask again; the two other new steps never began, the not-started sentence.
+    ["RUN_SETUP_FAILED:CHOICE_UNAVAILABLE", "CHOICE_GONE"],
+    ["RUN_SETUP_FAILED:RELEASE_NOT_SERVED", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:READMISSION", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:CHOICE_UNAVAILABLE:EXTRA", "NOT_STARTED"],
+    // Side-by-side uploads (plan B15, D7): a debate set aside because of an upload, with any waiver reason (the
+    // runner's backstop, a release no runner serves, the owner's stop, a settings version this release cannot run),
+    // as written; a wrapped RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason> would read the same (the runner writes none
+    // today). It never used the person's quota (the waiver).
+    ["RUN_SET_ASIDE:BACKSTOP", "SET_ASIDE"],
+    ["RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:BACKSTOP", "SET_ASIDE"],
+    ["RUN_SET_ASIDE:RELEASE_NOT_SERVED", "SET_ASIDE"],
+    ["RUN_SET_ASIDE:OWNER_STOPPED", "SET_ASIDE"],
+    ["RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED", "SET_ASIDE"],
+    ["RUN_SET_ASIDE", "SET_ASIDE"],
+    ["RUN_SET_ASIDE_ELSEWHERE", "STOPPED"],
     // The runner's claim-time refusals, first as written, then as the Hatchet
     // catch overwrites them (the role suffix is lost there).
     ["RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "MODELS_UNAVAILABLE"],
@@ -142,7 +169,9 @@ test("says the owner's chosen English sentence in both catalogues, and on the En
     PLAN_ENDED: "RUN_SETUP_FAILED:PLAN_CHANGED",
     MODELS_UNAVAILABLE: "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
     RUN_LIMIT_REACHED: "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL",
-    STOPPED: "CALL_BUDGET_EXHAUSTED"
+    STOPPED: "CALL_BUDGET_EXHAUSTED",
+    CHOICE_GONE: "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE",
+    SET_ASIDE: "RUN_SET_ASIDE:BACKSTOP"
   };
   for (const kind of RUN_FAILURE_KINDS) {
     for (const namespace of NAMESPACES) {
@@ -223,6 +252,8 @@ test("maps only codes their writers still produce", () => {
   // mention of the code: every runner code also sits in lookup tables.
   const runner = readFileSync(join(appRoot, "..", "runner", "src", "index.ts"), "utf8");
   const api = readFileSync(join(appRoot, "..", "api", "src", "index.ts"), "utf8");
+  const battery = readFileSync(join(appRoot, "..", "..", "packages", "battery", "src", "index.ts"), "utf8");
+  const retirement = readFileSync(join(appRoot, "..", "runner", "src", "runner-retirement.ts"), "utf8");
   assert.ok(runner.includes("return `RUNNER_EXECUTION_FAILED:${operationalDiagnosticOf(error)}`;"), "runner wrapper");
   // The Hatchet catch stores a thrown code as RUNNER_EXECUTION_FAILED:<code>
   // only when it is in the runner's operational alphabet; any other typed code
@@ -245,7 +276,11 @@ test("maps only codes their writers still produce", () => {
     // Role rotation: the same claim-time shape, written, then thrown.
     RUN_ROLE_ROTATION_INVALID: (code) =>
       runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
-    RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code)
+    RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code),
+    // Side-by-side uploads (plan B5, B11): the battery's one writer of every set-aside reason, and the runner's
+    // backstop, which sets its release's open work aside with it.
+    RUN_SET_ASIDE: () => battery.includes("return `RUN_SET_ASIDE:${reason}`;")
+      && retirement.includes('setAsideOpenWork(input.releaseKey, "BACKSTOP")')
   };
   assert.deepEqual(Object.keys(RUN_FAILURE_CODES).sort(), Object.keys(writers).sort(), "a writer check per mapped code");
   for (const [code, kind] of Object.entries(RUN_FAILURE_CODES)) {
@@ -262,7 +297,15 @@ test("maps only codes their writers still produce", () => {
     "RUN_SETUP_FAILED:PLAN_CHANGED": () =>
       api.includes("const reason = `RUN_SETUP_FAILED:${step}`;")
       && api.includes('await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");')
-      && /\| "ROOM_HOLD" \| "PLAN_CHANGED"\n/u.test(api)
+      && /\| "ROOM_HOLD" \| "PLAN_CHANGED"\n/u.test(api),
+    // Side-by-side uploads: the waking re-admission (plan C11, lane C) records the OLD run FAILED with this step when
+    // the new release no longer offers a choice it made. This sentence lands first (C13, lane C2): until C11 is in
+    // the tree the API names no such step at all; once it names it, the write itself must be where this table
+    // expects. The lane merge makes this strict by deleting the first arm (controller ruling owed).
+    "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE": () =>
+      !api.includes('"CHOICE_UNAVAILABLE"')
+      || (api.includes("const reason = `RUN_SETUP_FAILED:${step}`;")
+        && api.includes('await this.#recordRunSetupFailure(run.runId, "CHOICE_UNAVAILABLE");'))
   };
   assert.deepEqual(
     Object.keys(RUN_FAILURE_FULL_CODES).sort(), Object.keys(fullWriters).sort(), "a writer check per whole code"
@@ -322,6 +365,28 @@ test("a waiting question whose paid plan ended is told so, not that something we
   }
 });
 
+test("a waiting question whose chosen option is gone after an update is told to ask again, at no cost (side-by-side C13)", () => {
+  for (const namespace of NAMESPACES) {
+    const message = runFailureMessage("RUN_SETUP_FAILED:CHOICE_UNAVAILABLE", catalogue("en", namespace));
+    assert.equal(message, ENGLISH.CHOICE_GONE, `en/${namespace}`);
+  }
+  // A release that does not serve the debate, and a re-admission that broke after its new run was made, never began.
+  assert.equal(runFailureKind("RUN_SETUP_FAILED:RELEASE_NOT_SERVED"), "NOT_STARTED");
+  assert.equal(runFailureKind("RUN_SETUP_FAILED:READMISSION"), "NOT_STARTED");
+});
+
+test("a debate set aside by an upload is told it used no allowance (side-by-side §4, §9)", () => {
+  for (const namespace of NAMESPACES) {
+    const message = runFailureMessage("RUN_SET_ASIDE:BACKSTOP", catalogue("en", namespace));
+    assert.equal(message, ENGLISH.SET_ASIDE, `en/${namespace}`);
+    assert.notEqual(message, ENGLISH.STOPPED, `en/${namespace} still reads as a fault`);
+  }
+  // Controller ruling: a waiting question the API could not send to a release that serves it never began, so that
+  // setup step keeps the not-started sentence; only a RUN_SET_ASIDE code reads SET_ASIDE.
+  assert.equal(runFailureKind("RUN_SETUP_FAILED:RELEASE_NOT_SERVED"), "NOT_STARTED");
+  assert.equal(RUN_FAILURE_KINDS.indexOf("SET_ASIDE"), RUN_FAILURE_KINDS.indexOf("STOPPED") - 1, "SET_ASIDE sits before STOPPED");
+});
+
 test("the operator runbook's table lists every sentence the pages can show", () => {
   // deploy/vps/README.md, "What the asker sees when a debate fails": when an
   // asker quotes a sentence, the operator looks it up there.
@@ -334,6 +399,12 @@ test("the operator runbook's table lists every sentence the pages can show", () 
   for (const kind of RUN_FAILURE_KINDS) {
     const row = rows.find((line) => line.startsWith(`| "${ENGLISH[kind]}" | \`${kind}\` |`));
     assert.ok(row, `the ${kind} row quotes its English sentence`);
+  }
+  const choiceRow = rows.find((line) => line.includes("| `CHOICE_GONE` |"));
+  assert.ok(choiceRow.includes("`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`"), "the CHOICE_GONE row names its code");
+  const setAsideRow = rows.find((line) => line.includes("| `SET_ASIDE` |"));
+  for (const reason of ["BACKSTOP", "RELEASE_NOT_SERVED", "OWNER_STOPPED", "SETTINGS_VERSION_UNSUPPORTED"]) {
+    assert.ok(setAsideRow.includes(`\`RUN_SET_ASIDE:${reason}\``), `the SET_ASIDE row names RUN_SET_ASIDE:${reason}`);
   }
   const planRow = rows.find((line) => line.includes("| `PLAN_ENDED` |"));
   assert.ok(planRow.includes("`RUN_SETUP_FAILED:PLAN_CHANGED`"), "the PLAN_ENDED row names its code");
