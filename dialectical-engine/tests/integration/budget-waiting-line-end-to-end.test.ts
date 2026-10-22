@@ -241,6 +241,8 @@ async function startProviderDouble(): Promise<{
 function runnerSettings(): WalkingSkeletonSettings {
   return {
     workerId: "runner:budget-e2e", claimMs: 10_000, claimMarginMs: 1_000,
+    // Side-by-side spec §3: the runner runs as the release its runs are stamped with (else RUNNER_RELEASE_MISMATCH).
+    releaseKey: TEST_RELEASE_KEY,
     judgeBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
     composerBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
     conformanceBound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 },
@@ -508,7 +510,8 @@ async function failedReasonsOf(runId: string): Promise<readonly (string | null)[
 /** The runner claims the first job, then any job that job queued, until the run has none left. */
 async function runUntilSettled(runner: WalkingSkeletonRunner, runId: string, firstWorkItemId: string): Promise<readonly string[]> {
   const kinds: string[] = [];
-  const work = new WorkItemRepository(database.pool);
+  // The same release's queue: an unfenced repository lists only `legacy` runs, so `next` would be empty regardless.
+  const work = new WorkItemRepository(database.pool, { releaseKey: TEST_RELEASE_KEY });
   let next: readonly string[] = [firstWorkItemId];
   for (let round = 0; round < 5 && next.length > 0; round += 1) {
     for (const workItemId of next) kinds.push((await runner.executeWorkItem(workItemId)).kind);
