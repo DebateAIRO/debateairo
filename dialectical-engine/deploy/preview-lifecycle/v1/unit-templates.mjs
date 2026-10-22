@@ -46,6 +46,12 @@ export const COMPARED_PROPERTIES = Object.freeze(('User Group SupplementaryGroup
   // D7 review (controller ruling): also the env files, network/user/device isolation, file-system and socket rules.
   + 'EnvironmentFiles PrivateNetwork PrivateUsers DevicePolicy DeviceAllow RestrictFileSystems NoExecPaths ExecPaths TemporaryFileSystem '
   + 'SocketBindAllow SocketBindDeny LogsDirectory').split(' '));
+/**
+ * The properties `systemctl show` prints once per entry (final fix wave S5): a unit with two EnvironmentFile= lines shows
+ * two `EnvironmentFiles=` lines. They are read as ordered lists; every other property holds one value, and a repeat of
+ * one of those still refuses (which one would be true?).
+ */
+export const MULTI_VALUED_PROPERTIES = Object.freeze(['EnvironmentFiles', 'BindPaths', 'BindReadOnlyPaths', 'TemporaryFileSystem', 'DeviceAllow']);
 
 class TemplateRefusal extends Error { constructor(code, fields) { super(code); this.name = 'TemplateRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new TemplateRefusal(code, fields); };
@@ -178,23 +184,33 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
 export function compareEffective({ service, label, before, after, layout = LAYOUT }) {
   const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!SERVICES.includes(service) || !isLabel(label) || !isRecord(before) || !isRecord(after)) refuse('ARGUMENTS_REFUSED');
-  const value = (record, name) => (Object.hasOwn(record, name) && typeof record[name] === 'string' ? record[name] : '');
+  // A multi-valued property is its ordered list, one entry per line (parseShow); a single value is itself.
+  const value = (record, name) => {
+    const raw = Object.hasOwn(record, name) ? record[name] : undefined;
+    return typeof raw === 'string' ? raw : Array.isArray(raw) && raw.every(entry => typeof entry === 'string') ? raw.join('\n') : '';
+  };
   const oldPath = new RegExp(`${escape(`${layout.nativePlanRoot}/${service}.env`)}(?![A-Za-z0-9._-])`, 'g');
   const newPath = `${layout.nativePlanRoot}/${service}-${label}.env`;
   return Object.freeze(COMPARED_PROPERTIES.filter(name => value(before, name).replace(oldPath, () => newPath) !== value(after, name)));
 }
 
-/** `systemctl show` text -> its properties. A property asked about (`wanted`) that appears twice refuses: which one is true? */
-function parseShow(text, wanted, code) {
+/**
+ * `systemctl show` text -> its properties. A multi-valued property (MULTI_VALUED_PROPERTIES) asked about collects its
+ * lines in order; any other property asked about (`wanted`) that appears twice refuses: which one is true?
+ */
+export function parseShow(text, wanted, code) {
   const shown = Object.create(null);
   for (const line of text.split('\n')) {
     if (line === '') continue;
     const at = line.indexOf('=');
     if (at < 1) refuse(code);
     const key = line.slice(0, at);
-    if (wanted.includes(key) && Object.hasOwn(shown, key)) refuse(code);
-    if (wanted.includes(key)) shown[key] = line.slice(at + 1);
+    if (!wanted.includes(key)) continue;
+    if (MULTI_VALUED_PROPERTIES.includes(key)) { (shown[key] ??= []).push(line.slice(at + 1)); continue; }
+    if (Object.hasOwn(shown, key)) refuse(code);
+    shown[key] = line.slice(at + 1);
   }
+  for (const key of MULTI_VALUED_PROPERTIES) if (Object.hasOwn(shown, key)) Object.freeze(shown[key]);
   return shown;
 }
 

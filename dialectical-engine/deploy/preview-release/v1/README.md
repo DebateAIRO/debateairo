@@ -2575,6 +2575,15 @@ UD=/etc/systemd/system
 noinst() { awk '{ t = $0; sub(/^[ \t\r]+/, "", t); sub(/[ \t\r]+$/, "", t) } t ~ /^\[/ { inst = (t == "[Install]") } !inst'; }
 for SVC in api ui; do [ ! -e "$S/templates/$SVC" ] || { echo "TA_UNITS_NOT_DONE: $S/templates/$SVC exists (look first)"; exit 1; }; done
 for SVC in api ui; do cmp -s <(systemctl cat "debateai-preview-$SVC.service") "$S/preflight/$SVC.cat" || { echo "TA_UNITS_NOT_DONE: the live $SVC unit changed since TA0: ask"; exit 1; }; done
+# systemctl show prints EnvironmentFiles, BindPaths, BindReadOnlyPaths, TemporaryFileSystem and DeviceAllow once per entry
+# (unit-templates.mjs reads them as lists). Any other property TB6's compare reads, printed twice, would stop TB6 inside
+# the downtime: it stops here instead. ONE is that list (the guide test holds it to unit-templates.mjs).
+ONE='Id LoadState User Group SupplementaryGroups ProtectSystem ProtectHome PrivateTmp PrivateDevices ProtectProc ProcSubset NoNewPrivileges RestrictAddressFamilies IPAddressAllow IPAddressDeny ReadWritePaths ReadOnlyPaths InaccessiblePaths CapabilityBoundingSet AmbientCapabilities SystemCallFilter SystemCallArchitectures RestrictNamespaces RestrictSUIDSGID LockPersonality MemoryDenyWriteExecute UMask LimitNOFILE LimitCORE TasksMax Environment UnsetEnvironment PassEnvironment KillMode TimeoutStopUSec Restart RestartUSec StartLimitBurst StartLimitIntervalUSec ProtectKernelTunables ProtectKernelModules ProtectKernelLogs ProtectControlGroups ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory PrivateNetwork PrivateUsers DevicePolicy RestrictFileSystems NoExecPaths ExecPaths SocketBindAllow SocketBindDeny LogsDirectory'
+for SVC in api ui; do
+  echo "$SVC.show, one line per entry: $(for K in EnvironmentFiles BindPaths BindReadOnlyPaths TemporaryFileSystem DeviceAllow; do printf '%s %s, ' "$K" "$(grep -c "^$K=" "$S/preflight/$SVC.show" || true)"; done)"
+  DUP=$(cut -d= -f1 "$S/preflight/$SVC.show" | LC_ALL=C sort | uniq -d | grep -xF -f <(tr ' ' '\n' <<<"$ONE") || true)
+  [ -z "$DUP" ] || { echo "$DUP"; echo "TA_UNITS_NOT_DONE: $SVC.show holds a one-value property twice (above): TB6's compare would refuse it: ask"; exit 1; }
+done
 install -d -o root -g root -m 0700 "$S/templates" "$S/templates/api" "$S/templates/ui"
 for SVC in api ui; do
   RT=$(tl unit-templates.mjs render --service "$SVC" --cat "$S/preflight/$SVC.cat" --out "$S/templates/$SVC" 2>&1) || { echo "$RT"; echo "TA_UNITS_NOT_DONE: the $SVC template was refused (the line above names the file and line): ask"; exit 1; }

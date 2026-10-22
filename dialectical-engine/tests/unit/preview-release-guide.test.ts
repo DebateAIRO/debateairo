@@ -244,6 +244,18 @@ describe('the preview release guide: transition T, side by side, the way back, t
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  it('TA-units counts the multi-valued properties and stops on a one-value property printed twice, before the downtime (final fix wave S5)', async () => {
+    const templates = await import('../../deploy/' + 'preview-lifecycle/v1/unit-templates.mjs');
+    const lines = scriptOf('TA_UNITS').lines;
+    const one = /^ONE='([A-Za-z ]+)'$/.exec(lines.find(line => line.startsWith('ONE=')) ?? '')?.[1]?.split(' ');
+    // Exactly what compare reads with one value each: Id, LoadState and the compared properties minus the five lists.
+    expect(one).toEqual(['Id', 'LoadState', ...templates.COMPARED_PROPERTIES.filter((name: string) => !templates.MULTI_VALUED_PROPERTIES.includes(name))]);
+    expect(lines.join('\n')).toContain(`for K in ${templates.MULTI_VALUED_PROPERTIES.join(' ')}; do`);
+    const guard = lines.findIndex(line => line.includes('TA_UNITS_NOT_DONE: $SVC.show holds a one-value property twice'));
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(lines.findIndex(line => line.startsWith('install -d -o root -g root -m 0700 "$S/templates"')));
+  });
+
   it('the caddy step restores the old file on a failed check', () => {
     const tb7 = scriptOf('TB7').lines;
     const restoreLine = 'install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new"';
