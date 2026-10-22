@@ -2337,7 +2337,7 @@ cp -p "$C" "$P/Caddyfile.live"
 printf '%s\n' "$CF" > "$P/pg-config-file"
 echo "max_connections $(psqlq "SHOW max_connections"), reserved $(psqlq "SELECT current_setting('superuser_reserved_connections')||'+'||coalesce(current_setting('reserved_connections', true), '0')"), config $CF" | tee "$P/pg-limits"
 echo "role connection limits:"; psqlq "SELECT rolname||' '||rolconnlimit FROM pg_roles WHERE rolname LIKE 'debateai%' ORDER BY 1" | tee "$P/pg-role-limits"
-echo "connections in use, by login:"; psqlq "SELECT coalesce(usename, '(none)')||' '||count(*) FROM pg_stat_activity WHERE backend_type = 'client backend' GROUP BY 1 ORDER BY 1" | tee "$P/pg-connections"
+echo "connections in use, by login:"; psqlq "SELECT coalesce(usename, '(none)')||' '||count(*) FROM pg_stat_activity WHERE backend_type = 'client backend' GROUP BY usename ORDER BY 1" | tee "$P/pg-connections"
 echo "databases of this cluster:"; psqlq "SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY 1" | tee "$P/pg-databases"
 if grep -qx hatchet "$P/pg-databases"; then echo "HATCHET_DATABASE_IN_THIS_CLUSTER yes"; else echo "HATCHET_DATABASE_IN_THIS_CLUSTER no"; fi
 for U in api:2147483648 ui:1073741824 runner:3221225472; do
