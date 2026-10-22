@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
-import { migrate } from "@debateai/db";
+import { createPool, migrate } from "@debateai/db";
+import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
 import {
   SUPPORT_CONFIGURATION_KEYS,
   createPostgresRegisterPublicationPort,
@@ -56,6 +57,22 @@ async function refusal(work: Promise<unknown>): Promise<unknown> {
 /** A pool or one client in a transaction: the calls below run on either. */
 type Db = { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> };
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Side-by-side spec §13 (Task S9): the API's one runtime reader of the pointer, over a REAL house pool (createPool, the
+ * driver's own Query and its per-query timeout), read once as the API's boot reads it. A fresh reader each time, so the
+ * answer is the database's, never a cached one.
+ */
+async function apiReaderSays(siteVersion: number): Promise<number> {
+  const pool = createPool(database.connectionString, { max: 1, connectionTimeoutMillis: 5000, name: "test:active-settings-reader" });
+  try {
+    const reader = createActiveSettingsVersionReader({ pool, siteVersion });
+    const version = await reader.current();
+    expect(reader.lastObserved()).toBe(version);
+    return version;
+  } finally {
+    await pool.end();
+  }
+}
 
 let database: TestDatabase;
 let G1 = 0;
@@ -132,6 +149,8 @@ describe("0124: settings changes without an upload", () => {
 
   it("1. a fresh database: no pointer; a release passes its own site version with no verdict (D1), nothing else, legacy nothing", async () => {
     expect(await pointer()).toBeNull();
+    // Task S9: the API's reader answers its own site version while the pointer is empty (D1).
+    expect(await apiReaderSays(17)).toBe(17);
     expect(await passed(R17, 17)).toBe(true);
     expect(await passed("legacy", 17)).toBe(false);
     expect(await passed(R17, 18)).toBe(false);
@@ -219,6 +238,9 @@ describe("0124: settings changes without an upload", () => {
     expect(await pointer()).toBe(G2);
     expect((await database.pool.query("SELECT register_version::int AS v, expected_previous::int AS p, release_key FROM register.settings_activation ORDER BY activation_seq")).rows)
       .toEqual([{ v: G2, p: null, release_key: A }, { v: 4, p: G2, release_key: A }, { v: G2, p: 4, release_key: A }]);
+    // Task S9: once activated, the API's reader answers the activated version, whatever its own site version.
+    expect(await apiReaderSays(4)).toBe(G2);
+    expect(await apiReaderSays(17)).toBe(G2);
   });
 
   it("4b. the switch hook through 0123's real switch (B current, pointer G1 afterwards)", async () => {

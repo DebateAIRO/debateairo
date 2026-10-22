@@ -10,6 +10,7 @@
  * - a clock that goes backwards makes the value stale (read again), never fresh.
  */
 import { readFile } from "node:fs/promises";
+import pg from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -20,12 +21,17 @@ import {
 const SITE_VERSION = 17;
 const SQL = "SELECT register.read_active_settings_version() AS version";
 
-/** A fake pool whose answers are queued; each call records its SQL and the per-query client timeout it was sent with. */
+/**
+ * A fake pool whose answers are queued; each call records its SQL and the per-query client timeout it was sent with.
+ * Every config goes through pg's own Query constructor first, as pg-pool hands it to the client (normalizeQueryConfig
+ * writes the callback onto the config object), so a frozen or shared config fails here exactly as against a database.
+ */
 function fakePool(...answers: ReadonlyArray<unknown | (() => Promise<unknown>)>) {
   const queue = [...answers];
   const sql: string[] = [];
   const timeouts: unknown[] = [];
   const query = vi.fn(async (config: string | Readonly<{ text: string; query_timeout?: number }>) => {
+    new pg.Query(config as never, undefined, () => undefined);
     sql.push(typeof config === "string" ? config : config.text);
     timeouts.push(typeof config === "string" ? undefined : config.query_timeout);
     const next = queue.shift();
@@ -185,7 +191,9 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     vi.useFakeTimers();
     const time = clock();
     const never = () => new Promise<unknown>(() => undefined);
-    const { pool, query } = fakePool(18, never, never, 21);
+    let answerFirst!: (value: unknown) => void;
+    const first = () => new Promise<unknown>((resolve) => { answerFirst = resolve; });
+    const { pool, query, timeouts } = fakePool(18, first, never, 21);
     const reader = createActiveSettingsVersionReader({ pool, siteVersion: SITE_VERSION, clock: time.read });
     expect(await reader.current()).toBe(18);
     time.advance(1000);
@@ -197,19 +205,43 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     time.advance(ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs - 2000);
     expect(await reader.current()).toBe(18);
     expect(query).toHaveBeenCalledTimes(2);
-    // Past it: the gate opens and ONE replacement query goes out (it hangs too, and holds the gate in its turn).
+    // Past it: the gate opens and ONE replacement query goes out (it hangs too).
     time.advance(2000);
     const replacement = reader.current();
     await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
     expect(await replacement).toBe(18);
     expect(query).toHaveBeenCalledTimes(3);
-    time.advance(1000);
-    expect(await reader.current()).toBe(18);
+    // Two unanswered: nothing more, however long (the driver's query_timeout is what ends them for real).
+    for (const wait of [1000, ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs, ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs]) {
+      time.advance(wait);
+      expect(await reader.current()).toBe(18);
+    }
     expect(query).toHaveBeenCalledTimes(3);
-    // And after its own query timeout, another: the database answers this time.
-    time.advance(ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs);
+    // One of them settles: the next refresh sends again, and the database answers this time.
+    answerFirst(19);
+    await vi.advanceTimersByTimeAsync(0);
+    time.advance(1000);
     expect(await reader.current()).toBe(21);
     expect(query).toHaveBeenCalledTimes(4);
+    // Every query carried the driver's timeout.
+    expect(timeouts).toEqual(Array(4).fill(ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs));
+  });
+
+  it("under a clock that goes backwards, never more than two queries are in flight", async () => {
+    vi.useFakeTimers();
+    const time = clock(10000);
+    const never = () => new Promise<unknown>(() => undefined);
+    const { pool, query } = fakePool(18, never, never, never, never);
+    const reader = createActiveSettingsVersionReader({ pool, siteVersion: SITE_VERSION, clock: time.read });
+    expect(await reader.current()).toBe(18);
+    for (const at of [11000, 500, 200, 100, 50, 20]) {
+      time.set(at);
+      const pending = reader.current();
+      await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
+      expect(await pending).toBe(18);
+    }
+    // The first read, the abandoned one, and at most one replacement.
+    expect(query).toHaveBeenCalledTimes(3);
   });
 
   it("its two refusal codes are in both KNOWN_DOMAIN_CODES lists, sorted (so the error sweeps see them)", async () => {
