@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Vartotojų apsauga",
-  "chrome.release.newerVersion": "Yra prieinama naujesnė svetainės versija.",
+  "chrome.release.newerVersion": "Svetainė buvo atnaujinta. Iš naujo įkelkite puslapį.",
   "chrome.release.reload": "Įkelti iš naujo",
   "chrome.release.madeByNewer": "Šiuos debatus sukūrė naujesnė svetainės versija. Iš naujo įkelkite puslapį arba bandykite dar kartą po kelių minučių."
 }

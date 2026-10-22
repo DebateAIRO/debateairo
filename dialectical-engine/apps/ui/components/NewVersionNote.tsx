@@ -9,8 +9,9 @@ import { newerVersionReason, subscribeNewerVersion } from "@/lib/v3/releaseWatch
 const nothingOnTheServer = () => null;
 
 /**
- * Side-by-side uploads spec 2026-10-21 §7 (plan C13): once this page learns that a newer version of the site is out
- * (lib/v3/releaseWatch.ts), one small, plain, non-blocking line under the top bar says so, with a Reload button. The
+ * Side-by-side uploads spec 2026-10-21 §7 (plan C13): once this page learns that another version of the site serves
+ * (lib/v3/releaseWatch.ts), one small, plain, non-blocking line under the top bar says so — neutrally, "The site was
+ * updated." (final fix wave W4: after a way back it is older) — with a Reload button. The
  * page keeps working underneath; nothing is hidden or disabled. Words from the layout's shared catalogue (`chrome`).
  */
 export function NewVersionNote() {

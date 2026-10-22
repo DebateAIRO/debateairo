@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Ochrana spotřebitele",
-  "chrome.release.newerVersion": "Je k dispozici novější verze webu.",
+  "chrome.release.newerVersion": "Web byl aktualizován. Znovu načtěte stránku.",
   "chrome.release.reload": "Znovu načíst",
   "chrome.release.madeByNewer": "Tuto debatu vytvořila novější verze webu. Znovu načtěte stránku nebo to zkuste znovu za několik minut."
 }

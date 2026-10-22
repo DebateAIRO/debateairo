@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Tarbijakaitse",
-  "chrome.release.newerVersion": "Saadaval on veebisaidi uuem versioon.",
+  "chrome.release.newerVersion": "Veebisait on uuendatud. Laadige leht uuesti.",
   "chrome.release.reload": "Laadige uuesti",
   "chrome.release.madeByNewer": "Selle väitluse tegi veebisaidi uuem versioon. Laadige leht uuesti või proovige mõne minuti pärast veel kord."
 }

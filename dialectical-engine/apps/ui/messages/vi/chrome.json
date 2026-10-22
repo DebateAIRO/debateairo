@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Bảo vệ người tiêu dùng",
-  "chrome.release.newerVersion": "Đã có phiên bản mới hơn của trang web.",
+  "chrome.release.newerVersion": "Trang web đã được cập nhật. Hãy tải lại trang.",
   "chrome.release.reload": "Tải lại",
   "chrome.release.madeByNewer": "Cuộc tranh luận này được tạo bởi phiên bản mới hơn của trang web. Hãy tải lại trang hoặc thử lại sau vài phút."
 }

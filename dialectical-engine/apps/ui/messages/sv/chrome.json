@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Konsumentskydd",
-  "chrome.release.newerVersion": "En nyare version av webbplatsen finns tillgänglig.",
+  "chrome.release.newerVersion": "Webbplatsen har uppdaterats. Ladda om sidan.",
   "chrome.release.reload": "Ladda om",
   "chrome.release.madeByNewer": "Den här debatten skapades av en nyare version av webbplatsen. Ladda om sidan eller försök igen om några minuter."
 }

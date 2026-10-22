@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Protection des consommateurs",
-  "chrome.release.newerVersion": "Une version plus récente du site est disponible.",
+  "chrome.release.newerVersion": "Le site a été mis à jour. Rechargez la page.",
   "chrome.release.reload": "Recharger",
   "chrome.release.madeByNewer": "Ce débat a été créé par une version plus récente de ce site. Rechargez la page ou réessayez dans quelques minutes."
 }

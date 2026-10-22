@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "حماية المستهلك",
-  "chrome.release.newerVersion": "تتوفر نسخة أحدث من الموقع.",
+  "chrome.release.newerVersion": "تم تحديث الموقع. أعد تحميل الصفحة.",
   "chrome.release.reload": "إعادة تحميل",
   "chrome.release.madeByNewer": "أُنشئت هذه المناظرة بنسخة أحدث من الموقع. أعد تحميل الصفحة، أو حاول مرة أخرى بعد بضع دقائق."
 }
