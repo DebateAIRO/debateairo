@@ -3065,6 +3065,13 @@ RZ=$(readyz "$UIP"); echo "T's website /readyz (Host 127.0.0.1:$UIP, as Caddy's 
 echo TB6_DONE
 ```
 
+Note from R20 (2026-10-22): TB6 stopped inside the downtime with `differs: ["RestrictFileSystems"]` for both the API
+and the website. The settings were the same; only the printing differed: the full `systemctl show` saved at TA0 leaves
+an empty setting out, while `systemctl show -p` prints an empty deny list as a bare `~`. The owner approved resuming
+with a copy of the TA0 capture that had a `RestrictFileSystems=~` line added, and the compare then said SAME. The tool
+now reads a bare `~` as empty (for RestrictFileSystems, RestrictAddressFamilies and SystemCallFilter), so this stop
+should not come back; a `~` followed by names is still a real list and is still compared.
+
 From TB6 on, the team unlock and the creator read the current release's API from the release table and lock v2.
 
 ### TB7. Caddy with two slots

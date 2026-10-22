@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 const templates = await import('../../deploy/' + 'preview-lifecycle/v1/unit-templates.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { splitSystemctlCat, renderTemplate, compareEffective, parseShow, COMPARED_PROPERTIES, MULTI_VALUED_PROPERTIES, main } = templates;
+const { splitSystemctlCat, renderTemplate, compareEffective, parseShow, COMPARED_PROPERTIES, MULTI_VALUED_PROPERTIES, EMPTY_DENY_LIST_PROPERTIES, main } = templates;
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid };
 const DIR = '/etc/systemd/system';
@@ -286,6 +286,25 @@ describe('compareEffective', () => {
     const { Restart: _gone, ...noRestart } = shown();
     expect(compareEffective({ service: 'api', label: 'new-v1', before: { ...noRestart, ReadOnlyPaths: '' }, after: { ...noRestart, ReadOnlyPaths: '', Restart: '' } })).toEqual([]);
   });
+  it('reads a bare ~ (an empty deny list) as empty, but compares a real deny or allow list strictly (R20 TB6, 2026-10-22)', () => {
+    // A full `systemctl show` leaves an empty deny list out; `systemctl show -p` prints it as a bare `~`.
+    expect(EMPTY_DENY_LIST_PROPERTIES).toEqual(['RestrictAddressFamilies', 'SystemCallFilter', 'RestrictFileSystems']);
+    for (const name of EMPTY_DENY_LIST_PROPERTIES) expect(COMPARED_PROPERTIES, name).toContain(name);
+    const compare = (before: Record<string, string>, after: Record<string, string>) => compareEffective({ service: 'api', label: 'new-v1', before: shown(before), after: shown({ ReadOnlyPaths: `${ENV}/api-new-v1.env -/etc/debateai-v3-preview/api`, ...after }) });
+    for (const name of ['RestrictFileSystems', 'RestrictAddressFamilies', 'SystemCallFilter']) {
+      expect(compare({}, { [name]: '~' })).toEqual([]);
+      expect(compare({ [name]: '~' }, {})).toEqual([]);
+    }
+    expect(compare({ RestrictFileSystems: '~ext4' }, {})).toEqual(['RestrictFileSystems']);
+    expect(compare({}, { RestrictFileSystems: '~ext4 tmpfs' })).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: '~ext4' }, { RestrictFileSystems: '~' })).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: '~ext4' }, { RestrictFileSystems: '~ext4' })).toEqual([]);
+    expect(compare({ RestrictFileSystems: 'ext4' }, {})).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: 'ext4' }, { RestrictFileSystems: '~ext4' })).toEqual(['RestrictFileSystems']);
+    // Only the deny-list properties: a bare `~` anywhere else stays a value of its own.
+    expect(compare({}, { SystemCallArchitectures: '~' })).toEqual(['SystemCallArchitectures']);
+    expect(compare({}, { SocketBindDeny: '~' })).toEqual(['SocketBindDeny']);
+  });
   it('compares exactly the confinement, identity, environment and restart properties the plan names', () => {
     expect(COMPARED_PROPERTIES).toEqual(('User Group SupplementaryGroups ProtectSystem ProtectHome PrivateTmp PrivateDevices ProtectProc ProcSubset NoNewPrivileges RestrictAddressFamilies '
       + 'IPAddressAllow IPAddressDeny ReadWritePaths ReadOnlyPaths InaccessiblePaths BindPaths BindReadOnlyPaths CapabilityBoundingSet AmbientCapabilities SystemCallFilter '
@@ -393,6 +412,12 @@ describe('unit-templates.mjs CLI', () => {
     const s = systemd(NEW);
     const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow(OLD)], { deps: { run: s.run } });
     expect(s.calls).toEqual([{ argv: showArgv, env: {} }]);
+    expect(result).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_SAME', service: 'api', label: 'new-v1', differs: [] }] });
+  });
+
+  it('compare exits 0 when the saved full show leaves out an empty deny list that systemctl show -p prints as ~ (R20 TB6)', async () => {
+    const s = systemd([...NEW, 'RestrictFileSystems=~', 'RestrictAddressFamilies=~', 'SystemCallFilter=~']);
+    const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow(OLD)], { deps: { run: s.run } });
     expect(result).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_SAME', service: 'api', label: 'new-v1', differs: [] }] });
   });
 
