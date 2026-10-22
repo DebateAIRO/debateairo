@@ -276,13 +276,16 @@ EXECUTE for `debateai_runtime`), the funding publication at a version; §7 adds 
 `RELEASE_NOT_SERVED`; SELECT, INSERT for `debateai_runtime`, SELECT for `debateai_staff_security_owner` and
 `debateai_replay`) and redefines `billing.read_internal_grant_spent` in place (same signature, owner, definer, path and
 grants) so a waived run's spend leaves a funded person's window; site-day readers still count it; §8 adds
-`core.private_erasure_run_chain(uuid)` (a STABLE definer, callable by no role: a run's re-admission chain, newest first)
-and redefines in place, same signature, owner, definer, path, grants and 0099's session clamp, the per-debate private
-erasure `core.prepare_private_run_erasure`, `core.resume_private_run_erasure` and `core.finalize_private_run_erasure`
-(EXECUTE for `debateai_erasure_runtime` only), so deleting a debate erases every run of its chain that the person owns:
-the step-up grant may be bound to any run of the chain, prepare marks them all in one transaction (under a try of the
-supersession guard's lock and of the other runs' content leases), and resume names each one still pending until the
-coordinator has completed them all (addendum A-x3). Its header declares
+`core.private_erasure_run_chain(uuid)` (a STABLE definer, callable by no role: a debate's runs, linked by the
+re-admission marker `identity.run_execution_binding.readmitted_from_run_id` between two encrypted runs of one account,
+so the copies no edge links are included and an edge to a run that does not re-admit its old run joins nothing; a
+plaintext run is a chain of one) and redefines in place, same signature, owner, definer, path, grants and 0099's
+session clamp, the per-debate private erasure `core.prepare_private_run_erasure`, `core.resume_private_run_erasure` and
+`core.finalize_private_run_erasure` (EXECUTE for `debateai_erasure_runtime` only), so deleting a debate erases every run
+of its chain that the person owns: the step-up grant may be bound to any run of the chain, prepare marks them all in one
+transaction (under a try of the site-wide supersession guard's lock, which every deletion now tries, and of the other
+runs' content leases), and resume names each one still pending until the coordinator has completed them all (addendum
+A-x3). Its header declares
 `-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier
 functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
 `verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no

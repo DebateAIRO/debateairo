@@ -21,8 +21,9 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
  * and adds staff.read_internal_funding_policy_at(bigint); §7 adds the append-only spend waiver ledger.model_spend_waiver
  * and redefines billing.read_internal_grant_spent in place so a waived run leaves a funded person's window; §8 adds the
- * chain reader core.private_erasure_run_chain(uuid) and redefines the per-debate private erasure (prepare, resume,
- * finalize) in place so deleting a debate erases every run of its re-admission chain (addendum A-x3). The view, that
+ * chain reader core.private_erasure_run_chain(uuid) (a debate's runs, linked by the re-admission marker) and redefines
+ * the per-debate private erasure (prepare, resume, finalize) in place so deleting a debate erases every run of its
+ * re-admission chain (addendum A-x3). The view, that
  * CHECK, the two indexes on the marker and the ten redefinitions of §6, §7 and §8 are checked by the closing block and
  * by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled).
  * It adds no billing relation and no billing function, so the effective verifier in force (0111's) stays in force and

@@ -1243,34 +1243,51 @@ REVOKE ALL ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestam
 GRANT EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) TO debateai_runtime;
 
 -- §8. Deleting a debate erases every run of it (spec §4; plan A addendum A-x3) ------------------------------------------
--- A re-admitted debate is a chain of runs (§4): the old run keeps its question (ciphertext under its own still-live run
--- key) while the person's list, the export and every route show only the newest. Deleting the debate (DELETE
--- /v1/debates/:id: the id resolved to the newest run, then 0040's per-debate private erasure of that run) left the old
--- runs readable until the whole account was erased. A person who deletes a debate expects it gone, so the three erasure
--- functions now act on the debate's chain: core.private_erasure_run_chain(run) is the run's re-admission chain, newest
--- first (core.resolve_run_ref's walk forward to the newest run, at most 16 hops, then back through every superseded
--- run, at most 16; RUN_SUPERSESSION_CHAIN_INVALID beyond, as resolve_run_ref refuses), and
+-- A re-admitted debate is several runs (§4): the old run keeps its question (ciphertext under its own still-live run
+-- key) while the person's list, the export and every route show only the newest; and a re-admission whose START never
+-- committed its edge (recorded FAILED, never started, or refused because a deletion landed between the copy's row and
+-- its edge) is a copy too, with its own key, hidden from the list but in the person's export. Deleting the debate
+-- (DELETE /v1/debates/:id: the id resolved to the newest run, then 0040's per-debate private erasure of that run) left
+-- every other copy readable until the whole account was erased. A person who deletes a debate expects it gone, so the
+-- three erasure functions now act on the debate's runs, core.private_erasure_run_chain(run):
+--   · THE RUNS OF A DEBATE are linked by the re-admission marker (identity.run_execution_binding.readmitted_from_run_id,
+--     §4: durable, written only by core.prepare_readmitted_run_key_provision, for an owner's encrypted old run): from the
+--     run named up through the run each one re-admits to the debate's first run, then down through every run whose
+--     marker names a run already found, generation by generation. A link counts only between two encrypted runs whose
+--     bindings name the same account. A supersession edge means "deleting one deletes both", so it is followed only to
+--     the re-admission of its old run, which is exactly such a link (every edge START writes for an owner's debate
+--     points at a run §4's provision marked with that old run), and core.run_supersession itself is not read: an edge
+--     whose new run carries no marker naming its old run (the guard allows one, e.g. between two debates of one person)
+--     joins nothing. A plaintext (legacy) run is never linked, so its chain is itself alone and a person's chain never
+--     holds a plaintext run next to encrypted ones (nothing can block their erasure; a plaintext run named answers
+--     LEGACY_PLAINTEXT_RETAINED as it always did). At most 17 links up and 17 generations down (resolve_run_ref's 16
+--     re-admissions, plus a copy of the newest that never got its edge); RUN_SUPERSESSION_CHAIN_INVALID beyond.
 --   · prepare consumes the step-up grant when it is bound to ANY run of that chain (controller ruling (h) on C9: the
 --     grant stays bound to the id the page sent, which may be the old or the new one; the old id alone could not
 --     delete anything before), and in its one transaction marks every run of the chain that the person owns (first and
 --     latest ownership event p_owner_ref, as for the run named) and that is not erased yet: one audit binding and one
 --     key-cleanup intent per run, its attestation secret deleted. A run of the chain someone else owns is never read,
---     locked or touched (0123's guard keeps a chain within one person; an edge written past the guard changes nothing).
---     Any run of the person's chain still plaintext (legacy) answers LEGACY_PLAINTEXT_RETAINED and any PUBLISHED one
---     PUBLISHED, before anything is marked, as the run named alone always did; it answers ERASED only when every run
---     is already erased or marked. It returns the first marked run's erasure id; the API's coordinator then completes
---     each marked run (its key destroyed, then finalize), asking resume for the next until none is left.
+--     locked or touched (0123's guard and provision keep a debate within one person; a marker written past them changes
+--     nothing). The run named still plaintext answers LEGACY_PLAINTEXT_RETAINED and any PUBLISHED run of the person's
+--     chain PUBLISHED, before anything is marked, as the run named alone always did; it answers ERASED only when every
+--     run is already erased or marked. It returns the first marked run's erasure id; the API's coordinator then
+--     completes each marked run (its key destroyed, then finalize), asking resume for the next until none is left.
 --   · resume returns one marked run of the chain still pending under that grant (the oldest binding first), so a
 --     request cut short part-way, or a repeated request with the same grant, completes the rest (and 0040's
 --     reconciler completes any intent no request comes back for);
 --   · finalize accepts that grant for each run of the chain.
--- The chain is read again after the run lock and the account lock, under a try of the supersession guard's own
--- advisory lock ('debateai:run-supersession'): no edge is written while prepare holds it, and an edge written after it
--- commits is refused (the old run no longer waits, final review P3), so no new copy can join a deleted debate; busy is
--- CONTENDED, as every other lock here. The other runs' private-content leases (0040's 'debateai:run-content-lease:v1:'
--- namespace, which the API takes only for the run named) are tried here too: a reader still holding one is CONTENDED,
--- never a wait, so no lock order can deadlock. A run never re-admitted has a chain of one, and every function acts
--- exactly as 0099 left it. Bodies: 0085's (2171-2355, 2358-2472, 2475-2600) with 0099's session clamp, as applied.
+-- No copy joins unseen: every marker is written, and every re-admitted run's row committed, under the account's
+-- advisory lock, which prepare holds before it reads the chain again; a copy committed earlier is read and marked, a
+-- later one is refused (the run it re-admits no longer waits). After the account lock prepare also tries the
+-- supersession guard's own advisory lock ('debateai:run-supersession'), so no START commits a re-admission's edge, hold
+-- and first job next to the deletion: the guard reads the old run after that lock, and a marked run no longer waits
+-- (final review P3). That lock is site-wide and every deletion tries it, a run never re-admitted included: while any
+-- re-admission edge anywhere is being written, a deletion answers CONTENDED (202 PENDING, grant unspent, nothing
+-- marked) and the page asks again. The other runs' private-content leases (0040's 'debateai:run-content-lease:v1:'
+-- namespace, which the API takes only for the run named) are tried too: a reader still holding one is CONTENDED, never a
+-- wait, so no lock order can deadlock. A run never re-admitted has a chain of one and passes 0099's checks in 0099's
+-- order, plus that try of the site-wide lock. Bodies: 0085's (2171-2355, 2358-2472, 2475-2600) with 0099's session
+-- clamp, as applied.
 --
 -- 0063's rule ("never CREATE OR REPLACE a function another migration defines") is broken for these three, as §6 breaks
 -- it, because T is drained: no debate waits or runs while it is applied, and the old release never runs beside it. Same
@@ -1286,34 +1303,52 @@ SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
 DECLARE
-  v_newest uuid := p_run_id;
+  v_root uuid := p_run_id;
   v_next uuid;
   v_chain uuid[];
+  v_generation uuid[];
   v_hops integer := 0;
 BEGIN
   IF p_run_id IS NULL THEN
     RETURN ARRAY[]::uuid[];
   END IF;
+  -- Up: the run each one re-admits, while both are encrypted runs of one account.
   LOOP
-    SELECT edge.new_run_id INTO v_next FROM core.run_supersession AS edge WHERE edge.old_run_id = v_newest;
+    SELECT parent.run_id INTO v_next
+    FROM identity.run_execution_binding AS child
+    JOIN core.run AS child_run ON child_run.run_id = child.run_id AND child_run.content_encryption_version = 1
+    JOIN identity.run_execution_binding AS parent
+      ON parent.run_id = child.readmitted_from_run_id AND parent.user_id = child.user_id
+    JOIN core.run AS parent_run ON parent_run.run_id = parent.run_id AND parent_run.content_encryption_version = 1
+    WHERE child.run_id = v_root;
     EXIT WHEN NOT FOUND;
     v_hops := v_hops + 1;
-    IF v_hops > 16 THEN
+    IF v_hops > 17 THEN
       RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';
     END IF;
-    v_newest := v_next;
+    v_root := v_next;
   END LOOP;
-  v_chain := ARRAY[v_newest];
+  -- Down: every run that re-admits a run already found, under the same two conditions, one generation at a time.
+  v_chain := ARRAY[v_root];
+  v_generation := ARRAY[v_root];
   v_hops := 0;
   LOOP
-    SELECT edge.old_run_id INTO v_next FROM core.run_supersession AS edge
-    WHERE edge.new_run_id = v_chain[cardinality(v_chain)];
-    EXIT WHEN NOT FOUND;
+    v_generation := ARRAY(
+      SELECT child.run_id
+      FROM identity.run_execution_binding AS child
+      JOIN core.run AS child_run ON child_run.run_id = child.run_id AND child_run.content_encryption_version = 1
+      JOIN identity.run_execution_binding AS parent
+        ON parent.run_id = child.readmitted_from_run_id AND parent.user_id = child.user_id
+      JOIN core.run AS parent_run ON parent_run.run_id = parent.run_id AND parent_run.content_encryption_version = 1
+      WHERE child.readmitted_from_run_id = ANY(v_generation) AND child.run_id <> ALL(v_chain)
+      ORDER BY child.run_id
+    );
+    EXIT WHEN cardinality(v_generation) = 0;
     v_hops := v_hops + 1;
-    IF v_hops > 16 THEN
+    IF v_hops > 17 THEN
       RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';
     END IF;
-    v_chain := v_chain || v_next;
+    v_chain := v_chain || v_generation;
   END LOOP;
   RETURN v_chain;
 END;
@@ -1357,7 +1392,7 @@ DECLARE
   v_first_request_ref uuid;
 BEGIN
   BEGIN
-    -- Side-by-side A-x3: the debate's re-admission chain; the grant may be bound to any run of it.
+    -- Side-by-side A-x3: the debate's runs (its re-admission chain); the grant may be bound to any run of it.
     v_chain := core.private_erasure_run_chain(p_run_id);
     -- Opaque, nonlocking preauthorization happens before the NOWAIT run lock.
     -- It may reject a stale/racing request, but it cannot reveal whether a
@@ -1406,9 +1441,10 @@ BEGIN
       RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
     END IF;
     v_audit_token := v_account.audit_token;
-    -- Side-by-side A-x3: no re-admission edge is written while the supersession guard's lock is held here, so the
-    -- chain read now is the whole debate until this transaction commits (and an edge out of a run it marks is refused
-    -- afterwards: that run no longer waits).
+    -- Side-by-side A-x3: every marker and every re-admitted run's row is written under the account lock held above, so
+    -- the chain read below is the whole debate until this transaction commits (a later copy is refused: the run it
+    -- re-admits no longer waits). The supersession guard's lock, tried here, keeps a START from committing an edge,
+    -- hold and first job beside this deletion; it is site-wide, so any edge being written makes this CONTENDED.
     IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-supersession',0)) THEN
       RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;
     END IF;
@@ -1471,10 +1507,9 @@ BEGIN
     WHERE step_up_grant_id=v_grant_id AND consumed_at IS NULL;
     IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
 
-    IF v_content_encryption_version IS DISTINCT FROM 1 OR EXISTS (
-      SELECT 1 FROM core.run AS run
-      WHERE run.run_id=ANY(v_members) AND run.content_encryption_version IS DISTINCT FROM 1
-    ) THEN
+    -- Side-by-side A-x3: only the run named can be plaintext (the chain links encrypted runs only, and a plaintext run
+    -- named is a chain of one), so this is 0085's check unchanged.
+    IF v_content_encryption_version IS DISTINCT FROM 1 THEN
       RETURN QUERY SELECT 'LEGACY_PLAINTEXT_RETAINED'::text,NULL::uuid; RETURN;
     END IF;
     SELECT event.state INTO v_latest_visibility FROM core.run_visibility_event AS event
@@ -2111,14 +2146,20 @@ BEGIN
          'model_spend_waiver') > 0 THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_SPEND_WAIVER_CONTRACT_INCOMPLETE';
   END IF;
-  -- §8: the chain reader a STABLE definer with the pinned path, callable by no role; the three erasure functions
-  -- VOLATILE definers with the pinned path, owned by the reader's owner, each reading the chain and binding the grant to
-  -- it (no grant bound to the run named alone is left), with EXECUTE for the erasure runtime alone; prepare taking the
-  -- supersession guard's lock and trying the other runs' content leases; prepare and resume keeping 0099's session clamp.
+  -- §8: the chain reader a STABLE definer with the pinned path, callable by no role, linking the debate's runs by the
+  -- re-admission marker between two encrypted runs of one account (never by a bare supersession edge); the three erasure
+  -- functions VOLATILE definers with the pinned path, owned by the reader's owner, each reading the chain and binding the
+  -- grant to it (no grant bound to the run named alone is left), with EXECUTE for the erasure runtime alone; prepare
+  -- taking the supersession guard's lock and trying the other runs' content leases; prepare and resume keeping 0099's
+  -- session clamp.
   IF v_chain IS NULL OR array_position(v_erasure, NULL) IS NOT NULL
     OR NOT EXISTS (
       SELECT 1 FROM pg_proc AS p
-      WHERE p.oid = v_chain AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.provolatile = 's')
+      WHERE p.oid = v_chain AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.provolatile = 's'
+        AND strpos(pg_get_functiondef(p.oid), 'ON parent.run_id = child.readmitted_from_run_id AND parent.user_id = child.user_id') > 0
+        AND strpos(pg_get_functiondef(p.oid), 'child_run.content_encryption_version = 1') > 0
+        AND strpos(pg_get_functiondef(p.oid), 'parent_run.content_encryption_version = 1') > 0
+        AND strpos(pg_get_functiondef(p.oid), 'core.run_supersession') = 0)
     OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
              FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
              WHERE p.oid = v_chain AND a.grantee <> p.proowner ORDER BY 1) <> ARRAY[]::text[]

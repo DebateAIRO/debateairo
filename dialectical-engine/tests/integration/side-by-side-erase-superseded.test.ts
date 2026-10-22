@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pool as PgPool, type PoolClient } from "pg";
 import { buildApi, type AskApplication } from "@debateai/api";
+import { WorkItemRepository } from "@debateai/battery";
 import {
   ContentCipher, FileRunContentKeyStore, FileUserDekStore, generateDek, hashToken, loadKek,
   type AuditContextHasher, type RunContentKeyStore
@@ -27,7 +28,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * run) must leave no readable content in ANY run of its chain and no live run key, whichever id the page sent and
  * whichever id the step-up grant is bound to (controller ruling (h): the grant stays bound to the id the page sent).
  * Another person's run and a run outside the chain are never touched; a legacy (plaintext) chain stays out of reach of
- * a signed-in person's per-debate erasure, as a single legacy run always was. Over embedded Postgres and migration 0123,
+ * a signed-in person's per-debate erasure, as a single legacy run always was. The runs are linked by the re-admission
+ * marker (security review follow-ups): a copy whose START never committed its edge (recorded FAILED, never started) goes
+ * with the debate, an edge to a run that does not re-admit its old run joins nothing, and a plaintext run is never a run
+ * of an encrypted debate (so it never blocks its deletion). Over embedded Postgres and migration 0123,
  * through the real route, the real account-erasure application and coordinator (on a connection acting as
  * debateai_erasure_runtime) and a real file key store. CI skips this directory; run it alone.
  */
@@ -159,12 +163,17 @@ async function enterLine(runId: string): Promise<void> {
  * upload can re-admit it once more.
  */
 async function readmit(old: string, principal: ReadmissionPrincipal, questionLine: string, waits = false): Promise<string> {
-  const created = await new RunRepository(database.pool).startReadmittedRun({
-    ...runShape(questionLine), fromRunId: old, principal, registerVersion: 17, releaseKey: NEW_RELEASE
-  });
+  const created = await readmittedRow(old, principal, questionLine);
   if (waits) await enterLine(created);
   await inTransaction((client) => recordRunSupersession(client, { oldRunId: old, newRunId: created }));
   return created;
+}
+
+/** The new run's row of a re-admission, and nothing else: a START that never committed its edge (plan C11's orphan). */
+async function readmittedRow(old: string, principal: ReadmissionPrincipal, questionLine: string): Promise<string> {
+  return new RunRepository(database.pool).startReadmittedRun({
+    ...runShape(questionLine), fromRunId: old, principal, registerVersion: 17, releaseKey: NEW_RELEASE
+  });
 }
 
 const ownerPrincipal = () => ({ kind: "server" as const, userId: owner.userId, ownerRef: owner.ownerRef });
@@ -413,6 +422,84 @@ describe("side-by-side A-x3: deleting a re-admitted debate erases every run of i
     expect(await remains(oldest)).toEqual(ERASED);
     expect(await remains(newest)).toEqual(ERASED);
     expect(await remains(foreign)).toEqual(untouched(foreignQuestion));
+  });
+
+  it("erases the copies no edge links (recorded FAILED, never started) with the debate; another person's marked run is never touched", async () => {
+    const question = "Should the copies a failed start left behind go with the debate?";
+    const oldest = await waitingRun(question, ownerPrincipal(), owner.sessionId);
+    // A first re-admission whose START failed after its row committed: recorded FAILED, which frees the old run.
+    const failed = await readmittedRow(oldest, readmittedOwner(), question);
+    expect(await new WorkItemRepository(database.pool).recordSetupFailure({
+      runId: failed, batteryRowId: "Q1", commandKey: `S00:${failed}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION"
+    })).toBe(true);
+    const newest = await readmit(oldest, readmittedOwner(), question, true);
+    // The newest run's own re-admission, cut short before its START (a crash, or a deletion landing in between): a row,
+    // no edge, no job.
+    const unstarted = await readmittedRow(newest, readmittedOwner(), question);
+    expect(await resolveRunRef(database.pool, oldest)).toBe(newest);
+    const foreignQuestion = "Another person's question, marked past the provision";
+    const foreign = await waitingRun(foreignQuestion, { kind: "server", userId: other.userId, ownerRef: other.ownerRef }, other.sessionId);
+    // Only a superuser can write it: another person's run whose binding claims to re-admit this debate's first run.
+    await database.pool.query(
+      "UPDATE identity.run_execution_binding SET readmitted_from_run_id = $1 WHERE run_id = $2", [oldest, foreign]);
+    for (const runId of [oldest, failed, newest, unstarted]) expect(await remains(runId), runId).toEqual(untouched(question));
+    const audits = await erasedAudits();
+
+    const grant = await deletionGrant(owner, oldest);
+    expect(await deleteDebate(owner, oldest, grant)).toEqual({ status: 200, body: JSON.stringify({ status: "CLEANED" }) });
+
+    for (const runId of [oldest, failed, newest, unstarted]) expect(await remains(runId), runId).toEqual(ERASED);
+    expect(await erasedAudits()).toBe(audits + 4);
+    expect(await remains(foreign)).toEqual(untouched(foreignQuestion));
+    // The cut-short START can no longer link its copy: the run it re-admits no longer waits.
+    await expect(inTransaction((client) => recordRunSupersession(client, { oldRunId: newest, newRunId: unstarted })))
+      .rejects.toThrow("RUN_SUPERSESSION_INVALID");
+  });
+
+  it("follows an edge only to the re-admission of its old run: an edge between two of the person's debates joins nothing", async () => {
+    const firstQuestion = "Is a debate an edge points away from deleted with the other one?";
+    const secondQuestion = "Is the debate an edge points at deleted alone?";
+    const first = await waitingRun(firstQuestion, ownerPrincipal(), owner.sessionId);
+    const second = await waitingRun(secondQuestion, ownerPrincipal(), owner.sessionId);
+    // The guard allows this edge: the old run waits, the new run is the same person's, live, unmarked, with no edge.
+    await inTransaction((client) => recordRunSupersession(client, { oldRunId: first, newRunId: second }));
+    expect(await resolveRunRef(database.pool, first)).toBe(second);
+    // The second run does not re-admit the first, so a grant bound to the first does not open the second ...
+    const firstGrant = await deletionGrant(owner, first);
+    expect((await deleteDebate(owner, second, firstGrant)).status).toBe(404);
+    expect(await grantConsumed(firstGrant)).toBe(false);
+    // ... and deleting the second leaves the first as it was.
+    const secondGrant = await deletionGrant(owner, second);
+    expect(await deleteDebate(owner, second, secondGrant)).toEqual({ status: 200, body: JSON.stringify({ status: "CLEANED" }) });
+    expect(await remains(second)).toEqual(ERASED);
+    expect(await remains(first)).toEqual(untouched(firstQuestion));
+  });
+
+  it("a plaintext run marked as a copy of an encrypted debate shares no chain with it: it never blocks the deletion, nor is touched", async () => {
+    const question = "Does a plaintext copy keep the encrypted copies from going?";
+    const [oldest, newest] = await readmittedDebate(question, 1) as [string, string];
+    const plainQuestion = "A plaintext run the same person claimed";
+    const plain = await waitingRun(plainQuestion, { kind: "legacy", legacyAskerId: `legacy-erase-superseded-${randomUUID()}` }, randomUUID());
+    // Only a superuser can write these (no provision marks a plaintext run: §4 re-admits encrypted runs only): the person
+    // owns the plaintext run (its first and latest ownership event), and its binding claims to re-admit the first run.
+    await inTransaction(async (client) => {
+      await client.query("SET LOCAL session_replication_role = replica");
+      await client.query(
+        "INSERT INTO core.run_ownership_event (run_id, owner_ref, at_seq) VALUES ($1, $2, ledger.allocate_sequence())",
+        [plain, owner.ownerRef]);
+      await client.query(
+        `INSERT INTO identity.run_execution_binding (execution_ref, user_id, identity_session_id, run_id, created_at, readmitted_from_run_id)
+         VALUES ($1, $2, $3, $4, now(), $5)`, [randomUUID(), owner.userId, owner.sessionId, plain, oldest]);
+    });
+    // Named, it is one legacy run, as 0040 always answered it: kept, and no encrypted run touched.
+    const plainGrant = await deletionGrant(owner, plain);
+    expect(await deleteDebate(owner, plain, plainGrant)).toEqual({ status: 409, body: JSON.stringify({ error: "LEGACY_CONTENT_RETAINED" }) });
+    for (const runId of [oldest, newest]) expect(await remains(runId), runId).toEqual(untouched(question));
+    // Deleting the debate erases both encrypted runs; the plaintext run is no run of it and stays as it was.
+    const grant = await deletionGrant(owner, newest);
+    expect(await deleteDebate(owner, newest, grant)).toEqual({ status: 200, body: JSON.stringify({ status: "CLEANED" }) });
+    for (const runId of [oldest, newest]) expect(await remains(runId), runId).toEqual(ERASED);
+    expect(await remains(plain)).toMatchObject({ key: false, question: plainQuestion, tombstone: false, intent: false });
   });
 
   it("a re-admitted legacy (plaintext) debate stays out of a signed-in person's per-debate erasure, by either id", async () => {

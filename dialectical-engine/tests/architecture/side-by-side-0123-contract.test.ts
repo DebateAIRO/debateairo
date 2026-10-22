@@ -309,11 +309,20 @@ describe("0123: the side-by-side releases step", () => {
       expect(start, head).toBeGreaterThanOrEqual(0);
       return section.slice(start, section.indexOf("$$;", start));
     };
-    // The chain reader: the newest run first, then every superseded run, 16 hops each way at most; ids only, no role.
+    // The chain reader: up through the run each one re-admits, then down through every run whose re-admission marker
+    // names a run found, 17 links each way at most; a link only between two encrypted runs of one account, never a bare
+    // supersession edge; ids only, no role.
     const chain = body("core.private_erasure_run_chain(p_run_id uuid)");
     for (const line of ["RETURNS uuid[]", "STABLE", "SECURITY DEFINER", "SET search_path = pg_catalog",
-      "SELECT edge.new_run_id INTO v_next FROM core.run_supersession AS edge WHERE edge.old_run_id = v_newest;",
-      "WHERE edge.new_run_id = v_chain[cardinality(v_chain)];"]) expect(chain).toContain(line);
+      "WHERE child.run_id = v_root;",
+      "WHERE child.readmitted_from_run_id = ANY(v_generation) AND child.run_id <> ALL(v_chain)"]) expect(chain).toContain(line);
+    for (const link of [
+      "JOIN core.run AS child_run ON child_run.run_id = child.run_id AND child_run.content_encryption_version = 1",
+      "ON parent.run_id = child.readmitted_from_run_id AND parent.user_id = child.user_id",
+      "JOIN core.run AS parent_run ON parent_run.run_id = parent.run_id AND parent_run.content_encryption_version = 1"
+    ]) expect(chain.split(link), link).toHaveLength(3);
+    expect(chain).not.toContain("core.run_supersession");
+    expect(chain.split("IF v_hops > 17 THEN")).toHaveLength(3);
     expect(chain.split("MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID'")).toHaveLength(3);
     expect(section).not.toMatch(/GRANT [^;]*core\.private_erasure_run_chain/u);
     expect(section).toMatch(/REVOKE ALL ON FUNCTION core\.private_erasure_run_chain\(uuid\)\s+FROM PUBLIC,debateai_runtime,[^;]*debateai_erasure_runtime,[^;]*;/u);
@@ -335,8 +344,9 @@ describe("0123: the side-by-side releases step", () => {
     expect(resume.split(clamp)).toHaveLength(3);
     for (const text of [prepare, resume, finalize]) expect(text).not.toContain("AND session.absolute_expires_at>");
     // Prepare: the chain read again under the supersession guard's lock, after the account lock; the other runs owned
-    // first and last by the person, locked, their content leases tried; the grant consumed once; legacy, published and
-    // erased judged over the person's runs; publication copies checked before any run is marked; the first id returned.
+    // first and last by the person, locked, their content leases tried; the grant consumed once; legacy judged on the run
+    // named alone (0085's check: only it can be plaintext), published and erased over the person's runs; publication
+    // copies checked before any run is marked; the first id returned.
     const supersessionLock = "IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-supersession',0)) THEN";
     expect(prepare.indexOf(supersessionLock)).toBeGreaterThan(prepare.indexOf("SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);"));
     expect(prepare.indexOf("v_chain := core.private_erasure_run_chain(p_run_id);", prepare.indexOf(supersessionLock)))
@@ -346,7 +356,8 @@ describe("0123: the side-by-side releases step", () => {
     expect(prepare.split("UPDATE identity.step_up_grant SET consumed_at=v_now")).toHaveLength(2);
     expect(prepare.indexOf("RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;\n      END IF;\n    END LOOP;"))
       .toBeLessThan(prepare.indexOf("UPDATE identity.step_up_grant SET consumed_at=v_now"));
-    expect(prepare).toContain("WHERE run.run_id=ANY(v_members) AND run.content_encryption_version IS DISTINCT FROM 1");
+    expect(prepare).toContain("IF v_content_encryption_version IS DISTINCT FROM 1 THEN\n      RETURN QUERY SELECT 'LEGACY_PLAINTEXT_RETAINED'::text,NULL::uuid; RETURN;");
+    expect(prepare).not.toContain("run.content_encryption_version IS DISTINCT FROM 1");
     expect(prepare).toContain("WHERE snapshot.run_id=ANY(v_pending) AND cleanup.publication_ref IS NULL");
     expect(prepare.indexOf("WHERE snapshot.run_id=ANY(v_pending) AND cleanup.publication_ref IS NULL"))
       .toBeLessThan(prepare.indexOf("FOREACH v_member IN ARRAY v_pending LOOP"));
@@ -362,6 +373,15 @@ describe("0123: the side-by-side releases step", () => {
       expect(section).not.toContain(`ALTER FUNCTION ${signature} OWNER`);
     }
     expect(sql).toContain("SIDE_BY_SIDE_ERASURE_CHAIN_CONTRACT_INCOMPLETE");
+    // The closing block checks the reader's links too: the marker between one account's runs, both encrypted, and no
+    // bare supersession edge.
+    const closing = sql.slice(sql.indexOf("-- THE CONTRACT THIS FILE CLAIMS"));
+    for (const check of [
+      "strpos(pg_get_functiondef(p.oid), 'ON parent.run_id = child.readmitted_from_run_id AND parent.user_id = child.user_id') > 0",
+      "strpos(pg_get_functiondef(p.oid), 'child_run.content_encryption_version = 1') > 0",
+      "strpos(pg_get_functiondef(p.oid), 'parent_run.content_encryption_version = 1') > 0",
+      "strpos(pg_get_functiondef(p.oid), 'core.run_supersession') = 0"
+    ]) expect(closing).toContain(check);
     // The loader digests the new reader; the three redefinitions are checked by the closing block and these tests.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("'core.private_erasure_run_chain(uuid)'");
