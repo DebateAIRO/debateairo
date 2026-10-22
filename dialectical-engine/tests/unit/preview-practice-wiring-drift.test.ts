@@ -236,6 +236,9 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const stranded = await new RunWaitRepository(pool).countWaiting();",
       "assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });",
       "maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)",
+      // Fresh-site estimate (owner rulings 2026-10-22): the sealed starting figures, read at the version in force.
+      "readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION)",
+      "maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy), start: costEstimateStartPolicy",
       "dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros, closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
       "perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,",
       "moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,",

@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength, type DepthMode, type Scrutiny } from "@debateai/contract";
-import { DEBATE_SHAPE_PLAN_KEYS, type DebateShapePlanKey } from "@debateai/register";
+import { DEBATE_SHAPE_PLAN_KEYS, type CostEstimateStartPolicy, type DebateShapePlanKey } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
 
 /**
@@ -17,6 +17,12 @@ import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.
  *    (`mostOneRunMaySpendMicros`), and never below one micro-unit (a hold is > 0);
  *  - with fewer samples than that, answers the maximum — today's reservation
  *    figure, the careful side;
+ *  - owner rulings 2026-10-22 (fresh-site estimate): with the register's
+ *    `costEstimateStartPolicy` row (`start`), the sample is trusted from its
+ *    `min_samples` (5) runs, and below that the answer is the sealed starting
+ *    figure of the ask's depth, capped at the maximum (a depth with no figure,
+ *    or nothing to price with, still answers the maximum). Without the row
+ *    (null or left out) nothing changes: 20 samples, the maximum while short;
  *  - caches each class for `cacheMs` (60 s) per process.
  * The estimate is never sent to a client (I6): the room read returns a word.
  */
@@ -99,6 +105,10 @@ export function estimateFromSampleCosts(input: Readonly<{
   costs: ReadonlyArray<number>;
   sampleSize: number;
   maximumMicros: number;
+  /** The samples needed before the percentile is trusted (1 … sampleSize); left out, the whole sample size. */
+  minSamples?: number;
+  /** The answer while the sample is short (capped at the maximum); null or left out, the maximum. */
+  startMicros?: number | null;
 }>): number {
   if (!Number.isSafeInteger(input.maximumMicros) || input.maximumMicros < 1) {
     throw new TypeError("COST_ESTIMATE_MAXIMUM_INVALID");
@@ -106,10 +116,20 @@ export function estimateFromSampleCosts(input: Readonly<{
   if (!Number.isSafeInteger(input.sampleSize) || input.sampleSize < 1) {
     throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
   }
+  const minSamples = input.minSamples ?? input.sampleSize;
+  if (!Number.isSafeInteger(minSamples) || minSamples < 1 || minSamples > input.sampleSize) {
+    throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
+  }
+  const startMicros = input.startMicros ?? null;
+  if (startMicros !== null && (!Number.isSafeInteger(startMicros) || startMicros < 1)) {
+    throw new TypeError("COST_ESTIMATE_START_INVALID");
+  }
   for (const cost of input.costs) {
     if (!Number.isSafeInteger(cost) || cost < 0) throw new TypeError("COST_ESTIMATE_COST_INVALID");
   }
-  if (input.costs.length < input.sampleSize) return input.maximumMicros;
+  if (input.costs.length < minSamples) {
+    return startMicros === null ? input.maximumMicros : Math.min(startMicros, input.maximumMicros);
+  }
   const sorted = [...input.costs].sort((left, right) => left - right);
   // Nearest rank: the smallest sample at or above three quarters of the sample.
   const rank = Math.ceil((sorted.length * 75) / 100);
@@ -152,6 +172,7 @@ export class RecentRunsCostEstimator implements CostEstimator {
   readonly #sampleSize: number;
   readonly #lookbackMs: number;
   readonly #cacheMs: number;
+  readonly #start: CostEstimateStartPolicy | null;
   readonly #cache = new Map<string, Readonly<{ at: number; value: number }>>();
 
   constructor(options: Readonly<{
@@ -163,6 +184,11 @@ export class RecentRunsCostEstimator implements CostEstimator {
     sampleSize?: number;
     lookbackMs?: number;
     cacheMs?: number;
+    /**
+     * The register's `costEstimateStartPolicy` at the version in force (readCostEstimateStartPolicy): the trusted
+     * minimum and the per-depth starting figures. Null or left out: a version without the row, today's behaviour.
+     */
+    start?: CostEstimateStartPolicy | null;
   }>) {
     this.#source = options.source;
     this.#prices = options.prices;
@@ -171,8 +197,13 @@ export class RecentRunsCostEstimator implements CostEstimator {
     this.#sampleSize = options.sampleSize ?? 20;
     this.#lookbackMs = options.lookbackMs ?? 30 * 24 * 60 * 60 * 1_000;
     this.#cacheMs = options.cacheMs ?? 60_000;
+    this.#start = options.start ?? null;
     for (const value of [this.#maximumMicros, this.#sampleSize, this.#lookbackMs, this.#cacheMs]) {
       if (!Number.isSafeInteger(value) || value < 1) throw new TypeError("COST_ESTIMATE_OPTIONS_INVALID");
+    }
+    if (this.#start !== null && (!Number.isSafeInteger(this.#start.minSamples) || this.#start.minSamples < 1
+      || this.#start.minSamples > this.#sampleSize)) {
+      throw new TypeError("COST_ESTIMATE_OPTIONS_INVALID");
     }
   }
 
@@ -190,7 +221,12 @@ export class RecentRunsCostEstimator implements CostEstimator {
     if (this.#prices.size > 0) {
       for (const run of runs) costs.push(priceRecentRun(run, this.#prices) ?? this.#maximumMicros);
     }
-    const value = estimateFromSampleCosts({ costs, sampleSize: this.#sampleSize, maximumMicros: this.#maximumMicros });
+    // With nothing to price with, the starting figure is not used either: the careful side, the maximum.
+    const start = this.#start === null || this.#prices.size === 0 ? {} : {
+      minSamples: this.#start.minSamples,
+      startMicros: this.#start.startMicrosByDepth.get(settings.depth) ?? null
+    };
+    const value = estimateFromSampleCosts({ costs, sampleSize: this.#sampleSize, maximumMicros: this.#maximumMicros, ...start });
     this.#cache.set(key, Object.freeze({ at: now, value }));
     return value;
   }

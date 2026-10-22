@@ -84,6 +84,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
@@ -570,6 +571,12 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   // time; the round's busy models (an unbilled refusal) may sit out an ask (evaluateAskAdmission).
   ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch!, previewRound: true })
 });
+// Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, sealed as
+// the optional costEstimateStartPolicy row. Hosted only (only the room estimates); absent = null = today's estimate (20
+// samples, the run's maximum while short); a malformed row refuses this boot (COST_ESTIMATE_START_POLICY_INVALID).
+const costEstimateStartPolicy = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("cost-estimate-start-policy", () => readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION))
+  : null;
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
  * Hosted, and only once the costEnvelopePolicy in force carries the band; without
@@ -623,7 +630,8 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       const estimator = new RecentRunsCostEstimator({
         source: new PostgresRecentRunUsageSource(pool),
         prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
-        maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)
+        maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy),
+        start: costEstimateStartPolicy
       });
       const room = new AskRoom({
         lockPool: roomDecisionPool,

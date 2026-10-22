@@ -171,6 +171,7 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readCountryPolicy,
   readDeploymentRiskTier,
   readEngineVersion,
@@ -1520,6 +1521,9 @@ export async function verifyHostedRegisterBootReadiness(
   if (countryPolicy !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
   assertHostedSupportAdmissionSealed("hosted", admission);
   const envelope = await readCostEnvelopePolicy(pool, version);
+  // Fresh-site estimate (owner rulings 2026-10-22): main.ts's cost-estimate-start-policy stage. Optional (absent = the
+  // estimate as before), but a malformed row refuses the API's boot (COST_ESTIMATE_START_POLICY_INVALID).
+  await readCostEstimateStartPolicy(pool, version);
   // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
   // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
   const billingPolicy = await readBillingPolicy(pool, version);

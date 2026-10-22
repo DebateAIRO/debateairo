@@ -1130,7 +1130,7 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
     expect(read(await run(t.nativePlan('plan', ['--hosted-billing', typed]).with(-1, join(t.s.art, 'native-plan-typed.json')), t.s.layout))).toEqual(t.plan);
     const proposal = t.proposalOf();
     expect(proposal.composer).toBe('preview-register-composer-v3');
-    expect(proposal.addedKeys).toEqual(['storyCostEnvelopePolicy']);
+    expect(proposal.addedKeys).toEqual(['costEstimateStartPolicy', 'storyCostEnvelopePolicy']);
     expect(proposal.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
   });
 

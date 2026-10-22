@@ -8,6 +8,10 @@
 // - storyCostEnvelopePolicy: the story's money row, which only a HOSTED build seals (story-policy.ts: without it the
 //   hosted story writer refuses, STORY_ENVELOPE_MISSING, and the story is off). It is taken from the hosted builder
 //   itself, and every other story row of that build must equal v2's byte for byte.
+// - costEstimateStartPolicy (owner rulings 2026-10-22, fresh-site estimate): the room estimate's trusted minimum (5 settled
+//   runs) and per-depth starting figures ($0.30 / $0.60 / $1.00 for depths 1-3). Code-owned, sealed by every HOSTED build
+//   (dev-deployment-register.ts), so v2's local source has no such row; added here with the code's values, never an
+//   operator input. A version without it keeps the estimate as before (20 runs, the maximum while short).
 // - costEnvelopePolicy: the per-run and daily ceilings are the owner's plan inputs (never a value in this file); every
 //   other member of the code-owned row stays, the budget band included (billing needs it, BILLING_REQUIRES_ENVELOPE_MEMBERS).
 // - admissionPolicy: the owner's ask_room_reads budget joins the code-owned row as its one added member, exactly as
@@ -43,6 +47,7 @@ import {
   billingPolicyFromValue, billingPlansFromValue, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue, COUNTRY_POLICY_ROW_KEY, readStoryPolicy,
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
+  COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW, costEstimateStartPolicyFromValue,
   DEBATE_SHAPE_POLICY_ROW_KEY, parseDebateShapePolicy, MAP_CONTRACT_HASH_ROW_KEY, parseMapContractHash, debateShapeInForce,
   QUESTION_LANGUAGE_POLICY_ROW_KEY, parseQuestionLanguagePolicy,
   LENGTH_GUIDANCE_POLICY_ROW_KEY, parseLengthGuidancePolicy,
@@ -74,8 +79,8 @@ const COMPOSER = 'preview-register-composer-v3' as const;
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /** The story's money row: the one key a hosted build adds to v2's source. */
 export const STORY_COST_ENVELOPE_POLICY_ROW_KEY = 'storyCostEnvelopePolicy' as const;
-/** v3's reviewed source closure: v2's keys plus the story's money row. */
-export const PREVIEW_SOURCE_ROW_KEYS_V3 = Object.freeze([...PREVIEW_SOURCE_ROW_KEYS_V2, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
+/** v3's reviewed source closure: v2's keys plus the two rows only a hosted build seals (the estimate's starting figures, the story's money row). */
+export const PREVIEW_SOURCE_ROW_KEYS_V3 = Object.freeze([...PREVIEW_SOURCE_ROW_KEYS_V2, COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
 /** The country added to withdrawal_countries while billing is on, on this sandbox host only (deploy/vps/README.md §14.9). */
 export const PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY = 'US' as const;
 /** Why each owner-input row changed, as the proposal shows it to the owner. */
@@ -176,7 +181,11 @@ export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runt
     [ADMISSION_POLICY_ROW_KEY,{rowKey:ADMISSION_POLICY_ROW_KEY,valueJsonText:canonicalValue(admission),sourceRef:admissionRef}],
     [BILLING_POLICY_ROW_KEY,billingRows[0]!]
   ]);
-  const rows=[...local.map(row=>replaced.get(row.rowKey)??row),storyCost];
+  // Fresh-site estimate (owner rulings 2026-10-22): the code-owned row a hosted build seals, with the code's values.
+  if(byKey.has(COST_ESTIMATE_START_POLICY_ROW_KEY))fail('hosted-estimate-start-row');
+  const estimateStart={rowKey:COST_ESTIMATE_START_POLICY_ROW_KEY,valueJsonText:canonicalValue(COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.value),
+    sourceRef:COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef};
+  const rows=[...local.map(row=>replaced.get(row.rowKey)??row),estimateStart,storyCost];
   if(!sourceKeysReviewedV3(rows.map(row=>row.rowKey)))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze({...row})));
 }
@@ -257,6 +266,10 @@ export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow
   const story=readStoryPolicy(rows.map(row=>({rowKey:row.rowKey,value:JSON.parse(row.valueJsonText) as unknown,sourceRef:row.sourceRef})),1);
   if(story===null||story.perStoryCeilingMicros===null)fail('hosted-story-money-row');
   costEnvelopeGuardPolicy(envelope,story);
+  // Fresh-site estimate (owner rulings 2026-10-22): main.ts's cost-estimate-start-policy stage. Optional (absent = the
+  // estimate as before), but a malformed row refuses the API's boot (COST_ESTIMATE_START_POLICY_INVALID).
+  const estimateStart=map.has(COST_ESTIMATE_START_POLICY_ROW_KEY)?parsed(COST_ESTIMATE_START_POLICY_ROW_KEY):null;
+  if(estimateStart!==null)costEstimateStartPolicyFromValue(estimateStart.value,estimateStart.sourceRef);
   const billingRow=parsed(BILLING_POLICY_ROW_KEY),policy=billingPolicyFromValue(billingRow.value,billingRow.sourceRef);
   const plansRow=map.has(BILLING_PLANS_ROW_KEY)?parsed(BILLING_PLANS_ROW_KEY):null;
   assertBillingReady({policy,plans:plansRow===null?null:billingPlansFromValue(plansRow.value,plansRow.sourceRef),envelope});

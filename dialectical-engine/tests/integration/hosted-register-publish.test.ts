@@ -49,6 +49,7 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
   readMapContractHash,
@@ -200,6 +201,8 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     await expect(readCostEnvelopePolicy(database.pool, version)).resolves.toMatchObject({
       perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000, provisional: true
     });
+    // Fresh-site estimate (owner rulings 2026-10-22): the API's "cost-estimate-start-policy" stage; code-owned, sealed.
+    await expect(readCostEstimateStartPolicy(database.pool, version)).resolves.toMatchObject({ minSamples: 5 });
     await readProductRolePolicy(database.pool, version);
     const makers = await readDeploymentMakerCapability(database.pool, version);
     expect(makers.configuredProviders.map((provider) => provider.providerRef))
