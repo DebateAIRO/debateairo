@@ -588,14 +588,23 @@ export class WorkItemRepository {
     });
   }
 
+  /**
+   * Records the work item DONE with its settled attempt and artifact. R3 (final review), spec §3/§4: a repository that
+   * names its worker settles only that worker's own claim (`state = 'CLAIMED' AND claimed_by = worker`), so a task
+   * finishing after the backstop set its debate aside FAILED (RUN_SET_ASIDE, with the waiver) never writes DONE over it,
+   * and never settles another worker's claim. One told no worker id (test fixtures) settles a READY or CLAIMED item, and
+   * never a FAILED one either. True when this call wrote it.
+   */
   async settle(input: { readonly workItemId: string; readonly attemptId: string; readonly artifactRef: string }): Promise<boolean> {
     return withWriteTransaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE core.work_item
          SET state = 'DONE', claimed_by = NULL, claim_deadline = NULL,
              settled_attempt_id = $2, settled_artifact_ref = $3
-         WHERE work_item_id = $1 AND settled_attempt_id IS NULL`,
-        [input.workItemId, input.attemptId, input.artifactRef]
+         WHERE work_item_id = $1 AND settled_attempt_id IS NULL
+           AND state IN ('READY','CLAIMED')
+           AND ($4::text IS NULL OR (state = 'CLAIMED' AND claimed_by = $4::text))`,
+        [input.workItemId, input.attemptId, input.artifactRef, this.#fence.workerId]
       );
       return result.rowCount === 1;
     });

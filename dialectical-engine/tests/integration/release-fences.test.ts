@@ -197,6 +197,40 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await jobRow(ready.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "TEST_LAYER:REWRITTEN" });
   });
 
+  it("settle writes DONE only under this worker's own claim, never over a set-aside FAILED item (R3)", async () => {
+    const settle = (repository: WorkItemRepository, job: Job) =>
+      repository.settle({ workItemId: job.workItemId, attemptId: randomUUID(), artifactRef: randomUUID() });
+
+    const mine = await runWithJob(KEY_A);
+    await claim(mine, "worker:a", true);
+    expect(await settle(fenceA(), mine)).toBe(true);
+    expect(await jobRow(mine.workItemId)).toEqual({ state: "DONE", terminal_reason: null, claimed_by: null });
+
+    const othersLive = await runWithJob(KEY_A);
+    await claim(othersLive, "worker:other", true);
+    expect(await settle(fenceA(), othersLive)).toBe(false);
+    expect(await jobRow(othersLive.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:other" });
+
+    // The backstop set the debate aside while this worker's last task still ran: that task's settle writes nothing.
+    const setAside = await runWithJob(KEY_A);
+    await claim(setAside, "worker:a", true);
+    expect(await fenceA().setAsideWorkItem({ ...setAside, reason: "BACKSTOP", readyOnly: false })).toBe(true);
+    expect(await settle(fenceA(), setAside)).toBe(false);
+    expect(await jobRow(setAside.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+
+    // A runner settles only what it claimed: never a READY item.
+    const ready = await runWithJob(KEY_A);
+    expect(await settle(fenceA(), ready)).toBe(false);
+    expect(await jobRow(ready.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
+
+    // A repository told no worker id (the test fixtures') still settles an open item, and never a FAILED one.
+    const unnamed = new WorkItemRepository(runtime, { releaseKey: KEY_A });
+    expect(await settle(unnamed, ready)).toBe(true);
+    expect(await jobRow(ready.workItemId)).toMatchObject({ state: "DONE" });
+    expect(await settle(unnamed, setAside)).toBe(false);
+    expect(await jobRow(setAside.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+  });
+
   it("refuses a malformed fence key; legacy and a well-formed key are accepted", () => {
     for (const releaseKey of ["r1-0123456789AB", "r01-aaaaaaaaaaaa", "", "LEGACY"]) {
       expect(() => new WorkItemRepository(runtime, { releaseKey })).toThrow(expect.objectContaining({ code: "RELEASE_KEY_INVALID" }));
