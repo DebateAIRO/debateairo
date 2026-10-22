@@ -5528,17 +5528,32 @@ export class WalkingSkeletonRunner {
     const claimInput = { workerId: settings.workerId, claimSeconds: settings.claimMs / 1_000 };
     if (resolution?.kind === "UNSUPPORTED") {
       /**
-       * S7 HOOK (side-by-side spec §13 runner point 5; plan D3; ruling R10): a version this release cannot run never runs.
-       * The fenced claim is taken first, so nothing is ever written for a run this copy does not hold; then the typed
-       * SETTINGS_VERSION_UNSUPPORTED (the cache printed its one DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line). Until S7
-       * writes the set-aside (waiver + plain failure) here, the task's catch records the wrapped failure.
+       * A VERSION THIS RELEASE CANNOT RUN (side-by-side spec §13 runner point 3, §9 "the waiver"; Task S7; plan D3;
+       * ruling R10) ends plainly, uses none of the person's quota and makes no model call. The fenced claim is taken
+       * first (the `claimNext` path already holds it), so nothing is ever written for a run this copy does not hold.
+       * Then Phase 1's set-aside of this one item, its claimed state allowed (`readyOnly: false`) and never under another
+       * worker's live claim: FAILED with `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` (the site reads SET_ASIDE's plain
+       * sentence) and the run's SETTINGS_VERSION_UNSUPPORTED waiver, on one transaction. The loader's code goes only to
+       * this content-free journal line (the run, the version, the code); the error that ends the task carries none, and
+       * the task's catch writes nothing over the set-aside (LEAVES_WORK_ITEM_ALONE). A set-aside that wrote nothing
+       * (the item is no longer this copy's, or already ended) wrote no waiver either and is left to its holder.
        */
       const held = early?.claimed ?? await this.#work.claimById({ ...claimInput, workItemId: workItemId! });
       if (held === null) return { kind: "NO_WORK" };
-      throw new TypedDomainError(
-        "SETTINGS_VERSION_UNSUPPORTED",
-        `SETTINGS_VERSION_UNSUPPORTED:${resolution.code}`
-      );
+      if (held.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", held.workItemId);
+      await this.#work.setAsideWorkItem({
+        runId: held.runId,
+        workItemId: held.workItemId,
+        reason: "SETTINGS_VERSION_UNSUPPORTED",
+        readyOnly: false
+      });
+      console.warn(JSON.stringify({
+        kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED",
+        runId: held.runId,
+        version: String(resolution.version),
+        code: resolution.code
+      }));
+      throw new TypedDomainError("SETTINGS_VERSION_UNSUPPORTED", "SETTINGS_VERSION_UNSUPPORTED");
     }
     // The claim-time gates, against this debate's own settings (side-by-side spec §13): before the claim on the Hatchet
     // path, so a refusal leaves the item READY; right after it on the `claimNext` path with a resolver (plan D2).
@@ -12857,9 +12872,17 @@ export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
  * before anything runs, so this is the defence for a mismatch raised anywhere later). Neither becomes a
  * `terminal_reason`. Side-by-side spec §4: nor a debate stopped because its release is retiring (RUNNER_RETIRING): the
  * item is left as is for this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3
- * fence keeps every other release off it.
+ * fence keeps every other release off it. Side-by-side spec §13, §9 (Task S7): nor a debate whose settings version this
+ * release cannot run (SETTINGS_VERSION_UNSUPPORTED): `execute` already set it aside, FAILED with
+ * `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` and its waiver, so a wrapped failure here would replace SET_ASIDE's plain
+ * sentence with another one (or the item is no longer this copy's, and is left to its holder).
  */
-const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set(["RUNNER_CLAIM_LOST", "RUNNER_RELEASE_MISMATCH", "RUNNER_RETIRING"]);
+const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
+  "RUNNER_CLAIM_LOST",
+  "RUNNER_RELEASE_MISMATCH",
+  "RUNNER_RETIRING",
+  "SETTINGS_VERSION_UNSUPPORTED"
+]);
 
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;

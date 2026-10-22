@@ -9,8 +9,13 @@
  *  5. a source scan of `execute()`: no `this.settings.` read after the debate's `settings` binding;
  *  6. the version reads select `register_version` by id;
  *  and, through `executeWorkItem` over a scripted pool: the version is resolved before the claim, the gates run against
- *  the debate's settings, the run → version map is set, the lane opens with the version's limits, an UNSUPPORTED
- *  version never runs (the S7 hook), and an untyped resolver failure leaves the item unclaimed (ruling R37).
+ *  the debate's settings, the run → version map is set, the lane opens with the version's limits, and an untyped
+ *  resolver failure leaves the item unclaimed (ruling R37).
+ *
+ * Task S7 (spec §13 runner point 3, §9; plan D3; ruling R10): an UNSUPPORTED version never runs: after this copy's
+ * fenced claim the item is set aside (RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED) with ONE waiver on one transaction,
+ * no model call, one content-free DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line, and the task's catch writes nothing over it;
+ * another release's item is never claimed (NO_WORK).
  *
  * Addition D17-D18 (Task SA5): each preview call runs at its OWN debate's thinking levels, by run id through the same
  * run → version map (`runPreviewThinkingLevelsOf`): the resolver's rules, the shipped wiring (main.ts and the practice),
@@ -32,8 +37,10 @@ import {
 } from "@debateai/providers";
 import {
   assertRunnerSettingsGates,
+  declareHatchetWalkingSkeletonTask,
   mergeRunnerSettings,
   WalkingSkeletonRunner,
+  type RunnerFailureRecorder,
   type RunnerGatedSettings,
   type WalkingSkeletonSettings
 } from "../../apps/runner/src/index.js";
@@ -516,16 +523,28 @@ describe("the version reads select register_version by id (behaviour: S19)", () 
  * A scripted pool: the release read, the version peek and the claim are answered; anything else (the content lease
  * the debate opens next) is refused, so the debate stops right after its lane opens and no model call is made.
  */
-function scriptedPool(options: Readonly<{ peekVersion: number | null; peekReleaseKey?: string }>) {
+function scriptedPool(options: Readonly<{
+  peekVersion: number | null;
+  peekReleaseKey?: string;
+  /** The work item's run's release, as `releaseKeyOf` reads it (default: this runner's). */
+  releaseKey?: string;
+  /** Rows the set-aside UPDATE writes (default 1; 0 = the item was no longer this copy's to set aside). */
+  setAsideRows?: number;
+}>) {
   const statements: string[] = [];
+  const calls: { sql: string; params: readonly unknown[] }[] = [];
   let connects = 0;
-  const answer = (sql: string) => {
+  const answer = (sql: string, params: readonly unknown[] = []) => {
     statements.push(sql.replace(/\s+/gu, " ").trim());
-    if (sql.includes("SELECT run.release_key")) return { rows: [{ release_key: RELEASE_KEY }] };
+    calls.push({ sql: sql.replace(/\s+/gu, " ").trim(), params });
+    if (sql.includes("SELECT run.release_key")) return { rows: [{ release_key: options.releaseKey ?? RELEASE_KEY }] };
     if (sql.includes("SELECT run.run_id, run.register_version::integer AS register_version, run.release_key")) {
       return { rows: options.peekVersion === null ? [] : [{
         run_id: "run-1", register_version: options.peekVersion, release_key: options.peekReleaseKey ?? RELEASE_KEY
       }] };
+    }
+    if (sql.includes("SELECT register_version::integer AS register_version FROM core.run WHERE run_id = $1")) {
+      return { rows: options.peekVersion === null ? [] : [{ register_version: options.peekVersion }] };
     }
     if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
     if (sql.includes("SET state = 'CLAIMED'")) {
@@ -534,14 +553,17 @@ function scriptedPool(options: Readonly<{ peekVersion: number | null; peekReleas
         claim_deadline: new Date(Date.now() + 60000), run_id: "run-1"
       }] };
     }
+    // Side-by-side spec §4, §9 (S7): Phase 1's set-aside of one item, and the run's waiver on the same transaction.
+    if (sql.includes("SET state = 'FAILED'")) return { rows: [], rowCount: options.setAsideRows ?? 1 };
+    if (sql.includes("INSERT INTO ledger.model_spend_waiver")) return { rows: [], rowCount: 1 };
     throw new Error("SCRIPTED_POOL_UNSCRIPTED");
   };
-  const client = { query: async (sql: string) => answer(sql), release: () => undefined };
+  const client = { query: async (sql: string, params?: readonly unknown[]) => answer(sql, params), release: () => undefined };
   const pool = {
-    query: async (sql: string) => answer(sql),
+    query: async (sql: string, params?: readonly unknown[]) => answer(sql, params),
     connect: async () => { connects += 1; return client; }
   } as unknown as Pool;
-  return { pool, statements, connects: () => connects };
+  return { pool, statements, calls, connects: () => connects };
 }
 
 /** The boot's settings: deliberately WITHOUT the composition row, so only the debate's own version passes the gates. */
@@ -624,19 +646,6 @@ describe("executeWorkItem resolves the debate's own version (side-by-side spec �
     expect(settingsForVersion).not.toHaveBeenCalled();
   });
 
-  it("never runs an UNSUPPORTED version: it takes the fenced claim, then refuses SETTINGS_VERSION_UNSUPPORTED (the S7 hook)", async () => {
-    const settingsForVersion = async (): Promise<RunnerSettingsResolution> =>
-      ({ kind: "UNSUPPORTED", code: "ENGINE_CONTRACT_HASH_MISMATCH" });
-    const { settings, opened, versions } = processSettings({ settingsForVersion });
-    const db = scriptedPool({ peekVersion: VERSION });
-    await expect(new WalkingSkeletonRunner(db.pool, provider, settings).executeWorkItem("item-1")).rejects.toMatchObject({
-      code: "SETTINGS_VERSION_UNSUPPORTED", message: "SETTINGS_VERSION_UNSUPPORTED:ENGINE_CONTRACT_HASH_MISMATCH"
-    });
-    expect(db.statements.some((sql) => sql.includes("SET state = 'CLAIMED'"))).toBe(true);
-    expect(opened).toEqual([]);
-    expect(versions.versionOf("run-1")).toBeUndefined();
-  });
-
   it("ruling R37: an untyped resolver failure leaves the item unclaimed, prints one content-free line and propagates", async () => {
     const lines: string[] = [];
     vi.spyOn(console, "warn").mockImplementation((line: unknown) => { lines.push(String(line)); });
@@ -651,5 +660,150 @@ describe("executeWorkItem resolves the debate's own version (side-by-side spec �
       version: String(VERSION), code: "UNTYPED"
     }]);
     expect(lines.join("\n")).not.toContain("connection reset");
+  });
+});
+
+/**
+ * Side-by-side spec §13 runner point 3 and §9 (Task S7, plan D3, ruling R10): a debate whose settings version this
+ * release cannot run ends plainly, with no quota use and no model call. After this copy's fenced claim, Phase 1's
+ * set-aside writes the item FAILED with `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` and the run's waiver on ONE
+ * transaction; the loader's code goes only to the content-free journal line; the task's catch then writes nothing over
+ * the set-aside reason.
+ */
+describe("a settings version this release cannot run (side-by-side spec §13, §9; Task S7)", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const unsupported = async (): Promise<RunnerSettingsResolution> =>
+    ({ kind: "UNSUPPORTED", code: "ENGINE_CONTRACT_HASH_MISMATCH" });
+  const capturedLines = () => {
+    const lines: Record<string, unknown>[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: unknown) => { lines.push(JSON.parse(String(line)) as Record<string, unknown>); });
+    return lines;
+  };
+  const writes = (db: ReturnType<typeof scriptedPool>) => db.calls.filter((call) =>
+    call.sql.includes("SET state = 'FAILED'") || call.sql.includes("INSERT INTO ledger.model_spend_waiver"));
+
+  it("claims the item, sets it aside with ONE waiver on one transaction, makes no call, logs one line, and refuses", async () => {
+    const lines = capturedLines();
+    const complete = vi.fn(async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); });
+    const { settings, opened, versions } = processSettings({ settingsForVersion: unsupported });
+    const db = scriptedPool({ peekVersion: VERSION });
+    const runner = new WalkingSkeletonRunner(db.pool, { complete } as never, settings);
+    const refusal = await runner.executeWorkItem("item-1").catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(TypedDomainError);
+    // The loader's code is not in the error (it reaches Hatchet's store and stderr): only the journal line carries it.
+    expect(refusal).toMatchObject({ code: "SETTINGS_VERSION_UNSUPPORTED", message: "SETTINGS_VERSION_UNSUPPORTED" });
+    // D3: the claim first, then the set-aside and the waiver, both inside the second write transaction.
+    const claimAt = db.statements.findIndex((sql) => sql.includes("SET state = 'CLAIMED'"));
+    const setAsideAt = db.statements.findIndex((sql) => sql.includes("SET state = 'FAILED'"));
+    const waiverAt = db.statements.findIndex((sql) => sql.includes("INSERT INTO ledger.model_spend_waiver"));
+    expect(claimAt).toBeGreaterThan(-1);
+    expect(setAsideAt).toBeGreaterThan(claimAt);
+    expect(waiverAt).toBe(setAsideAt + 1);
+    expect(db.statements[setAsideAt - 1]).toBe("BEGIN");
+    expect(db.statements[waiverAt + 1]).toBe("COMMIT");
+    // Phase 1's set-aside of THIS item of THIS run, its claimed state allowed (not READY-only), fenced to this release
+    // and this worker; and exactly one waiver, with the same reason.
+    const [setAside, waiver, ...more] = writes(db);
+    expect(more).toEqual([]);
+    expect(setAside!.params).toEqual(["item-1", "run-1", "RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED", RELEASE_KEY, "worker", false]);
+    expect(setAside!.sql).toContain("NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)");
+    expect(waiver!.params).toEqual(["run-1", "SETTINGS_VERSION_UNSUPPORTED"]);
+    // No model call, no lane, no run → version entry (nothing of the debate ran).
+    expect(complete).not.toHaveBeenCalled();
+    expect(opened).toEqual([]);
+    expect(versions.versionOf("run-1")).toBeUndefined();
+    // One content-free line: the run, the version and the loader's code; no text.
+    expect(lines).toEqual([{
+      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH"
+    }]);
+  });
+
+  it("the claimNext path (executeNext) claims, then reads the version, then sets the item aside the same way", async () => {
+    const lines = capturedLines();
+    const { settings, opened } = processSettings({ settingsForVersion: unsupported });
+    const db = scriptedPool({ peekVersion: VERSION });
+    await expect(new WalkingSkeletonRunner(db.pool, provider, settings).executeNext())
+      .rejects.toMatchObject({ code: "SETTINGS_VERSION_UNSUPPORTED" });
+    expect(db.statements.filter((sql) => sql.includes("SET state = 'CLAIMED'")).length).toBe(1);
+    const [setAside, waiver, ...more] = writes(db);
+    expect(more).toEqual([]);
+    expect(setAside!.params.slice(0, 3)).toEqual(["item-1", "run-1", "RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED"]);
+    expect(waiver!.params).toEqual(["run-1", "SETTINGS_VERSION_UNSUPPORTED"]);
+    expect(opened).toEqual([]);
+    expect(lines).toEqual([{
+      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH"
+    }]);
+  });
+
+  it("D3: a claim this copy did not get writes nothing (no set-aside, no waiver) and answers NO_WORK", async () => {
+    capturedLines();
+    const { settings } = processSettings({ settingsForVersion: unsupported });
+    const db = scriptedPool({ peekVersion: VERSION });
+    const claimless = {
+      query: (sql: string, params?: readonly unknown[]) => db.pool.query(sql, params as unknown[]),
+      connect: async () => {
+        const client = await db.pool.connect();
+        return {
+          query: async (sql: string, params?: readonly unknown[]) => sql.includes("SET state = 'CLAIMED'")
+            ? { rows: [] }
+            : client.query(sql, params as unknown[]),
+          release: () => undefined
+        };
+      }
+    } as unknown as Pool;
+    await expect(new WalkingSkeletonRunner(claimless, provider, settings).executeWorkItem("item-1"))
+      .resolves.toEqual({ kind: "NO_WORK" });
+    expect(writes(db)).toEqual([]);
+  });
+
+  it("another release's item: no resolve, no claim, no waiver, NO_WORK (RUNNER_RELEASE_MISMATCH, Phase 1)", async () => {
+    const lines = capturedLines();
+    const settingsForVersion = vi.fn(unsupported);
+    const { settings } = processSettings({ settingsForVersion });
+    const other = "r18-" + "0123456789ab";
+    const db = scriptedPool({ peekVersion: VERSION, releaseKey: other, peekReleaseKey: other });
+    await expect(new WalkingSkeletonRunner(db.pool, provider, settings).executeWorkItem("item-1"))
+      .resolves.toEqual({ kind: "NO_WORK" });
+    expect(settingsForVersion).not.toHaveBeenCalled();
+    expect(db.connects()).toBe(0);
+    expect(db.statements.some((sql) => sql.includes("SET state = 'CLAIMED'"))).toBe(false);
+    expect(writes(db)).toEqual([]);
+    expect(lines).toEqual([{
+      kind: "DEBATEAI_RUNNER_CLAIM", event: "RUNNER_RELEASE_MISMATCH", workItemId: "item-1", runReleaseKey: other, releaseKey: RELEASE_KEY
+    }]);
+  });
+
+  /** The Hatchet task over a real runner on the scripted pool, its failure recorder recording what the catch writes. */
+  function hatchetTaskOver(runner: WalkingSkeletonRunner, recorded: unknown[]) {
+    let declared: ((dispatch: unknown) => Promise<unknown>) | null = null;
+    declareHatchetWalkingSkeletonTask({
+      client: { task: (definition: { fn: (dispatch: never) => Promise<unknown> }) => {
+        declared = definition.fn as unknown as (dispatch: unknown) => Promise<unknown>;
+        return definition as never;
+      } } as never,
+      runner,
+      failures: { recordTerminalFailure: async (entry: unknown) => { recorded.push(entry); return true; } } as RunnerFailureRecorder,
+      workflowName: "walking-skeleton",
+      engineRetries: 3
+    });
+    if (declared === null) throw new Error("the task declaration must register a function");
+    return declared as (dispatch: unknown) => Promise<unknown>;
+  }
+  const RUN_ID = "11111111-1111-4111-8111-111111111111";
+  const ITEM_ID = "22222222-2222-4222-8222-222222222222";
+
+  it.each([1, 0])("the task's catch writes nothing over the set-aside reason (set-aside rows: %i)", async (setAsideRows) => {
+    capturedLines();
+    const { settings } = processSettings({ settingsForVersion: unsupported });
+    const db = scriptedPool({ peekVersion: VERSION, setAsideRows });
+    const recorded: unknown[] = [];
+    const task = hatchetTaskOver(new WalkingSkeletonRunner(db.pool, provider, settings), recorded);
+    await expect(task({ runId: RUN_ID, workItemId: ITEM_ID })).rejects.toMatchObject({ code: "SETTINGS_VERSION_UNSUPPORTED" });
+    // No RUNNER_EXECUTION_FAILED:SETTINGS_VERSION_UNSUPPORTED (which reads STOPPED, a different sentence) replaces
+    // RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED (SET_ASIDE); an item no longer this copy's is left to its holder.
+    expect(recorded).toEqual([]);
+    // A set-aside that wrote nothing wrote no waiver either (Phase 1: both on one transaction, the waiver only after).
+    expect(writes(db).filter((call) => call.sql.includes("model_spend_waiver")).length).toBe(setAsideRows);
   });
 });
