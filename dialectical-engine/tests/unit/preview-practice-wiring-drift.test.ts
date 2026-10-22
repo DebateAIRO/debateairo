@@ -305,7 +305,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(runner).toContain("renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID })");
     const ask = withoutComments(PRACTICE_ASK);
     expect(ask).not.toContain("developmentReleaseKey(");
-    for (const stamp of ask.match(/\breleaseKey:[^,\n}]*/gu) ?? []) expect(stamp).toBe("releaseKey: settings.runner.RELEASE_KEY");
+    // Two stamps, so the loop below cannot pass on none: the admission gate's key and the run's stamp.
+    const stamps = ask.match(/\breleaseKey:[^,\n}]*/gu) ?? [];
+    expect(stamps).toHaveLength(2);
+    for (const stamp of stamps) expect(stamp).toBe("releaseKey: settings.runner.RELEASE_KEY");
   });
 
   it("control: the reader sees a key that is missing", () => {
