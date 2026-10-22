@@ -274,8 +274,9 @@ describe('database ahead and unpinning', () => {
       { name: '0124_side_next.sql', manifestSha256: digest, sourceSha256: digest, verifierSha256: digest, n1Expand: true, keepsVerifier: true, outsideTransaction: false }], ...patch });
 
   it("records the newer release's database-ahead file on the older release", async () => {
-    const s = server();
+    const s = server([V1, NEW]);
     await pinned(s);
+    await pinned(s, NEW);
     const path = common.databaseAheadPathFor(s.layout, 'v1');
     const fileSha = s.write(path, ahead());
     const result = await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout });
@@ -294,10 +295,14 @@ describe('database ahead and unpinning', () => {
     // Side-by-side spec §5 (D5): the whole file is checked here too, so a bad file is refused before any restart needs it.
     ['a file without the newer chain', 'own', { newerChain: undefined }, 'DATABASE_AHEAD_REFUSED'],
     ['a step that is not the newer chain\'s last', 'own', { steps: [{ name: '0125_more.sql', sha256: digest }] }, 'DATABASE_AHEAD_REFUSED'],
-    ['a group-writable file', 'writable', {}, 'DATABASE_AHEAD_UNREADABLE']
+    ['a group-writable file', 'writable', {}, 'DATABASE_AHEAD_UNREADABLE'],
+    // D5 review: the newer release the file names must be pinned, at the revision the file names.
+    ['a newer release the lock does not pin', 'own', { newerLabel: 'other-v1' }, 'DATABASE_AHEAD_REFUSED'],
+    ['a newer release pinned at another revision', 'own', { newerSourceRevision: 'c'.repeat(40) }, 'DATABASE_AHEAD_REFUSED']
   ] as const)('refuses %s', async (_name, where, patch, code) => {
-    const s = server();
+    const s = server([V1, NEW]);
     await pinned(s);
+    await pinned(s, NEW);
     const own = common.databaseAheadPathFor(s.layout, 'v1');
     const path = where === 'elsewhere' ? join(s.layout.nativePlanRoot, 'database-ahead-other.json') : own;
     s.write(path, ahead(patch), where === 'writable' ? 0o664 : 0o644);
@@ -307,8 +312,9 @@ describe('database ahead and unpinning', () => {
   });
 
   it('verifies in database-ahead mode exactly when the lock pins a database-ahead file, and binds the proof to that file', async () => {
-    const s = server();
+    const s = server([V1, NEW]);
     await pinned(s, V1, ['api', 'ui', 'runner']);
+    await pinned(s, NEW);
     const at = Date.parse('2026-10-09T10:00:12Z');
     const start = async (databaseAhead: unknown) => {
       const seen: unknown[] = [];

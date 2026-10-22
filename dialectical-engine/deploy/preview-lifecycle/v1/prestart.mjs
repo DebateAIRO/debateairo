@@ -422,7 +422,8 @@ export async function pinRelease({ planPath, layout = LAYOUT, deps = {}, now = D
 
 /**
  * Side-by-side spec §5: the older release may (re)start beside a newer database only with the newer
- * release's root-owned list of extra steps. Checks the whole file (database-ahead.mjs) and records its path
+ * release's root-owned list of extra steps. Checks the whole file (database-ahead.mjs), that the newer release it
+ * names is pinned in the lock at the revision it names, and records its path
  * and hash on the older release; the native verify (D5) re-reads it, checks the steps against the newer
  * release's source manifest and the database, and its proof must name this hash.
  */
@@ -436,6 +437,9 @@ export async function acceptAhead({ label, fromPath, layout = LAYOUT }) {
   const revision = Object.values(release.services)[0].sourceRevision;
   try { validateDatabaseAheadFile(ahead); } catch { refuse('DATABASE_AHEAD_REFUSED'); }
   if (ahead.olderLabel !== label || ahead.olderSourceRevision !== revision || ahead.newerLabel === label) refuse('DATABASE_AHEAD_REFUSED');
+  // The newer release is one root pinned, at the revision the file names (D5 review).
+  const newer = own(lock.releases, ahead.newerLabel);
+  if (!newer || Object.values(newer.services)[0].sourceRevision !== ahead.newerSourceRevision) refuse('DATABASE_AHEAD_REFUSED');
   const databaseAhead = { path: fromPath, sha256: file.sha256, newerLabel: ahead.newerLabel };
   const lockSha256 = await writeLock({ ...lock, releases: { ...lock.releases, [label]: { ...release, databaseAhead } } }, layout);
   return { event: 'PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED', label, releaseKey: release.releaseKey, newerLabel: ahead.newerLabel, databaseAheadSha256: file.sha256, lockSha256 };

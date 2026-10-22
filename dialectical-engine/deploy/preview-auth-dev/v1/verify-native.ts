@@ -61,21 +61,23 @@ export type NativeDatabaseAhead=Readonly<{fileSha256:string;newerLabel:string;ac
 export type VerifyNativeOptions=Readonly<{databaseAhead?:NativeDatabaseAhead|null;verifyDatabaseAhead?:typeof verifyDatabaseAhead}>;
 /** What the proof says about a database ahead: null, or the pinned file and the extra steps verify accepted. */
 export type NativeDatabaseAheadProof=Readonly<{fileSha256:string;newerLabel:string;extraSteps:readonly string[]}>|null;
+const sameSteps=(a:readonly string[],b:readonly string[])=>a.length===b.length&&a.every((name,index)=>name===b[index]);
 /**
- * Side-by-side spec §5 ("database ahead"), plan D task D5: the extra steps (the ledger's names after this source's last
- * step that it does not know, packages/db/src/migration-lineage.ts splitLedger) must be the first steps of the pinned
- * list, in order (else DATABASE_AHEAD_NOT_ACCEPTED NOT_PINNED <name>); then plan A's read-only verifyDatabaseAhead
- * judges them with the newer release's whole chain (receipts, chain, verifier, n1 declarations, one newer release) and
- * must report exactly those steps.
+ * Side-by-side spec §5 ("database ahead"), plan D task D5, before anything can write: the extra steps (the ledger's
+ * names after this source's last step that it does not know, packages/db/src/migration-lineage.ts splitLedger) need a
+ * pinned database-ahead file (else NativeVerifyDatabaseAheadError), must be the first steps of its list, in order (else
+ * DATABASE_AHEAD_NOT_ACCEPTED NOT_PINNED <name>), and plan A's read-only verifyDatabaseAhead must accept them with the
+ * newer release's whole chain (receipts, chain, verifier, n1 declarations, one newer release, chain prefix) and report
+ * exactly those steps. Returns the pinned file; the full replay with the same chain follows.
  */
-async function acceptDatabaseAhead(pool:Pool,extra:readonly string[],options:VerifyNativeOptions):Promise<NativeDatabaseAheadProof>{
+async function checkDatabaseAhead(pool:Pool,extra:readonly string[],options:VerifyNativeOptions):Promise<NativeDatabaseAhead>{
  const pinned=options.databaseAhead??null;
  if(pinned===null)throw new NativeVerifyDatabaseAheadError(extra);
  const unpinned=extra.find((name,index)=>pinned.accepted[index]?.name!==name);
  if(unpinned!==undefined)throw new TypedDomainError(DATABASE_AHEAD_NOT_ACCEPTED,`${DATABASE_AHEAD_NOT_ACCEPTED} NOT_PINNED ${unpinned}`);
  const report=await (options.verifyDatabaseAhead??verifyDatabaseAhead)(pool,{newerChain:pinned.newerChain});
- if(report.extraSteps.length!==extra.length||report.extraSteps.some((name,index)=>name!==extra[index]))fail();
- return Object.freeze({fileSha256:pinned.fileSha256,newerLabel:pinned.newerLabel,extraSteps:Object.freeze([...extra])});
+ if(!sameSteps(report.extraSteps,extra))fail();
+ return pinned;
 }
 export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevision:string;sourceTree:string;nativeSourceSha256:string;publication:RegisterPublicationReceipt}>,options:VerifyNativeOptions={}) {
  // Verification is replay-only: a pending step (any numbered migration of the source) is refused before migrate runs. Applying pending SQL is the
@@ -86,9 +88,13 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
  await refusePendingForwardSteps(pool,plan);
  // Side-by-side §5: every step of this source is applied (above); steps a newer release added after them are `extra`.
  const {extra}=splitLedger(plan,(await pool.query<{name:string}>('SELECT name FROM public.debateai_schema_migration ORDER BY name')).rows.map(row=>row.name));
- let databaseAhead:NativeDatabaseAheadProof=null;
- if(extra.length===0)await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
- else databaseAhead=await acceptDatabaseAhead(pool,extra,options); // Read-only: plan A's acceptance check replaces the migrate on a database ahead.
+ const ahead=extra.length===0?null:await checkDatabaseAhead(pool,extra,options);
+ // Authoritative current source, ahead or not: complete table/column/membership/owner/provenance checks. On a database
+ // ahead, plan A's migrate replays this source's own steps, applies nothing and accepts the extra steps only against the
+ // pinned newer chain (assertDatabaseAheadAccepted); verify never applies a step either way.
+ const replayed=await migrate(pool,ahead===null?{}:{newerChain:ahead.newerChain});
+ if(replayed.appliedSteps.length!==0||!sameSteps(replayed.extraSteps,extra))fail();
+ const databaseAhead:NativeDatabaseAheadProof=ahead===null?null:Object.freeze({fileSha256:ahead.fileSha256,newerLabel:ahead.newerLabel,extraSteps:Object.freeze([...extra])});
  const client=await pool.connect();let transaction=false,released=false;
  const release=()=>{if(!released){released=true;client.release();}};
  try{

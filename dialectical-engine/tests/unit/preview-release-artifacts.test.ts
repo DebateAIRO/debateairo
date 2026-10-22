@@ -1226,13 +1226,19 @@ describe('database-ahead', () => {
     const newer = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api', { files: [...base, ...SEALED.map(name => row(name)), ...added.map(name => row(name, text(name)))] }));
     const newerChain = chain ?? [chainEntry('0111_billing_netopia.sql', '4'.repeat(64)), ...SEALED.map(name => chainEntry(name, sha(migrationText(name)))), ...added.map(name => chainEntry(name, sha(text(name))))];
     const reads: string[] = [];
+    const children: { argv: string[]; options: Record<string, unknown> }[] = [];
     const deps = {
       readMigration: async (root: string, name: string) => { reads.push(`${root}|${name}`); return Buffer.from(onDisk[name] ?? text(name)); },
-      describeForwardSteps: async (root: string) => { reads.push(`chain|${root}`); return newerChain; }
+      execPath: '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node',
+      // The newer release describes its own chain in a child process (D5 review); this stands in for that child.
+      runBounded: async (argv: string[], options: Record<string, unknown>) => {
+        reads.push(`chain|${options.cwd}`); children.push({ argv, options });
+        return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(newerChain)), stderr: Buffer.alloc(0) };
+      }
     };
     const out = join(s.art, 'database-ahead-old-v1.json');
     const argv = ['database-ahead', '--older-source-manifest', older.path, '--newer-source-manifest', newer.path, '--out', out];
-    return { s, older, newer, newerChain, deps, reads, out, argv, text };
+    return { s, older, newer, newerChain, deps, reads, children, out, argv, text };
   }
 
   it('writes the exact file: both releases, the newer manifest, the added steps and the newer release\'s own chain', async () => {
@@ -1248,9 +1254,31 @@ describe('database-ahead', () => {
     expect(result).toMatchObject({ path: t.out, sha256: sha(readFileSync(t.out)) });
     expect(statSync(t.out).mode & 0o7777).toBe(0o644);
     // Each step's bytes come from the newer release's own folder; the chain is the newer release's description of itself.
-    expect(t.reads).toEqual([`${NEW_ROOT.api}|0124_side_next.sql`, `${NEW_ROOT.api}|0125_more.sql`, `chain|${NEW_ROOT.api}`]);
+    expect(t.reads).toEqual([`${NEW_ROOT.api}|0124_side_next.sql`, `${NEW_ROOT.api}|0125_more.sql`, `chain|${NEW_ROOT.api}/dialectical-engine`]);
     // prestart.mjs accept-ahead takes exactly this file for the older release.
     expect(tool.parseArguments(t.argv)).toMatchObject({ command: 'database-ahead' });
+  });
+
+  it('root never loads the newer code: a bounded child as nobody, from the verified engine, with no tsx cache and its own tsconfig', async () => {
+    const t = staged();
+    await run(t.argv, t.s.layout, t.deps);
+    const engine = `${NEW_ROOT.api}/dialectical-engine`, node = t.deps.execPath;
+    expect(t.children).toHaveLength(1);
+    expect(t.children[0]!.argv).toEqual(['/usr/sbin/runuser', '-u', 'nobody', '--', '/usr/bin/env', '-i',
+      'PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/bin:/bin', 'TSX_DISABLE_CACHE=1', `TSX_TSCONFIG_PATH=${engine}/tsconfig.json`,
+      node, '--import', `${engine}/node_modules/tsx/dist/loader.mjs`, '--input-type=module', '-e', tool.DESCRIBE_CHAIN_SCRIPT, `${engine}/packages/db/src/migration-ahead.ts`]);
+    expect(t.children[0]!.options).toEqual({ cwd: engine, env: {}, timeoutMs: 60_000, maxOutputBytes: 262_144 });
+    expect(tool.describeChainArgv({ sourceRoot: NEW_ROOT.api, execPath: node })).toEqual(t.children[0]!.argv);
+  });
+
+  it.each([
+    ['a non-zero exit', { code: 1 }], ['any stderr', { stderr: Buffer.from('warning') }], ['a timeout', { timedOut: true }], ['an output overflow', { overflow: true }],
+    ['a spawn error', { error: new Error('ENOENT') }], ['output that is not strict JSON', { stdout: Buffer.from('[{"a":1,"a":2}]') }]
+  ])('refuses a chain child with %s, and writes nothing', async (_name, outcome) => {
+    const t = staged();
+    const runBounded = async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(t.newerChain)), stderr: Buffer.alloc(0), ...outcome });
+    await expect(run(t.argv, t.s.layout, { ...t.deps, runBounded })).rejects.toMatchObject({ code: 'DATABASE_AHEAD_CHAIN_UNREADABLE' });
+    expect(existsSync(t.out)).toBe(false);
   });
 
   it('refuses a step without both header lines and names every such step', async () => {
