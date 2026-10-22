@@ -85,6 +85,9 @@ type Options = Partial<{
   jsonJournal: string | 'unreadable';
   alertJournal: string;
   openWork: Record<string, number>;
+  // S15: the settings line's two reads (settings-version.mjs): the switch's plan for a pinned new release, the status.
+  settingsPlan: { expectedActiveSettings: number | null; activate: number | null; planned: boolean } | string;
+  settingsStatus: { pointer: number | null } | null;
 }>;
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
 const fail = (code: string) => Object.assign(new Error(code), { code });
@@ -105,6 +108,8 @@ function host(options: Options = {}) {
     runner: { Result: 'success', ExecMainStatus: '0', InvocationID: invocation } as Record<string, string>,
     journal: `a line\nDEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey: OLD_KEY })}\nPREVIEW_RUNNER_RETIRED\n` as string,
     jsonJournal: '' as string, alertJournal: '', openWork: {} as Record<string, number>,
+    settingsPlan: { expectedActiveSettings: 19, activate: null, planned: true } as { expectedActiveSettings: number | null; activate: number | null; planned: boolean } | string,
+    settingsStatus: null as { pointer: number | null } | null,
     ...options
   };
   const log: string[] = [];
@@ -160,6 +165,12 @@ function host(options: Options = {}) {
     readMeminfo: async () => `MemTotal:       16384000 kB\nMemFree:          100000 kB\nMemAvailable:   ${o.memAvailableKb} kB\n`,
     pathExists: async (path: string) => o.paths.includes(path),
     portRefuses: async (port: number) => { log.push(`port ${port}`); return !o.answering.includes(port); },
+    planSettings: async ({ newKey, labels, activate }: { newKey: string; labels: string[]; activate: number | null }) => {
+      log.push(`settings-plan ${newKey} ${labels.join(',')} ${activate ?? '-'}`);
+      if (typeof o.settingsPlan === 'string') throw Object.assign(fail(o.settingsPlan), { fields: { passed: ['20', '21'] } });
+      return o.settingsPlan;
+    },
+    readSettingsStatus: async ({ label }: { label: string }) => { log.push(`settings-status ${label}`); return o.settingsStatus; },
     readSourceFile: async ({ root, path }: { root: string; path: string }) => {
       const absolute = `${root}/${path}`;
       if (!Object.hasOwn(disk, absolute)) throw fail('ENOENT');
@@ -187,7 +198,7 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
     expect(r.label).toBe(NEW);
     expect(r.verdict).toBe('SIDE_BY_SIDE');
     expect(r.checks.map((entry: { name: string }) => entry.name)).toEqual(CHECK_NAMES);
-    expect(CHECK_NAMES).toEqual(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
+    expect(CHECK_NAMES).toEqual(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES', 'SETTINGS']);
     expect(failing(r)).toEqual([]);
     expect(named(r, 'N1_HEADERS')).toEqual({ name: 'N1_HEADERS', ok: true, detail: 'new: 0124_side_next.sql' });
     expect(named(r, 'N1_BASELINE')).toEqual({ name: 'N1_BASELINE', ok: true, detail: `names the current release's commit ${OLD_REV}` });
@@ -198,8 +209,8 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
     // The spare slot is the one the current release does not use; its two ports are asked, nothing else is.
     expect(fake.log.filter(line => line.startsWith('port '))).toEqual(['port 3200', 'port 3201']);
     expect(fake.log).toContain(`snapshot ${gateFilesPathFor(LAYOUT, OLD_KEY)}`);
-    // Read-only: systemctl is only ever asked to show, and nothing is written.
-    expect(fake.log.every(line => line.startsWith('show ') || line.startsWith('port ') || line.startsWith('snapshot '))).toBe(true);
+    // Read-only: systemctl is only ever asked to show, and nothing is written (the settings line reads the pointer only, S15).
+    expect(fake.log.every(line => line.startsWith('show ') || line.startsWith('port ') || line.startsWith('snapshot ') || line.startsWith('settings-status '))).toBe(true);
   });
 
   it('passes a release that adds no migration', async () => {
@@ -413,6 +424,36 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
   });
 });
 
+describe('the settings line (side-by-side spec §13, S15)', () => {
+  const PINNED: Options = { releases: { [PREV]: { key: PREV_KEY, slot: 'B', state: 'RETIRED' }, [OLD]: { key: OLD_KEY, slot: 'A', state: 'CURRENT', manifest: OLDER }, [NEW]: { key: NEW_KEY, slot: 'B', state: 'STAGED' } },
+    units: { [U('api', NEW)]: 'inactive', [U('ui', NEW)]: 'inactive', [U('runner', NEW)]: 'inactive' } };
+  it('before the new release is pinned, it reads only the pointer and says what the switch will need', async () => {
+    const empty = input();
+    expect(named(await releaseCheck(empty.args), 'SETTINGS')).toEqual({ name: 'SETTINGS', ok: true, detail: 'no version activated: the first switch activates the new release\'s own site version' });
+    expect(empty.fake.log).toContain(`settings-status ${OLD}`);
+    expect(empty.fake.log.some(line => line.startsWith('settings-plan'))).toBe(false);
+    const active = await run({}, { settingsStatus: { pointer: 19 } });
+    expect(named(active, 'SETTINGS')).toEqual({ name: 'SETTINGS', ok: true, detail: `active 19: once ${NEW} is pinned, settings-version.mjs check ${NEW} 19 must PASS, or the switch takes --activate <v>` });
+  });
+
+  it('a pinned new release: the switch\'s own plan, from the new release\'s folder first; a version it has not passed is NOT_READY', async () => {
+    const planned = input({}, PINNED);
+    expect(named(await releaseCheck(planned.args), 'SETTINGS')).toEqual({ name: 'SETTINGS', ok: true, detail: 'expects 19; the switch activates nothing' });
+    expect(planned.fake.log).toContain(`settings-plan ${NEW_KEY} ${NEW},${OLD} -`);
+    const refused = await run({}, { ...PINNED, settingsPlan: 'SETTINGS_VERSION_NOT_PASSED' });
+    expect(refused.verdict).toBe('NOT_READY');
+    expect(named(refused, 'SETTINGS')).toEqual({ name: 'SETTINGS', ok: false,
+      detail: `the new release has not passed the active version (it passed: 20, 21): run settings-version.mjs check ${NEW} <active version>, or plan the switch with --activate <v>` });
+    const withActivate = input({ activate: 21 }, { ...PINNED, settingsPlan: { expectedActiveSettings: 19, activate: 21, planned: true } });
+    expect(named(await releaseCheck(withActivate.args), 'SETTINGS')).toMatchObject({ ok: true, detail: 'expects 19; the switch activates 21' });
+    expect(withActivate.fake.log).toContain(`settings-plan ${NEW_KEY} ${NEW},${OLD} 21`);
+    expect(named(await run({}, { ...PINNED, settingsPlan: 'SETTINGS_PLAN_UNAVAILABLE' }), 'SETTINGS')).toEqual({ name: 'SETTINGS', ok: false, detail: 'SETTINGS_PLAN_UNAVAILABLE' });
+    expect(named(await run({}, { ...PINNED, settingsPlan: { expectedActiveSettings: null, activate: null, planned: false } }), 'SETTINGS'))
+      .toMatchObject({ ok: true, detail: 'no settings pointer in these releases\' code: each release on its own site version' });
+    await expect(releaseCheck(input({ activate: 0 }).args)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+  });
+});
+
 describe('status, maintenance and the retirement receipt (side-by-side spec §4)', () => {
   it('lists every pinned release with its state, units and open work', async () => {
     const { deps } = host({
@@ -619,6 +660,13 @@ describe('the command line', () => {
     const notReady = await cli(CHECK, { gates: { deepinfra: 'halted' } });
     expect(notReady.code).toBe(2);
     expect(notReady.out[0]).toMatchObject({ verdict: 'NOT_READY' });
+  });
+
+  it('takes --activate <v> for the settings line (S15), after the other options', async () => {
+    expect((await cli([...CHECK, '--lifecycle-reviewed', '--activate', '21'])).code).toBe(0);
+    for (const argv of [[...CHECK, '--activate'], [...CHECK, '--activate', '021'], [...CHECK, '--activate', '21', '--lifecycle-reviewed']]) {
+      expect((await cli(argv)).err[0].reason, argv.join(' ')).toBe('ARGUMENTS_REFUSED');
+    }
   });
 
   it('takes the reviewed hash and the lifecycle yes', async () => {

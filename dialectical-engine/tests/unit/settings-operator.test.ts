@@ -1,0 +1,391 @@
+// Side-by-side spec §13 "Activating a settings version" and §11 (rollback), Task S15: the operator module that records
+// check-version's verdict, activates a version, reads the status, and plans the release switch's settings step. A fake
+// client answers the SQL; no database, no gate, no AI call. The real-database pass is
+// tests/integration/settings-operator-0124.test.ts.
+import { createHash } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { previewModelRowForRef } from "@debateai/providers";
+import { SETTINGS_CHECKER, settingsCheckLine, settingsCheckReport, type SettingsCheckReport } from "@debateai/register";
+import {
+  ACTIVATED_BY_PATTERN,
+  SettingsOperatorRefusal,
+  activateSettingsVersion,
+  canonicalSettingsJson,
+  latestPassedSettingsVersion,
+  parseSettingsCheckLine,
+  parseSettingsCheckOutput,
+  readSettingsStatus,
+  recordSettingsVerdict,
+  settingsForSwitch,
+  settingsVerdictOf,
+  type ActivationReaders,
+  type SettingsOperatorClient
+} from "../../tools/settings-version/settings-operator.js";
+import { runSettingsCli, type SettingsCliDeps } from "../../tools/settings-version/cli.js";
+
+// Keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
+const KEY = "r17-" + "0123456789ab";
+const NEXT = "r18-" + "abcdef012345";
+const SNAPSHOT = "c".repeat(64);
+
+type Handler = (sql: string, params: readonly unknown[]) => Record<string, unknown>[] | Error;
+/** A client answering by the first handler whose text the SQL contains; every query is recorded. */
+function fakeClient(handlers: ReadonlyArray<readonly [string, Handler]>) {
+  const queries: { sql: string; params: readonly unknown[] }[] = [];
+  const client = {
+    query: async (sql: string, params: readonly unknown[] = []) => {
+      queries.push({ sql, params });
+      const handler = handlers.find(([text]) => sql.includes(text));
+      if (handler === undefined) throw new Error(`unexpected SQL ${sql}`);
+      const answer = handler[1](sql, params);
+      if (answer instanceof Error) throw answer;
+      return { rows: answer };
+    }
+  } as unknown as SettingsOperatorClient;
+  return { client, queries, sqls: () => queries.map(({ sql }) => sql) };
+}
+const pgError = (code: string, message: string, detail?: string): Error => Object.assign(new Error(message), { code, ...(detail ? { detail } : {}) });
+const rows = (...values: Record<string, unknown>[]) => (): Record<string, unknown>[] => values;
+const refusal = async (work: Promise<unknown>): Promise<SettingsOperatorRefusal> => {
+  try { await work; } catch (error) { expect(error).toBeInstanceOf(SettingsOperatorRefusal); return error as SettingsOperatorRefusal; }
+  throw new Error("expected a refusal");
+};
+const report = (half: "runner" | "api", codes: string[] = [], over: Partial<{ releaseKey: string; version: number; snapshotSha256: string | null }> = {}): SettingsCheckReport =>
+  settingsCheckReport({ half, releaseKey: over.releaseKey ?? KEY, version: over.version ?? 18, codes, snapshotSha256: over.snapshotSha256 === undefined ? SNAPSHOT : over.snapshotSha256 });
+
+describe("the verdict (spec §13: PASS only when both halves PASS)", () => {
+  it("reads exactly the line S14 prints, and nothing else", () => {
+    const runner = report("runner");
+    expect(parseSettingsCheckLine(settingsCheckLine(runner))).toEqual(runner);
+    const failing = report("api", ["SETTINGS_SITE_MEMBER_DIFFERS:costEnvelopePolicy.daily_ceiling_micros", "SETTINGS_GATE_UNREVIEWED:preview:x"]);
+    expect(parseSettingsCheckLine(settingsCheckLine(failing).trimEnd())).toEqual(failing);
+    expect(parseSettingsCheckLine(settingsCheckLine(report("runner", [], { snapshotSha256: null })))).toMatchObject({ snapshotSha256: null });
+    const json = JSON.parse(settingsCheckLine(runner).slice("DEBATEAI_SETTINGS_CHECK ".length));
+    const variants: string[] = [
+      `DEBATEAI_SETTINGS_VERDICT ${JSON.stringify(json)}`,
+      `DEBATEAI_SETTINGS_CHECK  ${JSON.stringify(json)}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify(json)}\n\n`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, extra: 1 })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ releaseKey: json.releaseKey, half: json.half, version: json.version, verdict: json.verdict, codes: json.codes, snapshotSha256: json.snapshotSha256, checker: json.checker })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, half: "website" })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, releaseKey: "legacy" })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, version: "18" })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, version: 0 })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL" })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, codes: ["SETTINGS_X"] })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["SETTINGS_B", "SETTINGS_A"] })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["SETTINGS_A", "SETTINGS_A"] })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["settings lower case"] })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, snapshotSha256: "C".repeat(64) })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, checker: "check-version-v0" })}`,
+      "DEBATEAI_SETTINGS_CHECK {not json",
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify(json, null, 1).replace(/\n/gu, "")}`
+    ];
+    for (const variant of variants) {
+      expect(() => parseSettingsCheckLine(variant), variant).toThrow(expect.objectContaining({ code: "SETTINGS_CHECK_REPORT_INVALID" }));
+    }
+  });
+
+  it("PASS only when both halves PASS; the digest is sha256 of the canonical { releaseKey, version, runner, api }", () => {
+    const runner = report("runner"), api = report("api");
+    const verdict = settingsVerdictOf(runner, api);
+    const expected = createHash("sha256").update(canonicalSettingsJson({ releaseKey: KEY, version: 18, runner, api })).digest("hex");
+    expect(verdict).toEqual({ releaseKey: KEY, version: 18, verdict: "PASS", digest: expected });
+    // Canonical: key order does not matter, every value does.
+    expect(canonicalSettingsJson({ b: 1, a: [2, { d: 3, c: null }] })).toBe('{"a":[2,{"c":null,"d":3}],"b":1}');
+    expect(settingsVerdictOf(report("runner", ["SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:preview:x"]), api).verdict).toBe("FAIL");
+    expect(settingsVerdictOf(runner, report("api", ["SETTINGS_HASH_UNDECLARED:mapContractHash"])).verdict).toBe("FAIL");
+    expect(settingsVerdictOf(runner, report("api", ["SETTINGS_HASH_UNDECLARED:mapContractHash"])).digest).not.toBe(expected);
+  });
+
+  it("mismatched keys, versions or snapshots, a half in the wrong place, a half reported twice or an unknown line: SETTINGS_CHECK_REPORT_INVALID", () => {
+    const invalid = expect.objectContaining({ code: "SETTINGS_CHECK_REPORT_INVALID" });
+    expect(() => settingsVerdictOf(report("runner"), report("api", [], { releaseKey: NEXT }))).toThrow(invalid);
+    expect(() => settingsVerdictOf(report("runner"), report("api", [], { version: 19 }))).toThrow(invalid);
+    expect(() => settingsVerdictOf(report("runner"), report("api", [], { snapshotSha256: "e".repeat(64) }))).toThrow(invalid);
+    expect(() => settingsVerdictOf(report("runner"), report("runner"))).toThrow(invalid);
+    expect(() => settingsVerdictOf(report("api"), report("runner"))).toThrow(invalid);
+    const one = settingsCheckLine(report("runner"));
+    expect(parseSettingsCheckOutput(`\n${one}\n`)).toEqual(report("runner"));
+    expect(() => parseSettingsCheckOutput(one + one)).toThrow(invalid);
+    expect(() => parseSettingsCheckOutput(`> pnpm settings:check-runner 18\n${one}`)).toThrow(invalid);
+    expect(() => parseSettingsCheckOutput("")).toThrow(invalid);
+  });
+
+  it("records through register.record_settings_verdict and keeps the database's SETTINGS_VERDICT_INVALID typed", async () => {
+    const verdict = settingsVerdictOf(report("runner"), report("api"));
+    const ok = fakeClient([["record_settings_verdict", rows()]]);
+    await recordSettingsVerdict(ok.client, verdict);
+    expect(ok.queries).toEqual([{ sql: "SELECT register.record_settings_verdict($1::text, $2::bigint, $3::text, $4::text)", params: [KEY, 18, "PASS", verdict.digest] }]);
+    const refused = fakeClient([["record_settings_verdict", () => pgError("22023", "SETTINGS_VERDICT_INVALID")]]);
+    expect((await refusal(recordSettingsVerdict(refused.client, verdict))).code).toBe("SETTINGS_VERDICT_INVALID");
+    // Another error with the same words but another SQLSTATE is not the refusal: it passes through untouched.
+    const other = fakeClient([["record_settings_verdict", () => pgError("08006", "SETTINGS_VERDICT_INVALID")]]);
+    await expect(recordSettingsVerdict(other.client, verdict)).rejects.toMatchObject({ code: "08006" });
+  });
+});
+
+/** The database of one activation: current release, pointer, the pass check and the activation itself. */
+function activationDatabase(over: Partial<{
+  current: string | null; pointer: string | null; passed: boolean; passedList: string[];
+  activate: Handler; commit: Handler;
+}> = {}) {
+  const o = { current: KEY, pointer: "17", passed: true, passedList: ["17", "18"], ...over };
+  return fakeClient([
+    ["core.read_current_release()", () => (o.current === null ? [] : [{ release_key: o.current }])],
+    ["read_active_settings_version()", () => [{ pointer: o.pointer }]],
+    ["settings_version_passed", () => [{ passed: o.passed }]],
+    ["read_passed_settings_versions", () => o.passedList.map((v) => ({ v }))],
+    ["BEGIN ISOLATION LEVEL READ COMMITTED", rows()],
+    ["activate_settings_version", o.activate ?? rows({ activation_seq: "3" })],
+    ["COMMIT", o.commit ?? rows()],
+    ["ROLLBACK", rows()]
+  ]);
+}
+const SEATS = ["preview:fixture-a", "preview:claude-haiku-5-5"];
+/** The live condition 6 over injected role refs (the register's readers at the version, as check-version reads them). */
+const readersOf = (refs: readonly string[]): ActivationReaders => ({
+  readGateModels: async () => {
+    const models = [], unreviewed = [];
+    for (const ref of refs) {
+      const row = previewModelRowForRef(ref);
+      if (row === undefined) unreviewed.push(ref); else models.push({ ref, gate: row.provider, model: row.model });
+    }
+    return { models, unreviewed };
+  }
+});
+const switchDatabase = (pointer: string | null, passed: string[]) => fakeClient([
+  ["read_active_settings_version()", rows({ pointer })],
+  ["read_passed_settings_versions", () => passed.map((v) => ({ v }))]
+]);
+const BOTH_GATES = { deepinfra: ["zai-org/GLM-5.3-Flash"], anthropic: ["claude-haiku-5-5"] };
+
+describe("the activation (spec §13 activate <v>)", () => {
+  it("reads the release and the pointer, checks the gates live, then activates in one READ COMMITTED transaction", async () => {
+    const db = activationDatabase();
+    const done = await activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "new lengths", gateEnabledModels: BOTH_GATES }, readersOf(SEATS));
+    expect(done).toEqual({ activationSeq: "3", previous: 17, releaseKey: KEY });
+    expect(db.sqls()).toEqual([
+      "SELECT c.release_key FROM core.read_current_release() AS c",
+      "SELECT register.read_active_settings_version()::text AS pointer",
+      "SELECT register.settings_version_passed($1::text, $2::bigint) AS passed",
+      "BEGIN ISOLATION LEVEL READ COMMITTED",
+      "SELECT register.activate_settings_version($1::bigint, $2::bigint, $3::text, $4::text, $5::text)::text AS activation_seq",
+      "COMMIT"
+    ]);
+    expect(db.queries[4]!.params).toEqual([18, 17, KEY, "owner", "new lengths"]);
+    // Never activated: the expected previous is NULL.
+    const first = activationDatabase({ pointer: null });
+    expect((await activateSettingsVersion(first.client, { version: 18, activatedBy: "owner", reason: "first" }, readersOf(SEATS))).previous).toBeNull();
+    expect(first.queries.find(({ sql }) => sql.includes("activate_settings_version"))!.params[1]).toBeNull();
+  });
+
+  it("refuses early, with a plain line naming what passed, when the current release has not passed the version", async () => {
+    const db = activationDatabase({ passed: false, passedList: ["17"] });
+    const error = await refusal(activateSettingsVersion(db.client, { version: 19, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)));
+    expect([error.code, error.passed]).toEqual(["SETTINGS_VERSION_NOT_PASSED", [17]]);
+    expect(db.sqls().some((sql) => sql.includes("BEGIN") || sql.includes("activate_settings_version"))).toBe(false);
+    const none = activationDatabase({ current: null });
+    expect((await refusal(activateSettingsVersion(none.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe("SETTINGS_ACTIVATION_CONFLICT");
+  });
+
+  it("condition 6 live: every seat's model on at its gate; a missing gate answer or an unreviewed ref refuses, all codes together, nothing written", async () => {
+    const cases: [Record<string, readonly string[]>, readonly string[], string[]][] = [
+      [{ deepinfra: ["zai-org/GLM-5.3-Flash"], anthropic: [] }, SEATS, ["SETTINGS_GATE_MODEL_DISABLED:anthropic:claude-haiku-5-5"]],
+      [{ deepinfra: ["zai-org/GLM-5.3-Flash"] }, SEATS, ["SETTINGS_GATE_UNANSWERED:anthropic"]],
+      [{}, [...SEATS, "preview:not-reviewed"], ["SETTINGS_GATE_UNANSWERED:anthropic", "SETTINGS_GATE_UNANSWERED:deepinfra", "SETTINGS_GATE_UNREVIEWED:preview:not-reviewed"]]
+    ];
+    for (const [gates, refs, codes] of cases) {
+      const db = activationDatabase();
+      const error = await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates }, readersOf(refs)));
+      expect([error.code, error.codes]).toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", codes]);
+      expect(db.sqls().some((sql) => sql.includes("BEGIN"))).toBe(false);
+    }
+  });
+
+  it("maps the database's refusals by SQLSTATE and code; READ_COMMITTED_REQUIRED by its DETAIL", async () => {
+    const cases: [Error, string][] = [
+      [pgError("40001", "SETTINGS_ACTIVATION_CONFLICT"), "SETTINGS_ACTIVATION_CONFLICT"],
+      [pgError("55000", "SETTINGS_VERSION_NOT_PASSED"), "SETTINGS_VERSION_NOT_PASSED"],
+      [pgError("22023", "SETTINGS_ACTIVATION_UNCHANGED"), "SETTINGS_ACTIVATION_UNCHANGED"],
+      [pgError("22023", "SETTINGS_VERSION_KIND_INVALID"), "SETTINGS_VERSION_KIND_INVALID"],
+      [pgError("22023", "SETTINGS_ACTIVATION_CONFLICT", "READ_COMMITTED_REQUIRED"), "SETTINGS_ACTIVATION_ISOLATION_INVALID"],
+      [pgError("23514", "new row violates check constraint"), "SETTINGS_OPERATOR_USAGE"]
+    ];
+    for (const [error, code] of cases) {
+      const db = activationDatabase({ activate: () => error });
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe(code);
+      expect(db.sqls().at(-1)).toBe("ROLLBACK");
+    }
+    // The deferred check fails at COMMIT: the same mapping.
+    const atCommit = activationDatabase({ commit: () => pgError("55000", "SETTINGS_VERSION_NOT_PASSED") });
+    expect((await refusal(activateSettingsVersion(atCommit.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe("SETTINGS_VERSION_NOT_PASSED");
+    // An unmapped error passes through untouched.
+    const broken = activationDatabase({ activate: () => pgError("57014", "canceling statement due to statement timeout") });
+    await expect(activateSettingsVersion(broken.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS))).rejects.toMatchObject({ code: "57014" });
+  });
+
+  it("--by matches the table's CHECK (no colon) and --reason is one line, both before any read", async () => {
+    expect(ACTIVATED_BY_PATTERN.source).toBe("^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$");
+    for (const [activatedBy, reason] of [["root:owner", "x"], ["", "x"], [" owner", "x"], ["a".repeat(129), "x"], ["owner", ""], ["owner", "two\nlines"], ["owner", "x".repeat(513)]]) {
+      const db = activationDatabase();
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: activatedBy!, reason: reason! }, readersOf(SEATS)))).code).toBe("SETTINGS_OPERATOR_USAGE");
+      expect(db.queries).toEqual([]);
+    }
+  });
+});
+
+describe("the status, the rollback's version and the switch's settings step", () => {
+  it("status: the release, the pointer, what new asks use (the site version while nothing was activated), what passed", async () => {
+    const set = fakeClient([
+      ["core.read_current_release()", rows({ release_key: KEY })],
+      ["read_active_settings_version()", rows({ pointer: "18" })],
+      ["read_passed_settings_versions", rows({ v: "17" }, { v: "18" })]
+    ]);
+    expect(await readSettingsStatus(set.client)).toEqual({ currentRelease: KEY, pointer: 18, effectiveActive: 18, passed: [17, 18] });
+    const empty = fakeClient([
+      ["core.read_current_release()", rows({ release_key: KEY })],
+      ["read_active_settings_version()", rows({ pointer: null })],
+      ["read_passed_settings_versions", rows({ v: "17" })]
+    ]);
+    expect(await readSettingsStatus(empty.client)).toEqual({ currentRelease: KEY, pointer: null, effectiveActive: 17, passed: [17] });
+    const none = fakeClient([["core.read_current_release()", rows()], ["read_active_settings_version()", rows({ pointer: null })]]);
+    expect(await readSettingsStatus(none.client)).toEqual({ currentRelease: null, pointer: null, effectiveActive: null, passed: [] });
+  });
+
+  it("latest passed: the most recent PASS still PASS (by checked_at), else the release's own site version (D1, T)", async () => {
+    const found = fakeClient([["register.settings_verdict", rows({ v: "19" })]]);
+    expect(await latestPassedSettingsVersion(found.client, NEXT)).toBe(19);
+    expect(found.queries[0]!.params).toEqual([NEXT]);
+    expect(found.queries[0]!.sql).toMatch(/DISTINCT ON \(verdict_row\.register_version\)[\s\S]*WHERE latest\.verdict = 'PASS'[\s\S]*ORDER BY latest\.checked_at DESC/u);
+    const none = fakeClient([["register.settings_verdict", rows()]]);
+    expect(await latestPassedSettingsVersion(none.client, NEXT)).toBe(18);
+    expect((await refusal(latestPassedSettingsVersion(none.client, "legacy"))).code).toBe("SETTINGS_OPERATOR_USAGE");
+  });
+
+  it("switch: the pointer is the expected value; a pointer the new release passed needs no activation", async () => {
+    expect(await settingsForSwitch(switchDatabase("17", ["17", "18"]).client, { newRelease: NEXT })).toEqual({ expectedActiveSettings: 17, activate: null });
+  });
+  it("switch: no pointer yet activates the new release's own site version (owner answer Q-S2)", async () => {
+    expect(await settingsForSwitch(switchDatabase(null, ["18"]).client, { newRelease: NEXT })).toEqual({ expectedActiveSettings: null, activate: 18 });
+  });
+  it("switch: a pointer the new release has not passed refuses, naming what it passed; --activate a passed version plans it", async () => {
+    const error = await refusal(settingsForSwitch(switchDatabase("17", ["18", "19"]).client, { newRelease: NEXT }));
+    expect([error.code, error.passed]).toEqual(["SETTINGS_VERSION_NOT_PASSED", [18, 19]]);
+    expect(await settingsForSwitch(switchDatabase("17", ["18", "19"]).client, { newRelease: NEXT, activate: 19 })).toEqual({ expectedActiveSettings: 17, activate: 19 });
+    expect((await refusal(settingsForSwitch(switchDatabase("17", ["18"]).client, { newRelease: NEXT, activate: 20 }))).passed).toEqual([18]);
+    // Activating the pointer itself is nothing to do.
+    expect(await settingsForSwitch(switchDatabase("18", ["18"]).client, { newRelease: NEXT, activate: 18 })).toEqual({ expectedActiveSettings: 18, activate: null });
+  });
+});
+
+describe("cli.ts (one line per command, the exit codes of its header)", () => {
+  const output = () => {
+    const out: string[] = [], err: string[] = [];
+    return { out, err, io: { stdout: (text: string) => { out.push(text); }, stderr: (text: string) => { err.push(text); } } };
+  };
+  const depsOf = (client: SettingsOperatorClient, files: Record<string, string> = {}): SettingsCliDeps & { closed: () => number } => {
+    let closed = 0;
+    return {
+      connect: async () => ({ client, close: async () => { closed += 1; } }),
+      readText: async (path: string) => { if (!Object.hasOwn(files, path)) throw new Error("ENOENT"); return files[path]!; },
+      activationReaders: readersOf(SEATS),
+      closed: () => closed
+    };
+  };
+
+  it("verdict: records PASS (exit 0) or FAIL (exit 1) with the codes; a bad report writes nothing (exit 2)", async () => {
+    const db = fakeClient([["record_settings_verdict", rows()]]);
+    const files = { "/r": settingsCheckLine(report("runner")), "/a": settingsCheckLine(report("api", ["SETTINGS_HASH_UNDECLARED:mapContractHash"])) };
+    const o = output();
+    const deps = depsOf(db.client, files);
+    expect(await runSettingsCli(["verdict", "--runner", "/r", "--api", "/a"], o.io, deps)).toBe(1);
+    const printed = JSON.parse(o.out[0]!.slice("DEBATEAI_SETTINGS_VERDICT ".length));
+    expect(printed).toMatchObject({ releaseKey: KEY, version: "18", verdict: "FAIL", codes: ["SETTINGS_HASH_UNDECLARED:mapContractHash"] });
+    expect(deps.closed()).toBe(1);
+    const pass = output();
+    expect(await runSettingsCli(["verdict", "--runner", "/r", "--api", "/r2"], pass.io, depsOf(db.client, { ...files, "/r2": settingsCheckLine(report("api")) }))).toBe(0);
+    const bad = fakeClient([]);
+    const twice = output();
+    expect(await runSettingsCli(["verdict", "--runner", "/r", "--api", "/r"], twice.io, depsOf(bad.client, files))).toBe(2);
+    expect(JSON.parse(twice.err[0]!.slice("DEBATEAI_SETTINGS_REFUSED ".length))).toEqual({ command: "verdict", code: "SETTINGS_CHECK_REPORT_INVALID" });
+    expect(bad.queries).toEqual([]);
+  });
+
+  it("activate: the receipt line; unchanged exits 0; conflict 3; not passed 4 (with what passed); usage 2 before any read", async () => {
+    const o = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "new lengths"], o.io, depsOf(activationDatabase().client))).toBe(0);
+    expect(o.out).toEqual([`DEBATEAI_SETTINGS_ACTIVATED {"version":"18","previous":"17","releaseKey":"${KEY}","activationSeq":"3"}\n`]);
+    const same = output();
+    expect(await runSettingsCli(["activate", "17", "--by", "owner", "--reason", "x"], same.io,
+      depsOf(activationDatabase({ activate: () => pgError("22023", "SETTINGS_ACTIVATION_UNCHANGED") }).client))).toBe(0);
+    expect(same.out).toEqual(['SETTINGS_ACTIVATION_UNCHANGED {"version":"17"}\n']);
+    const conflict = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x"], conflict.io,
+      depsOf(activationDatabase({ activate: () => pgError("40001", "SETTINGS_ACTIVATION_CONFLICT") }).client))).toBe(3);
+    const notPassed = output();
+    expect(await runSettingsCli(["activate", "19", "--by", "owner", "--reason", "x"], notPassed.io,
+      depsOf(activationDatabase({ passed: false, passedList: ["17"] }).client))).toBe(4);
+    expect(notPassed.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_VERSION_NOT_PASSED","passed":["17"]}\n']);
+    for (const args of [["activate", "18", "--reason", "x"], ["activate", "18", "--by", "root:owner", "--reason", "x"], ["activate", "018", "--by", "o", "--reason", "x"], ["activate", "18", "--by", "o", "--by", "p", "--reason", "x"]]) {
+      const db = activationDatabase();
+      const u = output();
+      let connected = 0;
+      expect(await runSettingsCli(args, u.io, { ...depsOf(db.client), connect: async () => { connected += 1; return { client: db.client, close: async () => undefined }; } })).toBe(2);
+      expect(connected).toBe(0);
+    }
+  });
+
+  it("activate --gate-remaining: each gate's raw /remaining answer; an unreadable or invalid answer is no answer (condition 6 refuses, exit 1)", async () => {
+    const answer = (models: string[]) => JSON.stringify({ enabled_models: models, largest_reservation_usd: "0.01", max_concurrent_calls: 4, remaining_calls: 100, remaining_usd: "1.5", state: "active", window_open: true });
+    const files = { "/g/deepinfra.json": answer(["zai-org/GLM-5.3-Flash"]), "/g/anthropic.json": "{\"state\":\"active\"}" };
+    const db = activationDatabase();
+    const o = output();
+    const exit = await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/deepinfra.json",
+      "--gate-remaining", "anthropic=/g/anthropic.json", "--gate-remaining", "spare=/g/missing.json"], o.io, depsOf(db.client, files));
+    expect(exit).toBe(1);
+    expect(o.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic"]}\n']);
+    expect(db.sqls().some((sql) => sql.includes("activate_settings_version"))).toBe(false);
+    const on = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/deepinfra.json",
+      "--gate-remaining", "anthropic=/g/on.json"], on.io, depsOf(activationDatabase().client, { ...files, "/g/on.json": answer(["claude-haiku-5-5"]) }))).toBe(0);
+    expect(on.out[0]).toMatch(/^DEBATEAI_SETTINGS_ACTIVATED /u);
+    const bad = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra"], bad.io, depsOf(activationDatabase().client))).toBe(2);
+  });
+
+  it("status, latest-passed and switch-plan print one line each; switch-plan's refusal names what passed (exit 4)", async () => {
+    const status = output();
+    expect(await runSettingsCli(["status"], status.io, depsOf(fakeClient([
+      ["core.read_current_release()", rows({ release_key: KEY })],
+      ["read_active_settings_version()", rows({ pointer: null })],
+      ["read_passed_settings_versions", rows({ v: "17" })]
+    ]).client))).toBe(0);
+    expect(status.out).toEqual([`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${KEY}","pointer":null,"effectiveActive":"17","passed":["17"]}\n`]);
+    const latest = output();
+    expect(await runSettingsCli(["latest-passed", NEXT], latest.io, depsOf(fakeClient([["register.settings_verdict", rows()]]).client))).toBe(0);
+    expect(latest.out).toEqual([`DEBATEAI_SETTINGS_LATEST_PASSED {"releaseKey":"${NEXT}","version":"18","siteVersion":"18"}\n`]);
+    const plan = output();
+    expect(await runSettingsCli(["switch-plan", NEXT], plan.io, depsOf(switchDatabase(null, ["18"]).client))).toBe(0);
+    expect(plan.out).toEqual([`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${NEXT}","expectedActiveSettings":null,"activate":"18"}\n`]);
+    const rollback = output();
+    expect(await runSettingsCli(["switch-plan", KEY, "--latest-passed"], rollback.io, depsOf(fakeClient([
+      ["register.settings_verdict", rows()],
+      ["read_active_settings_version()", rows({ pointer: "18" })],
+      ["read_passed_settings_versions", rows({ v: "17" })]
+    ]).client))).toBe(0);
+    expect(rollback.out).toEqual([`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${KEY}","expectedActiveSettings":"18","activate":"17"}\n`]);
+    const refused = output();
+    expect(await runSettingsCli(["switch-plan", NEXT], refused.io, depsOf(switchDatabase("17", ["18"]).client))).toBe(4);
+    expect(refused.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"switch-plan","code":"SETTINGS_VERSION_NOT_PASSED","passed":["18"]}\n']);
+    for (const args of [["switch-plan", "legacy"], ["switch-plan", NEXT, "--activate"], ["switch-plan", NEXT, "--latest-passed", "x"], ["status", "x"], ["nonsense"], []]) {
+      const u = output();
+      expect(await runSettingsCli(args, u.io, depsOf(fakeClient([]).client)), args.join(" ")).toBe(2);
+    }
+    // An untyped failure (the database could not be asked) is exit 2 with a content-free code.
+    const down = output();
+    expect(await runSettingsCli(["status"], down.io, { ...depsOf(fakeClient([]).client), connect: async () => { throw new Error("connect ECONNREFUSED /run/x"); } })).toBe(2);
+    expect(down.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"status","code":"SETTINGS_OPERATOR_UNAVAILABLE"}\n']);
+    expect(SETTINGS_CHECKER).toBe("check-version-v1");
+  });
+});

@@ -18,10 +18,16 @@
 //   - maintenance  infrastructure maintenance (Postgres, Hatchet, Caddy, the gates' software) may be planned only while
 //                  no release drains (spec §4): the operator then creates the maintenance-pending flag by hand.
 //
-//   release-check.mjs check --label <new> --older-manifest <file> --newer-manifest <file> [--gate-rows-reviewed <sha256>] [--lifecycle-reviewed]
+//   release-check.mjs check --label <new> --older-manifest <file> --newer-manifest <file> [--gate-rows-reviewed <sha256>] [--lifecycle-reviewed] [--activate <v>]
 //   release-check.mjs status
 //   release-check.mjs receipt --label <label> --out <file>
 //   release-check.mjs maintenance
+//
+// SETTINGS (side-by-side spec §13, S15): the new release has passed the active settings version, or the switch is planned
+// with `--activate <v>` naming a version it passed (`tools/settings-version/cli.ts switch-plan`, the one operator module
+// that reads the pointer, through settings-version.mjs). Before the new release is pinned (the check runs before its pins),
+// the line reads the pointer only (`cli.ts status` from the current release's folder) and says what the switch will need.
+// It reads nothing but the pointer and the verdicts.
 //
 // The two manifests are the candidate API source manifests (root-owned 0644, release-artifacts.mjs source-manifest) of
 // the current release and of the new one. Read-only: the one file this tool writes is the receipt it is asked for.
@@ -41,9 +47,10 @@ import { releaseInfo, releaseInfos, slotsOf } from './release-info.mjs';
 import { gateState, retiredLinesFound } from './release-retire.mjs';
 import { GATE_FILES_SCHEMA, MAINTENANCE_PENDING_NAME, MAX_LABEL_LENGTH, gateFilesDigest, gateFilesPathFor } from './release-switch.mjs';
 import { countOpenWork, psqlArgv, readCurrentRelease, readReleaseEvents, readReleaseState } from './release-table.mjs';
+import { planSettingsForSwitch, readSettingsStatus } from './settings-version.mjs';
 
 /** The checks, in the order the verdict lists them (side-by-side plan D, Task D11). */
-export const CHECK_NAMES = Object.freeze(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
+export const CHECK_NAMES = Object.freeze(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES', 'SETTINGS']);
 /** Two of everything (plan D, connection budget): the server allows 320 connections and at least 120 are free. */
 export const MIN_MAX_CONNECTIONS = 320, MIN_FREE_CONNECTIONS = 120;
 /** At least 15 GB free on `/` and 4 GiB of MemAvailable before a second release starts beside the first. */
@@ -67,6 +74,7 @@ const N1_BASELINE_SCHEMA = 'debateai-n1-baseline-v1';
 const GIT_COMMIT = /^[0-9a-f]{40}$/;
 const MAX_BASELINE_BYTES = 64 * 1024;
 const HASH = /^[a-f0-9]{64}$/;
+const SETTINGS_VERSION = /^[1-9][0-9]{0,15}$/;
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);
 const STOPPED = Object.freeze(['inactive', 'failed']);
 const INVOCATION_ID = /^[0-9a-f]{32}$/;
@@ -164,6 +172,9 @@ function withDefaults(layout, deps) {
     statfs: deps.statfs ?? (path => statfs(path)),
     readMeminfo: deps.readMeminfo ?? (() => readFile('/proc/meminfo', 'utf8')),
     pathExists: deps.pathExists ?? pathExists,
+    // The settings line (S15): the switch's own plan for a pinned new release, else the pointer from the current release.
+    planSettings: deps.planSettings ?? (input => planSettingsForSwitch({ ...input, layout, deps: { run } })),
+    readSettingsStatus: deps.readSettingsStatus ?? (input => readSettingsStatus({ ...input, layout, deps: { run } })),
     portRefuses: deps.portRefuses ?? (port => portRefuses(port)),
     // One source file of a staged release, read as its manifest says it is held (owner, mode, no link).
     readSourceFile: deps.readSourceFile ?? (({ root, path, uid: owner, mode }) => withPrivateBytes(join(root, path),
@@ -315,9 +326,10 @@ async function stepsWithoutN1(added, newerManifest, io) {
  * older step); then every check runs, each one failing on its own with a typed detail, never stopping the others.
  * DRAINED_PATH when N1_HEADERS fails, else NOT_READY when any check fails, else SIDE_BY_SIDE.
  */
-export async function releaseCheck({ label, olderManifest, newerManifest, gateRowsReviewed = null, lifecycleReviewed = false, layout = LAYOUT, deps = {} }) {
+export async function releaseCheck({ label, olderManifest, newerManifest, gateRowsReviewed = null, lifecycleReviewed = false, activate = null, layout = LAYOUT, deps = {} }) {
   requireLabel(label);
   if ((gateRowsReviewed !== null && (typeof gateRowsReviewed !== 'string' || !HASH.test(gateRowsReviewed))) || typeof lifecycleReviewed !== 'boolean') refuse('ARGUMENTS_REFUSED');
+  if (activate !== null && !(Number.isSafeInteger(activate) && SETTINGS_VERSION.test(String(activate)))) refuse('ARGUMENTS_REFUSED');
   if (manifestLabel(newerManifest, 'NEWER_MANIFEST_REFUSED', layout) !== label) refuse('NEWER_MANIFEST_REFUSED');
   if (manifestLabel(olderManifest, 'OLDER_MANIFEST_REFUSED', layout) === label) refuse('OLDER_MANIFEST_REFUSED');
   const io = withDefaults(layout, deps);
@@ -458,6 +470,27 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       const changed = [...new Set([...older.keys(), ...newer.keys()])].filter(path => older.get(path) !== newer.get(path)).sort();
       if (changed.length === 0) return pass('unchanged');
       return lifecycleReviewed ? pass(`changed (reviewed): ${changed.length} files`) : miss(`changed: ${listed(changed)}`);
+    },
+    // Side-by-side spec §13 (S15): the switch's settings step, read-only. The public server has no settings operator
+    // until Phase 3 (plan D11).
+    SETTINGS: async () => {
+      if (layout.releaseSource === 'overlay') return pass('not planned on this server (the settings operator comes with Phase 3)');
+      const { releases, label: older } = await currentLabel();
+      const pinned = own(releases, label);
+      if (pinned) {
+        try {
+          const plan = await io.planSettings({ newKey: pinned.releaseKey, labels: [label, older], activate });
+          if (!plan.planned) return pass('no settings pointer in these releases\' code: each release on its own site version');
+          return pass(`expects ${plan.expectedActiveSettings ?? 'none'}; the switch activates ${plan.activate ?? 'nothing'}`);
+        } catch (error) {
+          if (codeOf(error) !== 'SETTINGS_VERSION_NOT_PASSED') throw error;
+          const passed = (error.fields?.passed ?? []).join(', ') || 'none';
+          return miss(`the new release has not passed the active version (it passed: ${passed}): run settings-version.mjs check ${label} <active version>, or plan the switch with --activate <v>`);
+        }
+      }
+      const status = await io.readSettingsStatus({ label: older });
+      if (status === null || status.pointer === null) return pass('no version activated: the first switch activates the new release\'s own site version');
+      return pass(`active ${status.pointer}: once ${label} is pinned, settings-version.mjs check ${label} ${status.pointer} must PASS, or the switch takes --activate <v>`);
     }
   };
 
@@ -624,7 +657,13 @@ function parseArguments(argv) {
     }
     const lifecycleReviewed = rest[0] === '--lifecycle-reviewed';
     if (lifecycleReviewed) rest.shift();
-    if (rest.length === 0) return { command: a, label: c, older: e, newer: g, gateRowsReviewed, lifecycleReviewed };
+    let activate = null;
+    if (rest[0] === '--activate') {
+      if (!SETTINGS_VERSION.test(rest[1] ?? '')) refuse('ARGUMENTS_REFUSED');
+      activate = Number(rest[1]);
+      rest.splice(0, 2);
+    }
+    if (rest.length === 0) return { command: a, label: c, older: e, newer: g, gateRowsReviewed, lifecycleReviewed, activate };
   }
   return refuse('ARGUMENTS_REFUSED');
 }
@@ -640,7 +679,7 @@ export async function main(argv, { platform = process.platform, uid = process.ge
       const io = withDefaults(layout, deps);
       const read = async path => { try { return await io.readManifest(path); } catch { return refuse('MANIFEST_UNREADABLE'); } };
       const result = await releaseCheck({ label: args.label, olderManifest: await read(args.older), newerManifest: await read(args.newer),
-        gateRowsReviewed: args.gateRowsReviewed, lifecycleReviewed: args.lifecycleReviewed, layout, deps });
+        gateRowsReviewed: args.gateRowsReviewed, lifecycleReviewed: args.lifecycleReviewed, activate: args.activate, layout, deps });
       logLine(stdout, result);
       return result.verdict === 'SIDE_BY_SIDE' ? 0 : 2;
     }

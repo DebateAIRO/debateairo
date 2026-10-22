@@ -232,6 +232,11 @@ function host(releases: Release[], options: Options = {}) {
     if (sql.includes("core.record_release_switch(")) {
       const expected = vars.expected_current === "" ? null : vars.expected_current;
       log.push(`recordReleaseSwitch(${vars.new_key}, expect ${expected}, ${vars.seconds}s)`);
+      // Side-by-side spec §13 (S15): the public server has no settings operator until Phase 3, so every switch passes the
+      // pointer as NULL (0124's hook refuses should one exist) and activates nothing.
+      expect(vars.expected_active).toBe("");
+      expect(sql).toContain("NULLIF(:'expected_active', '')::bigint");
+      expect(sql).not.toContain("activate_settings_version");
       if (currentKey() !== expected) return result("", 3, "ERROR:  RELEASE_SWITCH_CONFLICT\n");
       const old = currentKey();
       push(vars.new_key!, "CURRENT", null, clock + Number(vars.seconds) * 1000);
@@ -522,7 +527,9 @@ describe("release.mjs: the preview's release tools with the public server's layo
       // The N-1 baseline names the preview's live release; the public server pins no commit to compare it with (A2).
       N1_HEADERS: "new: 0002_b.sql", N1_BASELINE: "not compared on this server (the baseline names the preview's live release)", CURRENT_PINNED: "old-v1", PREVIOUS_RETIRED: "all retired", GATES_ACTIVE: "no gates on this server",
       GATE_ROWS_N1: "no gates on this server", CONNECTIONS: "max 320, free 307", DISK: "40.0 GB free", MEMORY: "7812 MiB available",
-      HATCHET: "active", NO_MAINTENANCE: "none", SLOT_FREE: "slot B", LIFECYCLE_FILES: "the release tools run from the operator checkout"
+      HATCHET: "active", NO_MAINTENANCE: "none", SLOT_FREE: "slot B", LIFECYCLE_FILES: "the release tools run from the operator checkout",
+      // Side-by-side spec §13 (S15): this server has no settings operator until Phase 3 (plan D11).
+      SETTINGS: "not planned on this server (the settings operator comes with Phase 3)"
     });
     // A new step without both n1 lines sends the upload the drained way.
     const drained = serverFiles([OLD, { ...NEW, migrations: { "0001_a.sql": `${N1}SELECT 1;\n`, "0002_b.sql": "SELECT 2;\n" } }]);

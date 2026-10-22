@@ -53,6 +53,10 @@ type Options = Partial<{
   runnerDispatched: number;
   lockLabels: string[];
   historyAt: number;
+  // S15: the switch's settings plan (settings-version.mjs planSettingsForSwitch), per new release key; a code refuses.
+  settings: Record<string, { expectedActiveSettings: number | null; activate: number | null; planned?: boolean } | string>;
+  // S15: the database's settings refusal of a switch write (the hook's CAS, or the COMMIT's deferred check).
+  settingsRefusal: string | undefined;
 }>;
 const fail = (code: string) => Object.assign(new Error(code), { code });
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
@@ -69,7 +73,8 @@ const AFTER_SWITCH_UNITS = { [U('runner', 'old-v1')]: 'inactive', [U('api', 'old
 function host(options: Options = {}) {
   const o = { history: DEFAULT_HISTORY, units: {} as Record<string, string>, started: {} as Record<string, Record<string, unknown> | null>, gates: {} as Record<string, string>,
     maintenance: false, eventFails: {} as Record<string, string>, stopRecorder: true, slots: { 'old-v1': 'A', 'new-v1': 'B', 'older-v1': 'A' } as Record<string, string>,
-    openWork: {} as Record<string, number>, startAnnounces: true, runnerDispatched: 0, lockLabels: ['old-v1', 'new-v1'], ...options };
+    openWork: {} as Record<string, number>, startAnnounces: true, runnerDispatched: 0, lockLabels: ['old-v1', 'new-v1'],
+    settings: {} as Record<string, { expectedActiveSettings: number | null; activate: number | null } | string>, settingsRefusal: undefined as string | undefined, ...options };
   let clock = START, invocations = 0, switchCount = 0;
   const log: string[] = [], switchCalls: (string | null)[][] = [], timeouts: [string, number][] = [];
   const events: { key: string; kind: string; reason: string | null; at: number; ttf: number | null }[] = [];
@@ -216,9 +221,14 @@ function host(options: Options = {}) {
       return events.filter(event => event.key === releaseKey).map(event => ({ kind: event.kind, recordedAt: iso(event.at), reason: event.reason }));
     },
     countOpenWork: async ({ releaseKey }: { releaseKey: string }) => { log.push(`read:openWork(${name(releaseKey)})`); return o.openWork[name(releaseKey)] ?? 0; },
-    recordReleaseSwitch: async ({ newKey, expectedCurrentKey, takeTrafficAfterSeconds, recordedBy }: any) => {
-      log.push(`recordReleaseSwitch(${name(newKey)}→, expect ${name(expectedCurrentKey)}, ${takeTrafficAfterSeconds}s)`);
+    recordReleaseSwitch: async ({ newKey, expectedCurrentKey, takeTrafficAfterSeconds, recordedBy, expectedActiveSettings, activation }: any) => {
+      // S15 (ruling R12): every switch write passes the pointer it saw; the log names it only when there is one or an activation.
+      expect(expectedActiveSettings === null || Number.isSafeInteger(expectedActiveSettings)).toBe(true);
+      const settings = expectedActiveSettings === null && activation === null ? ''
+        : `, settings ${expectedActiveSettings ?? 'none'}${activation ? ` → activate ${activation.version} by ${activation.activatedBy} (${activation.reason.replace(newKey, name(newKey))})` : ''}`;
+      log.push(`recordReleaseSwitch(${name(newKey)}→, expect ${name(expectedCurrentKey)}, ${takeTrafficAfterSeconds}s${settings})`);
       expect(recordedBy).toMatch(/^root:(release-switch|rollback)$/);
+      if (switchCount === 0 && o.settingsRefusal) throw fail(o.settingsRefusal);
       switchCalls.push([newKey, expectedCurrentKey]);
       const first = switchCount === 0;
       if (first && o.switchFails === 'CONFLICT') throw fail('RELEASE_SWITCH_CONFLICT');
@@ -246,6 +256,12 @@ function host(options: Options = {}) {
       if (!allowed) throw fail('RELEASE_EVENT_REFUSED');
       push(releaseKey, kind, reason);
       if (failure === 'UNREADABLE_BUT_COMMITTED') throw fail('RELEASE_TABLE_UNREADABLE');
+    },
+    planSettings: async ({ newKey, labels, activate }: { newKey: string; labels: string[]; activate: number | string | null }) => {
+      log.push(`read:settings-plan(${name(newKey)} from ${labels.join(',')}${activate === null ? '' : ` ${activate}`})`);
+      const plan = o.settings[newKey] ?? { expectedActiveSettings: null, activate: null };
+      if (typeof plan === 'string') throw Object.assign(fail(plan), { fields: { passed: ['20'] } });
+      return { planned: true, ...plan };
     },
     readEdgeSecret: async () => { log.push('read:secret'); return SECRET; },
     pathExists: async (path: string) => { log.push(`read:exists(${path})`); return (o.maintenance && path === '/etc/debateai-v3-preview/lifecycle/maintenance-pending') || Object.hasOwn(files, path); },
@@ -305,7 +321,8 @@ describe('the switch (side-by-side spec §6)', () => {
     const switchedAtMs = Date.parse(r.switchedAt);
     expect(r).toEqual({
       event: 'PREVIEW_RELEASE_SWITCHED', to: 'new-v1', from: 'old-v1', toKey: NEW_KEY, fromKey: OLD_KEY, switchedAt: r.switchedAt,
-      edgeConfirmedMs: r.edgeConfirmedMs, edgeFailures: 0, backstopAt: iso(Math.ceil((switchedAtMs + BACKSTOP_S * 1000) / 1000) * 1000), bad: []
+      edgeConfirmedMs: r.edgeConfirmedMs, edgeFailures: 0, backstopAt: iso(Math.ceil((switchedAtMs + BACKSTOP_S * 1000) / 1000) * 1000), bad: [],
+      settings: { expectedActiveSettings: null, activated: null }
     });
     expect(r.edgeConfirmedMs).toBeGreaterThan(0);
     expect(Object.isFrozen(r)).toBe(true);
@@ -573,6 +590,99 @@ describe('the switch (side-by-side spec §6)', () => {
       return original(argv, opts);
     };
     expect((await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps })).bad).toEqual([]);
+  });
+});
+
+describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling R12)', () => {
+  it('a switch whose new release passed the active version passes the pointer it saw and activates nothing', async () => {
+    const h = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: null } } });
+    const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(h.writes()[0]).toBe('recordReleaseSwitch(new→, expect old, 8s, settings 19)');
+    expect(h.log).toContain('read:settings-plan(new from new-v1,old-v1)');
+    // The plan is read-only and comes after the preconditions, before the one write.
+    expect(h.log.indexOf('read:settings-plan(new from new-v1,old-v1)')).toBeLessThan(h.log.indexOf(h.writes()[0]!));
+    expect(r.settings).toEqual({ expectedActiveSettings: 19, activated: null });
+  });
+
+  it('the first switch while nothing was ever activated activates the new release\'s own site version (owner answer Q-S2)', async () => {
+    const h = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(h.writes()[0]).toBe('recordReleaseSwitch(new→, expect old, 8s, settings none → activate 20 by root release-switch (release switch to new))');
+    expect(r.settings).toEqual({ expectedActiveSettings: null, activated: 20 });
+  });
+
+  it('a switch needing an activation refuses before any write, naming what passed; --activate <v> plans it', async () => {
+    const refused = host({ settings: { [NEW_KEY]: 'SETTINGS_VERSION_NOT_PASSED' } });
+    const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: refused.deps }));
+    expect(error).toMatchObject({ code: 'SETTINGS_VERSION_NOT_PASSED', fields: { passed: ['20'], next: 'release-switch.mjs switch --to new-v1 --from old-v1 --activate <a version it passed>' } });
+    expect(refused.writes()).toEqual([]);
+    const planned = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: planned.deps });
+    expect(planned.log).toContain('read:settings-plan(new from new-v1,old-v1 21)');
+    expect(planned.writes()[0]).toBe('recordReleaseSwitch(new→, expect old, 8s, settings 19 → activate 21 by root release-switch (release switch to new))');
+    // --activate with no operator module to plan it (the public server, or releases that predate §13) is refused, never dropped.
+    const unplanned = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: null, planned: false } } });
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: unplanned.deps }))).code).toBe('SETTINGS_OPERATOR_MISSING');
+    expect(unplanned.writes()).toEqual([]);
+    // A database refusal of the settings step (the pointer moved, or the COMMIT's check) passes through untouched.
+    const moved = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: null } }, settingsRefusal: 'SETTINGS_ACTIVATION_CONFLICT' });
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: moved.deps }))).code).toBe('SETTINGS_ACTIVATION_CONFLICT');
+    expect(moved.eventLog().slice(3)).toEqual([]);
+  });
+
+  it('a revert puts back what the switch replaced: the version active before, or the old release\'s own site version', async () => {
+    const first = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: first.deps }));
+    expect(first.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))).toEqual([
+      'recordReleaseSwitch(new→, expect old, 8s, settings none → activate 20 by root release-switch (release switch to new))',
+      'recordReleaseSwitch(old→, expect new, 8s, settings 20 → activate 19 by root release-switch (switch reverted to old))'
+    ]);
+    const later = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 18, activate: 21 } } });
+    await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: later.deps }));
+    expect(later.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 21 → activate 18 by root release-switch (switch reverted to old))');
+    const plain = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: null } } });
+    await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: plain.deps }));
+    expect(plain.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 19)');
+  });
+
+  it('a rollback to a release that predates §13 activates that release\'s own site version (D1), planned before anything is touched', async () => {
+    const h = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: { expectedActiveSettings: 20, activate: 19 } } });
+    await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps });
+    expect(h.log).toContain('read:settings-plan(old from old-v1,new-v1 latest-passed)');
+    expect(h.log.indexOf('read:settings-plan(old from old-v1,new-v1 latest-passed)')).toBeLessThan(h.log.indexOf(h.writes()[0]!));
+    expect(h.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))).toEqual(['recordReleaseSwitch(old→, expect new, 8s, settings 20 → activate 19 by root rollback (rollback to old))']);
+    // A plan that cannot be made leaves everything as it was.
+    const broken = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: 'SETTINGS_PLAN_UNAVAILABLE' } });
+    expect((await refusal(rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: broken.deps }))).code).toBe('SETTINGS_PLAN_UNAVAILABLE');
+    expect(broken.writes()).toEqual([]);
+  });
+
+  it('the seed passes the pointer too (all four switch writes, ruling R12)', async () => {
+    const h = host({ history: [], lockLabels: ['new-v1'], settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    await seedRelease({ label: 'new-v1', layout, deps: h.deps });
+    expect(h.writes()[1]).toBe('recordReleaseSwitch(new→, expect null, 0s, settings none → activate 20 by root release-switch (seed new))');
+  });
+
+  it('--activate <v> is an argument of the plain switch only', async () => {
+    const sink = () => { const lines: string[] = []; return { lines, stream: { write: (text: string) => { lines.push(text); return true; } } }; };
+    const run = async (argv: string[], deps: Record<string, any>) => {
+      const stdout = sink(), stderr = sink();
+      const code = await main(argv, { platform: 'linux', uid: 0, layout, deps, stdout: stdout.stream, stderr: stderr.stream });
+      return { code, stdout: stdout.lines.join(''), stderr: stderr.lines.join('') };
+    };
+    const h = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+    const out = await run(['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21'], h.deps);
+    expect([out.code, JSON.parse(out.stdout).settings]).toEqual([0, { expectedActiveSettings: 19, activated: 21 }]);
+    for (const argv of [['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '021'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate'],
+      ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21'], ['rollback', '--to', 'old-v1', '--from', 'new-v1', '--activate', '21'],
+      ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21', '--old-pair-stopped']]) {
+      const refused = host();
+      const result = await run(argv, refused.deps);
+      expect([result.code, JSON.parse(result.stderr).reason], argv.join(' ')).toEqual([1, 'ARGUMENTS_REFUSED']);
+      expect(refused.log).toEqual([]);
+    }
+    const drained = host({ units: AFTER_SWITCH_UNITS, edgeBefore: caddy(502), settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+    expect((await run(['switch', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped', '--activate', '21'], drained.deps)).code).toBe(0);
   });
 });
 

@@ -121,22 +121,63 @@ export async function readCurrentRelease({ layout = LAYOUT, run = runBounded }) 
   return Object.freeze({ releaseKey: row[0], takeTrafficFrom: row[1] });
 }
 
+/** `activated_by`'s CHECK in migration 0124 (no colon): the switch's activation names its root tool in this form. */
+export const ACTIVATED_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$/;
+const SETTINGS_VERSION = /^[1-9][0-9]{0,15}$/;
+/** The database's refusals of the switch transaction, each kept by name (0123's and 0124's codes). */
+const SWITCH_REFUSALS = Object.freeze({
+  RELEASE_SWITCH_CONFLICT: 'RELEASE_SWITCH_CONFLICT', RELEASE_EVENT_INVALID: 'RELEASE_EVENT_REFUSED',
+  SETTINGS_ACTIVATION_CONFLICT: 'SETTINGS_ACTIVATION_CONFLICT', SETTINGS_VERSION_NOT_PASSED: 'SETTINGS_VERSION_NOT_PASSED',
+  SETTINGS_ACTIVATION_UNCHANGED: 'SETTINGS_ACTIVATION_UNCHANGED', SETTINGS_VERSION_KIND_INVALID: 'SETTINGS_VERSION_KIND_INVALID'
+});
+
+/**
+ * The switch transaction's fixed text (side-by-side spec §13 and §11, ruling R12): one psql call, ON_ERROR_STOP=1, every
+ * value a `-v` variable. `core.record_release_switch` gets the pointer the operator saw as `p_expected_active_settings`
+ * (NULL = never activated; 0124's hook refuses any other value); with `activation`, the same transaction then activates
+ * that version for the new release (`register.activate_settings_version`), so 0124's deferred check (the current release
+ * has passed the active version) holds at COMMIT. Prints the switch's event_seq, then the activation_seq.
+ */
+export function releaseSwitchSql({ activation }) {
+  return [
+    'BEGIN ISOLATION LEVEL READ COMMITTED;',
+    "SELECT core.record_release_switch(:'new_key', NULLIF(:'expected_current', ''), clock_timestamp() + make_interval(secs => :'seconds'), :'recorded_by', NULLIF(:'expected_active', '')::bigint);",
+    ...(activation ? ["SELECT register.activate_settings_version(:'activate'::bigint, NULLIF(:'expected_active', '')::bigint, :'new_key', :'activated_by', :'activation_reason');"] : []),
+    'COMMIT;',
+    ''
+  ].join('\n');
+}
+
 /**
  * Make `newKey` CURRENT and the present current DRAINING in one database transaction.
  * The take-traffic time is the database's own clock plus `takeTrafficAfterSeconds`, never this
  * host's clock. `expectedCurrentKey` null means "no current release yet". The database refuses
  * RELEASE_SWITCH_CONFLICT when the current release is not the expected one.
+ * Side-by-side spec §13 (S15): `expectedActiveSettings` is required — the settings pointer the switch saw (null = never
+ * activated; tools/settings-version/cli.ts switch-plan reads it) — and `activation`, null or { version, activatedBy,
+ * reason }, activates that version in the same transaction (releaseSwitchSql). The database's settings refusals keep
+ * their names: SETTINGS_ACTIVATION_CONFLICT (the pointer moved), SETTINGS_VERSION_NOT_PASSED (at COMMIT: the new release
+ * has not passed the active version), SETTINGS_ACTIVATION_UNCHANGED, SETTINGS_VERSION_KIND_INVALID.
  */
-export async function recordReleaseSwitch({ newKey, expectedCurrentKey, takeTrafficAfterSeconds, recordedBy, layout = LAYOUT, run = runBounded }) {
+export async function recordReleaseSwitch({ newKey, expectedCurrentKey, takeTrafficAfterSeconds, recordedBy, expectedActiveSettings, activation = null, layout = LAYOUT, run = runBounded }) {
   requireKey(newKey);
   if (expectedCurrentKey !== null) requireKey(expectedCurrentKey);
   requireRecordedBy(recordedBy);
   if (!Number.isInteger(takeTrafficAfterSeconds) || takeTrafficAfterSeconds < 0 || takeTrafficAfterSeconds > 60) refuse('RELEASE_EVENT_REFUSED');
-  eventSeq(await query({
-    sql: "SELECT core.record_release_switch(:'new_key', NULLIF(:'expected_current', ''), clock_timestamp() + make_interval(secs => :'seconds'), :'recorded_by');\n",
-    variables: [['new_key', newKey], ['expected_current', expectedCurrentKey ?? ''], ['seconds', String(takeTrafficAfterSeconds)], ['recorded_by', recordedBy]],
-    layout, run, refusals: { RELEASE_SWITCH_CONFLICT: 'RELEASE_SWITCH_CONFLICT', RELEASE_EVENT_INVALID: 'RELEASE_EVENT_REFUSED' }
-  }));
+  if (expectedActiveSettings !== null && !(Number.isSafeInteger(expectedActiveSettings) && SETTINGS_VERSION.test(String(expectedActiveSettings)))) refuse('RELEASE_EVENT_REFUSED');
+  if (activation !== null && (typeof activation !== 'object' || !Number.isSafeInteger(activation.version) || !SETTINGS_VERSION.test(String(activation.version))
+    || typeof activation.activatedBy !== 'string' || !ACTIVATED_BY.test(activation.activatedBy)
+    || typeof activation.reason !== 'string' || !/^[ -~]{1,512}$/.test(activation.reason))) refuse('RELEASE_EVENT_REFUSED');
+  const rows = await query({
+    sql: releaseSwitchSql({ activation: activation !== null }),
+    variables: [['new_key', newKey], ['expected_current', expectedCurrentKey ?? ''], ['seconds', String(takeTrafficAfterSeconds)], ['recorded_by', recordedBy],
+      ['expected_active', expectedActiveSettings === null ? '' : String(expectedActiveSettings)],
+      ...(activation !== null ? [['activate', String(activation.version)], ['activated_by', activation.activatedBy], ['activation_reason', activation.reason]] : [])],
+    layout, run, refusals: SWITCH_REFUSALS
+  });
+  // One row per SELECT: the switch's event_seq, then (with an activation) the activation_seq.
+  if (rows.length !== (activation !== null ? 2 : 1)) refuse('RELEASE_TABLE_UNREADABLE');
+  rows.forEach(row => eventSeq([row]));
 }
 
 /** One plain event (STAGED, DRAINING, FRONT_PAIR_STOPPED, RETIRE_REQUESTED, RETIRED); `reason` is null or an upper-case code. */
