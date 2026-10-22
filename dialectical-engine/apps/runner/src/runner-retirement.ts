@@ -30,7 +30,7 @@ export interface TaskExecutionCounter {
    * forgets it (calling it more than once forgets once). Two copies of one item are named twice.
    */
   workingOn(workItemId: string): () => void;
-  /** True while a task of this process runs `workItemId`: the five-minute re-send never hands it back to this process. */
+  /** True while a task of this process runs `workItemId`: the five-minute re-send never hands it back here. */
   isWorkingOn(workItemId: string): boolean;
 }
 
@@ -93,7 +93,7 @@ export function createModelCallCounter(): ModelCallCounter {
   });
 }
 
-/** R1: `gateway`, with each of its calls counted in `calls` from the ask until the call settles (main.ts wraps them all). */
+/** R1: `gateway`, each of its calls counted in `calls` from the ask until it settles (main.ts wraps them all). */
 export function countModelCalls(gateway: ProviderGateway, calls: Pick<ModelCallCounter, "enter">): ProviderGateway {
   return Object.freeze({
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
@@ -155,8 +155,9 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *      (BACKSTOP_SET_ASIDE_FAILED, then BACKSTOP_SET_ASIDE with the count);
  *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP" — unless a model
  *      call of this process is still in flight (R1, the model-call counter, never the task counter): then it says
- *      RUNNER_BACKSTOP_CALL_IN_FLIGHT, does not retire, and leaves the end to root's forced stop. So when it does retire
- *      after BACKSTOP_SETTLE_EXPIRED, what still runs is a task's non-call wait, which the launcher's 30 s bound may cut.
+ *      RUNNER_BACKSTOP_CALL_IN_FLIGHT, does not retire, and leaves the end to root's forced stop. So when it does
+ *      retire after BACKSTOP_SETTLE_EXPIRED, what still runs is a task's non-call wait, which the launcher's 30 s
+ *      bound may cut.
  * A pass that throws is logged (BACKSTOP_FAILED) and runs again at the next read; every step is safe to repeat.
  * `stop()` ends a backstop between steps: the process is ending on its own signal.
  *
