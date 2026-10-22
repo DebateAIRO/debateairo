@@ -95,7 +95,9 @@ export async function runSynthesisCheck(deps: SynthesisCheckDeps, input: Synthes
     try { reply = await withinDeadline(port, framed.packet, signal); }
     catch (error) {
       const code = error instanceof SynthesisCheckFailure ? error.code : signal.aborted ? "DEADLINE" : "UNEXPECTED";
-      if (code === "DEADLINE") await recordCallSpend(estimatedInputTokens, SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS);
+      if (code === "DEADLINE" || code === "ANSWER_NOT_JSON" || code === "TRANSPORT_FAILED") {
+        await recordCallSpend(estimatedInputTokens, SYNTHESIS_CHECK_RECORDED_OUTPUT_TOKENS);
+      }
       return unavailable(code);
     }
 

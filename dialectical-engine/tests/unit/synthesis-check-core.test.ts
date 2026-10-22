@@ -90,12 +90,18 @@ describe("synthesis check core", () => {
     controller.abort();
     expect(synthesisCheckFailureCode(new Error("aborted"), controller.signal)).toBe("DEADLINE");
     let fetchCalls = 0;
+    let requestedBody = "";
     const port = createSynthesisCheckTransport(target, {
       readAuthorizationHeader: () => "Bearer fake", deadlineMs: 1500,
-      fetchImplementation: async () => { fetchCalls++; return new Response("failure", { status: 503 }); }
+      fetchImplementation: async (_url, init) => {
+        fetchCalls++;
+        requestedBody = String(init?.body ?? "");
+        return new Response("failure", { status: 503 });
+      }
     });
     const result = await port.complete({ packet, signal }).catch(error => error);
     expect(fetchCalls).toBe(1);
+    expect(JSON.parse(requestedBody)).toMatchObject({ model: "claude-haiku-5-5" });
     expect(result).toMatchObject({ code: "HTTP_STATUS" });
   });
 
@@ -203,6 +209,21 @@ describe("synthesis check core", () => {
     expect(f.records[0]).toMatchObject({ spendSource: "SYNTHESIS_CHECK", runId: "run-1",
       providerRef: "anthropic", outputTokens: 192 });
     expect(Number(f.records[0]?.inputTokens)).toBeGreaterThan(0);
+  });
+
+  it("records estimated spend for billed malformed replies but not an HTTP rejection", async () => {
+    // Property: a sent, billable call consumes the site pot even when its reply cannot be used.
+    const { runSynthesisCheck } = await import("../../apps/api/src/synthesis-check/check.js");
+    const { SynthesisCheckFailure } = await import("../../apps/api/src/synthesis-check/transport.js");
+    for (const [code, expectedRows] of [
+      ["ANSWER_NOT_JSON", 1], ["TRANSPORT_FAILED", 1], ["HTTP_STATUS", 0]
+    ] as const) {
+      const f = checkFixture({ complete: async () => { throw new SynthesisCheckFailure(code); } });
+      const result = await runSynthesisCheck(f.deps, f.input);
+      expect(result.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: code });
+      expect(f.calls()).toBe(1);
+      expect(f.records, code).toHaveLength(expectedRows);
+    }
   });
 
   it("a day pot at or over its ceiling records UNAVAILABLE MONEY_REFUSED with no model call", async () => {

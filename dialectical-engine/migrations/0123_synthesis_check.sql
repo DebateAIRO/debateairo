@@ -161,6 +161,15 @@ BEGIN
   ) THEN
     RAISE EXCEPTION USING ERRCODE='23503', MESSAGE='SYNTHESIS_CHECK_ATTEMPT_MISMATCH';
   END IF;
+  IF p_final AND EXISTS (
+    SELECT 1 FROM serve.answer AS current_answer
+    JOIN serve.answer AS earlier_answer ON earlier_answer.answer_id=current_answer.answer_id
+    WHERE current_answer.answer_id=p_answer_id AND current_answer.answer_version=p_answer_version
+      AND earlier_answer.answer_version<p_synthesis_origin_version
+      AND earlier_answer.composed_text_id IS NOT DISTINCT FROM current_answer.composed_text_id
+  ) THEN
+    RETURN false;
+  END IF;
   INSERT INTO serve.synthesis_check_result(
     result_id,attempt_id,run_id,answer_id,answer_version,synthesis_origin_version,
     final,failure_code,policy_version,content,content_ciphertext,content_attestation

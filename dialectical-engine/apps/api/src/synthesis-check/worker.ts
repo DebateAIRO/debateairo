@@ -95,11 +95,33 @@ export class SynthesisCheckWorker {
         byAnswer.set(claim.answerId, group);
       }
       const removals = await Promise.all([...byAnswer.values()].map(async (group) => {
-        let removed = false;
-        for (const claim of group.sort((a, b) => a.answerVersion - b.answerVersion)) {
-          removed = await processClaim(claim) || removed;
+        const ordered = group.sort((a, b) => a.answerVersion - b.answerVersion);
+        let texts: Map<number, string | null> | null = null;
+        try {
+          const ownerRef = await this.deps.repository.ownerRefOfRun(ordered[0]!.runId);
+          if (ownerRef !== null) texts = await this.deps.withContentLease(ordered[0]!.runId, async () => {
+            const versions = new Map<number, string | null>();
+            for (let version = 1; version <= ordered[ordered.length - 1]!.answerVersion; version++) {
+              const answer = await this.deps.readAnswer(ordered[0]!.runId, ordered[0]!.answerId, version, ownerRef);
+              if (answer === null) return null;
+              versions.set(version, synthesisTextOf(answer));
+            }
+            return versions;
+          });
+        } catch { /* processClaim reports the unavailable content for each claim */ }
+        const byOrigin = new Map<number, typeof claims>();
+        for (const claim of ordered) {
+          const origin = texts === null ? 0 : originVersionOf(texts, claim.answerVersion);
+          const chain = byOrigin.get(origin) ?? [];
+          chain.push(claim);
+          byOrigin.set(origin, chain);
         }
-        return removed;
+        const outcomes = await Promise.all([...byOrigin.values()].map(async (chain) => {
+          let removed = false;
+          for (const claim of chain) removed = await processClaim(claim) || removed;
+          return removed;
+        }));
+        return outcomes.some(Boolean);
       }));
       if (removals.some(Boolean)) {
         try { await this.deps.erasure.reconcile(100); }

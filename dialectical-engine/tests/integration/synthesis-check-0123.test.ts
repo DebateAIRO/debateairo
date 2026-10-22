@@ -76,6 +76,48 @@ beforeAll(async () => {
 afterAll(async () => { await database?.stop(); });
 
 describe("0123 synthesis check records and runtime boundaries", () => {
+  it("the result writer refuses an attempt whose answer version differs from its parameters", async () => {
+    const run = await seedRun();
+    await secondVersion(run);
+    const first = await insertAttempt(run, 1);
+    await expect(withRuntime((client) => client.query(`SELECT serve.store_synthesis_check_result(
+      $1,$2,$3,$4,2,1,true,NULL,$5,'{"verdict":"CLEAR","categories":[]}'::jsonb,NULL,NULL,false)`,
+      [randomUUID(),first.attemptId,run.runId,run.answerId,policy]))).rejects.toMatchObject({
+        code: "23503", message: "SYNTHESIS_CHECK_ATTEMPT_MISMATCH"
+      });
+  });
+
+  it("the inheritance writer refuses an attempt whose answer version differs from its parameters", async () => {
+    const run = await seedRun();
+    await secondVersion(run);
+    const first = await insertAttempt(run, 1);
+    const finalId = await insertResult(run, first.attemptId);
+    await expect(withRuntime((client) => client.query(`SELECT serve.record_synthesis_check_inheritance(
+      $1,$2,$3,2,$4)`, [first.attemptId,run.runId,run.answerId,finalId]))).rejects.toMatchObject({
+        code: "23503", message: "SYNTHESIS_CHECK_ATTEMPT_MISMATCH"
+      });
+  });
+
+  it("an attempt cannot inherit its own result", async () => {
+    const run = await seedRun();
+    const attempt = await insertAttempt(run);
+    const resultId = await insertResult(run, attempt.attemptId);
+    await expect(query(`INSERT INTO serve.synthesis_check_inheritance
+      (attempt_id,run_id,answer_id,answer_version,inherited_result_id) VALUES($1,$2,$3,1,$4)`,
+      [attempt.attemptId,run.runId,run.answerId,resultId])).rejects.toMatchObject({
+        code: "23514", message: "SYNTHESIS_CHECK_INHERITANCE_INVALID"
+      });
+  });
+
+  it("runtime cannot insert a removal request", async () => {
+    const run = await seedRun();
+    const attempt = await insertAttempt(run);
+    const resultId = await insertResult(run, attempt.attemptId);
+    await expect(withRuntime((client) => client.query(`INSERT INTO serve.synthesis_check_removal_request
+      (request_id,result_id,run_id) VALUES($1,$2,$3)`,
+      [randomUUID(),resultId,run.runId]))).rejects.toMatchObject({ code: "42501" });
+  });
+
   it("the runtime role inserts and selects a request, an attempt and a sealed result", async () => {
     const run = await seedRun();
     await withRuntime(async (client) => {

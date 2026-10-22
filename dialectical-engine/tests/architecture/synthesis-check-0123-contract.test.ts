@@ -125,6 +125,13 @@ describe("0123 synthesis check database contract", () => {
     }
   });
 
+  it("forward 0123 records both restricted writers in its pinned function postcondition", async () => {
+    const forward = await readFile(new URL("../../packages/db/src/migration-forward0123.ts", import.meta.url), "utf8");
+    for (const signature of writerFunctions) {
+      expect(forward).toContain(`"${signature}"`);
+    }
+  });
+
   it("ERASURE_FUNCTION_SIGNATURES lists the three erasure functions 0123 creates", async () => {
     const db = await readFile(new URL("../../packages/db/src/account-erasure.ts", import.meta.url), "utf8");
     const signatures = db.slice(db.indexOf("const ERASURE_FUNCTION_SIGNATURES"), db.indexOf("] as const", db.indexOf("const ERASURE_FUNCTION_SIGNATURES")));
