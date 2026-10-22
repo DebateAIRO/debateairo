@@ -3951,18 +3951,23 @@ write may have landed but the command did not get to its end (a lost ssh session
 `TARGET` means a step after the write failed. If the release table names the new release current, `switch --finish`
 runs the steps after the write again (each one repeats safely: edge, the old pair's stop and its record, the backstop,
 the boot target, the checks); it never writes the switch itself. If the table still names the old release current, the
-write did not land: read the refusal and run SB13 again.
+write did not land: read the refusal and run SB13 again. After DR6's drained switch, run WB4 with `bash -s -- drained`:
+it passes `--old-pair-stopped` to `switch --finish` (the old runner was stopped on purpose there too, as the refusal's
+`next` says).
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
-# WB4: finish a switch whose database write landed. Never writes the switch itself.
+# WB4: finish a switch whose database write landed. Never writes the switch itself. After DR6: bash -s -- drained.
+DRAINED=${1:-}
+[ -z "$DRAINED" ] || [ "$DRAINED" = drained ] || { echo "WB4_NOT_DONE: the one argument is drained (after DR6's switch), or none"; exit 1; }
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB4_NOT_DONE: release-check.mjs status refused"; exit 1; }
-[ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB4_NOT_DONE: the release table does not name $LABEL current: the write did not land (run SB13 again after reading its refusal)"; exit 1; }
-RC=0; FN=$(lc release-switch.mjs switch --finish --to "$LABEL" --from "$OLABEL" 2>&1) || RC=$?
+[ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB4_NOT_DONE: the release table does not name $LABEL current: the write did not land (run SB13, or DR6's switch, again after reading its refusal)"; exit 1; }
+RC=0; FN=$(lc release-switch.mjs switch --finish --to "$LABEL" --from "$OLABEL" ${DRAINED:+--old-pair-stopped} 2>&1) || RC=$?
 echo "$FN"
 [ "$RC" = 0 ] || { echo "WB4_NOT_DONE: the finish did not end cleanly (FINISH_EDGE_UNCONFIRMED: nothing was stopped; bad: read it): ask"; exit 1; }
 [ "$(jq -r '[.event, .toKey, (.bad | length)] | map(tostring) | join(" ")' <<<"$FN")" = "PREVIEW_RELEASE_SWITCH_FINISHED $KEY 0" ] && [ "$(edgekey)" = "200 $KEY" ] || { echo "WB4_NOT_DONE: the switch is not finished on $KEY"; exit 1; }
+[ -z "$DRAINED" ] || echo "drained switch finished: now run DR6's lines from release-retire.mjs mark-retired on"
 echo WB4_DONE
 ```
 
@@ -4172,8 +4177,8 @@ SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pai
 echo "$SW"
 case "$SC" in
   0) ;;
-  2) echo "DR6_NOT_DONE: the switch is done, but a check after it failed: bad $(jq -c .bad <<<"$SW" 2>/dev/null || echo '(unread)') (BACKSTOP or TARGET: WB4; anything else: ask)"; exit 1;;
-  *) echo "DR6_NOT_DONE: the switch refused (reason above; WB4 after SWITCH_OUTCOME_UNKNOWN; otherwise the way back is rbD-B)"; exit 1;;
+  2) echo "DR6_NOT_DONE: the switch is done, but a check after it failed: bad $(jq -c .bad <<<"$SW" 2>/dev/null || echo '(unread)') (BACKSTOP or TARGET: WB4 with bash -s -- drained; anything else: ask)"; exit 1;;
+  *) echo "DR6_NOT_DONE: the switch refused (reason above; after SWITCH_OUTCOME_UNKNOWN: WB4 with bash -s -- drained; otherwise the way back is rbD-B)"; exit 1;;
 esac
 [ "$(jq -r '[.event, .toKey, .fromKey, (.bad | length)] | map(tostring) | join(" ")' <<<"$SW")" = "PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0" ] || { echo "DR6_NOT_DONE: the switch line is not this switch with nothing in bad"; exit 1; }
 MR=$(lc release-retire.mjs mark-retired --label "$OLABEL" 2>&1) || { echo "$MR"; echo "DR6_NOT_DONE: the old release could not be marked retired (reason above): ask"; exit 1; }
@@ -4187,9 +4192,10 @@ echo DR6_DONE
 Then SB13b (the team member's test debate) and, later, SB15 as usual. The old release has no retirement receipt (it
 never retired by itself); its `RETIRED` row says `DRAINED`.
 
-The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN`, WB4's
-`switch --finish` does not know that, so its `bad` names `RUNNER_FROM` here: with nothing else in `bad`, that one is
-expected; run DR6's lines from `release-retire.mjs mark-retired` on by hand.
+The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN` (its
+`next` names `switch --finish … --old-pair-stopped`), or `BACKSTOP`/`TARGET` in `bad`, run WB4 with `bash -s -- drained`:
+its finish passes the same flag, so the stopped old runner is expected there too. Then run DR6's lines from
+`release-retire.mjs mark-retired` on by hand.
 
 **rbD-A: before DR4** (no migration ran). The old release is still CURRENT and untouched: start it again.
 

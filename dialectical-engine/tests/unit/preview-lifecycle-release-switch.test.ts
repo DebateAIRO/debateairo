@@ -41,7 +41,8 @@ type Options = Partial<{
   edgeAfter: Answer[][];
   gates: Record<string, string>;
   maintenance: boolean;
-  switchFails: 'CONFLICT' | 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'UNREADABLE_REREAD_FAILS';
+  // `undefined` through configure(): the table is readable again after a lost write.
+  switchFails: 'CONFLICT' | 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'UNREADABLE_REREAD_FAILS' | undefined;
   eventFails: Record<string, 'UNREADABLE' | 'UNREADABLE_BUT_COMMITTED' | 'REFUSED'>;
   stopRecorder: boolean;
   slots: Record<string, string>;
@@ -876,6 +877,25 @@ describe('release-switch.mjs (root CLI)', () => {
     expect(h.log.filter(entry => entry.startsWith('systemctl disable'))).toEqual(['systemctl disable --now debateai-preview-runner-retire@old-v1.timer', 'systemctl disable --now debateai-preview-runner-retire-check@old-v1.timer']);
   });
 
+  it('the drained path after SWITCH_OUTCOME_UNKNOWN: switch --finish --old-pair-stopped expects the old runner stopped, exit 0, and mark-retired then runs', async () => {
+    const h = host({ units: AFTER_SWITCH_UNITS, edgeBefore: caddy(502), switchFails: 'UNREADABLE_REREAD_FAILS' });
+    const lost = await cli(['switch', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped'], h.deps);
+    expect([lost.code, JSON.parse(lost.stderr).reason]).toEqual([1, 'SWITCH_OUTCOME_UNKNOWN']);
+    expect(JSON.parse(lost.stderr).fields.next).toBe(`if the release table names ${NEW_KEY} current: release-switch.mjs switch --finish --to new-v1 --from old-v1 --old-pair-stopped`);
+    // The write landed (new CURRENT, old DRAINING) and the table is readable again.
+    h.configure({ switchFails: undefined });
+    expect(h.eventLog().slice(-2)).toEqual(['new CURRENT', 'old DRAINING']);
+    // Without the flag the finish cannot know the old runner was stopped on purpose.
+    const plain = await cli(['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1'], h.deps);
+    expect([plain.code, JSON.parse(plain.stdout).bad]).toEqual([2, ['RUNNER_FROM']]);
+    const out = await cli(['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped'], h.deps);
+    expect([out.code, out.stderr]).toEqual([0, '']);
+    expect(JSON.parse(out.stdout)).toMatchObject({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', toKey: NEW_KEY, fromKey: OLD_KEY, edgeFailures: 0, bad: [] });
+    const code = await retire.main(['mark-retired', '--label', 'old-v1'], { platform: 'linux', uid: 0, layout, deps: h.deps, stdout: { write: () => true }, stderr: { write: () => true } });
+    expect(code).toBe(0);
+    expect(h.eventLog().slice(-1)).toEqual(['old RETIRED DRAINED']);
+  });
+
   it('on any other path an old runner that is not running and not retired is still a bad check', async () => {
     const h = host({ units: { [U('runner', 'old-v1')]: 'inactive' } });
     const out = await cli(['switch', '--to', 'new-v1', '--from', 'old-v1'], h.deps);
@@ -939,7 +959,8 @@ describe('release-switch.mjs (root CLI)', () => {
     for (const argv of [[], ['switch'], ['switch', '--to', 'new-v1'], ['switch', '--from', 'old-v1', '--to', 'new-v1'], ['switch', '--to', 'New', '--from', 'old-v1'],
       ['switch', '--to', 'new-v1', '--from', 'old-v1', '--force'], ['stage', '--label', '../x'], ['stage', '--label', 'a-'], ['seed'], ['rollback', '--to', 'old-v1'],
       ['rollback', '--before-switch', '--to', 'new-v1'], ['rollback', '--label', 'new-v1', '--before-switch'], ['retire', '--label', 'new-v1'],
-      ['switch', '--finish', '--to', 'new-v1'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--finish'], ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped']]) {
+      ['switch', '--finish', '--to', 'new-v1'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--finish'], ['switch', '--finish', '--old-pair-stopped', '--to', 'new-v1', '--from', 'old-v1'],
+      ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped', '--old-pair-stopped'], ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--force']]) {
       const out = await cli(argv, h.deps);
       expect([argv, out.code, JSON.parse(out.stderr).reason]).toEqual([argv, 1, 'ARGUMENTS_REFUSED']);
     }

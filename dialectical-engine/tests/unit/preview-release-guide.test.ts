@@ -408,6 +408,9 @@ describe('the guide\'s commands are the tools\' real command lines (D1-D13)', ()
     expect(sw).toBeGreaterThan(-1);
     expect(sw).toBeLessThan(bad);
     expect(bad).toBeLessThan(retired);
+    // After SWITCH_OUTCOME_UNKNOWN the finish carries the same flag (WB4 with `drained`).
+    expect(dr6.join('\n')).toContain('after SWITCH_OUTCOME_UNKNOWN: WB4 with bash -s -- drained');
+    expect(scriptOf('WB4').lines.join('\n')).toContain('lc release-switch.mjs switch --finish --to "$LABEL" --from "$OLABEL" ${DRAINED:+--old-pair-stopped}');
     const rbd = scriptOf('RBD_B').lines;
     const timers = rbd.findIndex(line => line.includes('"debateai-preview-runner-retire@$OLABEL.timer" "debateai-preview-runner-retire-check@$OLABEL.timer"') && line.includes('systemctl disable --now "$TM"'));
     const target = rbd.findIndex(line => line.includes('tar -C "$TGC" -xzf "$S/systemd-before.tgz" debateai-preview.target.d/60-current-release.conf'));
