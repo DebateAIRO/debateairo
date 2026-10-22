@@ -368,7 +368,7 @@ describe("0123: the side-by-side releases step", () => {
     // Owner and grants re-asserted as 0040 left them: EXECUTE for the erasure runtime alone.
     for (const signature of ["core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)", "core.resume_private_run_erasure(uuid,uuid,uuid,uuid,text)",
       "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)"]) {
-      expect(section).toMatch(new RegExp(`REVOKE ALL ON FUNCTION ${signature.replace(/[().]/gu, "\\$&")}\\s+FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,\\s+debateai_publication_cleanup,debateai_content_provision;`, "u"));
+      expect(section).toMatch(new RegExp(`REVOKE ALL ON FUNCTION ${signature.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}\\s+FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,\\s+debateai_publication_cleanup,debateai_content_provision;`, "u"));
       expect(section).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_erasure_runtime;`);
       expect(section).not.toContain(`ALTER FUNCTION ${signature} OWNER`);
     }
