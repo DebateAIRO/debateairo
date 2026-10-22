@@ -56,7 +56,7 @@ describe("settingsRefusalCode / isDatabaseFailure: a settings refusal, never the
 
   it("is written once: neither settings cache keeps a copy of its own", async () => {
     for (const file of ["apps/runner/src/run-settings.ts", "apps/api/src/admission-settings.ts"]) {
-      const source = await readFile(file, "utf8");
+      const source = await readFile(new URL(`../../${file}`, import.meta.url), "utf8");
       expect(source, file).not.toMatch(/function (?:isDatabaseFailure|settingsRefusalCode)\(/u);
       expect(source, file).not.toContain("const REFUSAL_CODE");
       expect(source, file).toMatch(/import \{[^}]*\bsettingsRefusalCode\b[^}]*\} from "@debateai\/db";/u);

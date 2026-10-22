@@ -20,18 +20,20 @@ import {
 const SITE_VERSION = 17;
 const SQL = "SELECT register.read_active_settings_version() AS version";
 
-/** A fake pool whose answers are queued; each call records its SQL. */
+/** A fake pool whose answers are queued; each call records its SQL and the per-query client timeout it was sent with. */
 function fakePool(...answers: ReadonlyArray<unknown | (() => Promise<unknown>)>) {
   const queue = [...answers];
   const sql: string[] = [];
-  const query = vi.fn(async (text: string) => {
-    sql.push(text);
+  const timeouts: unknown[] = [];
+  const query = vi.fn(async (config: string | Readonly<{ text: string; query_timeout?: number }>) => {
+    sql.push(typeof config === "string" ? config : config.text);
+    timeouts.push(typeof config === "string" ? undefined : config.query_timeout);
     const next = queue.shift();
     if (typeof next === "function") return { rows: [{ version: await (next as () => Promise<unknown>)() }] };
     if (next instanceof Error) throw next;
     return { rows: [{ version: next }] };
   });
-  return { pool: { query } as never, query, sql };
+  return { pool: { query } as never, query, sql, timeouts };
 }
 
 function clock(start = 1000) {
@@ -83,9 +85,12 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
   });
 
   it("sends exactly the reader's call, and the module writes that SQL once, as one constant", async () => {
-    const { pool, sql } = fakePool(null);
+    const { pool, sql, timeouts } = fakePool(null);
     await createActiveSettingsVersionReader({ pool, siteVersion: SITE_VERSION, clock: clock().read }).current();
     expect(sql).toEqual([SQL]);
+    // The driver's own per-query timeout: pg ends the query and the pool destroys its connection, so a dead peer
+    // never holds a connection (or the one-query gate below) for ever.
+    expect(timeouts).toEqual([ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs]);
     const source = await readFile(new URL("../../apps/api/src/active-settings-version.ts", import.meta.url), "utf8");
     expect(source.split(SQL)).toHaveLength(2);
     expect(source).toContain(`const ACTIVE_SETTINGS_VERSION_SQL = "${SQL}";`);
@@ -160,8 +165,9 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
     expect(await late).toBe(18);
     expect(query).toHaveBeenCalledTimes(2);
-    // The database still has not answered: every later refresh keeps the last good value and sends nothing.
-    for (let second = 0; second < 5; second += 1) {
+    // The database still has not answered: every later refresh (within the query timeout) keeps the last good value and
+    // sends nothing.
+    for (let second = 0; second < 3; second += 1) {
       time.advance(1000);
       expect(await reader.current()).toBe(18);
     }
@@ -173,6 +179,37 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     time.advance(1000);
     expect(await reader.current()).toBe(20);
     expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("an abandoned read that never settles holds the gate only until the query timeout: then one replacement query goes out", async () => {
+    vi.useFakeTimers();
+    const time = clock();
+    const never = () => new Promise<unknown>(() => undefined);
+    const { pool, query } = fakePool(18, never, never, 21);
+    const reader = createActiveSettingsVersionReader({ pool, siteVersion: SITE_VERSION, clock: time.read });
+    expect(await reader.current()).toBe(18);
+    time.advance(1000);
+    const late = reader.current();
+    await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
+    expect(await late).toBe(18);
+    expect(query).toHaveBeenCalledTimes(2);
+    // Within the query timeout of the abandoned read: nothing is sent.
+    time.advance(ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs - 2000);
+    expect(await reader.current()).toBe(18);
+    expect(query).toHaveBeenCalledTimes(2);
+    // Past it: the gate opens and ONE replacement query goes out (it hangs too, and holds the gate in its turn).
+    time.advance(2000);
+    const replacement = reader.current();
+    await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
+    expect(await replacement).toBe(18);
+    expect(query).toHaveBeenCalledTimes(3);
+    time.advance(1000);
+    expect(await reader.current()).toBe(18);
+    expect(query).toHaveBeenCalledTimes(3);
+    // And after its own query timeout, another: the database answers this time.
+    time.advance(ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs);
+    expect(await reader.current()).toBe(21);
+    expect(query).toHaveBeenCalledTimes(4);
   });
 
   it("its two refusal codes are in both KNOWN_DOMAIN_CODES lists, sorted (so the error sweeps see them)", async () => {
@@ -196,8 +233,8 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     expect(query).toHaveBeenCalledTimes(2);
   });
 
-  it("the bounds are one second each", () => {
-    expect(ACTIVE_SETTINGS_VERSION_CACHE).toEqual({ maxAgeMs: 1000, refreshDeadlineMs: 1000 });
+  it("the bounds: one second each to serve and to wait, five seconds for the driver to end a query", () => {
+    expect(ACTIVE_SETTINGS_VERSION_CACHE).toEqual({ maxAgeMs: 1000, refreshDeadlineMs: 1000, queryTimeoutMs: 5000 });
     expect(Object.isFrozen(ACTIVE_SETTINGS_VERSION_CACHE)).toBe(true);
   });
 });

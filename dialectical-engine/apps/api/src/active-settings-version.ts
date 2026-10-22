@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, QueryConfig } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 
 /**
@@ -16,11 +16,25 @@ import { TypedDomainError } from "@debateai/kernel";
  * one with the same constant; S16 pins "exactly once").
  */
 
-/** The cache's two bounds, in milliseconds: a value at most this old is served without a read; a read gets this long. */
-export const ACTIVE_SETTINGS_VERSION_CACHE = Object.freeze({ maxAgeMs: 1000, refreshDeadlineMs: 1000 });
+/**
+ * The reader's bounds, in milliseconds: a value at most `maxAgeMs` old is served without a read; a caller waits at most
+ * `refreshDeadlineMs` for a read; the driver ends a query after `queryTimeoutMs` (pg's per-query `query_timeout`: the
+ * pool then destroys that connection), and a read abandoned at its deadline holds the one-query gate no longer than that.
+ */
+export const ACTIVE_SETTINGS_VERSION_CACHE = Object.freeze({
+  maxAgeMs: 1000, refreshDeadlineMs: 1000, queryTimeoutMs: 5000
+});
 
 /** The pointer's one read (migration 0124; granted to debateai_billing_runtime and the release operator only). */
 const ACTIVE_SETTINGS_VERSION_SQL = "SELECT register.read_active_settings_version() AS version";
+/**
+ * The read as sent: the SQL above with pg's per-query client timeout (pg 8.22 honours `query_timeout` per query; the
+ * pool destroys the connection it ended), so a dead peer never holds a connection for ever. @types/pg does not list
+ * the member, hence the widened type.
+ */
+const ACTIVE_SETTINGS_VERSION_QUERY: QueryConfig & Readonly<{ query_timeout: number }> = Object.freeze({
+  text: ACTIVE_SETTINGS_VERSION_SQL, query_timeout: ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs
+});
 
 /** A failed later read is logged at most once in this many milliseconds (one content-free line). */
 const READ_FAILED_LOG_INTERVAL_MS = 60000;
@@ -86,26 +100,31 @@ export function createActiveSettingsVersionReader(input: Readonly<{
   let lastLoggedAt: number | null = null;
   let reading: Promise<number> | null = null;
   /**
-   * The query a read past its deadline left behind, until the database answers it. While it is open no new query is
-   * sent (the refresh counts as failed, ACTIVE_SETTINGS_READ_DEADLINE), so a hanging database holds at most one of the
-   * main pool's connections for this reader, never one more a second.
+   * The query a read past its deadline left behind, until the database answers it (or the driver ends it at
+   * `queryTimeoutMs`). While it is open, and for at most `queryTimeoutMs`, no new query is sent (the refresh counts as
+   * failed, ACTIVE_SETTINGS_READ_DEADLINE), so a hanging database holds at most one of the main pool's connections for
+   * this reader, never one more a second; a peer that never answers (no keep-alive) cannot close the gate for ever.
    */
   let openQuery: Promise<unknown> | null = null;
+  /** When `openQuery` was sent: past `queryTimeoutMs` (or on a clock that went backwards) the gate opens for one more. */
+  let openQueryAt = 0;
 
   const fresh = (now: number): boolean =>
     settledAt !== null && now >= settledAt && now - settledAt < ACTIVE_SETTINGS_VERSION_CACHE.maxAgeMs;
 
   async function readOnce(): Promise<number> {
-    if (openQuery !== null) {
+    const sentAt = clock();
+    if (openQuery !== null && sentAt >= openQueryAt && sentAt - openQueryAt < ACTIVE_SETTINGS_VERSION_CACHE.queryTimeoutMs) {
       throw new TypedDomainError(ACTIVE_SETTINGS_READ_DEADLINE, ACTIVE_SETTINGS_READ_DEADLINE);
     }
     let query: Promise<{ rows: readonly { version: unknown }[] }>;
     try {
-      query = pool.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_SQL);
+      query = pool.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_QUERY);
     } catch (error) {
       query = Promise.reject(error);
     }
     openQuery = query;
+    openQueryAt = sentAt;
     const settle = (): void => { if (openQuery === query) openQuery = null; };
     query.then(settle, settle);
     let timer: ReturnType<typeof setTimeout> | undefined;
