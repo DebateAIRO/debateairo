@@ -148,6 +148,13 @@ describe("publication review repository under debateai_runtime", () => {
     expect(await reviews.approvalCovers({...d,answerId:randomUUID()})).toBe(false);
   });
 
+  it("a refusal never covers the origin for publication", async () => {
+    const d=await debate(); await ask(d);
+    const actor=await staff();
+    await seedDecision(d,await reviewRef(d),actor.staffId,"REFUSE");
+    expect(await reviews.approvalCovers(d)).toBe(false);
+  });
+
   it("recordCopy stores a sealed copy: no plaintext column holds the question line, and decryption returns the snapshot", async () => {
     const d=await debate("Private publication question"); await ask(d);
     const actor=await staff(),opened=await reviews.open({context:actor.context,tokenHash:actor.tokenHash,
@@ -162,6 +169,53 @@ describe("publication review repository under debateai_runtime", () => {
     expect(await decryptContentForRun(database.pool,d.runId,"serve.publication_review_copy",
       row.copy_ref,row.content_ciphertext,row.content)).toEqual(snapshot);
   });
+
+  it("a decision waits for an in-flight READ copy and leaves no copy after it commits", async () => {
+    const d=await debate(); await ask(d);
+    const ref=await reviewRef(d),reader=await staff(),decider=await staff();
+    const openedRead=await reviews.open({context:reader.context,tokenHash:reader.tokenHash,
+      reviewRef:ref,purpose:"READ"});
+    const openedDecide=await reviews.open({context:decider.context,tokenHash:decider.tokenHash,
+      reviewRef:ref,purpose:"DECIDE"});
+    const proofId=randomUUID(),operationId=randomUUID();
+    const binding={action:"PUBLICATION_REVIEW_APPROVE",targetId:ref,bodySha256:"0".repeat(64),
+      expectedRevision:0,operationId};
+    await database.pool.query(`INSERT INTO staff.action_proof
+      (proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,
+       account_security_epoch,grant_revision,binding,credential_id,expires_at)
+      VALUES($1,$2,$3,$4,$5,0,0,0,$6::jsonb,'fixture-verified-key',now()+interval '5 minutes')`,
+      [proofId,decider.staffId,decider.context.userId,decider.context.ordinarySessionId,
+        decider.context.privilegeSessionId,binding]);
+    const scheduler=await database.pool.connect();
+    let reading: Promise<unknown>|undefined,deciding: Promise<unknown>|undefined;
+    try {
+      await scheduler.query("BEGIN");
+      await scheduler.query("SELECT 1 FROM serve.answer WHERE answer_id=$1 AND answer_version=1 FOR UPDATE",[d.answerId]);
+      reading=reviews.recordCopy({context:reader.context,tokenHash:reader.tokenHash,
+        opened:openedRead,answerVersion:1,snapshot:{question_line:d.questionLine}});
+      let blocked=false;
+      for(let tries=0;tries<100 && !blocked;tries++) {
+        const row=await database.pool.query<{waiting:boolean}>(`
+          SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock'
+            AND query LIKE '%record_publication_review_copy%') waiting`);
+        blocked=row.rows[0]!.waiting;
+        if(!blocked) await new Promise(resolve=>setTimeout(resolve,50));
+      }
+      expect(blocked).toBe(true);
+      let settled=false;
+      deciding=reviews.decide({context:decider.context,tokenHash:decider.tokenHash,proofId,binding,
+        opened:openedDecide,outcome:"APPROVE",reason:""}).finally(()=>{settled=true;});
+      await new Promise(resolve=>setTimeout(resolve,100));
+      expect(settled).toBe(false);
+      await scheduler.query("COMMIT");
+      await reading; await deciding;
+      expect((await database.pool.query("SELECT count(*)::int n FROM serve.publication_review_copy WHERE review_ref=$1",[ref])).rows[0]!.n).toBe(0);
+    } finally {
+      await scheduler.query("ROLLBACK").catch(()=>{});
+      await Promise.allSettled([reading,deciding].filter((value): value is Promise<unknown>=>value!==undefined));
+      scheduler.release();
+    }
+  },30_000);
 
   it("decide seals the reason, deletes the request's copies and writes one APPROVE or REFUSE event", async () => {
     const d=await debate(); await ask(d);

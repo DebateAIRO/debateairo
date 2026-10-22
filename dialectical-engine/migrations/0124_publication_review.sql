@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS serve.publication_review_copy (
   run_id uuid NOT NULL,
   answer_id uuid NOT NULL,
   answer_version integer NOT NULL,
-  reader_staff_id uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   content jsonb NOT NULL CHECK (jsonb_typeof(content) = 'object'),
   content_ciphertext jsonb,
@@ -201,6 +200,23 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+CREATE OR REPLACE FUNCTION core.enforce_erasure_barrier_publication_review_request()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE target_encrypted boolean; v_owner_ref uuid;
+BEGIN
+  SELECT r.content_encryption_version = 1 INTO target_encrypted
+  FROM core.run r WHERE r.run_id = NEW.run_id FOR KEY SHARE;
+  IF COALESCE(target_encrypted, false) THEN
+    SELECT e.owner_ref INTO v_owner_ref FROM core.run_ownership_event e
+    WHERE e.run_id = NEW.run_id ORDER BY e.at_seq ASC LIMIT 1;
+    PERFORM 1 FROM identity."user" u WHERE u.owner_ref = v_owner_ref FOR KEY SHARE;
+    IF NOT core.run_private_content_is_live(NEW.run_id) THEN
+      RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'PRIVATE_CONTENT_ERASED';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 CREATE OR REPLACE FUNCTION core.enforce_erasure_barrier_publication_review_copy()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE target_encrypted boolean; v_owner_ref uuid;
@@ -219,6 +235,9 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS enforce_erasure_barrier ON serve.publication_review_request;
+CREATE TRIGGER enforce_erasure_barrier BEFORE INSERT ON serve.publication_review_request
+FOR EACH ROW EXECUTE FUNCTION core.enforce_erasure_barrier_publication_review_request();
 DROP TRIGGER IF EXISTS aaa_enforce_content_attestation_v2 ON serve.publication_review_decision;
 CREATE TRIGGER aaa_enforce_content_attestation_v2 BEFORE INSERT ON serve.publication_review_decision
 FOR EACH ROW EXECUTE FUNCTION core.enforce_content_attestation_v2_publication_review_decision();
@@ -262,6 +281,7 @@ GRANT SELECT, INSERT ON serve.publication_review_decision TO debateai_staff_secu
 GRANT SELECT, INSERT, DELETE ON serve.publication_review_copy TO debateai_staff_security_owner;
 GRANT SELECT (run_id, asker_id) ON core.run TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION core.enforce_publication_review_answer_run() FROM PUBLIC;
+REVOKE ALL ON FUNCTION core.enforce_erasure_barrier_publication_review_request() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_content_attestation_v2_publication_review_decision() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_content_ciphertext_publication_review_decision() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_erasure_barrier_publication_review_decision() FROM PUBLIC;
@@ -563,19 +583,22 @@ CREATE OR REPLACE FUNCTION serve.ask_publication_review(
 DECLARE v_requests integer; v_ref uuid;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended('publication-review:' || p_answer_id::text, 0));
+  PERFORM 1 FROM core.run r WHERE r.run_id=p_run_id FOR SHARE;
+  IF NOT FOUND THEN RETURN 'GRANT_INVALID'; END IF;
   IF NOT EXISTS (SELECT 1 FROM core.run r WHERE r.run_id=p_run_id AND r.asker_id='owner:' || p_owner_ref::text)
     OR NOT EXISTS (SELECT 1 FROM identity."user" u WHERE u.user_id=p_user_id AND u.owner_ref=p_owner_ref)
     OR NOT serve.publication_review_run_live(p_run_id) THEN
     RETURN 'GRANT_INVALID';
   END IF;
-  UPDATE identity.step_up_grant g SET consumed_at=clock_timestamp()
-  WHERE g.token_hash=p_grant_token_hash AND g.session_id=p_session_id AND g.user_id=p_user_id
-    AND g.action='PUBLISH' AND g.target_run_id=p_run_id AND g.consumed_at IS NULL
-    AND g.issued_at<=clock_timestamp() AND g.expires_at>clock_timestamp()
-    AND EXISTS (SELECT 1 FROM identity.session s WHERE s.session_id=p_session_id AND s.user_id=p_user_id
-      AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp()
-      AND s.absolute_expires_at>clock_timestamp());
-  IF NOT FOUND THEN RETURN 'GRANT_INVALID'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM identity.step_up_grant g
+    WHERE g.token_hash=p_grant_token_hash AND g.session_id=p_session_id AND g.user_id=p_user_id
+      AND g.action='PUBLISH' AND g.target_run_id=p_run_id AND g.consumed_at IS NULL
+      AND g.issued_at<=clock_timestamp() AND g.expires_at>clock_timestamp()
+      AND EXISTS (SELECT 1 FROM identity.session s WHERE s.session_id=p_session_id AND s.user_id=p_user_id
+        AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp()
+        AND s.absolute_expires_at>clock_timestamp())
+  ) THEN RETURN 'GRANT_INVALID'; END IF;
   IF EXISTS (
     SELECT 1 FROM serve.publication_review_request r
     LEFT JOIN serve.publication_review_decision d ON d.review_ref=r.review_ref
@@ -589,6 +612,14 @@ BEGIN
   SELECT count(*) INTO v_requests FROM serve.publication_review_request r
   WHERE r.answer_id=p_answer_id AND r.synthesis_origin_version=p_origin;
   IF v_requests>=2 THEN RETURN 'NOT_ALLOWED'; END IF;
+  UPDATE identity.step_up_grant g SET consumed_at=clock_timestamp()
+  WHERE g.token_hash=p_grant_token_hash AND g.session_id=p_session_id AND g.user_id=p_user_id
+    AND g.action='PUBLISH' AND g.target_run_id=p_run_id AND g.consumed_at IS NULL
+    AND g.issued_at<=clock_timestamp() AND g.expires_at>clock_timestamp()
+    AND EXISTS (SELECT 1 FROM identity.session s WHERE s.session_id=p_session_id AND s.user_id=p_user_id
+      AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp()
+      AND s.absolute_expires_at>clock_timestamp());
+  IF NOT FOUND THEN RETURN 'GRANT_INVALID'; END IF;
   v_ref:=gen_random_uuid();
   INSERT INTO serve.publication_review_request
     (review_ref,run_id,answer_id,synthesis_origin_version,ask_ordinal)
@@ -756,16 +787,17 @@ CREATE OR REPLACE FUNCTION staff.record_publication_review_copy(
 DECLARE v_open jsonb;
 BEGIN
   PERFORM staff.require_http_authority(p_context,p_token,'PUBLICATION_REVIEW');
+  PERFORM pg_advisory_xact_lock(hashtextextended('publication-review-decide:' || p_review_ref::text, 0));
   v_open:=staff.open_publication_review(p_context,p_token,p_review_ref,'READ');
   IF (v_open->>'answerId')::uuid IS DISTINCT FROM p_answer_id THEN
     RAISE EXCEPTION 'PUBLICATION_REVIEW_NOT_FOUND';
   END IF;
   INSERT INTO serve.publication_review_copy(
-    copy_ref,review_ref,run_id,answer_id,answer_version,reader_staff_id,
+    copy_ref,review_ref,run_id,answer_id,answer_version,
     content,content_ciphertext,content_attestation
   ) VALUES (
     p_copy_ref,p_review_ref,(v_open->>'runId')::uuid,p_answer_id,p_answer_version,
-    (p_context->>'staffId')::uuid,p_content,p_ciphertext,p_attestation
+    p_content,p_ciphertext,p_attestation
   );
   INSERT INTO staff.publication_review_event(actor_staff_id,action,review_ref)
   VALUES ((p_context->>'staffId')::uuid,'READ',p_review_ref);
@@ -892,6 +924,10 @@ BEGIN
   SELECT count(*) INTO v_count FROM pg_trigger t
   WHERE t.tgrelid='serve.publication_review_request'::regclass AND NOT t.tgisinternal
     AND t.tgenabled IN ('O','A') AND t.tgname='aa_enforce_publication_review_answer_run';
+  IF v_count<>1 THEN RAISE EXCEPTION 'PUBLICATION_REVIEW_GUARD_CONTRACT_INVALID'; END IF;
+  SELECT count(*) INTO v_count FROM pg_trigger t
+  WHERE t.tgrelid='serve.publication_review_request'::regclass AND NOT t.tgisinternal
+    AND t.tgenabled IN ('O','A') AND t.tgname='enforce_erasure_barrier';
   IF v_count<>1 THEN RAISE EXCEPTION 'PUBLICATION_REVIEW_GUARD_CONTRACT_INVALID'; END IF;
   SELECT count(*) INTO v_count FROM pg_trigger t
   WHERE t.tgrelid='staff.publication_review_event'::regclass AND NOT t.tgisinternal

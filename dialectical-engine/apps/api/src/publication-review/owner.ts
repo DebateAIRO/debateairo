@@ -38,14 +38,20 @@ export function createPublicationReviewOwnerRoutes(deps: Readonly<{
       if (answer === null) return error(404, "RUN_NOT_FOUND");
       const verdict = await deps.readVerdictOfRecord({ ...input, answer });
       if (verdict?.verdict !== "FLAGGED") return error(409, "PUBLICATION_REVIEW_NOT_ALLOWED");
-      const result = await deps.repository.ask({
-        grantTokenHash: hashToken("step-up-grant", parsed.data.step_up_grant),
-        sessionId: input.authenticated.session.session_id,
-        userId: input.authenticated.userId,
-        ownerRef: input.authenticated.ownerRef,
-        runId: input.runId, answerId: answer.answer_id,
-        originVersion: verdict.synthesisOriginVersion
-      });
+      let result: Awaited<ReturnType<PublicationReviewRepository["ask"]>>;
+      try {
+        result = await deps.repository.ask({
+          grantTokenHash: hashToken("step-up-grant", parsed.data.step_up_grant),
+          sessionId: input.authenticated.session.session_id,
+          userId: input.authenticated.userId,
+          ownerRef: input.authenticated.ownerRef,
+          runId: input.runId, answerId: answer.answer_id,
+          originVersion: verdict.synthesisOriginVersion
+        });
+      } catch (caught) {
+        if (caught instanceof Error && caught.message === "PRIVATE_CONTENT_ERASED") return error(404, "RUN_NOT_FOUND");
+        throw caught;
+      }
       if (result === "GRANT_INVALID") return error(404, "RUN_NOT_FOUND");
       if (result === "PENDING") return error(409, "PUBLICATION_REVIEW_PENDING");
       if (result === "NOT_ALLOWED") return error(409, "PUBLICATION_REVIEW_NOT_ALLOWED");

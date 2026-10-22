@@ -15,6 +15,7 @@ const TABLES = [
 ] as const;
 const FUNCTIONS = [
   "core.enforce_publication_review_answer_run()",
+  "core.enforce_erasure_barrier_publication_review_request()",
   "core.enforce_content_attestation_v2_publication_review_decision()",
   "core.enforce_content_ciphertext_publication_review_decision()",
   "core.enforce_erasure_barrier_publication_review_decision()",

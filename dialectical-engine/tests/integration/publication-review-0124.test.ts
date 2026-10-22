@@ -226,7 +226,7 @@ describe("0124 publication review database boundary", () => {
     expect((await database.pool.query("SELECT has_function_privilege('debateai_staff_security_owner','serve.publication_review_run_live(uuid)','EXECUTE') allowed")).rows[0]!.allowed).toBe(true);
   });
 
-  it("Ask consumes a PUBLISH grant and inserts ordinal 1; a second Ask stays pending", async () => {
+  it("Ask consumes the first PUBLISH grant and inserts ordinal 1; a pending retry keeps its grant", async () => {
     const owner = await ownerRun();
     const call = (token: string) => asRole<{ result: string }>(
       'debateai_runtime','SELECT serve.ask_publication_review($1,$2,$3,$4,$5,$6,$7) result',
@@ -245,9 +245,100 @@ describe("0124 publication review database boundary", () => {
       'SELECT ask_ordinal FROM serve.publication_review_request WHERE run_id=$1', [owner.runId]
     )).rows).toEqual([{ ask_ordinal: 1 }]);
     expect((await database.pool.query(
-      'SELECT consumed_at IS NOT NULL spent FROM identity.step_up_grant WHERE token_hash=ANY($1::text[]) ORDER BY token_hash',
-      [[owner.token, second]]
-    )).rows).toEqual([{ spent: true }, { spent: true }]);
+      'SELECT consumed_at IS NOT NULL spent FROM identity.step_up_grant WHERE token_hash=$1',
+      [second]
+    )).rows).toEqual([{ spent: false }]);
+  });
+
+  it("a refused Ask leaves its PUBLISH grant available", async () => {
+    const owner = await ownerRun();
+    const ref = await requestFor(owner);
+    const reviewer = await staffActor();
+    await seedDecision(ref, owner.runId, reviewer.staffId, 'APPROVE');
+    const token = await freshGrant(owner);
+    const result = await asRole<{ result: string }>('debateai_runtime',
+      'SELECT serve.ask_publication_review($1,$2,$3,$4,$5,$6,$7) result',
+      [token, owner.sessionId, owner.userId, owner.ownerRef, owner.runId, owner.answerId, 1]);
+    expect(result[0]!.result).toBe('NOT_ALLOWED');
+    expect((await database.pool.query(
+      'SELECT consumed_at IS NOT NULL spent FROM identity.step_up_grant WHERE token_hash=$1', [token]
+    )).rows).toEqual([{ spent: false }]);
+  });
+
+  it("a missing 0124 sever trigger is rejected on forward replay", async () => {
+    const isolated = await startTestDatabase();
+    try {
+      await migrate(isolated.pool);
+      await isolated.pool.query('DROP TRIGGER zz_sever_publication_review ON core.run_content_attestation_secret');
+      await expect(migrate(isolated.pool)).rejects.toThrow();
+    } finally { await isolated.stop(); }
+  }, 180_000);
+
+  it("an unsevered request cannot make an erased run live to staff", async () => {
+    const owner = await ownerRun();
+    await requestFor(owner);
+    const seed = await database.pool.connect();
+    try {
+      await seed.query('BEGIN');
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await seed.query('DELETE FROM core.run_content_attestation_secret WHERE run_id=$1', [owner.runId]);
+      await seed.query(`INSERT INTO serve.private_run_key_cleanup_intent
+        (request_ref,user_id,run_id,requested_at,cleanup_publication_refs)
+        VALUES($1,$2,$3,now(),'{}'::uuid[])`, [randomUUID(),owner.userId,owner.runId]);
+      await seed.query('COMMIT');
+    } catch (error) { await seed.query('ROLLBACK'); throw error; }
+    finally { seed.release(); }
+    expect((await database.pool.query(
+      'SELECT count(*)::int n FROM serve.publication_review_request WHERE run_id=$1', [owner.runId]
+    )).rows[0]!.n).toBe(1);
+    expect((await asRole<{ live: boolean }>('debateai_staff_security_owner',
+      'SELECT serve.publication_review_run_live($1) live', [owner.runId]))[0]!.live).toBe(false);
+  });
+
+  it("an Ask waiting on a private delete returns GRANT_INVALID without an orphan request", async () => {
+    const owner = await ownerRun();
+    const deleting = await database.pool.connect();
+    try {
+      await deleting.query('BEGIN');
+      await deleting.query('SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE', [owner.runId]);
+      let settled = false;
+      const asking = asRole<{ result: string }>('debateai_runtime',
+        'SELECT serve.ask_publication_review($1,$2,$3,$4,$5,$6,$7) result',
+        [owner.token, owner.sessionId, owner.userId, owner.ownerRef, owner.runId, owner.answerId, 1]
+      ).finally(() => { settled = true; });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(settled).toBe(false);
+      await deleting.query(`INSERT INTO serve.private_run_key_cleanup_intent
+        (request_ref,user_id,run_id,requested_at,cleanup_publication_refs)
+        VALUES($1,$2,$3,now(),'{}'::uuid[])`, [randomUUID(),owner.userId,owner.runId]);
+      await deleting.query('DELETE FROM core.run_content_attestation_secret WHERE run_id=$1', [owner.runId]);
+      await deleting.query('COMMIT');
+      expect((await asking)[0]!.result).toBe('GRANT_INVALID');
+      expect((await database.pool.query(
+        'SELECT count(*)::int n FROM serve.publication_review_request WHERE run_id=$1', [owner.runId]
+      )).rows[0]!.n).toBe(0);
+    } finally {
+      await deleting.query('ROLLBACK').catch(() => {});
+      deleting.release();
+    }
+  }, 30_000);
+
+  it("the request erasure barrier refuses a late direct insert", async () => {
+    const owner = await ownerRun();
+    const seed = await database.pool.connect();
+    try {
+      await seed.query('BEGIN');
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await seed.query(`INSERT INTO serve.private_run_key_cleanup_intent
+        (request_ref,user_id,run_id,requested_at,cleanup_publication_refs)
+        VALUES($1,$2,$3,now(),'{}'::uuid[])`, [randomUUID(),owner.userId,owner.runId]);
+      await seed.query('COMMIT');
+    } catch (error) { await seed.query('ROLLBACK'); throw error; }
+    finally { seed.release(); }
+    await expect(database.pool.query(`INSERT INTO serve.publication_review_request
+      (review_ref,run_id,answer_id,synthesis_origin_version,ask_ordinal)
+      VALUES($1,$2,$3,1,1)`, [randomUUID(),owner.runId,owner.answerId]))
+      .rejects.toMatchObject({code:'55000',message:'PRIVATE_CONTENT_ERASED'});
   });
 
   it("Ask refuses missing, expired, consumed, wrong-action and wrong-run grants without a request", async () => {
@@ -322,9 +413,9 @@ describe("0124 publication review database boundary", () => {
       );
       await seed.query(
         `INSERT INTO serve.publication_review_copy
-          (copy_ref,review_ref,run_id,answer_id,answer_version,reader_staff_id,content)
-          VALUES($1,$2,$3,$4,1,$5,'{}'::jsonb)`,
-        [randomUUID(),reviewRef,owner.runId,owner.answerId,reviewer.staffId]
+          (copy_ref,review_ref,run_id,answer_id,answer_version,content)
+          VALUES($1,$2,$3,$4,1,'{}'::jsonb)`,
+        [randomUUID(),reviewRef,owner.runId,owner.answerId]
       );
       await seed.query('COMMIT');
     } catch (error) {
@@ -364,8 +455,8 @@ describe("0124 publication review database boundary", () => {
         [reviewRef,owner.runId,reviewer.staffId]
       );
       await seed.query(
-        "INSERT INTO serve.publication_review_copy(copy_ref,review_ref,run_id,answer_id,answer_version,reader_staff_id,content) VALUES($1,$2,$3,$4,1,$5,'{}'::jsonb)",
-        [randomUUID(),reviewRef,owner.runId,owner.answerId,reviewer.staffId]
+        "INSERT INTO serve.publication_review_copy(copy_ref,review_ref,run_id,answer_id,answer_version,content) VALUES($1,$2,$3,$4,1,'{}'::jsonb)",
+        [randomUUID(),reviewRef,owner.runId,owner.answerId]
       );
       await seed.query('COMMIT');
     } catch (error) {
@@ -537,10 +628,10 @@ describe("0124 publication review database boundary", () => {
     `,[owner.runId,table,ref,envelope,Buffer.alloc(32,7)])).rows[0]!.value;
     await asRole('debateai_staff_security_owner',
       `INSERT INTO serve.publication_review_copy
-        (copy_ref,review_ref,run_id,answer_id,answer_version,reader_staff_id,
+        (copy_ref,review_ref,run_id,answer_id,answer_version,
          content,content_ciphertext,content_attestation)
-        VALUES($1,$2,$3,$4,1,$5,$6::jsonb,$7::jsonb,$8)`,
-      [copyRef,reviewRef,owner.runId,owner.answerId,reviewer.staffId,
+        VALUES($1,$2,$3,$4,1,$5::jsonb,$6::jsonb,$7)`,
+      [copyRef,reviewRef,owner.runId,owner.answerId,
         {ciphertext:true,v:1},envelope,await attestation('serve.publication_review_copy',copyRef)]
     );
     await asRole('debateai_staff_security_owner',

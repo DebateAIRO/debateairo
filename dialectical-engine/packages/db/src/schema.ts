@@ -833,7 +833,6 @@ export const publicationReviewCopy = serve.table("publication_review_copy", {
   runId: uuid("run_id").notNull(),
   answerId: uuid("answer_id").notNull(),
   answerVersion: integer("answer_version").notNull(),
-  readerStaffId: uuid("reader_staff_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   content: jsonb("content").notNull(),
   contentCiphertext: jsonb("content_ciphertext"),

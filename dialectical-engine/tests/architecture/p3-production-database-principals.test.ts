@@ -681,6 +681,41 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
   ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "USAGE ON SCHEMA serve",
+    "SELECT ON serve.publication_review_request",
+    "SELECT, INSERT ON serve.publication_review_decision",
+    "SELECT, INSERT, DELETE ON serve.publication_review_copy",
+    "SELECT (run_id, asker_id) ON core.run",
+    "EXECUTE ON FUNCTION serve.publication_review_run_live(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
+    "EXECUTE ON FUNCTION serve.read_publication_review_state(uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION serve.publication_review_approved(uuid,uuid,integer)",
+    "EXECUTE ON FUNCTION staff.list_publication_reviews(jsonb,text,integer)",
+    "EXECUTE ON FUNCTION staff.open_publication_review(jsonb,text,uuid,text)",
+    "EXECUTE ON FUNCTION staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION staff.decide_publication_review(jsonb,text,uuid,jsonb,uuid,text,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_staff_recovery",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -949,4 +984,15 @@ it("discloses exactly the reviewed additive funding grants without other princip
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
   expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
+});
+
+it("discloses every 0124 publication review grant, including the run ownership columns", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0124_publication_review.sql", "utf8");
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO (?:debateai_runtime|debateai_staff_security_owner|debateai_staff_recovery);$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0124_publication_review.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(declared).toEqual(actual);
+  expect(declared).toContain("GRANT SELECT (run_id, asker_id) ON core.run TO debateai_staff_security_owner;");
 });

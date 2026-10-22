@@ -210,7 +210,7 @@ describe("synthesis checks in the owner's data export", () => {
         createTestAskAdmissionPoolFacades(runtime));
       const adapter = new OwnerViewAdapter({ application,
         synthesisAnswerAccess: createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 }) },
-      { exists: async () => true });
+      { exists: async () => true }, { readStates: async () => [] });
       const heldAnswer = await adapter.readRunAnswer(owner.ownerRef, runId);
       expect(heldAnswer).toBeNull();
       const h = exportHarness();

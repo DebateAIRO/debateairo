@@ -15,6 +15,7 @@ const newTables = [
 ];
 const newFunctions = [
   "core.enforce_publication_review_answer_run()",
+  "core.enforce_erasure_barrier_publication_review_request()",
   "core.enforce_content_attestation_v2_publication_review_decision()",
   "core.enforce_content_ciphertext_publication_review_decision()",
   "core.enforce_erasure_barrier_publication_review_decision()",
@@ -96,7 +97,7 @@ describe("0124 publication review contract", () => {
     expect(source).toMatch(/CREATE TRIGGER zz_sever_publication_review\s+AFTER INSERT ON serve\.private_run_key_cleanup_intent/gu);
   });
 
-  it("loadForward0124 pins only the four new tables, eighteen new functions and two sever triggers", async () => {
+  it("loadForward0124 pins only the four new tables, nineteen new functions and two sever triggers", async () => {
     const source = (await readFile(loader, "utf8")).replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/[^\n]*/gu, "");
     for (const name of [...newTables, ...newFunctions, "zz_sever_publication_review", "core.run_content_attestation_secret", "serve.private_run_key_cleanup_intent"]) {
       expect(source, name).toContain(name);
@@ -108,5 +109,64 @@ describe("0124 publication review contract", () => {
     ]) expect(source, shared).not.toContain(shared);
     const chain = await readFile(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8");
     expect(chain).toContain("loadForward0123,loadForward0124]");
+  });
+});
+
+const main = () => readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+
+describe("publication review production composition", () => {
+  it("joins approved origins to the publish gate and the owner route", async () => {
+    const source = await main();
+    expect(source).toContain("approvalCovers: input => publicationReviewRepository.approvalCovers(input)");
+    expect(source).toContain("publicationReviews: {\n    repository: publicationReviewRepository");
+    expect(source).toContain("core.run_private_content_is_live($1) AND NOT serve.run_removed_by_synthesis_check($1)");
+    expect(source).toContain("candidate => candidate === origin");
+  });
+
+  it("joins the staff window, its origin, and its verdict categories", async () => {
+    const source = await main();
+    expect(source).toContain("staff: { ...staffHttp, publicationReviews: publicationReviewStaff }");
+    expect(source).toContain("version) => version === originVersion)?.categories");
+    expect(source).toContain("for (let version = bound; version >= opened.originVersion; version--)");
+  });
+
+  it("includes review decisions in the export view", async () => {
+    expect(await main()).toContain("new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId)");
+  });
+});
+
+describe("publication review write serialization", () => {
+  it("serializes copy creation with decisions for the same request", async () => {
+    const source = await sql();
+    const copy = source.slice(source.indexOf("CREATE OR REPLACE FUNCTION staff.record_publication_review_copy("),
+      source.indexOf("ALTER FUNCTION staff.record_publication_review_copy("));
+    const lock = "pg_advisory_xact_lock(hashtextextended('publication-review-decide:' || p_review_ref::text, 0))";
+    expect(copy).toContain(lock);
+    expect(copy.indexOf(lock)).toBeLessThan(copy.indexOf("staff.open_publication_review"));
+  });
+
+  it("orders Ask after the run's erasure lock and bars later request inserts", async () => {
+    const source = await sql();
+    const ask = source.slice(source.indexOf("CREATE OR REPLACE FUNCTION serve.ask_publication_review("),
+      source.indexOf("REVOKE ALL ON FUNCTION serve.ask_publication_review("));
+    expect(ask).toMatch(/FROM core\.run r WHERE r\.run_id=p_run_id[^;]*FOR SHARE/u);
+    expect(ask.indexOf("FOR SHARE")).toBeLessThan(ask.indexOf("publication_review_run_live"));
+    expect(source).toContain("CREATE TRIGGER enforce_erasure_barrier BEFORE INSERT ON serve.publication_review_request");
+  });
+
+  it("keeps account closure in the database liveness predicate", async () => {
+    const source = await sql();
+    const live = source.slice(source.indexOf("CREATE OR REPLACE FUNCTION serve.publication_review_run_live("),
+      source.indexOf("REVOKE ALL ON FUNCTION serve.publication_review_run_live("));
+    expect(live).toContain("core.run_private_content_is_live(p_run_id)");
+  });
+});
+
+describe("review copy privacy", () => {
+  it("keeps the reading staff identity in the audit, outside the private copy", async () => {
+    const source = await sql();
+    const copy = source.slice(source.indexOf("CREATE TABLE IF NOT EXISTS serve.publication_review_copy"),
+      source.indexOf("SELECT core.install_truncate_guard('serve.publication_review_request')"));
+    expect(copy).not.toContain("reader_staff_id");
   });
 });

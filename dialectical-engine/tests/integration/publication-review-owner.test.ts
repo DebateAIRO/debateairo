@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { hashToken } from "@debateai/crypto";
 import {
   CONTENT_JSON_SENTINEL, configureContentEncryption, contentCipherFor, createPool,
@@ -283,6 +283,19 @@ describe("publication review owner routes over migrated database", () => {
     } finally { await fixture.api.close(); }
   });
 
+  it("Ask answers RUN_NOT_FOUND if erasure wins during the request insert", async () => {
+    const target = await debate();
+    const fixture = apiFor(target, true);
+    await grant(target, fixture.token);
+    const ask = vi.spyOn(reviews, "ask").mockRejectedValueOnce(
+      Object.assign(new Error("PRIVATE_CONTENT_ERASED"), { code: "55000" }));
+    try {
+      const response = await fixture.post();
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error).toBe("RUN_NOT_FOUND");
+    } finally { ask.mockRestore(); await fixture.api.close(); }
+  });
+
   it("POST on a CLEAR version answers 409 PUBLICATION_REVIEW_NOT_ALLOWED", async () => {
     const target = await debate("CLEAR");
     const fixture = apiFor(target, true);
@@ -298,7 +311,7 @@ describe("publication review owner routes over migrated database", () => {
     } finally { await fixture.api.close(); }
   });
 
-  it("Publish of a FLAGGED version covered by an approval answers 201 and calls the judge once", async () => {
+  it("Publish of a FLAGGED version covered by an approval answers 201 and publishes once", async () => {
     const target = await debate();
     await approve(target);
     const fixture = apiFor(target, true, grantToken(), { gate: gateFor(target) });
@@ -306,6 +319,24 @@ describe("publication review owner routes over migrated database", () => {
       const response = await fixture.publish();
       expect(response.statusCode).toBe(201);
       expect(fixture.publicationCalls()).toBe(1);
+    } finally { await fixture.api.close(); }
+  });
+
+  it("Publish of a refused version stays blocked by the approval gate", async () => {
+    const target = await debate();
+    const askToken = grantToken();
+    await grant(target, askToken);
+    expect(await reviews.ask({ grantTokenHash: hashToken("step-up-grant", askToken),
+      sessionId: owner.sessionId, userId: owner.userId, ownerRef: owner.ownerRef,
+      runId: target.runId, answerId: target.answerId, originVersion: 1 })).toBe("ASKED");
+    await refuse(target, "Still unsafe");
+    const fixture = apiFor(target, true, grantToken(), { gate: gateFor(target) });
+    await grant(target, fixture.token);
+    try {
+      const response = await fixture.publish();
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error).toBe("PUBLICATION_APPROVAL_REQUIRED");
+      expect(fixture.publicationCalls()).toBe(0);
     } finally { await fixture.api.close(); }
   });
 
