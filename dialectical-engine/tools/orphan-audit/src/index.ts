@@ -672,7 +672,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Side-by-side releases C11 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after startRun's insert moved into
 // a private helper shared with the new RunRepository.startReadmittedRun (ReadmissionPrincipal, StartReadmittedRunInput).
 // migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "9c34af4be45b2484277a6155161ac694a4e3a9e23b25182b9806f57db82fb655";
+// Side-by-side releases C11 review (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after it gained
+// RunRepository.listUnstartedReadmissions (0123's core.list_unstarted_readmissions). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "529837af4cce3cc8dd4a384499d9435ddf13dce17fef6627d0e04b33b414be33";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

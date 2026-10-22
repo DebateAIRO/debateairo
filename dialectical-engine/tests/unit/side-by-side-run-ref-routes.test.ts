@@ -69,7 +69,11 @@ function arrange(input: { resolve?: boolean } = {}) {
     cancel: async () => true,
     deletePrivateDebate: async ({ runId }) => { seen.push(`deletePrivateDebate:${runId}`); return "NOT_FOUND"; }
   };
-  const beginPasskeyStepUp = vi.fn(async (_body: unknown): Promise<never> => { throw new Error("RECORDED"); });
+  // C11 review, Minor 4: a valid options body (PasskeyAuthenticationOptionsResponseSchema), so each start answers 200.
+  const beginPasskeyStepUp = vi.fn(async (_body: unknown) => ({
+    challenge_handle: "h".repeat(43), expires_at: "2026-10-22T00:05:00.000Z",
+    options: { challenge: "c".repeat(43), rpId: "app.example.test", userVerification: "required" as const }
+  }));
   const beginStepUp = vi.fn(async (_provider: string, _body: unknown) => ({
     authorization_url: "https://accounts.example.test/authorize", flowCookie: "f".repeat(43),
     expiresAt: "2026-10-22T00:05:00.000Z"
@@ -153,10 +157,11 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
   it("the passkey and provider step-up starts hand the service the id the page sent", async () => {
     const { api, beginPasskeyStepUp, beginStepUp } = arrange();
     try {
-      await api.inject({
+      const passkey = await api.inject({
         method: "POST", url: "/v1/auth/passkeys/step-up/options", headers: write,
         payload: { authorization: { action: "DELETE_PRIVATE_DEBATE", target_run_id: OLD } }
       });
+      expect(passkey.statusCode).toBe(200);
       expect(beginPasskeyStepUp).toHaveBeenCalledOnce();
       expect(beginPasskeyStepUp.mock.calls[0]?.[0]).toEqual({ authorization: { action: "DELETE_PRIVATE_DEBATE", target_run_id: OLD } });
 
@@ -175,7 +180,8 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
     const { api, beginPasskeyStepUp } = arrange();
     try {
       const body = { authorization: { action: "DELETE_ACCOUNT" } };
-      await api.inject({ method: "POST", url: "/v1/auth/passkeys/step-up/options", headers: write, payload: body });
+      const response = await api.inject({ method: "POST", url: "/v1/auth/passkeys/step-up/options", headers: write, payload: body });
+      expect(response.statusCode).toBe(200);
       expect(beginPasskeyStepUp.mock.calls[0]?.[0]).toEqual(body);
     } finally {
       await api.close();
@@ -195,10 +201,11 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
       expect(stepUp).toHaveBeenCalledWith(expect.objectContaining({
         authorization: { action: "PUBLISH", targetRunId: OLD }
       }), expect.anything());
-      await api.inject({
+      const passkey = await api.inject({
         method: "POST", url: "/v1/auth/passkeys/step-up/options", headers: write,
         payload: { authorization: { action: "PUBLISH", target_run_id: OLD } }
       });
+      expect(passkey.statusCode).toBe(200);
       expect(beginPasskeyStepUp.mock.calls[0]?.[0]).toEqual({ authorization: { action: "PUBLISH", target_run_id: OLD } });
     } finally {
       await api.close();

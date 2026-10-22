@@ -5,7 +5,9 @@ import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } fro
 import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
-import { EntitlementRepository, RunRepository, RunWaitRepository, type StartRunInput } from "@debateai/db";
+import {
+  EntitlementRepository, RunRepository, RunWaitRepository, type ReadmissionPrincipal, type StartRunInput
+} from "@debateai/db";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, debateShapePolicyStartValues, parseDebateShapePolicy
 } from "@debateai/register";
@@ -117,7 +119,8 @@ describe("WaitingRun.releaseKey (side-by-side C10)", () => {
  * edge, the hold on the new run and its first job, all in the START (the new row itself committed just before, as
  * `#submitWithRoom` commits its run). A closed room writes nothing and plans nothing; a choice the new version no longer
  * offers closes the old run with "please ask again"; a START that fails after the new row committed leaves that row
- * FAILED and the old run in line.
+ * FAILED and the old run in line; and a new row whose START never committed at all (a crash) is closed FAILED by a later
+ * tick under the owner's lease (C11 review), so the debate is re-admitted after all.
  */
 // Built from pieces, so no line pairs a *_KEY name with a literal (gitleaks).
 const OLD_RELEASE = ["r16", "0123456789ab"].join("-");
@@ -253,6 +256,29 @@ async function storedWaiting(input: Partial<StartRunInput> & Pick<StartRunInput,
     await line.recordReason(client, runId, { waitsFor: "SITE", personRecheckAt: null, at: now });
   });
   return runId;
+}
+
+/**
+ * C11 review: a re-admission of `old` whose new row committed and whose START never did — the process died in between,
+ * so neither the edge, the hold, the first job nor a FAILED record exists. Written as `#readmit` writes it, under r17.
+ */
+function crashedReadmission(old: string, principal: ReadmissionPrincipal, questionLine: string): Promise<string> {
+  return new RunRepository(fixture.database.pool).startReadmittedRun({
+    fromRunId: old, principal, questionLine,
+    asOf: new Date("2026-10-22T00:00:00.000Z"),
+    askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker:side-by-side-c11",
+    compositionBudgetTier: "low", planTier: "free", depthParams: { depth: 1 },
+    discoveredPanel: fixtureDiscoveredPanel(2), strangerSampleRate: 0,
+    envelopeBasis: fixtureStructuralCeiling(4), registerVersion: 17, releaseKey: NEW_RELEASE, batteryVersion: "side-by-side-c11",
+    askContract: { decision_scope: "side-by-side C11 integration test", steering_presets: [], steering_annotations: [] },
+    batteryRows: []
+  });
+}
+
+/** The application's journal lines among console calls (the embedded database logs through console too). */
+function journalLines(calls: ReadonlyArray<ReadonlyArray<unknown>>): Array<Record<string, unknown>> {
+  return calls.map(([line]) => String(line)).filter((line) => line.startsWith("{"))
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 const count = async (sql: string, values: readonly unknown[] = []): Promise<number> =>
@@ -520,6 +546,71 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(edges).toHaveLength(1);
     expect(edges[0]!.new_run_id).not.toBe(orphan);
     expect(dispatched).toEqual([edges[0]!.new_run_id]);
+  });
+
+  // C11 review, Important (controller ruling 2026-10-22): a re-admission whose START never committed (the process died
+  // between the new row and the START, or its FAILED record never landed) never strands the debate. Under the old run's
+  // owner lease, 0123's core.list_unstarted_readmissions names it, and the waker records it FAILED.
+  it("a legacy re-admission whose START never committed (a crash) is closed FAILED by the next tick, which re-admits the run", async () => {
+    now = new Date("2034-05-08T10:00:00.000Z");
+    const askerId = `c11:crash:${randomUUID()}`;
+    const question = "Should a crashed re-admission strand a legacy asker's waiting debate?";
+    const old = await storedWaiting({ questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId }, sessionId: randomUUID() });
+    const orphan = await crashedReadmission(old, { kind: "legacy", legacyAskerId: askerId }, question);
+    expect(await jobsOf(orphan)).toEqual([]);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const dispatched: string[] = [];
+
+    now = new Date("2034-05-08T10:01:00.000Z");
+    await expect(newApplication(roomOf({ releaseKey: NEW_RELEASE, ceiling: RAISED_DAY }), { dispatched }).wakeWaitingRuns())
+      .resolves.toMatchObject({ started: 1, failed: 0 });
+    expect(await jobsOf(orphan)).toEqual([{ command_key: `S00:${orphan}:Q1`, state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:READMISSION" }]);
+    expect(await holdOf(orphan)).toBeNull();
+    const edges = await supersessionOf(old);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.new_run_id).not.toBe(orphan);
+    expect(dispatched).toEqual([edges[0]!.new_run_id]);
+    const lines = journalLines(info.mock.calls);
+    expect(lines).toContainEqual({ event: "api.wait.readmission_orphan", runId: old, newRunId: orphan });
+  });
+
+  it("an owner's re-admission whose START never committed is closed FAILED when the next tick meets TAKEN; the tick after re-admits", async () => {
+    now = new Date("2034-05-09T10:00:00.000Z");
+    const question = "Should a crashed re-admission strand an encrypted waiting debate?";
+    const old = await storedWaiting({
+      questionLine: question, principal: { kind: "server", userId: fixture.userId, ownerRef: fixture.ownerRef },
+      sessionId: fixture.authSessionId
+    });
+    const orphan = await crashedReadmission(old, { kind: "readmitted-owner", ownerRef: fixture.ownerRef }, question);
+    expect((await fixture.database.pool.query<{ readmitted_from_run_id: string }>(
+      "SELECT readmitted_from_run_id::text AS readmitted_from_run_id FROM identity.run_execution_binding WHERE run_id = $1", [orphan]
+    )).rows).toEqual([{ readmitted_from_run_id: old }]);
+    expect(await jobsOf(orphan)).toEqual([]);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const dispatched: string[] = [];
+    const application = newApplication(roomOf({ releaseKey: NEW_RELEASE, ceiling: RAISED_DAY }), { dispatched });
+
+    // The first tick: the key provision refuses TAKEN (the orphan is alive: no FAILED job); under the lease the waker
+    // records it FAILED, which frees the old run, and skips: nothing else written, the old run still in line.
+    now = new Date("2034-05-09T10:01:00.000Z");
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 0, skipped: 1, failed: 0 });
+    expect(await jobsOf(orphan)).toEqual([{ command_key: `S00:${orphan}:Q1`, state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:READMISSION" }]);
+    expect(await waitingIds()).toContain(old);
+    expect(await supersessionOf(old)).toEqual([]);
+    expect(dispatched).toEqual([]);
+    const lines = journalLines(info.mock.calls);
+    expect(lines).toContainEqual({ event: "api.wait.readmission_orphan", runId: old, newRunId: orphan });
+    expect(lines).toContainEqual({ event: "api.wait.readmission_skipped", runId: old, code: "RUN_READMISSION_TAKEN" });
+
+    // The next tick re-admits it.
+    now = new Date("2034-05-09T10:02:00.000Z");
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
+    const edges = await supersessionOf(old);
+    expect(edges).toHaveLength(1);
+    const created = edges[0]!.new_run_id;
+    expect(created).not.toBe(orphan);
+    expect(dispatched).toEqual([created]);
+    expect((await new RunRepository(fixture.database.pool).readStoredAsk(created))?.questionLine).toBe(question);
   });
 
   it("the same release: a waiting run stamped r17 starts on its own row, with no supersession and no new run", async () => {

@@ -2264,7 +2264,8 @@
       "source": "migrations/0123_side_by_side_releases.sql",
       "grants": [
         "EXECUTE ON FUNCTION core.resolve_run_ref(uuid)",
-        "SELECT, INSERT ON core.run_supersession"
+        "SELECT, INSERT ON core.run_supersession",
+        "EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid)"
       ]
     },
     {

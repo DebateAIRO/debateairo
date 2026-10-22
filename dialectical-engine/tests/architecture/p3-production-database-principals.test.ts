@@ -695,8 +695,8 @@ describe("P3-01 production database-principal manifest", () => {
 // Side-by-side spec §4, §9 (migration 0123 §3-§7), in source order: the release readers (§3); the redefined waiting
 // view's re-asserted SELECT (§4); the funding functions redefined in place re-assert 0092/0093's runtime grants (§7's
 // funded spend reader among them), and the new funding reader at a version is the one new runtime EXECUTE (§6); the
-// append-only spend waiver (§7). The API's role alone records and resolves supersessions (§4); the funding owner reads
-// the waiver (§7).
+// append-only spend waiver (§7). The API's role alone records and resolves supersessions and lists a waiting run's
+// re-admissions whose START never committed (§4, C11 review); the funding owner reads the waiver (§7).
 {
   "roleName": "debateai_runtime",
   "source": "migrations/0123_side_by_side_releases.sql",
@@ -719,7 +719,8 @@ describe("P3-01 production database-principal manifest", () => {
   "source": "migrations/0123_side_by_side_releases.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.resolve_run_ref(uuid)",
-    "SELECT, INSERT ON core.run_supersession"
+    "SELECT, INSERT ON core.run_supersession",
+    "EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid)"
   ]
 },
 {
@@ -1012,8 +1013,9 @@ it("discloses exactly 0123's grants to the runtime, the API's billing role and t
   const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0123_side_by_side_releases.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
-  // §3 two release readers, §4 the waiting view and the API's two supersession grants, §6-§7 seven funding EXECUTEs, §7
-  // the waiver's two table grants. The append-only tables are never writable beyond INSERT.
-  expect(declared).toHaveLength(14);
+  // §3 two release readers, §4 the waiting view and the API's three re-admission grants (record and resolve
+  // supersessions, list the unstarted re-admissions: C11 review), §6-§7 seven funding EXECUTEs, §7 the waiver's two
+  // table grants. The append-only tables are never writable beyond INSERT.
+  expect(declared).toHaveLength(15);
   expect(declared.some(grant => /\b(?:UPDATE|DELETE|TRUNCATE)\b/u.test(grant))).toBe(false);
 });

@@ -232,14 +232,17 @@ export interface AskRoomReader {
  * Side-by-side C11 (spec §4, O3): STARTED names the run that started — the waiting run itself, or the NEW run that
  * re-admits it. NEEDS_READMISSION: another release admitted the run (or the plan was made for another billing plan),
  * nothing was written, and the waker plans its re-admission for `planId`, the billing plan read under the lock (null
- * without billing, for a legacy asker or for internal funding). ASK_AGAIN: the room would start it, but the new version
- * no longer offers one of its choices; nothing was written, and the waker closes it ("please ask again").
+ * without billing, for a legacy asker or for internal funding). C11 review: phase one's answer also carries `preview`,
+ * the room as it measured this run under the lock (its START, the instant, and the owner's windows), so the waker plans
+ * the new run inside the person's room exactly as `#submitWithRoom` does (`personRoomOf(preview)`); a second
+ * NEEDS_READMISSION (the plan moved) carries none. ASK_AGAIN: the room would start it, but the new version no longer
+ * offers one of its choices; nothing was written, and the waker closes it ("please ask again").
  */
 export type WaitingStart<T> =
   | Readonly<{ kind: "STARTED"; runId: string; value: T }>
   | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "FUNDING_FAILED" | "ACCOUNT_HELD" }>
   | Readonly<{ kind: "SITE_BUSY" | "SWITCHING" | "ASK_AGAIN" }>
-  | Readonly<{ kind: "NEEDS_READMISSION"; planId: PlanId | null }>;
+  | Readonly<{ kind: "NEEDS_READMISSION"; planId: PlanId | null; preview?: RoomPreview }>;
 
 /**
  * Side-by-side C11: what the waker hands `startWaiting` the second time, once it has planned a re-admission outside
@@ -619,8 +622,9 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * of another release may touch it (O1). Each step below writes nothing unless it says so.
    *   1. SWITCHING, then still waiting, its funding and PLAN_CHANGED: as for any run.
    *   2. Phase one (no `readmission`): it is measured with its old settings-class estimate; a START the cap allows
-   *      answers NEEDS_READMISSION, and anything else answers as for any run. The waker then plans the re-admission
-   *      outside every lock (the only place a probe may run) and comes back with the plan, under the owner's lease.
+   *      answers NEEDS_READMISSION, with that measure (`preview`: the person's room for the plan's picker), and
+   *      anything else answers as for any run. The waker then plans the re-admission outside every lock (the only
+   *      place a probe may run) and comes back with the plan, under the owner's lease.
    *   3. ASK_AGAIN: a START answers ASK_AGAIN (the waker closes the old run); anything else as for any run.
    *   4. READMIT: measured with the plan's hold (the picker's figure, else the estimate of the plan's settings class).
    *      A plan made for another billing plan than the one read under this lock is NEEDS_READMISSION again. On a START
@@ -668,7 +672,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const estimateMicros = readmit === null
         ? await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run))
         : readmit.holdMicros ?? await this.#options.estimator.estimateMicros(readmit.settingsClass);
-      const { rooms, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
+      const { rooms, personUses, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
         rooms,
         siteLineBlocking: false,
@@ -690,8 +694,12 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         }
         return Object.freeze({ kind: "SITE_BUSY" as const });
       }
-      // Side-by-side C11, steps 2-4: a START the cap allows, for a run another release admitted.
-      if (readmission === undefined && stale) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
+      // Side-by-side C11, steps 2-4: a START the cap allows, for a run another release admitted. C11 review: with the
+      // room as measured here, so the plan's picker can step down to fit the person's windows.
+      if (readmission === undefined && stale) {
+        const preview: RoomPreview = Object.freeze({ admission, estimateMicros, now, personUses, waitReason });
+        return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId, preview });
+      }
       if (readmission?.plan.kind === "ASK_AGAIN") return Object.freeze({ kind: "ASK_AGAIN" as const });
       if (readmission !== undefined && readmit !== null) {
         const newRunId = await readmission.createRun();

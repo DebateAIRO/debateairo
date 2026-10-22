@@ -229,7 +229,10 @@ no re-admission marker naming another run, and both are the same person's; SELEC
 EXECUTE for `debateai_billing_runtime`, at most 16 hops), the readmitted run's key provision
 `core.prepare_readmitted_run_key_provision(uuid,uuid)` (EXECUTE for `debateai_content_provision` only) with its commit
 lock and the marker column `readmitted_from_run_id` on the intent and on the run's execution binding (one live
-re-admission per old run), and redefines `core.run_waiting_v` (0083's view plus "not superseded"); §5 widens
+re-admission per old run), `core.list_unstarted_readmissions(uuid)` (a STABLE definer, EXECUTE for
+`debateai_billing_runtime` only: the re-admissions of a waiting run whose START never committed, which the API records
+FAILED under the old run's owner lease; plan C11 review), and redefines `core.run_waiting_v` (0083's view plus "not
+superseded"); §5 widens
 `core.run_wait_reason`'s `waits_for` CHECK with `SITE_BUSY` and `SWITCHING` (NOT VALID, then validated); §6 redefines in
 place, same signature, owner, definer, path and grants, the five funding functions that tied a grant to the funding
 selection's or the run's version (`billing.reserve_internal_provider_call`, `billing.read_internal_run_state`,

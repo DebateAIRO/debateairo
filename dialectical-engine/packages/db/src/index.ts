@@ -2169,6 +2169,22 @@ export class RunRepository {
   }
 
   /**
+   * Side-by-side C11 review (controller ruling 2026-10-22) — THE RE-ADMISSIONS OF `oldRunId` WHOSE START NEVER
+   * COMMITTED: 0123's core.list_unstarted_readmissions (EXECUTE for the API's role), on this repository's runtime pool.
+   * Each is a new run with no supersession edge and no work item — an owner's run whose binding names the old run, or
+   * a legacy asker's plain copy of it — whose row committed while its START did not, and whose FAILED record never
+   * landed. Ask it only under the old run's owner ask-admission lease, where no START of that person is in flight, so
+   * every id is such an orphan (the waker records it FAILED, RUN_SETUP_FAILED:READMISSION). Ids only, in id order.
+   */
+  async listUnstartedReadmissions(oldRunId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ run_id: string }>(
+      "SELECT listed.run_id::text AS run_id FROM core.list_unstarted_readmissions($1::uuid) AS listed(run_id)",
+      [oldRunId]
+    );
+    return Object.freeze(result.rows.map((row) => row.run_id));
+  }
+
+  /**
    * One new run row and its opening rows, for `startRun` and `startReadmittedRun` alike: `identity` says whose it is
    * (`RunRowIdentity`); everything else is the run input. Byte for byte what `startRun` always wrote.
    */

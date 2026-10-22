@@ -9,7 +9,8 @@
 --   §3  core.release_event, its view core.release_state_v, its two readers and its two writers serialized on one
 --       advisory lock, owned by the new NOLOGIN role debateai_release_owner (A2);
 --   §4  re-admission records: core.run_supersession and its guard, core.resolve_run_ref, core.run_waiting_v redefined
---       so a superseded run no longer waits, the readmitted run's key provision, and the API runtime's reads (A3);
+--       so a superseded run no longer waits, the readmitted run's key provision, the re-admissions whose START never
+--       committed (core.list_unstarted_readmissions, plan C11 review), and the API runtime's reads (A3);
 --   §5  core.run_wait_reason.waits_for widened with SITE_BUSY and SWITCHING (A3);
 --   §6  the five funding functions that tied a grant to the selection's or the run's version, redefined in place
 --       without that comparison, staff.read_self_allowance_command naming a revoke's grant's own version, and
@@ -693,9 +694,10 @@ GRANT SELECT ON core.run_waiting_v TO debateai_runtime;
 -- RUN_READMISSION_TAKEN while any earlier re-admission of the same old run is pending (its binding has no run yet) or
 -- alive (its run exists without a FAILED job). A re-admitted run recorded FAILED (plan C11's orphan path,
 -- RUN_SETUP_FAILED:READMISSION: the START transaction failed after the new run committed) frees the old run for the
--- next tick, so the debate is never stranded; such a run never ran and never runs. Prepare decides this under the
--- account's advisory lock (two prepares for one person run one after the other), and a partial UNIQUE index keeps at
--- most one pending intent per old run regardless.
+-- next tick, so the debate is never stranded; such a run never ran and never runs. One whose FAILED record never
+-- landed (a crash between its row and its START) is listed by core.list_unstarted_readmissions below, and recorded
+-- then. Prepare decides this under the account's advisory lock (two prepares for one person run one after the other),
+-- and a partial UNIQUE index keeps at most one pending intent per old run regardless.
 ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS readmitted_from_run_id uuid NULL;
 COMMENT ON COLUMN core.run_key_provision_intent.readmitted_from_run_id IS
   'Side-by-side spec §4 (0123 §4): set only by core.prepare_readmitted_run_key_provision, the waiting run this provision re-admits; the commit then needs no live session. NULL for every ordinary provision.';
@@ -841,11 +843,60 @@ REVOKE ALL ON FUNCTION core.lock_readmitted_run_key_provision_for_commit(uuid,uu
   FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,
     debateai_replay,debateai_publication_cleanup,debateai_content_provision;
 
+-- THE RE-ADMISSIONS WHOSE START NEVER COMMITTED (plan C11 review, controller ruling 2026-10-22). START commits the new
+-- run's row first, on its own connection, and then the edge, the hold and the first job in ONE transaction (plan C11),
+-- so a process that dies between the two, or a FAILED record that never lands after a failed START, leaves a new run
+-- that never runs: no edge into it, no work item. For an owner's run, prepare above would then refuse
+-- RUN_READMISSION_TAKEN at every tick, and the debate would wait for ever. The API asks this reader only under the old
+-- run's owner ask-admission lease, where no START of that person is in flight, so every run it lists is such an orphan,
+-- which the API records FAILED (RUN_SETUP_FAILED:READMISSION, plan C11's orphan path, which frees the old run). Two
+-- kinds:
+--   · an owner's re-admission: a run whose execution binding names the old run (readmitted_from_run_id, above);
+--   · a legacy asker's: the plain insert copies the old row's asker id, session id and question (in the clear) under
+--     the current release and writes no binding, so it is a plain run of the same asker, session and question, written
+--     after the old run (created_at_seq) under another release, that never took a place in line (no core.run_wait row).
+-- Either way the run exists (a provision still pending has no run yet: 0040's sweep removes it with its intent), and it
+-- has no edge and no work item. A STABLE definer, because no runtime may read identity.run_execution_binding; it
+-- returns ids only. Owned, like this section's other definers that read the binding, by the migration's owner; callable
+-- by the API's role alone (debateai_billing_runtime, as core.resolve_run_ref), never by the runner's.
+CREATE OR REPLACE FUNCTION core.list_unstarted_readmissions(p_old_run_id uuid)
+RETURNS SETOF uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+  SELECT marked.run_id
+  FROM identity.run_execution_binding AS marked
+  JOIN core.run AS run ON run.run_id = marked.run_id
+  WHERE marked.readmitted_from_run_id = p_old_run_id
+    AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS edge WHERE edge.new_run_id = marked.run_id)
+    AND NOT EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = marked.run_id)
+  UNION
+  SELECT copy.run_id
+  FROM core.run AS old_run
+  JOIN core.run AS copy
+    ON copy.asker_id = old_run.asker_id AND copy.session_id = old_run.session_id
+   AND copy.question_line = old_run.question_line AND copy.created_at_seq > old_run.created_at_seq
+   AND copy.release_key <> old_run.release_key
+  WHERE old_run.run_id = p_old_run_id
+    AND old_run.content_encryption_version IS DISTINCT FROM 1
+    AND copy.content_encryption_version IS DISTINCT FROM 1
+    AND NOT EXISTS (SELECT 1 FROM core.run_wait AS wait WHERE wait.run_id = copy.run_id)
+    AND NOT EXISTS (
+      SELECT 1 FROM core.run_supersession AS edge WHERE edge.new_run_id = copy.run_id OR edge.old_run_id = copy.run_id)
+    AND NOT EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = copy.run_id)
+  ORDER BY 1
+$$;
+REVOKE ALL ON FUNCTION core.list_unstarted_readmissions(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid) TO debateai_billing_runtime;
+
 -- THE RUNTIMES' REACH (addendum A-x2, controller ruling 2026-10-22). Both the API's login and the runner's hold
 -- debateai_runtime: it reads core.run.release_key and calls §3's two readers (the runner's retirement reads its
 -- release's state). Only the API's role, debateai_billing_runtime (a member of debateai_runtime, 0093), also writes
--- core.run_supersession and calls core.resolve_run_ref (granted above). The runtime's table-wide SELECT on core.run
--- (0000:301) already covers the stamp, so no column grant is added; the closing block checks all of it.
+-- core.run_supersession and calls core.resolve_run_ref and core.list_unstarted_readmissions (granted above). The
+-- runtime's table-wide SELECT on core.run (0000:301) already covers the stamp, so no column grant is added; the closing
+-- block checks all of it.
 
 -- §5. Two new wait reasons (spec §9, §13; INTERFACE "Database") -------------------------------------------------------
 -- SITE_BUSY: the site runs as many debates as its runners take (plan C, SITE_CONCURRENT_DEBATES). SWITCHING: a release
@@ -1186,6 +1237,7 @@ DECLARE
   v_resolve regprocedure := to_regprocedure('core.resolve_run_ref(uuid)');
   v_readmit regprocedure := to_regprocedure('core.prepare_readmitted_run_key_provision(uuid,uuid)');
   v_readmit_lock regprocedure := to_regprocedure('core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)');
+  v_unstarted regprocedure := to_regprocedure('core.list_unstarted_readmissions(uuid)');
   v_start_guard regprocedure := to_regprocedure('core.refuse_starting_superseded_run()');
   v_funding regprocedure[] := ARRAY[
     to_regprocedure('billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)'),
@@ -1265,7 +1317,8 @@ BEGIN
   -- STABLE definer with the pinned path, callable by the API's role and not by the runtime (the runner); the start guard
   -- on core.run_wait_start; the line excluding superseded runs, readable by the runtime; the readmitted provision
   -- callable by the content-provision role alone, its commit lock by nobody, §2's commit taking it, and the intent's
-  -- marker column; and the runtime reaching the stamp and the two release readers (addendum A-x2).
+  -- marker column; the unstarted re-admissions reader a STABLE definer with the pinned path, callable by the API's
+  -- role alone (C11 review); and the runtime reaching the stamp and the two release readers (addendum A-x2).
   IF to_regclass('core.run_supersession') IS NULL
     OR (SELECT count(*) FROM pg_constraint
         WHERE conrelid = to_regclass('core.run_supersession')
@@ -1311,6 +1364,16 @@ BEGIN
     OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
              FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
              WHERE p.oid = v_readmit_lock AND a.grantee <> p.proowner ORDER BY 1) <> ARRAY[]::text[]
+    OR v_unstarted IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_proc AS p
+      WHERE p.oid = v_unstarted AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']
+        AND p.provolatile = 's')
+    OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
+             FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
+             WHERE p.oid = v_unstarted AND a.grantee <> p.proowner ORDER BY 1)
+       IS DISTINCT FROM ARRAY['debateai_billing_runtime:EXECUTE']
+    OR has_function_privilege('debateai_runtime', v_unstarted, 'EXECUTE')
     OR to_regclass('core.run_key_provision_intent_one_readmission_idx') IS NULL
     OR NOT EXISTS (
       SELECT 1 FROM pg_attribute
