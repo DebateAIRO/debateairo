@@ -195,43 +195,42 @@ describe("legal documents — generated data", () => {
       }
     });
 
-    // FIX-SF-S03-p2 (t_355a30d1, t_ecf5a65c); FIX-SF-S03-p3 (V-102 (a), t_52ef891f N4, t_2dcad4c1, t_45b9c37c): ToS §10
-    // lists the automatic support cases as the support code opens them. Derived from the code: escalation.ts defines E1-E8;
-    // E1 is a visitor's own request, and every evaluateEscalation call in support/index.ts passes `toolCalls: []`, so E4
-    // never fires; the six others are listed, the three word rules (E8, E2, E3) under "Three of these rules read words"
-    // and the three others (E6, E5, E7) under "In any language", and the password early return opens no case itself.
-    it("lists the automatic support cases as the support code opens them", () => {
-      const escalation = readFileSync(resolve(process.cwd(), "apps/api/src/support/escalation.ts"), "utf8");
-      expect([...escalation.matchAll(/predicate: "(E\d)"/g)].map((match) => match[1]).sort()).toEqual(["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]);
-      const route = readFileSync(resolve(process.cwd(), "apps/api/src/support/index.ts"), "utf8");
-      const calls = [...route.matchAll(/evaluateEscalation\(\{/g)].map((match) => route.slice(match.index, route.indexOf("})", match.index)));
-      expect(calls).toHaveLength(3);
-      for (const call of calls) expect(call, call.slice(0, 60)).toMatch(/toolCalls: \[\]/);
-      const risk = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.includes("In the support chat, our rules also open a case")) ?? "";
-      const support = risk.slice(risk.indexOf("In the support chat, our rules also open a case"));
-      const words = support.indexOf("Three of these rules read words: the support chat has its own lists of English and Romanian words and phrases, and the lists find those words in a message written in any language.");
-      const anyLanguage = support.indexOf("In any language, a case also opens ");
-      expect(words).toBeGreaterThan(0);
-      expect(anyLanguage).toBeGreaterThan(words);
-      const byLists = support.slice(support.indexOf("By these lists, a case opens: "), support.indexOf(". ", support.indexOf("By these lists, a case opens: "))).replace("By these lists, a case opens: ", "").split("; ");
-      expect(byLists).toHaveLength(3);
-      expect(byLists[0]).toMatch(/^when they find in a message their words for deleting your account \(their words for closing it are not enough\), for a child's account, or for a legal or personal-data request/);
-      expect(byLists[1]).toMatch(/^when they read a message as a person thinking of suicide or self-harm, as a threat to you, or as someone forcing you to write, and do not also read it as being about your account \(one word such as "password" or "session" can be enough, even used in another sense\)$/);
-      expect(byLists[2]).toMatch(/^and when they read two of your messages as being about your account/);
-      const password = support.indexOf("When the lists recognise a message as a request to recover or reset a forgotten password, that message opens no case itself, though it can count as one of those two messages.");
-      expect(password).toBeGreaterThan(words);
-      expect(password).toBeLessThan(anyLanguage);
-      const others = support.slice(anyLanguage + "In any language, a case also opens ".length).replace(/\.$/, "").split("; ");
-      expect(others).toEqual([
-        "when the assistant has twice found nothing in our help articles to answer a question about our service",
-        "when you rate two answers in a row as unhelpful",
-        "or when you write again after the chat said its model is unavailable"
-      ]);
-      expect(support).not.toMatch(/tries for you|attempts for you|is refused|is declined/);
-      // The Policy's own case sentence (PP §3) carries the same two limits: the list's words reach a message in any
-      // language, and one account word keeps the case closed (t_45b9c37c).
-      const policy = allTexts(PRIVACY_POLICY).find((text) => text.includes("the chat also opens a case that a member of our team reads (Terms, section 10)")) ?? "";
-      expect(policy).toContain("When the support chat's own list of English and Romanian phrases recognises such a message, which it can do in a message written in any language, and its lists do not also read the message as being about your account (one word such as \"password\" or \"session\" can be enough, even used in another sense), the chat also opens a case");
+    // TEXT-SF-S03-p4 (V-111, S05 SPEC-v10 S05-L2, S05-L9, S05-L13, S05-L14): the support chat keeps nothing and opens no
+    // case. PROPERTY: no sentence of either document says the support chat or its rules open a case, the Terms' "Contacting
+    // a human" gives the support address and the "Talk to a human" button, and the Policy's §3 and Annex B.2 say nothing of
+    // the chat is kept. Replaces FIX-SF-S03-p3's code-derived list of cases (escalation.ts goes with S05).
+    it("says the support chat keeps nothing and opens no case, and that a person is reached at the support address", () => {
+      const all = [...allTexts(PRIVACY_POLICY), ...allTexts(TERMS_OF_SERVICE)].flatMap((text) => text.split(/(?<=[.;])\s+/));
+      const opensCase = all.filter((sentence) => /support chat|support assistant|our rules/i.test(sentence) && /\bopens? (?:a|one) case|case opens|cases? (?:opened|that a member)/i.test(sentence));
+      expect(opensCase).toEqual([]);
+      const human = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.startsWith("Contacting a human.")) ?? "";
+      expect(human).toContain("You can write to a person at our support address, support@dezbatere.ro, at any time; the support assistant's \"Talk to a human\" button shows that address, and the chat itself passes nothing to a person.");
+      const risk = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.startsWith("Serious risk to life or safety.")) ?? "";
+      expect(risk.endsWith("who informs the competent authorities when the threat is credible.")).toBe(true);
+      const health = allTexts(PRIVACY_POLICY).find((text) => text.startsWith("Health information.")) ?? "";
+      expect(health.endsWith("then shows help numbers instead of an answer; we keep nothing of the message or of the reply, and the chat opens no case.")).toBe(true);
+      const b2 = allTexts(PRIVACY_POLICY).find((text) => text.startsWith("Notice at collection.")) ?? "";
+      expect(b2).toContain("What you write to the support chat we use without that consent only to answer you, and to recognise a message that reads like the words of a person in crisis and show help numbers instead of an answer (section 3); we keep nothing of it, and no case is opened.");
+    });
+
+    // TEXT-SF-S03-p4 (V-118; S05-L4, S05-L15): the Policy names Anthropic's support retention as the Register states it.
+    // PROPERTY: every number of the Register's Anthropic retention text is in the Policy's §5 support sentence, the sentence
+    // says zero data retention is not active exactly when the Register's support row says "no", and we never call the
+    // support chat's messages unretained.
+    it("names Anthropic's support retention as the Register states it, and says we do not retain the messages", async () => {
+      const { SUPPORT_PROVIDER } = await import("../../apps/ui/lib/legal/pages.js");
+      const legal = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/legal.json"), "utf8")) as Record<string, string>;
+      const register = legal[SUPPORT_PROVIDER.retentionKey] ?? "";
+      const sent = allTexts(PRIVACY_POLICY).find((text) => text.startsWith("What is sent.")) ?? "";
+      const support = sent.slice(sent.indexOf("If you use the support chat"), sent.indexOf("A provider never receives"));
+      expect(support).toContain("goes to an external model provider, Anthropic, so that its model Claude can answer you. We do not retain those messages, but Anthropic may, for the period our Register states");
+      const numbers = register.match(/[0-9]+/g) ?? [];
+      expect(numbers.length).toBeGreaterThan(0);
+      for (const number of numbers) expect(support, `the Register's ${number}`).toMatch(new RegExp(`\\b${number}\\b`));
+      expect(support.includes("zero data retention is not active for the endpoint we use")).toBe(SUPPORT_PROVIDER.zeroRetention === "no");
+      for (const text of [...allTexts(PRIVACY_POLICY), ...allTexts(TERMS_OF_SERVICE)]) {
+        if (/support (?:chat|assistant)/i.test(text)) expect(text, text.slice(0, 60)).not.toMatch(/unretained|not retained/i);
+      }
     });
 
     it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
@@ -284,8 +283,10 @@ describe("legal documents — generated data", () => {
       expect(content[2]!.startsWith("How your content reaches AI providers. To run a debate")).toBe(true);
       const support = content[3]!;
       expect(support.startsWith("What the support chat sends. The support assistant is also an AI model.")).toBe(true);
-      expect(support).toContain("we send your message to an external model provider");
-      expect(support).toContain("we also send the conversation, masked the same way, to the model");
+      expect(support).toContain("we send your message to an external model provider, Anthropic, so that its model Claude can answer");
+      // TEXT-SF-S03-p4 (V-118, S05-L12): no case summary any more; we do not retain, Anthropic may.
+      expect(support).toContain("We do not retain what you write in the chat, but Anthropic may keep it for the period stated in our AI Provider Register (below).");
+      expect(support).not.toMatch(/summary|a case opens/i);
       expect(support).toContain("the model receives anything else you type in the chat");
     });
 
