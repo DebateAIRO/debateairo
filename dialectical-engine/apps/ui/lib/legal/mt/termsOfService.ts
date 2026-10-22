@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Kanċellazzjoni. Ikkanċella fi kwalunkwe ħin minn Issettjar → Abbonament bi klikk waħda ta’ konferma, jew permezz tal-paġna tal-kanċellazzjoni fuq dezbatere.ro/cancel, li ma titlobx li tidħol fil-kont. Il-kanċellazzjoni tidħol fis-seħħ fi tmiem il-perjodu ta’ fatturazzjoni attwali, u tibqa’ jkollok aċċess sa dak iż-żmien. Mhux se nagħmlu l-kanċellazzjoni aktar diffiċli milli kien l-abbonar." },
       { kind: "p", text: "Bidliet fil-prezz jidħlu fis-seħħ biss mat-tiġdid. Nagħtu avviż ta’ mill-inqas 30 jum bil-posta elettronika, li jinkludi l-prezz il-ġdid u ħolqa għall-kanċellazzjoni. Fejn il-liġi ta’ pajjiżek titlob il-kunsens espliċitu tiegħek għal bidla fil-prezz, nitolbuh; inkella, jekk ma tagħmel xejn, il-prezz il-ġdid japplika mit-tiġdid li jmiss. L-Anness A jinnota r-regoli reġjonali." },
       { kind: "p", text: "Ħlasijiet li jfallu. Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla." },
-      { kind: "p", text: "Taxxi, u lil min tħallas. Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com). Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini." },
+      { kind: "p", text: "Taxxi, u lil min tħallas. Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini." },
+      { kind: "p", text: "Metodi ta’ ħlas. Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna." },
+      { kind: "p", text: "Kunsinna. Dialectical Engine huwa servizz online, għalhekk xejn ma jintbagħatlek. Il-funzjonalitajiet tal-pjan bi ħlas tiegħek ikunu disponibbli fil-kont tiegħek hekk kif il-ħlas tiegħek jiġi kkonfermat." },
       { kind: "p", text: "Treġġigħ lura ta’ ħlasijiet. Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan." },
       { kind: "p", text: "L-ewwel id-drittijiet statutorji. Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu ta’ kull pjan jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "7349514f189630c459b5f12fdde16bf731ec84cad56f6c972463d17635cff8b5",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.3 · EFFETTIVI 12 TA’ OTTUBRU 2026",
+  version: "2.4",
+  sha256: "d373f89b70125f4f4b6bccf7ae1cafbe9214dd8bf7c38c67c19bd7911ba9b97d",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.4 · EFFETTIVI 12 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.3",
+  endMarker: "TMIEM IT-TERMINI · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

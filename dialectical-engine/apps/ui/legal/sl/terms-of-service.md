@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.3 · VELJAVNI OD 12. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.4 · VELJAVNI OD 12. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.3
+endMarker: KONEC POGOJEV · v2.4
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.3 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.4 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -195,7 +195,11 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 
 **Neuspela plačila.** Če plačilo ne uspe, ga ponovno poskušamo izvesti 7 dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo.
 
-**Davki in prejemnik plačila.** Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com). Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
+**Davki in prejemnik plačila.** Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
+
+**Načini plačila.** Plačate s kartico. Sprejemamo kartice Visa in Mastercard; kartic American Express ne sprejemamo. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com), celotna številka vaše kartice pa nikoli ne pride do nas.
+
+**Dostava.** Dialectical Engine je spletna storitev, zato vam ničesar ne pošiljamo. Funkcije vašega plačljivega paketa so v vašem računu na voljo takoj, ko je plačilo potrjeno.
 
 **Povratne bremenitve.** Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin.
 

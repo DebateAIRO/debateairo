@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "取消。 您可随时通过设置 → 订阅，点击一次确认即可取消，亦可通过 dezbatere.ro/cancel 的取消页面取消，该页面无需登录。取消于当前计费周期结束时生效，您可继续使用至该时点。我们不会使取消流程比订阅流程更为困难。" },
       { kind: "p", text: "价格变更仅在续订时生效。我们至少提前 30 天通知，通过电子邮件告知新价格并提供取消链接。如果您所在国家的法律要求您明确同意价格变更，我们会征求您的同意；否则，如您不采取任何行动，新价格将从下一次续订起适用。附件 A 说明区域性规则。" },
       { kind: "p", text: "付款失败。 如果付款失败，我们会在 7 天内重试，并在将您的账户降级为免费方案前通过电子邮件发出警告。我们不会因付款失败而删除您的辩论。" },
-      { kind: "p", text: "税费及收款方。 价格包含增值税、商品及服务税或销售税，具体取决于您的居住地，并会在付款前显示。银行卡付款由 NETOPIA Payments（netopia-payments.com）处理。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。" },
+      { kind: "p", text: "税费及收款方。 价格包含增值税、商品及服务税或销售税，具体取决于您的居住地，并会在付款前显示。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。" },
+      { kind: "p", text: "付款方式。 您以银行卡付款。我们接受 Visa 和 Mastercard；不接受 American Express。银行卡付款由 NETOPIA Payments（netopia-payments.com）处理，您的完整卡号绝不会传到我们这里。" },
+      { kind: "p", text: "交付。 Dialectical Engine 是在线服务，因此不会向您寄送任何物品。付款一经确认，您付费方案的功能即可在您的账户中使用。" },
       { kind: "p", text: "拒付。 如果您向发卡机构提出交易争议，我们可以在争议解决期间暂停付费功能。我们不会为此收取费用。" },
       { kind: "p", text: "法定权利优先。 如果服务不符合我们的承诺，您有权要求使其达到约定标准，或依法获得相应的价格减免或退款。除此之外，如果您在计费周期内取消付费方案，我们会退还该周期价款中您尚未使用的部分，按方案的使用量计算，无论已过去多少天：如果您已使用方案的 30%，我们退还 70%；如果您一点也没有使用，我们退还全额。请通过 support@dezbatere.ro 提出申请；我们退款后，方案即终止。如果第 13 节的撤回权同样适用，您将获得两种退款中金额较大的一种。两种方案的使用限制均在产品中公布；如果收紧限制会对您造成重大影响，我们会提前通知。" }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "83c8bd35831c21c59b466216ffab66ca7dafab10797160cda2bf17000c469902",
-  eyebrow: "服务条款 · v2.3 · 生效日期 2026 年 10 月 12 日",
+  version: "2.4",
+  sha256: "edacef5682f452989d08b743f344e5b15f5cc6631fe7ce4f27dbf987f4882a55",
+  eyebrow: "服务条款 · v2.4 · 生效日期 2026 年 10 月 12 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",
-  endMarker: "服务条款结束 · v2.3",
+  endMarker: "服务条款结束 · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "服务条款正文",
   sectionIdPrefix: "terms-section-",

@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Opzeggen. Zeg te allen tijde via Instellingen → Abonnement op met één bevestigingsklik, of via de opzeggingspagina op dezbatere.ro/cancel, waarvoor u zich niet hoeft aan te melden. De opzegging wordt van kracht aan het einde van de lopende factureringsperiode en u behoudt tot dan toegang. Wij maken opzeggen niet moeilijker dan abonneren was." },
       { kind: "p", text: "Prijswijzigingen worden pas bij een verlenging van kracht. Wij stellen u ten minste 30 dagen van tevoren per e-mail in kennis van de nieuwe prijs en sturen een opzeggingslink mee. Wanneer het recht van uw land uw uitdrukkelijke toestemming voor een prijswijziging vereist, vragen wij u om die toestemming; anders geldt de nieuwe prijs vanaf de volgende verlenging als u niets doet. Bijlage A vermeldt regionale regels." },
       { kind: "p", text: "Mislukte betalingen. Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt." },
-      { kind: "p", text: "Belastingen en aan wie u betaalt. Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com). De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden." },
+      { kind: "p", text: "Belastingen en aan wie u betaalt. Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden." },
+      { kind: "p", text: "Betaalmethoden. U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit." },
+      { kind: "p", text: "Levering. Dialectical Engine is een onlinedienst, dus er wordt niets naar u verzonden. De functies van uw betaalde abonnement zijn in uw account beschikbaar zodra uw betaling is bevestigd." },
       { kind: "p", text: "Terugboeking. Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening." },
       { kind: "p", text: "Wettelijke rechten gaan voor. Wanneer de dienst niet beantwoordt aan wat wij hebben beloofd, hebt u het recht hem in overeenstemming te laten brengen of, zoals de wet bepaalt, een evenredige prijsvermindering of terugbetaling te ontvangen. Daarnaast betalen wij, als u een betaald abonnement opzegt tijdens een factureringsperiode, het deel van de prijs van die periode terug dat u niet hebt gebruikt, gemeten naar het gebruik van het abonnement, ongeacht hoeveel dagen er zijn verstreken: hebt u 30 % gebruikt, dan betalen wij 70 % terug; hebt u niets gebruikt, dan betalen wij de volledige prijs terug. Vraag het aan via support@dezbatere.ro; zodra wij terugbetalen, eindigt het abonnement. Geldt ook het herroepingsrecht van hoofdstuk 13, dan ontvangt u de hoogste van beide terugbetalingen. Gebruiksbeperkingen voor elk abonnement worden in het product gepubliceerd; wij stellen u op de hoogte voordat wij ze aanscherpen op een wijze die u wezenlijk raakt." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "3f057e9c98b1bdd8bd8b7812d58ed0c6c567af812f85738ad836e20991e07ad0",
-  eyebrow: "SERVICEVOORWAARDEN · v2.3 · VAN KRACHT OP 12 OKTOBER 2026",
+  version: "2.4",
+  sha256: "15af2c8c0f812e419911d11070a71e4b7b56e7cdb1cdc65b50f1606458dfa8af",
+  eyebrow: "SERVICEVOORWAARDEN · v2.4 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.3",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

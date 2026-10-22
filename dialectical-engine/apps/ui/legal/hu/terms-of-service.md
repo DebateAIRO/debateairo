@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.3 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.4 · HATÁLYOS 2026. OKTÓBER 12.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.3
+endMarker: A FELTÉTELEK VÉGE · v2.4
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.3 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.4 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -195,7 +195,11 @@ A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag
 
 **Sikertelen fizetések.** Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit.
 
-**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+
+**Fizetési módok.** Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk.
+
+**Szállítás.** A Dialectical Engine online szolgáltatás, így semmit sem szállítunk ki Önnek. Fizetős csomagjának funkciói a fizetés megerősítése után azonnal elérhetők a fiókjában.
 
 **Visszaterhelések.** Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat.
 

@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Cealú. Cealaigh am ar bith ó Socruithe → Síntiús le clic deimhnithe amháin, nó tríd an leathanach cealaithe ag dezbatere.ro/cancel, nach gceanglaíonn ort síniú isteach. Tagann an cealú i bhfeidhm ag deireadh na tréimhse billeála reatha, agus coimeádann tú rochtain go dtí sin. Ní dhéanfaimid cealú níos deacra ná mar a bhí liostáil." },
       { kind: "p", text: "Ní thagann athruithe praghais i bhfeidhm ach tráth athnuachana. Tugaimid fógra 30 lá ar a laghad ar ríomhphost leis an bpraghas nua agus nasc cealaithe. Sa chás ina gceanglaíonn dlí do thíre orainn do thoiliú sainráite a fháil le hathrú praghais, iarraimid é; murach sin, mura ndéanann tú aon ní, beidh feidhm ag an bpraghas nua ón gcéad athnuachan eile. Luaitear rialacha réigiúnacha in Iarscríbhinn A." },
       { kind: "p", text: "Íocaíochtaí teipthe. Má theipeann ar íocaíocht, bainimid triail eile as ar feadh 7 lá agus tugaimid rabhadh duit ar ríomhphost sula n-íosghrádaímid do chuntas go dtí an plean saor in aisce. Ní scriosaimid do dhíospóireachtaí toisc gur theip ar íocaíocht." },
-      { kind: "p", text: "Cánacha, agus cé leis a n-íocann tú. Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo." },
+      { kind: "p", text: "Cánacha, agus cé leis a n-íocann tú. Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo." },
+      { kind: "p", text: "Modhanna íocaíochta. Íocann tú le cárta. Glacaimid le Visa agus Mastercard; ní ghlacaimid le American Express. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta, agus ní shroicheann uimhir iomlán do chárta muid riamh." },
+      { kind: "p", text: "Seachadadh. Is seirbhís ar líne é Dialectical Engine, mar sin ní sheoltar aon rud chugat. Bíonn gnéithe do phlean íoctha ar fáil i do chuntas a luaithe a dheimhnítear d'íocaíocht." },
       { kind: "p", text: "Aisghairmeacha íocaíochta. Má dhéanann tú agóid i gcoinne muirir le d'eisitheoir cárta, féadfaimid gnéithe íoctha a chur ar fionraí fad a réitítear an díospóid. Ní ghearraimid táillí as seo." },
       { kind: "p", text: "Cearta reachtúla ar dtús. Sa chás nach gcomhlíonann an tseirbhís an méid a gheallamar, tá tú i dteideal go dtabharfaí chun comhréireachta í, nó go bhfaighfeá laghdú comhréireach ar an bpraghas nó aisíocaíocht, de réir mar a fhoráiltear sa dlí. Thairis sin, má chuireann tú plean íoctha ar ceal i rith tréimhse bhilleála, aisíocaimid duit an chuid de phraghas na tréimhse sin nár úsáid tú, arna tomhas de réir úsáide an phlean, is cuma cé mhéad lá atá caite: má úsáid tú 30% di, aisíocaimid 70%; mura bhfuil aon chuid di úsáidte agat, aisíocaimid an praghas iomlán. Iarr é ag support@dezbatere.ro; chomh luath agus a aisíocaimid, tagann deireadh leis an bplean. Má bhaineann an ceart tarraingthe siar i rannán 13 leis freisin, gheobhaidh tú cibé aisíocaíocht is mó. Foilsítear teorainneacha úsáide ar cheachtar plean sa táirge; tugaimid fógra sula ndéanaimid níos déine iad ar bhealach a théann i bhfeidhm go hábhartha ort." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "167f817c2e3d9180bc708a82546bb2dadd7b297bbefa9c54894c26b36868e59a",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "2.4",
+  sha256: "15a6fb837b3e6d646719dc3f25aaa4700bbfd883da57045cf8852147984d06ef",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.3",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

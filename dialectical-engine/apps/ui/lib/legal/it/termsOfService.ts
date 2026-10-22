@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Disdetta. Puoi disdire l'abbonamento in qualsiasi momento da Impostazioni → Abbonamento con un unico clic di conferma oppure tramite la pagina di disdetta all'indirizzo dezbatere.ro/cancel, che non richiede l'accesso. La disdetta diventa effettiva alla fine del periodo di fatturazione in corso e mantieni l'accesso fino a quel momento. Non renderemo la disdetta più difficile di quanto sia stata la sottoscrizione." },
       { kind: "p", text: "Le modifiche dei prezzi hanno effetto soltanto in occasione di un rinnovo. Ti diamo un preavviso di almeno 30 giorni tramite email, indicando il nuovo prezzo e un link per la disdetta. Qualora la legge del tuo Paese richieda il tuo consenso espresso a una modifica del prezzo, te lo chiediamo; altrimenti, se non fai nulla, il nuovo prezzo si applica dal rinnovo successivo. L'Allegato A indica le norme regionali." },
       { kind: "p", text: "Pagamenti non riusciti. Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito." },
-      { kind: "p", text: "Imposte e soggetto a cui effettui il pagamento. I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com). Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni." },
+      { kind: "p", text: "Imposte e soggetto a cui effettui il pagamento. I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni." },
+      { kind: "p", text: "Metodi di pagamento. Paghi con carta. Accettiamo Visa e Mastercard; non accettiamo American Express. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com) e il numero completo della tua carta non arriva mai a noi." },
+      { kind: "p", text: "Consegna. Dialectical Engine è un servizio online, quindi non ti viene spedito nulla. Le funzionalità del tuo piano a pagamento sono disponibili nel tuo account non appena il pagamento è confermato." },
       { kind: "p", text: "Storni. Se contesti un addebito presso l'emittente della tua carta, possiamo sospendere le funzionalità a pagamento mentre la controversia viene risolta. Non addebitiamo commissioni a tale titolo." },
       { kind: "p", text: "Prevalenza dei diritti previsti dalla legge. Qualora il servizio non sia conforme a quanto promesso, hai diritto a ottenerne la conformità oppure a una riduzione proporzionata del prezzo o a un rimborso, come previsto dalla legge. Oltre a ciò, se disdici un piano a pagamento durante un periodo di fatturazione, ti rimborsiamo la quota del prezzo di quel periodo che non hai utilizzato, misurata in base all'utilizzo del piano, indipendentemente dal numero di giorni trascorsi: se ne hai utilizzato il 30%, ti rimborsiamo il 70%; se non ne hai utilizzato nulla, ti rimborsiamo l'intero prezzo. Chiedilo a support@dezbatere.ro; una volta effettuato il rimborso, il piano termina. Se si applica anche il diritto di recesso di cui alla sezione 13, ottieni il rimborso più elevato tra i due. I limiti di utilizzo di ciascun piano sono pubblicati nel prodotto; diamo preavviso prima di renderli più restrittivi in modo tale da incidere significativamente su di te." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "922451b8b2dc246c399c8e7c01e8f939e9884fb25d7aa53e47ee3c8dcc51b9d0",
-  eyebrow: "CONDIZIONI DI SERVIZIO · v2.3 · IN VIGORE DAL 12 OTTOBRE 2026",
+  version: "2.4",
+  sha256: "8ae46004efa3fb840d7f084c12ecf26fe509d2945afc6cf814a477095a96ef40",
+  eyebrow: "CONDIZIONI DI SERVIZIO · v2.4 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",
-  endMarker: "FINE DELLE CONDIZIONI · v2.3",
+  endMarker: "FINE DELLE CONDIZIONI · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Testo delle Condizioni di servizio",
   sectionIdPrefix: "terms-section-",

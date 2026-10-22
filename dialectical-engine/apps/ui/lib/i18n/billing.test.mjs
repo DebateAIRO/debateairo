@@ -328,6 +328,10 @@ test("every locale names NETOPIA Payments where it names the card processor, and
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
   assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
   assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");
+  assert.equal(JSON.parse(source("messages/en/legal.json"))["legal.notice.s04.payments"],
+    "We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");
+  assert.equal(JSON.parse(source("messages/ro/legal.json"))["legal.notice.s04.payments"],
+    "Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments. Nu vedem și nu păstrăm niciodată numărul complet al cardului dumneavoastră.");
   assert.equal(catalogue("ro")["billing.card.countryRefused"], "Nu putem accepta carduri emise în țara acestui card. Nu s-a încasat nimic, iar abonamentul dvs. păstrează cardul pe care îl avea.");
   for (const { code } of LOCALES) {
     const billing = catalogue(code);
@@ -336,6 +340,10 @@ test("every locale names NETOPIA Payments where it names the card processor, and
       assert.ok(billing[key].includes("NETOPIA Payments"), `${code}: ${key} names NETOPIA Payments`);
     }
     assert.ok(legal["legal.notice.s04.payments"].includes("NETOPIA Payments"), `${code}: legal.notice.s04.payments`);
+    // NETOPIA eligibility (2026-10-22): the accepted cards are named, in Latin script, with American Express refused.
+    for (const brand of ["Visa", "Mastercard", "American Express"]) {
+      assert.ok(legal["legal.notice.s04.payments"].includes(brand), `${code}: legal.notice.s04.payments names ${brand}`);
+    }
     assert.ok(billing["billing.consent.renewal"].includes("dezbatere.ro/cancel"), `${code}: the cancel address`);
     assert.equal(Object.hasOwn(billing, "billing.card.holdNote"), false, `${code}: no hold sentence`);
     for (const [key, value] of [...Object.entries(billing), ...Object.entries(legal)]) {

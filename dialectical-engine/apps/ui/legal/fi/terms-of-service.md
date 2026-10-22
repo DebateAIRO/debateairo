@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.3
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.4
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.3 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.4 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -195,7 +195,11 @@ Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **P
 
 **Epäonnistuneet maksut.** Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi.
 
-**Verot ja maksunsaaja.** Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com). Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
+**Verot ja maksunsaaja.** Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
+
+**Maksutavat.** Maksat kortilla. Hyväksymme Visa- ja Mastercard-kortit; American Express -kortteja emme hyväksy. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com), eikä korttisi koko numero koskaan päädy meille.
+
+**Toimitus.** Dialectical Engine on verkkopalvelu, joten sinulle ei lähetetä mitään. Maksullisen tilauksesi ominaisuudet ovat käytettävissä tililläsi heti, kun maksusi on vahvistettu.
 
 **Takaisinveloitukset.** Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja.
 

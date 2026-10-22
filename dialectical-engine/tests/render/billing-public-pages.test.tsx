@@ -75,7 +75,7 @@ describe("P21 the pages the card processor requires, on the colleague's legal pa
     const text = notice.textContent ?? "";
     expect(text).not.toContain("Paid plans are not available yet.");
     expect(text).toContain(`${COMPANY.legalName} is also the seller of the paid plans`);
-    expect(text).toContain("Card payments are processed by NETOPIA Payments. We never see or store your card number.");
+    expect(text).toContain("We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");
     expect(text).toContain("renews every month until you cancel");
     expect(text).toContain("within 14 days of subscribing");
     for (const href of [...BILLING_LINKS, "/terms#legal-section-13"]) {

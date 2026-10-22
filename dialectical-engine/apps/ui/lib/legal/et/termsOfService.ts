@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tühistamine. Tühistage igal ajal menüüs Seaded → Tellimus ühe kinnitava klõpsuga või tühistamislehel aadressil dezbatere.ro/cancel, kuhu sisenemiseks ei ole vaja sisse logida. Tühistamine jõustub jooksva arveldusperioodi lõpus ja juurdepääs säilib selle ajani. Me ei muuda tühistamist keerulisemaks kui tellimist." },
       { kind: "p", text: "Hinnamuudatused jõustuvad ainult uuendamisel. Teatame uuest hinnast vähemalt 30 päeva ette e-posti teel ja lisame tühistamislingi. Kui teie riigi õigus nõuab hinnamuudatuseks teie sõnaselget nõusolekut, küsime seda; vastasel juhul kohaldatakse uuel uuendamisel uut hinda, kui te midagi ei tee. Lisas A on märgitud piirkondlikud reeglid." },
       { kind: "p", text: "Ebaõnnestunud maksed. Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu." },
-      { kind: "p", text: "Maksud ja makse saaja. Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com). Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest." },
+      { kind: "p", text: "Maksud ja makse saaja. Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest." },
+      { kind: "p", text: "Makseviisid. Maksate kaardiga. Aktsepteerime Visa ja Mastercardi kaarte; American Expressi kaarte me ei aktsepteeri. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com) ja teie kaardi täielik number ei jõua kunagi meieni." },
+      { kind: "p", text: "Tarnimine. Dialectical Engine on veebiteenus, seega teile midagi ei saadeta. Teie tasulise paketi funktsioonid on teie kontol kasutatavad kohe, kui makse on kinnitatud." },
       { kind: "p", text: "Makse tagasinõuded. Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu." },
       { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "56c4751d65861ad4f10d50b956b1a09d1ea17a2fc9e0c259ad469716c04c132c",
-  eyebrow: "TEENUSETINGIMUSED · v2.3 · KEHTIB ALATES 12. OKTOOBRIST 2026",
+  version: "2.4",
+  sha256: "d45c8d3db6a543397fc6485a9d950d6c7913ee7b4ede77a3ec49c7926ff8cf90",
+  eyebrow: "TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.3",
+  endMarker: "TINGIMUSTE LÕPP · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

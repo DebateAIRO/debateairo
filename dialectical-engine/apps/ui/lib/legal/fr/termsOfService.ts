@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Résiliation. Résiliez à tout moment depuis Paramètres → Abonnement, en un seul clic de confirmation, ou par la page de résiliation disponible à l’adresse dezbatere.ro/cancel, qui ne nécessite pas de vous connecter. La résiliation prend effet à la fin de la période de facturation en cours et vous conservez l’accès jusqu’à cette date. Nous ne rendrons pas la résiliation plus difficile que l’abonnement." },
       { kind: "p", text: "Modifications de prix. Elles ne prennent effet qu’au renouvellement. Nous vous en informons par e-mail au moins 30 jours à l’avance, en indiquant le nouveau prix et un lien de résiliation. Lorsque le droit de votre pays exige votre consentement exprès à une modification de prix, nous vous le demandons ; dans le cas contraire, si vous ne faites rien, le nouveau prix s’applique à compter du renouvellement suivant. L’annexe A précise les règles régionales." },
       { kind: "p", text: "Échecs de paiement. En cas d’échec d’un paiement, nous le réessayons pendant 7 jours et vous avertissons par e-mail avant de rétrograder votre compte vers la formule gratuite. Nous ne supprimons pas vos débats en raison d’un échec de paiement." },
-      { kind: "p", text: "Taxes et bénéficiaire de votre paiement. Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com). Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions." },
+      { kind: "p", text: "Taxes et bénéficiaire de votre paiement. Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions." },
+      { kind: "p", text: "Moyens de paiement. Vous payez par carte. Nous acceptons Visa et Mastercard ; nous n’acceptons pas American Express. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com), et le numéro complet de votre carte ne nous parvient jamais." },
+      { kind: "p", text: "Livraison. Dialectical Engine est un service en ligne : rien ne vous est expédié. Les fonctionnalités de votre formule payante sont disponibles dans votre compte dès que votre paiement est confirmé." },
       { kind: "p", text: "Rétrofacturations. Si vous contestez une opération auprès de l’émetteur de votre carte, nous pouvons suspendre les fonctionnalités payantes pendant le règlement du litige. Nous ne facturons aucuns frais à ce titre." },
       { kind: "p", text: "Priorité aux droits légaux. Lorsque le service n’est pas conforme à nos engagements, vous avez droit à sa mise en conformité ou, selon les dispositions légales applicables, à une réduction proportionnelle du prix ou à un remboursement. Au-delà, si vous résiliez une formule payante en cours de période de facturation, nous vous remboursons la part du prix de cette période que vous n’avez pas utilisée, mesurée à l’usage de la formule, quel que soit le nombre de jours écoulés : si vous en avez utilisé 30 %, nous vous remboursons 70 % ; si vous n’en avez rien utilisé, nous vous remboursons la totalité du prix. Demandez-le à support@dezbatere.ro ; dès que nous vous remboursons, la formule prend fin. Si le droit de rétractation prévu à la section 13 s’applique également, vous obtenez le remboursement le plus élevé des deux. Les limites d’utilisation de chaque formule sont publiées dans le produit ; nous vous informons avant de les resserrer d’une manière qui vous affecte substantiellement." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "29068dcc3496745deee982faab91ff52c90a7a90bbdd4b751c5b056cdd61fb1d",
-  eyebrow: "CONDITIONS D’UTILISATION · v2.3 · PRISE D’EFFET 12 OCTOBRE 2026",
+  version: "2.4",
+  sha256: "79801cb6731573fc883d490d665a2702b8c92933eaefc482df0c94d2b91879fd",
+  eyebrow: "CONDITIONS D’UTILISATION · v2.4 · PRISE D’EFFET 12 OCTOBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",
-  endMarker: "FIN DES CONDITIONS · v2.3",
+  endMarker: "FIN DES CONDITIONS · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texte des Conditions d’utilisation",
   sectionIdPrefix: "terms-section-",

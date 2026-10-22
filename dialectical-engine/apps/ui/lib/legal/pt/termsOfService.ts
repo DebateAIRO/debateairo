@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Cancelamento. Cancele a qualquer momento em Definições → Subscrição, com um clique de confirmação, ou através da página de cancelamento em dezbatere.ro/cancel, que não exige que inicie sessão. O cancelamento produz efeitos no final do período de faturação em curso, e o utilizador mantém o acesso até essa data. Não tornaremos o cancelamento mais difícil do que a subscrição." },
       { kind: "p", text: "Alterações de preço só produzem efeitos aquando de uma renovação. Damos um pré-aviso de pelo menos 30 dias por correio eletrónico, com o novo preço e uma ligação de cancelamento. Quando a legislação do seu país exigir o seu consentimento expresso para uma alteração de preço, solicitá-lo-emos; caso contrário, se nada fizer, o novo preço será aplicável a partir da renovação seguinte. O Anexo A assinala as regras regionais." },
       { kind: "p", text: "Pagamentos falhados. Se um pagamento falhar, repetiremos a tentativa durante 7 dias e avisá-lo-emos por correio eletrónico antes de convertermos a sua conta para o plano gratuito. Não eliminaremos os seus debates devido a uma falha de pagamento." },
-      { kind: "p", text: "Impostos e entidade a quem paga. Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com). A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos." },
+      { kind: "p", text: "Impostos e entidade a quem paga. Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos." },
+      { kind: "p", text: "Meios de pagamento. O pagamento é feito com cartão. Aceitamos Visa e Mastercard; não aceitamos American Express. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com), e o número completo do seu cartão nunca chega até nós." },
+      { kind: "p", text: "Entrega. A Dialectical Engine é um serviço online, pelo que nada lhe é enviado. As funcionalidades do seu plano pago ficam disponíveis na sua conta assim que o pagamento é confirmado." },
       { kind: "p", text: "Estornos. Se contestar uma cobrança junto do emissor do seu cartão, podemos suspender as funcionalidades pagas enquanto o litígio estiver a ser resolvido. Não cobramos taxas por esse motivo." },
       { kind: "p", text: "Prevalência dos direitos legais. Quando o serviço não estiver em conformidade com o que prometemos, tem direito a que seja reposta a conformidade, ou a uma redução proporcional do preço ou a um reembolso, nos termos previstos na lei. Além disso, se cancelar um plano pago durante um período de faturação, reembolsamos a parte do preço desse período que não utilizou, medida pela utilização do plano, independentemente de quantos dias tenham decorrido: se tiver utilizado 30 %, reembolsamos 70 %; se não tiver utilizado nada, reembolsamos o preço total. Peça o reembolso em support@dezbatere.ro; depois de reembolsarmos, o plano termina. Se o direito de retratação previsto na secção 13 também se aplicar, recebe o reembolso que for maior. Os limites de utilização de qualquer dos planos são publicados no produto; avisá-lo-emos antes de os restringir de uma forma que o afete substancialmente." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "56748891427a59961c312267c06075917bec379a78a1420405e471c2c27f140a",
-  eyebrow: "TERMOS DE SERVIÇO · v2.3 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
+  version: "2.4",
+  sha256: "b4771167c30289e50a21dffc46c138783a0fc3d133eb17c7b2017263671f7012",
+  eyebrow: "TERMOS DE SERVIÇO · v2.4 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.3",
+  endMarker: "FIM DOS TERMOS · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",
