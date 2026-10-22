@@ -437,4 +437,38 @@ describe("0123 §3 on a fresh database: the race, the whole drain path, abandoni
     expect(await state(C)).toEqual(live("STAGED"));
     expect(await state(D)).toEqual(live("STAGED"));
   });
+
+  // Final review A4: a draining release staged again for a rollback still runs its drained debates, yet reads STAGED.
+  // The reader also answers still_draining (a DRAINING event with no later RETIRED event, record_release_event's own
+  // test), so the API's per-send rule can tell it from a release that never drained. The TS reader keeps its three fields.
+  it("the reader answers still_draining, kept through a re-stage until the release retires (B current, A draining, C and D staged, E retired)", async () => {
+    const raw = async (key: string, client: Pick<PoolClient, "query"> = database.pool) => (await client.query(
+      "SELECT state, retire_requested, still_draining FROM core.read_release_state($1)", [key])).rows;
+    expect(await raw(B)).toEqual([{ state: "CURRENT", retire_requested: false, still_draining: false }]);
+    expect(await raw(A)).toEqual([{ state: "DRAINING", retire_requested: false, still_draining: true }]);
+    expect(await raw(C)).toEqual([{ state: "STAGED", retire_requested: false, still_draining: false }]); // never drained
+    expect(await raw(D)).toEqual([{ state: "STAGED", retire_requested: false, still_draining: false }]); // drained, retired, staged
+    expect(await raw(E)).toEqual([{ state: "RETIRED", retire_requested: true, still_draining: false }]);
+    expect(await raw("legacy")).toEqual([]);
+    // A rollback stages A again: its drained debates may still run, so it still drains.
+    await stage(A);
+    expect(await raw(A)).toEqual([{ state: "STAGED", retire_requested: false, still_draining: true }]);
+    // The runtime reads it as the API's login does (EXECUTE on the definer, no grant on the table).
+    const client: PoolClient = await database.pool.connect();
+    let clean = false;
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      expect(await raw(A, client)).toEqual([{ state: "STAGED", retire_requested: false, still_draining: true }]);
+      await client.query("ROLLBACK");
+      clean = true;
+    } finally { client.release(!clean); }
+    // Abandoning the re-stage, then the normal retirement path: it drains until RETIRED.
+    await recordReleaseEvent(database.pool, { releaseKey: A, kind: "DRAINING", recordedBy: BY, reason: "RESTAGE_ABANDONED" });
+    await recordReleaseEvent(database.pool, { releaseKey: A, kind: "RETIRE_REQUESTED", recordedBy: BY });
+    expect(await raw(A)).toEqual([{ state: "DRAINING", retire_requested: true, still_draining: true }]);
+    await recordReleaseEvent(database.pool, { releaseKey: A, kind: "RETIRED", recordedBy: BY, reason: "DRAINED" });
+    expect(await raw(A)).toEqual([{ state: "RETIRED", retire_requested: true, still_draining: false }]);
+    expect(await state(A)).toEqual({ state: "RETIRED", frontPairStopped: false, retireRequested: true });
+  });
 });

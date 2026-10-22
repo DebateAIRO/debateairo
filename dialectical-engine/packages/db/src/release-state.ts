@@ -56,7 +56,9 @@ export async function readCurrentRelease(db: ReleaseQueryable): Promise<Readonly
 
 /**
  * One release's state, or null for a release never recorded (and for `legacy`). The two flags count only events after
- * the release's latest STAGED, CURRENT or DRAINING event, so a release staged again starts clean.
+ * the release's latest STAGED, CURRENT or DRAINING event, so a release staged again starts clean. 0123's reader also
+ * answers `still_draining` (final review A4: a DRAINING event with no later RETIRED one, so a draining release staged
+ * again for a rollback reads true); this reader leaves it out, as its callers need the three fields only.
  */
 export async function readReleaseState(db: ReleaseQueryable, releaseKey: string): Promise<Readonly<{
   state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean;

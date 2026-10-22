@@ -292,14 +292,24 @@ AS $$
   SELECT release.release_key, release.take_traffic_from FROM core.release_state_v AS release WHERE release.current
 $$;
 
+-- still_draining (final review A4): a DRAINING event with no later RETIRED event, the same test record_release_event
+-- makes below, so a draining release staged again for a rollback (latest state STAGED) still reads true while its
+-- drained debates may run, and a release that never drained, or drained and retired, reads false.
 CREATE OR REPLACE FUNCTION core.read_release_state(p_release_key text)
-RETURNS TABLE(state text, front_pair_stopped boolean, retire_requested boolean)
+RETURNS TABLE(state text, front_pair_stopped boolean, retire_requested boolean, still_draining boolean)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
-  SELECT release.state, release.front_pair_stopped, release.retire_requested
+  SELECT release.state, release.front_pair_stopped, release.retire_requested,
+    EXISTS (
+      SELECT 1 FROM core.release_event AS drained
+      WHERE drained.release_key = release.release_key AND drained.kind = 'DRAINING'
+        AND NOT EXISTS (
+          SELECT 1 FROM core.release_event AS retired
+          WHERE retired.release_key = drained.release_key AND retired.kind = 'RETIRED'
+            AND retired.event_seq > drained.event_seq)) AS still_draining
   FROM core.release_state_v AS release
   WHERE release.release_key = p_release_key AND p_release_key <> 'legacy'
 $$;
@@ -1284,8 +1294,9 @@ BEGIN
   END IF;
   -- §3: both roles NOLOGIN NOINHERIT; the table with its two guards (append-only statement trigger, truncate guard) and
   -- its index; the view; the four functions owned by debateai_release_owner as definers with the pinned path (readers
-  -- STABLE, writers VOLATILE); readers callable by debateai_runtime, writers by debateai_release_operator, neither by
-  -- PUBLIC nor across; and no application role on the table or the view but the owner.
+  -- STABLE, writers VOLATILE), the state reader answering still_draining (final review A4); readers callable by
+  -- debateai_runtime, writers by debateai_release_operator, neither by PUBLIC nor across; and no application role on the
+  -- table or the view but the owner.
   IF (SELECT count(*) FROM pg_roles
       WHERE rolname IN ('debateai_release_owner', 'debateai_release_operator') AND NOT rolcanlogin AND NOT rolinherit
         AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls) <> 2
@@ -1297,6 +1308,8 @@ BEGIN
                 AND (tgtype & 26) = 26)
             OR (tgname = 'reject_truncate' AND (tgtype & 1) = 0 AND (tgtype & 34) = 34))) <> 2
     OR array_position(v_readers || v_writers, NULL) IS NOT NULL
+    OR pg_get_function_result(v_readers[2])
+       IS DISTINCT FROM 'TABLE(state text, front_pair_stopped boolean, retire_requested boolean, still_draining boolean)'
     OR (SELECT count(*) FROM pg_proc AS p
         WHERE p.oid = ANY(v_readers || v_writers) AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']
           AND pg_get_userbyid(p.proowner) = 'debateai_release_owner'

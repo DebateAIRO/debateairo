@@ -111,6 +111,14 @@ describe("0123: the side-by-side releases step", () => {
     }
     expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.read_current_release() TO debateai_runtime;");
     expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.read_release_state(text) TO debateai_runtime;");
+    // Final review A4: the state reader also answers still_draining (a DRAINING event with no later RETIRED one), and
+    // the closing block checks its result shape.
+    const reader = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.read_release_state(p_release_key text)"));
+    expect(reader.slice(0, reader.indexOf("$$;"))).toContain(
+      "RETURNS TABLE(state text, front_pair_stopped boolean, retire_requested boolean, still_draining boolean)");
+    expect(reader.slice(0, reader.indexOf("$$;"))).toContain("AND retired.event_seq > drained.event_seq)) AS still_draining");
+    expect(sql).toContain(
+      "IS DISTINCT FROM 'TABLE(state text, front_pair_stopped boolean, retire_requested boolean, still_draining boolean)'");
     expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.record_release_switch(text,text,timestamptz,text,bigint) TO debateai_release_operator;");
     expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO debateai_release_operator;");
     expect(sql).toContain("SIDE_BY_SIDE_RELEASE_TABLE_CONTRACT_INCOMPLETE");

@@ -246,9 +246,11 @@ each debate, written once at insert; §2 redefines `core.create_encrypted_run(js
 body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-asserting SECURITY DEFINER, the pinned
 `search_path` and EXECUTE for `debateai_content_provision` only; §3 adds the release table `core.release_event`
 (append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
-`core.read_release_state(text)` (EXECUTE for `debateai_runtime`) and the writers `core.record_release_switch` and
-`core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
-advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`; §4 adds the re-admission
+`core.read_release_state(text)` (EXECUTE for `debateai_runtime`; the latter also answers `still_draining`, a DRAINING
+event with no later RETIRED one, so a draining release staged again reads true; final review A4) and the writers
+`core.record_release_switch` and `core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on
+the `debateai:release-switch` advisory lock), all four owned by the new NOLOGIN NOINHERIT role
+`debateai_release_owner`; §4 adds the re-admission
 record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
 `RUN_SUPERSESSION_INVALID` unless the old run still waits, also as `core.run_waiting_v` reads it after the guard's lock
 (not FAILED, its content not erased, its account active: an erasure committed between the new run's write and START
